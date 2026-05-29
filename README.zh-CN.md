@@ -1,0 +1,75 @@
+# Talos
+
+安全优先、精简内核的 Rust Agent 运行时。从 CLI 起步，逐步演化为完整的 Agent 平台，内置自进化能力。
+
+**[English](README.md)** | 中文
+
+---
+
+## 项目状态
+
+**实现前阶段。** 架构设计与项目治理已完成。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
+
+## 路线图
+
+| 迭代 | 代号 | 用户可以... |
+|------|------|------------|
+| I001 | Hello Agent | `talos "What is 2+2?" -p` 获得流式 LLM 响应 |
+| I002 | Tool User | 让 Agent 执行文件和 Shell 操作 |
+| I003 | Safe Agent | 危险操作被权限系统拦截 |
+| I004 | Smart Agent | 50+ 轮长对话不爆上下文 |
+| I005 | Skilled Agent | 加载 SKILL.md，从经验中自进化学习 |
+| I006 | Extensible Agent | Hook 系统、MCP 协议、插件运行时 |
+| I007 | Polished Agent | 完整 TUI、多模式交互、发布就绪 |
+
+## 架构
+
+Talos 遵循**简单内核、灵活扩展**的设计哲学：
+
+- **核心**（5 个 crate）：最小化 turn loop — 配置、模型提供者、Agent、CLI 和基础类型。
+- **扩展**（9 个 crate）：按需引入 — 工具、会话、沙箱、权限、技能、自进化、插件、MCP、RPC。
+
+```
+[ talos-cli / talos-rpc ]
+          |
+          v
+    [ talos-agent ]
+    /     |     \
+   v      v      v
+[tools][session][provider][permission][skill][plugin][mcp]
+   \      |      /           |           |      /     /
+    \     v     /            v           v     /     /
+     [ talos-core ] <-------------------------------'
+```
+
+### 核心设计决策
+
+- **流式优先**：所有 LLM 通信基于 SSE 流式传输。双通道异步架构（SQ/EQ）。
+- **全链路安全**：权限管线、沙箱化工具执行、崩溃安全的会话存储。
+- **内置自进化**：运行时级别学习循环（观察 → 积累 → 提取 → 应用），而非技能系统功能。[ADR-001](docs/decisions/001-runtime-self-evolution.md)。
+- **渐进式存储**：纯文件（I001–I003）→ SQLite 索引（I004）→ SQLite 演化表（I005）。[ADR-002](docs/decisions/002-local-storage-architecture.md)。
+- **默认文件驱动**：配置（TOML）、技能（Markdown）、会话（JSONL）。人类可编辑、git 友好。
+
+## 文档
+
+| 路径 | 说明 |
+|------|------|
+| [AGENTS.md](AGENTS.md) | Agent 编码指南、硬性约束、任务路由 |
+| [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) | 完整架构参考 |
+| [docs/roadmap/IMPLEMENTATION-ROADMAP.md](docs/roadmap/IMPLEMENTATION-ROADMAP.md) | 逐迭代实现计划 |
+| [docs/backlog/PRODUCT-BACKLOG.md](docs/backlog/PRODUCT-BACKLOG.md) | 用户故事与验收标准 |
+| [docs/decisions/](docs/decisions/) | 架构决策记录（ADR） |
+| [docs/reference/REFERENCE-PROJECTS.md](docs/reference/REFERENCE-PROJECTS.md) | 参考项目模式与源码链接 |
+
+## 技术栈
+
+- **语言**：Rust（stable，edition 2024）
+- **异步**：tokio
+- **序列化**：serde + schemars
+- **错误处理**：thiserror（库）、anyhow（CLI）
+- **存储**：JSONL（会话）、TOML（配置）、SQLite via rusqlite bundled（索引、演化）
+- **TUI**：ratatui（I007）
+
+## 许可证
+
+基于 [Apache License 2.0](LICENSE) 许可。

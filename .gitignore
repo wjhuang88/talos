@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.*
+
+# Talos runtime data
+.talos/
+
+# OpenCode internal
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/.gitignore

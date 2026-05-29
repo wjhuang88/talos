@@ -1,0 +1,53 @@
+schema_version: "1"
+managed_by: "agent-project-governance"
+profile: "high-risk"
+status: "adopting"
+initialized_at: "2026-05-29"
+last_audited_at: "2026-05-29"
+
+entrypoints:
+  agent_guide: "AGENTS.md"
+  evolution: "EVOLUTION.md"
+  document_map: "docs/README.md"
+  backlog: "docs/backlog/PRODUCT-BACKLOG.md"
+  iterations: "docs/iterations/"
+  decisions: "docs/decisions/"
+  roadmap: "docs/roadmap/IMPLEMENTATION-ROADMAP.md"
+  proposals: "docs/proposals/"
+  reference: "docs/reference/"
+  sop: "docs/sop/"
+
+capabilities:
+  task_router: "conformant"
+  evolution_feedback: "conformant"
+  testing_policy: "conformant"
+  git_workflow: "conformant"
+  requirement_intake: "conformant"
+  iteration_workflow: "conformant"
+  change_control: "conformant"
+  decision_records: "conformant"
+  release_workflow: "not_applicable"
+  risk_specific_gates: "conformant"
+
+risk_gates:
+  - signal: "Sandbox escapes can lead to arbitrary code execution on host"
+    gate: "All sandbox-related code requires security review before merge"
+    owner: "docs/sop/NEW-FEATURE.md"
+  - signal: "LLM provider credentials stored in config"
+    gate: "Config files must support env var substitution; never hardcode secrets"
+    owner: "AGENTS.md"
+  - signal: "Tool execution can modify/delete user files"
+    gate: "Permission system must be implemented before any write-capable tool"
+    owner: "docs/sop/CHANGE-CONTROL.md"
+  - signal: "Agent loop can enter infinite tool-call cycles"
+    gate: "Turn budget and doom-loop detection required in agent loop"
+    owner: "docs/sop/TESTING.md"
+  - signal: "Multi-crate workspace with public APIs"
+    gate: "Breaking API changes require ADR before implementation"
+    owner: "docs/decisions/"
+
+migration:
+  legacy_assets: []
+  next_actions:
+    - "Initialize Cargo workspace with crate skeletons (Iteration 1)"
+    - "Add CI pipeline after first working agent loop"
