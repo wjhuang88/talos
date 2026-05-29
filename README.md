@@ -6,19 +6,21 @@ English | **[中文](README.zh-CN.md)**
 
 ## Status
 
-**Pre-implementation.** Architecture design and governance are complete. Implementation follows an agile vertical-slice roadmap — each iteration produces a runnable, testable `talos` binary.
+**I001 complete.** Project scaffold and core message types are in place. Implementation follows an agile vertical-slice roadmap — each iteration produces a runnable, testable `talos` binary.
 
 ## Roadmap
 
 | Iteration | Codename | User can... |
 |-----------|----------|-------------|
-| I001 | Hello Agent | `talos "What is 2+2?" -p` and get an LLM response |
-| I002 | Tool User | Ask the agent to perform file and shell operations |
-| I003 | Safe Agent | Dangerous operations get intercepted by permissions |
-| I004 | Smart Agent | Long conversations (50+ turns) without context overflow |
-| I005 | Skilled Agent | Load SKILL.md, self-evolve from experience |
-| I006 | Extensible Agent | Hook system, MCP protocol, plugin runtime |
-| I007 | Polished Agent | Full TUI, multi-mode interaction, release-ready |
+| ~~I001~~ | ~~Project Scaffold~~ | ~~`cargo check --workspace` passes~~ ✅ |
+| I002 | Hello Agent | `talos "What is 2+2?" -p` and get an LLM response |
+| I003 | Tool User | Ask the agent to perform file and shell operations |
+| I004 | Safe Agent | Dangerous operations get intercepted by permissions |
+| I005 | Smart Agent | Long conversations (50+ turns) without context overflow |
+| I006 | Skilled Agent | Load SKILL.md, multi-provider support |
+| I007 | Learning Agent | Self-evolve from experience |
+| I008 | Extensible Agent | Hook system, MCP protocol, plugin runtime |
+| I009 | Polished Agent | Full TUI, multi-mode interaction, release-ready |
 
 ## Architecture
 
@@ -45,7 +47,7 @@ Talos follows a **simple core, flexible extensions** design philosophy:
 - **Streaming-first**: All LLM communication via SSE streaming. Dual-channel async (SQ/EQ).
 - **Safety at every layer**: Permission pipeline, sandboxed tool execution, crash-safe session storage.
 - **Built-in self-evolution**: Runtime-level learning loop (Observe → Accumulate → Extract → Apply), not a skill feature. [ADR-001](docs/decisions/001-runtime-self-evolution.md).
-- **Progressive storage**: Pure files (I001–I003) → SQLite index (I004) → SQLite evolution tables (I005). [ADR-002](docs/decisions/002-local-storage-architecture.md).
+- **Progressive storage**: Pure files (I001–I004) → SQLite index (I005) → SQLite evolution tables (I007). [ADR-002](docs/decisions/002-local-storage-architecture.md).
 - **File-based by default**: Config (TOML), skills (Markdown), sessions (JSONL). Human-editable, git-friendly.
 
 ## Documentation
@@ -66,7 +68,7 @@ Talos follows a **simple core, flexible extensions** design philosophy:
 - **Serialization**: serde + schemars
 - **Errors**: thiserror (libraries), anyhow (CLI)
 - **Storage**: JSONL (sessions), TOML (config), SQLite via rusqlite bundled (index, evolution)
-- **TUI**: ratatui (I007)
+- **TUI**: ratatui (I009)
 
 ## License
 

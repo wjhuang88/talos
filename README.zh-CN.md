@@ -8,19 +8,21 @@
 
 ## 项目状态
 
-**实现前阶段。** 架构设计与项目治理已完成。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
+**I001 已完成。** 项目骨架和核心消息类型已就绪。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
 
 ## 路线图
 
 | 迭代 | 代号 | 用户可以... |
 |------|------|------------|
-| I001 | Hello Agent | `talos "What is 2+2?" -p` 获得流式 LLM 响应 |
-| I002 | Tool User | 让 Agent 执行文件和 Shell 操作 |
-| I003 | Safe Agent | 危险操作被权限系统拦截 |
-| I004 | Smart Agent | 50+ 轮长对话不爆上下文 |
-| I005 | Skilled Agent | 加载 SKILL.md，从经验中自进化学习 |
-| I006 | Extensible Agent | Hook 系统、MCP 协议、插件运行时 |
-| I007 | Polished Agent | 完整 TUI、多模式交互、发布就绪 |
+| ~~I001~~ | ~~Project Scaffold~~ | ~~`cargo check --workspace` 通过~~ ✅ |
+| I002 | Hello Agent | `talos "What is 2+2?" -p` 获得流式 LLM 响应 |
+| I003 | Tool User | 让 Agent 执行文件和 Shell 操作 |
+| I004 | Safe Agent | 危险操作被权限系统拦截 |
+| I005 | Smart Agent | 50+ 轮长对话不爆上下文 |
+| I006 | Skilled Agent | 加载 SKILL.md，多模型支持 |
+| I007 | Learning Agent | 从经验中自进化学习 |
+| I008 | Extensible Agent | Hook 系统、MCP 协议、插件运行时 |
+| I009 | Polished Agent | 完整 TUI、多模式交互、发布就绪 |
 
 ## 架构
 
@@ -47,7 +49,7 @@ Talos 遵循**简单内核、灵活扩展**的设计哲学：
 - **流式优先**：所有 LLM 通信基于 SSE 流式传输。双通道异步架构（SQ/EQ）。
 - **全链路安全**：权限管线、沙箱化工具执行、崩溃安全的会话存储。
 - **内置自进化**：运行时级别学习循环（观察 → 积累 → 提取 → 应用），而非技能系统功能。[ADR-001](docs/decisions/001-runtime-self-evolution.md)。
-- **渐进式存储**：纯文件（I001–I003）→ SQLite 索引（I004）→ SQLite 演化表（I005）。[ADR-002](docs/decisions/002-local-storage-architecture.md)。
+- **渐进式存储**：纯文件（I001–I004）→ SQLite 索引（I005）→ SQLite 演化表（I007）。[ADR-002](docs/decisions/002-local-storage-architecture.md)。
 - **默认文件驱动**：配置（TOML）、技能（Markdown）、会话（JSONL）。人类可编辑、git 友好。
 
 ## 文档
@@ -68,7 +70,7 @@ Talos 遵循**简单内核、灵活扩展**的设计哲学：
 - **序列化**：serde + schemars
 - **错误处理**：thiserror（库）、anyhow（CLI）
 - **存储**：JSONL（会话）、TOML（配置）、SQLite via rusqlite bundled（索引、演化）
-- **TUI**：ratatui（I007）
+- **TUI**：ratatui（I009）
 
 ## 许可证
 
