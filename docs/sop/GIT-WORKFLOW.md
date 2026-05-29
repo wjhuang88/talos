@@ -15,7 +15,10 @@ Define commit, branching, and PR conventions for the Talos project.
 
 ### Commit Messages
 
-Format: `type(scope): description (#story-id)`
+Format: `type(scope): description (#story-id) [model:<model-name>]`
+
+- `(#story-id)` may be omitted for project-level changes with no associated story.
+- `[model:<model-name>]` is required when an Agent authored or co-authored the commit, identifying the AI model used.
 
 Types:
 

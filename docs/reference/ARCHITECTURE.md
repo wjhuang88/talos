@@ -33,15 +33,15 @@ Talos crates are introduced progressively across iterations (see Implementation 
 
 | Crate | Iteration | Responsibility |
 |-------|-----------|----------------|
-| `talos-tools` | I002 | Implementations of standard system and developer tools. |
-| `talos-session` | I002 | Persistence layer for message history and session state. |
-| `talos-sandbox` | I003 | Process isolation, filesystem virtualization, and secure execution environments. |
-| `talos-permission` | I003 | Policy engine, capability-based security, and user approval workflows. |
-| `talos-skill` | I005 | Management of higher-level agent capabilities and task-specific instructions. |
-| `talos-evolution` | I005 | Runtime self-evolution: observe, accumulate, extract, apply learning loop (ADR-001). |
-| `talos-plugin` | I006 | Plugin runtime for third-party extensions (hook-based first, WASM as option). |
-| `talos-mcp` | I006 | Model Context Protocol implementation for external tool and resource access. |
-| `talos-rpc` | I006 | API layer for remote interaction and frontend integration. |
+| `talos-tools` | I003 | Implementations of standard system and developer tools. |
+| `talos-session` | I003 | Persistence layer for message history and session state. |
+| `talos-sandbox` | I004 | Process isolation, filesystem virtualization, and secure execution environments. |
+| `talos-permission` | I004 | Policy engine, capability-based security, and user approval workflows. |
+| `talos-skill` | I006 | Management of higher-level agent capabilities and task-specific instructions. |
+| `talos-evolution` | I007 | Runtime self-evolution: observe, accumulate, extract, apply learning loop (ADR-001). |
+| `talos-plugin` | I008 | Plugin runtime for third-party extensions (hook-based first, WASM as option). |
+| `talos-mcp` | I008 | Model Context Protocol implementation for external tool and resource access. |
+| `talos-rpc` | I008 | API layer for remote interaction and frontend integration. |
 
 ## Dependency Graph
 
@@ -140,7 +140,7 @@ To handle long conversations, Talos uses a progressive compaction strategy. Laye
 Talos uses a progressive storage strategy (ADR-002). Storage complexity is introduced incrementally
 as each iteration requires it.
 
-### Phase 1: Pure Files (I001–I003)
+### Phase 1: Pure Files (I001–I004)
 
 No database dependency. All data is file-based:
 
@@ -150,7 +150,7 @@ No database dependency. All data is file-based:
     (`~/.talos/config.toml` + `.talos/config.toml`).
 *   **Permission rules**: Inline in configuration (no separate rule files yet).
 
-### Phase 2: SQLite Introduction (I004)
+### Phase 2: SQLite Introduction (I005)
 
 Session metadata indexing and full-text search require a database:
 
@@ -159,7 +159,7 @@ Session metadata indexing and full-text search require a database:
 *   **FTS5** virtual table for full-text search across session content.
 *   All storage operations abstracted behind `SessionStore` trait for future engine migration.
 
-### Phase 3: SQLite Extension (I005)
+### Phase 3: SQLite Extension (I007)
 
 Evolution engine requires structured queries for observations and patterns:
 
@@ -184,7 +184,7 @@ SQLite is used directly via rusqlite calls. No trait abstraction until a concret
 
 Extensions in Talos follow a layered approach, starting simple and adding sandboxing when needed:
 
-1. **Hook system** (I006, first): Function hooks at key lifecycle points (before_tool_call, after_tool_call, message_transform, etc.). Plugins register handlers. Simplest to implement and debug.
+1. **Hook system** (I008, first): Function hooks at key lifecycle points (before_tool_call, after_tool_call, message_transform, etc.). Plugins register handlers. Simplest to implement and debug.
 
 2. **Native plugins** (future): Dynamic library loading (`.so`/`.dylib`) for Rust plugins. Direct access to Talos APIs, zero serialization overhead.
 

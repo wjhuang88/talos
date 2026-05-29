@@ -3,9 +3,9 @@
 Stories are organized by iteration. Each iteration is a vertical slice delivering runnable
 functionality. Story format: `#I{iteration}-S{story}`.
 
-## I001: "Hello Agent" (MVP)
+## I001: "Project Scaffold"
 
-**Delivers**: `talos "hello" -p` produces an LLM response.
+**Delivers**: Cargo workspace and core message types compile.
 
 ### #I001-S1: Initialize Cargo workspace
 
@@ -33,7 +33,13 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I001-S1
 **Estimate**: M
 
-### #I001-S3: Minimal configuration system
+---
+
+## I002: "Hello Agent" (MVP)
+
+**Delivers**: `talos "hello" -p` produces an LLM response.
+
+### #I002-S1: Minimal configuration system
 
 **Description**: `talos-config` loads a minimal config: API key (from env var `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`), model name, provider selection. Support `${ENV_VAR}` substitution in config values. Schema validation via `schemars`.
 
@@ -46,7 +52,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I001-S1
 **Estimate**: M
 
-### #I001-S4: Anthropic streaming provider
+### #I002-S2: Anthropic streaming provider
 
 **Description**: `talos-provider` implements streaming SSE connection to Anthropic Messages API. Define a `LanguageModel` trait with `stream()` method. Implement for Anthropic with proper error handling, retries on 429/5xx, and `CancellationToken` support.
 
@@ -57,10 +63,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Test with mock SSE server passes
 - [ ] Request includes proper `cache_control` headers for prompt caching
 
-**Depends on**: #I001-S2, #I001-S3
+**Depends on**: #I001-S2, #I002-S1
 **Estimate**: L
 
-### #I001-S5: Basic turn loop (no tools)
+### #I002-S3: Basic turn loop (no tools)
 
 **Description**: `talos-agent` implements the simplest possible turn loop: build prompt -> call provider -> stream response -> return. Uses SQ/EQ pattern (bounded submission, unbounded event channels). No tool execution yet.
 
@@ -70,10 +76,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] CancellationToken aborts mid-stream cleanly
 - [ ] Unit test: mock provider -> agent returns expected response
 
-**Depends on**: #I001-S4
+**Depends on**: #I002-S2
 **Estimate**: M
 
-### #I001-S6: CLI print mode and stdin pipe
+### #I002-S4: CLI print mode and stdin pipe
 
 **Description**: `talos-cli` supports two modes: `talos "prompt" -p` (print and exit) and `echo "prompt" | talos -p` (stdin pipe). Streaming output to stdout. Exit code 0 on success, 1 on error. `--version` and `--help` flags.
 
@@ -85,16 +91,16 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Missing API key prints actionable error message
 - [ ] `cargo test -p talos-cli` passes
 
-**Depends on**: #I001-S5
+**Depends on**: #I002-S3
 **Estimate**: M
 
 ---
 
-## I002: "Tool User"
+## I003: "Tool User"
 
 **Delivers**: Agent can execute file and shell operations.
 
-### #I002-S1: AgentTool trait and ToolRegistry
+### #I003-S1: AgentTool trait and ToolRegistry
 
 **Description**: Define `AgentTool` trait in `talos-core` with: `name()`, `description()`, `parameters()` (JSON Schema), `execute()` (async), `is_read_only()`. Implement `ToolRegistry` with `register()`, `get()`, `list()`.
 
@@ -107,7 +113,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I001-S2
 **Estimate**: M
 
-### #I002-S2: Bash tool
+### #I003-S2: Bash tool
 
 **Description**: Implement shell command execution tool. Runs commands via `tokio::process::Command`, captures stdout/stderr, enforces timeout (default 120s). Returns structured output.
 
@@ -118,10 +124,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Working directory defaults to project root
 - [ ] Error output clearly marked vs normal output
 
-**Depends on**: #I002-S1
+**Depends on**: #I003-S1
 **Estimate**: M
 
-### #I002-S3: File read/write/edit tools
+### #I003-S3: File read/write/edit tools
 
 **Description**: Implement three file tools. `read` reads file content with line range support. `write` creates/overwrites files. `edit` applies string replacements. All operations are relative to workspace root.
 
@@ -133,10 +139,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Paths outside workspace root are rejected
 - [ ] Binary files handled gracefully (error, not crash)
 
-**Depends on**: #I002-S1
+**Depends on**: #I003-S1
 **Estimate**: M
 
-### #I002-S4: Turn loop with tool execution
+### #I003-S4: Turn loop with tool execution
 
 **Description**: Extend the agent turn loop to handle tool calls from LLM responses. When the model emits `tool_use`, execute the tool and feed results back. Support concurrent read-only tools (up to 10) and serial write tools. Loop until model emits no tool calls.
 
@@ -148,10 +154,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Turn budget enforcement (max 50 tool calls per turn)
 - [ ] Doom loop detection: same tool+args 3 times triggers warning
 
-**Depends on**: #I001-S5, #I002-S2, #I002-S3
+**Depends on**: #I002-S3, #I003-S2, #I003-S3
 **Estimate**: L
 
-### #I002-S5: JSONL session logging
+### #I003-S5: JSONL session logging
 
 **Description**: `talos-session` appends every message and event to a JSONL file. Sessions stored in `~/.talos/sessions/` organized by working directory. Simple append-only, no branching yet.
 
@@ -164,7 +170,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I001-S2
 **Estimate**: S
 
-### #I002-S6: Interactive readline loop
+### #I003-S6: Interactive readline loop
 
 **Description**: `talos-cli` gains interactive mode (no TUI yet, just readline). User types a prompt, agent responds, repeat. `Ctrl+C` cancels current turn, double `Ctrl+C` exits.
 
@@ -175,16 +181,16 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Double `Ctrl+C` exits the program
 - [ ] Streaming output visible during response
 
-**Depends on**: #I002-S4
+**Depends on**: #I003-S4
 **Estimate**: M
 
 ---
 
-## I003: "Safe Agent"
+## I004: "Safe Agent"
 
 **Delivers**: Dangerous operations are caught and contained.
 
-### #I003-S1: Permission rules engine
+### #I004-S1: Permission rules engine
 
 **Description**: `talos-permission` evaluates tool calls against rules. Rules loaded from config: allow/deny/ask per tool name and path pattern. Wildcard matching with glob patterns. Default: ask for write operations, allow read operations.
 
@@ -196,10 +202,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Glob patterns match paths correctly (`src/**/*.rs`)
 - [ ] Default ruleset: read=allow, write=ask, bash=ask
 
-**Depends on**: #I002-S1
+**Depends on**: #I003-S1
 **Estimate**: M
 
-### #I003-S2: Interactive approval prompt
+### #I004-S2: Interactive approval prompt
 
 **Description**: When a tool call needs approval, present it to the user. Show: tool name, arguments, risk level. User can approve once, approve always (add rule), or deny.
 
@@ -209,10 +215,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] "Always approve" persists rule to config
 - [ ] Non-interactive mode (`-p`) defaults to deny for ask-rules
 
-**Depends on**: #I003-S1
+**Depends on**: #I004-S1
 **Estimate**: S
 
-### #I003-S3: Bubblewrap sandbox (Linux)
+### #I004-S3: Bubblewrap sandbox (Linux)
 
 **Description**: `talos-sandbox` runs bash commands in a Bubblewrap sandbox. Read-only filesystem except workspace root. Network namespace isolation. User/PID namespace isolation.
 
@@ -223,10 +229,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] `.git` directory always read-only
 - [ ] Command fails gracefully if bwrap not installed (fallback to no sandbox)
 
-**Depends on**: #I002-S2
+**Depends on**: #I003-S2
 **Estimate**: L
 
-### #I003-S4: sandbox-exec (macOS)
+### #I004-S4: sandbox-exec (macOS)
 
 **Description**: Implement macOS sandbox using `sandbox-exec` with Seatbelt profile. Similar restrictions to Bubblewrap: filesystem write restricted to workspace, network restricted.
 
@@ -236,10 +242,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] `.git` directory always read-only
 - [ ] Graceful fallback if sandbox-exec unavailable
 
-**Depends on**: #I002-S2
+**Depends on**: #I003-S2
 **Estimate**: L
 
-### #I003-S5: Process hardening basics
+### #I004-S5: Process hardening basics
 
 **Description**: Apply security measures to the agent process itself. Sanitize environment variables (remove `LD_PRELOAD`, `DYLD_*`). Set resource limits (max CPU, memory). Prevent core dumps.
 
@@ -248,10 +254,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Resource limits configurable (default: reasonable limits)
 - [ ] Core dumps disabled for sandboxed processes
 
-**Depends on**: #I003-S3 or #I003-S4
+**Depends on**: #I004-S3 or #I004-S4
 **Estimate**: M
 
-### #I003-S6: Tool execution pipeline integration
+### #I004-S6: Tool execution pipeline integration
 
 **Description**: Wire permission engine and sandbox into the tool execution flow. Pipeline: permission check -> sandbox selection -> execute -> retry on denial. Applies to all tools, not just bash.
 
@@ -262,16 +268,16 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Failed sandbox execution can retry with elevated permissions (user approval)
 - [ ] Integration test: agent attempts dangerous operation, pipeline blocks it
 
-**Depends on**: #I003-S1, #I003-S3, #I003-S4
+**Depends on**: #I004-S1, #I004-S3, #I004-S4
 **Estimate**: M
 
 ---
 
-## I004: "Smart Agent"
+## I005: "Smart Agent"
 
 **Delivers**: Long conversations work without context overflow.
 
-### #I004-S1: Token estimation
+### #I005-S1: Token estimation
 
 **Description**: Estimate token count for messages before sending to LLM. Character-based approximation (4 chars ~ 1 token) with provider-specific corrections. Track cumulative usage per session.
 
@@ -280,10 +286,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Usage tracked per turn (input, output, cache_read, cache_write)
 - [ ] Cost estimation based on model pricing
 
-**Depends on**: #I001-S5
+**Depends on**: #I002-S3
 **Estimate**: S
 
-### #I004-S2: Context compaction pipeline
+### #I005-S2: Context compaction pipeline
 
 **Description**: 5-layer compaction triggered when context nears model limit. Layer 1: budget (cap tool result sizes). Layer 2: trim (remove old tool results). Layer 3: microcompact (strip completed tool results by ID). Layer 4: collapse (summarize old turns). Layer 5: autocompact (LLM-based summarization).
 
@@ -295,10 +301,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] After compaction, conversation continues seamlessly
 - [ ] No infinite compact-fail-retry loops (circuit breaker: 3 failures -> stop)
 
-**Depends on**: #I004-S1, #I001-S4
+**Depends on**: #I005-S1, #I002-S2
 **Estimate**: XL
 
-### #I004-S3: JSONL tree-branching sessions
+### #I005-S3: JSONL tree-branching sessions
 
 **Description**: Extend session storage with parent-child relationships. Each entry has `id` and `parent_id`. Support forking from any point. Session resume via `-c` (continue last) and `-r` (select from history). Branching is implemented in JSONL only (no SQLite dependency yet).
 
@@ -309,10 +315,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Branch history preserved in single JSONL file
 - [ ] Session metadata includes: timestamp, model, token count, working directory
 
-**Depends on**: #I002-S5
+**Depends on**: #I003-S5
 **Estimate**: M
 
-### #I004-S4: Context file loading (AGENTS.md)
+### #I005-S4: Context file loading (AGENTS.md)
 
 **Description**: Load `AGENTS.md` files from working directory and parent directories. Concatenate all found files into system prompt context. Also load `~/.talos/AGENTS.md` as global context.
 
@@ -323,10 +329,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] `--no-context` flag disables loading
 - [ ] Total context file size capped at 20,000 chars (head/tail truncation)
 
-**Depends on**: #I001-S5
+**Depends on**: #I002-S3
 **Estimate**: S
 
-### #I004-S5: Prompt caching strategy
+### #I005-S5: Prompt caching strategy
 
 **Description**: Structure the system prompt for provider-side caching. Stable prefix (identity + tools + context files) kept constant across turns. Only conversation history grows. Add `cache_control` markers for Anthropic.
 
@@ -336,10 +342,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Cache hit rate tracked and reported in usage stats
 - [ ] Tool definitions maintain stable ordering
 
-**Depends on**: #I004-S1
+**Depends on**: #I005-S1
 **Estimate**: M
 
-### #I004-S6: SQLite session index with FTS5
+### #I005-S6: SQLite session index with FTS5
 
 **Description**: Introduce `rusqlite` (bundled) as the first database dependency. Create `~/.talos/index.db` with session metadata table and FTS5 virtual table. JSONL files remain the source of truth; SQLite serves as a metadata index and search engine. Storage operations use rusqlite directly — no trait abstraction until a concrete second engine exists (ADR-002).
 
@@ -353,16 +359,16 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] JSONL files remain the source of truth; SQLite is index only
 - [ ] Migration: existing JSONL sessions are indexed on first run
 
-**Depends on**: #I002-S5, #I004-S3
+**Depends on**: #I003-S5, #I005-S3
 **Estimate**: L
 
 ---
 
-## I005: "Skilled Agent"
+## I006: "Skilled Agent"
 
 **Delivers**: Skills system and multi-provider support.
 
-### #I005-S1: SKILL.md parser and loader
+### #I006-S1: SKILL.md parser and loader
 
 **Description**: `talos-skill` discovers and parses SKILL.md files. YAML frontmatter (name, description, trigger conditions) + Markdown body (instructions). Discovery from `.talos/skills/`, `~/.talos/skills/`, and parent directories.
 
@@ -375,7 +381,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I001-S2
 **Estimate**: M
 
-### #I005-S2: Progressive disclosure (3 levels)
+### #I006-S2: Progressive disclosure (3 levels)
 
 **Description**: Skills load in 3 levels. Level 0: name + description in system prompt (~50 tokens each). Level 1: full SKILL.md content loaded on demand when task matches. Level 2: specific reference files from skill.
 
@@ -385,10 +391,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Level 2 loaded when agent needs specific reference files
 - [ ] Total skill index stays under 3000 tokens for 20 skills
 
-**Depends on**: #I005-S1
+**Depends on**: #I006-S1
 **Estimate**: M
 
-### #I005-S3: OpenAI provider
+### #I006-S3: OpenAI provider
 
 **Description**: Add OpenAI as a second provider. Streaming via SSE. Chat Completions API format. Support `OPENAI_API_KEY` and `OPENAI_BASE_URL` for compatible providers.
 
@@ -399,29 +405,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] `OPENAI_BASE_URL` override works for compatible APIs
 - [ ] Model switching in interactive mode via `/model`
 
-**Depends on**: #I001-S4
+**Depends on**: #I002-S2
 **Estimate**: M
 
-### #I005-S4: Evolution engine with cognitive feedback
-
-**Description**: Implement the `talos-evolution` crate with the 4-phase learning loop (ADR-001): Observe → Accumulate → Extract → Apply. The exact signal taxonomy, confidence formulas, decay rates, and conflict resolution strategies will be designed at the start of I005 based on real usage data from I001-I004. Storage uses direct rusqlite calls extending the database from I004-S6. Skill creation from experience is one output channel — when a pattern stabilizes, it can be materialized as a SKILL.md.
-
-**Acceptance Criteria**:
-- [ ] `TurnObserver` captures structured observations per turn (tool calls, duration, outcome, signals)
-- [ ] Signal taxonomy designed based on I001-I004 usage patterns (per ADR-001 cognitive feedback principles)
-- [ ] `PatternExtractor` extracts preferences, project patterns, and error-avoidance rules
-- [ ] Contradiction detection: new patterns are checked against existing ones before storage
-- [ ] Patterns carry confidence scores with evidence backing and time decay
-- [ ] Extraction triggers include signal-driven events, not just session boundaries
-- [ ] SQLite tables: observations, patterns, pattern_conflicts
-- [ ] `BehaviorAdapter` injects high-confidence patterns into system prompt
-- [ ] Evolution data inspectable via `/learned` command
-- [ ] User can disable evolution via config
-
-**Depends on**: #I005-S1, #I002-S4, #I004-S6
-**Estimate**: XL
-
-### #I005-S5: System prompt assembly
+### #I006-S4: System prompt assembly
 
 **Description**: Assemble the full system prompt from: identity, tool descriptions, skill index, context files (AGENTS.md), and user preferences. Structure for optimal caching.
 
@@ -432,32 +419,43 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Append via `--append-system-prompt` flag
 - [ ] Total system prompt size logged for debugging
 
-**Depends on**: #I004-S4, #I005-S1
+**Depends on**: #I005-S4, #I006-S1
 **Estimate**: M
 
 ---
 
-## I006: "Extensible Agent"
+## I007: "Learning Agent"
 
-**Delivers**: WASM plugins and MCP integration.
+**Delivers**: Self-evolution from experience.
 
-### #I006-S1: WASM plugin runtime
+### #I007-S1: Evolution engine with cognitive feedback
 
-**Description**: `talos-plugin` integrates wasmtime for sandboxed plugin execution. Plugins are WASM modules that export hook handlers. Host provides API for tool registration, event subscription, and config access.
+**Description**: Implement the `talos-evolution` crate with the 4-phase learning loop (ADR-001): Observe → Accumulate → Extract → Apply. The exact signal taxonomy, confidence formulas, decay rates, and conflict resolution strategies will be designed at the start of I007 based on real usage data from I001-I006. Storage uses direct rusqlite calls extending the database from I005-S6. Skill creation from experience is one output channel — when a pattern stabilizes, it can be materialized as a SKILL.md.
 
 **Acceptance Criteria**:
-- [ ] WASM module loaded and executed in sandboxed runtime
-- [ ] Plugin can register custom tools
-- [ ] Plugin can subscribe to events (tool_call, message, etc.)
-- [ ] Plugin cannot access host filesystem or network directly
-- [ ] Plugin error does not crash the agent
+- [ ] `TurnObserver` captures structured observations per turn (tool calls, duration, outcome, signals)
+- [ ] Signal taxonomy designed based on I001-I006 usage patterns (per ADR-001 cognitive feedback principles)
+- [ ] `PatternExtractor` extracts preferences, project patterns, and error-avoidance rules
+- [ ] Contradiction detection: new patterns are checked against existing ones before storage
+- [ ] Patterns carry confidence scores with evidence backing and time decay
+- [ ] Extraction triggers include signal-driven events, not just session boundaries
+- [ ] SQLite tables: observations, patterns, pattern_conflicts
+- [ ] `BehaviorAdapter` injects high-confidence patterns into system prompt
+- [ ] Evolution data inspectable via `/learned` command
+- [ ] User can disable evolution via config
 
-**Depends on**: #I002-S1
+**Depends on**: #I006-S1, #I003-S4, #I005-S6
 **Estimate**: XL
 
-### #I006-S2: Hook system (20+ extension points)
+---
 
-**Description**: Define hooks at key points in the agent lifecycle. Plugins register handlers. Hooks include: before_tool_call, after_tool_call, message_transform, system_prompt_transform, permission_check, session_start/end.
+## I008: "Extensible Agent"
+
+**Delivers**: Hook system, MCP integration, and plugin runtime.
+
+### #I008-S1: Hook system (20+ extension points)
+
+**Description**: Define hooks at key points in the agent lifecycle. Hook system is pure Rust, no WASM dependency. Hooks at key lifecycle points: before_tool_call, after_tool_call, message_transform, system_prompt_transform, permission_check, session_start/end. Plugins register handlers.
 
 **Acceptance Criteria**:
 - [ ] 20+ hook points defined and documented
@@ -466,23 +464,23 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Hooks can modify or block operations
 - [ ] Performance overhead < 1ms per hook invocation
 
-**Depends on**: #I006-S1
+**Depends on**: None
 **Estimate**: L
 
-### #I006-S3: File-based plugin discovery
+### #I008-S2: File-based plugin discovery
 
-**Description**: Discover plugins from `.talos/plugins/*.wasm`, `~/.talos/plugins/*.wasm`. Auto-load on startup. Config `plugin` section for enabling/disabling.
+**Description**: Discover hook plugins from `.talos/plugins/`, `~/.talos/plugins/`. Plugins are Rust dynamic libraries (.so/.dylib) or WASM modules. Auto-load on startup. Config `plugin` section for enabling/disabling.
 
 **Acceptance Criteria**:
-- [ ] `.wasm` files discovered and loaded from plugin directories
+- [ ] Plugin files discovered and loaded from plugin directories
 - [ ] Config can enable/disable specific plugins
 - [ ] `--no-plugins` flag disables all plugins
 - [ ] Plugin load errors produce warnings, not crashes
 
-**Depends on**: #I006-S1, #I001-S3
+**Depends on**: #I008-S1, #I002-S1
 **Estimate**: S
 
-### #I006-S4: MCP client
+### #I008-S3: MCP client
 
 **Description**: `talos-mcp` connects to external MCP servers. Discovers tools, resources, and prompts from servers. Converts MCP tool definitions to AgentTool implementations. Config via `mcp` section in config file.
 
@@ -493,10 +491,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Multiple MCP servers supported simultaneously
 - [ ] Connection failures handled gracefully (retry + skip)
 
-**Depends on**: #I002-S1
+**Depends on**: #I003-S1
 **Estimate**: L
 
-### #I006-S5: MCP server
+### #I008-S4: MCP server
 
 **Description**: Expose Talos tools as an MCP server. Other agents can connect and use Talos tools. Support stdio transport.
 
@@ -506,10 +504,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] External MCP clients can call Talos tools
 - [ ] Permission rules still enforced for external callers
 
-**Depends on**: #I002-S1
+**Depends on**: #I003-S1
 **Estimate**: L
 
-### #I006-S6: JSON-RPC server (stdio)
+### #I008-S5: JSON-RPC server (stdio)
 
 **Description**: `talos-rpc` implements JSON-RPC over stdio. Methods: session/start, session/list, turn/start, turn/interrupt, config/read. Enables IDE and tool integration.
 
@@ -519,16 +517,30 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Streaming events delivered as JSON-RPC notifications
 - [ ] Error responses follow JSON-RPC error format
 
-**Depends on**: #I001-S5
+**Depends on**: #I002-S3
 **Estimate**: M
+
+### #I008-S6: WASM plugin runtime
+
+**Description**: `talos-plugin` integrates wasmtime for sandboxed WASM plugin execution. WASM is an alternative hosting mechanism for the same hook interface. Plugins are WASM modules that export hook handlers. Host provides API for tool registration, event subscription, and config access.
+
+**Acceptance Criteria**:
+- [ ] WASM module loaded and executed in sandboxed runtime
+- [ ] Plugin can register custom tools
+- [ ] Plugin can subscribe to events (tool_call, message, etc.)
+- [ ] Plugin cannot access host filesystem or network directly
+- [ ] Plugin error does not crash the agent
+
+**Depends on**: #I003-S1
+**Estimate**: XL
 
 ---
 
-## I007: "Polished Agent"
+## I009: "Polished Agent"
 
 **Delivers**: Full-featured, daily-usable coding agent with professional TUI.
 
-### #I007-S0: TUI layout and interaction design
+### #I009-S0: TUI layout and interaction design
 
 **Description**: Before implementing the TUI, design the complete layout, component hierarchy, interaction model, and keymap system. Reference Codex TUI architecture (80+ modules in `codex-rs/tui/src/`). Produce a design document covering: screen layout (chat viewport, bottom pane, status bar), HistoryCell types (message, exec, approval, patch, MCP), BottomPane view stack, slash command interface, approval overlay flow, keymap contexts, and `--no-alt-screen` inline mode. This design document will be the blueprint for all subsequent TUI stories.
 
@@ -544,12 +556,12 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Frame rate limiting strategy
 - [ ] Markdown rendering approach
 
-**Depends on**: #I002-S6 (interactive loop exists to understand UX needs)
+**Depends on**: #I003-S6 (interactive loop exists to understand UX needs)
 **Estimate**: M
 
-### #I007-S1: TUI with ratatui
+### #I009-S1: TUI with ratatui
 
-**Description**: Full terminal UI with: chat viewport with HistoryCell rendering, bottom pane with ChatComposer (multiline input), status bar with model/tokens/cost/context usage, approval overlay for permission requests, diff display for file changes. Based on TUI-DESIGN.md from #I007-S0. Supports `--no-alt-screen` for inline mode preserving terminal scrollback. Frame rate limited rendering via FrameRequester.
+**Description**: Full terminal UI with: chat viewport with HistoryCell rendering, bottom pane with ChatComposer (multiline input), status bar with model/tokens/cost/context usage, approval overlay for permission requests, diff display for file changes. Based on TUI-DESIGN.md from #I009-S0. Supports `--no-alt-screen` for inline mode preserving terminal scrollback. Frame rate limited rendering via FrameRequester.
 
 **Acceptance Criteria**:
 - [ ] `talos` launches full TUI by default
@@ -562,10 +574,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Works on macOS Terminal, iTerm2, Linux terminals
 - [ ] Markdown rendering in assistant messages
 
-**Depends on**: #I002-S6, #I007-S0
+**Depends on**: #I003-S6, #I009-S0
 **Estimate**: XL
 
-### #I007-S2: Steering and follow-up queues
+### #I009-S2: Steering and follow-up queues
 
 **Description**: Two message queues for mid-run input. Steering: delivered after current tool batch, before next LLM call. Follow-up: delivered only when agent would stop. Both support one-at-a-time or all-at-once drain modes. ChatComposer enters "queue mode" when agent is running — Enter queues message instead of interrupting.
 
@@ -576,10 +588,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Drain mode configurable in settings
 - [ ] ChatComposer shows queued message count indicator
 
-**Depends on**: #I007-S1
+**Depends on**: #I009-S1
 **Estimate**: M
 
-### #I007-S3: Interactive command system
+### #I009-S3: Interactive command system
 
 **Description**: Slash commands in TUI: `/model` (switch), `/new` (new session), `/resume` (pick session), `/fork` (branch), `/compact` (manual compaction), `/help`, `/quit`, `/diff` (show git diff), `/status` (session config + token usage), `/vim` (toggle vim mode). Tab autocomplete for commands. Fuzzy filtering as you type.
 
@@ -594,10 +606,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Tab completes command names
 - [ ] Fuzzy filter narrows command list as you type
 
-**Depends on**: #I007-S1, #I004-S3
+**Depends on**: #I009-S1, #I005-S3
 **Estimate**: M
 
-### #I007-S4: Guardian AI sub-agent
+### #I009-S4: Guardian AI sub-agent
 
 **Description**: Auto-approve low-risk tool calls using a lightweight LLM call. Guardian reviews tool call + context and decides approve/deny. Circuit breaker: 3 consecutive denials blocks Guardian.
 
@@ -608,10 +620,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Circuit breaker activates after 3 denials
 - [ ] Guardian uses a cheaper/faster model than main agent
 
-**Depends on**: #I003-S1, #I001-S4
+**Depends on**: #I004-S1, #I002-S2
 **Estimate**: L
 
-### #I007-S5: Headless and SDK modes
+### #I009-S5: Headless and SDK modes
 
 **Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly).
 
@@ -622,10 +634,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] All modes share the same core agent loop
 - [ ] Headless mode supports `--json` for machine-readable output
 
-**Depends on**: #I007-S1
+**Depends on**: #I009-S1
 **Estimate**: L
 
-### #I007-S6: Exec policy DSL rules
+### #I009-S6: Exec policy DSL rules
 
 **Description**: Full DSL for command approval rules in `.talos/rules/*.rules`. Pattern matching on command name, arguments, paths. Support for trusted commands, forbidden patterns, and conditional rules.
 
@@ -636,5 +648,5 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Complex shell features (pipes, redirects) bypass rules and require approval
 - [ ] Rules can reference environment variables
 
-**Depends on**: #I003-S1
+**Depends on**: #I004-S1
 **Estimate**: M
