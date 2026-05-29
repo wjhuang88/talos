@@ -22,8 +22,6 @@ Cargo.lock
 # Talos runtime data
 .talos/
 
-# OpenCode internal
-.opencode/node_modules/
-.opencode/package.json
-.opencode/package-lock.json
-.opencode/.gitignore
+# Agent tooling
+.opencode/
+.agent-governance/
