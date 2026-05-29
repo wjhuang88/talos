@@ -1,0 +1,13 @@
+[package]
+name = "talos-provider"
+description = "LLM client abstractions and provider-specific implementations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+talos-core = { path = "../talos-core" }
+
+[lints]
+workspace = true

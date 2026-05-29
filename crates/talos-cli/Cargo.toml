@@ -1,0 +1,18 @@
+[package]
+name = "talos-cli"
+description = "Primary command-line interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "talos"
+path = "src/main.rs"
+
+[dependencies]
+talos-core = { path = "../talos-core" }
+clap = { version = "4", features = ["derive"] }
+
+[lints]
+workspace = true
