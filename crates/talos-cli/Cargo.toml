@@ -15,9 +15,12 @@ talos-agent = { path = "../talos-agent" }
 talos-config = { path = "../talos-config" }
 talos-core = { path = "../talos-core" }
 talos-provider = { path = "../talos-provider" }
+talos-tools = { path = "../talos-tools" }
+talos-session = { path = "../talos-session" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "signal"] }
+tokio-util = "0.7"
 
 [lints]
 workspace = true
