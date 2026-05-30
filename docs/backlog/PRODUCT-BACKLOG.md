@@ -275,9 +275,41 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ## I005: "Smart Agent"
 
-**Delivers**: Long conversations work without context overflow.
+**Delivers**: Mock LLM for testing, basic TUI shell, context compaction, and prompt caching.
 
-### #I005-S1: Token estimation
+### #I005-S1: Mock LLM provider
+
+**Description**: Implement `LanguageModel` trait from `talos-core` as a mock provider in `talos-provider` (`#[cfg(test)]` module or separate `talos-mock` dev-dependency). Configurable response sequences (preset replies in order), simulates `tool_use` responses (returns tool call requests), simulates errors (401, 429, 500), supports streaming (simulates SSE delta events). Enables full agent testing without real API keys or network calls.
+
+**Acceptance Criteria**:
+- [ ] Implements `LanguageModel` trait from `talos-core`
+- [ ] Configurable response sequences — preset replies returned in order
+- [ ] Simulates `tool_use` responses — returns tool call requests when configured
+- [ ] Simulates errors — can be configured to return 401, 429, 500 responses
+- [ ] Supports streaming — simulates SSE delta events for streaming tests
+- [ ] Placed in `talos-provider` as `#[cfg(test)]` module or separate `talos-mock` dev-dependency
+- [ ] Unit tests verify: normal response, tool_use response, error response, streaming response
+
+**Depends on**: #I002-S2
+**Estimate**: S
+
+### #I005-S2: Basic TUI shell
+
+**Description**: `talos-tui` crate with ratatui + crossterm. Chat viewport for message display, input area for user prompts, status bar showing model/tokens/cost, Ctrl+C handling (cancel turn / exit), streaming output display. This is the foundational TUI shell that all subsequent iterations build upon.
+
+**Acceptance Criteria**:
+- [ ] `talos-tui` crate created with ratatui + crossterm dependencies
+- [ ] Chat viewport renders messages with scrolling
+- [ ] Input area accepts user text input
+- [ ] Status bar displays: current model, token count, estimated cost
+- [ ] Ctrl+C cancels current agent turn; double Ctrl+C exits
+- [ ] Streaming output renders incrementally without blocking the TUI
+- [ ] TUI works with Mock LLM for testing without API keys
+
+**Depends on**: #I003-S6
+**Estimate**: M
+
+### #I005-S3: Token estimation
 
 **Description**: Estimate token count for messages before sending to LLM. Character-based approximation (4 chars ~ 1 token) with provider-specific corrections. Track cumulative usage per session.
 
@@ -285,38 +317,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Token estimate within 20% of actual for English text
 - [ ] Usage tracked per turn (input, output, cache_read, cache_write)
 - [ ] Cost estimation based on model pricing
+- [ ] Token count displayed in TUI status bar
 
 **Depends on**: #I002-S3
 **Estimate**: S
-
-### #I005-S2: Context compaction pipeline
-
-**Description**: 5-layer compaction triggered when context nears model limit. Layer 1: budget (cap tool result sizes). Layer 2: trim (remove old tool results). Layer 3: microcompact (strip completed tool results by ID). Layer 4: collapse (summarize old turns). Layer 5: autocompact (LLM-based summarization).
-
-**Acceptance Criteria**:
-- [ ] Compaction triggers automatically at 80% context usage
-- [ ] Manual `/compact` command available in interactive mode
-- [ ] Compaction preserves recent turns (last 10) verbatim
-- [ ] Summarization uses a separate compact LLM call
-- [ ] After compaction, conversation continues seamlessly
-- [ ] No infinite compact-fail-retry loops (circuit breaker: 3 failures -> stop)
-
-**Depends on**: #I005-S1, #I002-S2
-**Estimate**: XL
-
-### #I005-S3: JSONL tree-branching sessions
-
-**Description**: Extend session storage with parent-child relationships. Each entry has `id` and `parent_id`. Support forking from any point. Session resume via `-c` (continue last) and `-r` (select from history). Branching is implemented in JSONL only (no SQLite dependency yet).
-
-**Acceptance Criteria**:
-- [ ] `/fork` creates branch from current position
-- [ ] `talos -c` resumes most recent session
-- [ ] `talos -r` lists sessions by scanning JSONL directory
-- [ ] Branch history preserved in single JSONL file
-- [ ] Session metadata includes: timestamp, model, token count, working directory
-
-**Depends on**: #I003-S5
-**Estimate**: M
 
 ### #I005-S4: Context file loading (AGENTS.md)
 
@@ -332,7 +336,22 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I002-S3
 **Estimate**: S
 
-### #I005-S5: Prompt caching strategy
+### #I005-S5: 5-layer context compaction
+
+**Description**: 5-layer compaction triggered when context nears model limit. Layer 1: budget (cap tool result sizes). Layer 2: trim (remove old tool results). Layer 3: microcompact (strip completed tool results by ID). Layer 4: collapse (summarize old turns). Layer 5: autocompact (LLM-based summarization).
+
+**Acceptance Criteria**:
+- [ ] Compaction triggers automatically at 80% context usage
+- [ ] Manual `/compact` command available in interactive mode
+- [ ] Compaction preserves recent turns (last 10) verbatim
+- [ ] Summarization uses a separate compact LLM call
+- [ ] After compaction, conversation continues seamlessly
+- [ ] No infinite compact-fail-retry loops (circuit breaker: 3 failures -> stop)
+
+**Depends on**: #I005-S3, #I002-S2
+**Estimate**: XL
+
+### #I005-S6: Prompt caching strategy
 
 **Description**: Structure the system prompt for provider-side caching. Stable prefix (identity + tools + context files) kept constant across turns. Only conversation history grows. Add `cache_control` markers for Anthropic.
 
@@ -342,10 +361,45 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Cache hit rate tracked and reported in usage stats
 - [ ] Tool definitions maintain stable ordering
 
-**Depends on**: #I005-S1
+**Depends on**: #I005-S3
 **Estimate**: M
 
-### #I005-S6: SQLite session index with FTS5
+---
+
+## I006: "Data Agent"
+
+**Delivers**: TUI tool call visualization, approval overlay, session branching, and SQLite search.
+
+### #I006-S1: TUI tool call bubbles + approval overlay
+
+**Description**: Enhance TUI chat viewport with visual tool call bubbles (showing tool name, arguments, results). Replace CLI approval prompt with TUI approval overlay (y/a/n) rendered on top of chat viewport.
+
+**Acceptance Criteria**:
+- [ ] Tool calls rendered as distinct bubbles in chat viewport
+- [ ] Tool results displayed inline with success/failure indicators
+- [ ] Approval overlay appears when permission is required
+- [ ] User options: y (approve once), a (always approve), n (deny)
+- [ ] Overlay dismisses cleanly after decision
+- [ ] Non-interactive mode defaults to deny for ask-rules
+
+**Depends on**: #I005-S2, #I004-S2
+**Estimate**: M
+
+### #I006-S2: JSONL tree-branching sessions
+
+**Description**: Extend session storage with parent-child relationships. Each entry has `id` and `parent_id`. Support forking from any point. Session resume via `-c` (continue last) and `-r` (select from history). Branching is implemented in JSONL only (no SQLite dependency yet).
+
+**Acceptance Criteria**:
+- [ ] `/fork` creates branch from current position
+- [ ] `talos -c` resumes most recent session
+- [ ] `talos -r` lists sessions by scanning JSONL directory
+- [ ] Branch history preserved in single JSONL file
+- [ ] Session metadata includes: timestamp, model, token count, working directory
+
+**Depends on**: #I003-S5
+**Estimate**: M
+
+### #I006-S3: SQLite session index with FTS5
 
 **Description**: Introduce `rusqlite` (bundled) as the first database dependency. Create `~/.talos/index.db` with session metadata table and FTS5 virtual table. JSONL files remain the source of truth; SQLite serves as a metadata index and search engine. Storage operations use rusqlite directly — no trait abstraction until a concrete second engine exists (ADR-002).
 
@@ -359,16 +413,58 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] JSONL files remain the source of truth; SQLite is index only
 - [ ] Migration: existing JSONL sessions are indexed on first run
 
-**Depends on**: #I003-S5, #I005-S3
+**Depends on**: #I003-S5, #I006-S2
 **Estimate**: L
+
+### #I006-S4: Session search and resume commands
+
+**Description**: CLI commands for searching and resuming sessions using the SQLite index. `talos --search <query>` for full-text search, `talos -r` for session listing, `talos -c <session-id>` for resuming a specific session.
+
+**Acceptance Criteria**:
+- [ ] `talos --search <query>` returns matching sessions with snippets
+- [ ] `talos -r` lists sessions sorted by last activity
+- [ ] `talos -c <session-id>` resumes the specified session
+- [ ] Search results show: session ID, project, last message preview, date
+- [ ] Results limited to 20 by default, `--limit` flag for more
+
+**Depends on**: #I006-S3
+**Estimate**: S
+
+### #I006-S5: Session fork command
+
+**Description**: `/fork` command in TUI and `talos --fork <session-id>` CLI flag. Creates a new session branch from the current position or a specified session. Forked session inherits all prior messages.
+
+**Acceptance Criteria**:
+- [ ] `/fork` in TUI creates branch from current position
+- [ ] `talos --fork <session-id>` forks from specified session
+- [ ] Forked session has independent message history after fork point
+- [ ] TUI shows session branch indicator in status bar
+- [ ] Fork metadata recorded in SQLite index
+
+**Depends on**: #I006-S2, #I006-S3
+**Estimate**: M
 
 ---
 
-## I006: "Skilled Agent"
+## I007: "Skilled Agent"
 
-**Delivers**: Skills system and multi-provider support.
+**Delivers**: Skills system with TUI sidebar, SKILL.md parsing, progressive disclosure, and OpenAI provider.
 
-### #I006-S1: SKILL.md parser and loader
+### #I007-S1: TUI skill index sidebar
+
+**Description**: Add a sidebar panel to the TUI showing loaded skills. Each skill displays name, description, and trigger status. Sidebar toggles with a keybinding. Skills update dynamically as they are loaded/unloaded.
+
+**Acceptance Criteria**:
+- [ ] Sidebar panel renders on the right side of TUI
+- [ ] Each skill shows: name, description, active/inactive status
+- [ ] Sidebar toggles with configurable keybinding
+- [ ] Skills list updates when new SKILL.md files are discovered
+- [ ] Sidebar collapses to icon-only mode when space is limited
+
+**Depends on**: #I005-S2
+**Estimate**: S
+
+### #I007-S2: SKILL.md parser and loader
 
 **Description**: `talos-skill` discovers and parses SKILL.md files. YAML frontmatter (name, description, trigger conditions) + Markdown body (instructions). Discovery from `.talos/skills/`, `~/.talos/skills/`, and parent directories.
 
@@ -381,7 +477,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I001-S2
 **Estimate**: M
 
-### #I006-S2: Progressive disclosure (3 levels)
+### #I007-S3: Progressive disclosure (3 levels)
 
 **Description**: Skills load in 3 levels. Level 0: name + description in system prompt (~50 tokens each). Level 1: full SKILL.md content loaded on demand when task matches. Level 2: specific reference files from skill.
 
@@ -391,10 +487,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Level 2 loaded when agent needs specific reference files
 - [ ] Total skill index stays under 3000 tokens for 20 skills
 
-**Depends on**: #I006-S1
+**Depends on**: #I007-S2
 **Estimate**: M
 
-### #I006-S3: OpenAI provider
+### #I007-S4: OpenAI provider
 
 **Description**: Add OpenAI as a second provider. Streaming via SSE. Chat Completions API format. Support `OPENAI_API_KEY` and `OPENAI_BASE_URL` for compatible providers.
 
@@ -408,7 +504,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I002-S2
 **Estimate**: M
 
-### #I006-S4: System prompt assembly
+### #I007-S5: System prompt assembly
 
 **Description**: Assemble the full system prompt from: identity, tool descriptions, skill index, context files (AGENTS.md), and user preferences. Structure for optimal caching.
 
@@ -419,41 +515,70 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Append via `--append-system-prompt` flag
 - [ ] Total system prompt size logged for debugging
 
-**Depends on**: #I005-S4, #I006-S1
+**Depends on**: #I005-S4, #I007-S2
 **Estimate**: M
 
 ---
 
-## I007: "Learning Agent"
+## I008: "Learning Agent"
 
-**Delivers**: Self-evolution from experience.
+**Delivers**: Self-evolution engine with cognitive feedback and TUI insights panel.
 
-### #I007-S1: Evolution engine with cognitive feedback
+### #I008-S1: TUI evolution insights panel + /learned command
 
-**Description**: Implement the `talos-evolution` crate with the 4-phase learning loop (ADR-001): Observe → Accumulate → Extract → Apply. The exact signal taxonomy, confidence formulas, decay rates, and conflict resolution strategies will be designed at the start of I007 based on real usage data from I001-I006. Storage uses direct rusqlite calls extending the database from I005-S6. Skill creation from experience is one output channel — when a pattern stabilizes, it can be materialized as a SKILL.md.
+**Description**: Add an evolution insights panel to the TUI showing learned patterns, confidence scores, and evidence counts. `/learned` command opens the panel. Panel displays: top patterns by confidence, recent observations, pattern conflicts, and time-decay visualization.
+
+**Acceptance Criteria**:
+- [ ] `/learned` command opens evolution insights panel in TUI
+- [ ] Panel shows patterns sorted by confidence score
+- [ ] Each pattern displays: description, confidence, evidence count, last reinforced date
+- [ ] Pattern conflicts highlighted with resolution status
+- [ ] Panel supports scrolling for long pattern lists
+- [ ] Insights persist across sessions (loaded from SQLite)
+
+**Depends on**: #I005-S2
+**Estimate**: M
+
+### #I008-S2: Evolution engine with cognitive feedback (ADR-001)
+
+**Description**: Implement the `talos-evolution` crate with the 4-phase learning loop (ADR-001): Observe → Accumulate → Extract → Apply. The exact signal taxonomy, confidence formulas, decay rates, and conflict resolution strategies will be designed at the start of I008 based on real usage data from I001-I007. Storage uses direct rusqlite calls extending the database from I006-S3. Skill creation from experience is one output channel — when a pattern stabilizes, it can be materialized as a SKILL.md.
 
 **Acceptance Criteria**:
 - [ ] `TurnObserver` captures structured observations per turn (tool calls, duration, outcome, signals)
-- [ ] Signal taxonomy designed based on I001-I006 usage patterns (per ADR-001 cognitive feedback principles)
+- [ ] Signal taxonomy designed based on I001-I007 usage patterns (per ADR-001 cognitive feedback principles)
 - [ ] `PatternExtractor` extracts preferences, project patterns, and error-avoidance rules
 - [ ] Contradiction detection: new patterns are checked against existing ones before storage
 - [ ] Patterns carry confidence scores with evidence backing and time decay
-- [ ] Extraction triggers include signal-driven events, not just session boundaries
+- [ ] Extraction triggers include signal-driven events, not just session boundary
 - [ ] SQLite tables: observations, patterns, pattern_conflicts
 - [ ] `BehaviorAdapter` injects high-confidence patterns into system prompt
 - [ ] Evolution data inspectable via `/learned` command
 - [ ] User can disable evolution via config
 
-**Depends on**: #I006-S1, #I003-S4, #I005-S6
+**Depends on**: #I007-S2, #I003-S4, #I006-S3
 **Estimate**: XL
 
 ---
 
-## I008: "Extensible Agent"
+## I009: "Extensible Agent"
 
-**Delivers**: Hook system, MCP integration, and plugin runtime.
+**Delivers**: Hook system, MCP integration, plugin runtime, and TUI extensions for external tools.
 
-### #I008-S1: Hook system (20+ extension points)
+### #I009-S1: TUI MCP tool markers + plugin status
+
+**Description**: Enhance TUI to visually distinguish MCP-provided tools from built-in tools (special icon/badge). Add plugin status display showing loaded plugins, active hooks, and hook execution counts.
+
+**Acceptance Criteria**:
+- [ ] MCP-provided tools display with distinct marker/icon in tool call bubbles
+- [ ] Plugin status panel shows: loaded plugins, active hooks, execution counts
+- [ ] Hook execution logged in TUI (subtle indicator, not intrusive)
+- [ ] Plugin load errors displayed as warnings in status bar
+- [ ] `/plugins` command lists all loaded plugins and their hooks
+
+**Depends on**: #I005-S2
+**Estimate**: S
+
+### #I009-S2: Hook system (20+ extension points)
 
 **Description**: Define hooks at key points in the agent lifecycle. Hook system is pure Rust, no WASM dependency. Hooks at key lifecycle points: before_tool_call, after_tool_call, message_transform, system_prompt_transform, permission_check, session_start/end. Plugins register handlers.
 
@@ -467,20 +592,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: None
 **Estimate**: L
 
-### #I008-S2: File-based plugin discovery
-
-**Description**: Discover hook plugins from `.talos/plugins/`, `~/.talos/plugins/`. Plugins are Rust dynamic libraries (.so/.dylib) or WASM modules. Auto-load on startup. Config `plugin` section for enabling/disabling.
-
-**Acceptance Criteria**:
-- [ ] Plugin files discovered and loaded from plugin directories
-- [ ] Config can enable/disable specific plugins
-- [ ] `--no-plugins` flag disables all plugins
-- [ ] Plugin load errors produce warnings, not crashes
-
-**Depends on**: #I008-S1, #I002-S1
-**Estimate**: S
-
-### #I008-S3: MCP client
+### #I009-S3: MCP client
 
 **Description**: `talos-mcp` connects to external MCP servers. Discovers tools, resources, and prompts from servers. Converts MCP tool definitions to AgentTool implementations. Config via `mcp` section in config file.
 
@@ -494,7 +606,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I003-S1
 **Estimate**: L
 
-### #I008-S4: MCP server
+### #I009-S4: MCP server
 
 **Description**: Expose Talos tools as an MCP server. Other agents can connect and use Talos tools. Support stdio transport.
 
@@ -507,7 +619,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I003-S1
 **Estimate**: L
 
-### #I008-S5: JSON-RPC server (stdio)
+### #I009-S5: JSON-RPC server (stdio)
 
 **Description**: `talos-rpc` implements JSON-RPC over stdio. Methods: session/start, session/list, turn/start, turn/interrupt, config/read. Enables IDE and tool integration.
 
@@ -520,69 +632,57 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I002-S3
 **Estimate**: M
 
-### #I008-S6: WASM plugin runtime
-
-**Description**: `talos-plugin` integrates wasmtime for sandboxed WASM plugin execution. WASM is an alternative hosting mechanism for the same hook interface. Plugins are WASM modules that export hook handlers. Host provides API for tool registration, event subscription, and config access.
-
-**Acceptance Criteria**:
-- [ ] WASM module loaded and executed in sandboxed runtime
-- [ ] Plugin can register custom tools
-- [ ] Plugin can subscribe to events (tool_call, message, etc.)
-- [ ] Plugin cannot access host filesystem or network directly
-- [ ] Plugin error does not crash the agent
-
-**Depends on**: #I003-S1
-**Estimate**: XL
-
 ---
 
-## I009: "Polished Agent"
+## I010: "Polished Agent"
 
-**Delivers**: Full-featured, daily-usable coding agent with professional TUI.
+**Delivers**: Release-ready TUI with Nord theme, markdown rendering, diff display, and advanced features.
 
-### #I009-S0: TUI layout and interaction design
+### #I010-S1: Nord theme application
 
-**Description**: Before implementing the TUI, design the complete layout, component hierarchy, interaction model, keymap system, and color scheme. Reference Codex TUI architecture (80+ modules in `codex-rs/tui/src/`). Use the **Nord theme** (https://www.nordtheme.com/) for all color definitions — see `docs/reference/REFERENCE-PROJECTS.md` §19 for palette and component mapping. Produce a design document covering: screen layout (chat viewport, bottom pane, status bar), HistoryCell types (message, exec, approval, patch, MCP), BottomPane view stack, slash command interface, approval overlay flow, keymap contexts, `--no-alt-screen` inline mode, and Nord color scheme application. This design document will be the blueprint for all subsequent TUI stories.
+**Description**: Apply the Nord color scheme (https://www.nordtheme.com/) across all TUI components per REFERENCE-PROJECTS.md §19. Define Ratatui `Color::Rgb` constants for all Nord palette colors. Verify WCAG AA contrast ratios for all text/background combinations.
 
 **Acceptance Criteria**:
-- [ ] Design document written at `docs/reference/TUI-DESIGN.md`
-- [ ] Screen layout diagram with component boundaries
-- [ ] HistoryCell type catalog with visual mockups (ASCII art)
-- [ ] BottomPane view stack state machine
-- [ ] Slash command catalog and filtering behavior
-- [ ] Approval overlay interaction flow
-- [ ] Keymap context hierarchy (App/Chat/Composer/Editor/Pager/List/Approval)
-- [ ] Inline mode (`--no-alt-screen`) behavior specification
-- [ ] Frame rate limiting strategy
-- [ ] Markdown rendering approach
-- [ ] Nord color scheme: component-to-color mapping table with hex values
-- [ ] Nord color scheme: Ratatui `Color::Rgb` constants module
-- [ ] Nord color scheme: contrast ratio verification for all text/background combinations (WCAG AA)
+- [ ] Nord color palette defined as Ratatui `Color::Rgb` constants module
+- [ ] All TUI components use Nord colors (no hardcoded hex values)
+- [ ] Chat viewport, status bar, sidebar, overlays all themed consistently
+- [ ] WCAG AA contrast ratio verified for all text/background combinations
+- [ ] Dark/light mode toggle (Nord Polar Night vs Nord Snow Storm)
 
-**Depends on**: #I003-S6 (interactive loop exists to understand UX needs)
+**Depends on**: #I005-S2
 **Estimate**: M
 
-### #I009-S1: TUI with ratatui
+### #I010-S2: Markdown rendering in assistant messages
 
-**Description**: Full terminal UI with: chat viewport with HistoryCell rendering, bottom pane with ChatComposer (multiline input), status bar with model/tokens/cost/context usage, approval overlay for permission requests, diff display for file changes. Based on TUI-DESIGN.md from #I009-S0. Implements the **Nord color scheme** as defined in §19 of REFERENCE-PROJECTS.md — all components use Nord palette colors via the Ratatui `Color::Rgb` constants. Supports `--no-alt-screen` for inline mode preserving terminal scrollback. Frame rate limited rendering via FrameRequester.
+**Description**: Render markdown in assistant messages: code blocks with syntax highlighting, headers, lists, links, bold/italic text, inline code. Use a markdown parser compatible with ratatui rendering.
 
 **Acceptance Criteria**:
-- [ ] `talos` launches full TUI by default
-- [ ] Messages scroll with HistoryCell rendering (text, exec, approval, patch types)
-- [ ] Status bar shows: model, tokens, cost, context usage
-- [ ] `Ctrl+C` cancels current turn, double exits
-- [ ] Approval overlay replaces editor when permission requested
-- [ ] `--no-alt-screen` flag runs inline preserving scrollback
-- [ ] Frame rate limiting prevents wasteful renders during streaming
-- [ ] Works on macOS Terminal, iTerm2, Linux terminals
-- [ ] Markdown rendering in assistant messages
-- [ ] Nord color scheme applied to all components per TUI-DESIGN.md
-- [ ] All text/background combinations meet WCAG AA contrast ratio
+- [ ] Code blocks rendered with syntax highlighting (Rust, Python, JS, etc.)
+- [ ] Headers displayed with appropriate sizing/bolding
+- [ ] Lists (ordered and unordered) rendered correctly
+- [ ] Links displayed as clickable or copyable
+- [ ] Bold/italic text rendered with appropriate styling
+- [ ] Inline code highlighted distinctly
+- [ ] Long code blocks support scrolling within message bubble
 
-**Depends on**: #I003-S6, #I009-S0
-**Estimate**: XL
+**Depends on**: #I005-S2
+**Estimate**: L
 
-### #I009-S2: Steering and follow-up queues
+### #I010-S3: Diff display for file changes
+
+**Description**: Visual diff rendering for file changes in chat viewport. Show added/removed/modified lines with color coding (green for additions, red for deletions). Support unified diff format.
+
+**Acceptance Criteria**:
+- [ ] File tool results with diffs rendered with line-by-line coloring
+- [ ] Added lines highlighted in green, removed lines in red
+- [ ] Line numbers displayed for context
+- [ ] Large diffs support scrolling within the diff viewport
+- [ ] `/diff` command shows git diff for current working directory
+
+**Depends on**: #I005-S2, #I003-S3
+**Estimate**: M
+
+### #I010-S4: Steering and follow-up queues
 
 **Description**: Two message queues for mid-run input. Steering: delivered after current tool batch, before next LLM call. Follow-up: delivered only when agent would stop. Both support one-at-a-time or all-at-once drain modes. ChatComposer enters "queue mode" when agent is running — Enter queues message instead of interrupting.
 
@@ -593,12 +693,12 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Drain mode configurable in settings
 - [ ] ChatComposer shows queued message count indicator
 
-**Depends on**: #I009-S1
+**Depends on**: #I005-S2
 **Estimate**: M
 
-### #I009-S3: Interactive command system
+### #I010-S5: Slash commands with fuzzy filtering
 
-**Description**: Slash commands in TUI: `/model` (switch), `/new` (new session), `/resume` (pick session), `/fork` (branch), `/compact` (manual compaction), `/help`, `/quit`, `/diff` (show git diff), `/status` (session config + token usage), `/vim` (toggle vim mode). Tab autocomplete for commands. Fuzzy filtering as you type.
+**Description**: Slash commands in TUI: `/model` (switch), `/new` (new session), `/resume` (pick session), `/fork` (branch), `/compact` (manual compaction), `/diff` (show git diff), `/status` (session config + token usage), `/vim` (toggle vim mode), `/help`, `/quit`. Tab autocomplete for commands. Fuzzy filtering as you type.
 
 **Acceptance Criteria**:
 - [ ] `/model` opens model selector
@@ -611,10 +711,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Tab completes command names
 - [ ] Fuzzy filter narrows command list as you type
 
-**Depends on**: #I009-S1, #I005-S3
+**Depends on**: #I005-S2, #I006-S2
 **Estimate**: M
 
-### #I009-S4: Guardian AI sub-agent
+### #I010-S6: Guardian AI sub-agent
 
 **Description**: Auto-approve low-risk tool calls using a lightweight LLM call. Guardian reviews tool call + context and decides approve/deny. Circuit breaker: 3 consecutive denials blocks Guardian.
 
@@ -628,7 +728,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I004-S1, #I002-S2
 **Estimate**: L
 
-### #I009-S5: Headless and SDK modes
+### #I010-S7: Headless and SDK modes
 
 **Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly).
 
@@ -639,10 +739,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] All modes share the same core agent loop
 - [ ] Headless mode supports `--json` for machine-readable output
 
-**Depends on**: #I009-S1
+**Depends on**: #I005-S2
 **Estimate**: L
 
-### #I009-S6: Exec policy DSL rules
+### #I010-S8: Exec policy DSL rules
 
 **Description**: Full DSL for command approval rules in `.talos/rules/*.rules`. Pattern matching on command name, arguments, paths. Support for trusted commands, forbidden patterns, and conditional rules.
 

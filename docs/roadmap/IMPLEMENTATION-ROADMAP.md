@@ -7,15 +7,16 @@ testable `talos` binary. No iteration leaves the project in a "foundation-only" 
 iteration delivers something a user can actually run and verify.
 
 ```
-I001 "Project Scaffold"  cargo check --workspace               能编译
-I002 "Hello Agent"       talos "What is 2+2?" -p               能对话
-I003 "Tool User"         talos "list files here"               会调工具
-I004 "Safe Agent"        talos "rm -rf /"                      会被拦住
-I005 "Smart Agent"       talos 长对话50轮不炸上下文              能压缩
-I006 "Skilled Agent"     talos 加载SKILL.md自动遵循 + 多模型    会技能
-I007 "Learning Agent"    talos 从经验中自进化学习               会学习
-I008 "Extensible Agent"  talos 加载Hook插件 + MCP工具           可扩展
-I009 "Polished Agent"    talos 全功能TUI交互 + 多模式           可发布
+I001 "Project Scaffold"  cargo check --workspace               能编译 ✅
+I002 "Hello Agent"       talos "What is 2+2?" -p               能对话 ✅
+I003 "Tool User"         talos "list files here"               会调工具 ✅
+I004 "Safe Agent"        talos "rm -rf /"                      会被拦住 ✅
+I005 "Smart Agent"       Mock LLM + 基础TUI + 压缩 + caching    能压缩
+I006 "Data Agent"        TUI工具调用气泡 + 审批 + 会话分支 + SQLite  能搜索
+I007 "Skilled Agent"     TUI技能侧栏 + SKILL.md + OpenAI        会技能
+I008 "Learning Agent"    TUI进化洞察面板 + 自进化引擎             会学习
+I009 "Extensible Agent"  TUI MCP标记 + Hook + MCP + JSON-RPC   可扩展
+I010 "Polished Agent"    TUI打磨 (Nord + markdown + 高级功能)    可发布
 ```
 
 ## I001: "Project Scaffold"
@@ -105,24 +106,54 @@ talos "Read /etc/shadow"
 
 ## I005: "Smart Agent"
 
-**User can**: Have long conversations without hitting context limits. Search across session history.
+**User can**: Have long conversations without hitting context limits. Test agent behavior without real LLM costs.
 
 **Scope**:
+- **Mock LLM provider** (`talos-provider`): `#[cfg(test)]` module implementing `LanguageModel` trait, configurable response sequences, simulates tool_use/errors/streaming — enables full agent testing without API keys
+- **Basic TUI shell** (`talos-tui`): ratatui + crossterm, chat viewport, input area, status bar, Ctrl+C handling, streaming output display
 - 5-layer context compaction: budget -> trim -> microcompact -> collapse -> summarize
-- JSONL tree-branching sessions (`/fork`, session resume with `-c`)
-- **SQLite introduction** (ADR-002): `rusqlite` bundled, session metadata index + FTS5 full-text search
-- `SessionStore` trait for storage abstraction (future engine migration path)
 - Token estimation and budget tracking per turn
 - Prompt caching strategy (stable system prompt prefix)
 - Basic context files: load `AGENTS.md` from project root
 
-**Not in scope**: Skills, plugins, MCP, TUI, evolution
+**Not in scope**: Skills, plugins, MCP, evolution, SQLite, session branching
 
 **Verification**:
 ```bash
+# Mock LLM enables testing without API key
+cargo test -p talos-provider -- mock_llm
+# Expected: mock provider returns preset responses, simulates tool_use and errors
+
 # 50-turn conversation stays within context window
 for i in $(seq 1 50); do echo "Turn $i: what is $i + $i?"; done | talos
 # Expected: no context overflow errors, compaction kicks in
+
+# TUI launches without blocking during streaming
+talos
+# Expected: basic TUI shell appears, streaming output renders smoothly
+```
+
+## I006: "Data Agent"
+
+**User can**: See tool calls visually in TUI, approve/deny operations, search and fork sessions.
+
+**Scope**:
+- **TUI tool call bubbles**: Visual rendering of tool calls and results in chat viewport
+- **TUI approval overlay**: y/a/n approval UI rendered in TUI (replaces CLI prompt)
+- JSONL tree-branching sessions (`/fork`, session resume with `-c`)
+- **SQLite introduction** (ADR-002): `rusqlite` bundled, session metadata index + FTS5 full-text search
+- Session search and resume commands
+- Session fork command
+
+**Not in scope**: Skills, plugins, MCP, evolution
+
+**Verification**:
+```bash
+talos "List all .rs files"
+# Expected: TUI shows tool call bubble with bash tool execution
+
+talos "rm -rf /tmp/test"
+# Expected: approval overlay appears in TUI with y/a/n options
 
 talos -c  # Resume last session
 # Expected: previous conversation context restored
@@ -131,17 +162,19 @@ talos --search "authentication error"
 # Expected: FTS5 returns matching sessions
 ```
 
-## I006: "Skilled Agent"
+## I007: "Skilled Agent"
 
-**User can**: Define skills in SKILL.md files; agent loads and follows them. Multiple LLM providers available.
+**User can**: Define skills in SKILL.md files; agent loads and follows them. Switch between LLM providers.
 
 **Scope**:
 - `talos-skill`: SKILL.md parser, progressive disclosure (3 levels)
+- **TUI skill index sidebar**: Visual display of loaded skills
 - OpenAI provider added (second provider)
 - System prompt assembly: identity + skills index + context files
 - File-based skill discovery: `.talos/skills/**/SKILL.md`, global `~/.talos/skills/`
+- `/model` command for switching providers in TUI
 
-**Not in scope**: Evolution, WASM plugins, MCP, TUI
+**Not in scope**: Evolution, WASM plugins, MCP
 
 **Verification**:
 ```bash
@@ -152,13 +185,13 @@ Use this skill when asked to review code.
 Focus on: security, performance, correctness.
 EOF
 talos "Review src/main.rs"
-# Expected: agent loads skill, follows review instructions
+# Expected: TUI shows skill index sidebar, agent loads skill, follows review instructions
 
 talos --provider openai "hello"
 # Expected: response from OpenAI provider
 ```
 
-## I007: "Learning Agent"
+## I008: "Learning Agent"
 
 **User can**: Agent adapts its behavior across sessions via built-in evolution with cognitive feedback (ADR-001).
 
@@ -166,15 +199,15 @@ talos --provider openai "hello"
 - `talos-evolution` (new crate, per ADR-001): 4-phase learning loop with cognitive signals
   - TurnObserver: captures signals (error, correction, satisfaction, inefficiency) with intensity
   - PatternExtractor: rule-based + optional LLM, with contradiction detection
-  - KnowledgeStore: SQLite extension (same DB from I005), observations + patterns + conflicts tables
+  - KnowledgeStore: SQLite extension (same DB from I006), observations + patterns + conflicts tables
   - BehaviorAdapter: injects high-confidence patterns into system prompt
   - Cognitive feedback: confidence scoring, evidence counting, 70-day half-life time decay
   - Signal-driven extraction triggers (high-pain, conflict, threshold, session end, `/learn`)
-- Cognitive feedback signal taxonomy designed at I007 start based on I001–I006 usage data
+- **TUI evolution insights panel**: Visual display of learned patterns
+- `/learned` command for transparency
 - Evolution data: user preferences, project patterns, error patterns, tool efficiency
 - Skill materialization: stable patterns (confidence > 0.8) can become SKILL.md files
 - System prompt assembly: identity + evolution context + skills index + context files
-- `/learned` command for transparency
 
 **Not in scope**: LLM-assisted pattern extraction tuning, skill hub, WASM plugins, MCP
 
@@ -188,14 +221,14 @@ talos -c
 
 # Evolution transparency — inspect cognitive feedback
 talos /learned
-# Expected: lists patterns with confidence scores, evidence counts, and last-reinforced dates
+# Expected: TUI shows evolution insights panel with patterns, confidence scores, evidence counts
 
 # Evolution data inspection
 ls ~/.talos/
 # Expected: index.db (SQLite with session + evolution tables), sessions/ directory
 ```
 
-## I008: "Extensible Agent"
+## I009: "Extensible Agent"
 
 **User can**: Extend Talos via hooks, MCP servers, and plugins.
 
@@ -205,6 +238,8 @@ ls ~/.talos/
 - `talos-rpc`: JSON-RPC over stdio (basic, no WebSocket yet)
 - `talos-plugin`: Plugin runtime — native hooks first, WASM as optional hosting mechanism
 - File-based plugin discovery: `.talos/plugins/`
+- **TUI MCP tool markers**: Visual indicators for MCP-provided tools
+- **TUI plugin status display**: Show loaded plugins and hook activity
 
 **Not in scope**: MCP OAuth, WebSocket RPC, plugin marketplace
 
@@ -216,39 +251,35 @@ talos --plugin ./my-plugin "hello"
 
 # MCP server provides external tools
 talos --mcp-config mcp.json "Search the web for Rust 2024 edition changes"
-# Expected: agent uses MCP-provided web search tool
+# Expected: agent uses MCP-provided web search tool, TUI shows MCP tool marker
 
 # JSON-RPC control
 echo '{"method":"thread/start","params":{"prompt":"hello"}}' | talos --mode rpc
 # Expected: JSON response with agent output
 ```
 
-## I009: "Polished Agent"
+## I010: "Polished Agent"
 
-**User can**: Use Talos as a daily coding companion with full TUI.
+**User can**: Use Talos as a daily coding companion with fully polished TUI.
 
 **Scope**:
-- **TUI layout design** (#I009-S0): Design document for layout, components, interaction model, keymaps
-  before implementation (reference: Codex `codex-rs/tui/src/` 80+ modules)
-- **Full TUI** (#I009-S1): ratatui-based, HistoryCell rendering, ChatComposer, status bar, approval overlay,
-  diff display, `--no-alt-screen` inline mode, frame rate limiting, markdown rendering
+- **Nord theme**: Full Nord color scheme application across all TUI components (per REFERENCE-PROJECTS.md §19)
+- **Markdown rendering**: Rich markdown display in assistant messages (code blocks, lists, headers, links)
+- **Diff display**: Visual diff rendering for file changes in chat viewport
 - **Steering + follow-up** message queues with ChatComposer queue mode
-- **Slash commands**: 10+ commands with fuzzy filtering (`/model`, `/new`, `/resume`, `/fork`, `/compact`,
-  `/diff`, `/status`, `/vim`, `/help`, `/quit`)
-- **Three execution modes**: interactive (TUI), headless (`exec`), SDK (library)
-  via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly)
-- Session management commands
-- Guardian AI sub-agent for auto-approval (with circuit breaker)
-- Full exec policy DSL rules in `.talos/rules/`
+- **Slash commands**: 10+ commands with fuzzy filtering (`/model`, `/new`, `/resume`, `/fork`, `/compact`, `/diff`, `/status`, `/vim`, `/help`, `/quit`)
+- **Guardian AI** sub-agent for auto-approval (with circuit breaker)
+- **Headless mode** (`talos exec`) and **SDK mode** (library embedding) via AppServerSession abstraction
+- **Exec policy DSL** rules in `.talos/rules/`
 
 **Not in scope**: Desktop app, web UI, mobile, multi-agent side threads (future)
 
 **Verification**:
 ```bash
 talos  # Launch full TUI
-# Expected: interactive terminal UI with streaming output
-# Type messages, see tool execution in real-time
-# Ctrl+C to cancel, /help for commands
+# Expected: Nord-themed interactive terminal UI with streaming output, markdown rendering
+# Type messages, see tool execution with diff display in real-time
+# Ctrl+C to cancel, /help for commands, fuzzy slash command filtering
 
 talos --no-alt-screen  # Inline mode preserving scrollback
 # Expected: same UI but in terminal scroll buffer
@@ -261,6 +292,19 @@ talos exec "run tests and fix failures" --max-turns 20
 # Rust code can embed Talos as a library
 ```
 
+## TUI Evolution Timeline
+
+The TUI grows progressively from I005. Each iteration adds visualization for the features delivered:
+
+| Iteration | TUI 新增能力 | 验证场景 |
+|-----------|-------------|---------|
+| I005 | 基础壳：聊天视口 + 输入区 + 状态栏 + Ctrl+C + 流式输出 | Mock LLM 测试压缩时 TUI 不卡顿 |
+| I006 | 工具调用气泡 + 审批覆盖层 (y/a/n) + 会话列表 | 权限提示在 TUI 中弹出 |
+| I007 | 技能索引侧栏 + /model 切换 | 加载 SKILL.md 后显示技能列表 |
+| I008 | 进化洞察面板 + /learned 命令 | 自进化后显示学到的模式 |
+| I009 | MCP 工具标记 + 插件状态 + Hook 日志 | MCP 工具有特殊标识 |
+| I010 | Nord 主题 + markdown + diff + steering + slash + Guardian + headless + DSL | 发布级打磨 |
+
 ## Iteration Transition Rules
 
 1. Each iteration must produce `cargo build -p talos-cli` that runs.
@@ -272,19 +316,20 @@ talos exec "run tests and fix failures" --max-turns 20
 
 ## Crate Introduction Schedule
 
-Not all 14 crates exist from day one. Crates are created when first needed:
+Not all 15 crates exist from day one. Crates are created when first needed:
 
 | Iteration | New Crates | Cumulative |
 |-----------|-----------|------------|
-| I001 | core, config, provider, agent, cli (skeletons only) | 5 |
+| I001 | core, config, provider, agent, cli (skeletons) | 5 |
 | I002 | (none new; provider and agent get real implementations) | 5 |
 | I003 | tools, session | 7 |
-| I004 | sandbox, permission | 9 |
-| I005 | (none new; rusqlite dependency introduced) | 9 |
-| I006 | skill | 10 |
-| I007 | evolution | 11 |
-| I008 | plugin, mcp, rpc | 14 |
-| I009 | (none new) | 14 |
+| I004 | permission, sandbox | 9 |
+| I005 | tui (basic shell) | 10 |
+| I006 | (none new; rusqlite dependency introduced) | 10 |
+| I007 | skill | 11 |
+| I008 | evolution | 12 |
+| I009 | plugin, mcp, rpc | 15 |
+| I010 | (none new) | 15 |
 
 ## Storage Introduction Timeline
 
@@ -293,6 +338,6 @@ Storage complexity grows with each iteration's needs (ADR-002):
 | Iteration | Storage Technology | Data Domains |
 |-----------|-------------------|--------------|
 | I001–I004 | Pure files (zero DB) | JSONL sessions, TOML config |
-| I005 | + SQLite (rusqlite bundled) | Session metadata index, FTS5 search |
-| I007 | + SQLite extension | Evolution observations, patterns, conflicts |
-| Future | Possible Turso migration | Same traits, different engine |
+| I006 | + SQLite (rusqlite bundled) | Session metadata index, FTS5 search |
+| I008 | + SQLite extension | Evolution observations, patterns, conflicts |
+| Future | Possible Turso migration | Same traits, different engine
