@@ -1,5 +1,7 @@
 //! Talos provider — LLM client abstractions and provider-specific implementations.
 
+pub mod mock;
+
 use std::time::Duration;
 
 use futures_util::StreamExt;
