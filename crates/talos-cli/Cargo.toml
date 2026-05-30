@@ -11,15 +11,16 @@ name = "talos"
 path = "src/main.rs"
 
 [dependencies]
-talos-agent = { path = "../talos-agent" }
-talos-config = { path = "../talos-config" }
 talos-core = { path = "../talos-core" }
+talos-config = { path = "../talos-config" }
 talos-provider = { path = "../talos-provider" }
+talos-agent = { path = "../talos-agent" }
 talos-tools = { path = "../talos-tools" }
 talos-session = { path = "../talos-session" }
-anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full", "signal"] }
+anyhow = "1"
+ctrlc = { version = "3", features = ["termination"] }
 tokio-util = "0.7"
 
 [lints]

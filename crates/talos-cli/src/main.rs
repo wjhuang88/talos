@@ -7,6 +7,7 @@
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -120,12 +121,40 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
+    // Global Ctrl+C flag — set by signal handler, checked by main loop
+    static CTRL_C_FLAG: AtomicBool = AtomicBool::new(false);
+    ctrlc::set_handler(move || {
+        CTRL_C_FLAG.store(true, Ordering::SeqCst);
+    })
+    .context("failed to install Ctrl+C handler")?;
+
     let mut stdout = io::stdout().lock();
     let mut cancel_token = CancellationToken::new();
     let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
     let mut first_ctrl_c_time: Option<std::time::Instant> = None;
 
     loop {
+        // Check if Ctrl+C was pressed since last iteration
+        if CTRL_C_FLAG.swap(false, Ordering::SeqCst) {
+            if let Some(handle) = running_task.take() {
+                cancel_token.cancel();
+                handle.abort();
+                let _ = handle.await;
+                eprintln!("\nTurn cancelled.");
+                cancel_token = CancellationToken::new();
+            } else {
+                let now = std::time::Instant::now();
+                if let Some(prev) = first_ctrl_c_time {
+                    if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
+                        eprintln!("\nExiting.");
+                        return Ok(());
+                    }
+                }
+                first_ctrl_c_time = Some(now);
+                eprintln!("Press Ctrl+C again within 2 seconds to exit.");
+            }
+        }
+
         stdout
             .write_all(b"> ")
             .context("failed to write prompt")?;
@@ -165,24 +194,8 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 });
                 running_task = Some(handle);
             }
-            _ = tokio::signal::ctrl_c() => {
-                if let Some(handle) = running_task.take() {
-                    cancel_token.cancel();
-                    handle.abort();
-                    let _ = handle.await;
-                    eprintln!("\nTurn cancelled.");
-                    cancel_token = CancellationToken::new();
-                } else {
-                    let now = std::time::Instant::now();
-                    if let Some(prev) = first_ctrl_c_time {
-                        if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                            eprintln!("\nExiting.");
-                            return Ok(());
-                        }
-                    }
-                    first_ctrl_c_time = Some(now);
-                    eprintln!("\nPress Ctrl+C again within 2 seconds to exit.");
-                }
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+                // Periodic wake to check Ctrl+C flag
             }
         }
 
