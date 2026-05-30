@@ -14,7 +14,7 @@ English | **[中文](README.zh-CN.md)**
 |-----------|----------|-------------|
 | ~~I001~~ | ~~Project Scaffold~~ | ~~`cargo check --workspace` passes~~ ✅ |
 | ~~I002~~ | ~~Hello Agent~~ | ~~`talos "What is 2+2?" -p` and get an LLM response~~ ✅ |
-| I003 | Tool User | Ask the agent to perform file and shell operations |
+| ~~I003~~ | ~~Tool User~~ | ~~Ask the agent to perform file and shell operations~~ ✅ |
 | I004 | Safe Agent | Dangerous operations get intercepted by permissions |
 | I005 | Smart Agent | Long conversations (50+ turns) without context overflow |
 | I006 | Skilled Agent | Load SKILL.md, multi-provider support |
