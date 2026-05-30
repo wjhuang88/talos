@@ -212,8 +212,11 @@ impl InteractiveState {
                 let input = self.input_buffer.clone();
                 self.input_buffer.clear();
                 self.first_ctrl_c_time = None;
-                // Print the submitted line
                 self.print_status(&input)?;
+                if input.is_empty() {
+                    self.redraw_prompt()?;
+                    return Ok(EventAction::Continue);
+                }
                 self.spawn_turn(input);
                 Ok(EventAction::Continue)
             }
