@@ -11,8 +11,13 @@ name = "talos"
 path = "src/main.rs"
 
 [dependencies]
+talos-agent = { path = "../talos-agent" }
+talos-config = { path = "../talos-config" }
 talos-core = { path = "../talos-core" }
+talos-provider = { path = "../talos-provider" }
+anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
 
 [lints]
 workspace = true
