@@ -4,17 +4,22 @@
 //! interactive mode for conversational agent sessions, and optional
 //! stdin pipe input and CLI argument overrides.
 
+mod approval;
+
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
 use clap::Parser;
+use serde_json::Value;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
 use talos_core::message::{AgentEvent, Message};
-use talos_core::tool::ToolRegistry;
+use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
+use talos_permission::PermissionDecision;
 use talos_provider::AnthropicProvider;
 use talos_session::{Session, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
@@ -22,7 +27,72 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
+use crate::approval::ApprovalPrompt;
+
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
+
+/// Permission-aware tool wrapper that checks the permission engine before
+/// executing the underlying tool. In interactive mode, [`PermissionDecision::Ask`]
+/// triggers a user prompt. In print mode, it defaults to deny.
+struct PermissionAwareTool {
+    inner: Arc<dyn AgentTool>,
+    approval: Arc<Mutex<ApprovalPrompt>>,
+    print_mode: bool,
+}
+
+#[async_trait]
+impl AgentTool for PermissionAwareTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+
+    fn parameters(&self) -> Value {
+        self.inner.parameters()
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let tool_name = self.inner.name().to_owned();
+        let decision = {
+            let mut approval = self.approval.lock().expect("approval lock poisoned");
+            let engine_decision = approval.engine().evaluate(&tool_name, &input);
+
+            match engine_decision {
+                PermissionDecision::Allow => PermissionDecision::Allow,
+                PermissionDecision::Deny(reason) => PermissionDecision::Deny(reason),
+                PermissionDecision::Ask => {
+                    if self.print_mode {
+                        PermissionDecision::Deny(
+                            "Print mode: interactive approval unavailable".to_string(),
+                        )
+                    } else {
+                        match approval.prompt(&tool_name, &input) {
+                            Ok(decision) => decision,
+                            Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
+                        }
+                    }
+                }
+            }
+        };
+
+        match decision {
+            PermissionDecision::Allow => self.inner.execute(input).await,
+            PermissionDecision::Deny(reason) => {
+                ToolResult::error(format!("Permission denied: {reason}"))
+            }
+            PermissionDecision::Ask => {
+                unreachable!("Ask decision should have been resolved by prompt or print-mode default")
+            }
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.inner.is_read_only()
+    }
+}
 
 #[derive(Parser, Clone)]
 #[command(name = "talos", version, about = "Next-generation agent runtime")]
@@ -74,7 +144,34 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     let prompt = resolve_prompt(cli.prompt)?;
 
     let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
-    let agent = Agent::new(provider, ToolRegistry::new());
+
+    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::new(),
+    )));
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(BashTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(EditTool::new(PathBuf::from("."))),
+        approval,
+        print_mode: true,
+    }));
+
+    let agent = Agent::new(provider, registry);
 
     let (event_tx, mut event_rx) = broadcast::channel::<AgentEvent>(32);
 
@@ -228,11 +325,31 @@ async fn run_agent_turn(
 
     let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
 
+    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::new(),
+    )));
+
     let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(BashTool::new(workspace_root.clone())));
-    registry.register(Arc::new(ReadTool::new(workspace_root.clone())));
-    registry.register(Arc::new(WriteTool::new(workspace_root.clone())));
-    registry.register(Arc::new(EditTool::new(workspace_root)));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(BashTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ReadTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(WriteTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(EditTool::new(workspace_root)),
+        approval,
+        print_mode: false,
+    }));
 
     let agent = Agent::new(provider, registry);
 
