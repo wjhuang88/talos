@@ -15,6 +15,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use serde_json::Value;
+use talos_agent::context::ContextLoader;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
 use talos_core::message::{AgentEvent, Message};
@@ -23,6 +24,7 @@ use talos_permission::PermissionDecision;
 use talos_provider::AnthropicProvider;
 use talos_session::{Session, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
+use talos_tui::Tui;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
@@ -108,6 +110,12 @@ struct Cli {
 
     #[arg(long, help = "Override the provider (`anthropic` or `openai`).")]
     provider: Option<String>,
+
+    #[arg(long, help = "Launch terminal UI instead of readline loop.")]
+    tui: bool,
+
+    #[arg(long, help = "Skip loading workspace context.")]
+    no_context: bool,
 }
 
 #[tokio::main]
@@ -116,6 +124,10 @@ async fn main() -> Result<()> {
 
     if cli.print {
         return run_print_mode(cli).await;
+    }
+
+    if cli.tui {
+        return run_tui_mode(cli).await;
     }
 
     if !io::stdin().is_terminal() {
@@ -142,6 +154,17 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
 
     let prompt = resolve_prompt(cli.prompt)?;
+    let prompt = if cli.no_context {
+        prompt
+    } else {
+        let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
+        let context = ContextLoader::new(workspace_root).load().map_err(|e| anyhow!("{e}"))?;
+        if context.is_empty() {
+            prompt
+        } else {
+            format!("{context}\n\n{prompt}")
+        }
+    };
 
     let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
 
@@ -201,6 +224,65 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
             }
         }
     }
+}
+
+async fn run_tui_mode(cli: Cli) -> Result<()> {
+    let mut config = Config::load().context("failed to load configuration")?;
+
+    if let Some(ref model) = cli.model {
+        config.model = model.clone();
+    }
+    if let Some(ref provider_str) = cli.provider {
+        config.provider = parse_provider(provider_str)?;
+    }
+
+    if config.model.is_empty() {
+        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
+    }
+
+    let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
+
+    let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
+
+    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::new(),
+    )));
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(BashTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(EditTool::new(PathBuf::from("."))),
+        approval,
+        print_mode: true,
+    }));
+
+    let agent = Agent::new(provider, registry);
+
+    let (event_tx, event_rx) = broadcast::channel::<AgentEvent>(32);
+
+    let mut tui = Tui::new().context("failed to initialize TUI")?;
+
+    let run_handle = tokio::spawn(async move { agent.run_streaming("Hello".to_string(), event_tx).await });
+
+    let tui_result = tui.run(event_rx).await;
+
+    run_handle.abort();
+
+    tui_result
 }
 
 async fn run_interactive_mode(cli: Cli) -> Result<()> {
@@ -322,6 +404,17 @@ async fn run_agent_turn(
     }
 
     let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
+
+    let prompt = if cli.no_context {
+        prompt
+    } else {
+        let context = ContextLoader::new(workspace_root.clone()).load().map_err(|e| anyhow!("{e}"))?;
+        if context.is_empty() {
+            prompt
+        } else {
+            format!("{context}\n\n{prompt}")
+        }
+    };
 
     let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
 

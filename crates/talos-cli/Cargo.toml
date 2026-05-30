@@ -24,6 +24,7 @@ clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 tokio-util = "0.7"
+talos-tui = { path = "../talos-tui" }
 
 [lints]
 workspace = true
