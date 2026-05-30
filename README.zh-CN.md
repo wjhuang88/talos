@@ -15,7 +15,7 @@
 | 迭代 | 代号 | 用户可以... |
 |------|------|------------|
 | ~~I001~~ | ~~Project Scaffold~~ | ~~`cargo check --workspace` 通过~~ ✅ |
-| I002 | Hello Agent | `talos "What is 2+2?" -p` 获得流式 LLM 响应 |
+| ~~I002~~ | ~~Hello Agent~~ | ~~`talos "What is 2+2?" -p` 获得流式 LLM 响应~~ ✅ |
 | I003 | Tool User | 让 Agent 执行文件和 Shell 操作 |
 | I004 | Safe Agent | 危险操作被权限系统拦截 |
 | I005 | Smart Agent | 50+ 轮长对话不爆上下文 |
