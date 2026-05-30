@@ -212,7 +212,8 @@ impl InteractiveState {
                 let input = self.input_buffer.clone();
                 self.input_buffer.clear();
                 self.first_ctrl_c_time = None;
-                self.print_status(&input)?;
+                print!("\r\n");
+                io::stdout().flush().context("failed to flush stdout")?;
                 if input.is_empty() {
                     self.redraw_prompt()?;
                     return Ok(EventAction::Continue);
