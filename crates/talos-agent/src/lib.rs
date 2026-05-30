@@ -3,14 +3,28 @@
 //! The agent manages a conversation turn with an LLM provider, executing tool
 //! calls when the model requests them and feeding results back until a final
 //! text response is produced.
+//!
+//! # Security Pipeline
+//!
+//! Every tool call goes through a security pipeline:
+//! 1. **Permission check** — the [`PermissionEngine`] evaluates the call
+//! 2. **Sandbox execution** — bash tools run through the sandbox when available
+//! 3. **Execute** — the tool is invoked directly
+//! 4. **Retry on denial** — denied calls return an error result
+//!
+//! The `Ask` decision defaults to `Deny` at the agent level; interactive
+//! approval is handled by the CLI layer.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures_util::future::join_all;
 use talos_core::message::{AgentEvent, Message, ToolCall, ToolResult as MessageToolResult};
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolRegistry, ToolResult as ToolExecutionResult};
+use talos_permission::{PermissionDecision, PermissionEngine};
+use talos_sandbox::{SandboxConfig, SandboxError, SandboxProvider, SandboxResult};
 use thiserror::Error;
 use tokio::sync::broadcast;
 use tokio::sync::Semaphore;
@@ -45,7 +59,7 @@ pub enum AgentError {
     #[error("tool error: {0}")]
     ToolError(String),
 
-    /// The turn exceeded the maximum allowed tool call budget.
+    /// The turn exceeds the maximum allowed tool call budget.
     #[error("turn budget exceeded: maximum of {MAX_TOOL_CALLS_PER_TURN} tool calls per turn")]
     TurnBudgetExceeded,
 
@@ -61,6 +75,16 @@ pub type AgentResult<T> = Result<T, AgentError>;
 /// The agent orchestrates a conversation turn: takes a user message, calls the
 /// LLM provider, streams events, executes tool calls when requested, and feeds
 /// results back until a final text response is produced.
+///
+/// # Security Pipeline
+///
+/// When a permission engine is configured, every tool call is evaluated before
+/// execution. Denied calls return an error result without invoking the tool.
+/// The `Ask` decision defaults to `Deny` at the agent level.
+///
+/// When a sandbox is configured, bash tool calls are executed within the
+/// sandbox environment. If the sandbox is unavailable, execution falls back
+/// to direct invocation.
 ///
 /// # Example
 ///
@@ -87,14 +111,89 @@ pub struct Agent {
     provider: Arc<dyn LanguageModel>,
     /// Registry of tools available to the agent.
     tools: ToolRegistry,
+    /// Optional permission engine for gating tool execution.
+    permission_engine: Option<Arc<PermissionEngine>>,
+    /// Optional sandbox provider for bash tool execution.
+    sandbox: Option<Arc<dyn SandboxProvider>>,
+    /// Workspace root directory, used for sandbox configuration.
+    workspace_root: PathBuf,
 }
 
 impl Agent {
     /// Creates a new agent with the given language model provider and tool
     /// registry.
+    ///
+    /// No permission engine or sandbox is configured. All tool calls are
+    /// executed directly without security gating.
     #[must_use]
     pub fn new(provider: Arc<dyn LanguageModel>, tools: ToolRegistry) -> Self {
-        Self { provider, tools }
+        Self {
+            provider,
+            tools,
+            permission_engine: None,
+            sandbox: None,
+            workspace_root: PathBuf::from("."),
+        }
+    }
+
+    /// Creates a new agent with security controls enabled.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider` — The language model provider.
+    /// * `tools` — Registry of tools available to the agent.
+    /// * `permission_engine` — Optional permission engine for gating tool calls.
+    ///   When `Some`, every tool call is evaluated before execution.
+    /// * `sandbox` — Optional sandbox provider for bash tool execution.
+    ///   When `Some`, bash commands run within the sandbox environment.
+    /// * `workspace_root` — The workspace root directory, used for sandbox
+    ///   configuration and path resolution.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use talos_agent::Agent;
+    /// use talos_core::tool::ToolRegistry;
+    /// use talos_permission::PermissionEngine;
+    /// use talos_sandbox::create_sandbox;
+    /// use std::sync::Arc;
+    /// use std::path::PathBuf;
+    /// # use talos_core::provider::{LanguageModel, ProviderResult, Receiver};
+    /// # use talos_core::message::{AgentEvent, Message};
+    /// # struct MyModel;
+    /// # #[async_trait::async_trait]
+    /// # impl LanguageModel for MyModel {
+    /// #     async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> { unimplemented!() }
+    /// # }
+    /// # async fn example() {
+    /// let provider: Arc<dyn LanguageModel> = Arc::new(MyModel);
+    /// let tools = ToolRegistry::new();
+    /// let permission = PermissionEngine::new();
+    /// let sandbox = talos_sandbox::create_sandbox();
+    /// let agent = Agent::with_security(
+    ///     provider,
+    ///     tools,
+    ///     Some(Arc::new(permission)),
+    ///     Some(sandbox),
+    ///     PathBuf::from("/tmp/workspace"),
+    /// );
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_security(
+        provider: Arc<dyn LanguageModel>,
+        tools: ToolRegistry,
+        permission_engine: Option<Arc<PermissionEngine>>,
+        sandbox: Option<Box<dyn SandboxProvider>>,
+        workspace_root: PathBuf,
+    ) -> Self {
+        Self {
+            provider,
+            tools,
+            permission_engine,
+            sandbox: sandbox.map(Arc::from),
+            workspace_root,
+        }
     }
 
     /// Runs a single turn with the given user message and returns the complete
@@ -228,6 +327,9 @@ impl Agent {
     /// Executes a batch of tool calls, running read-only tools concurrently
     /// (up to [`MAX_CONCURRENT_READ_ONLY`]) and write tools serially.
     ///
+    /// Each tool call goes through the security pipeline: permission check,
+    /// sandbox execution (for bash tools), and direct execution.
+    ///
     /// Results are returned in the same order as the input calls.
     async fn execute_tools(&self, calls: &[ToolCall]) -> Vec<ToolExecutionResult> {
         let mut results: Vec<Option<ToolExecutionResult>> = vec![None; calls.len()];
@@ -260,15 +362,22 @@ impl Agent {
         if !read_only_indices.is_empty() {
             let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_READ_ONLY));
             let registry = &self.tools;
+            let permission = self.permission_engine.clone();
+            let sandbox = self.sandbox.clone();
+            let workspace_root = self.workspace_root.clone();
 
             let futures: Vec<_> = read_only_indices
                 .iter()
                 .map(|&idx| {
                     let call = &calls[idx];
                     let sem = semaphore.clone();
+                    let perm = permission.clone();
+                    let sb = sandbox.clone();
+                    let wr = workspace_root.clone();
                     async move {
                         let _permit = sem.acquire().await.expect("semaphore closed");
-                        let result = Self::execute_single_tool(registry, call).await;
+                        let result =
+                            Self::execute_single_tool(registry, call, perm.as_deref(), sb.as_deref(), &wr).await;
                         (idx, result)
                     }
                 })
@@ -281,22 +390,132 @@ impl Agent {
 
         for idx in write_indices {
             let call = &calls[idx];
-            let result = Self::execute_single_tool(&self.tools, call).await;
+            let result = Self::execute_single_tool(
+                &self.tools,
+                call,
+                self.permission_engine.as_deref(),
+                self.sandbox.as_deref(),
+                &self.workspace_root,
+            )
+            .await;
             results[idx] = Some(result);
         }
 
         results.into_iter().map(|r| r.expect("all results should be populated")).collect()
     }
 
-    /// Executes a single tool call, returning an error result if the tool is
-    /// not found in the registry.
+    /// Executes a single tool call through the security pipeline.
+    ///
+    /// The pipeline is:
+    /// 1. **Permission check** — if a permission engine is configured, evaluate
+    ///    the call. `Allow` proceeds, `Deny` returns an error result, `Ask`
+    ///    defaults to `Deny`.
+    /// 2. **Sandbox execution** — for bash tools, if a sandbox is available,
+    ///    execute through the sandbox. Falls back to direct execution if the
+    ///    sandbox reports `NotAvailable`.
+    /// 3. **Direct execution** — invoke the tool directly.
+    ///
+    /// Returns an error result if the tool is not found in the registry.
     async fn execute_single_tool(
         registry: &ToolRegistry,
         call: &ToolCall,
+        permission_engine: Option<&PermissionEngine>,
+        sandbox: Option<&dyn SandboxProvider>,
+        workspace_root: &Path,
     ) -> ToolExecutionResult {
-        match registry.get(&call.name) {
-            Some(tool) => tool.execute(call.input.clone()).await,
-            None => ToolExecutionResult::error(format!("tool not found: {}", call.name)),
+        if let Some(engine) = permission_engine {
+            let decision = engine.evaluate(&call.name, &call.input);
+            match decision {
+                PermissionDecision::Allow => {}
+                PermissionDecision::Deny(reason) => {
+                    return ToolExecutionResult::error(format!(
+                        "permission denied: {reason}"
+                    ));
+                }
+                PermissionDecision::Ask => {
+                    return ToolExecutionResult::error(format!(
+                        "permission denied: tool '{}' requires approval (interactive approval not available at agent level)",
+                        call.name
+                    ));
+                }
+            }
+        }
+
+        let tool = match registry.get(&call.name) {
+            Some(t) => t,
+            None => {
+                return ToolExecutionResult::error(format!("tool not found: {}", call.name));
+            }
+        };
+
+        if call.name == "bash" {
+            if let Some(sb) = sandbox {
+                if sb.is_available() {
+                    return Self::execute_bash_in_sandbox(sb, &call.input, workspace_root).await;
+                }
+            }
+        }
+
+        tool.execute(call.input.clone()).await
+    }
+
+    /// Executes a bash command through the sandbox provider.
+    ///
+    /// Extracts the `command` field from the tool input and runs it within
+    /// the sandbox environment. Returns a [`ToolExecutionResult`] with the
+    /// combined stdout/stderr output.
+    async fn execute_bash_in_sandbox(
+        sandbox: &dyn SandboxProvider,
+        input: &serde_json::Value,
+        workspace_root: &Path,
+    ) -> ToolExecutionResult {
+        let command = match input.get("command").and_then(serde_json::Value::as_str) {
+            Some(cmd) => cmd.to_owned(),
+            None => {
+                return ToolExecutionResult::error(
+                    "bash tool input missing required field 'command'".to_owned(),
+                );
+            }
+        };
+
+        let config = SandboxConfig {
+            workspace_root: workspace_root.to_path_buf(),
+            allow_network: false,
+            extra_read_paths: vec![],
+        };
+
+        match sandbox.execute(&command, &config).await {
+            Ok(result) => Self::sandbox_result_to_tool_result(result),
+            Err(SandboxError::NotAvailable) => {
+                ToolExecutionResult::error(
+                    "sandbox became unavailable during execution".to_owned(),
+                )
+            }
+            Err(SandboxError::ExecutionFailed(reason)) => {
+                ToolExecutionResult::error(format!("sandbox execution failed: {reason}"))
+            }
+            Err(SandboxError::PermissionDenied(reason)) => {
+                ToolExecutionResult::error(format!("sandbox permission denied: {reason}"))
+            }
+        }
+    }
+
+    /// Converts a [`SandboxResult`] to a [`ToolExecutionResult`].
+    fn sandbox_result_to_tool_result(result: SandboxResult) -> ToolExecutionResult {
+        let mut content = String::new();
+        if !result.stdout.is_empty() {
+            content.push_str(&result.stdout);
+        }
+        if !result.stderr.is_empty() {
+            if !content.is_empty() {
+                content.push('\n');
+            }
+            content.push_str(&result.stderr);
+        }
+
+        ToolExecutionResult {
+            content,
+            is_error: result.exit_code != 0,
         }
     }
 
@@ -408,6 +627,8 @@ mod tests {
             self.result.clone()
         }
     }
+
+
 
     #[tokio::test]
     async fn test_run_collects_text_deltas() {
@@ -1131,5 +1352,429 @@ mod tests {
             "Expected 1 ToolResult event, got: {:?}",
             events
         );
+    }
+
+
+
+    /// Mock sandbox that tracks execution and returns configurable results.
+    struct MockSandbox {
+        available: bool,
+        execution_log: Arc<Mutex<Vec<String>>>,
+        result: Option<SandboxResult>,
+    }
+
+    impl MockSandbox {
+        fn new(available: bool, result: SandboxResult) -> Self {
+            Self {
+                available,
+                execution_log: Arc::new(Mutex::new(Vec::new())),
+                result: Some(result),
+            }
+        }
+
+        fn unavailable() -> Self {
+            Self {
+                available: false,
+                execution_log: Arc::new(Mutex::new(Vec::new())),
+                result: None,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SandboxProvider for MockSandbox {
+        async fn execute(
+            &self,
+            command: &str,
+            _config: &SandboxConfig,
+        ) -> Result<SandboxResult, SandboxError> {
+            self.execution_log
+                .lock()
+                .await
+                .push(format!("sandbox_execute:{command}"));
+            if !self.available {
+                return Err(SandboxError::NotAvailable);
+            }
+            Ok(self.result.clone().unwrap_or_else(|| SandboxResult {
+                stdout: "sandboxed".into(),
+                stderr: String::new(),
+                exit_code: 0,
+            }))
+        }
+
+        fn is_available(&self) -> bool {
+            self.available
+        }
+    }
+
+    #[tokio::test]
+    async fn test_permission_check_blocks_denied_tool() {
+        let mut engine = PermissionEngine { rules: Vec::new() };
+        engine.add_rule(talos_permission::PermissionRule {
+            tool_name: "echo".into(),
+            path_pattern: None,
+            decision: PermissionDecision::Deny("not allowed".into()),
+        });
+
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_1".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({ "message": "hello" }),
+                    },
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Done".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "echo".into(),
+            read_only: true,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("should not reach"),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+        }));
+
+        let agent = Agent::with_security(
+            Arc::new(MockModel::new(responses)),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+        );
+
+        let result = agent.run("Test".into()).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Done");
+    }
+
+    #[tokio::test]
+    async fn test_permission_check_allows_permitted_tool() {
+        let mut engine = PermissionEngine { rules: Vec::new() };
+        engine.add_rule(talos_permission::PermissionRule {
+            tool_name: "echo".into(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_1".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({ "message": "hello" }),
+                    },
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Result: hello".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "echo".into(),
+            read_only: true,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("hello"),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+        }));
+
+        let agent = Agent::with_security(
+            Arc::new(MockModel::new(responses)),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+        );
+
+        let result = agent.run("Test".into()).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Result: hello");
+    }
+
+    #[tokio::test]
+    async fn test_permission_ask_defaults_to_deny() {
+        let mut engine = PermissionEngine { rules: Vec::new() };
+        engine.add_rule(talos_permission::PermissionRule {
+            tool_name: "echo".into(),
+            path_pattern: None,
+            decision: PermissionDecision::Ask,
+        });
+
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_1".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({ "message": "hello" }),
+                    },
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Denied".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "echo".into(),
+            read_only: true,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("should not reach"),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+        }));
+
+        let agent = Agent::with_security(
+            Arc::new(MockModel::new(responses)),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+        );
+
+        let result = agent.run("Test".into()).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Denied");
+    }
+
+    #[tokio::test]
+    async fn test_sandbox_execution_for_bash_tool() {
+        let sandbox_result = SandboxResult {
+            stdout: "sandboxed output".into(),
+            stderr: String::new(),
+            exit_code: 0,
+        };
+        let sandbox = MockSandbox::new(true, sandbox_result);
+        let log = sandbox.execution_log.clone();
+
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_1".into(),
+                        name: "bash".into(),
+                        input: serde_json::json!({ "command": "echo hello" }),
+                    },
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Done".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "bash".into(),
+            read_only: false,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("direct execution"),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+        }));
+
+        let agent = Agent::with_security(
+            Arc::new(MockModel::new(responses)),
+            registry,
+            None,
+            Some(Box::new(sandbox)),
+            PathBuf::from("/tmp"),
+        );
+
+        let result = agent.run("Test".into()).await;
+        assert!(result.is_ok());
+
+        let log_entries = log.lock().await;
+        assert!(
+            log_entries.iter().any(|e| e.contains("echo hello")),
+            "Sandbox should have been called with the command, log: {:?}",
+            log_entries
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sandbox_fallback_when_not_available() {
+        let sandbox = MockSandbox::unavailable();
+
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_1".into(),
+                        name: "bash".into(),
+                        input: serde_json::json!({ "command": "echo hello" }),
+                    },
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Fallback worked".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "bash".into(),
+            read_only: false,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("direct execution"),
+            execution_log: log.clone(),
+        }));
+
+        let agent = Agent::with_security(
+            Arc::new(MockModel::new(responses)),
+            registry,
+            None,
+            Some(Box::new(sandbox)),
+            PathBuf::from("/tmp"),
+        );
+
+        let result = agent.run("Test".into()).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Fallback worked");
+
+        let log_entries = log.lock().await;
+        assert!(
+            log_entries.iter().any(|e| e.starts_with("start:bash:")),
+            "Direct execution should have been used as fallback, log: {:?}",
+            log_entries
+        );
+    }
+
+    #[test]
+    fn test_agent_with_security_constructor() {
+        let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
+        let tools = ToolRegistry::new();
+        let permission = PermissionEngine::new();
+
+        let agent = Agent::with_security(
+            provider.clone(),
+            tools,
+            Some(Arc::new(permission)),
+            None,
+            PathBuf::from("/tmp/workspace"),
+        );
+
+        let _token = agent.cancellation_token();
+        assert!(!_token.is_cancelled());
+    }
+
+    #[test]
+    fn test_agent_new_has_no_security() {
+        let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
+        let tools = ToolRegistry::new();
+
+        let agent = Agent::new(provider, tools);
+        let _token = agent.cancellation_token();
+        assert!(!_token.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_sandbox_result_to_tool_result_success() {
+        let sandbox_result = SandboxResult {
+            stdout: "hello".into(),
+            stderr: "warning".into(),
+            exit_code: 0,
+        };
+
+        let tool_result = Agent::sandbox_result_to_tool_result(sandbox_result);
+        assert!(!tool_result.is_error);
+        assert!(tool_result.content.contains("hello"));
+        assert!(tool_result.content.contains("warning"));
+    }
+
+    #[tokio::test]
+    async fn test_sandbox_result_to_tool_result_error() {
+        let sandbox_result = SandboxResult {
+            stdout: String::new(),
+            stderr: "error occurred".into(),
+            exit_code: 1,
+        };
+
+        let tool_result = Agent::sandbox_result_to_tool_result(sandbox_result);
+        assert!(tool_result.is_error);
+        assert!(tool_result.content.contains("error occurred"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_bash_in_sandbox_missing_command() {
+        let sandbox = MockSandbox::new(true, SandboxResult {
+            stdout: String::new(),
+            stderr: String::new(),
+            exit_code: 0,
+        });
+
+        let input = serde_json::json!({});
+        let workspace = PathBuf::from("/tmp");
+
+        let result = Agent::execute_bash_in_sandbox(&sandbox, &input, &workspace).await;
+        assert!(result.is_error);
+        assert!(result.content.contains("missing required field 'command'"));
     }
 }
