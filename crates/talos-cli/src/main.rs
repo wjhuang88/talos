@@ -119,109 +119,157 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .create_session(project_name)
         .context("failed to create session")?;
 
-    // Enable raw mode so every keystroke is delivered immediately
     crossterm::terminal::enable_raw_mode().context("failed to enable raw mode")?;
 
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-    let mut cancel_token = CancellationToken::new();
-    let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
-    let mut first_ctrl_c_time: Option<std::time::Instant> = None;
-    let mut input_buffer = String::new();
-
+    let mut state = InteractiveState::new(session, cli, workspace_root);
     let mut events = EventStream::new();
 
     loop {
-        print!("> {input_buffer}");
+        print!("> {}", state.input_buffer);
         io::stdout().flush().context("failed to flush stdout")?;
 
-        tokio::select! {
-            event = events.next() => {
-                let Some(event) = event else { break };
-                let event = match event {
-                    Ok(e) => e,
-                    Err(e) => {
-                        eprintln!("stdin error: {e}");
-                        continue;
-                    }
-                };
-                let Event::Key(key_event) = event else { continue };
-                if key_event.kind != KeyEventKind::Press {
-                    continue;
-                }
-
-                // Normalize C0 control chars: \x03 → Ctrl+C
-                let (code, modifiers) = normalize_key(key_event.code, key_event.modifiers);
-
-                match (code, modifiers) {
-                    // Ctrl+C: cancel turn or exit
-                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                        input_buffer.clear();
-                        if let Some(handle) = running_task.take() {
-                            cancel_token.cancel();
-                            handle.abort();
-                            let _ = handle.await;
-                            eprintln!("\nTurn cancelled.");
-                            cancel_token = CancellationToken::new();
-                        } else {
-                            let now = std::time::Instant::now();
-                            if let Some(prev) = first_ctrl_c_time {
-                                if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                                    eprintln!("Exiting.");
-                                    let _ = crossterm::terminal::disable_raw_mode();
-                                    return Ok(());
-                                }
-                            }
-                            first_ctrl_c_time = Some(now);
-                            eprintln!("Press Ctrl+C again within 2 seconds to exit.");
-                        }
-                    }
-                    // Enter: submit input
-                    (KeyCode::Enter, _) => {
-                        let input = input_buffer.clone();
-                        input_buffer.clear();
-                        first_ctrl_c_time = None;
-                        eprintln!();
-
-                        if input.is_empty() {
-                            continue;
-                        }
-
-                        if let Some(handle) = running_task.take() {
-                            handle.abort();
-                            let _ = handle.await;
-                        }
-
-                        cancel_token = CancellationToken::new();
-                        let token = cancel_token.clone();
-                        let session_clone = session.clone();
-                        let cli_clone = cli.clone();
-                        let workspace_clone = workspace_root.clone();
-
-                        let handle = tokio::spawn(async move {
-                            run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
-                        });
-                        running_task = Some(handle);
-                    }
-                    // Backspace: delete last char
-                    (KeyCode::Backspace, _) => {
-                        input_buffer.pop();
-                    }
-                    // Regular character: append to buffer
-                    (KeyCode::Char(c), _) => {
-                        input_buffer.push(c);
-                    }
-                    _ => {}
-                }
+        let event = if state.running_task.is_some() {
+            tokio::select! {
+                event = events.next() => event,
+                _ = tokio::time::sleep(Duration::from_millis(50)) => None,
             }
-            _ = tokio::time::sleep(Duration::from_millis(50)) => {
-                // Periodic wake to check if running task completed
+        } else {
+            events.next().await
+        };
+
+        match state.handle_event(event)? {
+            EventAction::Continue => {}
+            EventAction::Exit => {
+                let _ = crossterm::terminal::disable_raw_mode();
+                return Ok(());
             }
         }
 
-        // Check if running task completed
-        if let Some(handle) = running_task.take() {
+        state.check_task_completion().await;
+    }
+}
+
+enum EventAction {
+    Continue,
+    Exit,
+}
+
+struct InteractiveState {
+    session: Session,
+    cli: Cli,
+    workspace_root: PathBuf,
+    cancel_token: CancellationToken,
+    running_task: Option<tokio::task::JoinHandle<Result<()>>>,
+    first_ctrl_c_time: Option<std::time::Instant>,
+    input_buffer: String,
+}
+
+impl InteractiveState {
+    fn new(session: Session, cli: Cli, workspace_root: PathBuf) -> Self {
+        Self {
+            session,
+            cli,
+            workspace_root,
+            cancel_token: CancellationToken::new(),
+            running_task: None,
+            first_ctrl_c_time: None,
+            input_buffer: String::new(),
+        }
+    }
+
+    fn handle_event(
+        &mut self,
+        event: Option<Result<Event, std::io::Error>>,
+    ) -> Result<EventAction> {
+        let Some(event) = event else {
+            return Ok(EventAction::Continue);
+        };
+        let event = match event {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("stdin error: {e}");
+                return Ok(EventAction::Continue);
+            }
+        };
+        let Event::Key(key_event) = event else {
+            return Ok(EventAction::Continue);
+        };
+        if key_event.kind != KeyEventKind::Press {
+            return Ok(EventAction::Continue);
+        }
+
+        let (code, modifiers) = normalize_key(key_event.code, key_event.modifiers);
+
+        match (code, modifiers) {
+            (KeyCode::Char('c'), KeyModifiers::CONTROL) => return self.on_ctrl_c(),
+            (KeyCode::Enter, _) => self.spawn_turn(),
+            (KeyCode::Backspace, _) => {
+                self.input_buffer.pop();
+            }
+            (KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End | KeyCode::Delete, _) => {}
+            (KeyCode::Char(c), KeyModifiers::NONE) => {
+                self.input_buffer.push(c);
+            }
+            _ => {}
+        }
+
+        Ok(EventAction::Continue)
+    }
+
+    fn on_ctrl_c(&mut self) -> Result<EventAction> {
+        self.input_buffer.clear();
+        if let Some(handle) = self.running_task.take() {
+            self.cancel_token.cancel();
+            handle.abort();
+            // Can't await here in sync context — just abort
+            eprintln!("\nTurn cancelled.");
+            self.cancel_token = CancellationToken::new();
+        } else {
+            let now = std::time::Instant::now();
+            if let Some(prev) = self.first_ctrl_c_time {
+                if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
+                    eprintln!("Exiting.");
+                    let _ = crossterm::terminal::disable_raw_mode();
+                    return Ok(EventAction::Exit);
+                }
+            }
+            self.first_ctrl_c_time = Some(now);
+            eprintln!("Press Ctrl+C again within 2 seconds to exit.");
+        }
+        Ok(EventAction::Continue)
+    }
+
+    fn spawn_turn(&mut self) {
+        let input = self.input_buffer.clone();
+        self.input_buffer.clear();
+        self.first_ctrl_c_time = None;
+        eprintln!();
+
+        if input.is_empty() {
+            return;
+        }
+
+        if let Some(handle) = self.running_task.take() {
+            handle.abort();
+        }
+
+        self.cancel_token = CancellationToken::new();
+        let token = self.cancel_token.clone();
+        let session = self.session.clone();
+        let cli = self.cli.clone();
+        let workspace = self.workspace_root.clone();
+
+        let handle = tokio::spawn(async move {
+            run_agent_turn(input, cli, workspace, session, token).await
+        });
+        self.running_task = Some(handle);
+    }
+
+    async fn check_task_completion(&mut self) {
+        if let Some(handle) = self.running_task.take() {
             if handle.is_finished() {
                 match handle.await {
                     Ok(Ok(())) => {}
@@ -232,14 +280,12 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                         }
                     }
                 }
+                println!();
             } else {
-                running_task = Some(handle);
+                self.running_task = Some(handle);
             }
         }
     }
-
-    let _ = crossterm::terminal::disable_raw_mode();
-    Ok(())
 }
 
 /// Normalize C0 control characters to their Ctrl+letter equivalent.
@@ -401,5 +447,227 @@ fn parse_provider(s: &str) -> Result<Provider> {
         "anthropic" => Ok(Provider::Anthropic),
         "openai" => Ok(Provider::OpenAI),
         other => Err(anyhow!("unknown provider '{other}': supported values are 'anthropic' and 'openai'")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── c0_to_ctrl ──────────────────────────────────────────────
+
+    #[test]
+    fn c0_to_ctrl_maps_a_to_z() {
+        assert_eq!(c0_to_ctrl('\x01'), Some('a'));
+        assert_eq!(c0_to_ctrl('\x03'), Some('c'));
+        assert_eq!(c0_to_ctrl('\x1a'), Some('z'));
+    }
+
+    #[test]
+    fn c0_to_ctrl_returns_none_for_printable() {
+        assert_eq!(c0_to_ctrl('a'), None);
+        assert_eq!(c0_to_ctrl(' '), None);
+        assert_eq!(c0_to_ctrl('\x7f'), None);
+    }
+
+    #[test]
+    fn c0_to_ctrl_maps_newline_to_ctrl_j() {
+        assert_eq!(c0_to_ctrl('\n'), Some('j'));
+    }
+
+    // ── normalize_key ───────────────────────────────────────────
+
+    #[test]
+    fn normalize_key_passes_through_with_modifiers() {
+        assert_eq!(
+            normalize_key(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            (KeyCode::Char('c'), KeyModifiers::CONTROL)
+        );
+    }
+
+    #[test]
+    fn normalize_key_passes_through_non_char() {
+        assert_eq!(
+            normalize_key(KeyCode::Enter, KeyModifiers::NONE),
+            (KeyCode::Enter, KeyModifiers::NONE)
+        );
+    }
+
+    #[test]
+    fn normalize_key_converts_c0_to_ctrl() {
+        assert_eq!(
+            normalize_key(KeyCode::Char('\x03'), KeyModifiers::NONE),
+            (KeyCode::Char('c'), KeyModifiers::CONTROL)
+        );
+        assert_eq!(
+            normalize_key(KeyCode::Char('\x01'), KeyModifiers::NONE),
+            (KeyCode::Char('a'), KeyModifiers::CONTROL)
+        );
+    }
+
+    #[test]
+    fn normalize_key_leaves_printable_unchanged() {
+        assert_eq!(
+            normalize_key(KeyCode::Char('x'), KeyModifiers::NONE),
+            (KeyCode::Char('x'), KeyModifiers::NONE)
+        );
+    }
+
+    // ── InteractiveState input handling ─────────────────────────
+
+    fn make_state() -> InteractiveState {
+        InteractiveState {
+            session: make_test_session(),
+            cli: Cli { prompt: None, print: false, model: None, provider: None },
+            workspace_root: PathBuf::from("/tmp"),
+            cancel_token: CancellationToken::new(),
+            running_task: None,
+            first_ctrl_c_time: None,
+            input_buffer: String::new(),
+        }
+    }
+
+    fn make_test_session() -> Session {
+        let dir = tempfile::tempdir().unwrap();
+        let mgr = SessionManager::with_dir(dir.path().to_path_buf());
+        mgr.create_session("test").unwrap()
+    }
+
+    fn key_event(code: KeyCode, modifiers: KeyModifiers) -> Event {
+        Event::Key(crossterm::event::KeyEvent {
+            code,
+            modifiers,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        })
+    }
+
+    #[test]
+    fn typing_appends_to_buffer() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('i'), KeyModifiers::NONE)))).unwrap();
+        assert_eq!(s.input_buffer, "hi");
+    }
+
+    #[test]
+    fn backspace_removes_last_char() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('a'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('b'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Backspace, KeyModifiers::NONE)))).unwrap();
+        assert_eq!(s.input_buffer, "a");
+    }
+
+    #[test]
+    fn backspace_on_empty_does_not_panic() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Backspace, KeyModifiers::NONE)))).unwrap();
+        assert_eq!(s.input_buffer, "");
+    }
+
+    #[test]
+    fn ctrl_c_clears_buffer() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('i'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        assert_eq!(s.input_buffer, "");
+    }
+
+    #[test]
+    fn ctrl_c_single_press_sets_timer() {
+        let mut s = make_state();
+        let action = s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        assert!(matches!(action, EventAction::Continue));
+        assert!(s.first_ctrl_c_time.is_some());
+    }
+
+    #[test]
+    fn ctrl_c_double_press_exits() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        // Second press within 2 seconds
+        let action = s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        assert!(matches!(action, EventAction::Exit));
+    }
+
+    #[test]
+    fn ctrl_c_double_press_after_timeout_resets() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        // Simulate timeout by setting first_ctrl_c_time to the past
+        s.first_ctrl_c_time = Some(std::time::Instant::now() - Duration::from_secs(3));
+        let action = s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        assert!(matches!(action, EventAction::Continue));
+        // Timer should be refreshed
+        assert!(s.first_ctrl_c_time.is_some());
+    }
+
+    #[tokio::test]
+    async fn enter_submits_non_empty_input() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('i'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Enter, KeyModifiers::NONE)))).unwrap();
+        assert_eq!(s.input_buffer, "");
+        assert!(s.running_task.is_some());
+    }
+
+    #[tokio::test]
+    async fn enter_on_empty_does_not_spawn_task() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Enter, KeyModifiers::NONE)))).unwrap();
+        assert!(s.running_task.is_none());
+    }
+
+    #[tokio::test]
+    async fn enter_clears_ctrl_c_timer() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
+        assert!(s.first_ctrl_c_time.is_some());
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Enter, KeyModifiers::NONE)))).unwrap();
+        assert!(s.first_ctrl_c_time.is_none());
+    }
+
+    #[test]
+    fn arrow_keys_ignored() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(key_event(KeyCode::Char('a'), KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Left, KeyModifiers::NONE)))).unwrap();
+        s.handle_event(Some(Ok(key_event(KeyCode::Right, KeyModifiers::NONE)))).unwrap();
+        assert_eq!(s.input_buffer, "a");
+    }
+
+    #[test]
+    fn ctrl_d_not_treated_as_printable() {
+        let mut s = make_state();
+        // Ctrl+D normalizes to Ctrl+d, which has CONTROL modifier
+        let (code, modifiers) = normalize_key(KeyCode::Char('\x04'), KeyModifiers::NONE);
+        assert_eq!(code, KeyCode::Char('d'));
+        assert_eq!(modifiers, KeyModifiers::CONTROL);
+        // Should NOT match (KeyCode::Char('d'), KeyModifiers::NONE)
+        s.handle_event(Some(Ok(key_event(code, modifiers)))).unwrap();
+        assert_eq!(s.input_buffer, "");
+    }
+
+    #[test]
+    fn non_key_event_ignored() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(Event::Resize(80, 24)))).unwrap();
+        assert_eq!(s.input_buffer, "");
+    }
+
+    #[test]
+    fn release_event_ignored() {
+        let mut s = make_state();
+        s.handle_event(Some(Ok(Event::Key(crossterm::event::KeyEvent {
+            code: KeyCode::Char('a'),
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Release,
+            state: crossterm::event::KeyEventState::empty(),
+        })))).unwrap();
+        assert_eq!(s.input_buffer, "");
     }
 }
