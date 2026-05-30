@@ -209,7 +209,12 @@ impl InteractiveState {
         match (code, modifiers) {
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.on_ctrl_c(),
             (KeyCode::Enter, _) => {
-                self.spawn_turn();
+                let input = self.input_buffer.clone();
+                self.input_buffer.clear();
+                self.first_ctrl_c_time = None;
+                // Print the submitted line
+                self.print_status(&input)?;
+                self.spawn_turn(input);
                 Ok(EventAction::Continue)
             }
             (KeyCode::Backspace, _) => {
@@ -232,35 +237,40 @@ impl InteractiveState {
         if let Some(handle) = self.running_task.take() {
             self.cancel_token.cancel();
             handle.abort();
-            // Can't await here in sync context — just abort
-            eprintln!("\nTurn cancelled.");
+            self.print_status("\nTurn cancelled.")?;
             self.cancel_token = CancellationToken::new();
         } else {
             let now = std::time::Instant::now();
             if let Some(prev) = self.first_ctrl_c_time {
                 if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                    eprintln!("Exiting.");
+                    self.print_status("Exiting.")?;
                     let _ = crossterm::terminal::disable_raw_mode();
                     return Ok(EventAction::Exit);
                 }
             }
             self.first_ctrl_c_time = Some(now);
-            eprintln!("Press Ctrl+C again within 2 seconds to exit.");
+            self.print_status("Press Ctrl+C again within 2 seconds to exit.")?;
         }
+        self.redraw_prompt()?;
         Ok(EventAction::Continue)
     }
 
     fn redraw_prompt(&self) -> Result<()> {
-        print!("\r> {}\x1b[K", self.input_buffer);
+        // \r = carriage return to column 0
+        // \x1b[0K = clear from cursor to end of line
+        // \x1b[?25l = hide cursor (prevent flicker during redraw)
+        // \x1b[?25h = show cursor
+        print!("\r\x1b[0K> {}\x1b[?25h", self.input_buffer);
         io::stdout().flush().context("failed to flush stdout")
     }
 
-    fn spawn_turn(&mut self) {
-        let input = self.input_buffer.clone();
-        self.input_buffer.clear();
-        self.first_ctrl_c_time = None;
-        eprintln!();
+    fn print_status(&self, msg: &str) -> Result<()> {
+        // Move cursor to beginning of line, clear line, print status
+        print!("\r\x1b[0K{}\n", msg);
+        io::stdout().flush().context("failed to flush stdout")
+    }
 
+    fn spawn_turn(&mut self, input: String) {
         if input.is_empty() {
             return;
         }
@@ -286,10 +296,12 @@ impl InteractiveState {
             if handle.is_finished() {
                 match handle.await {
                     Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("Error: {e}"),
+                    Ok(Err(e)) => {
+                        let _ = self.print_status(&format!("Error: {e}"));
+                    }
                     Err(e) => {
                         if !e.is_cancelled() {
-                            eprintln!("Task error: {e}");
+                            let _ = self.print_status(&format!("Task error: {e}"));
                         }
                     }
                 }
