@@ -193,7 +193,7 @@ impl InteractiveState {
         let event = match event {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("stdin error: {e}");
+                let _ = self.print_status(&format!("stdin error: {e}"));
                 return Ok(EventAction::Continue);
             }
         };
@@ -390,13 +390,15 @@ async fn run_agent_turn(
                         io::stdout().flush().context("failed to flush stdout")?;
                     }
                     Ok(AgentEvent::ToolCall { call }) => {
-                        eprintln!("\n[tool: {}]", call.name);
+                        print!("\r\x1b[0K\n[tool: {}]\n> ", call.name);
+                        io::stdout().flush().context("failed to flush stdout")?;
                         session
                             .append_event(&AgentEvent::ToolCall { call })
                             .context("failed to log tool call to session")?;
                     }
                     Ok(AgentEvent::ToolResult { result }) => {
-                        eprintln!("[tool result: {}]", if result.is_error { "error" } else { "ok" });
+                        print!("\r\x1b[0K[tool result: {}]\n", if result.is_error { "error" } else { "ok" });
+                        io::stdout().flush().context("failed to flush stdout")?;
                         session
                             .append_event(&AgentEvent::ToolResult { result })
                             .context("failed to log tool result to session")?;
@@ -414,12 +416,14 @@ async fn run_agent_turn(
                         return Ok(());
                     }
                     Ok(AgentEvent::Error { message }) => {
-                        eprintln!("\nError: {message}");
+                        print!("\r\x1b[0K\nError: {message}\n");
+                        io::stdout().flush().context("failed to flush stdout")?;
                         bail!("{message}");
                     }
                     Ok(AgentEvent::TurnStart) => {}
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        eprintln!("\nWarning: dropped {n} event(s) due to slow consumer");
+                        print!("\r\x1b[0K\nWarning: dropped {n} event(s) due to slow consumer\n");
+                        io::stdout().flush().context("failed to flush stdout")?;
                     }
                     Err(broadcast::error::RecvError::Closed) => {
                         bail!("event channel closed before TurnEnd");
