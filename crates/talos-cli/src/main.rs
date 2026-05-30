@@ -124,10 +124,9 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-    print!("> ");
-    io::stdout().flush().context("failed to flush stdout")?;
-
     let mut state = InteractiveState::new(session, cli, workspace_root);
+    state.redraw_prompt()?;
+
     let mut events = EventStream::new();
 
     loop {
@@ -136,8 +135,8 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 biased;
                 result = state.check_task_completion() => {
                     if result {
-                        print!("\n> ");
-                        io::stdout().flush().context("failed to flush stdout")?;
+                        println!();
+                        state.redraw_prompt()?;
                     }
                     continue;
                 }
@@ -149,8 +148,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
         let needs_redraw = state.handle_event(event)?;
         if needs_redraw == EventAction::Redraw {
-            print!("\r> {}", state.input_buffer);
-            io::stdout().flush().context("failed to flush stdout")?;
+            state.redraw_prompt()?;
         }
     }
 }
@@ -250,6 +248,11 @@ impl InteractiveState {
             eprintln!("Press Ctrl+C again within 2 seconds to exit.");
         }
         Ok(EventAction::Continue)
+    }
+
+    fn redraw_prompt(&self) -> Result<()> {
+        print!("\r> {}\x1b[K", self.input_buffer);
+        io::stdout().flush().context("failed to flush stdout")
     }
 
     fn spawn_turn(&mut self) {
