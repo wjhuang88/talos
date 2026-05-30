@@ -18,9 +18,10 @@ talos-agent = { path = "../talos-agent" }
 talos-tools = { path = "../talos-tools" }
 talos-session = { path = "../talos-session" }
 clap = { version = "4", features = ["derive"] }
-tokio = { version = "1", features = ["full", "signal"] }
+tokio = { version = "1", features = ["full"] }
 anyhow = "1"
-ctrlc = { version = "3", features = ["termination"] }
+crossterm = { version = "0.28", features = ["event-stream"] }
+futures = "0.3"
 tokio-util = "0.7"
 
 [lints]

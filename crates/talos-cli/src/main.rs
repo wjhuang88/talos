@@ -7,11 +7,12 @@
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
+use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind, KeyModifiers};
+use futures::StreamExt;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
 use talos_core::message::{AgentEvent, Message};
@@ -118,80 +119,146 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .create_session(project_name)
         .context("failed to create session")?;
 
+    // Enable raw mode so every keystroke is delivered immediately
+    crossterm::terminal::enable_raw_mode().context("failed to enable raw mode")?;
+
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
-
-    static CTRL_C_FLAG: AtomicBool = AtomicBool::new(false);
-    ctrlc::set_handler(move || {
-        CTRL_C_FLAG.store(true, Ordering::SeqCst);
-    })
-    .context("failed to install Ctrl+C handler")?;
 
     let mut cancel_token = CancellationToken::new();
     let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
     let mut first_ctrl_c_time: Option<std::time::Instant> = None;
+    let mut input_buffer = String::new();
+
+    let mut events = EventStream::new();
 
     loop {
-        if CTRL_C_FLAG.swap(false, Ordering::SeqCst) {
-            if let Some(handle) = running_task.take() {
-                cancel_token.cancel();
-                handle.abort();
-                let _ = handle.await;
-                eprintln!("\nTurn cancelled.");
-                cancel_token = CancellationToken::new();
-            } else {
-                let now = std::time::Instant::now();
-                if let Some(prev) = first_ctrl_c_time {
-                    if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                        eprintln!("Exiting.");
-                        return Ok(());
+        print!("> {input_buffer}");
+        io::stdout().flush().context("failed to flush stdout")?;
+
+        tokio::select! {
+            event = events.next() => {
+                let Some(event) = event else { break };
+                let event = match event {
+                    Ok(e) => e,
+                    Err(e) => {
+                        eprintln!("stdin error: {e}");
+                        continue;
                     }
+                };
+                let Event::Key(key_event) = event else { continue };
+                if key_event.kind != KeyEventKind::Press {
+                    continue;
                 }
-                first_ctrl_c_time = Some(now);
-                eprintln!("Press Ctrl+C again within 2 seconds to exit.");
+
+                // Normalize C0 control chars: \x03 → Ctrl+C
+                let (code, modifiers) = normalize_key(key_event.code, key_event.modifiers);
+
+                match (code, modifiers) {
+                    // Ctrl+C: cancel turn or exit
+                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                        input_buffer.clear();
+                        if let Some(handle) = running_task.take() {
+                            cancel_token.cancel();
+                            handle.abort();
+                            let _ = handle.await;
+                            eprintln!("\nTurn cancelled.");
+                            cancel_token = CancellationToken::new();
+                        } else {
+                            let now = std::time::Instant::now();
+                            if let Some(prev) = first_ctrl_c_time {
+                                if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
+                                    eprintln!("Exiting.");
+                                    let _ = crossterm::terminal::disable_raw_mode();
+                                    return Ok(());
+                                }
+                            }
+                            first_ctrl_c_time = Some(now);
+                            eprintln!("Press Ctrl+C again within 2 seconds to exit.");
+                        }
+                    }
+                    // Enter: submit input
+                    (KeyCode::Enter, _) => {
+                        let input = input_buffer.clone();
+                        input_buffer.clear();
+                        first_ctrl_c_time = None;
+                        eprintln!();
+
+                        if input.is_empty() {
+                            continue;
+                        }
+
+                        if let Some(handle) = running_task.take() {
+                            handle.abort();
+                            let _ = handle.await;
+                        }
+
+                        cancel_token = CancellationToken::new();
+                        let token = cancel_token.clone();
+                        let session_clone = session.clone();
+                        let cli_clone = cli.clone();
+                        let workspace_clone = workspace_root.clone();
+
+                        let handle = tokio::spawn(async move {
+                            run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
+                        });
+                        running_task = Some(handle);
+                    }
+                    // Backspace: delete last char
+                    (KeyCode::Backspace, _) => {
+                        input_buffer.pop();
+                    }
+                    // Regular character: append to buffer
+                    (KeyCode::Char(c), _) => {
+                        input_buffer.push(c);
+                    }
+                    _ => {}
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_millis(50)) => {
+                // Periodic wake to check if running task completed
             }
         }
 
-        print!("> ");
-        io::stdout().flush().context("failed to flush stdout")?;
-
-        let (line, read_result) = tokio::task::spawn_blocking(|| {
-            let mut line = String::new();
-            let result = io::stdin().read_line(&mut line);
-            (line, result)
-        })
-        .await
-        .context("readline task panicked")?;
-
-        if CTRL_C_FLAG.swap(false, Ordering::SeqCst) {
-            first_ctrl_c_time = None;
-            continue;
-        }
-
-        let _ = read_result;
-        let input = line.trim().to_string();
-
-        if input.is_empty() {
-            continue;
-        }
-
-        first_ctrl_c_time = None;
-
+        // Check if running task completed
         if let Some(handle) = running_task.take() {
-            handle.abort();
-            let _ = handle.await;
+            if handle.is_finished() {
+                match handle.await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!("Error: {e}"),
+                    Err(e) => {
+                        if !e.is_cancelled() {
+                            eprintln!("Task error: {e}");
+                        }
+                    }
+                }
+            } else {
+                running_task = Some(handle);
+            }
         }
+    }
 
-        cancel_token = CancellationToken::new();
-        let token = cancel_token.clone();
-        let session_clone = session.clone();
-        let cli_clone = cli.clone();
-        let workspace_clone = workspace_root.clone();
+    let _ = crossterm::terminal::disable_raw_mode();
+    Ok(())
+}
 
-        let handle = tokio::spawn(async move {
-            run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
-        });
-        running_task = Some(handle);
+/// Normalize C0 control characters to their Ctrl+letter equivalent.
+/// Terminals in raw mode may send raw C0 codes (e.g., \x03 for Ctrl+C).
+fn normalize_key(code: KeyCode, modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {
+    if modifiers.is_empty() {
+        if let KeyCode::Char(ch) = code {
+            if let Some(ctrl) = c0_to_ctrl(ch) {
+                return (KeyCode::Char(ctrl), KeyModifiers::CONTROL);
+            }
+        }
+    }
+    (code, modifiers)
+}
+
+fn c0_to_ctrl(ch: char) -> Option<char> {
+    match u32::from(ch) {
+        0x01..=0x1a => char::from_u32(0x60 + u32::from(ch)), // 0x01→'a', 0x03→'c'
+        _ => None,
     }
 }
 
