@@ -995,6 +995,134 @@ tui-overlay = "0.4"
 
 ---
 
+## 19. TUI Color Scheme — Nord Theme
+
+### Design Philosophy
+
+Talos TUI uses the **Nord** color palette — an arctic, north-bluish color palette designed by Arctic Ice Studio.
+Nord emphasizes a calm, clean, and minimal aesthetic with high contrast for readability.
+
+Official reference: https://www.nordtheme.com/docs/colors-and-palettes
+
+### Color Palette
+
+#### Polar Night (Dark Backgrounds — nord0 to nord3)
+
+| Name | Hex | RGB | Purpose |
+|------|-----|-----|---------|
+| `nord0` | `#2E3440` | `46,52,64` | Main background, primary area coloring |
+| `nord1` | `#3B4252` | `59,66,82` | Status bar, panels, modals, popups, borders |
+| `nord2` | `#434C5E` | `67,76,94` | Active line highlight, selection, elevated panels |
+| `nord3` | `#4C566A` | `76,86,106` | Indent guides, wrap markers, comments |
+
+#### Snow Storm (Light Text — nord4 to nord6)
+
+| Name | Hex | RGB | Purpose |
+|------|-----|-----|---------|
+| `nord4` | `#D8DEE9` | `216,222,233` | Elevated UI text, caret, variables, constants |
+| `nord5` | `#E5E9F0` | `229,233,240` | Subtle text, hover/active state animations |
+| `nord6` | `#ECEFF4` | `236,239,244` | Primary text color, plain text, reserved syntax chars |
+
+#### Frost (Blue Accent — nord7 to nord10)
+
+| Name | Hex | RGB | Purpose |
+|------|-----|-----|---------|
+| `nord7` | `#8FBCBB` | `143,188,187` | Secondary accent, classes, types, focused elements |
+| `nord8` | `#88C0D0` | `136,192,208` | **Primary accent** — function calls, links, active tabs |
+| `nord9` | `#81A1C1` | `129,161,193` | Keywords, operators, tags, secondary UI highlights |
+| `nord10` | `#5E81AC` | `94,129,172` | Tertiary accents, pragmas, pre-processor |
+
+#### Aurora (Semantic Colors — nord11 to nord15)
+
+| Name | Hex | RGB | Purpose |
+|------|-----|-----|---------|
+| `nord11` | `#BF616A` | `191,97,106` | **Error** — linter errors, diff deletions, error states |
+| `nord12` | `#D08770` | `208,135,112` | Advanced/danger functionality, annotations, decorators |
+| `nord13` | `#EBCB8B` | `235,203,139` | **Warning** — linter warnings, diff modifications |
+| `nord14` | `#A3BE8C` | `163,190,140` | **Success** — success states, diff additions, strings |
+| `nord15` | `#B48EAD` | `180,142,173` | Uncommon functionality, numbers |
+
+### Talos TUI Component Mapping
+
+| Component | Background | Text | Accent | Border |
+|-----------|-----------|------|--------|--------|
+| **Main background** | `nord0` | — | — | — |
+| **Status bar** | `nord1` | `nord4` | `nord8` | `nord2` (top) |
+| **Chat viewport** | `nord0` | `nord6` | — | — |
+| **User message** | `nord1` | `nord6` | — | `nord2` (left) |
+| **Assistant message** | `nord0` | `nord4` | — | — |
+| **Tool call indicator** | `nord2` | `nord8` | `nord8` | `nord9` |
+| **Tool result (ok)** | `nord0` | `nord14` | `nord14` | `nord14` (left) |
+| **Tool result (error)** | `nord0` | `nord11` | `nord11` | `nord11` (left) |
+| **Input area** | `nord1` | `nord6` | `nord8` | `nord2` (top) |
+| **Input prompt `>`** | — | `nord8` | — | — |
+| **Approval overlay** | `nord1` (90% opacity) | `nord6` | `nord9` | `nord9` |
+| **Approval allow button** | `nord14` | `nord0` | — | — |
+| **Approval deny button** | `nord11` | `nord6` | — | — |
+| **Selection highlight** | `nord2` | `nord6` | — | — |
+| **Scrollbar** | — | `nord3` | `nord8` (thumb) | — |
+| **Diff additions** | — | `nord14` | — | — |
+| **Diff deletions** | — | `nord11` | — | — |
+| **Diff modifications** | — | `nord13` | — | — |
+| **Spinner / loading** | — | `nord8` | — | — |
+| **Session ID** | — | `nord3` | — | — |
+| **Key hints** | — | `nord3` | `nord9` (key) | — |
+
+### Ratatui Color Constants
+
+```rust
+// Talos TUI color scheme — Nord theme
+// Reference: https://www.nordtheme.com/docs/colors-and-palettes
+
+use ratatui::style::Color;
+
+/// Polar Night — dark backgrounds
+mod polar_night {
+    use super::Color;
+    pub const NORD0: Color = Color::Rgb(46, 52, 64);   // #2E3440 — main background
+    pub const NORD1: Color = Color::Rgb(59, 66, 82);   // #3B4252 — status bar, panels
+    pub const NORD2: Color = Color::Rgb(67, 76, 94);   // #434C5E — active line, selection
+    pub const NORD3: Color = Color::Rgb(76, 86, 106);  // #4C566A — indent guides, comments
+}
+
+/// Snow Storm — light text
+mod snow_storm {
+    use super::Color;
+    pub const NORD4: Color = Color::Rgb(216, 222, 233); // #D8DEE9 — elevated text
+    pub const NORD5: Color = Color::Rgb(229, 233, 240); // #E5E9F0 — subtle text, hover
+    pub const NORD6: Color = Color::Rgb(236, 239, 244); // #ECEFF4 — primary text
+}
+
+/// Frost — blue accent
+mod frost {
+    use super::Color;
+    pub const NORD7: Color = Color::Rgb(143, 188, 187); // #8FBCBB — secondary accent
+    pub const NORD8: Color = Color::Rgb(136, 192, 208); // #88C0D0 — primary accent
+    pub const NORD9: Color = Color::Rgb(129, 161, 193); // #81A1C1 — keywords, operators
+    pub const NORD10: Color = Color::Rgb(94, 129, 172); // #5E81AC — tertiary accent
+}
+
+/// Aurora — semantic colors
+mod aurora {
+    use super::Color;
+    pub const NORD11: Color = Color::Rgb(191, 97, 106);  // #BF616A — error
+    pub const NORD12: Color = Color::Rgb(208, 135, 112); // #D08770 — danger/advanced
+    pub const NORD13: Color = Color::Rgb(235, 203, 139); // #EBCB8B — warning
+    pub const NORD14: Color = Color::Rgb(163, 190, 140); // #A3BE8C — success
+    pub const NORD15: Color = Color::Rgb(180, 142, 173); // #B48EAD — uncommon
+}
+```
+
+### Design Principles
+
+1. **Calm, not flashy**: Nord's muted blues create a focused, distraction-free environment
+2. **High contrast for readability**: Light text on dark backgrounds with sufficient contrast ratios
+3. **Semantic colors are restrained**: Errors/warnings/success use Aurora colors sparingly
+4. **Consistent with developer tools**: Nord is widely adopted in terminals, editors, and IDEs
+5. **Accessible**: All text/background combinations meet WCAG AA contrast requirements
+
+---
+
 ## Usage During Implementation
 
 When implementing a specific Talos feature:

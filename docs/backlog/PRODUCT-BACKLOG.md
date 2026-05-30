@@ -542,7 +542,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ### #I009-S0: TUI layout and interaction design
 
-**Description**: Before implementing the TUI, design the complete layout, component hierarchy, interaction model, and keymap system. Reference Codex TUI architecture (80+ modules in `codex-rs/tui/src/`). Produce a design document covering: screen layout (chat viewport, bottom pane, status bar), HistoryCell types (message, exec, approval, patch, MCP), BottomPane view stack, slash command interface, approval overlay flow, keymap contexts, and `--no-alt-screen` inline mode. This design document will be the blueprint for all subsequent TUI stories.
+**Description**: Before implementing the TUI, design the complete layout, component hierarchy, interaction model, keymap system, and color scheme. Reference Codex TUI architecture (80+ modules in `codex-rs/tui/src/`). Use the **Nord theme** (https://www.nordtheme.com/) for all color definitions — see `docs/reference/REFERENCE-PROJECTS.md` §19 for palette and component mapping. Produce a design document covering: screen layout (chat viewport, bottom pane, status bar), HistoryCell types (message, exec, approval, patch, MCP), BottomPane view stack, slash command interface, approval overlay flow, keymap contexts, `--no-alt-screen` inline mode, and Nord color scheme application. This design document will be the blueprint for all subsequent TUI stories.
 
 **Acceptance Criteria**:
 - [ ] Design document written at `docs/reference/TUI-DESIGN.md`
@@ -555,13 +555,16 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Inline mode (`--no-alt-screen`) behavior specification
 - [ ] Frame rate limiting strategy
 - [ ] Markdown rendering approach
+- [ ] Nord color scheme: component-to-color mapping table with hex values
+- [ ] Nord color scheme: Ratatui `Color::Rgb` constants module
+- [ ] Nord color scheme: contrast ratio verification for all text/background combinations (WCAG AA)
 
 **Depends on**: #I003-S6 (interactive loop exists to understand UX needs)
 **Estimate**: M
 
 ### #I009-S1: TUI with ratatui
 
-**Description**: Full terminal UI with: chat viewport with HistoryCell rendering, bottom pane with ChatComposer (multiline input), status bar with model/tokens/cost/context usage, approval overlay for permission requests, diff display for file changes. Based on TUI-DESIGN.md from #I009-S0. Supports `--no-alt-screen` for inline mode preserving terminal scrollback. Frame rate limited rendering via FrameRequester.
+**Description**: Full terminal UI with: chat viewport with HistoryCell rendering, bottom pane with ChatComposer (multiline input), status bar with model/tokens/cost/context usage, approval overlay for permission requests, diff display for file changes. Based on TUI-DESIGN.md from #I009-S0. Implements the **Nord color scheme** as defined in §19 of REFERENCE-PROJECTS.md — all components use Nord palette colors via the Ratatui `Color::Rgb` constants. Supports `--no-alt-screen` for inline mode preserving terminal scrollback. Frame rate limited rendering via FrameRequester.
 
 **Acceptance Criteria**:
 - [ ] `talos` launches full TUI by default
@@ -573,6 +576,8 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Frame rate limiting prevents wasteful renders during streaming
 - [ ] Works on macOS Terminal, iTerm2, Linux terminals
 - [ ] Markdown rendering in assistant messages
+- [ ] Nord color scheme applied to all components per TUI-DESIGN.md
+- [ ] All text/background combinations meet WCAG AA contrast ratio
 
 **Depends on**: #I003-S6, #I009-S0
 **Estimate**: XL
