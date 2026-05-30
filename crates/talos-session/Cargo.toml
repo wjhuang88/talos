@@ -1,0 +1,21 @@
+[package]
+name = "talos-session"
+description = "JSONL-based session logging for Talos agent conversations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+talos-core = { path = "../talos-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
