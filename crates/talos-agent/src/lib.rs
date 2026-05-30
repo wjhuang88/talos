@@ -15,9 +15,15 @@
 //! The `Ask` decision defaults to `Deny` at the agent level; interactive
 //! approval is handled by the CLI layer.
 
+pub mod compaction;
+pub mod token;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+pub mod caching;
+pub mod context;
 
 use futures_util::future::join_all;
 use talos_core::message::{AgentEvent, Message, ToolCall, ToolResult as MessageToolResult};
