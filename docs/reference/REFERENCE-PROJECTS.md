@@ -935,6 +935,66 @@ These patterns were synthesized from:
 
 ---
 
+## 18. TUI Framework Selection (I009)
+
+### Decision: ratatui + crossterm
+
+Talos TUI will use **ratatui** (v0.30+) as the rendering framework with **crossterm** as the terminal backend.
+
+### Comparison
+
+| Framework | Status | Language | Verdict |
+|-----------|--------|----------|---------|
+| **ratatui + crossterm** | Active (v0.30, Dec 2025), 20.8k stars, 15.1k dependents | Rust | **Selected** |
+| tui-rs | Archived (Aug 2023) | Rust | Dead, don't use |
+| termion | Slow maintenance, UNIX-only | Rust | Not cross-platform |
+| OpenTUI | Active (v0.3, May 2026) | Zig + TypeScript | Not Rust, unofficial Rust port incomplete |
+| Textual | Active | Python | Not applicable |
+
+### Why ratatui + crossterm
+
+1. **Proven in production for exactly this use case**: Codex CLI and Claude Code both use ratatui + crossterm for their chat TUI
+2. **Complete widget ecosystem for agent CLI requirements**:
+
+| Agent CLI Component | Ratatui Solution |
+|---|---|
+| Chat viewport | `Paragraph` + `tui-scrollview` + `ansi-to-tui` |
+| Input area | `ratatui-textarea` or `tui-input` |
+| Tool call display | `List` / `Table` with custom styling |
+| Approval overlay | `tui-overlay` / `tui-popup` |
+| Status bar | `Block` widget at bottom of layout |
+| Syntax highlighting | `ratatui-code-editor` (Tree-sitter) or `ansi-to-tui` |
+| Markdown rendering | `ratatui-markdown` |
+| Streaming updates | Immediate-mode re-render on each token |
+
+3. **Pure Rust, no FFI** — satisfies Hard Constraint #1
+4. **tokio compatible** — works with async event loop
+
+### Reference: Pi's TUI Architecture
+
+Pi (TypeScript) uses a **fully custom-built TUI** with no third-party framework. Key patterns worth studying:
+
+- **3-layer input pipeline**: `ProcessTerminal` (raw mode + Kitty protocol) → `StdinBuffer` (escape sequence buffering) → `TUI.handleInput()` (middleware chain → focused component)
+- **Differential rendering**: Compares previous/new lines, only re-renders changed lines, 16ms frame cap
+- **Overlay system**: Stack-based modal overlays with anchor positioning
+- **Hardware cursor for IME**: Components embed cursor markers in render output
+
+Pi hand-rolled its TUI because TypeScript lacks a mature equivalent to ratatui. **We don't need to** — ratatui provides all these capabilities out of the box.
+
+### Suggested Dependencies
+
+```toml
+[dependencies]
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+ratatui-textarea = "0.3"
+ansi-to-tui = "7"
+tui-scrollview = "0.5"
+tui-overlay = "0.4"
+```
+
+---
+
 ## Usage During Implementation
 
 When implementing a specific Talos feature:

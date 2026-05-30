@@ -4,15 +4,13 @@
 //! interactive mode for conversational agent sessions, and optional
 //! stdin pipe input and CLI argument overrides.
 
-use std::io::{self, IsTerminal, Read, Write};
+use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
-use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind, KeyModifiers};
-use futures::StreamExt;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
 use talos_core::message::{AgentEvent, Message};
@@ -20,6 +18,7 @@ use talos_core::tool::ToolRegistry;
 use talos_provider::AnthropicProvider;
 use talos_session::{Session, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
@@ -122,199 +121,87 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-    crossterm::terminal::enable_raw_mode().context("failed to enable raw mode")?;
+    let stdin = BufReader::new(tokio::io::stdin());
+    let mut lines = stdin.lines();
 
-    let mut state = InteractiveState::new(session, cli, workspace_root);
-    state.redraw_prompt()?;
-
-    let mut events = EventStream::new();
+    let mut cancel_token = CancellationToken::new();
+    let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
+    let mut first_ctrl_c_time: Option<std::time::Instant> = None;
 
     loop {
-        let event = if state.running_task.is_some() {
-            tokio::select! {
-                biased;
-                result = state.check_task_completion() => {
-                    if result {
-                        println!();
-                        state.redraw_prompt()?;
+        print!("> ");
+        io::stdout().flush().context("failed to flush stdout")?;
+
+        tokio::select! {
+            biased;
+            // Ctrl+C takes priority
+            _ = tokio::signal::ctrl_c() => {
+                if let Some(handle) = running_task.take() {
+                    cancel_token.cancel();
+                    handle.abort();
+                    let _ = handle.await;
+                    eprintln!("\nTurn cancelled.");
+                    cancel_token = CancellationToken::new();
+                } else {
+                    let now = std::time::Instant::now();
+                    if let Some(prev) = first_ctrl_c_time {
+                        if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
+                            eprintln!("Exiting.");
+                            return Ok(());
+                        }
                     }
+                    first_ctrl_c_time = Some(now);
+                    eprintln!("Press Ctrl+C again within 2 seconds to exit.");
+                }
+            }
+            line_result = lines.next_line() => {
+                let Some(input) = line_result.context("failed to read stdin")? else {
+                    break;
+                };
+                let input = input.trim().to_string();
+                first_ctrl_c_time = None;
+
+                if input.is_empty() {
                     continue;
                 }
-                event = events.next() => event,
-            }
-        } else {
-            events.next().await
-        };
 
-        let needs_redraw = state.handle_event(event)?;
-        if needs_redraw == EventAction::Redraw {
-            state.redraw_prompt()?;
-        }
-    }
-}
-
-#[derive(PartialEq)]
-enum EventAction {
-    Continue,
-    Redraw,
-    Exit,
-}
-
-struct InteractiveState {
-    session: Session,
-    cli: Cli,
-    workspace_root: PathBuf,
-    cancel_token: CancellationToken,
-    running_task: Option<tokio::task::JoinHandle<Result<()>>>,
-    first_ctrl_c_time: Option<std::time::Instant>,
-    input_buffer: String,
-}
-
-impl InteractiveState {
-    fn new(session: Session, cli: Cli, workspace_root: PathBuf) -> Self {
-        Self {
-            session,
-            cli,
-            workspace_root,
-            cancel_token: CancellationToken::new(),
-            running_task: None,
-            first_ctrl_c_time: None,
-            input_buffer: String::new(),
-        }
-    }
-
-    fn handle_event(
-        &mut self,
-        event: Option<Result<Event, std::io::Error>>,
-    ) -> Result<EventAction> {
-        let Some(event) = event else {
-            return Ok(EventAction::Continue);
-        };
-        let event = match event {
-            Ok(e) => e,
-            Err(e) => {
-                let _ = self.print_status(&format!("stdin error: {e}"));
-                return Ok(EventAction::Continue);
-            }
-        };
-        let Event::Key(key_event) = event else {
-            return Ok(EventAction::Continue);
-        };
-        if key_event.kind != KeyEventKind::Press {
-            return Ok(EventAction::Continue);
-        }
-
-        let (code, modifiers) = normalize_key(key_event.code, key_event.modifiers);
-
-        match (code, modifiers) {
-            (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.on_ctrl_c(),
-            (KeyCode::Enter, _) => {
-                let input = self.input_buffer.clone();
-                self.input_buffer.clear();
-                self.first_ctrl_c_time = None;
-                print!("\r\n");
-                io::stdout().flush().context("failed to flush stdout")?;
-                if input.is_empty() {
-                    self.redraw_prompt()?;
-                    return Ok(EventAction::Continue);
+                if let Some(handle) = running_task.take() {
+                    handle.abort();
+                    let _ = handle.await;
                 }
-                self.spawn_turn(input);
-                Ok(EventAction::Continue)
-            }
-            (KeyCode::Backspace, _) => {
-                self.input_buffer.pop();
-                Ok(EventAction::Redraw)
-            }
-            (KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End | KeyCode::Delete, _) => {
-                Ok(EventAction::Continue)
-            }
-            (KeyCode::Char(c), KeyModifiers::NONE) => {
-                self.input_buffer.push(c);
-                Ok(EventAction::Redraw)
-            }
-            _ => Ok(EventAction::Continue),
-        }
-    }
 
-    fn on_ctrl_c(&mut self) -> Result<EventAction> {
-        self.input_buffer.clear();
-        if let Some(handle) = self.running_task.take() {
-            self.cancel_token.cancel();
-            handle.abort();
-            self.print_status("\nTurn cancelled.")?;
-            self.cancel_token = CancellationToken::new();
-        } else {
-            let now = std::time::Instant::now();
-            if let Some(prev) = self.first_ctrl_c_time {
-                if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                    self.print_status("Exiting.")?;
-                    let _ = crossterm::terminal::disable_raw_mode();
-                    return Ok(EventAction::Exit);
-                }
+                cancel_token = CancellationToken::new();
+                let token = cancel_token.clone();
+                let session_clone = session.clone();
+                let cli_clone = cli.clone();
+                let workspace_clone = workspace_root.clone();
+
+                let handle = tokio::spawn(async move {
+                    run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
+                });
+                running_task = Some(handle);
             }
-            self.first_ctrl_c_time = Some(now);
-            self.print_status("Press Ctrl+C again within 2 seconds to exit.")?;
-        }
-        self.redraw_prompt()?;
-        Ok(EventAction::Continue)
-    }
-
-    fn redraw_prompt(&self) -> Result<()> {
-        // \r = carriage return to column 0
-        // \x1b[0K = clear from cursor to end of line
-        // \x1b[?25l = hide cursor (prevent flicker during redraw)
-        // \x1b[?25h = show cursor
-        print!("\r\x1b[0K> {}\x1b[?25h", self.input_buffer);
-        io::stdout().flush().context("failed to flush stdout")
-    }
-
-    fn print_status(&self, msg: &str) -> Result<()> {
-        print!("\r\x1b[0K{}\r\n", msg);
-        io::stdout().flush().context("failed to flush stdout")
-    }
-
-    fn spawn_turn(&mut self, input: String) {
-        if input.is_empty() {
-            return;
         }
 
-        if let Some(handle) = self.running_task.take() {
-            handle.abort();
-        }
-
-        self.cancel_token = CancellationToken::new();
-        let token = self.cancel_token.clone();
-        let session = self.session.clone();
-        let cli = self.cli.clone();
-        let workspace = self.workspace_root.clone();
-
-        let handle = tokio::spawn(async move {
-            run_agent_turn(input, cli, workspace, session, token).await
-        });
-        self.running_task = Some(handle);
-    }
-
-    async fn check_task_completion(&mut self) -> bool {
-        if let Some(handle) = self.running_task.take() {
+        // Check if running task completed
+        if let Some(handle) = running_task.take() {
             if handle.is_finished() {
                 match handle.await {
                     Ok(Ok(())) => {}
-                    Ok(Err(e)) => {
-                        let _ = self.print_status(&format!("Error: {e}"));
-                    }
+                    Ok(Err(e)) => eprintln!("Error: {e}"),
                     Err(e) => {
                         if !e.is_cancelled() {
-                            let _ = self.print_status(&format!("Task error: {e}"));
+                            eprintln!("Task error: {e}");
                         }
                     }
                 }
-                return true;
             } else {
-                self.running_task = Some(handle);
+                running_task = Some(handle);
             }
         }
-        false
     }
+
+    Ok(())
 }
 
 /// Normalize C0 control characters to their Ctrl+letter equivalent.
