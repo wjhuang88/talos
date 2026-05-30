@@ -121,20 +121,17 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-    // Global Ctrl+C flag — set by signal handler, checked by main loop
     static CTRL_C_FLAG: AtomicBool = AtomicBool::new(false);
     ctrlc::set_handler(move || {
         CTRL_C_FLAG.store(true, Ordering::SeqCst);
     })
     .context("failed to install Ctrl+C handler")?;
 
-    let mut stdout = io::stdout().lock();
     let mut cancel_token = CancellationToken::new();
     let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
     let mut first_ctrl_c_time: Option<std::time::Instant> = None;
 
     loop {
-        // Check if Ctrl+C was pressed since last iteration
         if CTRL_C_FLAG.swap(false, Ordering::SeqCst) {
             if let Some(handle) = running_task.take() {
                 cancel_token.cancel();
@@ -146,7 +143,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 let now = std::time::Instant::now();
                 if let Some(prev) = first_ctrl_c_time {
                     if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                        eprintln!("\nExiting.");
+                        eprintln!("Exiting.");
                         return Ok(());
                     }
                 }
@@ -155,66 +152,46 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             }
         }
 
-        stdout
-            .write_all(b"> ")
-            .context("failed to write prompt")?;
-        stdout.flush().context("failed to flush stdout")?;
+        print!("> ");
+        io::stdout().flush().context("failed to flush stdout")?;
 
-        let readline_handle = tokio::task::spawn_blocking(|| {
+        let (line, read_result) = tokio::task::spawn_blocking(|| {
             let mut line = String::new();
             let result = io::stdin().read_line(&mut line);
             (line, result)
-        });
+        })
+        .await
+        .context("readline task panicked")?;
 
-        tokio::select! {
-            result = readline_handle => {
-                let (line, read_result) = result.context("readline task panicked")?;
-                let _ = read_result.context("failed to read from stdin")?;
-                let input = line.trim().to_string();
-
-                first_ctrl_c_time = None;
-
-                if input.is_empty() {
-                    continue;
-                }
-
-                if let Some(handle) = running_task.take() {
-                    handle.abort();
-                    let _ = handle.await;
-                }
-
-                cancel_token = CancellationToken::new();
-                let token = cancel_token.clone();
-                let session_clone = session.clone();
-                let cli_clone = cli.clone();
-                let workspace_clone = workspace_root.clone();
-
-                let handle = tokio::spawn(async move {
-                    run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
-                });
-                running_task = Some(handle);
-            }
-            _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                // Periodic wake to check Ctrl+C flag
-            }
+        if CTRL_C_FLAG.swap(false, Ordering::SeqCst) {
+            first_ctrl_c_time = None;
+            continue;
         }
+
+        let _ = read_result;
+        let input = line.trim().to_string();
+
+        if input.is_empty() {
+            continue;
+        }
+
+        first_ctrl_c_time = None;
 
         if let Some(handle) = running_task.take() {
-            if handle.is_finished() {
-                match handle.await {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("Error: {e}"),
-                    Err(e) => {
-                        if !e.is_cancelled() {
-                            eprintln!("Task error: {e}");
-                        }
-                    }
-                }
-                println!();
-            } else {
-                running_task = Some(handle);
-            }
+            handle.abort();
+            let _ = handle.await;
         }
+
+        cancel_token = CancellationToken::new();
+        let token = cancel_token.clone();
+        let session_clone = session.clone();
+        let cli_clone = cli.clone();
+        let workspace_clone = workspace_root.clone();
+
+        let handle = tokio::spawn(async move {
+            run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
+        });
+        running_task = Some(handle);
     }
 }
 
