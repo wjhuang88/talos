@@ -124,36 +124,41 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
+    print!("> ");
+    io::stdout().flush().context("failed to flush stdout")?;
+
     let mut state = InteractiveState::new(session, cli, workspace_root);
     let mut events = EventStream::new();
 
     loop {
-        print!("> {}", state.input_buffer);
-        io::stdout().flush().context("failed to flush stdout")?;
-
         let event = if state.running_task.is_some() {
             tokio::select! {
+                biased;
+                result = state.check_task_completion() => {
+                    if result {
+                        print!("\n> ");
+                        io::stdout().flush().context("failed to flush stdout")?;
+                    }
+                    continue;
+                }
                 event = events.next() => event,
-                _ = tokio::time::sleep(Duration::from_millis(50)) => None,
             }
         } else {
             events.next().await
         };
 
-        match state.handle_event(event)? {
-            EventAction::Continue => {}
-            EventAction::Exit => {
-                let _ = crossterm::terminal::disable_raw_mode();
-                return Ok(());
-            }
+        let needs_redraw = state.handle_event(event)?;
+        if needs_redraw == EventAction::Redraw {
+            print!("\r> {}", state.input_buffer);
+            io::stdout().flush().context("failed to flush stdout")?;
         }
-
-        state.check_task_completion().await;
     }
 }
 
+#[derive(PartialEq)]
 enum EventAction {
     Continue,
+    Redraw,
     Exit,
 }
 
@@ -204,19 +209,24 @@ impl InteractiveState {
         let (code, modifiers) = normalize_key(key_event.code, key_event.modifiers);
 
         match (code, modifiers) {
-            (KeyCode::Char('c'), KeyModifiers::CONTROL) => return self.on_ctrl_c(),
-            (KeyCode::Enter, _) => self.spawn_turn(),
+            (KeyCode::Char('c'), KeyModifiers::CONTROL) => self.on_ctrl_c(),
+            (KeyCode::Enter, _) => {
+                self.spawn_turn();
+                Ok(EventAction::Continue)
+            }
             (KeyCode::Backspace, _) => {
                 self.input_buffer.pop();
+                Ok(EventAction::Redraw)
             }
-            (KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End | KeyCode::Delete, _) => {}
+            (KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End | KeyCode::Delete, _) => {
+                Ok(EventAction::Continue)
+            }
             (KeyCode::Char(c), KeyModifiers::NONE) => {
                 self.input_buffer.push(c);
+                Ok(EventAction::Redraw)
             }
-            _ => {}
+            _ => Ok(EventAction::Continue),
         }
-
-        Ok(EventAction::Continue)
     }
 
     fn on_ctrl_c(&mut self) -> Result<EventAction> {
@@ -268,7 +278,7 @@ impl InteractiveState {
         self.running_task = Some(handle);
     }
 
-    async fn check_task_completion(&mut self) {
+    async fn check_task_completion(&mut self) -> bool {
         if let Some(handle) = self.running_task.take() {
             if handle.is_finished() {
                 match handle.await {
@@ -280,11 +290,12 @@ impl InteractiveState {
                         }
                     }
                 }
-                println!();
+                return true;
             } else {
                 self.running_task = Some(handle);
             }
         }
+        false
     }
 }
 
