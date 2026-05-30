@@ -8,13 +8,16 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { path = "../talos-core" }
+talos-tools = { path = "../talos-tools" }
 async-trait = "0.1"
+futures-util = "0.3"
 thiserror = "2"
-tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread", "time", "process"] }
 tokio-util = "0.7"
 
 [dev-dependencies]
 serde_json = "1"
+tempfile = "3"
 
 [lints]
 workspace = true
