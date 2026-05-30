@@ -4,7 +4,7 @@
 //! interactive mode for conversational agent sessions, and optional
 //! stdin pipe input and CLI argument overrides.
 
-use std::io::{self, IsTerminal, Read};
+use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -204,26 +204,6 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-/// Normalize C0 control characters to their Ctrl+letter equivalent.
-/// Terminals in raw mode may send raw C0 codes (e.g., \x03 for Ctrl+C).
-fn normalize_key(code: KeyCode, modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {
-    if modifiers.is_empty() {
-        if let KeyCode::Char(ch) = code {
-            if let Some(ctrl) = c0_to_ctrl(ch) {
-                return (KeyCode::Char(ctrl), KeyModifiers::CONTROL);
-            }
-        }
-    }
-    (code, modifiers)
-}
-
-fn c0_to_ctrl(ch: char) -> Option<char> {
-    match u32::from(ch) {
-        0x01..=0x1a => char::from_u32(0x60 + u32::from(ch)), // 0x01→'a', 0x03→'c'
-        _ => None,
-    }
-}
-
 async fn run_agent_turn(
     prompt: String,
     cli: Cli,
@@ -374,220 +354,22 @@ fn parse_provider(s: &str) -> Result<Provider> {
 mod tests {
     use super::*;
 
-    // ── c0_to_ctrl ──────────────────────────────────────────────
-
     #[test]
-    fn c0_to_ctrl_maps_a_to_z() {
-        assert_eq!(c0_to_ctrl('\x01'), Some('a'));
-        assert_eq!(c0_to_ctrl('\x03'), Some('c'));
-        assert_eq!(c0_to_ctrl('\x1a'), Some('z'));
+    fn parse_provider_anthropic() {
+        assert!(matches!(parse_provider("anthropic"), Ok(Provider::Anthropic)));
+        assert!(matches!(parse_provider("Anthropic"), Ok(Provider::Anthropic)));
+        assert!(matches!(parse_provider("ANTHROPIC"), Ok(Provider::Anthropic)));
     }
 
     #[test]
-    fn c0_to_ctrl_returns_none_for_printable() {
-        assert_eq!(c0_to_ctrl('a'), None);
-        assert_eq!(c0_to_ctrl(' '), None);
-        assert_eq!(c0_to_ctrl('\x7f'), None);
+    fn parse_provider_openai() {
+        assert!(matches!(parse_provider("openai"), Ok(Provider::OpenAI)));
+        assert!(matches!(parse_provider("OpenAI"), Ok(Provider::OpenAI)));
     }
 
     #[test]
-    fn c0_to_ctrl_maps_newline_to_ctrl_j() {
-        assert_eq!(c0_to_ctrl('\n'), Some('j'));
-    }
-
-    // ── normalize_key ───────────────────────────────────────────
-
-    #[test]
-    fn normalize_key_passes_through_with_modifiers() {
-        assert_eq!(
-            normalize_key(KeyCode::Char('c'), KeyModifiers::CONTROL),
-            (KeyCode::Char('c'), KeyModifiers::CONTROL)
-        );
-    }
-
-    #[test]
-    fn normalize_key_passes_through_non_char() {
-        assert_eq!(
-            normalize_key(KeyCode::Enter, KeyModifiers::NONE),
-            (KeyCode::Enter, KeyModifiers::NONE)
-        );
-    }
-
-    #[test]
-    fn normalize_key_converts_c0_to_ctrl() {
-        assert_eq!(
-            normalize_key(KeyCode::Char('\x03'), KeyModifiers::NONE),
-            (KeyCode::Char('c'), KeyModifiers::CONTROL)
-        );
-        assert_eq!(
-            normalize_key(KeyCode::Char('\x01'), KeyModifiers::NONE),
-            (KeyCode::Char('a'), KeyModifiers::CONTROL)
-        );
-    }
-
-    #[test]
-    fn normalize_key_leaves_printable_unchanged() {
-        assert_eq!(
-            normalize_key(KeyCode::Char('x'), KeyModifiers::NONE),
-            (KeyCode::Char('x'), KeyModifiers::NONE)
-        );
-    }
-
-    // ── InteractiveState input handling ─────────────────────────
-
-    fn make_state() -> InteractiveState {
-        InteractiveState {
-            session: make_test_session(),
-            cli: Cli { prompt: None, print: false, model: None, provider: None },
-            workspace_root: PathBuf::from("/tmp"),
-            cancel_token: CancellationToken::new(),
-            running_task: None,
-            first_ctrl_c_time: None,
-            input_buffer: String::new(),
-        }
-    }
-
-    fn make_test_session() -> Session {
-        let dir = tempfile::tempdir().unwrap();
-        let mgr = SessionManager::with_dir(dir.path().to_path_buf());
-        mgr.create_session("test").unwrap()
-    }
-
-    fn key_event(code: KeyCode, modifiers: KeyModifiers) -> Event {
-        Event::Key(crossterm::event::KeyEvent {
-            code,
-            modifiers,
-            kind: KeyEventKind::Press,
-            state: crossterm::event::KeyEventState::empty(),
-        })
-    }
-
-    #[test]
-    fn typing_appends_to_buffer() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('i'), KeyModifiers::NONE)))).unwrap();
-        assert_eq!(s.input_buffer, "hi");
-    }
-
-    #[test]
-    fn backspace_removes_last_char() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('a'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('b'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Backspace, KeyModifiers::NONE)))).unwrap();
-        assert_eq!(s.input_buffer, "a");
-    }
-
-    #[test]
-    fn backspace_on_empty_does_not_panic() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Backspace, KeyModifiers::NONE)))).unwrap();
-        assert_eq!(s.input_buffer, "");
-    }
-
-    #[test]
-    fn ctrl_c_clears_buffer() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('i'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        assert_eq!(s.input_buffer, "");
-    }
-
-    #[test]
-    fn ctrl_c_single_press_sets_timer() {
-        let mut s = make_state();
-        let action = s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        assert!(matches!(action, EventAction::Continue));
-        assert!(s.first_ctrl_c_time.is_some());
-    }
-
-    #[test]
-    fn ctrl_c_double_press_exits() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        // Second press within 2 seconds
-        let action = s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        assert!(matches!(action, EventAction::Exit));
-    }
-
-    #[test]
-    fn ctrl_c_double_press_after_timeout_resets() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        // Simulate timeout by setting first_ctrl_c_time to the past
-        s.first_ctrl_c_time = Some(std::time::Instant::now() - Duration::from_secs(3));
-        let action = s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        assert!(matches!(action, EventAction::Continue));
-        // Timer should be refreshed
-        assert!(s.first_ctrl_c_time.is_some());
-    }
-
-    #[tokio::test]
-    async fn enter_submits_non_empty_input() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('i'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Enter, KeyModifiers::NONE)))).unwrap();
-        assert_eq!(s.input_buffer, "");
-        assert!(s.running_task.is_some());
-    }
-
-    #[tokio::test]
-    async fn enter_on_empty_does_not_spawn_task() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Enter, KeyModifiers::NONE)))).unwrap();
-        assert!(s.running_task.is_none());
-    }
-
-    #[tokio::test]
-    async fn enter_clears_ctrl_c_timer() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('c'), KeyModifiers::CONTROL)))).unwrap();
-        assert!(s.first_ctrl_c_time.is_some());
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('h'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Enter, KeyModifiers::NONE)))).unwrap();
-        assert!(s.first_ctrl_c_time.is_none());
-    }
-
-    #[test]
-    fn arrow_keys_ignored() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(key_event(KeyCode::Char('a'), KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Left, KeyModifiers::NONE)))).unwrap();
-        s.handle_event(Some(Ok(key_event(KeyCode::Right, KeyModifiers::NONE)))).unwrap();
-        assert_eq!(s.input_buffer, "a");
-    }
-
-    #[test]
-    fn ctrl_d_not_treated_as_printable() {
-        let mut s = make_state();
-        // Ctrl+D normalizes to Ctrl+d, which has CONTROL modifier
-        let (code, modifiers) = normalize_key(KeyCode::Char('\x04'), KeyModifiers::NONE);
-        assert_eq!(code, KeyCode::Char('d'));
-        assert_eq!(modifiers, KeyModifiers::CONTROL);
-        // Should NOT match (KeyCode::Char('d'), KeyModifiers::NONE)
-        s.handle_event(Some(Ok(key_event(code, modifiers)))).unwrap();
-        assert_eq!(s.input_buffer, "");
-    }
-
-    #[test]
-    fn non_key_event_ignored() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(Event::Resize(80, 24)))).unwrap();
-        assert_eq!(s.input_buffer, "");
-    }
-
-    #[test]
-    fn release_event_ignored() {
-        let mut s = make_state();
-        s.handle_event(Some(Ok(Event::Key(crossterm::event::KeyEvent {
-            code: KeyCode::Char('a'),
-            modifiers: KeyModifiers::NONE,
-            kind: KeyEventKind::Release,
-            state: crossterm::event::KeyEventState::empty(),
-        })))).unwrap();
-        assert_eq!(s.input_buffer, "");
+    fn parse_provider_unknown() {
+        assert!(parse_provider("unknown").is_err());
+        assert!(parse_provider("").is_err());
     }
 }

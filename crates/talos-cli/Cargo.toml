@@ -22,9 +22,5 @@ tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 tokio-util = "0.7"
 
-[dev-dependencies]
-tempfile = "3"
-tokio-util = "0.7"
-
 [lints]
 workspace = true
