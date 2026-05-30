@@ -8,6 +8,8 @@ members = [
     "crates/talos-cli",
     "crates/talos-session",
     "crates/talos-tools",
+    "crates/talos-sandbox",
+    "crates/talos-permission",
 ]
 
 [workspace.package]
