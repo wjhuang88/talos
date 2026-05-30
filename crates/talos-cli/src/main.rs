@@ -119,10 +119,10 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .create_session(project_name)
         .context("failed to create session")?;
 
-    crossterm::terminal::enable_raw_mode().context("failed to enable raw mode")?;
-
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
+
+    crossterm::terminal::enable_raw_mode().context("failed to enable raw mode")?;
 
     let mut state = InteractiveState::new(session, cli, workspace_root);
     state.redraw_prompt()?;
@@ -265,8 +265,7 @@ impl InteractiveState {
     }
 
     fn print_status(&self, msg: &str) -> Result<()> {
-        // Move cursor to beginning of line, clear line, print status
-        print!("\r\x1b[0K{}\n", msg);
+        print!("\r\x1b[0K{}\r\n", msg);
         io::stdout().flush().context("failed to flush stdout")
     }
 
@@ -390,14 +389,14 @@ async fn run_agent_turn(
                         io::stdout().flush().context("failed to flush stdout")?;
                     }
                     Ok(AgentEvent::ToolCall { call }) => {
-                        print!("\r\x1b[0K\n[tool: {}]\n> ", call.name);
+                        print!("\r\x1b[0K\r\n[tool: {}]\r\n", call.name);
                         io::stdout().flush().context("failed to flush stdout")?;
                         session
                             .append_event(&AgentEvent::ToolCall { call })
                             .context("failed to log tool call to session")?;
                     }
                     Ok(AgentEvent::ToolResult { result }) => {
-                        print!("\r\x1b[0K[tool result: {}]\n", if result.is_error { "error" } else { "ok" });
+                        print!("\r\x1b[0K[tool result: {}]\r\n", if result.is_error { "error" } else { "ok" });
                         io::stdout().flush().context("failed to flush stdout")?;
                         session
                             .append_event(&AgentEvent::ToolResult { result })
@@ -416,13 +415,13 @@ async fn run_agent_turn(
                         return Ok(());
                     }
                     Ok(AgentEvent::Error { message }) => {
-                        print!("\r\x1b[0K\nError: {message}\n");
+                        print!("\r\x1b[0K\r\nError: {message}\r\n");
                         io::stdout().flush().context("failed to flush stdout")?;
                         bail!("{message}");
                     }
                     Ok(AgentEvent::TurnStart) => {}
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        print!("\r\x1b[0K\nWarning: dropped {n} event(s) due to slow consumer\n");
+                        print!("\r\x1b[0K\r\nWarning: dropped {n} event(s) due to slow consumer\r\n");
                         io::stdout().flush().context("failed to flush stdout")?;
                     }
                     Err(broadcast::error::RecvError::Closed) => {
