@@ -16,7 +16,7 @@ English | **[中文](README.zh-CN.md)**
 | ~~I002~~ | ~~Hello Agent~~ | ~~`talos "What is 2+2?" -p` and get an LLM response~~ ✅ |
 | ~~I003~~ | ~~Tool User~~ | ~~Ask the agent to perform file and shell operations~~ ✅ |
 | ~~I004~~ | ~~Safe Agent~~ | ~~Dangerous operations get intercepted by permissions~~ ✅ |
-| I005 | Smart Agent | Mock LLM + basic TUI + context compaction + caching |
+| ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + basic TUI + context compaction + caching~~ ✅ |
 | I006 | Data Agent | TUI tool display + approval + session branching + SQLite search |
 | I007 | Skilled Agent | TUI skill display + SKILL.md + multi-provider support |
 | I008 | Learning Agent | TUI evolution display + self-evolution engine |
