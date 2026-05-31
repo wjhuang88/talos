@@ -11,6 +11,7 @@ talos-core = { path = "../talos-core" }
 talos-tools = { path = "../talos-tools" }
 talos-permission = { path = "../talos-permission" }
 talos-sandbox = { path = "../talos-sandbox" }
+talos-skill = { path = "../talos-skill" }
 async-trait = "0.1"
 futures-util = "0.3"
 serde_json = "1"

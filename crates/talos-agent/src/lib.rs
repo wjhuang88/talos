@@ -24,6 +24,7 @@ use std::sync::Arc;
 
 pub mod caching;
 pub mod context;
+pub mod prompt;
 
 use futures_util::future::join_all;
 use talos_core::message::{AgentEvent, Message, ToolCall, ToolResult as MessageToolResult};
@@ -31,10 +32,13 @@ use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolRegistry, ToolResult as ToolExecutionResult};
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_sandbox::{SandboxConfig, SandboxError, SandboxProvider, SandboxResult};
+use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::broadcast;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
+
+pub use prompt::{ContextFile, SystemPromptBuilder, ToolDescription};
 
 /// Maximum number of tool calls allowed per turn before budget exhaustion.
 const MAX_TOOL_CALLS_PER_TURN: usize = 50;
@@ -123,6 +127,8 @@ pub struct Agent {
     sandbox: Option<Arc<dyn SandboxProvider>>,
     /// Workspace root directory, used for sandbox configuration.
     workspace_root: PathBuf,
+    /// Builder for assembling the system prompt.
+    prompt_builder: SystemPromptBuilder,
 }
 
 impl Agent {
@@ -139,6 +145,7 @@ impl Agent {
             permission_engine: None,
             sandbox: None,
             workspace_root: PathBuf::from("."),
+            prompt_builder: SystemPromptBuilder::new(),
         }
     }
 
@@ -199,7 +206,57 @@ impl Agent {
             permission_engine,
             sandbox: sandbox.map(Arc::from),
             workspace_root,
+            prompt_builder: SystemPromptBuilder::new(),
         }
+    }
+
+    /// Sets the tool descriptions for the system prompt builder.
+    ///
+    /// Tools are sorted alphabetically by name in the assembled prompt
+    /// to ensure stable ordering across turns.
+    pub fn set_tools(&mut self, tools: Vec<ToolDescription>) {
+        self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_tools(tools);
+    }
+
+    /// Sets the skill index for the system prompt builder.
+    ///
+    /// Only Level 0 metadata (name, description, triggers) is included.
+    pub fn set_skill_index(&mut self, skills: Vec<SkillIndex>) {
+        self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_skill_index(skills);
+    }
+
+    /// Sets the context files for the system prompt builder.
+    ///
+    /// Typically loaded from `AGENTS.md` files via [`ContextLoader`].
+    ///
+    /// [`ContextLoader`]: crate::context::ContextLoader
+    pub fn set_context_files(&mut self, files: Vec<ContextFile>) {
+        self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_context_files(files);
+    }
+
+    /// Sets user-specific instructions for the system prompt builder.
+    pub fn set_user_preferences(&mut self, prefs: String) {
+        self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_user_preferences(prefs);
+    }
+
+    /// Sets a custom prompt that replaces the default identity.
+    pub fn set_custom_prompt(&mut self, prompt: String) {
+        self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_custom_prompt(prompt);
+    }
+
+    /// Sets an append prompt that is added at the end of the system prompt.
+    pub fn set_append_prompt(&mut self, prompt: String) {
+        self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_append_prompt(prompt);
+    }
+
+    /// Assembles and returns the full system prompt from all configured components.
+    ///
+    /// Components are assembled in the optimal order for caching:
+    /// identity, tools, skill index, context files, user preferences,
+    /// and append prompt (if provided).
+    #[must_use]
+    pub fn build_system_prompt(&self) -> String {
+        self.prompt_builder.build()
     }
 
     /// Runs a single turn with the given user message and returns the complete
@@ -246,8 +303,15 @@ impl Agent {
         user_message: String,
         event_tx: Option<broadcast::Sender<AgentEvent>>,
     ) -> AgentResult<String> {
+        let system_prompt = self.build_system_prompt();
+        let full_message = if system_prompt.is_empty() {
+            user_message
+        } else {
+            format!("{system_prompt}\n\n{user_message}")
+        };
+
         let mut messages = vec![Message::User {
-            content: user_message,
+            content: full_message,
         }];
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();

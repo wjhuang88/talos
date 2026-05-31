@@ -48,6 +48,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use serde_json::Value;
 use talos_agent::context::ContextLoader;
+use talos_agent::prompt::ContextFile;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
 use talos_core::message::AgentEvent;
@@ -167,6 +168,12 @@ struct Cli {
 
     #[arg(long, default_value = "20", help = "Maximum results for --search or --list.")]
     limit: usize,
+
+    #[arg(long, help = "Override the default system prompt entirely.")]
+    system_prompt: Option<String>,
+
+    #[arg(long, help = "Append additional instructions to the system prompt.")]
+    append_system_prompt: Option<String>,
 }
 
 #[tokio::main]
@@ -213,17 +220,6 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
 
     let prompt = resolve_prompt(cli.prompt)?;
-    let prompt = if cli.no_context {
-        prompt
-    } else {
-        let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
-        let context = ContextLoader::new(workspace_root).load().map_err(|e| anyhow!("{e}"))?;
-        if context.is_empty() {
-            prompt
-        } else {
-            format!("{context}\n\n{prompt}")
-        }
-    };
 
     let provider = build_provider(&config, &api_key);
 
@@ -253,7 +249,26 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         print_mode: true,
     }));
 
-    let agent = Agent::new(provider, registry);
+    let mut agent = Agent::new(provider, registry);
+
+    if !cli.no_context {
+        let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
+        let context = ContextLoader::new(workspace_root).load().map_err(|e| anyhow!("{e}"))?;
+        if !context.is_empty() {
+            agent.set_context_files(vec![ContextFile {
+                path: "AGENTS.md".into(),
+                content: context,
+            }]);
+        }
+    }
+
+    if let Some(ref system_prompt) = cli.system_prompt {
+        agent.set_custom_prompt(system_prompt.clone());
+    }
+
+    if let Some(ref append_prompt) = cli.append_system_prompt {
+        agent.set_append_prompt(append_prompt.clone());
+    }
 
     let (event_tx, mut event_rx) = broadcast::channel::<AgentEvent>(32);
 

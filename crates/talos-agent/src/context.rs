@@ -325,7 +325,11 @@ mod tests {
     #[test]
     fn test_missing_agents_md_skipped_gracefully() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        // No AGENTS.md created
+        let fake_home = TempDir::new().expect("failed to create fake home");
+        
+        unsafe {
+            std::env::set_var("HOME", fake_home.path());
+        }
 
         let loader = ContextLoader::new(temp_dir.path().to_path_buf());
         let context = loader.load().expect("load failed");
