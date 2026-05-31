@@ -182,6 +182,8 @@ impl EventLoop {
             }
 
             (AppState::WaitingForInput, AppEvent::UserInterrupt) => {
+                print!("\r");
+                io::stdout().flush().ok();
                 let now = Instant::now();
                 if let Some(prev) = self.first_ctrl_c_time {
                     if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
@@ -201,6 +203,8 @@ impl EventLoop {
                 },
                 AppEvent::UserInterrupt,
             ) => {
+                print!("\r");
+                io::stdout().flush().ok();
                 cancel_token.cancel();
                 task_handle.abort();
                 eprintln!("Turn cancelled.");
