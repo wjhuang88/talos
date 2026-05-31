@@ -34,10 +34,14 @@ use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use thiserror::Error;
 use uuid::Uuid;
 
 use talos_core::message::{AgentEvent, Message};
+
+pub mod sqlite;
+pub use sqlite::{IndexError, SearchResult, SessionIndex};
 
 /// Errors that can occur during session operations.
 #[derive(Debug, Error)]
@@ -433,10 +437,10 @@ impl Session {
 }
 
 /// Manages sessions on disk.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SessionManager {
-    /// Root directory for all session files.
     sessions_dir: PathBuf,
+    index: Mutex<Option<SessionIndex>>,
 }
 
 impl SessionManager {
@@ -444,12 +448,18 @@ impl SessionManager {
     pub fn new() -> Result<Self, SessionError> {
         let home = std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
         let dir = PathBuf::from(home).join(".talos").join("sessions");
-        Ok(Self { sessions_dir: dir })
+        Ok(Self {
+            sessions_dir: dir,
+            index: Mutex::new(None),
+        })
     }
 
     /// Create a new `SessionManager` with a custom sessions directory.
     pub fn with_dir(sessions_dir: PathBuf) -> Self {
-        Self { sessions_dir }
+        Self {
+            sessions_dir,
+            index: Mutex::new(None),
+        }
     }
 
     /// Create a new session for the given project.
@@ -631,14 +641,58 @@ impl SessionManager {
 
         Ok((count, last_preview))
     }
+
+    fn get_or_create_index(&self) -> Result<std::sync::MutexGuard<'_, Option<SessionIndex>>, IndexError> {
+        let mut guard = self.index.lock().expect("index lock poisoned");
+        if guard.is_none() {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            let db_path = PathBuf::from(home)
+                .join(".talos")
+                .join("sessions")
+                .join("index.db");
+
+            let index = SessionIndex::new(&db_path)?;
+            index.init_schema()?;
+            *guard = Some(index);
+        }
+        Ok(guard)
+    }
+
+    /// Perform a full-text search across all indexed session messages.
+    ///
+    /// Returns results ranked by relevance. The index is created lazily if it
+    /// does not exist.
+    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, IndexError> {
+        let guard = self.get_or_create_index()?;
+        let index = guard.as_ref().expect("index just created");
+        index.search(query, limit)
+    }
+
+    /// List the most recently updated sessions from the index.
+    ///
+    /// Returns sessions ordered by last update time, descending.
+    pub fn list_recent(&self, limit: usize) -> Result<Vec<SessionInfo>, IndexError> {
+        let guard = self.get_or_create_index()?;
+        let index = guard.as_ref().expect("index just created");
+        index.list_recent(limit)
+    }
+
+    /// Update the search index for a session.
+    ///
+    /// If the index has not been initialized, this is a no-op.
+    pub fn update_index(&self, session: &Session) -> Result<(), IndexError> {
+        let mut guard = self.get_or_create_index()?;
+        let index = guard.as_mut().expect("index just created");
+        index.index_session(session)
+    }
 }
 
 impl Default for SessionManager {
     fn default() -> Self {
-        // Use a fallback path if HOME is not set
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
         Self {
             sessions_dir: PathBuf::from(home).join(".talos").join("sessions"),
+            index: Mutex::new(None),
         }
     }
 }

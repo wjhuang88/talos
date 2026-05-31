@@ -22,7 +22,7 @@ use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_permission::PermissionDecision;
 use talos_provider::AnthropicProvider;
-use talos_session::SessionManager;
+use talos_session::{IndexError, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::broadcast;
@@ -121,11 +121,28 @@ struct Cli {
 
     #[arg(long, help = "Resume a specific session by ID.")]
     session: Option<String>,
+
+    #[arg(long, help = "Search session messages with full-text search.")]
+    search: Option<String>,
+
+    #[arg(long, help = "List recent sessions from the index.")]
+    list: bool,
+
+    #[arg(long, default_value = "20", help = "Maximum results for --search or --list.")]
+    limit: usize,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.search.is_some() {
+        return run_search_mode(cli);
+    }
+
+    if cli.list {
+        return run_list_mode(cli);
+    }
 
     if cli.print {
         return run_print_mode(cli).await;
@@ -406,6 +423,69 @@ pub(crate) fn parse_provider(s: &str) -> Result<Provider> {
         "openai" => Ok(Provider::OpenAI),
         other => Err(anyhow!("unknown provider '{other}': supported values are 'anthropic' and 'openai'")),
     }
+}
+
+fn run_search_mode(cli: Cli) -> Result<()> {
+    let query = cli.search.as_ref().expect("search query required");
+    let manager = SessionManager::new().context("failed to initialize session manager")?;
+
+    let results = manager.search(query, cli.limit).map_err(|e| match e {
+        IndexError::SqliteError(e) => anyhow!("search error: {e}"),
+        IndexError::IoError(e) => anyhow!("I/O error: {e}"),
+        IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
+    })?;
+
+    if results.is_empty() {
+        println!("No results found for '{query}'.");
+        return Ok(());
+    }
+
+    println!("Found {} result(s) for '{query}':\n", results.len());
+
+    for (i, result) in results.iter().enumerate() {
+        let ts = result.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
+        println!(
+            "{:>3}. [{}] {}\n     {}\n     {}\n",
+            i + 1,
+            ts,
+            result.session_id,
+            result.project,
+            result.snippet,
+        );
+    }
+
+    Ok(())
+}
+
+fn run_list_mode(cli: Cli) -> Result<()> {
+    let manager = SessionManager::new().context("failed to initialize session manager")?;
+
+    let sessions = manager.list_recent(cli.limit).map_err(|e| match e {
+        IndexError::SqliteError(e) => anyhow!("list error: {e}"),
+        IndexError::IoError(e) => anyhow!("I/O error: {e}"),
+        IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
+    })?;
+
+    if sessions.is_empty() {
+        println!("No indexed sessions found. Run sessions to build the index.");
+        return Ok(());
+    }
+
+    println!("Recent sessions ({}):\n", sessions.len());
+
+    for (i, session) in sessions.iter().enumerate() {
+        let ts = session.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
+        println!(
+            "{:>3}. {} | {} | {} messages | {}",
+            i + 1,
+            session.id,
+            session.project,
+            session.message_count,
+            ts,
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
