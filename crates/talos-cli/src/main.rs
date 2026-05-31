@@ -300,16 +300,30 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-    // Spawn stdin reading in a separate task so we can abort it on exit.
+    // Spawn stdin reading in a separate task so we can cancel it on exit.
     // tokio::io::stdin() has a global background reader that blocks shutdown
-    // if not explicitly aborted.
+    // if not explicitly cancelled.
     let (stdin_tx, mut stdin_rx) = tokio::sync::mpsc::channel::<String>(16);
+    let stdin_cancel = CancellationToken::new();
+    let stdin_cancel_clone = stdin_cancel.clone();
     let stdin_task = tokio::spawn(async move {
         let stdin = BufReader::new(tokio::io::stdin());
         let mut lines = stdin.lines();
-        while let Ok(Some(line)) = lines.next_line().await {
-            if stdin_tx.send(line).await.is_err() {
-                break;
+        loop {
+            tokio::select! {
+                _ = stdin_cancel_clone.cancelled() => {
+                    break;
+                }
+                result = lines.next_line() => {
+                    match result {
+                        Ok(Some(line)) => {
+                            if stdin_tx.send(line).await.is_err() {
+                                break;
+                            }
+                        }
+                        _ => break,
+                    }
+                }
             }
         }
     });
@@ -338,7 +352,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     if let Some(prev) = first_ctrl_c_time {
                         if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
                             eprintln!("Exiting.");
-                            stdin_task.abort();
+                            stdin_cancel.cancel();
                             break;
                         }
                     }
@@ -390,7 +404,8 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         }
     }
 
-    stdin_task.abort();
+    stdin_cancel.cancel();
+    let _ = stdin_task.await;
     if let Some(handle) = running_task.take() {
         cancel_token.cancel();
         handle.abort();
