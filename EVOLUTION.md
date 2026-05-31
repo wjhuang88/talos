@@ -16,6 +16,9 @@ repeating known mistakes.
 | 5 | Architecture | Mock LLM 是测试基础设施，应尽早实现 | I005 |
 | 6 | Delegation | 子代理适合独立模块，复杂集成需主代理协调 | I003-I005 |
 | 7 | Security | `setrlimit` 需要 unsafe，必须有文档说明 | I004 |
+| 8 | TUI | UTF-8 字符边界问题需要字符索引而非字节索引 | I008 |
+| 9 | TUI | EventStream 需要定期重绘间隔防止界面冻结 | I008 |
+| 10 | SQLite | 多 crate 共享 SQLite 需要统一 rusqlite 版本 | I008 |
 
 ## Lessons
 
@@ -100,6 +103,42 @@ repeating known mistakes.
 **Remedy**: 使用 `unsafe` 块包裹调用，并添加详细注释说明为什么这是安全的（参数验证、错误处理）。
 
 **Prevention**: 任何 `unsafe` 代码必须有：(1) 注释说明安全性保证，(2) 参数验证，(3) 错误处理。考虑是否可以用 safe wrapper crate（如 `rlimit`）。
+
+---
+
+### 8. UTF-8 字符边界问题需要字符索引而非字节索引 (I008)
+
+**Symptom**: TUI 输入中文字符时崩溃，错误信息 `end byte index 1 is not a char boundary; it is inside '你' (bytes 0..3)`。
+
+**Cause**: `String::insert()` 和 `String::remove()` 使用字节索引，但 `cursor_pos` 是字符索引。中文字符占 3 字节，字节索引 1 不是字符边界。
+
+**Remedy**: 使用 `char_indices()` 将字符索引转换为字节索引后再操作字符串。输入缓冲区长度使用 `chars().count()` 而非 `len()`。
+
+**Prevention**: 处理可能包含多字节字符的字符串时，始终使用字符索引而非字节索引。
+
+---
+
+### 9. EventStream 需要定期重绘间隔防止界面冻结 (I008)
+
+**Symptom**: TUI 第二次输入后屏幕不再更新，界面冻结。
+
+**Cause**: `tokio::select!` 中 `EventStream::next()` 在无事件时阻塞，导致整个循环无法继续，界面无法重绘。
+
+**Remedy**: 添加 `render_interval.tick()` 作为 select 分支，每 50ms 强制触发一次重绘。
+
+**Prevention**: TUI 事件循环必须有定期重绘机制，不能完全依赖事件驱动。
+
+---
+
+### 10. SQLite 多 crate 共享需要统一 rusqlite 版本 (I008)
+
+**Symptom**: 编译错误 `package 'libsqlite3-sys' links to the native library 'sqlite3', but it conflicts with a previous package`。
+
+**Cause**: `talos-session` 使用 `rusqlite 0.37`，`talos-evolution` 使用 `rusqlite 0.31`，导致两个版本的 `libsqlite3-sys` 链接冲突。
+
+**Remedy**: 统一所有 crate 的 `rusqlite` 版本为 `0.37`。
+
+**Prevention**: 多个 crate 使用同一个原生库时，必须在 workspace 级别统一版本。
 
 ## When to Write a Lesson
 

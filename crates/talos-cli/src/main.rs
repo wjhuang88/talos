@@ -53,6 +53,7 @@ use talos_agent::Agent;
 use talos_config::{Config, Provider};
 use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
+use talos_evolution::store::KnowledgeStore;
 use talos_permission::PermissionDecision;
 use talos_provider::AnthropicProvider;
 use talos_provider::openai::OpenAIProvider;
@@ -60,6 +61,7 @@ use talos_session::{IndexError, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
@@ -177,6 +179,9 @@ struct Cli {
 
     #[arg(long, help = "Use mock LLM provider for testing (no API key required).")]
     mock: bool,
+
+    #[arg(long, help = "Display learned patterns from the evolution engine.")]
+    learned: bool,
 }
 
 #[tokio::main]
@@ -189,6 +194,10 @@ async fn main() -> Result<()> {
 
     if cli.list {
         return run_list_mode(cli);
+    }
+
+    if cli.learned {
+        return run_learned_mode(cli);
     }
 
     if cli.print {
@@ -204,6 +213,47 @@ async fn main() -> Result<()> {
     }
 
     run_interactive_mode(cli).await
+}
+
+fn run_learned_mode(_cli: Cli) -> Result<()> {
+    let db_path = dirs::home_dir()
+        .context("failed to find home directory")?
+        .join(".talos")
+        .join("index.db");
+
+    if !db_path.exists() {
+        println!("No evolution data found. Run talos with an agent to start learning.");
+        return Ok(());
+    }
+
+    let store = KnowledgeStore::open(db_path.to_str().unwrap_or_default())
+        .context("failed to open knowledge store")?;
+
+    let patterns = store.get_all_patterns().context("failed to get patterns")?;
+
+    if patterns.is_empty() {
+        println!("No patterns learned yet. Use the agent and provide feedback to start learning.");
+        return Ok(());
+    }
+
+    println!("=== Learned Patterns ===\n");
+
+    for (i, pattern) in patterns.iter().enumerate() {
+        let status = if pattern.active { "active" } else { "inactive" };
+        println!(
+            "{}. [{}] {} (confidence: {:.0}%, evidence: {}, status: {})",
+            i + 1,
+            pattern.category,
+            pattern.description,
+            pattern.confidence * 100.0,
+            pattern.evidence_count,
+            status
+        );
+        println!("   Instruction: {}", pattern.instruction);
+        println!();
+    }
+
+    Ok(())
 }
 
 async fn run_print_mode(cli: Cli) -> Result<()> {
@@ -327,47 +377,64 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let provider = build_provider(&config, &api_key, cli.mock);
+    // Build tool registry once (shared across agent calls)
+    fn build_tool_registry() -> ToolRegistry {
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+            talos_permission::PermissionEngine::new(),
+        )));
 
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::new(),
-    )));
-
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(PathBuf::from("."))),
-        approval,
-        print_mode: true,
-    }));
-
-    let agent = Agent::new(provider, registry);
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: Arc::new(BashTool::new(PathBuf::from("."))),
+            approval: approval.clone(),
+            print_mode: true,
+        }));
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: Arc::new(ReadTool::new(PathBuf::from("."))),
+            approval: approval.clone(),
+            print_mode: true,
+        }));
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: Arc::new(WriteTool::new(PathBuf::from("."))),
+            approval: approval.clone(),
+            print_mode: true,
+        }));
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: Arc::new(EditTool::new(PathBuf::from("."))),
+            approval,
+            print_mode: true,
+        }));
+        registry
+    }
 
     let (event_tx, event_rx) = broadcast::channel::<AgentEvent>(32);
 
     let mut tui = Tui::new().context("failed to initialize TUI")?;
 
-    let run_handle = tokio::spawn(async move { agent.run_streaming("Hello".to_string(), event_tx).await });
+    // Channel for TUI to send user messages back for agent processing
+    let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
+    tui.set_message_tx(user_msg_tx);
 
-    let tui_result = tui.run(event_rx).await;
+    // Keep the broadcast channel alive so the TUI doesn't exit when an agent task completes
+    let _event_tx_alive = event_tx.clone();
 
-    run_handle.abort();
+    // Spawn a task to handle user messages from TUI and spawn agent tasks
+    let config_clone = config.clone();
+    let api_key_clone = api_key.clone();
+    tokio::spawn(async move {
+        while let Some(input) = user_msg_rx.recv().await {
+            let provider = build_provider(&config_clone, &api_key_clone, cli.mock);
+            let registry = build_tool_registry();
+            let agent = Agent::new(provider, registry);
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                let _ = agent.run_streaming(input, event_tx).await;
+            });
+        }
+    });
 
-    tui_result
+    // Run TUI in the main task (blocking until user exits)
+    tui.run(event_rx).await
 }
 
 async fn run_interactive_mode(cli: Cli) -> Result<()> {

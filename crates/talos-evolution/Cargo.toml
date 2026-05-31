@@ -1,0 +1,19 @@
+[package]
+name = "talos-evolution"
+description = "Self-evolution engine for Talos agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+talos-core = { path = "../talos-core" }
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[lints]
+workspace = true

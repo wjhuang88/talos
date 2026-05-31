@@ -27,8 +27,11 @@ use ratatui::{
     Frame, Terminal,
 };
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use futures::StreamExt;
+use evolution::EvolutionPanel;
+
+pub mod evolution;
 
 // Nord theme colors — reference: https://www.nordtheme.com/docs/colors-and-palettes
 #[allow(dead_code)]
@@ -550,7 +553,10 @@ impl TuiState {
 
     /// Appends a character to the input buffer at the cursor position.
     fn input_append_char(&mut self, ch: char) {
-        self.input_buffer.insert(self.cursor_pos, ch);
+        let byte_pos = self.input_buffer.char_indices().nth(self.cursor_pos)
+            .map(|(i, _)| i)
+            .unwrap_or(self.input_buffer.len());
+        self.input_buffer.insert(byte_pos, ch);
         self.cursor_pos += 1;
     }
 
@@ -558,7 +564,10 @@ impl TuiState {
     fn input_backspace(&mut self) {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
-            self.input_buffer.remove(self.cursor_pos);
+            let byte_pos = self.input_buffer.char_indices().nth(self.cursor_pos)
+                .map(|(i, _)| i)
+                .unwrap_or(self.input_buffer.len());
+            self.input_buffer.remove(byte_pos);
         }
     }
 
@@ -571,7 +580,7 @@ impl TuiState {
 
     /// Moves the cursor right in the input buffer.
     fn input_cursor_right(&mut self) {
-        if self.cursor_pos < self.input_buffer.len() {
+        if self.cursor_pos < self.input_buffer.chars().count() {
             self.cursor_pos += 1;
         }
     }
@@ -662,6 +671,10 @@ pub struct Tui {
     terminal: Terminal<CrosstermBackend<Stdout>>,
     /// Skill sidebar panel.
     skill_sidebar: SkillSidebar,
+    /// Evolution insights panel.
+    evolution_panel: EvolutionPanel,
+    /// Channel to send user messages to the agent loop.
+    message_tx: Option<mpsc::UnboundedSender<String>>,
 }
 
 impl Tui {
@@ -682,6 +695,8 @@ impl Tui {
             state: TuiState::new(),
             terminal,
             skill_sidebar: SkillSidebar::new(),
+            evolution_panel: evolution::EvolutionPanel::new(),
+            message_tx: None,
         })
     }
 
@@ -700,13 +715,16 @@ impl Tui {
         self.state.model_name = "mock".to_string();
 
         let mut event_stream = EventStream::new();
+        let mut render_interval = tokio::time::interval(Duration::from_millis(50));
 
         loop {
             let state = &self.state;
             let sidebar = &self.skill_sidebar;
-            self.terminal.draw(|frame| render(frame, state, sidebar))?;
+            let evo = &self.evolution_panel;
+            self.terminal.draw(|frame| render(frame, state, sidebar, evo))?;
 
             tokio::select! {
+                _ = render_interval.tick() => {}
                 Some(Ok(event)) = event_stream.next() => {
                     if self.handle_input_event(&event) {
                         break;
@@ -749,9 +767,24 @@ impl Tui {
         self.state.approval_state = ApprovalState::Hidden;
     }
 
+    /// Sets the channel to send user messages to the agent loop.
+    pub fn set_message_tx(&mut self, tx: mpsc::UnboundedSender<String>) {
+        self.message_tx = Some(tx);
+    }
+
     /// Toggles the visibility of the skill sidebar.
     pub fn toggle_skill_sidebar(&mut self) {
         self.skill_sidebar.toggle();
+    }
+
+    /// Toggles the visibility of the evolution insights panel.
+    pub fn toggle_evolution_panel(&mut self) {
+        self.evolution_panel.toggle();
+    }
+
+    /// Updates the patterns displayed in the evolution panel.
+    pub fn update_evolution_patterns(&mut self, patterns: Vec<evolution::PatternInfo>) {
+        self.evolution_panel.update_patterns(patterns);
     }
 
     /// Updates the skills displayed in the sidebar.
@@ -808,6 +841,10 @@ impl Tui {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.toggle_skill_sidebar();
                     }
+                    KeyCode::Char('e') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.toggle_evolution_panel();
+                    }
                     KeyCode::Char(c) if !matches!(self.state.approval_state, ApprovalState::Hidden) => {
                         if let Some(choice) = self.handle_approval_key(c) {
                             self.hide_approval();
@@ -842,6 +879,9 @@ impl Tui {
                         let input = self.state.input_submit();
                         if !input.is_empty() {
                             self.state.append_user_message(&input);
+                            if let Some(ref tx) = self.message_tx {
+                                let _ = tx.send(input);
+                            }
                         }
                     }
                     KeyCode::Esc => {
@@ -858,7 +898,7 @@ impl Tui {
     }
 }
 
-fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar) {
+fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar, evolution_panel: &evolution::EvolutionPanel) {
     let main_area = frame.area();
 
     // If sidebar is visible, split off the right portion
@@ -895,12 +935,12 @@ fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar) {
     let chat_paragraph = Paragraph::new(chat_text)
         .block(Block::default().borders(Borders::ALL).title(" Chat "))
         .wrap(Wrap { trim: false })
-        .scroll((chat_scroll_offset(state), 0));
+        .scroll((chat_scroll_offset(state, chat_area.height as usize), 0));
     frame.render_widget(chat_paragraph, chat_area);
 
     let input_text = build_input_text(state);
     let input_paragraph = Paragraph::new(input_text)
-        .block(Block::default().borders(Borders::ALL).title(" Input (Enter to send, Esc to clear, Ctrl+K skills) "));
+        .block(Block::default().borders(Borders::ALL).title(" Input (Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution) "));
     frame.render_widget(input_paragraph, input_area);
 
     let status_text = build_status_text(state);
@@ -964,28 +1004,36 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
     Text::from(lines)
 }
 
-fn chat_scroll_offset(state: &TuiState) -> u16 {
+fn chat_scroll_offset(state: &TuiState, viewport_height: usize) -> u16 {
     let total_lines = state.chat_lines.len()
         + if state.current_turn_text.is_empty() { 0 } else { 1 };
     let total_lines = if total_lines == 0 { 1 } else { total_lines };
-    total_lines.saturating_sub(1) as u16
+    
+    if total_lines <= viewport_height {
+        0
+    } else {
+        (total_lines - viewport_height) as u16
+    }
 }
 
 fn build_input_text(state: &TuiState) -> Text<'static> {
     let buffer = &state.input_buffer;
-    let cursor_pos = state.cursor_pos.min(buffer.len());
+    let char_count = buffer.chars().count();
+    let cursor_pos = state.cursor_pos.min(char_count);
 
-    let before = &buffer[..cursor_pos];
-    let after = &buffer[cursor_pos..];
+    let before: String = buffer.chars().take(cursor_pos).collect();
+    let after: String = buffer.chars().skip(cursor_pos).collect();
 
     let mut spans = Vec::new();
-    spans.push(Span::raw(before.to_string()));
+    spans.push(Span::raw(before));
     if after.is_empty() {
         spans.push(Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED)));
     } else {
-        let (first, rest) = after.split_at(1);
-        spans.push(Span::styled(first.to_string(), Style::default().add_modifier(Modifier::REVERSED)));
-        spans.push(Span::raw(rest.to_string()));
+        let mut chars = after.chars();
+        let first = chars.next().unwrap().to_string();
+        let rest: String = chars.collect();
+        spans.push(Span::styled(first, Style::default().add_modifier(Modifier::REVERSED)));
+        spans.push(Span::raw(rest));
     }
 
     Text::from(Line::from(spans))
@@ -1006,7 +1054,7 @@ fn build_status_text(state: &TuiState) -> Text<'static> {
         .branch_id
         .as_ref()
         .map(|b| {
-            let short = if b.len() > 8 { &b[..8] } else { b.as_str() };
+            let short: String = b.chars().take(8).collect();
             format!(" | Branch: {short}")
         })
         .unwrap_or_default();

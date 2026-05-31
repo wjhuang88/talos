@@ -12,6 +12,7 @@ members = [
     "crates/talos-permission",
     "crates/talos-tui",
     "crates/talos-skill",
+    "crates/talos-evolution",
 ]
 
 [workspace.package]

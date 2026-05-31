@@ -14,7 +14,7 @@ I004 "Safe Agent"        talos "rm -rf /"                      会被拦住 ✅
 I005 "Smart Agent"       Mock LLM + 基础TUI + 压缩 + caching    能压缩
 I006 "Data Agent"        TUI工具调用气泡 + 审批 + 会话分支 + SQLite  能搜索
 I007 "Skilled Agent"     TUI技能侧栏 + SKILL.md + OpenAI        会技能
-I008 "Learning Agent"    TUI进化洞察面板 + 自进化引擎             会学习
+I008 "Learning Agent"    TUI进化洞察面板 + 自进化引擎             会学习 ✅
 I009 "Extensible Agent"  TUI MCP标记 + Hook + MCP + JSON-RPC   可扩展
 I010 "Polished Agent"    TUI打磨 (Nord + markdown + 高级功能)    可发布
 ```

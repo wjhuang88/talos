@@ -112,6 +112,37 @@ Each turn in the agent loop follows a deterministic lifecycle.
 5. **Observe**: Capture tool output and append it to the session.
 6. **Finish**: Determine if the task is complete or if another turn is needed.
 
+## Self-Evolution Engine (I008)
+
+The evolution engine implements a 4-phase learning loop per ADR-001.
+
+### Learning Loop
+
+```text
+Observe -> Extract -> Store -> Apply
+   ^                           |
+   |___________________________|
+```
+
+1. **Observe**: `TurnObserver` captures signals (error, correction, satisfaction, inefficiency) with intensity scores.
+2. **Extract**: `PatternExtractor` identifies patterns from observations using rule-based logic with contradiction detection.
+3. **Store**: `KnowledgeStore` persists patterns in SQLite with confidence scores and evidence counts.
+4. **Apply**: `BehaviorAdapter` injects high-confidence patterns into the system prompt.
+
+### Cognitive Feedback
+
+Patterns use evidence-based confidence scoring with 70-day half-life time decay:
+
+- **Confidence**: Increases with supporting evidence, decreases with contradictions
+- **Time Decay**: Older evidence has less weight (half-life: 70 days)
+- **Minimum Threshold**: Only patterns with confidence ≥ 0.7 and evidence ≥ 3 are injected
+
+### Integration Points
+
+- **TUI Evolution Panel**: Visual display of learned patterns (Ctrl+E to toggle)
+- **`--learned` Command**: CLI command to inspect evolution data
+- **System Prompt Assembly**: High-confidence patterns are injected as natural language instructions
+
 ## Tool Execution Pipeline
 
 Tools never run with direct system access. They follow a four-stage pipeline.

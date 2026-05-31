@@ -21,7 +21,7 @@
 | ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + 基础 TUI + 上下文压缩 + 缓存~~ ✅ |
 | ~~I006~~ | ~~Data Agent~~ | ~~TUI 工具展示 + 审批 + 会话分支 + SQLite 搜索~~ ✅ |
 | ~~I007~~ | ~~Skilled Agent~~ | ~~TUI 技能展示 + SKILL.md + 多模型支持~~ ✅ |
-| I008 | Learning Agent | TUI 进化展示 + 自进化引擎 |
+| ~~I008~~ | ~~Learning Agent~~ | ~~TUI 进化展示 + 自进化引擎~~ ✅ |
 | I009 | Extensible Agent | TUI MCP 展示 + Hook 系统 + MCP + JSON-RPC |
 | I010 | Polished Agent | 完整 TUI 打磨（Nord 主题 + Markdown + 高级功能） |
 
@@ -30,7 +30,7 @@
 Talos 遵循**简单内核、灵活扩展**的设计哲学：
 
 - **核心**（5 个 crate）：最小化 turn loop — 配置、模型提供者、Agent、CLI 和基础类型。
-- **扩展**（10 个 crate）：按需引入 — 工具、会话、沙箱、权限、TUI、技能、自进化、插件、MCP、RPC。
+- **扩展**（11 个 crate）：按需引入 — 工具、会话、沙箱、权限、TUI、技能、自进化、插件、MCP、RPC。
 
 ```
 [ talos-cli / talos-rpc ]
@@ -43,6 +43,9 @@ Talos 遵循**简单内核、灵活扩展**的设计哲学：
    \      |      /           |           |      /     /
     \     v     /            v           v     /     /
      [ talos-core ] <-------------------------------'
+                      |
+                      v
+               [ talos-evolution ]
 ```
 
 ### 核心设计决策
