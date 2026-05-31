@@ -329,7 +329,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     if let Some(prev) = first_ctrl_c_time {
                         if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
                             eprintln!("Exiting.");
-                            return Ok(());
+                            std::process::exit(0);
                         }
                     }
                     first_ctrl_c_time = Some(now);
