@@ -19,7 +19,7 @@
 | ~~I003~~ | ~~Tool User~~ | ~~让 Agent 执行文件和 Shell 操作~~ ✅ |
 | ~~I004~~ | ~~Safe Agent~~ | ~~危险操作被权限系统拦截~~ ✅ |
 | ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + 基础 TUI + 上下文压缩 + 缓存~~ ✅ |
-| I006 | Data Agent | TUI 工具展示 + 审批 + 会话分支 + SQLite 搜索 |
+| ~~I006~~ | ~~Data Agent~~ | ~~TUI 工具展示 + 审批 + 会话分支 + SQLite 搜索~~ ✅ |
 | I007 | Skilled Agent | TUI 技能展示 + SKILL.md + 多模型支持 |
 | I008 | Learning Agent | TUI 进化展示 + 自进化引擎 |
 | I009 | Extensible Agent | TUI MCP 展示 + Hook 系统 + MCP + JSON-RPC |

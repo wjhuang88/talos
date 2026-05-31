@@ -58,6 +58,7 @@ use talos_session::{IndexError, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::broadcast;
+use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
 
@@ -153,6 +154,9 @@ struct Cli {
 
     #[arg(long, help = "Resume a specific session by ID.")]
     session: Option<String>,
+
+    #[arg(long, help = "Fork from a specific session ID, creating a new branch.")]
+    fork: Option<String>,
 
     #[arg(long, help = "Search session messages with full-text search.")]
     search: Option<String>,
@@ -344,7 +348,9 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
 
-    let session = if let Some(ref session_id) = cli.session {
+    let session = if let Some(ref source_session_id) = cli.fork {
+        fork_session(&session_manager, source_session_id)?
+    } else if let Some(ref session_id) = cli.session {
         session_manager
             .resume_session(session_id)
             .with_context(|| format!("failed to resume session {session_id}"))?
@@ -383,18 +389,24 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 .create_session(project_name)
                 .context("failed to create session")?
         } else {
-            println!("Available sessions:");
+            println!("{}Available sessions:{}\n", colors::BOLD, colors::RESET);
             for (idx, s) in sessions.iter().enumerate() {
+                let ts = s.timestamp.format("%Y-%m-%d %H:%M");
                 println!(
-                    "  {}. {} ({}) - {} - {} messages",
+                    "  {}. {}{}{} ({}{}{}) {}{} messages | {}",
                     idx + 1,
+                    colors::NORD8,
                     s.id,
+                    colors::RESET,
+                    colors::NORD14,
                     s.project,
-                    s.last_message_preview,
+                    colors::RESET,
+                    colors::NORD3,
                     s.message_count,
+                    ts,
                 );
             }
-            print!("Select a session (1-{}): ", sessions.len());
+            print!("\nSelect a session (1-{}): ", sessions.len());
             io::stdout().flush().context("failed to flush stdout")?;
 
             let mut input = String::new();
@@ -536,6 +548,95 @@ fn run_list_mode(cli: Cli) -> Result<()> {
             session.project,
             session.message_count,
             ts,
+        );
+    }
+
+    Ok(())
+}
+
+/// Fork an existing session, creating a new session file with entries up to the
+/// fork point. Records the fork relationship in the SQLite index.
+fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<talos_session::Session> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    use talos_session::{Session, SessionEntry};
+
+    let source = manager
+        .resume_session(source_session_id)
+        .with_context(|| format!("failed to load source session {source_session_id}"))?;
+
+    let entries = source.read_entries().context("failed to read source entries")?;
+    if entries.is_empty() {
+        bail!("cannot fork an empty session");
+    }
+
+    let fork_entry_id = entries.last().map(|e| e.id.clone()).unwrap();
+
+    let new_id = Uuid::new_v4();
+    let project_dir = manager
+        .list_sessions()
+        .context("failed to list sessions")?
+        .iter()
+        .find(|s| s.id.to_string() == source_session_id)
+        .map(|s| s.project.clone())
+        .unwrap_or_else(|| "default".to_string());
+
+    let home = std::env::var("HOME").map_err(|e| anyhow!("{e}"))?;
+    let sessions_dir = PathBuf::from(home).join(".talos").join("sessions");
+    let project_path = sessions_dir.join(&project_dir);
+    std::fs::create_dir_all(&project_path).context("failed to create project directory")?;
+
+    let new_file_path = project_path.join(format!("{new_id}.jsonl"));
+
+    let mut new_session = Session::new(new_id, project_dir.clone(), new_file_path.clone());
+
+    for entry in &entries {
+        let line = serde_json::to_string(entry).map_err(|e| anyhow!("serialize error: {e}"))?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&new_file_path)
+            .context("failed to create fork file")?;
+        writeln!(file, "{line}").context("failed to write fork entry")?;
+    }
+
+    new_session.fork(&fork_entry_id).context("failed to create fork branch")?;
+
+    if let Ok(mut index) = talos_session::SessionIndex::new(
+        &sessions_dir.join("index.db"),
+    ) {
+        let _ = index.init_schema();
+        let _ = index.record_fork(source_session_id, &new_id.to_string(), &fork_entry_id);
+        let _ = index.index_session(&new_session);
+    }
+
+    eprintln!("Forked session {source_session_id} -> {new_id} (from entry {fork_entry_id})");
+
+    Ok(new_session)
+}
+
+    println!(
+        "{}Recent sessions ({}):{}\n",
+        colors::BOLD,
+        sessions.len(),
+        colors::RESET
+    );
+
+    for (i, session) in sessions.iter().enumerate() {
+        let ts = session.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
+        println!(
+            "{:>3}. {}{}{} | {}{}{} | {} messages | {}{}{}",
+            i + 1,
+            colors::NORD8,
+            session.id,
+            colors::RESET,
+            colors::NORD14,
+            session.project,
+            colors::RESET,
+            session.message_count,
+            colors::NORD3,
+            ts,
+            colors::RESET,
         );
     }
 
