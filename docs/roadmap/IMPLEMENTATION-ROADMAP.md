@@ -138,6 +138,7 @@ talos
 **User can**: See tool calls visually in TUI, approve/deny operations, search and fork sessions.
 
 **Scope**:
+- **Production-grade event loop** (ADR-004): Single event channel, explicit state machine (AppState), layered cancellation, stdin via std::thread, render/logic separation — foundational infrastructure for all interactive features
 - **TUI tool call bubbles**: Visual rendering of tool calls and results in chat viewport
 - **TUI approval overlay**: y/a/n approval UI rendered in TUI (replaces CLI prompt)
 - JSONL tree-branching sessions (`/fork`, session resume with `-c`)
@@ -149,6 +150,10 @@ talos
 
 **Verification**:
 ```bash
+# Event loop: double Ctrl+C exits immediately
+talos
+# Press Ctrl+C twice — Expected: exits without hanging
+
 talos "List all .rs files"
 # Expected: TUI shows tool call bubble with bash tool execution
 
@@ -299,7 +304,7 @@ The TUI grows progressively from I005. Each iteration adds visualization for the
 | Iteration | TUI 新增能力 | 验证场景 |
 |-----------|-------------|---------|
 | I005 | 基础壳：聊天视口 + 输入区 + 状态栏 + Ctrl+C + 流式输出 | Mock LLM 测试压缩时 TUI 不卡顿 |
-| I006 | 工具调用气泡 + 审批覆盖层 (y/a/n) + 会话列表 | 权限提示在 TUI 中弹出 |
+| I006 | **事件循环架构 (ADR-004)** + 工具调用气泡 + 审批覆盖层 (y/a/n) + 会话列表 | 双击 Ctrl+C 立即退出，权限提示在 TUI 中弹出 |
 | I007 | 技能索引侧栏 + /model 切换 | 加载 SKILL.md 后显示技能列表 |
 | I008 | 进化洞察面板 + /learned 命令 | 自进化后显示学到的模式 |
 | I009 | MCP 工具标记 + 插件状态 + Hook 日志 | MCP 工具有特殊标识 |

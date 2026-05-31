@@ -368,7 +368,29 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ## I006: "Data Agent"
 
-**Delivers**: TUI tool call visualization, approval overlay, session branching, and SQLite search.
+**Delivers**: Production-grade event loop, TUI tool call visualization, approval overlay, session branching, and SQLite search.
+
+### #I006-S0: Production-grade event loop architecture
+
+**Description**: Implement the event loop architecture defined in ADR-004. Replace the current ad-hoc `select!` loop with a structured state machine: single event channel (`mpsc::unbounded`), explicit `AppState` enum (Idle → WaitingForInput → AgentRunning → ToolExecuting → ShuttingDown), layered cancellation (CancellationToken tree: app → session → turn → tools), stdin via `std::thread`, and render/logic separation. This is foundational infrastructure for all subsequent interactive features.
+
+**Acceptance Criteria**:
+- [ ] `AppEvent` enum defined with all event types (UserInput, UserInterrupt, AgentStarted, AgentTextDelta, AgentToolCall, AgentToolResult, AgentCompleted, AgentError, ShutdownRequested)
+- [ ] `AppState` enum with explicit state transitions (Idle, WaitingForInput, AgentRunning, ToolExecuting, ShuttingDown)
+- [ ] Main loop processes events from single `mpsc::unbounded` channel
+- [ ] stdin reader runs in `std::thread` (not `tokio::spawn`), sends events via `blocking_send`
+- [ ] Signal handler runs in `tokio::spawn`, sends `UserInterrupt` events
+- [ ] Layered cancellation: first Ctrl+C cancels turn, second Ctrl+C (within 2s) cancels session
+- [ ] Shutdown sequence: cancel tools → cancel agent → close channel → runtime exits
+- [ ] `render(&state)` called after every state transition
+- [ ] Existing interactive mode functionality preserved (input, agent execution, streaming output)
+- [ ] Double Ctrl+C exits immediately without hanging (no stdin blocking)
+- [ ] Unit tests for state machine transitions
+- [ ] Integration test: simulated event sequence (input → agent → tool → complete)
+
+**Depends on**: #I005-S1 (Mock LLM for testing)
+**Estimate**: L
+**Reference**: ADR-004
 
 ### #I006-S1: TUI tool call bubbles + approval overlay
 
@@ -382,7 +404,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Overlay dismisses cleanly after decision
 - [ ] Non-interactive mode defaults to deny for ask-rules
 
-**Depends on**: #I005-S2, #I004-S2
+**Depends on**: #I006-S0, #I005-S2, #I004-S2
 **Estimate**: M
 
 ### #I006-S2: JSONL tree-branching sessions
