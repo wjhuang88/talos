@@ -306,6 +306,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let mut cancel_token = CancellationToken::new();
     let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
     let mut first_ctrl_c_time: Option<std::time::Instant> = None;
+    let exit_token = CancellationToken::new();
 
     loop {
         print!("> ");
@@ -313,9 +314,10 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
         tokio::select! {
             biased;
-            // Ctrl+C takes priority
+            _ = exit_token.cancelled() => {
+                break;
+            }
             _ = tokio::signal::ctrl_c() => {
-                // Overwrite the ^C that terminal echoed in cooked mode
                 print!("\r");
                 io::stdout().flush().context("failed to flush stdout")?;
                 if let Some(handle) = running_task.take() {
@@ -329,7 +331,8 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     if let Some(prev) = first_ctrl_c_time {
                         if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
                             eprintln!("Exiting.");
-                            std::process::exit(0);
+                            exit_token.cancel();
+                            break;
                         }
                     }
                     first_ctrl_c_time = Some(now);
@@ -381,6 +384,13 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 running_task = Some(handle);
             }
         }
+    }
+
+    // Clean shutdown: cancel any running task
+    if let Some(handle) = running_task.take() {
+        cancel_token.cancel();
+        handle.abort();
+        let _ = handle.await;
     }
 
     Ok(())
