@@ -300,8 +300,19 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     eprintln!("Talos interactive mode (session: {})", session.id);
     eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-    let stdin = BufReader::new(tokio::io::stdin());
-    let mut lines = stdin.lines();
+    // Spawn stdin reading in a separate task so we can abort it on exit.
+    // tokio::io::stdin() has a global background reader that blocks shutdown
+    // if not explicitly aborted.
+    let (stdin_tx, mut stdin_rx) = tokio::sync::mpsc::channel::<String>(16);
+    let stdin_task = tokio::spawn(async move {
+        let stdin = BufReader::new(tokio::io::stdin());
+        let mut lines = stdin.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            if stdin_tx.send(line).await.is_err() {
+                break;
+            }
+        }
+    });
 
     let mut cancel_token = CancellationToken::new();
     let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
@@ -327,7 +338,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     if let Some(prev) = first_ctrl_c_time {
                         if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
                             eprintln!("Exiting.");
-                            drop(lines);
+                            stdin_task.abort();
                             break;
                         }
                     }
@@ -335,10 +346,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     eprintln!("Press Ctrl+C again within 2 seconds to exit.");
                 }
             }
-            line_result = lines.next_line() => {
-                let Some(input) = line_result.context("failed to read stdin")? else {
-                    break;
-                };
+            Some(input) = stdin_rx.recv() => {
                 let input = input.trim().to_string();
                 first_ctrl_c_time = None;
 
@@ -362,9 +370,9 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 });
                 running_task = Some(handle);
             }
+            else => break,
         }
 
-        // Check if running task completed
         if let Some(handle) = running_task.take() {
             if handle.is_finished() {
                 match handle.await {
@@ -382,7 +390,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         }
     }
 
-    // Clean shutdown: cancel any running task
+    stdin_task.abort();
     if let Some(handle) = running_task.take() {
         cancel_token.cancel();
         handle.abort();
