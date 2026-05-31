@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -28,6 +28,7 @@ use ratatui::{
 };
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use tokio::sync::broadcast;
+use futures::StreamExt;
 
 // Nord theme colors — reference: https://www.nordtheme.com/docs/colors-and-palettes
 #[allow(dead_code)]
@@ -698,17 +699,17 @@ impl Tui {
     pub async fn run(&mut self, mut event_rx: broadcast::Receiver<AgentEvent>) -> Result<()> {
         self.state.model_name = "mock".to_string();
 
+        let mut event_stream = EventStream::new();
+
         loop {
             let state = &self.state;
             let sidebar = &self.skill_sidebar;
             self.terminal.draw(|frame| render(frame, state, sidebar))?;
 
             tokio::select! {
-                _ = Self::poll_event() => {
-                    if let Ok(event) = event::read() {
-                        if self.handle_input_event(&event) {
-                            break;
-                        }
+                Some(Ok(event)) = event_stream.next() => {
+                    if self.handle_input_event(&event) {
+                        break;
                     }
                 }
                 event = event_rx.recv() => {
@@ -732,14 +733,6 @@ impl Tui {
         }
 
         Ok(())
-    }
-
-    async fn poll_event() -> Result<()> {
-        if event::poll(Duration::from_millis(50))? {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("no event"))
-        }
     }
 
     /// Shows the approval overlay with the given tool info.
