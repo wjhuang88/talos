@@ -15,6 +15,17 @@ use std::io::{self, BufRead, Write};
 use anyhow::{Context, Result};
 use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
 
+/// User's choice when presented with an approval prompt in TUI mode.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ApprovalChoice {
+    /// Approve this tool call once.
+    ApproveOnce,
+    /// Always approve this tool (add a rule).
+    AlwaysApprove,
+    /// Deny the tool call.
+    Deny,
+}
+
 /// Maximum length for formatted tool input before truncation.
 const MAX_INPUT_LENGTH: usize = 200;
 
@@ -120,6 +131,16 @@ impl ApprovalPrompt {
             let truncated = pretty.chars().take(MAX_INPUT_LENGTH).collect::<String>();
             format!("{truncated}{TRUNCATION_SUFFIX}")
         }
+    }
+
+    /// Returns approval info for TUI mode without blocking.
+    ///
+    /// The TUI renders the approval overlay and handles user interaction.
+    /// This method simply returns the tool name and formatted arguments
+    /// so the TUI can display them.
+    pub fn prompt_tui(tool_name: &str, input: &serde_json::Value) -> (String, String) {
+        let formatted = Self::format_input(input);
+        (tool_name.to_string(), formatted)
     }
 }
 

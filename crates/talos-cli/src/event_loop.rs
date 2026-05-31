@@ -22,6 +22,17 @@ use crate::{parse_provider, Cli, PermissionAwareTool};
 
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
+/// User's choice when resolving an approval prompt.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ApprovalChoice {
+    /// Approve this tool call once.
+    ApproveOnce,
+    /// Always approve this tool (add a rule).
+    AlwaysApprove,
+    /// Deny the tool call.
+    Deny,
+}
+
 pub enum AppEvent {
     UserInput(String),
     UserInterrupt,
@@ -30,6 +41,13 @@ pub enum AppEvent {
     AgentToolResult(bool),
     AgentCompleted,
     AgentError(String),
+    /// TUI requests approval for a tool call.
+    ApprovalRequested {
+        tool_name: String,
+        arguments: String,
+    },
+    /// TUI resolved an approval prompt.
+    ApprovalResolved(ApprovalChoice),
 }
 
 pub enum AppState {

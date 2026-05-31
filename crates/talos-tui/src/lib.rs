@@ -2,6 +2,8 @@
 //!
 //! Provides a chat-based interface with:
 //! - Chat viewport with scrolling message history
+//! - Tool call bubbles with status indicators
+//! - Approval overlay for permission-required tool calls
 //! - Single-line input area with cursor
 //! - Status bar showing model, token count, and cost
 //! - Ctrl+C handling (single press cancels turn, double press exits)
@@ -18,14 +20,277 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
     Frame, Terminal,
 };
-use talos_core::message::{AgentEvent, Usage};
+use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use tokio::sync::broadcast;
+
+// Nord theme colors — reference: https://www.nordtheme.com/docs/colors-and-palettes
+#[allow(dead_code)]
+mod nord {
+    use ratatui::style::Color;
+
+    // Polar Night (dark backgrounds)
+    pub const NORD0: Color = Color::Rgb(46, 52, 64);
+    pub const NORD1: Color = Color::Rgb(59, 66, 82);
+    pub const NORD2: Color = Color::Rgb(67, 76, 94);
+    pub const NORD3: Color = Color::Rgb(76, 86, 106);
+
+    // Snow Storm (light text)
+    pub const NORD4: Color = Color::Rgb(216, 222, 233);
+    pub const NORD5: Color = Color::Rgb(229, 233, 240);
+    pub const NORD6: Color = Color::Rgb(236, 239, 244);
+
+    // Frost (blue accents)
+    pub const NORD8: Color = Color::Rgb(136, 192, 208);
+    pub const NORD9: Color = Color::Rgb(129, 161, 193);
+
+    // Aurora (semantic colors)
+    pub const NORD11: Color = Color::Rgb(191, 97, 106);
+    pub const NORD13: Color = Color::Rgb(235, 203, 139);
+    pub const NORD14: Color = Color::Rgb(163, 190, 140);
+}
+
+// ── Approval State ───────────────────────────────────────────────────────────
+
+/// User's choice when presented with an approval prompt.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ApprovalChoice {
+    /// Approve this tool call once.
+    ApproveOnce,
+    /// Always approve this tool (add a rule).
+    AlwaysApprove,
+    /// Deny the tool call.
+    Deny,
+}
+
+/// State of the approval overlay.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum ApprovalState {
+    /// No approval prompt is visible.
+    #[default]
+    Hidden,
+    /// Approval overlay is visible with the given tool info and selected choice.
+    Visible {
+        /// Name of the tool requiring approval.
+        tool_name: String,
+        /// Formatted arguments for the tool.
+        arguments: String,
+        /// Currently highlighted option.
+        selected: ApprovalChoice,
+    },
+}
+
+// ── Tool Call Bubble ─────────────────────────────────────────────────────────
+
+/// Maximum length for tool call arguments before truncation.
+const MAX_ARGS_LENGTH: usize = 80;
+/// Maximum length for tool result content before truncation.
+const MAX_RESULT_LENGTH: usize = 200;
+
+/// Renders a tool call as a styled bubble in the chat viewport.
+///
+/// Displays the tool name in bold with accent color, truncated arguments,
+/// and a result status indicator when available.
+pub struct ToolCallBubble<'a> {
+    /// Name of the tool.
+    tool_name: &'a str,
+    /// Formatted arguments (may be truncated).
+    arguments: &'a str,
+    /// Whether the tool result was an error.
+    result_status: Option<bool>,
+    /// Result content (may be truncated).
+    result_content: Option<&'a str>,
+}
+
+impl<'a> ToolCallBubble<'a> {
+    /// Creates a new tool call bubble with the given tool name and arguments.
+    pub fn new(tool_name: &'a str, arguments: &'a str) -> Self {
+        Self {
+            tool_name,
+            arguments,
+            result_status: None,
+            result_content: None,
+        }
+    }
+
+    /// Sets the result status and content for this bubble.
+    pub fn with_result(mut self, is_error: bool, content: &'a str) -> Self {
+        self.result_status = Some(is_error);
+        self.result_content = Some(content);
+        self
+    }
+}
+
+impl ratatui::widgets::Widget for ToolCallBubble<'_> {
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        let mut lines: Vec<Line<'static>> = Vec::new();
+
+        let tool_name_style = Style::default()
+            .fg(nord::NORD8)
+            .add_modifier(Modifier::BOLD);
+        lines.push(Line::from(Span::styled(
+            format!("▸ {}", self.tool_name),
+            tool_name_style,
+        )));
+
+        let args_style = Style::default()
+            .fg(nord::NORD3)
+            .add_modifier(Modifier::DIM);
+        let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
+        lines.push(Line::from(Span::styled(format!("  {args_display}"), args_style)));
+
+        if let Some(is_error) = self.result_status {
+            let (icon, style) = if is_error {
+                ("✗ error", Style::default().fg(nord::NORD11))
+            } else {
+                ("✓ success", Style::default().fg(nord::NORD14))
+            };
+            lines.push(Line::from(Span::styled(format!("  {icon}"), style)));
+
+            if let Some(content) = self.result_content {
+                let content_style = Style::default().fg(nord::NORD4);
+                let content_display = truncate(content, MAX_RESULT_LENGTH);
+                lines.push(Line::from(Span::styled(
+                    format!("  {content_display}"),
+                    content_style,
+                )));
+            }
+        }
+
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(nord::NORD2)),
+            )
+            .wrap(Wrap { trim: false });
+
+        paragraph.render(area, buf);
+    }
+}
+
+// ── Approval Overlay ─────────────────────────────────────────────────────────
+
+/// Renders a semi-transparent approval overlay on top of the chat viewport.
+///
+/// Displays the tool name, arguments, risk level, and three options:
+/// `[y] Approve once`, `[a] Always approve`, `[n] Deny`.
+/// The currently selected option is highlighted with nord8.
+pub struct ApprovalOverlay<'a> {
+    /// Name of the tool requiring approval.
+    tool_name: &'a str,
+    /// Formatted arguments for the tool.
+    arguments: &'a str,
+    /// Currently selected choice.
+    selected: &'a ApprovalChoice,
+}
+
+impl<'a> ApprovalOverlay<'a> {
+    /// Creates a new approval overlay.
+    pub fn new(tool_name: &'a str, arguments: &'a str, selected: &'a ApprovalChoice) -> Self {
+        Self {
+            tool_name,
+            arguments,
+            selected,
+        }
+    }
+}
+
+impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        let overlay_width = 50.min(area.width);
+        let overlay_height = 10.min(area.height);
+        let x = area.x + (area.width.saturating_sub(overlay_width)) / 2;
+        let y = area.y + (area.height.saturating_sub(overlay_height)) / 2;
+        let overlay_area = Rect {
+            x,
+            y,
+            width: overlay_width,
+            height: overlay_height,
+        };
+
+        Clear.render(overlay_area, buf);
+
+        let mut lines: Vec<Line<'static>> = Vec::new();
+
+        let title_style = Style::default()
+            .fg(nord::NORD9)
+            .add_modifier(Modifier::BOLD);
+        lines.push(Line::from(Span::styled(
+            "⚠ Permission Required",
+            title_style,
+        )));
+        lines.push(Line::from(""));
+
+        let tool_style = Style::default()
+            .fg(nord::NORD8)
+            .add_modifier(Modifier::BOLD);
+        lines.push(Line::from(Span::styled(
+            format!("Tool: {}", self.tool_name),
+            tool_style,
+        )));
+
+        let args_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
+        let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
+        lines.push(Line::from(Span::styled(
+            format!("Args: {args_display}"),
+            args_style,
+        )));
+        lines.push(Line::from(""));
+
+        let risk_style = Style::default().fg(nord::NORD13);
+        lines.push(Line::from(Span::styled(
+            "Risk: Requires user approval",
+            risk_style,
+        )));
+        lines.push(Line::from(""));
+
+        let options = [
+            ("y", "Approve once", ApprovalChoice::ApproveOnce),
+            ("a", "Always approve", ApprovalChoice::AlwaysApprove),
+            ("n", "Deny", ApprovalChoice::Deny),
+        ];
+
+        for (key, label, choice) in options {
+            let style = if *self.selected == choice {
+                Style::default()
+                    .fg(nord::NORD8)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(nord::NORD4)
+            };
+            lines.push(Line::from(Span::styled(
+                format!("[{key}] {label}"),
+                style,
+            )));
+        }
+
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(nord::NORD9))
+                    .title(" Approval "),
+            );
+
+        paragraph.render(overlay_area, buf);
+    }
+}
+
+/// Truncates a string to the given maximum length, appending "…" if truncated.
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_len.saturating_sub(1)).collect();
+        format!("{truncated}…")
+    }
+}
 
 /// Duration window for detecting double Ctrl+C press.
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
@@ -40,27 +305,28 @@ enum CtrlCState {
     Waiting(Instant),
 }
 
-/// Tracks the state of the TUI application.
+#[derive(Debug, Clone, PartialEq)]
+enum ChatLine {
+    Text(String),
+    ToolCall {
+        tool_name: String,
+        arguments: String,
+        result: Option<ToolResult>,
+    },
+}
+
 #[derive(Debug, Default)]
 struct TuiState {
-    /// Chat messages displayed in the viewport.
-    chat_lines: Vec<String>,
-    /// Current input buffer.
+    chat_lines: Vec<ChatLine>,
     input_buffer: String,
-    /// Cursor position within the input buffer (character index).
     cursor_pos: usize,
-    /// Whether the agent is currently processing a turn.
     is_processing: bool,
-    /// Current turn's accumulated text (for streaming).
     current_turn_text: String,
-    /// Ctrl+C state machine.
     ctrl_c_state: CtrlCState,
-    /// Whether the TUI should exit.
     should_exit: bool,
-    /// Last usage statistics from the agent.
     usage: Usage,
-    /// Model name displayed in the status bar.
     model_name: String,
+    approval_state: ApprovalState,
 }
 
 impl TuiState {
@@ -74,27 +340,48 @@ impl TuiState {
         self.current_turn_text.push_str(delta);
     }
 
-    /// Finalizes the current turn by appending accumulated text to chat history.
     fn finalize_turn(&mut self) {
         if !self.current_turn_text.is_empty() {
-            self.chat_lines.push(self.current_turn_text.clone());
+            self.chat_lines.push(ChatLine::Text(self.current_turn_text.clone()));
             self.current_turn_text.clear();
         }
     }
 
-    /// Appends a user message to the chat history.
     fn append_user_message(&mut self, content: &str) {
-        self.chat_lines.push(format!("> {content}"));
+        self.chat_lines.push(ChatLine::Text(format!("> {content}")));
     }
 
-    /// Appends an error message to the chat history.
     fn append_error(&mut self, message: &str) {
-        self.chat_lines.push(format!("[Error] {message}"));
+        self.chat_lines.push(ChatLine::Text(format!("[Error] {message}")));
     }
 
-    /// Appends a system message to the chat history.
     fn append_system(&mut self, message: &str) {
-        self.chat_lines.push(format!("[System] {message}"));
+        self.chat_lines.push(ChatLine::Text(format!("[System] {message}")));
+    }
+
+    fn append_tool_call(&mut self, call: &ToolCall) {
+        self.chat_lines.push(ChatLine::ToolCall {
+            tool_name: call.name.clone(),
+            arguments: serde_json::to_string_pretty(&call.input)
+                .unwrap_or_else(|_| call.input.to_string()),
+            result: None,
+        });
+    }
+
+    fn set_tool_result(&mut self, result: &ToolResult) {
+        for line in self.chat_lines.iter_mut().rev() {
+            if let ChatLine::ToolCall {
+                tool_name: _,
+                arguments: _,
+                result: slot,
+            } = line
+            {
+                if slot.is_none() {
+                    *slot = Some(result.clone());
+                    break;
+                }
+            }
+        }
     }
 
     /// Appends a character to the input buffer at the cursor position.
@@ -167,7 +454,6 @@ impl TuiState {
         }
     }
 
-    /// Handles an agent event, updating state accordingly.
     fn handle_event(&mut self, event: &AgentEvent) {
         match event {
             AgentEvent::TurnStart => {
@@ -178,11 +464,10 @@ impl TuiState {
                 self.append_delta(delta);
             }
             AgentEvent::ToolCall { call } => {
-                self.chat_lines.push(format!("[tool: {}]", call.name));
+                self.append_tool_call(call);
             }
             AgentEvent::ToolResult { result } => {
-                let status = if result.is_error { "error" } else { "ok" };
-                self.chat_lines.push(format!("[tool result: {status}]"));
+                self.set_tool_result(result);
             }
             AgentEvent::TurnEnd { usage, .. } => {
                 self.is_processing = false;
@@ -278,14 +563,57 @@ impl Tui {
         Ok(())
     }
 
-    /// Polls for a terminal event with a short timeout.
-    ///
-    /// Returns `Ok(())` if an event is available, `Err` on timeout.
     async fn poll_event() -> Result<()> {
         if event::poll(Duration::from_millis(50))? {
             Ok(())
         } else {
             Err(anyhow::anyhow!("no event"))
+        }
+    }
+
+    /// Shows the approval overlay with the given tool info.
+    pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
+        self.state.approval_state = ApprovalState::Visible {
+            tool_name: tool_name.to_string(),
+            arguments: arguments.to_string(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
+    }
+
+    /// Hides the approval overlay.
+    pub fn hide_approval(&mut self) {
+        self.state.approval_state = ApprovalState::Hidden;
+    }
+
+    /// Returns the current approval choice, if any.
+    pub fn approval_choice(&self) -> Option<&ApprovalChoice> {
+        match &self.state.approval_state {
+            ApprovalState::Visible { selected, .. } => Some(selected),
+            ApprovalState::Hidden => None,
+        }
+    }
+
+    /// Handles a key press while the approval overlay is visible.
+    /// Returns the chosen action if a valid key was pressed.
+    pub fn handle_approval_key(&mut self, key: char) -> Option<ApprovalChoice> {
+        let ApprovalState::Visible { selected, .. } = &mut self.state.approval_state else {
+            return None;
+        };
+
+        match key {
+            'y' => {
+                *selected = ApprovalChoice::ApproveOnce;
+                Some(ApprovalChoice::ApproveOnce)
+            }
+            'a' => {
+                *selected = ApprovalChoice::AlwaysApprove;
+                Some(ApprovalChoice::AlwaysApprove)
+            }
+            'n' => {
+                *selected = ApprovalChoice::Deny;
+                Some(ApprovalChoice::Deny)
+            }
+            _ => None,
         }
     }
 
@@ -301,6 +629,19 @@ impl Tui {
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         return self.state.handle_ctrl_c();
+                    }
+                    KeyCode::Char(c) if !matches!(self.state.approval_state, ApprovalState::Hidden) => {
+                        if let Some(choice) = self.handle_approval_key(c) {
+                            self.hide_approval();
+                            self.state.append_system(&format!(
+                                "Tool call {}",
+                                match choice {
+                                    ApprovalChoice::ApproveOnce => "approved once",
+                                    ApprovalChoice::AlwaysApprove => "always approved",
+                                    ApprovalChoice::Deny => "denied",
+                                }
+                            ));
+                        }
                     }
                     KeyCode::Char(c) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
@@ -363,13 +704,50 @@ fn render(frame: &mut Frame, state: &TuiState) {
     let status_paragraph = Paragraph::new(status_text)
         .style(Style::default().add_modifier(Modifier::REVERSED));
     frame.render_widget(status_paragraph, chunks[2]);
+
+    if let ApprovalState::Visible {
+        tool_name,
+        arguments,
+        selected,
+    } = &state.approval_state
+    {
+        let overlay = ApprovalOverlay::new(tool_name, arguments, selected);
+        frame.render_widget(overlay, chunks[0]);
+    }
 }
 
 fn build_chat_text(state: &TuiState) -> Text<'static> {
     let mut lines: Vec<Line<'static>> = Vec::new();
 
     for line in &state.chat_lines {
-        lines.push(Line::from(line.clone()));
+        match line {
+            ChatLine::Text(text) => {
+                lines.push(Line::from(text.clone()));
+            }
+            ChatLine::ToolCall {
+                tool_name,
+                arguments,
+                result,
+            } => {
+                let mut bubble = ToolCallBubble::new(tool_name, arguments);
+                if let Some(result) = result {
+                    bubble = bubble.with_result(result.is_error, &result.content);
+                }
+                let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 40, 6));
+                bubble.render(buf.area, &mut buf);
+                for y in 0..buf.area.height {
+                    let mut spans = Vec::new();
+                    for x in 0..buf.area.width {
+                        let cell = buf.cell((x, y)).expect("cell within buffer bounds");
+                        spans.push(Span::styled(
+                            cell.symbol().to_string(),
+                            cell.style(),
+                        ));
+                    }
+                    lines.push(Line::from(spans));
+                }
+            }
+        }
     }
 
     if !state.current_turn_text.is_empty() {
@@ -482,7 +860,7 @@ mod tests {
         let mut state = TuiState::new();
         state.append_delta("Assistant response");
         state.finalize_turn();
-        assert_eq!(state.chat_lines, vec!["Assistant response"]);
+        assert_eq!(state.chat_lines, vec![ChatLine::Text("Assistant response".into())]);
         assert!(state.current_turn_text.is_empty());
     }
 
@@ -497,21 +875,21 @@ mod tests {
     fn test_append_user_message() {
         let mut state = TuiState::new();
         state.append_user_message("Hello");
-        assert_eq!(state.chat_lines, vec!["> Hello"]);
+        assert_eq!(state.chat_lines, vec![ChatLine::Text("> Hello".into())]);
     }
 
     #[test]
     fn test_append_error() {
         let mut state = TuiState::new();
         state.append_error("Something failed");
-        assert_eq!(state.chat_lines, vec!["[Error] Something failed"]);
+        assert_eq!(state.chat_lines, vec![ChatLine::Text("[Error] Something failed".into())]);
     }
 
     #[test]
     fn test_append_system() {
         let mut state = TuiState::new();
         state.append_system("Turn cancelled");
-        assert_eq!(state.chat_lines, vec!["[System] Turn cancelled"]);
+        assert_eq!(state.chat_lines, vec![ChatLine::Text("[System] Turn cancelled".into())]);
     }
 
     #[test]
@@ -656,37 +1034,47 @@ mod tests {
     #[test]
     fn test_handle_event_tool_call() {
         let mut state = TuiState::new();
-        let call = talos_core::message::ToolCall {
+        let call = ToolCall {
             id: "c1".into(),
             name: "bash".into(),
             input: serde_json::json!({"command": "ls"}),
         };
-        state.handle_event(&AgentEvent::ToolCall { call });
-        assert_eq!(state.chat_lines, vec!["[tool: bash]"]);
+        state.handle_event(&AgentEvent::ToolCall { call: call.clone() });
+        assert_eq!(state.chat_lines.len(), 1);
+        match &state.chat_lines[0] {
+            ChatLine::ToolCall { tool_name, arguments, result } => {
+                assert_eq!(tool_name, "bash");
+                assert!(arguments.contains("command"));
+                assert!(arguments.contains("ls"));
+                assert!(result.is_none());
+            }
+            _ => panic!("expected ToolCall variant"),
+        }
     }
 
     #[test]
-    fn test_handle_event_tool_result_ok() {
+    fn test_handle_event_tool_result_sets_on_last_tool_call() {
         let mut state = TuiState::new();
-        let result = talos_core::message::ToolResult {
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "read".into(),
+            input: serde_json::json!({"path": "src/main.rs"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall { call });
+        let result = ToolResult {
             tool_use_id: "c1".into(),
-            content: "file.rs".into(),
+            content: "fn main() {}".into(),
             is_error: false,
         };
-        state.handle_event(&AgentEvent::ToolResult { result });
-        assert_eq!(state.chat_lines, vec!["[tool result: ok]"]);
-    }
-
-    #[test]
-    fn test_handle_event_tool_result_error() {
-        let mut state = TuiState::new();
-        let result = talos_core::message::ToolResult {
-            tool_use_id: "c1".into(),
-            content: "failed".into(),
-            is_error: true,
-        };
-        state.handle_event(&AgentEvent::ToolResult { result });
-        assert_eq!(state.chat_lines, vec!["[tool result: error]"]);
+        state.handle_event(&AgentEvent::ToolResult { result: result.clone() });
+        assert_eq!(state.chat_lines.len(), 1);
+        match &state.chat_lines[0] {
+            ChatLine::ToolCall { result: Some(r), .. } => {
+                assert_eq!(r.content, "fn main() {}");
+                assert!(!r.is_error);
+            }
+            _ => panic!("expected ToolCall with result"),
+        }
     }
 
     #[test]
@@ -704,7 +1092,7 @@ mod tests {
             },
         });
         assert!(!state.is_processing);
-        assert_eq!(state.chat_lines, vec!["Response text"]);
+        assert_eq!(state.chat_lines, vec![ChatLine::Text("Response text".into())]);
         assert_eq!(state.usage.input_tokens, 100);
         assert_eq!(state.usage.output_tokens, 50);
     }
@@ -717,7 +1105,7 @@ mod tests {
         state.handle_event(&AgentEvent::Error { message: "API error".into() });
         assert!(!state.is_processing);
         assert!(state.current_turn_text.is_empty());
-        assert_eq!(state.chat_lines, vec!["[Error] API error"]);
+        assert_eq!(state.chat_lines, vec![ChatLine::Text("[Error] API error".into())]);
     }
 
     #[test]
@@ -737,5 +1125,149 @@ mod tests {
         };
         let cost = calculate_cost(&usage);
         assert_eq!(cost, "$0.0045");
+    }
+
+    #[test]
+    fn test_approval_state_default_hidden() {
+        let state = ApprovalState::default();
+        assert!(matches!(state, ApprovalState::Hidden));
+    }
+
+    #[test]
+    fn test_truncate_short_string() {
+        assert_eq!(truncate("hello", 10), "hello");
+    }
+
+    #[test]
+    fn test_truncate_long_string() {
+        let result = truncate("hello world this is a long string", 10);
+        assert_eq!(result.chars().count(), 10);
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn test_truncate_empty_string() {
+        assert_eq!(truncate("", 5), "");
+    }
+
+    #[test]
+    fn test_approval_state_transitions() {
+        let mut state = TuiState::new();
+        assert!(matches!(state.approval_state, ApprovalState::Hidden));
+
+        state.approval_state = ApprovalState::Visible {
+            tool_name: "bash".into(),
+            arguments: "{}".into(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
+        assert!(matches!(state.approval_state, ApprovalState::Visible { .. }));
+
+        state.approval_state = ApprovalState::Hidden;
+        assert!(matches!(state.approval_state, ApprovalState::Hidden));
+    }
+
+    #[test]
+    fn test_handle_approval_key_approve_once() {
+        let mut state = TuiState::new();
+        state.approval_state = ApprovalState::Visible {
+            tool_name: "bash".into(),
+            arguments: "{}".into(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
+
+        let choice = handle_approval_key_event(&mut state, 'y');
+        assert_eq!(choice, Some(ApprovalChoice::ApproveOnce));
+    }
+
+    #[test]
+    fn test_handle_approval_key_always_approve() {
+        let mut state = TuiState::new();
+        state.approval_state = ApprovalState::Visible {
+            tool_name: "bash".into(),
+            arguments: "{}".into(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
+
+        let choice = handle_approval_key_event(&mut state, 'a');
+        assert_eq!(choice, Some(ApprovalChoice::AlwaysApprove));
+    }
+
+    #[test]
+    fn test_handle_approval_key_deny() {
+        let mut state = TuiState::new();
+        state.approval_state = ApprovalState::Visible {
+            tool_name: "bash".into(),
+            arguments: "{}".into(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
+
+        let choice = handle_approval_key_event(&mut state, 'n');
+        assert_eq!(choice, Some(ApprovalChoice::Deny));
+    }
+
+    #[test]
+    fn test_handle_approval_key_invalid_when_hidden() {
+        let mut state = TuiState::new();
+        assert!(matches!(state.approval_state, ApprovalState::Hidden));
+        let choice = handle_approval_key_event(&mut state, 'y');
+        assert!(choice.is_none());
+    }
+
+    #[test]
+    fn test_handle_approval_key_invalid_char() {
+        let mut state = TuiState::new();
+        state.approval_state = ApprovalState::Visible {
+            tool_name: "bash".into(),
+            arguments: "{}".into(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
+
+        let choice = handle_approval_key_event(&mut state, 'x');
+        assert!(choice.is_none());
+    }
+
+    #[test]
+    fn test_tool_call_bubble_creation() {
+        let bubble = ToolCallBubble::new("read", r#"{"path": "src/main.rs"}"#);
+        assert_eq!(bubble.tool_name, "read");
+        assert!(bubble.result_status.is_none());
+    }
+
+    #[test]
+    fn test_tool_call_bubble_with_result() {
+        let bubble = ToolCallBubble::new("bash", r#"{"command": "ls"}"#)
+            .with_result(false, "file.rs\nCargo.toml");
+        assert_eq!(bubble.tool_name, "bash");
+        assert_eq!(bubble.result_status, Some(false));
+        assert_eq!(bubble.result_content, Some("file.rs\nCargo.toml"));
+    }
+
+    #[test]
+    fn test_tool_call_bubble_with_error() {
+        let bubble = ToolCallBubble::new("bash", r#"{"command": "rm -rf /"}"#)
+            .with_result(true, "Permission denied");
+        assert_eq!(bubble.result_status, Some(true));
+    }
+
+    fn handle_approval_key_event(state: &mut TuiState, key: char) -> Option<ApprovalChoice> {
+        let ApprovalState::Visible { selected, .. } = &mut state.approval_state else {
+            return None;
+        };
+
+        match key {
+            'y' => {
+                *selected = ApprovalChoice::ApproveOnce;
+                Some(ApprovalChoice::ApproveOnce)
+            }
+            'a' => {
+                *selected = ApprovalChoice::AlwaysApprove;
+                Some(ApprovalChoice::AlwaysApprove)
+            }
+            'n' => {
+                *selected = ApprovalChoice::Deny;
+                Some(ApprovalChoice::Deny)
+            }
+            _ => None,
+        }
     }
 }
