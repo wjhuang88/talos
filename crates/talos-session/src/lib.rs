@@ -41,7 +41,7 @@ use uuid::Uuid;
 use talos_core::message::{AgentEvent, Message};
 
 pub mod sqlite;
-pub use sqlite::{IndexError, SearchResult, SessionIndex};
+pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 
 /// Errors that can occur during session operations.
 #[derive(Debug, Error)]

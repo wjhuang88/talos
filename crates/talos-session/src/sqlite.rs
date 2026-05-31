@@ -53,6 +53,22 @@ pub struct SearchResult {
     pub rank: f64,
 }
 
+/// Metadata about a session fork relationship.
+///
+/// Captures the source session, the forked session, and the entry point
+/// from which the fork was created.
+#[derive(Debug, Clone)]
+pub struct ForkInfo {
+    /// The session ID of the forked (child) session.
+    pub forked_session_id: String,
+
+    /// The entry ID in the source session from which the fork was created.
+    pub fork_entry_id: String,
+
+    /// When the fork was created.
+    pub forked_at: DateTime<Utc>,
+}
+
 /// SQLite-based full-text search index for session messages.
 ///
 /// Wraps a [`Connection`] to a SQLite database with FTS5 support. The index is
@@ -115,6 +131,13 @@ impl SessionIndex {
                 role,
                 content,
                 timestamp
+            );
+
+            CREATE TABLE IF NOT EXISTS forks (
+                source_session_id TEXT NOT NULL,
+                forked_session_id TEXT PRIMARY KEY,
+                fork_entry_id TEXT NOT NULL,
+                forked_at TEXT NOT NULL
             );
             "#,
         )?;
@@ -345,6 +368,79 @@ impl SessionIndex {
     /// Return the path to the SQLite database file.
     pub fn db_path(&self) -> &Path {
         &self.db_path
+    }
+
+    /// Record a fork relationship in the index.
+    ///
+    /// Inserts a row into the `forks` table linking the source session to the
+    /// newly forked session at the specified entry point.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_session_id` — The session ID being forked from.
+    /// * `forked_session_id` — The new session ID created by the fork.
+    /// * `fork_entry_id` — The entry ID in the source session where the fork occurred.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the fork relationship cannot be recorded.
+    pub fn record_fork(
+        &mut self,
+        source_session_id: &str,
+        forked_session_id: &str,
+        fork_entry_id: &str,
+    ) -> Result<(), IndexError> {
+        let forked_at = Utc::now().to_rfc3339();
+
+        self.conn.execute(
+            "INSERT INTO forks (source_session_id, forked_session_id, fork_entry_id, forked_at) VALUES (?1, ?2, ?3, ?4)",
+            params![source_session_id, forked_session_id, fork_entry_id, forked_at],
+        )?;
+
+        Ok(())
+    }
+
+    /// Get all forks originating from a specific session.
+    ///
+    /// Returns fork metadata for all sessions that were forked from the given
+    /// source session, ordered by fork time descending.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` — The source session ID to query forks for.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
+    pub fn get_forks(&self, session_id: &str) -> Result<Vec<ForkInfo>, IndexError> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT forked_session_id, fork_entry_id, forked_at
+            FROM forks
+            WHERE source_session_id = ?1
+            ORDER BY forked_at DESC
+            "#,
+        )?;
+
+        let results = stmt
+            .query_map(params![session_id], |row| {
+                let forked_session_id: String = row.get(0)?;
+                let fork_entry_id: String = row.get(1)?;
+                let forked_at_str: String = row.get(2)?;
+
+                let forked_at = DateTime::parse_from_rfc3339(&forked_at_str)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap_or_else(|_| Utc::now());
+
+                Ok(ForkInfo {
+                    forked_session_id,
+                    fork_entry_id,
+                    forked_at,
+                })
+            })?
+            .collect::<RusqliteResult<Vec<_>>>()?;
+
+        Ok(results)
     }
 }
 

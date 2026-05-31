@@ -3,9 +3,41 @@
 //! Supports print mode (`-p`) for streaming LLM responses to stdout,
 //! interactive mode for conversational agent sessions, and optional
 //! stdin pipe input and CLI argument overrides.
+//!
+//! # Session Commands
+//!
+//! - `--search <query>`: Full-text search across indexed session messages
+//! - `--list`: List recent sessions from the SQLite index
+//! - `--resume`: Interactive session selection from recent sessions
+//! - `--continue`: Resume the most recent session automatically
+//! - `--session <id>`: Resume a specific session by UUID
 
 mod approval;
 mod event_loop;
+
+/// Nord theme ANSI color constants for terminal output.
+///
+/// Reference: https://www.nordtheme.com/docs/colors-and-palettes
+mod colors {
+    /// Reset all formatting.
+    pub const RESET: &str = "\x1b[0m";
+    /// Bold text.
+    pub const BOLD: &str = "\x1b[1m";
+
+    // Polar Night
+    /// nord3 — comments, timestamps (RGB: 76, 86, 106).
+    pub const NORD3: &str = "\x1b[38;2;76;86;106m";
+
+    // Frost
+    /// nord8 — primary accent, session IDs (RGB: 136, 192, 208).
+    pub const NORD8: &str = "\x1b[38;2;136;192;208m";
+
+    // Aurora
+    /// nord13 — warning, snippet highlights (RGB: 235, 203, 139).
+    pub const NORD13: &str = "\x1b[38;2;235;203;139m";
+    /// nord14 — success, project names (RGB: 163, 190, 140).
+    pub const NORD14: &str = "\x1b[38;2;163;190;140m";
+}
 
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
@@ -430,7 +462,7 @@ fn run_search_mode(cli: Cli) -> Result<()> {
     let manager = SessionManager::new().context("failed to initialize session manager")?;
 
     let results = manager.search(query, cli.limit).map_err(|e| match e {
-        IndexError::SqliteError(e) => anyhow!("search error: {e}"),
+        IndexError::SqliteError(e) => anyhow!("search error: {e}\nHint: run a session first to build the index."),
         IndexError::IoError(e) => anyhow!("I/O error: {e}"),
         IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
     })?;
@@ -440,21 +472,43 @@ fn run_search_mode(cli: Cli) -> Result<()> {
         return Ok(());
     }
 
-    println!("Found {} result(s) for '{query}':\n", results.len());
+    println!(
+        "{}Found {} result(s) for '{}':{}\n",
+        colors::BOLD,
+        results.len(),
+        query,
+        colors::RESET
+    );
 
     for (i, result) in results.iter().enumerate() {
         let ts = result.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
+        let snippet = highlight_snippet(&result.snippet);
         println!(
-            "{:>3}. [{}] {}\n     {}\n     {}\n",
+            "{:>3}. {}{}{} {}{}{} {}{}{}\n     {}\n",
             i + 1,
+            colors::NORD3,
             ts,
+            colors::RESET,
+            colors::NORD8,
             result.session_id,
+            colors::RESET,
+            colors::NORD14,
             result.project,
-            result.snippet,
+            colors::RESET,
+            snippet,
         );
     }
 
     Ok(())
+}
+
+/// Format a search snippet with Nord theme highlighting for matched terms.
+///
+/// Replaces FTS5 `<b>...</b>` markers with ANSI color codes.
+fn highlight_snippet(snippet: &str) -> String {
+    snippet
+        .replace("<b>", &format!("{}{}BOLD{}{}", colors::NORD13, colors::BOLD, colors::RESET, colors::NORD13))
+        .replace("</b>", colors::RESET)
 }
 
 fn run_list_mode(cli: Cli) -> Result<()> {
