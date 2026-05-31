@@ -112,6 +112,15 @@ struct Cli {
 
     #[arg(long, help = "Skip loading workspace context.")]
     no_context: bool,
+
+    #[arg(short = 'c', long, help = "Resume the most recent session.")]
+    r#continue: bool,
+
+    #[arg(short = 'r', long, help = "List sessions and prompt for selection.")]
+    resume: bool,
+
+    #[arg(long, help = "Resume a specific session by ID.")]
+    session: Option<String>,
 }
 
 #[tokio::main]
@@ -285,13 +294,85 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let project_name = workspace_root
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("default");
-    let session = session_manager
-        .create_session(project_name)
-        .context("failed to create session")?;
+
+    let session = if let Some(ref session_id) = cli.session {
+        session_manager
+            .resume_session(session_id)
+            .with_context(|| format!("failed to resume session {session_id}"))?
+    } else if cli.r#continue {
+        let sessions = session_manager
+            .list_sessions()
+            .context("failed to list sessions")?;
+        if sessions.is_empty() {
+            let project_name = workspace_root
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("default");
+            session_manager
+                .create_session(project_name)
+                .context("failed to create session")?
+        } else {
+            let most_recent = sessions
+                .iter()
+                .max_by_key(|s| s.timestamp)
+                .context("no sessions found")?;
+            session_manager
+                .get_session(&most_recent.id)
+                .with_context(|| format!("failed to resume session {}", most_recent.id))?
+        }
+    } else if cli.resume {
+        let sessions = session_manager
+            .list_sessions()
+            .context("failed to list sessions")?;
+        if sessions.is_empty() {
+            println!("No existing sessions. Creating a new one.");
+            let project_name = workspace_root
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("default");
+            session_manager
+                .create_session(project_name)
+                .context("failed to create session")?
+        } else {
+            println!("Available sessions:");
+            for (idx, s) in sessions.iter().enumerate() {
+                println!(
+                    "  {}. {} ({}) - {} - {} messages",
+                    idx + 1,
+                    s.id,
+                    s.project,
+                    s.last_message_preview,
+                    s.message_count,
+                );
+            }
+            print!("Select a session (1-{}): ", sessions.len());
+            io::stdout().flush().context("failed to flush stdout")?;
+
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .context("failed to read input")?;
+            let choice: usize = input
+                .trim()
+                .parse()
+                .context("invalid selection")?;
+            if choice < 1 || choice > sessions.len() {
+                bail!("selection out of range");
+            }
+            let selected = &sessions[choice - 1];
+            session_manager
+                .get_session(&selected.id)
+                .with_context(|| format!("failed to resume session {}", selected.id))?
+        }
+    } else {
+        let project_name = workspace_root
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("default");
+        session_manager
+            .create_session(project_name)
+            .context("failed to create session")?
+    };
 
     let event_loop = event_loop::EventLoop::new(cli, workspace_root, session);
     event_loop.run().await
