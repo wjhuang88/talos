@@ -402,11 +402,15 @@ async fn run_agent_turn_inner(
         config.provider = parse_provider(provider_str)?;
     }
 
-    if config.model.is_empty() {
+    if config.model.is_empty() && !cli.mock {
         bail!("no model configured");
     }
 
-    let api_key = config.api_key().map_err(|e| anyhow::anyhow!("{e}"))?;
+    let api_key = if cli.mock {
+        String::new()
+    } else {
+        config.api_key().map_err(|e| anyhow::anyhow!("{e}"))?
+    };
 
     let prompt = if cli.no_context {
         prompt
@@ -421,7 +425,7 @@ async fn run_agent_turn_inner(
         }
     };
 
-    let provider = build_provider(&config, &api_key);
+    let provider = build_provider(&config, &api_key, cli.mock);
 
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
 

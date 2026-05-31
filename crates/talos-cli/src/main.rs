@@ -174,6 +174,9 @@ struct Cli {
 
     #[arg(long, help = "Append additional instructions to the system prompt.")]
     append_system_prompt: Option<String>,
+
+    #[arg(long, help = "Use mock LLM provider for testing (no API key required).")]
+    mock: bool,
 }
 
 #[tokio::main]
@@ -213,15 +216,19 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         config.provider = parse_provider(provider_str)?;
     }
 
-    if config.model.is_empty() {
+    if config.model.is_empty() && !cli.mock {
         bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
     }
 
-    let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
+    let api_key = if cli.mock {
+        String::new()
+    } else {
+        config.api_key().map_err(|e| anyhow!("{e}"))?
+    };
 
     let prompt = resolve_prompt(cli.prompt)?;
 
-    let provider = build_provider(&config, &api_key);
+    let provider = build_provider(&config, &api_key, cli.mock);
 
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::new(),
@@ -310,13 +317,17 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.provider = parse_provider(provider_str)?;
     }
 
-    if config.model.is_empty() {
+    if config.model.is_empty() && !cli.mock {
         bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
     }
 
-    let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
+    let api_key = if cli.mock {
+        String::new()
+    } else {
+        config.api_key().map_err(|e| anyhow!("{e}"))?
+    };
 
-    let provider = build_provider(&config, &api_key);
+    let provider = build_provider(&config, &api_key, cli.mock);
 
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::new(),
@@ -485,7 +496,12 @@ pub(crate) fn parse_provider(s: &str) -> Result<Provider> {
     }
 }
 
-pub(crate) fn build_provider(config: &Config, api_key: &str) -> Arc<dyn talos_core::provider::LanguageModel> {
+pub(crate) fn build_provider(config: &Config, api_key: &str, mock: bool) -> Arc<dyn talos_core::provider::LanguageModel> {
+    if mock {
+        use talos_provider::mock::MockProvider;
+        return Arc::new(MockProvider::new()
+            .with_response("I'm a mock LLM. I can help you with testing and development without making real API calls."));
+    }
     match config.provider {
         Provider::Anthropic => Arc::new(AnthropicProvider::new(api_key, &config.model)),
         Provider::OpenAI => Arc::new(OpenAIProvider::new(api_key, &config.model)),
