@@ -5,11 +5,11 @@
 //! stdin pipe input and CLI argument overrides.
 
 mod approval;
+mod event_loop;
 
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
@@ -18,24 +18,21 @@ use serde_json::Value;
 use talos_agent::context::ContextLoader;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
-use talos_core::message::{AgentEvent, Message};
+use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_permission::PermissionDecision;
 use talos_provider::AnthropicProvider;
-use talos_session::{Session, SessionManager};
+use talos_session::SessionManager;
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
 
 use crate::approval::ApprovalPrompt;
-
-const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
 /// Permission-aware tool wrapper that checks the permission engine before
 /// executing the underlying tool. In interactive mode, [`PermissionDecision::Ask`]
 /// triggers a user prompt. In print mode, it defaults to deny.
-struct PermissionAwareTool {
+pub(crate) struct PermissionAwareTool {
     inner: Arc<dyn AgentTool>,
     approval: Arc<Mutex<ApprovalPrompt>>,
     print_mode: bool,
@@ -296,258 +293,8 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .create_session(project_name)
         .context("failed to create session")?;
 
-    eprintln!("Talos interactive mode (session: {})", session.id);
-    eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
-
-    let (stdin_tx, mut stdin_rx) = tokio::sync::mpsc::channel::<String>(16);
-    // Use std::thread (not tokio::spawn) so the blocking stdin read
-    // doesn't prevent tokio runtime shutdown.
-    std::thread::spawn(move || {
-        let stdin = std::io::stdin();
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match stdin.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(_) => {
-                    if stdin_tx.blocking_send(line.clone()).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    let mut cancel_token = CancellationToken::new();
-    let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
-    let mut first_ctrl_c_time: Option<std::time::Instant> = None;
-
-    loop {
-        print!("> ");
-        io::stdout().flush().context("failed to flush stdout")?;
-
-        tokio::select! {
-            biased;
-            _ = tokio::signal::ctrl_c() => {
-                print!("\r");
-                io::stdout().flush().context("failed to flush stdout")?;
-                if let Some(handle) = running_task.take() {
-                    cancel_token.cancel();
-                    handle.abort();
-                    let _ = handle.await;
-                    eprintln!("Turn cancelled.");
-                    cancel_token = CancellationToken::new();
-                } else {
-                    let now = std::time::Instant::now();
-                    if let Some(prev) = first_ctrl_c_time {
-                        if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                            eprintln!("Exiting.");
-                            break;
-                        }
-                    }
-                    first_ctrl_c_time = Some(now);
-                    eprintln!("Press Ctrl+C again within 2 seconds to exit.");
-                }
-            }
-            Some(input) = stdin_rx.recv() => {
-                let input = input.trim().to_string();
-                first_ctrl_c_time = None;
-
-                if input.is_empty() {
-                    continue;
-                }
-
-                if let Some(handle) = running_task.take() {
-                    handle.abort();
-                    let _ = handle.await;
-                }
-
-                cancel_token = CancellationToken::new();
-                let token = cancel_token.clone();
-                let session_clone = session.clone();
-                let cli_clone = cli.clone();
-                let workspace_clone = workspace_root.clone();
-
-                let handle = tokio::spawn(async move {
-                    run_agent_turn(input, cli_clone, workspace_clone, session_clone, token).await
-                });
-                running_task = Some(handle);
-            }
-            else => break,
-        }
-
-        if let Some(handle) = running_task.take() {
-            if handle.is_finished() {
-                match handle.await {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("Error: {e}"),
-                    Err(e) => {
-                        if !e.is_cancelled() {
-                            eprintln!("Task error: {e}");
-                        }
-                    }
-                }
-            } else {
-                running_task = Some(handle);
-            }
-        }
-    }
-
-    if let Some(handle) = running_task.take() {
-        cancel_token.cancel();
-        handle.abort();
-        let _ = handle.await;
-    }
-
-    Ok(())
-}
-
-async fn run_agent_turn(
-    prompt: String,
-    cli: Cli,
-    workspace_root: PathBuf,
-    session: Session,
-    cancel_token: CancellationToken,
-) -> Result<()> {
-    let mut config = Config::load().context("failed to load configuration")?;
-
-    if let Some(ref model) = cli.model {
-        config.model = model.clone();
-    }
-    if let Some(ref provider_str) = cli.provider {
-        config.provider = parse_provider(provider_str)?;
-    }
-
-    if config.model.is_empty() {
-        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
-    }
-
-    let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
-
-    let prompt = if cli.no_context {
-        prompt
-    } else {
-        let context = ContextLoader::new(workspace_root.clone()).load().map_err(|e| anyhow!("{e}"))?;
-        if context.is_empty() {
-            prompt
-        } else {
-            format!("{context}\n\n{prompt}")
-        }
-    };
-
-    let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
-
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::new(),
-    )));
-
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root)),
-        approval,
-        print_mode: false,
-    }));
-
-    let agent = Agent::new(provider, registry);
-
-    let (event_tx, mut event_rx) = broadcast::channel::<AgentEvent>(32);
-
-    let user_msg = Message::User { content: prompt.clone() };
-    session
-        .append(&user_msg)
-        .context("failed to log user message to session")?;
-
-    let mut run_handle = tokio::spawn(async move { agent.run_streaming(prompt, event_tx).await });
-
-    let mut assistant_text = String::new();
-
-    loop {
-        tokio::select! {
-            _ = cancel_token.cancelled() => {
-                return Ok(());
-            }
-            event = event_rx.recv() => {
-                match event {
-                    Ok(AgentEvent::TextDelta { delta }) => {
-                        assistant_text.push_str(&delta);
-                        print!("{delta}");
-                        io::stdout().flush().context("failed to flush stdout")?;
-                    }
-                    Ok(AgentEvent::ToolCall { call }) => {
-                        print!("\r\x1b[0K\r\n[tool: {}]\r\n", call.name);
-                        io::stdout().flush().context("failed to flush stdout")?;
-                        session
-                            .append_event(&AgentEvent::ToolCall { call })
-                            .context("failed to log tool call to session")?;
-                    }
-                    Ok(AgentEvent::ToolResult { result }) => {
-                        print!("\r\x1b[0K[tool result: {}]\r\n", if result.is_error { "error" } else { "ok" });
-                        io::stdout().flush().context("failed to flush stdout")?;
-                        session
-                            .append_event(&AgentEvent::ToolResult { result })
-                            .context("failed to log tool result to session")?;
-                    }
-                    Ok(AgentEvent::TurnEnd { .. }) => {
-                        if !assistant_text.is_empty() {
-                            let assistant_msg = Message::Assistant {
-                                content: assistant_text,
-                                tool_calls: vec![],
-                            };
-                            session
-                                .append(&assistant_msg)
-                                .context("failed to log assistant message to session")?;
-                        }
-                        return Ok(());
-                    }
-                    Ok(AgentEvent::Error { message }) => {
-                        print!("\r\x1b[0K\r\nError: {message}\r\n");
-                        io::stdout().flush().context("failed to flush stdout")?;
-                        bail!("{message}");
-                    }
-                    Ok(AgentEvent::TurnStart) => {}
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        print!("\r\x1b[0K\r\nWarning: dropped {n} event(s) due to slow consumer\r\n");
-                        io::stdout().flush().context("failed to flush stdout")?;
-                    }
-                    Err(broadcast::error::RecvError::Closed) => {
-                        bail!("event channel closed before TurnEnd");
-                    }
-                }
-            }
-            run_result = &mut run_handle => {
-                match run_result {
-                    Ok(Ok(_text)) => {
-                        return Ok(());
-                    }
-                    Ok(Err(e)) => {
-                        bail!("agent error: {e}");
-                    }
-                    Err(e) => {
-                        if e.is_cancelled() {
-                            return Ok(());
-                        }
-                        bail!("agent task panicked: {e}");
-                    }
-                }
-            }
-        }
-    }
+    let event_loop = event_loop::EventLoop::new(cli, workspace_root, session);
+    event_loop.run().await
 }
 
 fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {
@@ -572,7 +319,7 @@ fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {
     ))
 }
 
-fn parse_provider(s: &str) -> Result<Provider> {
+pub(crate) fn parse_provider(s: &str) -> Result<Provider> {
     match s.to_lowercase().as_str() {
         "anthropic" => Ok(Provider::Anthropic),
         "openai" => Ok(Provider::OpenAI),
