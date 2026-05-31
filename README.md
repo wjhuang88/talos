@@ -18,7 +18,7 @@ English | **[中文](README.zh-CN.md)**
 | ~~I004~~ | ~~Safe Agent~~ | ~~Dangerous operations get intercepted by permissions~~ ✅ |
 | ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + basic TUI + context compaction + caching~~ ✅ |
 | ~~I006~~ | ~~Data Agent~~ | ~~TUI tool display + approval + session branching + SQLite search~~ ✅ |
-| I007 | Skilled Agent | TUI skill display + SKILL.md + multi-provider support |
+| ~~I007~~ | ~~Skilled Agent~~ | ~~TUI skill display + SKILL.md + multi-provider support~~ ✅ |
 | I008 | Learning Agent | TUI evolution display + self-evolution engine |
 | I009 | Extensible Agent | TUI MCP display + Hook system + MCP + JSON-RPC |
 | I010 | Polished Agent | Full TUI polish (Nord theme + markdown + advanced features) |
