@@ -315,11 +315,14 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             biased;
             // Ctrl+C takes priority
             _ = tokio::signal::ctrl_c() => {
+                // Overwrite the ^C that terminal echoed in cooked mode
+                print!("\r");
+                io::stdout().flush().context("failed to flush stdout")?;
                 if let Some(handle) = running_task.take() {
                     cancel_token.cancel();
                     handle.abort();
                     let _ = handle.await;
-                    eprintln!("\nTurn cancelled.");
+                    eprintln!("Turn cancelled.");
                     cancel_token = CancellationToken::new();
                 } else {
                     let now = std::time::Instant::now();
