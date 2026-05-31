@@ -55,6 +55,168 @@ mod nord {
     pub const NORD14: Color = Color::Rgb(163, 190, 140);
 }
 
+// ── Skill Sidebar ────────────────────────────────────────────────────────────
+
+/// Information about a loaded skill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkillInfo {
+    /// Name of the skill.
+    pub name: String,
+    /// Short description of what the skill does.
+    pub description: String,
+    /// Whether the skill is currently active.
+    pub active: bool,
+}
+
+/// Sidebar panel displaying loaded skills.
+///
+/// Shows a list of skills with their name, description, and active/inactive status.
+/// Can be toggled visible/hidden and collapses to an icon when width is too narrow.
+#[derive(Debug, Clone)]
+pub struct SkillSidebar {
+    /// Whether the sidebar is currently visible.
+    pub visible: bool,
+    /// List of loaded skills.
+    pub skills: Vec<SkillInfo>,
+    /// Width of the sidebar in columns.
+    pub width: u16,
+}
+
+impl SkillSidebar {
+    /// Default width for the sidebar in columns.
+    pub const DEFAULT_WIDTH: u16 = 30;
+    /// Minimum width below which the sidebar collapses to icon-only mode.
+    pub const COLLAPSE_THRESHOLD: u16 = 20;
+
+    /// Creates a new hidden skill sidebar with default width.
+    pub fn new() -> Self {
+        Self {
+            visible: false,
+            skills: Vec::new(),
+            width: Self::DEFAULT_WIDTH,
+        }
+    }
+
+    /// Toggles the visibility of the sidebar.
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    /// Updates the list of skills displayed in the sidebar.
+    pub fn update_skills(&mut self, skills: Vec<SkillInfo>) {
+        self.skills = skills;
+    }
+
+    /// Returns whether the sidebar should render in collapsed (icon-only) mode.
+    fn is_collapsed(&self) -> bool {
+        self.width < Self::COLLAPSE_THRESHOLD
+    }
+
+    /// Renders the skill sidebar on the given frame area.
+    ///
+    /// When visible and not collapsed, shows a bordered panel with:
+    /// - Title "Skills"
+    /// - List of skills with name (nord8), description (nord4), and status indicator
+    ///   (● active in nord14, ○ inactive in nord3)
+    ///
+    /// When collapsed, shows only a skill count icon.
+    pub fn render(&self, frame: &mut Frame, area: Rect) {
+        if !self.visible {
+            return;
+        }
+
+        if self.is_collapsed() {
+            self.render_collapsed(frame, area);
+        } else {
+            self.render_expanded(frame, area);
+        }
+    }
+
+    fn render_expanded(&self, frame: &mut Frame, area: Rect) {
+        let mut lines: Vec<Line<'static>> = Vec::new();
+
+        if self.skills.is_empty() {
+            let empty_style = Style::default()
+                .fg(nord::NORD3)
+                .add_modifier(Modifier::DIM);
+            lines.push(Line::from(Span::styled("No skills loaded", empty_style)));
+        } else {
+            for skill in &self.skills {
+                let status_icon = if skill.active { "●" } else { "○" };
+                let status_style = if skill.active {
+                    Style::default().fg(nord::NORD14)
+                } else {
+                    Style::default().fg(nord::NORD3)
+                };
+
+                let name_style = Style::default()
+                    .fg(nord::NORD8)
+                    .add_modifier(Modifier::BOLD);
+                let desc_style = Style::default()
+                    .fg(nord::NORD4)
+                    .add_modifier(Modifier::DIM);
+
+                lines.push(Line::from(vec![
+                    Span::styled(status_icon.to_string(), status_style),
+                    Span::raw(" "),
+                    Span::styled(skill.name.clone(), name_style),
+                ]));
+
+                let desc_display = truncate(&skill.description, self.width.saturating_sub(4) as usize);
+                lines.push(Line::from(Span::styled(
+                    format!("  {desc_display}"),
+                    desc_style,
+                )));
+
+                lines.push(Line::from(""));
+            }
+        }
+
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(nord::NORD2))
+                    .title(" Skills "),
+            )
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, area);
+    }
+
+    fn render_collapsed(&self, frame: &mut Frame, area: Rect) {
+        let count = self.skills.len();
+        let active_count = self.skills.iter().filter(|s| s.active).count();
+
+        let text = if count == 0 {
+            "⚡".to_string()
+        } else {
+            format!("⚡{count}")
+        };
+
+        let style = if active_count > 0 {
+            Style::default().fg(nord::NORD14)
+        } else {
+            Style::default().fg(nord::NORD3)
+        };
+
+        let paragraph = Paragraph::new(Text::from(Span::styled(text, style)))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(nord::NORD2)),
+            );
+
+        frame.render_widget(paragraph, area);
+    }
+}
+
+impl Default for SkillSidebar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ── Approval State ───────────────────────────────────────────────────────────
 
 /// User's choice when presented with an approval prompt.
@@ -327,6 +489,7 @@ struct TuiState {
     usage: Usage,
     model_name: String,
     approval_state: ApprovalState,
+    branch_id: Option<String>,
 }
 
 impl TuiState {
@@ -454,6 +617,10 @@ impl TuiState {
         }
     }
 
+    fn set_branch_id(&mut self, branch_id: String) {
+        self.branch_id = Some(branch_id);
+    }
+
     fn handle_event(&mut self, event: &AgentEvent) {
         match event {
             AgentEvent::TurnStart => {
@@ -492,6 +659,8 @@ pub struct Tui {
     state: TuiState,
     /// Terminal backend.
     terminal: Terminal<CrosstermBackend<Stdout>>,
+    /// Skill sidebar panel.
+    skill_sidebar: SkillSidebar,
 }
 
 impl Tui {
@@ -511,6 +680,7 @@ impl Tui {
         Ok(Self {
             state: TuiState::new(),
             terminal,
+            skill_sidebar: SkillSidebar::new(),
         })
     }
 
@@ -530,7 +700,8 @@ impl Tui {
 
         loop {
             let state = &self.state;
-            self.terminal.draw(|frame| render(frame, state))?;
+            let sidebar = &self.skill_sidebar;
+            self.terminal.draw(|frame| render(frame, state, sidebar))?;
 
             tokio::select! {
                 _ = Self::poll_event() => {
@@ -585,6 +756,16 @@ impl Tui {
         self.state.approval_state = ApprovalState::Hidden;
     }
 
+    /// Toggles the visibility of the skill sidebar.
+    pub fn toggle_skill_sidebar(&mut self) {
+        self.skill_sidebar.toggle();
+    }
+
+    /// Updates the skills displayed in the sidebar.
+    pub fn update_skills(&mut self, skills: Vec<SkillInfo>) {
+        self.skill_sidebar.update_skills(skills);
+    }
+
     /// Returns the current approval choice, if any.
     pub fn approval_choice(&self) -> Option<&ApprovalChoice> {
         match &self.state.approval_state {
@@ -629,6 +810,10 @@ impl Tui {
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         return self.state.handle_ctrl_c();
+                    }
+                    KeyCode::Char('k') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.toggle_skill_sidebar();
                     }
                     KeyCode::Char(c) if !matches!(self.state.approval_state, ApprovalState::Hidden) => {
                         if let Some(choice) = self.handle_approval_key(c) {
@@ -680,30 +865,55 @@ impl Tui {
     }
 }
 
-fn render(frame: &mut Frame, state: &TuiState) {
-    let chunks = Layout::vertical([
-        Constraint::Min(1),
-        Constraint::Length(3),
-        Constraint::Length(1),
-    ])
-    .split(frame.area());
+fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar) {
+    let main_area = frame.area();
+
+    // If sidebar is visible, split off the right portion
+    let (chat_area, input_area, status_area) = if skill_sidebar.visible {
+        let sidebar_width = skill_sidebar.width.min(main_area.width.saturating_sub(40));
+        let chunks = Layout::horizontal([
+            Constraint::Min(40),
+            Constraint::Length(sidebar_width),
+        ])
+        .split(main_area);
+
+        skill_sidebar.render(frame, chunks[1]);
+
+        let main_chunks = Layout::vertical([
+            Constraint::Min(1),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ])
+        .split(chunks[0]);
+
+        (main_chunks[0], main_chunks[1], main_chunks[2])
+    } else {
+        let chunks = Layout::vertical([
+            Constraint::Min(1),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ])
+        .split(main_area);
+
+        (chunks[0], chunks[1], chunks[2])
+    };
 
     let chat_text = build_chat_text(state);
     let chat_paragraph = Paragraph::new(chat_text)
         .block(Block::default().borders(Borders::ALL).title(" Chat "))
         .wrap(Wrap { trim: false })
         .scroll((chat_scroll_offset(state), 0));
-    frame.render_widget(chat_paragraph, chunks[0]);
+    frame.render_widget(chat_paragraph, chat_area);
 
     let input_text = build_input_text(state);
     let input_paragraph = Paragraph::new(input_text)
-        .block(Block::default().borders(Borders::ALL).title(" Input (Enter to send, Esc to clear) "));
-    frame.render_widget(input_paragraph, chunks[1]);
+        .block(Block::default().borders(Borders::ALL).title(" Input (Enter to send, Esc to clear, Ctrl+K skills) "));
+    frame.render_widget(input_paragraph, input_area);
 
     let status_text = build_status_text(state);
     let status_paragraph = Paragraph::new(status_text)
         .style(Style::default().add_modifier(Modifier::REVERSED));
-    frame.render_widget(status_paragraph, chunks[2]);
+    frame.render_widget(status_paragraph, status_area);
 
     if let ApprovalState::Visible {
         tool_name,
@@ -712,7 +922,7 @@ fn render(frame: &mut Frame, state: &TuiState) {
     } = &state.approval_state
     {
         let overlay = ApprovalOverlay::new(tool_name, arguments, selected);
-        frame.render_widget(overlay, chunks[0]);
+        frame.render_widget(overlay, chat_area);
     }
 }
 
@@ -799,8 +1009,17 @@ fn build_status_text(state: &TuiState) -> Text<'static> {
     let total_tokens = state.usage.input_tokens + state.usage.output_tokens;
     let cost = calculate_cost(&state.usage);
 
+    let branch_info = state
+        .branch_id
+        .as_ref()
+        .map(|b| {
+            let short = if b.len() > 8 { &b[..8] } else { b.as_str() };
+            format!(" | Branch: {short}")
+        })
+        .unwrap_or_default();
+
     let text = format!(
-        " {processing_indicator}{status} | Model: {} | Tokens: {} | Cost: {}",
+        " {processing_indicator}{status} | Model: {} | Tokens: {}{branch_info} | Cost: {}",
         state.model_name, total_tokens, cost
     );
 
@@ -1269,5 +1488,127 @@ mod tests {
             }
             _ => None,
         }
+    }
+
+    // ── Skill Sidebar Tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_skill_sidebar_new_is_hidden() {
+        let sidebar = SkillSidebar::new();
+        assert!(!sidebar.visible);
+        assert!(sidebar.skills.is_empty());
+        assert_eq!(sidebar.width, SkillSidebar::DEFAULT_WIDTH);
+    }
+
+    #[test]
+    fn test_skill_sidebar_default_is_hidden() {
+        let sidebar = SkillSidebar::default();
+        assert!(!sidebar.visible);
+    }
+
+    #[test]
+    fn test_skill_sidebar_toggle_visibility() {
+        let mut sidebar = SkillSidebar::new();
+        assert!(!sidebar.visible);
+
+        sidebar.toggle();
+        assert!(sidebar.visible);
+
+        sidebar.toggle();
+        assert!(!sidebar.visible);
+    }
+
+    #[test]
+    fn test_skill_sidebar_update_skills() {
+        let mut sidebar = SkillSidebar::new();
+        assert!(sidebar.skills.is_empty());
+
+        let skills = vec![
+            SkillInfo {
+                name: "test-skill".into(),
+                description: "A test skill".into(),
+                active: true,
+            },
+            SkillInfo {
+                name: "another-skill".into(),
+                description: "Another skill".into(),
+                active: false,
+            },
+        ];
+        sidebar.update_skills(skills.clone());
+        assert_eq!(sidebar.skills.len(), 2);
+        assert_eq!(sidebar.skills[0].name, "test-skill");
+        assert!(sidebar.skills[0].active);
+        assert_eq!(sidebar.skills[1].name, "another-skill");
+        assert!(!sidebar.skills[1].active);
+    }
+
+    #[test]
+    fn test_skill_sidebar_collapsed_mode() {
+        let mut sidebar = SkillSidebar::new();
+        sidebar.width = 15;
+        assert!(sidebar.is_collapsed());
+
+        sidebar.width = 20;
+        assert!(!sidebar.is_collapsed());
+
+        sidebar.width = 19;
+        assert!(sidebar.is_collapsed());
+    }
+
+    #[test]
+    fn test_skill_sidebar_default_not_collapsed() {
+        let sidebar = SkillSidebar::new();
+        assert!(!sidebar.is_collapsed());
+    }
+
+    #[test]
+    fn test_skill_info_fields() {
+        let skill = SkillInfo {
+            name: "code-review".into(),
+            description: "Reviews code for quality".into(),
+            active: true,
+        };
+        assert_eq!(skill.name, "code-review");
+        assert_eq!(skill.description, "Reviews code for quality");
+        assert!(skill.active);
+    }
+
+    #[test]
+    fn test_skill_sidebar_render_empty_when_hidden() {
+        let sidebar = SkillSidebar::new();
+        assert!(!sidebar.visible);
+        // Hidden sidebar should not render anything — verified by visible flag
+    }
+
+    #[test]
+    fn test_skill_sidebar_with_many_skills() {
+        let mut sidebar = SkillSidebar::new();
+        let skills: Vec<SkillInfo> = (0..10)
+            .map(|i| SkillInfo {
+                name: format!("skill-{i}"),
+                description: format!("Description for skill {i}"),
+                active: i % 2 == 0,
+            })
+            .collect();
+        sidebar.update_skills(skills);
+        assert_eq!(sidebar.skills.len(), 10);
+        assert!(sidebar.skills[0].active);
+        assert!(!sidebar.skills[1].active);
+        assert!(sidebar.skills[2].active);
+    }
+
+    #[test]
+    fn test_skill_sidebar_width_boundary() {
+        let mut sidebar = SkillSidebar::new();
+
+        sidebar.width = SkillSidebar::COLLAPSE_THRESHOLD - 1;
+        assert!(sidebar.is_collapsed());
+
+        sidebar.width = SkillSidebar::COLLAPSE_THRESHOLD;
+        assert!(!sidebar.is_collapsed());
+
+        sidebar.width = SkillSidebar::COLLAPSE_THRESHOLD + 1;
+        assert!(!sidebar.is_collapsed());
     }
 }

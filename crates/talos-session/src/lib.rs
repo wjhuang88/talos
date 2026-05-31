@@ -1212,4 +1212,91 @@ mod tests {
         assert!(alpha.last_message_preview.contains("First message in alpha"));
         assert!(beta.last_message_preview.contains("Reply in beta"));
     }
+
+    #[test]
+    fn fork_from_specific_entry_includes_correct_history() {
+        let manager = test_manager();
+        let mut session = manager.create_session("test-project").unwrap();
+
+        session
+            .append(&Message::User {
+                content: "msg1".into(),
+            })
+            .unwrap();
+        session
+            .append(&Message::Assistant {
+                content: "reply1".into(),
+                tool_calls: vec![],
+            })
+            .unwrap();
+        session
+            .append(&Message::User {
+                content: "msg2".into(),
+            })
+            .unwrap();
+        session
+            .append(&Message::Assistant {
+                content: "reply2".into(),
+                tool_calls: vec![],
+            })
+            .unwrap();
+
+        let entries = session.read_entries().unwrap();
+        assert_eq!(entries.len(), 4);
+
+        let fork_from_id = entries[1].id.clone();
+        let new_branch_id = session.fork(&fork_from_id).unwrap();
+
+        let new_branch = session.get_branch(&new_branch_id).unwrap();
+        assert_eq!(new_branch.entries.len(), 2);
+        assert_eq!(new_branch.entries[0].content, "msg1");
+        assert_eq!(new_branch.entries[1].content, "reply1");
+    }
+
+    #[test]
+    fn fork_from_current_position_includes_all_entries() {
+        let manager = test_manager();
+        let mut session = manager.create_session("test-project").unwrap();
+
+        session
+            .append(&Message::User {
+                content: "only message".into(),
+            })
+            .unwrap();
+
+        let entries = session.read_entries().unwrap();
+        let last_entry_id = entries.last().unwrap().id.clone();
+
+        let new_branch_id = session.fork(&last_entry_id).unwrap();
+        let new_branch = session.get_branch(&new_branch_id).unwrap();
+
+        assert_eq!(new_branch.entries.len(), 1);
+        assert_eq!(new_branch.entries[0].content, "only message");
+    }
+
+    #[test]
+    fn forked_session_branch_has_correct_root_id() {
+        let manager = test_manager();
+        let mut session = manager.create_session("test-project").unwrap();
+
+        session
+            .append(&Message::User {
+                content: "root".into(),
+            })
+            .unwrap();
+        session
+            .append(&Message::Assistant {
+                content: "child".into(),
+                tool_calls: vec![],
+            })
+            .unwrap();
+
+        let entries = session.read_entries().unwrap();
+        let fork_point = entries[0].id.clone();
+
+        let new_branch_id = session.fork(&fork_point).unwrap();
+        let new_branch = session.get_branch(&new_branch_id).unwrap();
+
+        assert_eq!(new_branch.root_id, fork_point);
+    }
 }

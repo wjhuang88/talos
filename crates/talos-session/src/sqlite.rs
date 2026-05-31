@@ -738,4 +738,89 @@ mod tests {
 
         assert_eq!(index.db_path(), db_path);
     }
+
+    // === Fork Metadata Tests ===
+
+    #[test]
+    fn test_fork_schema_creation() {
+        let (index, _dir) = temp_index();
+
+        let table_count: i64 = index
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='forks'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(table_count, 1, "forks table should exist");
+    }
+
+    #[test]
+    fn test_record_fork() {
+        let (mut index, _dir) = temp_index();
+
+        index
+            .record_fork("source-session-1", "forked-session-1", "entry-abc")
+            .unwrap();
+
+        let count: i64 = index
+            .conn
+            .query_row("SELECT COUNT(*) FROM forks", [], |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(count, 1, "One fork relationship should be recorded");
+    }
+
+    #[test]
+    fn test_get_forks_returns_correct_relationships() {
+        let (mut index, _dir) = temp_index();
+
+        index
+            .record_fork("source-1", "forked-1", "entry-a")
+            .unwrap();
+        index
+            .record_fork("source-1", "forked-2", "entry-b")
+            .unwrap();
+        index
+            .record_fork("source-2", "forked-3", "entry-c")
+            .unwrap();
+
+        let forks = index.get_forks("source-1").unwrap();
+        assert_eq!(forks.len(), 2, "Should return 2 forks for source-1");
+
+        let fork_ids: Vec<&str> = forks.iter().map(|f| f.forked_session_id.as_str()).collect();
+        assert!(fork_ids.contains(&"forked-1"));
+        assert!(fork_ids.contains(&"forked-2"));
+
+        let forks_source2 = index.get_forks("source-2").unwrap();
+        assert_eq!(forks_source2.len(), 1);
+        assert_eq!(forks_source2[0].forked_session_id, "forked-3");
+    }
+
+    #[test]
+    fn test_get_forks_empty_for_unknown_session() {
+        let (index, _dir) = temp_index();
+
+        let forks = index.get_forks("unknown-session").unwrap();
+        assert!(forks.is_empty(), "Should return empty for unknown session");
+    }
+
+    #[test]
+    fn test_fork_info_contains_entry_id_and_timestamp() {
+        let (mut index, _dir) = temp_index();
+
+        index
+            .record_fork("source-1", "forked-1", "entry-123")
+            .unwrap();
+
+        let forks = index.get_forks("source-1").unwrap();
+        assert_eq!(forks.len(), 1);
+
+        let fork = &forks[0];
+        assert_eq!(fork.fork_entry_id, "entry-123");
+        assert_eq!(fork.forked_session_id, "forked-1");
+        assert!(fork.forked_at.year() > 2020, "Timestamp should be reasonable");
+    }
 }

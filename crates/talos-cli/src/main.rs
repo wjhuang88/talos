@@ -54,6 +54,7 @@ use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_permission::PermissionDecision;
 use talos_provider::AnthropicProvider;
+use talos_provider::openai::OpenAIProvider;
 use talos_session::{IndexError, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
@@ -224,7 +225,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         }
     };
 
-    let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
+    let provider = build_provider(&config, &api_key);
 
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::new(),
@@ -300,7 +301,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let api_key = config.api_key().map_err(|e| anyhow!("{e}"))?;
 
-    let provider = Arc::new(AnthropicProvider::new(api_key, &config.model));
+    let provider = build_provider(&config, &api_key);
 
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::new(),
@@ -469,6 +470,13 @@ pub(crate) fn parse_provider(s: &str) -> Result<Provider> {
     }
 }
 
+pub(crate) fn build_provider(config: &Config, api_key: &str) -> Arc<dyn talos_core::provider::LanguageModel> {
+    match config.provider {
+        Provider::Anthropic => Arc::new(AnthropicProvider::new(api_key, &config.model)),
+        Provider::OpenAI => Arc::new(OpenAIProvider::new(api_key, &config.model)),
+    }
+}
+
 fn run_search_mode(cli: Cli) -> Result<()> {
     let query = cli.search.as_ref().expect("search query required");
     let manager = SessionManager::new().context("failed to initialize session manager")?;
@@ -527,27 +535,38 @@ fn run_list_mode(cli: Cli) -> Result<()> {
     let manager = SessionManager::new().context("failed to initialize session manager")?;
 
     let sessions = manager.list_recent(cli.limit).map_err(|e| match e {
-        IndexError::SqliteError(e) => anyhow!("list error: {e}"),
+        IndexError::SqliteError(e) => anyhow!("list error: {e}\nHint: run `talos --search <term>` first to build the index."),
         IndexError::IoError(e) => anyhow!("I/O error: {e}"),
         IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
     })?;
 
     if sessions.is_empty() {
-        println!("No indexed sessions found. Run sessions to build the index.");
+        println!("No indexed sessions found. Run `talos --search <term>` to build the index.");
         return Ok(());
     }
 
-    println!("Recent sessions ({}):\n", sessions.len());
+    println!(
+        "{}Recent sessions ({}):{}\n",
+        colors::BOLD,
+        sessions.len(),
+        colors::RESET
+    );
 
     for (i, session) in sessions.iter().enumerate() {
         let ts = session.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
         println!(
-            "{:>3}. {} | {} | {} messages | {}",
+            "{:>3}. {}{}{} | {}{}{} | {} messages | {}{}{}",
             i + 1,
+            colors::NORD8,
             session.id,
+            colors::RESET,
+            colors::NORD14,
             session.project,
+            colors::RESET,
             session.message_count,
+            colors::NORD3,
             ts,
+            colors::RESET,
         );
     }
 
@@ -559,7 +578,7 @@ fn run_list_mode(cli: Cli) -> Result<()> {
 fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<talos_session::Session> {
     use std::fs::OpenOptions;
     use std::io::Write;
-    use talos_session::{Session, SessionEntry};
+    use talos_session::Session;
 
     let source = manager
         .resume_session(source_session_id)
@@ -570,7 +589,7 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<tal
         bail!("cannot fork an empty session");
     }
 
-    let fork_entry_id = entries.last().map(|e| e.id.clone()).unwrap();
+    let fork_entry_id = entries.last().expect("entries checked non-empty above").id.clone();
 
     let new_id = Uuid::new_v4();
     let project_dir = manager
@@ -615,34 +634,6 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<tal
     Ok(new_session)
 }
 
-    println!(
-        "{}Recent sessions ({}):{}\n",
-        colors::BOLD,
-        sessions.len(),
-        colors::RESET
-    );
-
-    for (i, session) in sessions.iter().enumerate() {
-        let ts = session.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
-        println!(
-            "{:>3}. {}{}{} | {}{}{} | {} messages | {}{}{}",
-            i + 1,
-            colors::NORD8,
-            session.id,
-            colors::RESET,
-            colors::NORD14,
-            session.project,
-            colors::RESET,
-            session.message_count,
-            colors::NORD3,
-            ts,
-            colors::RESET,
-        );
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -664,5 +655,139 @@ mod tests {
     fn parse_provider_unknown() {
         assert!(parse_provider("unknown").is_err());
         assert!(parse_provider("").is_err());
+    }
+
+    // === Snippet Highlighting Tests ===
+
+    #[test]
+    fn highlight_snippet_replaces_b_tags() {
+        let input = "This is a <b>matched</b> term in the snippet.";
+        let output = highlight_snippet(input);
+        assert!(output.contains(colors::NORD13));
+        assert!(output.contains(colors::BOLD));
+        assert!(!output.contains("<b>"));
+        assert!(!output.contains("</b>"));
+    }
+
+    #[test]
+    fn highlight_snippet_multiple_matches() {
+        let input = "<b>first</b> and <b>second</b> match";
+        let output = highlight_snippet(input);
+        // Each match produces 2 NORD13 sequences (before and after BOLD/RESET)
+        let nord13_count = output.matches(colors::NORD13).count();
+        assert_eq!(nord13_count, 4, "Should have 4 NORD13 sequences (2 per match)");
+    }
+
+    #[test]
+    fn highlight_snippet_no_tags_passthrough() {
+        let input = "No matches in this snippet.";
+        let output = highlight_snippet(input);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn highlight_snippet_empty_string() {
+        let output = highlight_snippet("");
+        assert_eq!(output, "");
+    }
+
+    // === Session ID Parsing Tests ===
+
+    #[test]
+    fn session_id_valid_uuid_parses() {
+        let valid_id = "550e8400-e29b-41d4-a716-446655440000";
+        let result = uuid::Uuid::parse_str(valid_id);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn session_id_invalid_uuid_fails() {
+        let invalid_ids = vec![
+            "not-a-uuid",
+            "550e8400-e29b-41d4-a716",
+            "",
+        ];
+        for invalid_id in invalid_ids {
+            let result = uuid::Uuid::parse_str(invalid_id);
+            assert!(result.is_err(), "Should fail to parse: {invalid_id}");
+        }
+    }
+
+    // === Color Constant Tests ===
+
+    #[test]
+    fn color_constants_are_non_empty() {
+        assert!(!colors::RESET.is_empty());
+        assert!(!colors::BOLD.is_empty());
+        assert!(!colors::NORD3.is_empty());
+        assert!(!colors::NORD8.is_empty());
+        assert!(!colors::NORD13.is_empty());
+        assert!(!colors::NORD14.is_empty());
+    }
+
+    #[test]
+    fn color_constants_contain_ansi_escape() {
+        // All color constants should start with the ANSI escape sequence
+        for color in [
+            colors::NORD3,
+            colors::NORD8,
+            colors::NORD13,
+            colors::NORD14,
+        ] {
+            assert!(
+                color.starts_with("\x1b["),
+                "Color constant should start with ANSI escape: {color:?}"
+            );
+        }
+        assert!(colors::RESET.starts_with("\x1b["));
+        assert!(colors::BOLD.starts_with("\x1b["));
+    }
+
+    // === Error Handling Tests ===
+
+    #[test]
+    fn session_manager_resume_invalid_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
+
+        let result = manager.resume_session("not-a-valid-uuid");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn session_manager_resume_nonexistent_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
+
+        let valid_uuid = uuid::Uuid::new_v4().to_string();
+        let result = manager.resume_session(&valid_uuid);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            talos_session::SessionError::SessionNotFound(_) => {}
+            other => panic!("expected SessionNotFound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn session_manager_search_empty_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
+
+        // Search on empty index may return empty results or error if DB not initialized
+        let results = manager.search("nonexistent", 10);
+        // Either empty results or an error is acceptable for uninitialized index
+        if let Ok(r) = results {
+            assert!(r.is_empty());
+        }
+    }
+
+    #[test]
+    fn session_manager_list_recent_empty_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
+
+        let results = manager.list_recent(10);
+        assert!(results.is_ok());
+        assert!(results.unwrap().is_empty());
     }
 }

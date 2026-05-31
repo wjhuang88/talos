@@ -11,6 +11,7 @@ members = [
     "crates/talos-sandbox",
     "crates/talos-permission",
     "crates/talos-tui",
+    "crates/talos-skill",
 ]
 
 [workspace.package]

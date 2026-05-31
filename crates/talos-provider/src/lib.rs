@@ -1,6 +1,7 @@
 //! Talos provider — LLM client abstractions and provider-specific implementations.
 
 pub mod mock;
+pub mod openai;
 
 use std::time::Duration;
 
