@@ -306,7 +306,6 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let mut cancel_token = CancellationToken::new();
     let mut running_task: Option<tokio::task::JoinHandle<Result<()>>> = None;
     let mut first_ctrl_c_time: Option<std::time::Instant> = None;
-    let exit_token = CancellationToken::new();
 
     loop {
         print!("> ");
@@ -314,9 +313,6 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
         tokio::select! {
             biased;
-            _ = exit_token.cancelled() => {
-                break;
-            }
             _ = tokio::signal::ctrl_c() => {
                 print!("\r");
                 io::stdout().flush().context("failed to flush stdout")?;
@@ -331,7 +327,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     if let Some(prev) = first_ctrl_c_time {
                         if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
                             eprintln!("Exiting.");
-                            exit_token.cancel();
+                            drop(lines);
                             break;
                         }
                     }
