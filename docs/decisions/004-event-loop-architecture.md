@@ -2,7 +2,14 @@
 
 ## Status
 
-Accepted
+Accepted — **Amended by [ADR-005](005-tui-event-architecture.md)**.
+
+> **Amendment (ADR-005):** The single-`mpsc` `AppEvent` bus and explicit `AppState` state machine
+> below remain the canonical **TUI-internal (Layer 1)** design. However, the Implementation Plan
+> §355 claim that the I010 TUI integration leaves the "event loop unchanged" — with the agent turn
+> spawned *inside* the TUI loop — is **retracted**. Per the Codex reference ("TUI never calls agent
+> loop directly"), the agent loop moves behind an `AppServerSession` (Layer 2) SQ/EQ boundary. See
+> ADR-005 for the two-layer model and phased migration.
 
 ## Context
 
@@ -339,6 +346,7 @@ fn render(state: &AppState) {
 ## Related
 
 - ADR-003: TUI 渐进式演进策略
+- ADR-005: 规范 TUI 事件架构（修订本 ADR §355；引入 AppServerSession L2 边界）
 - I005: Smart Agent（当前迭代）
 - I010: Polished Agent（将实现完整 TUI）
 
@@ -354,7 +362,8 @@ fn render(state: &AppState) {
    
 3. **I010**: TUI 集成
    - 替换 render 函数为 ratatui 渲染
-   - 事件循环保持不变
+   - ~~事件循环保持不变~~ **[RETRACTED by ADR-005]** L1 事件循环结构保留，但 agent turn 不再在 TUI 循环内
+     `tokio::spawn`；改为经 `AppServerSession`（L2，SQ/EQ 边界）驱动。详见 ADR-005。
 
 ## References
 

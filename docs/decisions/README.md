@@ -53,3 +53,7 @@ Which Assumptions need validation?]
 ## Current Decisions
 
 1. [001: Self-Evolution as Runtime Primitive](001-runtime-self-evolution.md) — Evolution is a first-class runtime capability (Observe → Learn → Adapt), not just a skill system feature.
+2. [002: Local Storage Architecture](002-local-storage-architecture.md) — Progressive storage strategy: pure files first, SQLite introduced only where query patterns (FTS, aggregation) demand it.
+3. [003: TUI Progressive Evolution](003-tui-progressive-evolution.md) — Accepted. TUI grows incrementally from I005 onward rather than landing all at once in a final polish iteration.
+4. [004: Production-Grade Event Loop Architecture](004-event-loop-architecture.md) — Accepted (amended by ADR-005). Single-mpsc `AppEvent` bus + explicit `AppState` state machine for the TUI-internal event loop.
+5. [005: Canonical TUI Event Architecture](005-tui-event-architecture.md) — Accepted. Two-layer model: retain ADR-004's L1 mpsc bus; add an `AppServerSession` L2 seam (bounded SQ / unbounded EQ) so the TUI never spawns the agent loop directly. Phased migration deferred to I010.
