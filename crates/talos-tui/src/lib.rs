@@ -631,7 +631,7 @@ impl TuiState {
             AgentEvent::TextDelta { delta } => {
                 self.append_delta(delta);
             }
-            AgentEvent::ToolCall { call } => {
+            AgentEvent::ToolCall { call, .. } => {
                 self.append_tool_call(call);
             }
             AgentEvent::ToolResult { result } => {
@@ -647,6 +647,7 @@ impl TuiState {
                 self.current_turn_text.clear();
                 self.append_error(message);
             }
+            _ => {}
         }
     }
 }
@@ -1311,7 +1312,10 @@ mod tests {
             name: "bash".into(),
             input: serde_json::json!({"command": "ls"}),
         };
-        state.handle_event(&AgentEvent::ToolCall { call: call.clone() });
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call.clone(),
+            provenance: Default::default(),
+        });
         assert_eq!(state.chat_lines.len(), 1);
         match &state.chat_lines[0] {
             ChatLine::ToolCall { tool_name, arguments, result } => {
@@ -1332,7 +1336,10 @@ mod tests {
             name: "read".into(),
             input: serde_json::json!({"path": "src/main.rs"}),
         };
-        state.handle_event(&AgentEvent::ToolCall { call });
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: Default::default(),
+        });
         let result = ToolResult {
             tool_use_id: "c1".into(),
             content: "fn main() {}".into(),

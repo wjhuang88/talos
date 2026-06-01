@@ -123,6 +123,7 @@ pub async fn run(
                         Ok(AgentEvent::TurnEnd { .. }) => break,
                         Ok(AgentEvent::Error { message }) => return Err(RpcError::Internal(message)),
                         Ok(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
+                        Ok(_) => {}
                         Err(_) => break,
                     }
                 }

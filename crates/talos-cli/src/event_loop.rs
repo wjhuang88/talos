@@ -541,10 +541,13 @@ async fn run_agent_turn_inner(
                         assistant_text.push_str(&delta);
                         let _ = event_tx.send(AppEvent::AgentTextDelta(delta));
                     }
-                    Ok(AgentEvent::ToolCall { call }) => {
+                    Ok(AgentEvent::ToolCall { call, .. }) => {
                         let _ = event_tx.send(AppEvent::AgentToolCall(call.name.clone()));
                         session
-                            .append_event(&AgentEvent::ToolCall { call })
+                            .append_event(&AgentEvent::ToolCall {
+                                call,
+                                provenance: Default::default(),
+                            })
                             .context("failed to log tool call to session")?;
                     }
                     Ok(AgentEvent::ToolResult { result }) => {
@@ -575,6 +578,7 @@ async fn run_agent_turn_inner(
                         bail!("{message}");
                     }
                     Ok(AgentEvent::TurnStart) => {}
+                    Ok(_) => {}
                     Err(broadcast::error::RecvError::Lagged(n)) => {
                         eprintln!("Warning: dropped {n} event(s) due to slow consumer");
                     }

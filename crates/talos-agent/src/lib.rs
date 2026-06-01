@@ -443,7 +443,7 @@ impl Agent {
                             }
                         }
                     }
-                    AgentEvent::ToolCall { call } => {
+                    AgentEvent::ToolCall { call, .. } => {
                         match self
                             .run_hook(&hook_ctx, HookEvent::OnToolCallProposed { call: &call })
                             .await
@@ -485,6 +485,7 @@ impl Agent {
                         );
                     }
                     AgentEvent::TurnStart | AgentEvent::ToolResult { .. } => {}
+                    _ => {}
                 }
             }
 
@@ -1136,7 +1137,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1180,14 +1181,14 @@ mod tests {
                         name: "read".into(),
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "read".into(),
                         input: serde_json::json!({ "path": "b.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1231,21 +1232,21 @@ mod tests {
                         name: "fast_read".into(),
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "fast_read".into(),
                         input: serde_json::json!({ "path": "b.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_3".into(),
                         name: "fast_read".into(),
                         input: serde_json::json!({ "path": "c.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1303,14 +1304,14 @@ mod tests {
                         name: "write".into(),
                         input: serde_json::json!({ "path": "a.txt", "content": "a" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "write".into(),
                         input: serde_json::json!({ "path": "b.txt", "content": "b" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1361,7 +1362,7 @@ mod tests {
                     name: "echo".into(),
                     input: serde_json::json!({ "message": format!("msg_{i}") }),
                 },
-            });
+            provenance: Default::default(),});
         }
         events.push(AgentEvent::TurnEnd {
             stop_reason: StopReason::ToolUse,
@@ -1397,7 +1398,7 @@ mod tests {
                     name: "echo".into(),
                     input: serde_json::json!({ "message": format!("msg_{i}") }),
                 },
-            });
+            provenance: Default::default(),});
         }
         tool_events.push(AgentEvent::TurnEnd {
             stop_reason: StopReason::ToolUse,
@@ -1442,7 +1443,7 @@ mod tests {
                 name: "echo".into(),
                 input: serde_json::json!({ "message": "same" }),
             },
-        };
+        provenance: Default::default(),};
 
         let responses = vec![
             vec![
@@ -1501,7 +1502,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "first" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1515,7 +1516,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "second" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1559,7 +1560,7 @@ mod tests {
                         name: "nonexistent_tool".into(),
                         input: serde_json::json!({}),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1598,7 +1599,7 @@ mod tests {
                         name: "failing".into(),
                         input: serde_json::json!({}),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1643,21 +1644,21 @@ mod tests {
                         name: "read".into(),
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "write".into(),
                         input: serde_json::json!({ "path": "b.txt", "content": "b" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_3".into(),
                         name: "read".into(),
                         input: serde_json::json!({ "path": "c.txt" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1733,7 +1734,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "test" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1853,7 +1854,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1911,7 +1912,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1969,7 +1970,7 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -2028,7 +2029,7 @@ mod tests {
                         name: "bash".into(),
                         input: serde_json::json!({ "command": "echo hello" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -2087,7 +2088,7 @@ mod tests {
                         name: "bash".into(),
                         input: serde_json::json!({ "command": "echo hello" }),
                     },
-                },
+                provenance: Default::default(),},
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),

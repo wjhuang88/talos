@@ -376,7 +376,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                     name: tool_call_names[i].clone(),
                                     input: args,
                                 },
-                            })
+                            provenance: Default::default(),})
                             .await;
                     }
                 }
@@ -422,7 +422,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         name: tool_call_names[i].clone(),
                         input: args,
                     },
-                })
+                provenance: Default::default(),})
                 .await;
         }
     }

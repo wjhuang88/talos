@@ -27,6 +27,19 @@ pub enum ToolError {
     ExecutionError(String),
 }
 
+use serde::{Deserialize, Serialize};
+
+/// Provenance of a registered tool.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolProvenance {
+    /// A native tool registered within the main process.
+    #[default]
+    Native,
+    /// A tool provided by a remote MCP server.
+    McpRemote { server: String },
+}
+
 /// The result of executing a tool.
 #[derive(Debug, Clone)]
 pub struct ToolResult {
@@ -86,6 +99,16 @@ pub trait AgentTool: Send + Sync {
     /// only read data (e.g., file readers, web fetchers).
     fn is_read_only(&self) -> bool {
         false
+    }
+
+    /// Returns the provenance of this tool.
+    ///
+    /// The default implementation returns [`ToolProvenance::Native`].
+    /// Override for tools that live in another process or behind a
+    /// network boundary (e.g., MCP remote tools) so consumers can
+    /// render an origin marker in the UI.
+    fn provenance(&self) -> ToolProvenance {
+        ToolProvenance::Native
     }
 }
 

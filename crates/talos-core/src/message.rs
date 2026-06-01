@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::tool::ToolProvenance;
+
 /// A tool call requested by the assistant.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
@@ -78,10 +80,11 @@ pub struct Usage {
 /// Events emitted during a turn for streaming.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AgentEvent {
     /// Turn has started.
     TurnStart,
-    /// A chunk of text from the assistant.
+    /// A text delta was received from the provider.
     TextDelta {
         /// The text chunk.
         delta: String,
@@ -90,6 +93,8 @@ pub enum AgentEvent {
     ToolCall {
         /// The tool call details.
         call: ToolCall,
+        /// The provenance of the tool being called.
+        provenance: ToolProvenance,
     },
     /// A tool call completed.
     ToolResult {
@@ -166,6 +171,7 @@ mod tests {
                     name: "bash".into(),
                     input: serde_json::json!({"command": "ls"}),
                 },
+                provenance: ToolProvenance::Native,
             },
             AgentEvent::ToolResult {
                 result: ToolResult {

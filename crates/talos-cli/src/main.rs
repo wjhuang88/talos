@@ -496,6 +496,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
                 std::process::exit(1);
             }
             Ok(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
+            Ok(_) => {}
             Err(broadcast::error::RecvError::Lagged(n)) => {
                 eprintln!("Warning: dropped {n} event(s) due to slow consumer");
             }

@@ -133,4 +133,10 @@ impl AgentTool for McpToolAdapter {
     fn is_read_only(&self) -> bool {
         self.read_only
     }
+
+    fn provenance(&self) -> talos_core::tool::ToolProvenance {
+        talos_core::tool::ToolProvenance::McpRemote {
+            server: self.remote.server.clone(),
+        }
+    }
 }

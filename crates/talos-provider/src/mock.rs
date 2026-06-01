@@ -225,7 +225,7 @@ async fn emit_tool_call_response(
                 name: name.to_string(),
                 input,
             },
-        })
+        provenance: Default::default(),})
         .await;
     let _ = tx
         .send(AgentEvent::TurnEnd {
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(events.len(), 3);
         assert!(matches!(events[0], AgentEvent::TurnStart));
         match &events[1] {
-            AgentEvent::ToolCall { call } => {
+            AgentEvent::ToolCall { call, .. } => {
                 assert_eq!(call.name, "read_file");
                 assert_eq!(call.input, serde_json::json!({"path": "test.rs"}));
             }
@@ -468,7 +468,7 @@ mod tests {
         // 2: tool call
         let rx = provider.stream(&[]).await.unwrap();
         let events = collect_events(rx).await;
-        assert!(matches!(&events[1], AgentEvent::ToolCall { call } if call.name == "bash"));
+        assert!(matches!(&events[1], AgentEvent::ToolCall { call, .. } if call.name == "bash"));
 
         // 3: error
         let rx = provider.stream(&[]).await.unwrap();
