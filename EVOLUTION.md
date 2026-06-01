@@ -23,6 +23,9 @@ repeating known mistakes.
 | 12 | Storage | 自包含 SQLite 需要 ADR 明确例外与运行时边界 | I008 |
 | 13 | Testing | 自定义存储目录必须隔离派生索引文件 | I008 |
 | 14 | Process | 并行委派时 `git stash` 会吞掉兄弟任务的未提交改动 | R0 |
+| 15 | Delegation | 并行委派代理会"顺手"实现兄弟任务范围，需用 marker 协议隔离 | I009 |
+| 16 | Planning | `task()` 调用必须二选一：`category` 或 `subagent_type`，不可同时给 | I009 |
+| 17 | TUI | visual-engineering 任务在 R0 级别并行委派下 30 分钟不够（结构+消费两个 scope） | I009 |
 
 ## Lessons
 
@@ -196,6 +199,63 @@ repeating known mistakes.
 1. 委派给子代理的 prompt 必须显式禁止 `git stash` / `git reset --hard` / `git checkout --` 等会改动工作树的命令——验证预先存在性应用 `git diff HEAD` / `git show HEAD:<file>`，而不是污染工作树。
 2. 多个并行委派之间，每个代理的改动应**先 commit 再开始下一个委托**，让工作树不被多个 WIP 同时占据。
 3. 主代理在并行委派结束、收齐结果后，应跑 `git status --short` + `git diff --stat` 校验每个故事的关键文件是否仍在；如果某故事的关键文件 (如 `hardening.rs`) 缺失，要么要求该代理重做，要么主代理自己补。
+
+---
+
+### 15. 并行委派代理会"顺手"实现兄弟任务范围，需用 marker 协议隔离 (I009)
+
+**Symptom**: I009 的 Wave 2 同时启动了 S3 (MCP client)、S4 (MCP server)、S5 (JSON-RPC) 三个并行 deep 任务。S3 代理本应只交付 client 范围，却额外在 `main.rs` 里写好了 MCP server 的 dispatch 路径；S5 代理则在 JSON-RPC server 里预留了 MCP server 的处理钩子。结果三个文件交叠，最终必须用 `// I009-S{n} begin/end` 标记 + 手工剥离 + 多个 Python 脚本（`/tmp/i009-split/` 下的 `build_s3_config.py`、`fix_s3_main_v3.py` 等）来拆分 commit。
+
+**Cause**: 委派 prompt 里只写了"实现 S3 范围"，但代理看到的是整个仓库状态，会从"系统完整可工作"的视角出发去补全关联代码。缺少机器可校验的边界标记时，代理无法判断哪些代码属于"兄弟任务"。
+
+**Remedy**: 主代理最终手动重做拆分：
+- 在每个 story 的 start 位置加 `// I009-S{N} begin` 标记；
+- 用 `strip_markers.sh` 剥除不属于本 story 的 marker 块；
+- 用 Python 脚本逐行分析 `main.rs` 块，按 marker 范围重新分文件；
+- 逐个 commit 后跑 `cargo test --workspace` 验证范围。
+
+**Prevention**:
+1. **Marker 协议**：每个 story 必须有显式的 `// IXXX-S{N} begin/end` 标记，划定"本故事独占代码块"。Marker 之外区域即使逻辑上相关也不动。
+2. **Plan-first pre-stage**：主代理应在并行委派之前，预先在主入口（`main.rs`、`Config`、dispatch 表）写入**空的** marker 块和 stub 实现，让代理只填 marker 内部；不在 marker 内的代码改动 = 越界。
+3. **子代理 prompt 显式禁止**："不要修改本 marker 块以外的代码。如需跨 story 协作，把改动写到 TODO 注释，由主代理后续分配。"
+4. **主代理验收时硬性规则**：收齐结果后 `git diff --stat` 比对 marker 范围，标记外的改动一律 revert。
+
+---
+
+### 16. `task()` 调用必须二选一：`category` 或 `subagent_type`，不可同时给 (I009)
+
+**Symptom**: I009 plan agent 输出的 prompt 里写了 `task(subagent_type="general", category="ultrabrain", ...)` 这种"同时给两个"的形态。第一次 `task()` 调度就失败、plan 内容丢失，必须重跑。
+
+**Cause**: Sisyphus-Junior 的 `task()` 工具签名是 `category XOR subagent_type`。同时给两个时框架按 `category` 走但参数校验失败，导致整个任务被丢弃没有任何回执。Momus 第一次审稿时也撞上同样的格式错误被拒。
+
+**Remedy**: I009 后半段把"同时给两个"的调用全部改为纯 `category` 形式（`task(category="ultrabrain", ...)` / `task(category="deep", ...)` / `task(category="visual-engineering", ...)`）。Momus 必须以 `task(prompt=".sisyphus/plans/*.md")` 形式调用，路径作为**唯一** prompt。
+
+**Prevention**:
+1. 在 `.opencode/agents/Sisyphus-Junior.md` 或全局 prompt 里加一条硬性规则："`task()` 调用必须 EITHER `category` OR `subagent_type`, NEVER BOTH"。
+2. Plan agent 在输出 prompt 时应自动 lint 这条规则。
+3. 主代理在 plan agent 跑完、Momus 审完之后、肉眼 / 脚本扫一遍所有 `task(` 调用，确认没有同时给两个参数。
+
+---
+
+### 17. visual-engineering 任务在 R0 级别并行委派下 30 分钟不够（结构+消费两个 scope） (I009)
+
+**Symptom**: I009-S1 委派给 `visual-engineering` 任务跑 30 分钟超时。主代理在超时后看到部分工作遗留：TUI 状态机改了一半、`agent_ext.rs` 成了孤儿、consumer 侧 (`/plugins` 命令、provenance marker 渲染) 还没接上。
+
+**Cause**: I009-S1 实际上有两个不同 scope：
+- **结构 scope**：`talos-core` 加 `ToolProvenance`、`AgentEvent` 加字段、`AgentTool` trait 加默认方法 — 这是 `ultrabrain` 范畴。
+- **消费 scope**：TUI 状态机加 provenance 渲染、`/plugins` 斜杠命令 — 这是 `visual-engineering` 范畴。
+
+`visual-engineering` 30 分钟内同时完成"理解现有 TUI 状态机 + 调整渲染函数 + 写新命令 + 验证不破坏现有交互"，对 1667 行的 `talos-tui/src/lib.rs` 来说太紧。
+
+**Remedy**: 主代理在超时后做了一次"分离式补完"：
+1. 撤销消费侧未完成 / 中间状态代码（`set_plugin_status_cb`、`handle_plugins_command`、`agent_ext.rs`）；
+2. 保留并完成结构侧（`ToolProvenance` 枚举、`AgentEvent` 字段、MCP adapter override、ADR-009）；
+3. 把消费侧 TUI marker + `/plugins` 命令**显式记录到 ADR-009 "Out of Scope"**，作为独立 follow-up story。
+
+**Prevention**:
+1. visual-engineering 任务在 ≥1000 行的 TUI 状态机上预计需要 ≥45 分钟。R0 级别（涉及结构变更）应单独预留 60 分钟预算。
+2. 当一个 story 同时跨越 core 结构和 UI 消费时，应**先**委派结构给 `ultrabrain`、验证编译后再**再**委派消费给 `visual-engineering`——两阶段串行而非一阶段并行。
+3. 必须在 plan agent 输出里就标注 "预计时间 > 30 分钟？→ 不要并行委派给 visual-engineering，串行两阶段"。
 
 ## When to Write a Lesson
 
