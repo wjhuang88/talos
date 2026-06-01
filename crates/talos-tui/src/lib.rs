@@ -617,6 +617,7 @@ impl TuiState {
         }
     }
 
+    #[allow(dead_code)]
     fn set_branch_id(&mut self, branch_id: String) {
         self.branch_id = Some(branch_id);
     }
@@ -1035,10 +1036,16 @@ fn build_input_text(state: &TuiState) -> Text<'static> {
         spans.push(Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED)));
     } else {
         let mut chars = after.chars();
-        let first = chars.next().unwrap().to_string();
-        let rest: String = chars.collect();
-        spans.push(Span::styled(first, Style::default().add_modifier(Modifier::REVERSED)));
-        spans.push(Span::raw(rest));
+        if let Some(first) = chars.next() {
+            let rest: String = chars.collect();
+            spans.push(Span::styled(
+                first.to_string(),
+                Style::default().add_modifier(Modifier::REVERSED),
+            ));
+            spans.push(Span::raw(rest));
+        } else {
+            spans.push(Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED)));
+        }
     }
 
     Text::from(Line::from(spans))

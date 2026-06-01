@@ -25,3 +25,4 @@ Cargo.lock
 # Agent tooling
 .opencode/
 .agent-governance/
+.sisyphus/

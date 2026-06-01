@@ -13,7 +13,6 @@
 use std::io::{self, BufRead, Write};
 
 use anyhow::{Context, Result};
-use talos_core::ApprovalChoice;
 use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
 
 /// Maximum length for formatted tool input before truncation.
@@ -128,6 +127,7 @@ impl ApprovalPrompt {
     /// The TUI renders the approval overlay and handles user interaction.
     /// This method simply returns the tool name and formatted arguments
     /// so the TUI can display them.
+    #[allow(dead_code)]
     pub fn prompt_tui(tool_name: &str, input: &serde_json::Value) -> (String, String) {
         let formatted = Self::format_input(input);
         (tool_name.to_string(), formatted)
