@@ -109,15 +109,32 @@ pub struct McpServerConfig {
 }
 
 /// JSON-RPC server configuration placeholder for I009-S5.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RpcConfig {
-    /// Whether RPC mode is enabled.
-    pub enabled: bool,
     /// Allowed RPC methods.
     #[serde(default)]
     pub methods_allowlist: Vec<String>,
+    /// Maximum number of concurrent RPC requests.
+    ///
+    /// MVP is serialized request handling, so this defaults to `1`.
+    #[serde(default = "RpcConfig::default_max_concurrent")]
+    pub max_concurrent: usize,
 }
 
+impl RpcConfig {
+    fn default_max_concurrent() -> usize {
+        1
+    }
+}
+
+impl Default for RpcConfig {
+    fn default() -> Self {
+        Self {
+            methods_allowlist: Vec::new(),
+            max_concurrent: Self::default_max_concurrent(),
+        }
+    }
+}
 impl Config {
     /// Returns the default path for the configuration file: `~/.talos/config.toml`.
     pub fn default_path() -> PathBuf {

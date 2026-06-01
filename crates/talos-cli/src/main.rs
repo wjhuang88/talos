@@ -65,6 +65,7 @@ use talos_permission::{PermissionDecision, PermissionRule};
 use talos_plugin::{HookRegistry, LoggingHandler};
 use talos_provider::AnthropicProvider;
 use talos_provider::openai::OpenAIProvider;
+use talos_rpc::RpcServer;
 use talos_session::{IndexError, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
@@ -243,7 +244,9 @@ async fn main() -> Result<()> {
         return run_learned_mode(cli);
     }
 
-    // I009-S5: Mode::Rpc dispatch deferred to S5 commit.
+    if matches!(cli.mode, Some(Mode::Rpc)) {
+        return run_rpc_mode(cli).await;
+    }
 
     if cli.print {
         return run_print_mode(cli).await;
@@ -301,7 +304,41 @@ fn run_learned_mode(_cli: Cli) -> Result<()> {
     Ok(())
 }
 
-// I009-S5: run_rpc_mode deferred to S5 commit.
+async fn run_rpc_mode(cli: Cli) -> Result<()> {
+    // I009-S5 begin
+    let mut config = Config::load().context("failed to load configuration")?;
+
+    if let Some(ref model) = cli.model {
+        config.model = model.clone();
+    }
+    if let Some(ref provider_str) = cli.provider {
+        config.provider = parse_provider(provider_str)?;
+    }
+
+    if config.model.is_empty() && !cli.mock {
+        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
+    }
+
+    let api_key = if cli.mock {
+        String::new()
+    } else {
+        config.api_key().map_err(|e| anyhow!("{e}"))?
+    };
+
+    let hooks = build_hook_registry();
+    let agent = Agent::with_security_and_hooks(
+        build_provider(&config, &api_key, cli.mock),
+        build_print_tool_registry(),
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        PathBuf::from("."),
+        hooks,
+    );
+
+    let server = RpcServer::new(Arc::new(agent));
+    server.run_stdio().await
+    // I009-S5 end
+}
 
 async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;

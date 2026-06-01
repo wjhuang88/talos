@@ -16,7 +16,12 @@ talos-config = { path = "../talos-config" }
 talos-provider = { path = "../talos-provider" }
 talos-agent = { path = "../talos-agent" }
 talos-plugin = { path = "../talos-plugin" }
+# I009-S3 begin
 talos-mcp = { path = "../talos-mcp" }
+# I009-S3 end
+# I009-S5 begin
+talos-rpc = { path = "../talos-rpc" }
+# I009-S5 end
 talos-tools = { path = "../talos-tools" }
 talos-session = { path = "../talos-session" }
 talos-permission = { path = "../talos-permission" }
@@ -32,12 +37,13 @@ uuid = { version = "1", features = ["v4"] }
 dirs = "5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-# I009-S4 begin
-rmcp = { version = "=0.16.0", default-features = false, features = ["client", "transport-child-process", "transport-async-rw", "server"] }
-# I009-S4 end
+rmcp = "=0.16.0"
 
 [lints]
 workspace = true
 
 [dev-dependencies]
 tempfile = "3"
+# I009-S4 begin
+rmcp = { version = "=0.16.0", default-features = false, features = ["client", "transport-child-process", "transport-async-rw"] }
+# I009-S4 end
