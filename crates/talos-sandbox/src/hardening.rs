@@ -23,6 +23,9 @@
 //! - The resource constants (`RLIMIT_*`) are well-defined by POSIX.
 //! - Failure returns an error rather than causing undefined behavior.
 //!
+//! See `docs/decisions/007-process-hardening-unsafe.md` for the ADR that
+//! justifies these `unsafe` sites.
+//!
 //! # Example
 //!
 //! ```no_run
@@ -251,6 +254,7 @@ impl ProcessHardening {
                 // Note: `env::remove_var` is documented as unsafe in multithreaded
                 // contexts, but we assume the caller applies hardening before
                 // spawning threads or child processes.
+                // See docs/decisions/007-process-hardening-unsafe.md.
                 unsafe {
                     env::remove_var(var);
                 }
@@ -281,6 +285,7 @@ impl ProcessHardening {
             // SAFETY: We pass a valid pointer to a properly initialized rlimit struct.
             // RLIMIT_CORE is a well-defined constant. setrlimit returns -1 on error
             // and sets errno; we check the return value.
+            // See docs/decisions/007-process-hardening-unsafe.md.
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim as *const _) };
             if ret != 0 {
                 let errno = std::io::Error::last_os_error();
@@ -296,6 +301,7 @@ impl ProcessHardening {
                 rlim_max: seconds as libc::rlim_t,
             };
             // SAFETY: Same as above — valid struct, valid pointer, well-defined constant.
+            // See docs/decisions/007-process-hardening-unsafe.md.
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_CPU, &rlim as *const _) };
             if ret != 0 {
                 let errno = std::io::Error::last_os_error();
@@ -311,6 +317,7 @@ impl ProcessHardening {
                 rlim_max: bytes as libc::rlim_t,
             };
             // SAFETY: Same as above — valid struct, valid pointer, well-defined constant.
+            // See docs/decisions/007-process-hardening-unsafe.md.
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &rlim as *const _) };
             if ret != 0 {
                 let errno = std::io::Error::last_os_error();
