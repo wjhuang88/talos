@@ -135,8 +135,19 @@ impl Agent {
     /// Creates a new agent with the given language model provider and tool
     /// registry.
     ///
-    /// No permission engine or sandbox is configured. All tool calls are
-    /// executed directly without security gating.
+    /// # Security
+    ///
+    /// **This constructor is unsafe-by-policy**: no permission engine and no
+    /// sandbox are configured. Every tool call is executed directly without
+    /// any security gating. It exists **for unit tests only**; production
+    /// run paths must use [`Agent::with_security`] to attach a permission
+    /// engine and a sandbox provider.
+    ///
+    /// See `docs/decisions/007-process-hardening-unsafe.md` and the ARCH
+    /// remediation review (R0 #ARCH-S2) for context.
+    #[deprecated(
+        note = "Agent::new() has NO permission engine and NO sandbox; use Agent::with_security(). See docs/decisions/007-process-hardening-unsafe.md and ARCH review."
+    )]
     #[must_use]
     pub fn new(provider: Arc<dyn LanguageModel>, tools: ToolRegistry) -> Self {
         Self {
@@ -722,6 +733,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_run_handles_error_event() {
         let events = vec![
             AgentEvent::TurnStart,
@@ -738,6 +750,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_run_handles_channel_close_without_turn_end() {
         let agent = Agent::new(Arc::new(MockModel::new(vec![])), ToolRegistry::new());
         let result = agent.run("Hi".into()).await;
@@ -747,6 +760,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_run_streaming_forwards_events() {
         let events = vec![
             AgentEvent::TurnStart,
@@ -777,6 +791,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_tool_execution_loop_single_call() {
         let responses = vec![
             vec![
@@ -823,6 +838,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_tool_execution_loop_multiple_calls() {
         let responses = vec![
             vec![
@@ -873,6 +889,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_concurrent_read_only_tools() {
         let responses = vec![
             vec![
@@ -944,6 +961,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_serial_write_tools() {
         let responses = vec![
             vec![
@@ -1002,6 +1020,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_turn_budget_enforcement() {
         let mut events = vec![AgentEvent::TurnStart];
         for i in 0..51 {
@@ -1037,6 +1056,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_turn_budget_allows_50_calls() {
         let mut tool_events = vec![AgentEvent::TurnStart];
         for i in 0..50 {
@@ -1083,6 +1103,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_doom_loop_detection() {
         let tool_call_event = AgentEvent::ToolCall {
             call: ToolCall {
@@ -1138,6 +1159,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_doom_loop_different_args_allowed() {
         let responses = vec![
             vec![
@@ -1195,6 +1217,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_tool_not_found_returns_error_result() {
         let responses = vec![
             vec![
@@ -1233,6 +1256,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_tool_execution_error_feeds_back_to_provider() {
         let responses = vec![
             vec![
@@ -1277,6 +1301,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_mixed_read_only_and_write_tools() {
         let responses = vec![
             vec![
@@ -1353,6 +1378,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_cancellation_token_is_created() {
         let agent = Agent::new(
             Arc::new(MockModel::new(vec![])),
@@ -1365,6 +1391,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_tool_result_events_broadcast() {
         let responses = vec![
             vec![
@@ -1796,6 +1823,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     fn test_agent_new_has_no_security() {
         let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
         let tools = ToolRegistry::new();

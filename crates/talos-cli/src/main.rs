@@ -308,7 +308,13 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         print_mode: true,
     }));
 
-    let mut agent = Agent::new(provider, registry);
+    let mut agent = Agent::with_security(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        PathBuf::from("."),
+    );
 
     if !cli.no_context {
         let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
@@ -461,7 +467,13 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         while let Some(input) = user_msg_rx.recv().await {
             let provider = build_provider(&config_clone, &api_key_clone, cli.mock);
             let registry = build_tool_registry();
-            let agent = Agent::new(provider, registry);
+            let agent = Agent::with_security(
+                provider,
+                registry,
+                Some(Arc::new(talos_permission::PermissionEngine::new())),
+                None,
+                PathBuf::from("."),
+            );
             let event_tx = event_tx.clone();
             tokio::spawn(async move {
                 let _ = agent.run_streaming(input, event_tx).await;
