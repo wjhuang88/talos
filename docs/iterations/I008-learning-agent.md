@@ -16,6 +16,14 @@
 > renders. Remaining before COMPLETE: wire the same pipeline into `run_tui_mode` and
 > `run_interactive_mode`, plus TUI end-to-end evidence. Status stays REVIEW until all live
 > paths are covered.
+>
+> **Update 2026-06-01 (architecture re-scope, ADR-005):** The remaining TUI/interactive wiring
+> is **not** a per-path patch. Per [ADR-005](../decisions/005-tui-event-architecture.md), all run
+> paths converge on a single `AppServerSession` (SQ/EQ) seam, and evolution must attach **once** at
+> that seam — wiring it per-path now would create the double-firing risk ADR-005 explicitly
+> prohibits and would be discarded by the I010 migration. R1/R2/R4 for TUI/interactive are
+> therefore sequenced under backlog **#I010-S7** (AppServerSession). I008 remains REVIEW; its
+> print-path evidence stands, and COMPLETE is gated on the I010 seam landing.
 
 ## Story Status
 
@@ -31,16 +39,21 @@
 
 ## Residual Work (registered, not deferred silently)
 
-Remaining items before I008 can be claimed COMPLETE. Tracked as a follow-up slice (see backlog):
+Remaining items before I008 can be claimed COMPLETE. The TUI/interactive items are sequenced under
+the `AppServerSession` seam ([ADR-005](../decisions/005-tui-event-architecture.md), backlog
+**#I010-S7**) — evolution attaches once at the session/EQ, not per-path.
 
 - **R1** — Invoke `TurnObserver` in the real turn loop. **Print path ✅** (`evolution_runtime.rs`
   observes `AgentEvent::Error` + user-correction heuristic and writes to `KnowledgeStore`).
-  **Remaining:** `run_tui_mode` and `run_interactive_mode` (event_loop) paths.
+  **Remaining (→ #I010-S7):** attach the observer at the `AppServerSession` EQ so `run_tui_mode`
+  and `run_interactive_mode` are covered by the single seam, not by duplicated per-path hooks.
 - **R2** — Call `BehaviorAdapter` during system-prompt assembly. **Print path ✅** (combined with
-  `--append-system-prompt`, injected before the agent runs). **Remaining:** TUI/interactive injection.
+  `--append-system-prompt`, injected before the agent runs). **Remaining (→ #I010-S7):** inject at
+  the session boundary so TUI/interactive share one injection point.
 - **R3** — Render `EvolutionPanel` in `talos-tui::render()` so `Ctrl+E` shows data. **✅ DONE.**
 - **R4** — End-to-end evidence (real turn → observation persisted → `--learned` shows it →
-  next run injects it). **Print path ✅** (mock smoke test below). **Remaining:** TUI evidence (needs a TTY).
+  next run injects it). **Print path ✅** (mock smoke test below). **Remaining (→ #I010-S7):** TUI
+  evidence once the seam lands (needs a TTY).
 
 ## Verification
 

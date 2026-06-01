@@ -752,7 +752,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ### #I010-S7: Headless and SDK modes
 
-**Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly).
+**Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly). Canonical architecture defined in [ADR-005](../decisions/005-tui-event-architecture.md): bounded SQ (cap=512) / unbounded EQ seam; SQ/EQ protocol types in `talos-core`, session actor in `talos-agent`. This story is the convergence point for the three current run paths (`run_print_mode`, `run_interactive_mode`, `run_tui_mode`) and the single wiring point for I008 self-evolution (R1/R2/R4 for the TUI/interactive paths land here, attached at the EQ — not per-path).
 
 **Acceptance Criteria**:
 - [ ] `talos exec "run tests and fix failures" --max-turns 20` runs autonomously
@@ -760,8 +760,12 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] SDK: `AgentSession::new()` -> `session.prompt("hello")` works as library
 - [ ] All modes share the same core agent loop
 - [ ] Headless mode supports `--json` for machine-readable output
+- [ ] All three run paths drive the agent only via `AppServerSession` (no direct `tokio::spawn` of the agent turn inside a run path)
+- [ ] I008 evolution `TurnObserver`/`BehaviorAdapter` attach once at the session/EQ seam; TUI + interactive paths observe, persist, inject, and surface patterns with no double-firing (closes I008 R1/R2/R4)
+- [ ] `event_loop.rs` dead variants removed (`ApprovalRequested`, `ApprovalResolved`, `ToggleSkillSidebar`, `SkillsUpdated`, `ApprovalChoice`)
+- [ ] `cargo test --workspace` green after each path migration (ADR-005 phased-migration invariant)
 
-**Depends on**: #I005-S2
+**Depends on**: #I005-S2, ADR-005
 **Estimate**: L
 
 ### #I010-S8: Exec policy DSL rules
