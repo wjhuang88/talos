@@ -35,7 +35,7 @@ docs/iterations/
 | I001 | Project Scaffold | Complete | ✅ |
 | I002 | Hello Agent | Complete | ✅ |
 | I003 | Tool User | Complete | ✅ |
-| I004 | Safe Agent | Complete | ✅ |
+| I004 | Safe Agent | Complete | ⚠️ #I004-S5 process hardening built+tested but **unwired** (no runtime effect); see `I004-safe-agent.md` → #ARCH-S3, ADR-007 |
 | I005 | Smart Agent | Complete | ✅ |
 | I006 | Data Agent | Complete | ⚠️ ADR-004 event-loop variants partly unused (dead code) |
 | I007 | Skilled Agent | Complete | ✅ |

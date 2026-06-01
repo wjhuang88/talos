@@ -9,7 +9,7 @@ the optimization depth of Claude Code, the openness of OpenCode, and the self-ev
 Starting as a pure CLI tool, evolving into a full agent runtime platform.
 
 **Language**: Rust (stable, edition 2024)
-**Workspace**: Cargo workspace with 14 crates under `crates/`
+**Workspace**: Cargo workspace with 12 crates under `crates/`
 **Architecture**: See `docs/reference/ARCHITECTURE.md`
 
 ## Hard Constraints
@@ -87,6 +87,9 @@ These are immutable facts that every change must respect:
 | "Where is the architecture documented?" | `docs/reference/ARCHITECTURE.md` |
 | "What are the reference projects?" | `docs/reference/REFERENCE-PROJECTS.md` |
 | "I have a technical tradeoff to decide" | `docs/decisions/README.md` (then create a new ADR) |
+| "I need to fix an architecture/design/security review finding" | `docs/backlog/PRODUCT-BACKLOG.md` → "ARCH: Architecture Review Remediation" (`#ARCH-S1..S4`) |
+| "Should we add a global message bus / unified event bus / pub-sub?" | `docs/decisions/006-event-architecture-boundary.md` (decided: no global pub/sub) |
+| "Where is `unsafe` allowed and why?" | `docs/decisions/007-process-hardening-unsafe.md` |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
 | "I have an idea for later" | `docs/proposals/` |
 | "What's the implementation plan?" | `docs/roadmap/IMPLEMENTATION-ROADMAP.md` |

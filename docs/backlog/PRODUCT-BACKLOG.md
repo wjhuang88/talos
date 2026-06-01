@@ -781,3 +781,157 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 **Depends on**: #I004-S1
 **Estimate**: M
+
+---
+
+## ARCH: Architecture Review Remediation
+
+> **Source**: architecture & security review (2026-06). These stories fix **existing defects** found
+> in shipped code, not new features. They are self-contained — each lists exact file paths, line
+> anchors, MUST DO / MUST NOT DO, and acceptance criteria so they can be executed without re-deriving
+> the analysis.
+>
+> **Target window**: complete `#ARCH-S1`…`#ARCH-S4` **before starting I009**. They harden the
+> security baseline that I009 (MCP/plugins exposing tools to external callers) depends on.
+>
+> **Scope guard**: do NOT expand these into the larger I010 event-architecture migration. The
+> three-run-path convergence and dead `event_loop.rs` variant deletion are owned by **#I010-S7** and
+> governed by [ADR-005](../decisions/005-tui-event-architecture.md) / [ADR-006](../decisions/006-event-architecture-boundary.md).
+> If a change here would require touching the agent turn-loop spawn model, STOP — that is I010 scope.
+
+### #ARCH-S1: Link sandbox `unsafe` blocks to ADR-007 (compliance, P0)
+
+**Description**: AGENTS.md Hard Constraint #2 requires every `unsafe` to have an ADR.
+[ADR-007](../decisions/007-process-hardening-unsafe.md) now exists; this story makes the code
+**discoverably** reference it and closes the gap recorded in `EVOLUTION.md`. **Documentation/comment
+change only — zero runtime-logic change.**
+
+**Files & anchors** (`crates/talos-sandbox/src/hardening.rs`):
+- Module `# Safety` section, ~lines 18–25
+- `// SAFETY:` comment at `env::remove_var`, ~line 248–254
+- `// SAFETY:` comment at `setrlimit(RLIMIT_CORE)`, ~line 281–284
+- `// SAFETY:` comment at `setrlimit(RLIMIT_CPU)`, ~line 298–299
+- `// SAFETY:` comment at `setrlimit(RLIMIT_AS)`, ~line 313–314
+- `EVOLUTION.md` (the entry acknowledging the missing-ADR gap)
+
+**MUST DO**:
+- Append `See docs/decisions/007-process-hardening-unsafe.md` to the module `# Safety` section and to **each** of the four `// SAFETY:` comments.
+- Update the `EVOLUTION.md` gap entry to state the gap is resolved by ADR-007 (do not delete the lesson; mark it resolved).
+
+**MUST NOT DO**:
+- Do NOT change any `unsafe` block body, the `rlimit` values, the env-var list, or any control flow.
+- Do NOT add/remove dependencies. Do NOT touch tests.
+
+**Acceptance Criteria**:
+- [ ] All four production `unsafe` SAFETY comments and the module `# Safety` note cite ADR-007
+- [ ] `EVOLUTION.md` gap entry marked resolved (references ADR-007)
+- [ ] `git diff` shows comment/doc lines only — no executable line changed
+- [ ] `cargo test --workspace` exits 0
+
+**Depends on**: ADR-007
+**Estimate**: S
+**Risk gate**: sandbox change → security review (AGENTS.md #5), though comment-only
+
+### #ARCH-S2: Deprecate zero-security `Agent::new()` (escape vector, P1)
+
+**Description**: `Agent::new()` (`crates/talos-agent/src/lib.rs:141–150`) constructs an agent with
+`permission_engine: None` and `sandbox: None` — a fully **un-gated** agent. This is a silent escape
+vector: a caller who uses `new()` instead of `with_security()` (`lib.rs:195–211`) gets no permission
+checks and no sandbox. Make the insecure path loud and ensure no production run path uses it.
+
+**Files & anchors**:
+- `crates/talos-agent/src/lib.rs:141–150` (`Agent::new`)
+- `crates/talos-agent/src/lib.rs:195–211` (`Agent::with_security` — the correct constructor)
+- `crates/talos-cli/src/main.rs` run paths: `run_print_mode` (~261), `run_tui_mode` (~396), `run_interactive_mode` (~476)
+
+**MUST DO**:
+- Add `#[deprecated(note = "Agent::new() has NO permission engine and NO sandbox; use Agent::with_security(). See docs/decisions/007 and ARCH review.")]` to `Agent::new`.
+- Expand the `///` doc on `Agent::new` to state explicitly it is unsafe-by-policy (no gating) and is intended for tests only.
+- Audit all three CLI run paths; confirm each builds its agent via `with_security(...)`. If any uses `new()`, switch it to `with_security(...)`.
+- If `#[cfg(test)]` code triggers the deprecation lint and the workspace denies warnings, scope a narrow `#[allow(deprecated)]` **only** on the specific test items, each with a one-line comment explaining why.
+
+**MUST NOT DO**:
+- Do NOT delete `Agent::new` (unit tests legitimately use a no-security agent).
+- Do NOT change `with_security` behavior or signatures.
+- Do NOT blanket-`#[allow(deprecated)]` at crate/module scope to silence the warning globally.
+- Do NOT add `as any`-style suppressions or alter the permission/sandbox defaults.
+
+**Acceptance Criteria**:
+- [ ] `Agent::new` carries `#[deprecated(note = …)]` pointing callers to `with_security`
+- [ ] All three production run paths (`print`/`tui`/`interactive`) construct the agent via `with_security`
+- [ ] No `#[allow(deprecated)]` exists outside `#[cfg(test)]`
+- [ ] `cargo build --workspace` produces no deprecation warnings from production (non-test) code
+- [ ] `cargo test --workspace` exits 0
+
+**Depends on**: none
+**Estimate**: S
+**Risk gate**: permission change → security review (AGENTS.md #5)
+
+### #ARCH-S3: Wire `ProcessHardening` into child execution — closes #I004-S5 false-complete (P2)
+
+**Description**: `#I004-S5` was marked complete, but `ProcessHardening` (`crates/talos-sandbox/src/hardening.rs`)
+is **defined and unit-tested yet never invoked** by any production execution path — a *security
+illusion*. `apply()` exists; nothing calls it. Hardening must be applied to the **child** bash
+subprocess (via `Command::pre_exec` on Unix), **not** to the parent CLI process. Applying `RLIMIT_AS`
+/ `RLIMIT_CPU` to the parent would cripple Talos itself.
+
+**Files & anchors**:
+- `crates/talos-sandbox/src/hardening.rs` (`ProcessHardening::apply`, `apply_rlimits`, `sanitize_env_vars_internal`)
+- Bash subprocess spawn site (the `tokio::process::Command` for the bash tool) reached from `crates/talos-agent/src/lib.rs:489` (`execute_single_tool`) → bash sandbox branch ~`lib.rs:521–527`; confirm whether the actual spawn lives in `talos-tools` (bash tool) or `talos-sandbox` and harden at the real spawn point.
+
+**MUST DO**:
+- Apply hardening to the **child** bash process: on Unix, set env scrubbing + `setrlimit` inside `Command::pre_exec` (or the platform sandbox's own child-spawn), so limits bind the subprocess, not the parent.
+- Ensure dangerous env vars (`LD_PRELOAD`, `DYLD_*`, …) are absent from the child's environment.
+- Add an **integration test** proving, in the child: (a) a set `LD_PRELOAD` is not visible, and (b) a resource limit is in effect (e.g., `RLIMIT_CORE`/`RLIMIT_CPU` observable via the child).
+- Keep the `pre_exec` closure async-signal-safe (no allocation/locking/arbitrary Rust) per ADR-007.
+- Any `unsafe` introduced (`pre_exec`) MUST carry a `// SAFETY:` comment referencing ADR-007.
+
+**MUST NOT DO**:
+- Do NOT call `ProcessHardening::apply()` on the parent CLI process.
+- Do NOT introduce `unsafe` not covered by ADR-007 (update ADR-007 first if scope grows).
+- Do NOT change the default limit values in `ProcessHardening::new()`.
+- Do NOT weaken existing sandbox behavior or its graceful-degradation fallback.
+
+**Acceptance Criteria**:
+- [ ] Bash subprocesses run with env sanitization + resource limits applied **in the child**
+- [ ] Integration test demonstrates `LD_PRELOAD` stripped and a resource limit active in the child
+- [ ] Parent CLI process is unaffected (no rlimit applied to self)
+- [ ] `#I004-S5` acceptance criteria are now genuinely satisfied at runtime, not just in unit tests
+- [ ] Any new `unsafe` cites ADR-007; `cargo test --workspace` exits 0
+
+**Depends on**: ADR-007, #I004-S5
+**Estimate**: M
+**Risk gate**: process-hardening change → security review (AGENTS.md #5) — review against escape vectors
+
+### #ARCH-S4: Unify the duplicated `ApprovalChoice` definitions (P3)
+
+**Description**: `ApprovalChoice` is defined **three times** with drifting copies:
+`crates/talos-cli/src/approval.rs:20` (live), `crates/talos-tui/src/lib.rs:228` (live), and
+`crates/talos-cli/src/event_loop.rs:27` (dead). Three sources of truth for an approval (y/a/n)
+decision invites divergence. Consolidate the two **live** definitions onto one canonical type.
+
+**Files & anchors**:
+- `crates/talos-cli/src/approval.rs:20` (live definition + usage)
+- `crates/talos-tui/src/lib.rs:228` (live definition + usage)
+- `crates/talos-cli/src/event_loop.rs:27` (DEAD copy — see MUST NOT DO)
+
+**MUST DO**:
+- Define **one** canonical `ApprovalChoice` and have `approval.rs` and the TUI both use it.
+- Place the canonical type in `talos-core` (depends on nothing; every crate may depend on it — no circular-dependency risk). Only choose `talos-permission` instead if (and only if) `talos-tui` already depends on it; verify the dependency edge before deciding, and keep `talos-core` as the default.
+- Give the canonical type `///` doc comments on the type and each variant (AGENTS.md doc rule).
+- Update all live call sites to the canonical type; keep behavior identical (same variants/semantics).
+
+**MUST NOT DO**:
+- Do NOT delete or modify the dead `event_loop.rs:27` copy — its removal is owned by **#I010-S7** (ADR-005 phased migration). Touching dead `event_loop.rs` variants here is out of scope.
+- Do NOT introduce a circular dependency (verify `cargo check` after placing the type).
+- Do NOT change the approval semantics (y = approve once, a = always, n = deny).
+
+**Acceptance Criteria**:
+- [ ] Exactly one **live** `ApprovalChoice` definition; `approval.rs` and TUI both import it
+- [ ] Canonical type lives in `talos-core` (or `talos-permission` only if justified), with `///` docs
+- [ ] No new circular dependencies; `cargo check --workspace` clean
+- [ ] Dead `event_loop.rs:27` copy left untouched (deferred to #I010-S7)
+- [ ] `cargo test --workspace` exits 0
+
+**Depends on**: none (coordinates with #I010-S7 for the dead-copy deletion)
+**Estimate**: S
