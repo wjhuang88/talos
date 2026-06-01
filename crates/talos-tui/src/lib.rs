@@ -27,6 +27,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
+use talos_core::ApprovalChoice;
 use tokio::sync::{broadcast, mpsc};
 use futures::StreamExt;
 use evolution::EvolutionPanel;
@@ -222,17 +223,6 @@ impl Default for SkillSidebar {
 }
 
 // ── Approval State ───────────────────────────────────────────────────────────
-
-/// User's choice when presented with an approval prompt.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ApprovalChoice {
-    /// Approve this tool call once.
-    ApproveOnce,
-    /// Always approve this tool (add a rule).
-    AlwaysApprove,
-    /// Deny the tool call.
-    Deny,
-}
 
 /// State of the approval overlay.
 #[derive(Debug, Clone, PartialEq, Default)]

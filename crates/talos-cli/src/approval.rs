@@ -13,18 +13,8 @@
 use std::io::{self, BufRead, Write};
 
 use anyhow::{Context, Result};
+use talos_core::ApprovalChoice;
 use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
-
-/// User's choice when presented with an approval prompt in TUI mode.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ApprovalChoice {
-    /// Approve this tool call once.
-    ApproveOnce,
-    /// Always approve this tool (add a rule).
-    AlwaysApprove,
-    /// Deny the tool call.
-    Deny,
-}
 
 /// Maximum length for formatted tool input before truncation.
 const MAX_INPUT_LENGTH: usize = 200;
