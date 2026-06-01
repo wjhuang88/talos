@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -282,6 +282,34 @@ impl Session {
         Ok(new_branch_id)
     }
 
+    /// Atomically re-stamp a forked session with a new identity.
+    ///
+    /// After [`fork`](Self::fork) creates a new branch in memory, callers typically write
+    /// the branched entries to a fresh JSONL file under a new [`Uuid`]. This method
+    /// updates the in-memory [`Session`] so that subsequent [`append`](Self::append)
+    /// and [`append_event`](Self::append_event) calls write to the new file and so the
+    /// SQLite index sees a coherent `(id, file_path, branch_id)` triple.
+    ///
+    /// Without this, the original session's `id`/`file_path` would survive a fork in
+    /// memory while the on-disk file moved to a new UUID — the SQLite index would then
+    /// either point at the wrong file or fail to locate the fork.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_id` - The new session [`Uuid`] (must match the JSONL filename).
+    /// * `new_file_path` - The path to the new JSONL file the fork was written to.
+    /// * `branch_id` - The branch ID to mark as currently active on the fork.
+    pub fn with_fork_identity(
+        &mut self,
+        new_id: Uuid,
+        new_file_path: PathBuf,
+        branch_id: String,
+    ) {
+        self.id = new_id;
+        self.file_path = new_file_path;
+        self.current_branch = branch_id;
+    }
+
     /// Get a reference to a branch by its ID.
     ///
     /// Returns `None` if the branch ID doesn't exist.
@@ -437,10 +465,10 @@ impl Session {
 }
 
 /// Manages sessions on disk.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionManager {
     sessions_dir: PathBuf,
-    index: Mutex<Option<SessionIndex>>,
+    index: Arc<Mutex<Option<SessionIndex>>>,
 }
 
 impl SessionManager {
@@ -450,7 +478,7 @@ impl SessionManager {
         let dir = PathBuf::from(home).join(".talos").join("sessions");
         Ok(Self {
             sessions_dir: dir,
-            index: Mutex::new(None),
+            index: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -458,7 +486,7 @@ impl SessionManager {
     pub fn with_dir(sessions_dir: PathBuf) -> Self {
         Self {
             sessions_dir,
-            index: Mutex::new(None),
+            index: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -688,7 +716,7 @@ impl Default for SessionManager {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
         Self {
             sessions_dir: PathBuf::from(home).join(".talos").join("sessions"),
-            index: Mutex::new(None),
+            index: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -1294,5 +1322,178 @@ mod tests {
         let new_branch = session.get_branch(&new_branch_id).unwrap();
 
         assert_eq!(new_branch.root_id, fork_point);
+    }
+
+    #[test]
+    fn arch_s5_update_index_reflects_new_session_in_list_recent() {
+        let manager = test_manager();
+        let session = manager
+            .create_session("arch-s5-list")
+            .expect("create_session");
+        session
+            .append(&Message::User {
+                content: "hello arch s5".into(),
+            })
+            .unwrap();
+
+        manager
+            .update_index(&session)
+            .expect("update_index should succeed");
+
+        let listed = manager
+            .list_recent(10)
+            .expect("list_recent should succeed after index refresh");
+        assert!(
+            listed.iter().any(|s| s.id == session.id),
+            "list_recent should surface the session after update_index; got {listed:?}"
+        );
+    }
+
+    #[test]
+    fn arch_s5_update_index_reflects_new_session_in_search() {
+        let manager = test_manager();
+        let session = manager
+            .create_session("arch-s5-search")
+            .expect("create_session");
+        session
+            .append(&Message::User {
+                content: "searchable content alpha".into(),
+            })
+            .unwrap();
+
+        manager.update_index(&session).expect("update_index");
+
+        let hits = manager
+            .search("alpha", 10)
+            .expect("search should succeed after index refresh");
+        let expected_id = session.id.to_string();
+        assert!(
+            hits.iter().any(|h| h.session_id == expected_id),
+            "FTS5 search should find the session after update_index; got {hits:?}"
+        );
+    }
+
+    #[test]
+    fn arch_s6_fork_identity_sets_new_id_and_path() {
+        let mut session = make_session_with_two_entries();
+        let original_id = session.id;
+        let original_path = session.file_path.clone();
+
+        let new_id = Uuid::new_v4();
+        let new_path = original_path
+            .parent()
+            .unwrap()
+            .join(format!("{new_id}.jsonl"));
+        let new_branch = Uuid::new_v4().to_string();
+
+        session.with_fork_identity(new_id, new_path.clone(), new_branch.clone());
+
+        assert_eq!(session.id, new_id, "id should be re-stamped to fork UUID");
+        assert_ne!(
+            session.id, original_id,
+            "fork id must differ from source id"
+        );
+        assert_eq!(
+            session.file_path, new_path,
+            "file_path should point at the new JSONL"
+        );
+        assert_eq!(
+            session.current_branch, new_branch,
+            "current_branch should be the fork's branch id"
+        );
+    }
+
+    #[test]
+    fn arch_s6_fork_index_uses_new_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = SessionManager::with_dir(dir.path().to_path_buf());
+        let mut source = manager.create_session("arch-s6-index").unwrap();
+        source
+            .append(&Message::User {
+                content: "source entry".into(),
+            })
+            .unwrap();
+        let source_id = source.id;
+        let entries = source.read_entries().unwrap();
+        let fork_point = entries.last().unwrap().id.clone();
+        let branch_id = source.fork(&fork_point).unwrap();
+        let fork_id = Uuid::new_v4();
+        let fork_path = dir
+            .path()
+            .join("arch-s6-index")
+            .join(format!("{fork_id}.jsonl"));
+        std::fs::create_dir_all(fork_path.parent().unwrap()).unwrap();
+        std::fs::write(&fork_path, b"").unwrap();
+        source.with_fork_identity(fork_id, fork_path, branch_id);
+
+        manager.update_index(&source).expect("index fork");
+        let recent = manager.list_recent(10).expect("list_recent");
+        let by_id: std::collections::HashSet<Uuid> =
+            recent.iter().map(|s| s.id).collect();
+        assert!(
+            by_id.contains(&fork_id),
+            "list_recent should contain fork id {fork_id}; got {by_id:?}"
+        );
+        assert!(
+            !by_id.contains(&source_id),
+            "list_recent should NOT contain the source id {source_id} under the fork key; got {by_id:?}"
+        );
+    }
+
+    #[test]
+    fn arch_s6_fork_file_receives_subsequent_appends() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = SessionManager::with_dir(dir.path().to_path_buf());
+        let mut session = manager.create_session("arch-s6-append").unwrap();
+        session
+            .append(&Message::User {
+                content: "before fork".into(),
+            })
+            .unwrap();
+        let entries = session.read_entries().unwrap();
+        let fork_point = entries.last().unwrap().id.clone();
+        let branch_id = session.fork(&fork_point).unwrap();
+        let fork_id = Uuid::new_v4();
+        let fork_path = dir
+            .path()
+            .join("arch-s6-append")
+            .join(format!("{fork_id}.jsonl"));
+        std::fs::create_dir_all(fork_path.parent().unwrap()).unwrap();
+        std::fs::write(&fork_path, b"").unwrap();
+        session.with_fork_identity(fork_id, fork_path.clone(), branch_id);
+
+        session
+            .append(&Message::Assistant {
+                content: "after fork".into(),
+                tool_calls: vec![],
+            })
+            .expect("append should write to fork file");
+
+        let fork_contents =
+            std::fs::read_to_string(&fork_path).expect("read fork file");
+        assert!(
+            fork_contents.contains("after fork"),
+            "fork file should contain the new entry; got {fork_contents:?}"
+        );
+    }
+
+    fn make_session_with_two_entries() -> Session {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = SessionManager::with_dir(dir.path().to_path_buf());
+        let session = manager
+            .create_session("arch-s6-identity")
+            .expect("create_session");
+        session
+            .append(&Message::User {
+                content: "first".into(),
+            })
+            .unwrap();
+        session
+            .append(&Message::Assistant {
+                content: "second".into(),
+                tool_calls: vec![],
+            })
+            .unwrap();
+        session
     }
 }

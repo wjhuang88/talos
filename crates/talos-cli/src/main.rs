@@ -577,7 +577,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             .context("failed to create session")?
     };
 
-    let event_loop = event_loop::EventLoop::new(cli, workspace_root, session);
+    let event_loop = event_loop::EventLoop::new(cli, workspace_root, session, session_manager);
     event_loop.run().await
 }
 

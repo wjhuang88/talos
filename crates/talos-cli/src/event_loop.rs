@@ -10,7 +10,7 @@ use talos_config::Config;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::tool::ToolRegistry;
 use talos_permission::PermissionEngine;
-use talos_session::Session;
+use talos_session::{Session, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::SkillInfo;
 use tokio::sync::{broadcast, mpsc};
@@ -81,10 +81,16 @@ pub struct EventLoop {
     workspace_root: PathBuf,
     session: Session,
     branch_id: Option<String>,
+    session_manager: SessionManager,
 }
 
 impl EventLoop {
-    pub fn new(cli: Cli, workspace_root: PathBuf, session: Session) -> Self {
+    pub fn new(
+        cli: Cli,
+        workspace_root: PathBuf,
+        session: Session,
+        session_manager: SessionManager,
+    ) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         Self {
             event_tx,
@@ -95,6 +101,7 @@ impl EventLoop {
             workspace_root,
             session,
             branch_id: None,
+            session_manager,
         }
     }
 
@@ -240,7 +247,31 @@ impl EventLoop {
 
             (AppState::WaitingForInput, AppEvent::ForkCompleted { new_session_id, branch_id }) => {
                 self.branch_id = Some(branch_id.clone());
-                eprintln!("Fork completed. New session: {new_session_id}, branch: {branch_id}");
+                // Reload the fork from disk so subsequent turns append to the new file.
+                // Without this, `self.session` still points at the source session's id/path
+                // and tool calls would be logged into the source JSONL, not the fork.
+                if let Ok(new_uuid) = uuid::Uuid::parse_str(&new_session_id) {
+                    match self.session_manager.get_session(&new_uuid) {
+                        Ok(forked) => {
+                            self.session = forked;
+                            eprintln!(
+                                "Fork completed. New session: {new_session_id}, branch: {branch_id}"
+                            );
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "Fork completed but could not reload fork session: {e}. \
+                                 Falling back to in-memory id; subsequent turns may write to the \
+                                 source session."
+                            );
+                        }
+                    }
+                } else {
+                    eprintln!(
+                        "Fork completed. New session: {new_session_id}, branch: {branch_id} \
+                         (invalid uuid; not reloading)"
+                    );
+                }
             }
 
             (AppState::WaitingForInput, AppEvent::ForkSession { entry_id }) => {
@@ -266,10 +297,19 @@ impl EventLoop {
         let cli = self.cli.clone();
         let workspace = self.workspace_root.clone();
         let event_tx = self.event_tx.clone();
+        let session_manager = self.session_manager.clone();
 
         let task_handle = tokio::spawn(async move {
-            let result =
-                run_agent_turn_inner(input, cli, workspace, session, token, event_tx.clone()).await;
+            let result = run_agent_turn_inner(
+                input,
+                cli,
+                workspace,
+                session,
+                session_manager,
+                token,
+                event_tx.clone(),
+            )
+            .await;
             if let Err(e) = result {
                 let _ = event_tx.send(AppEvent::AgentError(e.to_string()));
             }
@@ -355,6 +395,11 @@ impl EventLoop {
                 if let Ok(mut index) = SessionIndex::new(&sessions_dir.join("index.db")) {
                     let _ = index.init_schema();
                     let _ = index.record_fork(&session.id.to_string(), &new_id.to_string(), &fork_from_id);
+                    // Re-stamp `forked` with the new identity BEFORE indexing so the
+                    // SQLite FTS5 index points at the fork's id/file_path/branch_id,
+                    // not the source's. Without this, search and list_recent would
+                    // surface the source under the fork's UUID.
+                    forked.with_fork_identity(new_id, new_file_path.clone(), branch_id.clone());
                     let _ = index.index_session(&forked);
                 }
 
@@ -390,6 +435,7 @@ async fn run_agent_turn_inner(
     cli: Cli,
     workspace_root: PathBuf,
     session: Session,
+    session_manager: SessionManager,
     cancel_token: CancellationToken,
     event_tx: mpsc::UnboundedSender<AppEvent>,
 ) -> Result<()> {
@@ -501,6 +547,9 @@ async fn run_agent_turn_inner(
                                 .append(&assistant_msg)
                                 .context("failed to log assistant message to session")?;
                         }
+                        if let Err(e) = session_manager.update_index(&session) {
+                            eprintln!("Warning: failed to refresh session index: {e}");
+                        }
                         let _ = event_tx.send(AppEvent::AgentCompleted);
                         return Ok(());
                     }
@@ -520,6 +569,9 @@ async fn run_agent_turn_inner(
             run_result = &mut run_handle => {
                 match run_result {
                     Ok(Ok(_)) => {
+                        if let Err(e) = session_manager.update_index(&session) {
+                            eprintln!("Warning: failed to refresh session index: {e}");
+                        }
                         let _ = event_tx.send(AppEvent::AgentCompleted);
                         return Ok(());
                     }
