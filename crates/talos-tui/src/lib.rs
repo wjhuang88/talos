@@ -899,7 +899,22 @@ impl Tui {
 }
 
 fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar, evolution_panel: &evolution::EvolutionPanel) {
-    let main_area = frame.area();
+    let full_area = frame.area();
+
+    // If the evolution panel is visible, carve a right column for it first.
+    let main_area = if evolution_panel.visible {
+        let evo_width = evolution_panel.width.min(full_area.width.saturating_sub(40));
+        let cols = Layout::horizontal([
+            Constraint::Min(40),
+            Constraint::Length(evo_width),
+        ])
+        .split(full_area);
+
+        evolution_panel.render(frame, cols[1]);
+        cols[0]
+    } else {
+        full_area
+    };
 
     // If sidebar is visible, split off the right portion
     let (chat_area, input_area, status_area) = if skill_sidebar.visible {
