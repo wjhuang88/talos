@@ -6,7 +6,14 @@ English | **[中文](README.zh-CN.md)**
 
 ## Status
 
-**I004 complete.** 167 tests passing. Agent can perform file and shell operations safely with permission gating. Implementation follows an agile vertical-slice roadmap — each iteration produces a runnable, testable `talos` binary.
+**I007 complete; I008 in review.** 450 tests passing across 12 crates. The agent performs
+file and shell operations safely with permission gating, supports a TUI, sessions with SQLite
+search, skills, and multiple providers. The I008 self-evolution engine is **wired into the
+`-p` print-mode runtime** (observes signals, accumulates patterns, injects learned context);
+wiring into the TUI and interactive paths is the remaining residual work — see
+[docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md). Implementation
+follows an agile vertical-slice roadmap — each iteration produces a runnable, testable `talos`
+binary.
 
 ## Roadmap
 
@@ -19,7 +26,7 @@ English | **[中文](README.zh-CN.md)**
 | ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + basic TUI + context compaction + caching~~ ✅ |
 | ~~I006~~ | ~~Data Agent~~ | ~~TUI tool display + approval + session branching + SQLite search~~ ✅ |
 | ~~I007~~ | ~~Skilled Agent~~ | ~~TUI skill display + SKILL.md + multi-provider support~~ ✅ |
-| ~~I008~~ | ~~Learning Agent~~ | ~~TUI evolution display + self-evolution engine~~ ✅ |
+| I008 | Learning Agent | TUI evolution display + self-evolution engine — 🔶 print-mode runtime wired; TUI/interactive wiring pending |
 | I009 | Extensible Agent | TUI MCP display + Hook system + MCP + JSON-RPC |
 | I010 | Polished Agent | Full TUI polish (Nord theme + markdown + advanced features) |
 

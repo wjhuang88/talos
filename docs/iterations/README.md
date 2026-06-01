@@ -30,4 +30,18 @@ docs/iterations/
 
 ## Current Iterations
 
-No iterations yet. See `docs/roadmap/IMPLEMENTATION-ROADMAP.md` for the plan and `docs/sop/START-ITERATION.md` for the process.
+| ID | Codename | State | Deliverable verified end-to-end? |
+|----|----------|-------|----------------------------------|
+| I001 | Project Scaffold | Complete | ✅ |
+| I002 | Hello Agent | Complete | ✅ |
+| I003 | Tool User | Complete | ✅ |
+| I004 | Safe Agent | Complete | ✅ |
+| I005 | Smart Agent | Complete | ✅ |
+| I006 | Data Agent | Complete | ⚠️ ADR-004 event-loop variants partly unused (dead code) |
+| I007 | Skilled Agent | Complete | ✅ |
+| I008 | Learning Agent | **Review** | ⚠️ print-mode runtime wired; TUI/interactive paths pending (see `I008-learning-agent.md`) |
+| I009 | Extensible Agent | Planned | — |
+| I010 | Polished Agent | Planned | — |
+
+> Update this table whenever an iteration changes state. "Complete" requires runtime
+> evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.

@@ -8,7 +8,7 @@
 
 ## 项目状态
 
-**I004 已完成。** 167 个测试通过。Agent 可以安全地执行文件和 Shell 操作，并带有权限门控。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
+**I007 已完成；I008 评审中。** 450 个测试通过（12 个 crate）。Agent 可安全执行文件和 Shell 操作（带权限门控），支持 TUI、带 SQLite 搜索的会话、技能与多模型。I008 自进化引擎已**接入 `-p` 打印模式运行时**（观察信号、累积模式、注入已学习上下文）；接入 TUI 与交互式路径为剩余残留工作——详见 [docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md)。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
 
 ## 路线图
 
@@ -21,7 +21,7 @@
 | ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + 基础 TUI + 上下文压缩 + 缓存~~ ✅ |
 | ~~I006~~ | ~~Data Agent~~ | ~~TUI 工具展示 + 审批 + 会话分支 + SQLite 搜索~~ ✅ |
 | ~~I007~~ | ~~Skilled Agent~~ | ~~TUI 技能展示 + SKILL.md + 多模型支持~~ ✅ |
-| ~~I008~~ | ~~Learning Agent~~ | ~~TUI 进化展示 + 自进化引擎~~ ✅ |
+| I008 | Learning Agent | TUI 进化展示 + 自进化引擎 —— 🔶 打印模式运行时已接入，TUI/交互式接入待办 |
 | I009 | Extensible Agent | TUI MCP 展示 + Hook 系统 + MCP + JSON-RPC |
 | I010 | Polished Agent | 完整 TUI 打磨（Nord 主题 + Markdown + 高级功能） |
 
