@@ -107,13 +107,59 @@ impl AgentTool for BashTool {
 
 impl BashTool {
     async fn run_command(&self, command: &str) -> ToolResult {
-        let output = match Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .current_dir(&self.working_dir)
-            .output()
-            .await
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c").arg(command).current_dir(&self.working_dir);
+
+        #[cfg(unix)]
         {
+            let c_names: Vec<std::ffi::CString> =
+                talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names()
+                    .into_iter()
+                    .map(|s| std::ffi::CString::new(s).expect("valid env var name"))
+                    .collect();
+
+            // SAFETY: pre_exec closure runs post-fork/pre-exec, async-signal-safe per ADR-007.
+            // Only libc::unsetenv and libc::setrlimit are called — both async-signal-safe.
+            // No allocation, locking, formatting, or panics inside the closure.
+            unsafe {
+                cmd.pre_exec(move || {
+                    for c_name in &c_names {
+                        // SAFETY: c_name.as_ptr() is a valid NUL-terminated pointer.
+                        // libc::unsetenv is async-signal-safe (POSIX.1-2008).
+                        // ADR-007 pre-authorizes this unsafe site.
+                        libc::unsetenv(c_name.as_ptr());
+                    }
+
+                    let rlim = libc::rlimit {
+                        rlim_cur: 0,
+                        rlim_max: 0,
+                    };
+                    // SAFETY: valid rlimit struct, well-defined POSIX constant.
+                    // ADR-007 pre-authorizes this unsafe site.
+                    libc::setrlimit(libc::RLIMIT_CORE, &rlim as *const _);
+
+                    let rlim = libc::rlimit {
+                        rlim_cur: 300,
+                        rlim_max: 300,
+                    };
+                    // SAFETY: valid rlimit struct, well-defined POSIX constant.
+                    // ADR-007 pre-authorizes this unsafe site.
+                    libc::setrlimit(libc::RLIMIT_CPU, &rlim as *const _);
+
+                    let rlim = libc::rlimit {
+                        rlim_cur: 2 * 1024 * 1024 * 1024,
+                        rlim_max: 2 * 1024 * 1024 * 1024,
+                    };
+                    // SAFETY: valid rlimit struct, well-defined POSIX constant.
+                    // ADR-007 pre-authorizes this unsafe site.
+                    libc::setrlimit(libc::RLIMIT_AS, &rlim as *const _);
+
+                    Ok(())
+                });
+            }
+        }
+
+        let output = match cmd.output().await {
             Ok(o) => o,
             Err(e) => return ToolResult::error(format!("failed to spawn shell: {e}")),
         };
