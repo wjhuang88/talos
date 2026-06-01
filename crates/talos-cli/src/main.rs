@@ -48,6 +48,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use clap::ValueEnum;
+use rmcp::ServiceExt;
 use serde_json::Value;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
@@ -59,6 +60,7 @@ use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_evolution::store::KnowledgeStore;
 use talos_mcp::client::McpClientManager;
+use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_permission::{PermissionDecision, PermissionRule};
 use talos_plugin::{HookRegistry, LoggingHandler};
 use talos_provider::AnthropicProvider;
@@ -223,7 +225,9 @@ struct Cli {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // I009-S4: Mode::McpServer dispatch deferred to S4 commit.
+    if matches!(cli.mode, Some(Mode::McpServer)) {
+        return run_mcp_server().await;
+    }
 
     init_tracing();
 
@@ -296,6 +300,8 @@ fn run_learned_mode(_cli: Cli) -> Result<()> {
 
     Ok(())
 }
+
+// I009-S5: run_rpc_mode deferred to S5 commit.
 
 async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
@@ -659,7 +665,72 @@ fn build_print_tool_registry() -> ToolRegistry {
     registry
 }
 
-// I009-S4: StatusTool + build_mcp_tool_registry + run_mcp_server deferred to S4 commit.
+/// A lightweight health/status tool for MCP mode.
+struct StatusTool;
+
+#[async_trait]
+impl AgentTool for StatusTool {
+    fn name(&self) -> &str {
+        "status"
+    }
+
+    fn description(&self) -> &str {
+        "Return Talos MCP server status"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {}
+        })
+    }
+
+    async fn execute(&self, _input: Value) -> ToolResult {
+        ToolResult::success("talos mcp server alive")
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+}
+
+fn build_mcp_tool_registry() -> ToolRegistry {
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BashTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(ReadTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(WriteTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(EditTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(StatusTool));
+    registry
+}
+
+// I009-S4 begin
+async fn run_mcp_server() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_writer(std::io::stderr)
+        .try_init();
+
+    let tool_registry = Arc::new(build_mcp_tool_registry());
+    let permission_engine = Arc::new(talos_permission::PermissionEngine::new());
+    let hook_registry = build_hook_registry();
+    let permission_gate = Arc::new(McpPermissionGate::new(permission_engine, hook_registry));
+    let handler = TalosMcpHandler::new(tool_registry, permission_gate);
+
+    let running = handler
+        .serve(rmcp::transport::stdio())
+        .await
+        .map_err(|e| anyhow!("failed to start mcp server: {e}"))?;
+    let _ = running
+        .waiting()
+        .await
+        .map_err(|e| anyhow!("mcp server join error: {e}"))?;
+    Ok(())
+}
+// I009-S4 end
 
 fn init_tracing() {
     let _ = tracing_subscriber::fmt()
