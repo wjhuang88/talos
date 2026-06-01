@@ -16,6 +16,9 @@ talos-config = { path = "../talos-config" }
 talos-provider = { path = "../talos-provider" }
 talos-agent = { path = "../talos-agent" }
 talos-plugin = { path = "../talos-plugin" }
+# I009-S3 begin
+talos-mcp = { path = "../talos-mcp" }
+# I009-S3 end
 talos-tools = { path = "../talos-tools" }
 talos-session = { path = "../talos-session" }
 talos-permission = { path = "../talos-permission" }

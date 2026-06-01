@@ -53,10 +53,13 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::Agent;
 use talos_config::{Config, Provider};
+#[cfg(debug_assertions)]
+use talos_config::McpServerConfig;
 use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_evolution::store::KnowledgeStore;
-use talos_permission::PermissionDecision;
+use talos_mcp::client::McpClientManager;
+use talos_permission::{PermissionDecision, PermissionRule};
 use talos_plugin::{HookRegistry, LoggingHandler};
 use talos_provider::AnthropicProvider;
 use talos_provider::openai::OpenAIProvider;
@@ -204,12 +207,25 @@ struct Cli {
 
     #[arg(long, value_enum, help = "Explicit runtime mode.")]
     mode: Option<Mode>,
+
+    // I009-S3 begin
+    #[cfg(debug_assertions)]
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Use local fixture MCP server binary (tests/dev only)."
+    )]
+    mcp_server_fixture: Option<PathBuf>,
+    // I009-S3 end
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing();
     let cli = Cli::parse();
+
+    // I009-S4: Mode::McpServer dispatch deferred to S4 commit.
+
+    init_tracing();
 
     if cli.search.is_some() {
         return run_search_mode(cli);
@@ -222,6 +238,8 @@ async fn main() -> Result<()> {
     if cli.learned {
         return run_learned_mode(cli);
     }
+
+    // I009-S5: Mode::Rpc dispatch deferred to S5 commit.
 
     if cli.print {
         return run_print_mode(cli).await;
@@ -302,10 +320,61 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     let prompt = resolve_prompt(cli.prompt)?;
 
     let hooks = build_hook_registry();
+    let mut registry = build_print_tool_registry();
+    let mut permission_engine = talos_permission::PermissionEngine::new();
+    // I009-S3 begin
+    #[cfg(debug_assertions)]
+    if let Some(path) = cli.mcp_server_fixture.clone() {
+        config.mcp.servers = vec![McpServerConfig {
+            name: "fixture".to_string(),
+            transport: "stdio".to_string(),
+            command: path.to_string_lossy().to_string(),
+            args: Vec::new(),
+            env: std::collections::HashMap::from([
+                ("ECHO_PREFIX".to_string(), "fixture".to_string()),
+            ]),
+            cwd: std::env::current_dir().ok(),
+        }];
+    }
+
+    #[cfg(debug_assertions)]
+    let fixture_mode = cli.mcp_server_fixture.is_some();
+    #[cfg(not(debug_assertions))]
+    let fixture_mode = false;
+
+    let mcp_manager = McpClientManager::start(&config.mcp, hooks.clone()).await?;
+    for startup_failure in mcp_manager.startup_failures() {
+        eprintln!(
+            "Warning: MCP server '{}' failed to start: {}",
+            startup_failure.server, startup_failure.error
+        );
+    }
+    for tool in mcp_manager.discover_tools().await {
+        permission_engine.add_rule(PermissionRule::new(
+            tool.name(),
+            None,
+            PermissionDecision::Allow,
+        ));
+        registry.register(tool);
+    }
+    // I009-S3 end
+
+    let provider = if fixture_mode && cli.mock {
+        use talos_provider::mock::MockProvider;
+        Arc::new(
+            MockProvider::new()
+                .with_tool_call("mcp:fixture:echo", serde_json::json!({ "text": "ping" }))
+                .with_response("fixture tool call complete"),
+        ) as Arc<dyn talos_core::provider::LanguageModel>
+    } else {
+        build_provider(&config, &api_key, cli.mock)
+    };
+    // I009-S3 end
+
     let mut agent = Agent::with_security_and_hooks(
-        build_provider(&config, &api_key, cli.mock),
-        build_print_tool_registry(),
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        provider,
+        registry,
+        Some(Arc::new(permission_engine)),
         None,
         PathBuf::from("."),
         hooks,
@@ -589,6 +658,8 @@ fn build_print_tool_registry() -> ToolRegistry {
     }));
     registry
 }
+
+// I009-S4: StatusTool + build_mcp_tool_registry + run_mcp_server deferred to S4 commit.
 
 fn init_tracing() {
     let _ = tracing_subscriber::fmt()

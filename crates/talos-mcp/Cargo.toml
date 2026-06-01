@@ -1,0 +1,33 @@
+[package]
+name = "talos-mcp"
+description = "MCP client/server integration for Talos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+talos-core = { path = "../talos-core" }
+talos-config = { path = "../talos-config" }
+talos-plugin = { path = "../talos-plugin" }
+talos-agent = { path = "../talos-agent" }
+# I009-S4 begin
+talos-permission = { path = "../talos-permission" }
+rmcp = { version = "=0.16.0", default-features = false, features = ["server", "client", "transport-io", "transport-child-process", "transport-async-rw"] }
+# I009-S4 end
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+# I009-S4 begin
+talos-tools = { path = "../talos-tools" }
+# I009-S4 end
+
+[lints]
+workspace = true

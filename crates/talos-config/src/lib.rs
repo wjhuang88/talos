@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::collections::HashMap;
 use thiserror::Error;
 
 /// Error types for configuration operations.
@@ -87,11 +88,24 @@ pub struct McpConfig {
 /// MCP server configuration placeholder for I009-S3.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpServerConfig {
+    // I009-S3 begin
     /// Stable MCP server name.
     pub name: String,
     /// Transport kind (`stdio` or `http`).
     pub transport: String,
-    // TODO: I009-S3 will add command/args/env or url fields
+    /// Executable command for stdio transport.
+    #[serde(default)]
+    pub command: String,
+    /// Command arguments for stdio transport.
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Environment variables for stdio transport.
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+    /// Working directory for stdio transport.
+    #[serde(default)]
+    pub cwd: Option<PathBuf>,
+    // I009-S3 end
 }
 
 /// JSON-RPC server configuration placeholder for I009-S5.

@@ -6,6 +6,9 @@ members = [
     "crates/talos-provider",
     "crates/talos-agent",
     "crates/talos-plugin",
+    # I009-S3 begin
+    "crates/talos-mcp",
+    # I009-S3 end
     "crates/talos-cli",
     "crates/talos-session",
     "crates/talos-tools",
