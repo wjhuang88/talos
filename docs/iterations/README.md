@@ -41,7 +41,8 @@ docs/iterations/
 | I006 | Data Agent | Complete | ⚠️ ADR-004 event-loop variants partly unused (dead code); session index/fork residuals tracked by #ARCH-S5/#ARCH-S6/#ARCH-S7 |
 | I007 | Skilled Agent | Complete | ✅ |
 | I008 | Learning Agent | **Review** | ⚠️ print-mode runtime wired; TUI/interactive paths pending (see `I008-learning-agent.md`) |
-| I009 | Extensible Agent | Planned | See `I009-extensible-agent.md` |
+| R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
+| I009 | Extensible Agent | Ready | See `I009-extensible-agent.md` (R0 dependencies closed) |
 | I010 | Polished Agent | Planned | See `I010-polished-agent.md` |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
@@ -54,7 +55,7 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 
 | Round | When | Work Items | Promotion Rule |
 |-------|------|------------|----------------|
-| R0: Remediation Gate | Now, before I009 | `R0-remediation-gate.md` | I009 may start only after security false-completes and session index/search defects are closed or explicitly re-triaged |
-| R1: I009 Extensibility | After R0 | `I009-extensible-agent.md` | Move I009 to Review when hook/MCP/RPC paths work end-to-end with permission gates |
+| R0: Remediation Gate | ✅ Done (2026-06-01) | `R0-remediation-gate.md` | All 7 ARCH stories closed; runtime evidence recorded |
+| R1: I009 Extensibility | Now | `I009-extensible-agent.md` | Move I009 to Review when hook/MCP/RPC paths work end-to-end with permission gates |
 | R2: I010 Architecture Slice | After I009 Review, or earlier only if needed to unblock I008 | `I010-polished-agent.md` / Slice R2 | I008 can become Complete only after TUI/interactive evolution wiring attaches at the shared AppServerSession seam |
 | R3: I010 Product Polish | After R2 | `I010-polished-agent.md` / Slice R3 | Move I010 to Review when daily-use TUI workflows are verified end-to-end |

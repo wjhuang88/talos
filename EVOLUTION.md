@@ -22,6 +22,7 @@ repeating known mistakes.
 | 11 | Process | "单测全过 + 勾选验收" ≠ 完成；需端到端运行时证据 | I008 |
 | 12 | Storage | 自包含 SQLite 需要 ADR 明确例外与运行时边界 | I008 |
 | 13 | Testing | 自定义存储目录必须隔离派生索引文件 | I008 |
+| 14 | Process | 并行委派时 `git stash` 会吞掉兄弟任务的未提交改动 | R0 |
 
 ## Lessons
 
@@ -107,6 +108,8 @@ repeating known mistakes.
 
 **Prevention**: 任何 `unsafe` 代码必须有：(1) 注释说明安全性保证，(2) 参数验证，(3) 错误处理。考虑是否可以用 safe wrapper crate（如 `rlimit`）。
 
+**Resolution**: Resolved 2026-06-01 by ADR-007 (`docs/decisions/007-process-hardening-unsafe.md`). The four production `unsafe` sites in `crates/talos-sandbox/src/hardening.rs` now carry `// See docs/decisions/007-…` annotations next to each `// SAFETY:` comment, and the module `# Safety` section links the ADR. Closes the compliance gap recorded by this lesson.
+
 ---
 
 ### 8. UTF-8 字符边界问题需要字符索引而非字节索引 (I008)
@@ -178,6 +181,21 @@ repeating known mistakes.
 **Remedy**: SQLite session index 改为 `self.sessions_dir.join("index.db")`。默认运行路径不变，自定义目录和测试目录获得独立 index。
 
 **Prevention**: 任何可注入的 storage root 都必须约束所有派生文件（索引、锁文件、缓存、临时文件），不能只约束主数据文件。
+
+---
+
+### 14. 并行委派时 `git stash` 会吞掉兄弟任务的未提交改动 (R0)
+
+**Symptom**: R0 同时启动了 6 个并行委派实现 #ARCH-S1…#ARCH-S7。#ARCH-S4 的代理为 "验证编译错误是否为预先存在" 跑了 `git stash` / `git stash pop` 来回切两次。stash 收走了同时段另一个代理 (#ARCH-S1) 的未提交注释改动，pop 之后那些改动没回来，事后 `git status` 才发现 #ARCH-S1 整个丢失，必须人工重做一遍。
+
+**Cause**: 并行委派下，工作树是多个代理共享的"并发写"区域。`git stash` 会把全部 untracked/modified 改动打包——包括兄弟代理尚未 commit 的工作。`stash pop` 假设 stash 当时的工作树是干净的，但并行场景下不是。
+
+**Remedy**: R0 的 #ARCH-S1 注释工作最终由主代理手工重做 (4 处 `// SAFETY:` + 模块 # Safety 段 + `EVOLUTION.md` Lesson #7 解决标记)。事后在 `docs/iterations/R0-remediation-gate.md` 的 Execution Results 段落记录全过程，并在本表新增 Lesson #14。
+
+**Prevention**:
+1. 委派给子代理的 prompt 必须显式禁止 `git stash` / `git reset --hard` / `git checkout --` 等会改动工作树的命令——验证预先存在性应用 `git diff HEAD` / `git show HEAD:<file>`，而不是污染工作树。
+2. 多个并行委派之间，每个代理的改动应**先 commit 再开始下一个委托**，让工作树不被多个 WIP 同时占据。
+3. 主代理在并行委派结束、收齐结果后，应跑 `git status --short` + `git diff --stat` 校验每个故事的关键文件是否仍在；如果某故事的关键文件 (如 `hardening.rs`) 缺失，要么要求该代理重做，要么主代理自己补。
 
 ## When to Write a Lesson
 

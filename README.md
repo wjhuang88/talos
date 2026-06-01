@@ -6,14 +6,19 @@ English | **[中文](README.zh-CN.md)**
 
 ## Status
 
-**I007 complete; I008 in review.** 472 tests passing across 12 crates. The agent performs
-file and shell operations safely with permission gating, supports a TUI, sessions with SQLite
-search, skills, and multiple providers. The I008 self-evolution engine is **wired into the
+**I007 complete; I008 in review; R0 complete.** 480 tests passing across 12 crates. The agent
+performs file and shell operations safely with permission gating, supports a TUI, sessions with
+SQLite search, skills, and multiple providers. The I008 self-evolution engine is **wired into the
 `-p` print-mode runtime** (observes signals, accumulates patterns, injects learned context);
 wiring into the TUI and interactive paths is the remaining residual work — see
-[docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md). Implementation
-follows an agile vertical-slice roadmap — each iteration produces a runnable, testable `talos`
-binary.
+[docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md). R0 closed all
+seven architecture-review findings: process hardening now genuinely applies to the child bash
+subprocess via `pre_exec` (closes the I004-S5 false-complete), `Agent::new` is deprecated in favor
+of `Agent::with_security`, `ApprovalChoice` is unified in `talos-core`, the SQLite session index
+refreshes on normal turns, and interactive fork identity is repaired — see
+[docs/iterations/R0-remediation-gate.md](docs/iterations/R0-remediation-gate.md). **I009 is
+unblocked.** Implementation follows an agile vertical-slice roadmap — each iteration produces a
+runnable, testable `talos` binary.
 
 ## Roadmap
 
@@ -27,6 +32,7 @@ binary.
 | ~~I006~~ | ~~Data Agent~~ | ~~TUI tool display + approval + session branching + SQLite search~~ ✅ |
 | ~~I007~~ | ~~Skilled Agent~~ | ~~TUI skill display + SKILL.md + multi-provider support~~ ✅ |
 | I008 | Learning Agent | TUI evolution display + self-evolution engine — 🔶 print-mode runtime wired; TUI/interactive wiring pending |
+| ~~R0~~ | ~~Remediation Gate~~ | ~~Close ARCH findings (sandbox unsafe-ADR link, Agent::new deprecation, ApprovalChoice unification, session index refresh, fork identity, BOLD highlight, ProcessHardening pre_exec)~~ ✅ |
 | I009 | Extensible Agent | TUI MCP display + Hook system + MCP + JSON-RPC |
 | I010 | Polished Agent | Full TUI polish (Nord theme + markdown + advanced features) |
 
