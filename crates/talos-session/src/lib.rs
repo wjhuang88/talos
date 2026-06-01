@@ -645,11 +645,7 @@ impl SessionManager {
     fn get_or_create_index(&self) -> Result<std::sync::MutexGuard<'_, Option<SessionIndex>>, IndexError> {
         let mut guard = self.index.lock().expect("index lock poisoned");
         if guard.is_none() {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-            let db_path = PathBuf::from(home)
-                .join(".talos")
-                .join("sessions")
-                .join("index.db");
+            let db_path = self.sessions_dir.join("index.db");
 
             let index = SessionIndex::new(&db_path)?;
             index.init_schema()?;

@@ -19,6 +19,27 @@ I009 "Extensible Agent"  TUI MCP标记 + Hook + MCP + JSON-RPC   可扩展
 I010 "Polished Agent"    TUI打磨 (Nord + markdown + 高级功能)    可发布
 ```
 
+## Near-Term Execution Sequence
+
+This sequence records the post-I008 diagnostic plan. It does not add speculative scope; it only
+orders the existing backlog so remediation, extension work, and polish do not block or duplicate
+each other.
+
+| Round | State Gate | Primary Scope | Exit Criteria |
+|-------|------------|---------------|---------------|
+| R0 | Before I009 starts | Architecture remediation: `#ARCH-S1`…`#ARCH-S5`, `#ARCH-S7`; assess whether `#ARCH-S6` is self-contained or should wait for `#I010-S7` | Security baseline has no known false-complete items; session search/list correctness is restored; CLI search highlight bug fixed; `cargo test --workspace` passes |
+| R1 | I009 Active | Extensibility vertical slice: hooks, MCP client/server, JSON-RPC, plugin status markers | A user can load at least one hook/plugin path, call an MCP-provided tool, and drive Talos over stdio JSON-RPC with permission gates still enforced |
+| R2 | First I010 slice | `#I010-S7` AppServerSession convergence, headless/SDK modes, TUI approval protocol, I008 TUI/interactive evolution attach | Print, interactive, TUI, headless, and SDK paths share one session loop; I008 can move from Review to Complete; dead `event_loop.rs` variants are removed |
+| R3 | Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering, Guardian, exec policy DSL | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
+
+Ordering rules:
+- Do not start I009 until `#ARCH-S1`…`#ARCH-S5` and `#ARCH-S7` are closed or explicitly re-triaged.
+- Do not implement more per-run-path evolution wiring before `#I010-S7`; attach evolution once at the session/EQ seam.
+- Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
+  move it into the R2 `#I010-S7` slice instead.
+- Each round ends with `cargo test --workspace`; security-sensitive rounds also require `cargo check --workspace`
+  and explicit verification notes in `docs/iterations/`.
+
 ## I001: "Project Scaffold"
 
 **User can**: Build the workspace and get a binary that prints version/help.

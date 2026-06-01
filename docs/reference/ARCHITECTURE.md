@@ -186,18 +186,20 @@ No database dependency. All data is file-based:
 
 Session metadata indexing and full-text search require a database:
 
-*   **SQLite** (via `rusqlite`, bundled compilation): `~/.talos/index.db`.
+*   **SQLite** (via `rusqlite/bundled`, ADR-008): `~/.talos/sessions/index.db`.
 *   **Session messages** remain as JSONL files (source of truth). SQLite stores metadata only.
 *   **FTS5** virtual table for full-text search across session content.
-*   All storage operations abstracted behind `SessionStore` trait for future engine migration.
+*   Storage is implemented directly with rusqlite calls; trait extraction is deferred until a
+    second storage engine is real.
 
 ### Phase 3: SQLite Extension (I008)
 
 Evolution engine requires structured queries for observations and patterns:
 
-*   Same SQLite database, extended with `observations`, `patterns`, and `pattern_conflicts` tables.
+*   Bundled SQLite is also used by `talos-evolution` for `observations`, `patterns`, and
+    `pattern_conflicts` tables.
 *   Patterns include cognitive feedback fields: confidence, evidence counts, time decay (ADR-001).
-*   All evolution operations abstracted behind `EvolutionStore` trait.
+*   Evolution storage is implemented directly with rusqlite calls under the same ADR-008 exception.
 
 ### File-Based Domains (All Phases)
 
@@ -211,6 +213,11 @@ These domains remain file-based permanently because they must be human-editable:
 ### Storage Implementation (Phases 2-3)
 
 SQLite is used directly via rusqlite calls. No trait abstraction until a concrete second implementation exists (YAGNI — trait extraction happens when Turso or another engine is production-ready and we have real migration needs).
+
+`rusqlite/bundled` is an explicit ADR-008 exception to the general no-C/C++-bindings rule. SQLite is
+compiled into the Talos binary, so users do not need a system SQLite installation. The final binary
+is still platform-linked (for example, macOS system frameworks), so this is "SQLite self-contained",
+not "fully static binary".
 
 ## Plugin System
 

@@ -60,7 +60,7 @@ most promise for future migration but is explicitly beta with known data integri
 
 | Constraint | Type | Source | Can Change? |
 |---|---|---|---|
-| All crates are pure Rust, no FFI | Hard | AGENTS.md | No (but rusqlite uses bundled C, not FFI) |
+| Rust-first; no arbitrary C/C++ bindings | Hard | AGENTS.md | ADR-008 approves bundled SQLite as a scoped storage exception |
 | No secrets in persistent storage | Hard | AGENTS.md | No |
 | Single-user CLI, no concurrent access | Soft | Product scope | Yes |
 | Cross-platform (macOS/Linux/Windows) | Soft | Product scope | Yes |
@@ -68,11 +68,12 @@ most promise for future migration but is explicitly beta with known data integri
 | Turso will reach production readiness | Assumption | Well-funded company, 19K stars, active dev | Maybe (12-18 months) |
 | Storage engine should be swappable | Assumption | Future-proofing | Yes |
 
-### Note on "Pure Rust" Constraint
+### Note on the Rust-First Constraint
 
-AGENTS.md states "no C/C++ bindings, no Python FFI, no Node.js runtime." rusqlite uses the
-`bundled` feature to compile SQLite from C source via the `cc` crate. This is not an FFI binding
-to an external library — it compiles SQLite into the binary. This is acceptable because:
+AGENTS.md now treats SQLite as an ADR-recorded exception rather than a silent loophole.
+`rusqlite/bundled` compiles SQLite from C source into the Talos binary, so users do not need a
+system SQLite installation at runtime. This is acceptable only within the scope recorded by
+[ADR-008](008-sqlite-bundled-storage.md), because:
 
 1. SQLite is the most tested C code in existence (fuzz-tested to 100% branch coverage).
 2. The `bundled` feature requires zero system dependencies.
@@ -85,11 +86,11 @@ to an external library — it compiles SQLite into the binary. This is acceptabl
 
 The fundamental question is: **when does each data domain actually need database capabilities?**
 
-- **I001-I003** (MVP → Safe Agent): Sessions are append-only JSONL. Config is TOML. No queries
+- **I001-I005** (MVP → Smart Agent): Sessions are append-only JSONL. Config is TOML. No queries
   needed. Zero database dependencies.
-- **I004** (Smart Agent): Session resume (`-c`, `-r`) requires metadata lookup. Session search
+- **I006** (Data Agent): Session resume (`-c`, `-r`) requires metadata lookup. Session search
   requires FTS. JSONL alone is insufficient. **SQLite introduced here.**
-- **I005** (Learning Agent): Evolution observations need aggregation queries. Patterns need
+- **I008** (Learning Agent): Evolution observations need aggregation queries. Patterns need
   confidence tracking. **SQLite extended here.**
 
 This progressive introduction follows the agile principle: each iteration adds only the complexity
@@ -112,25 +113,24 @@ This "extract when needed" approach avoids speculative abstraction while keeping
 ### Data Domain → Storage Mapping
 
 ```
-Phase 1 (I001-I003): Pure Files
+Phase 1 (I001-I005): Pure Files
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Sessions    → JSONL files  (~/.talos/sessions/<project>/<id>.jsonl)
 Config      → TOML files   (~/.talos/config.toml, .talos/config.toml)
-Skills      → Not yet (I005)
-Rules       → Not yet (I003 uses inline config)
+Skills      → Markdown files from I007 onward
+Rules       → Inline config first, file rules later
 
-Phase 2 (I004): SQLite Introduction
+Phase 2 (I006): SQLite Introduction
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Sessions    → JSONL files (unchanged) + SQLite index (~/.talos/index.db)
-               SQLite tables: sessions, messages_metadata
-               SQLite FTS5: sessions_fts (full-text search)
+Sessions    → JSONL files (unchanged) + SQLite index (~/.talos/sessions/index.db)
+               SQLite tables: sessions, messages_fts, forks
 Config      → TOML files (unchanged)
 
-Phase 3 (I005): SQLite Extension
+Phase 3 (I008): SQLite Extension
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Sessions    → Same as Phase 2
-Evolution   → Same SQLite DB, new tables:
-               observations, patterns, signals
+Evolution   → SQLite knowledge store (~/.talos/index.db)
+               observations, patterns, pattern_conflicts
 Config      → TOML files (unchanged)
 Skills      → File discovery (~/.talos/skills/, .talos/skills/)
 Rules       → TOML/DSL files (.talos/rules/)
@@ -215,9 +215,10 @@ CREATE INDEX idx_patterns_confidence ON patterns(confidence DESC);
 ```
 ~/.talos/
 ├── config.toml                    # Global configuration (TOML)
-├── index.db                       # SQLite database (session index + evolution)
+├── index.db                       # SQLite database (evolution knowledge store)
 ├── AGENTS.md                      # Global agent context
 ├── sessions/                      # Session JSONL files
+│   ├── index.db                   # SQLite index for session metadata/search
 │   ├── <project_hash>/
 │   │   ├── <uuid-1>.jsonl
 │   │   └── <uuid-2>.jsonl
@@ -240,16 +241,16 @@ CREATE INDEX idx_patterns_confidence ON patterns(confidence DESC);
 ## Decision
 
 1. **Storage is introduced progressively**, matching each iteration's actual needs:
-   - I001-I003: Pure files (zero database dependency)
-   - I004: SQLite via rusqlite (session index + FTS5)
-   - I005: SQLite extended (evolution tables with cognitive feedback schema)
+   - I001-I005: Pure files (zero database dependency)
+   - I006: SQLite via `rusqlite/bundled` (session index + FTS5)
+   - I008: SQLite extended for evolution tables with cognitive feedback schema
 
-2. **SQLite (rusqlite, bundled)** is the storage engine. It is the only option that satisfies
-   all hard requirements (FTS5, OLTP, SQL, JSON, production maturity, cross-platform).
+2. **SQLite (`rusqlite/bundled`)** is the storage engine. It is the only option that satisfies
+   all hard requirements (FTS5, OLTP, SQL, JSON, production maturity, cross-platform). The bundled
+   C dependency is governed by ADR-008.
 
-3. **All storage operations are abstracted behind traits** (`SessionStore`, `EvolutionStore`)
-   to enable future engine migration (e.g., Turso when production-ready) without changing
-   calling code.
+3. **Storage is currently implemented directly with rusqlite calls.** Trait extraction is deferred
+   until a concrete second engine is production-ready and there is a real migration need.
 
 4. **Session data uses JSONL files as the primary store** (append-friendly, human-readable,
    crash-safe) with SQLite as the metadata index and search engine. Session messages are never
@@ -261,9 +262,8 @@ CREATE INDEX idx_patterns_confidence ON patterns(confidence DESC);
 6. **Config, skills, and rules remain file-based** (TOML/Markdown/DSL). These must be
    human-editable and benefit from git-friendliness.
 
-7. **Future Turso migration is a planned possibility**, not a commitment. The trait abstraction
-   ensures migration cost is bounded to implementing new storage backends, not rewriting
-   application logic.
+7. **Future Turso migration is a planned possibility**, not a commitment. If it becomes viable,
+   extract storage traits from the live rusqlite implementation at that time.
 
 ## Reversal Trigger
 

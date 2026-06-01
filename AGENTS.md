@@ -16,7 +16,7 @@ Starting as a pure CLI tool, evolving into a full agent runtime platform.
 
 These are immutable facts that every change must respect:
 
-1. **Rust only.** No C/C++ bindings, no Python FFI, no Node.js runtime. All crates are pure Rust.
+1. **Rust first.** No arbitrary C/C++ bindings, Python FFI, or Node.js runtime. Approved exceptions are limited to ADR-recorded system/runtime dependencies: OS ABI access via `libc` (ADR-007) and bundled SQLite for local storage via `rusqlite/bundled` (ADR-008).
 2. **No `unsafe` without ADR.** Any use of `unsafe` requires a decision record in `docs/decisions/`.
 3. **No secrets in code or config.** All credentials via env vars or secret stores. Config supports `${ENV_VAR}` substitution.
 4. **All write-capable tools gated by permissions.** No tool can modify files without going through the permission pipeline.
@@ -90,6 +90,7 @@ These are immutable facts that every change must respect:
 | "I need to fix an architecture/design/security review finding" | `docs/backlog/PRODUCT-BACKLOG.md` → "ARCH: Architecture Review Remediation" (`#ARCH-S1..S4`) |
 | "Should we add a global message bus / unified event bus / pub-sub?" | `docs/decisions/006-event-architecture-boundary.md` (decided: no global pub/sub) |
 | "Where is `unsafe` allowed and why?" | `docs/decisions/007-process-hardening-unsafe.md` |
+| "Why is bundled SQLite allowed?" | `docs/decisions/008-sqlite-bundled-storage.md` |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
 | "I have an idea for later" | `docs/proposals/` |
 | "What's the implementation plan?" | `docs/roadmap/IMPLEMENTATION-ROADMAP.md` |

@@ -20,6 +20,8 @@ repeating known mistakes.
 | 9 | TUI | EventStream 需要定期重绘间隔防止界面冻结 | I008 |
 | 10 | SQLite | 多 crate 共享 SQLite 需要统一 rusqlite 版本 | I008 |
 | 11 | Process | "单测全过 + 勾选验收" ≠ 完成；需端到端运行时证据 | I008 |
+| 12 | Storage | 自包含 SQLite 需要 ADR 明确例外与运行时边界 | I008 |
+| 13 | Testing | 自定义存储目录必须隔离派生索引文件 | I008 |
 
 ## Lessons
 
@@ -152,6 +154,30 @@ repeating known mistakes.
 **Remedy**: 将 I008 状态降级为 REVIEW，登记残留工作 R1-R4，并在 `docs/sop/ITERATION-WORKFLOW.md` 增加强制的"端到端运行时验收门"(§3a)，新建 `docs/sop/DOC-CHECK.md` 防止文档状态漂移。
 
 **Prevention**: 任何改变可观察行为的故事，必须有"通过真实二进制驱动该功能并断言用户可见结果"的证据(测试或手动记录)才能标记 Done。功能核心类型上的 `never used` 警告 = 验收失败。
+
+---
+
+### 12. 自包含 SQLite 需要 ADR 明确例外与运行时边界 (I008)
+
+**Symptom**: 诊断发现 `talos-session` 和 `talos-evolution` 使用 `rusqlite/bundled`。技术上它能把 SQLite 编进二进制、避免依赖系统 SQLite，但 AGENTS.md 的 "No C/C++ bindings" 字面约束没有说明这个例外。
+
+**Cause**: ADR-002 说明了为什么引入 SQLite，但没有说明 `rusqlite/bundled` 与硬约束 #1 的关系，也没有区分 "SQLite 自包含" 和 "完全静态二进制"。
+
+**Remedy**: 新增 ADR-008，明确 `rusqlite/bundled` 是仅限本地存储的例外：SQLite 静态链接进 Talos，运行时不需要系统 SQLite；但最终二进制仍可能链接平台系统库。同步更新 AGENTS.md、README 和架构文档。
+
+**Prevention**: 任何引入原生库、FFI 或 bundled C 源码的依赖，都必须在合并前有 ADR 说明范围、运行时依赖边界、替代方案和回退触发条件。
+
+---
+
+### 13. 自定义存储目录必须隔离派生索引文件 (I008)
+
+**Symptom**: `cargo test --workspace` 中 `session_manager_list_recent_empty_index` 失败。测试创建了临时 `SessionManager::with_dir(...)`，但 `list_recent()` 仍读取真实 `$HOME/.talos/sessions/index.db`。
+
+**Cause**: `SessionManager` 的 JSONL 目录支持注入，但 `get_or_create_index()` 硬编码 `$HOME/.talos/sessions/index.db`，导致测试和自定义运行目录没有完全隔离。
+
+**Remedy**: SQLite session index 改为 `self.sessions_dir.join("index.db")`。默认运行路径不变，自定义目录和测试目录获得独立 index。
+
+**Prevention**: 任何可注入的 storage root 都必须约束所有派生文件（索引、锁文件、缓存、临时文件），不能只约束主数据文件。
 
 ## When to Write a Lesson
 

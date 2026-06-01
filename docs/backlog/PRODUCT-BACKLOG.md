@@ -761,6 +761,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] All modes share the same core agent loop
 - [ ] Headless mode supports `--json` for machine-readable output
 - [ ] All three run paths drive the agent only via `AppServerSession` (no direct `tokio::spawn` of the agent turn inside a run path)
+- [ ] TUI approval requests flow through the canonical `AppServerSession`/EQ approval protocol, not through a `PermissionAwareTool { print_mode: true }` default-deny shim
 - [ ] I008 evolution `TurnObserver`/`BehaviorAdapter` attach once at the session/EQ seam; TUI + interactive paths observe, persist, inject, and surface patterns with no double-firing (closes I008 R1/R2/R4)
 - [ ] `event_loop.rs` dead variants removed (`ApprovalRequested`, `ApprovalResolved`, `ToggleSkillSidebar`, `SkillsUpdated`, `ApprovalChoice`)
 - [ ] `cargo test --workspace` green after each path migration (ADR-005 phased-migration invariant)
@@ -793,6 +794,9 @@ functionality. Story format: `#I{iteration}-S{story}`.
 >
 > **Target window**: complete `#ARCH-S1`…`#ARCH-S4` **before starting I009**. They harden the
 > security baseline that I009 (MCP/plugins exposing tools to external callers) depends on.
+> Complete `#ARCH-S5`…`#ARCH-S7` in the same remediation lane as current correctness findings
+> from the I006 session stack; `#ARCH-S5` and `#ARCH-S7` should land before I009, while
+> `#ARCH-S6` may coordinate with `#I010-S7` if the active session handoff touches run-path migration.
 >
 > **Scope guard**: do NOT expand these into the larger I010 event-architecture migration. The
 > three-run-path convergence and dead `event_loop.rs` variant deletion are owned by **#I010-S7** and
@@ -935,3 +939,109 @@ decision invites divergence. Consolidate the two **live** definitions onto one c
 
 **Depends on**: none (coordinates with #I010-S7 for the dead-copy deletion)
 **Estimate**: S
+
+### #ARCH-S5: Keep the SQLite session index current on normal turns (P2)
+
+**Description**: The I006 SQLite index is treated as the fast path for `talos --search` and
+`talos -r`, but normal interactive turns append to JSONL without refreshing the index. Fork paths
+and tests call `SessionIndex::index_session(...)`; the ordinary "user prompt -> assistant response"
+path does not. Because `SessionIndex::search(...)` and `SessionIndex::list_recent(...)` query only
+SQLite, search/list can miss recently created or updated sessions even though JSONL remains the
+source of truth.
+
+**Files & anchors**:
+- `crates/talos-cli/src/event_loop.rs:461` (`SessionEntry::user(...)` append during normal turns)
+- `crates/talos-session/src/lib.rs:661` (`SessionIndex::search`)
+- `crates/talos-session/src/lib.rs:670` (`SessionIndex::list_recent`)
+- `crates/talos-session/src/lib.rs` (`SessionManager::update_index`)
+
+**MUST DO**:
+- Refresh the SQLite index after normal session writes that should be visible to search/list.
+- Preserve JSONL as the source of truth; SQLite stays a derived index.
+- Ensure injected/custom session directories also use their colocated `index.db` from ADR-008 follow-up work.
+- Add a regression test proving a newly written normal session appears in `list_recent` and `search`
+  without a manual reindex command.
+
+**MUST NOT DO**:
+- Do NOT move session source-of-truth data from JSONL into SQLite.
+- Do NOT introduce a storage trait abstraction; ADR-002 still says direct `rusqlite` calls until a
+  concrete second engine exists.
+- Do NOT solve this by scanning all JSONL files on every search/list call unless there is an explicit
+  bounded backfill path.
+
+**Acceptance Criteria**:
+- [ ] A normal completed turn updates the session's SQLite metadata/content index
+- [ ] `talos -r` / `list_recent` includes the just-updated session
+- [ ] `talos --search <term>` finds content from the just-updated session
+- [ ] Custom session roots remain isolated from `$HOME/.talos`
+- [ ] Regression tests cover the stale-index failure mode; `cargo test -p talos-session` exits 0
+
+**Depends on**: #I006-S3, #I006-S4, ADR-002, ADR-008
+**Estimate**: S
+
+### #ARCH-S6: Repair interactive fork session identity and continuation (P2)
+
+**Description**: Interactive `/fork` creates a new session file path and UUID, but the cloned
+`Session` value still carries the source session identity/path when it is indexed. The event loop
+also records `ForkCompleted` by setting `branch_id` only; it does not switch the active session to
+the fork. The result can be a fork file with copied entries, stale index metadata for the source
+session, and later turns continuing on the original session rather than the fork.
+
+**Files & anchors**:
+- `crates/talos-cli/src/event_loop.rs:326` (`let mut forked = session.clone()`)
+- `crates/talos-cli/src/event_loop.rs:334` / `:335` (new fork id/path creation)
+- `crates/talos-cli/src/event_loop.rs:358` (`index.index_session(&forked)`)
+- `crates/talos-cli/src/event_loop.rs:241` (`AppEvent::ForkCompleted` handler)
+- `crates/talos-session/src/lib.rs` (`Session` identity/path fields and fork helpers)
+
+**MUST DO**:
+- Ensure the forked `Session` carries the new session id, parent/root metadata, and JSONL path before
+  it is indexed.
+- Update the active interactive session after `/fork` so subsequent turns append to the fork, not the
+  source session.
+- Keep fork history independent after the fork point while preserving parent/branch metadata.
+- Add a regression test for "fork, then append another turn" proving the new turn lands in the fork
+  file and the SQLite index points at the fork id/path.
+
+**MUST NOT DO**:
+- Do NOT redesign the full ADR-005 run-path architecture in this story.
+- Do NOT duplicate fork logic independently across CLI/TUI if an existing `talos-session` helper can
+  own the identity/path mutation.
+- Do NOT change the JSONL entry format without a migration note.
+
+**Acceptance Criteria**:
+- [ ] `/fork` creates a session with a distinct id and path in both JSONL and SQLite metadata
+- [ ] The active interactive session switches to the fork after `ForkCompleted`
+- [ ] Subsequent turns append to the forked session only
+- [ ] `talos -c <fork-id>` resumes the fork
+- [ ] Regression tests cover fork metadata, index metadata, and post-fork append behavior
+
+**Depends on**: #I006-S2, #I006-S3, #I006-S5
+**Estimate**: M
+
+### #ARCH-S7: Fix CLI search highlight output leaking literal `BOLD` (P4)
+
+**Description**: Search snippets replace `<b>` with an ANSI-color string that includes the literal
+text `BOLD`, so highlighted search output can show `BOLDmatched text` instead of only applying the
+bold terminal style. The existing test checks for ANSI output and removed HTML tags, but not for
+absence of the marker text.
+
+**Files & anchors**:
+- `crates/talos-cli/src/main.rs:662` (search snippet `<b>` replacement)
+- `crates/talos-cli/src/main.rs:797` (highlight rendering tests)
+
+**MUST DO**:
+- Replace `<b>` with the ANSI bold escape sequence only; do not emit literal marker text.
+- Extend the existing search snippet test to assert the output does not contain `BOLD`.
+
+**MUST NOT DO**:
+- Do NOT change search ranking, FTS query behavior, or snippet generation.
+- Do NOT remove color output support.
+
+**Acceptance Criteria**:
+- [ ] Highlighted search output applies bold styling without printing `BOLD`
+- [ ] Regression test fails on the current marker leak and passes after the fix
+- [ ] `cargo test -p talos-cli search` exits 0
+
+**Depends on**: #I006-S4
+**Estimate**: XS

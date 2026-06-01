@@ -8,7 +8,7 @@
 
 ## 项目状态
 
-**I007 已完成；I008 评审中。** 450 个测试通过（12 个 crate）。Agent 可安全执行文件和 Shell 操作（带权限门控），支持 TUI、带 SQLite 搜索的会话、技能与多模型。I008 自进化引擎已**接入 `-p` 打印模式运行时**（观察信号、累积模式、注入已学习上下文）；接入 TUI 与交互式路径为剩余残留工作——详见 [docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md)。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
+**I007 已完成；I008 评审中。** 472 个测试通过（12 个 crate）。Agent 可安全执行文件和 Shell 操作（带权限门控），支持 TUI、带 SQLite 搜索的会话、技能与多模型。I008 自进化引擎已**接入 `-p` 打印模式运行时**（观察信号、累积模式、注入已学习上下文）；接入 TUI 与交互式路径为剩余残留工作——详见 [docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md)。开发遵循敏捷垂直切片路线图——每个迭代交付可运行、可测试的 `talos` 二进制文件。
 
 ## 路线图
 
@@ -54,6 +54,7 @@ Talos 遵循**简单内核、灵活扩展**的设计哲学：
 - **全链路安全**：权限管线、沙箱化工具执行、崩溃安全的会话存储。
 - **内置自进化**：运行时级别学习循环（观察 → 积累 → 提取 → 应用），而非技能系统功能。[ADR-001](docs/decisions/001-runtime-self-evolution.md)。
 - **渐进式存储**：纯文件（I001–I005）→ SQLite 索引（I006）→ SQLite 演化表（I008）。[ADR-002](docs/decisions/002-local-storage-architecture.md)。
+- **内置 SQLite**：`rusqlite/bundled` 是 ADR 批准的存储例外；Talos 运行时不需要系统安装 SQLite。[ADR-008](docs/decisions/008-sqlite-bundled-storage.md)。
 - **默认文件驱动**：配置（TOML）、技能（Markdown）、会话（JSONL）。人类可编辑、git 友好。
 
 ## 文档
@@ -62,7 +63,7 @@ Talos 遵循**简单内核、灵活扩展**的设计哲学：
 |------|------|
 | [AGENTS.md](AGENTS.md) | Agent 编码指南、硬性约束、任务路由 |
 | [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) | 完整架构参考 |
-| [docs/roadmap/IMPLEMENTATION-ROADMAP.md](docs/roadmap/IMPLEMENTATION-ROADMAP.md) | 逐迭代实现计划 |
+| [docs/roadmap/IMPLEMENTATION-ROADMAP.md](docs/roadmap/IMPLEMENTATION-ROADMAP.md) | 逐迭代实现计划，包含当前 R0–R3 执行顺序 |
 | [docs/backlog/PRODUCT-BACKLOG.md](docs/backlog/PRODUCT-BACKLOG.md) | 用户故事与验收标准 |
 | [docs/decisions/](docs/decisions/) | 架构决策记录（ADR） |
 | [docs/reference/REFERENCE-PROJECTS.md](docs/reference/REFERENCE-PROJECTS.md) | 参考项目模式与源码链接 |
@@ -73,7 +74,7 @@ Talos 遵循**简单内核、灵活扩展**的设计哲学：
 - **异步**：tokio
 - **序列化**：serde + schemars
 - **错误处理**：thiserror（库）、anyhow（CLI）
-- **存储**：JSONL（会话）、TOML（配置）、SQLite via rusqlite bundled（索引、演化）
+- **存储**：JSONL（会话）、TOML（配置）、SQLite via `rusqlite/bundled`（索引、演化）
 - **TUI**：ratatui + crossterm（I005+，逐步演进，Nord 主题）
 
 ## 许可证
