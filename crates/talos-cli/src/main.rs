@@ -14,6 +14,7 @@
 
 mod approval;
 mod event_loop;
+mod evolution_runtime;
 
 /// Nord theme ANSI color constants for terminal output.
 ///
@@ -65,6 +66,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
+use crate::evolution_runtime::EvolutionRuntime;
 
 /// Permission-aware tool wrapper that checks the permission engine before
 /// executing the underlying tool. In interactive mode, [`PermissionDecision::Ask`]
@@ -323,8 +325,31 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         agent.set_custom_prompt(system_prompt.clone());
     }
 
+    let mut evolution = match EvolutionRuntime::open_default(None) {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("Warning: evolution disabled: {e}");
+            None
+        }
+    };
+
+    let mut append_parts: Vec<String> = Vec::new();
     if let Some(ref append_prompt) = cli.append_system_prompt {
-        agent.set_append_prompt(append_prompt.clone());
+        append_parts.push(append_prompt.clone());
+    }
+    if let Some(runtime) = evolution.as_ref() {
+        let context = runtime.evolution_context();
+        if !context.is_empty() {
+            append_parts.push(context);
+        }
+    }
+    if !append_parts.is_empty() {
+        agent.set_append_prompt(append_parts.join("\n\n"));
+    }
+
+    if let Some(runtime) = evolution.as_mut() {
+        runtime.start_turn();
+        runtime.observe_user_input(&prompt);
     }
 
     let (event_tx, mut event_rx) = broadcast::channel::<AgentEvent>(32);
@@ -340,10 +365,21 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
             }
             Ok(AgentEvent::TurnEnd { .. }) => {
                 println!();
+                if let Some(runtime) = evolution.as_mut() {
+                    if let Err(e) = runtime.ingest() {
+                        eprintln!("Warning: evolution ingest failed: {e}");
+                    }
+                }
                 return Ok(());
             }
             Ok(AgentEvent::Error { message }) => {
                 eprintln!("Error: {message}");
+                if let Some(runtime) = evolution.as_mut() {
+                    runtime.observe_event(&AgentEvent::Error {
+                        message: message.clone(),
+                    });
+                    let _ = runtime.ingest();
+                }
                 std::process::exit(1);
             }
             Ok(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
