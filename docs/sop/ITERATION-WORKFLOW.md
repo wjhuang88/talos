@@ -35,6 +35,28 @@ For each story:
 - [ ] No `unwrap()` in library code
 - [ ] No `unsafe` without an ADR in `docs/decisions/`
 - [ ] `README.md` updated to reflect changes (features, usage, architecture)
+- [ ] **End-to-end runtime evidence** recorded (see gate below)
+
+### 3a. End-to-End Runtime Acceptance Gate (MANDATORY)
+
+> Originating lesson: I008 passed all unit tests and every acceptance box was checked,
+> yet the feature was a no-op at runtime because the library was never wired into the
+> binary. Passing unit tests is **necessary but not sufficient**.
+
+A story that changes observable behavior may be marked Done **only** when its capability
+is exercised through the actual `talos` binary, not just isolated unit tests:
+
+- [ ] The feature is reachable from a real run path (`talos ...` / TUI), not only from `#[test]`.
+- [ ] There is at least one test or recorded manual transcript that drives the feature through
+      the binary and asserts the user-visible result.
+- [ ] Newly added library types are referenced by non-test runtime code
+      (a `never used` / `never constructed` warning on a feature's core type is a **gate failure**).
+- [ ] The evidence (command + observed output, or integration-test name) is pasted into the
+      iteration file's Verification section.
+
+If the runtime path is intentionally out of scope for this story, the story is **library-only**:
+say so explicitly, and register the integration work as a residual item — do not mark the
+behavior-facing parent story Done.
 
 ### 4. Commit
 
@@ -54,9 +76,13 @@ Record any residual work or follow-up items.
 When all stories are done:
 
 1. Run full verification: `cargo test --workspace && cargo clippy --workspace`
-2. Update iteration file with execution results.
-3. Write a brief retrospective: what worked, what didn't, lessons for `EVOLUTION.md`.
-4. Record any decisions made during implementation in `docs/decisions/`.
+2. Confirm the End-to-End Runtime Acceptance Gate (3a) passed for every behavior-facing story;
+   an iteration whose deliverable is not runnable end-to-end is **not** Complete — mark it Review.
+3. Update iteration file with execution results, including the runtime evidence.
+4. Update `docs/iterations/README.md` "Current Iterations" table state.
+5. Write a brief retrospective: what worked, what didn't, lessons for `EVOLUTION.md`.
+6. Record any decisions made during implementation in `docs/decisions/`.
+7. Update `.agent-governance/manifest.yaml` `last_audited_at`.
 
 ## Doom Loop Prevention
 

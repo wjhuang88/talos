@@ -24,6 +24,7 @@
 | `NEW-FEATURE.md` | Implementing a new feature during an iteration |
 | `TESTING.md` | Writing and running tests |
 | `GIT-WORKFLOW.md` | Committing, branching, and PR workflow |
+| `DOC-CHECK.md` | Keeping documentation synchronized with code reality |
 
 ## Quick Reference
 

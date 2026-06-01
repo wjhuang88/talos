@@ -19,6 +19,7 @@ repeating known mistakes.
 | 8 | TUI | UTF-8 字符边界问题需要字符索引而非字节索引 | I008 |
 | 9 | TUI | EventStream 需要定期重绘间隔防止界面冻结 | I008 |
 | 10 | SQLite | 多 crate 共享 SQLite 需要统一 rusqlite 版本 | I008 |
+| 11 | Process | "单测全过 + 勾选验收" ≠ 完成；需端到端运行时证据 | I008 |
 
 ## Lessons
 
@@ -139,6 +140,18 @@ repeating known mistakes.
 **Remedy**: 统一所有 crate 的 `rusqlite` 版本为 `0.37`。
 
 **Prevention**: 多个 crate 使用同一个原生库时，必须在 workspace 级别统一版本。
+
+---
+
+### 11. "单测全过 + 勾选验收" ≠ 完成；需端到端运行时证据 (I008)
+
+**Symptom**: I008 自进化引擎被标记 COMPLETE（7/7 故事打勾，467 测试通过），但事后审计发现该能力在真实二进制中是 no-op：`TurnObserver`/`BehaviorAdapter` 从未在真实 turn loop 中被调用，TUI `render()` 收到 `evolution_panel` 却从不绘制，`--learned` 因无写入永远为空。
+
+**Cause**: 验收门只有 `cargo test --workspace`。单元测试隔离测试库代码，覆盖不到"库是否被接进运行路径"。`never used` / `never constructed` 警告正是这种脱节的信号，却被忽略。
+
+**Remedy**: 将 I008 状态降级为 REVIEW，登记残留工作 R1-R4，并在 `docs/sop/ITERATION-WORKFLOW.md` 增加强制的"端到端运行时验收门"(§3a)，新建 `docs/sop/DOC-CHECK.md` 防止文档状态漂移。
+
+**Prevention**: 任何改变可观察行为的故事，必须有"通过真实二进制驱动该功能并断言用户可见结果"的证据(测试或手动记录)才能标记 Done。功能核心类型上的 `never used` 警告 = 验收失败。
 
 ## When to Write a Lesson
 

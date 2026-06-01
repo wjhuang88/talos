@@ -86,7 +86,8 @@ These are immutable facts that every change must respect:
 | "How do I commit my work?" | `docs/sop/GIT-WORKFLOW.md` |
 | "Where is the architecture documented?" | `docs/reference/ARCHITECTURE.md` |
 | "What are the reference projects?" | `docs/reference/REFERENCE-PROJECTS.md` |
-| "I have a technical tradeoff to decide" | `docs/decisions/` (create new ADR) |
+| "I have a technical tradeoff to decide" | `docs/decisions/README.md` (then create a new ADR) |
+| "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
 | "I have an idea for later" | `docs/proposals/` |
 | "What's the implementation plan?" | `docs/roadmap/IMPLEMENTATION-ROADMAP.md` |
 | "What work is planned?" | `docs/backlog/PRODUCT-BACKLOG.md` |
