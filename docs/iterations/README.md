@@ -42,7 +42,7 @@ docs/iterations/
 | I007 | Skilled Agent | Complete | ✅ |
 | I008 | Learning Agent | **Review** | ⚠️ print-mode runtime wired; TUI/interactive paths pending (see `I008-learning-agent.md`) |
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
-| I009 | Extensible Agent | Ready | See `I009-extensible-agent.md` (R0 dependencies closed) |
+| I009 | Extensible Agent | **Active** (2026-06-01) | See `I009-extensible-agent.md`; S2 → S3 → S4 → S5 → S1 order |
 | I010 | Polished Agent | Planned | See `I010-polished-agent.md` |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime

@@ -51,6 +51,7 @@
 //! ```
 
 use talos_skill::SkillIndex;
+use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
 
 /// Default identity text for the Talos agent.
 pub const DEFAULT_IDENTITY: &str =
@@ -303,6 +304,30 @@ impl SystemPromptBuilder {
         }
 
         parts.join("\n")
+    }
+
+    /// Assembles the system prompt and emits the `OnSystemPromptBuilt` hook.
+    ///
+    /// Handlers may replace the final prompt by returning
+    /// [`talos_plugin::HookResult::Modify`]. `Skip` leaves the prompt unchanged.
+    pub(crate) async fn build_with_hooks(
+        &self,
+        hook_registry: &HookRegistry,
+        ctx: &HookContext,
+    ) -> Result<String, String> {
+        let prompt = self.build();
+        let outcome = hook_registry
+            .dispatch(ctx, HookEvent::OnSystemPromptBuilt { prompt: &prompt })
+            .await;
+
+        match outcome {
+            HookOutcome::Continue(HookEvent::OnSystemPromptBuilt { prompt })
+            | HookOutcome::Skip(HookEvent::OnSystemPromptBuilt { prompt }) => {
+                Ok(prompt.to_string())
+            }
+            HookOutcome::Deny { reason, .. } => Err(reason),
+            HookOutcome::Continue(_) | HookOutcome::Skip(_) => Ok(prompt),
+        }
     }
 
     /// Assembles the system prompt with cache control markers.

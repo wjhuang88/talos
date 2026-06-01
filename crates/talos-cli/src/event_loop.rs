@@ -10,6 +10,7 @@ use talos_config::Config;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::tool::ToolRegistry;
 use talos_permission::PermissionEngine;
+use talos_plugin::HookRegistry;
 use talos_session::{Session, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::SkillInfo;
@@ -23,6 +24,7 @@ use crate::{build_provider, parse_provider, Cli, PermissionAwareTool};
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
 /// User's choice when resolving an approval prompt.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ApprovalChoice {
     /// Approve this tool call once.
@@ -33,6 +35,7 @@ pub enum ApprovalChoice {
     Deny,
 }
 
+#[allow(dead_code)]
 pub enum AppEvent {
     UserInput(String),
     UserInterrupt,
@@ -82,6 +85,7 @@ pub struct EventLoop {
     session: Session,
     branch_id: Option<String>,
     session_manager: SessionManager,
+    hook_registry: Arc<HookRegistry>,
 }
 
 impl EventLoop {
@@ -90,6 +94,7 @@ impl EventLoop {
         workspace_root: PathBuf,
         session: Session,
         session_manager: SessionManager,
+        hook_registry: Arc<HookRegistry>,
     ) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         Self {
@@ -102,6 +107,7 @@ impl EventLoop {
             session,
             branch_id: None,
             session_manager,
+            hook_registry,
         }
     }
 
@@ -298,6 +304,7 @@ impl EventLoop {
         let workspace = self.workspace_root.clone();
         let event_tx = self.event_tx.clone();
         let session_manager = self.session_manager.clone();
+        let hook_registry = self.hook_registry.clone();
 
         let task_handle = tokio::spawn(async move {
             let result = run_agent_turn_inner(
@@ -308,6 +315,7 @@ impl EventLoop {
                 session_manager,
                 token,
                 event_tx.clone(),
+                hook_registry,
             )
             .await;
             if let Err(e) = result {
@@ -430,6 +438,7 @@ impl EventLoop {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_agent_turn_inner(
     prompt: String,
     cli: Cli,
@@ -438,6 +447,7 @@ async fn run_agent_turn_inner(
     session_manager: SessionManager,
     cancel_token: CancellationToken,
     event_tx: mpsc::UnboundedSender<AppEvent>,
+    hook_registry: Arc<HookRegistry>,
 ) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -492,12 +502,19 @@ async fn run_agent_turn_inner(
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root)),
+        inner: Arc::new(EditTool::new(workspace_root.clone())),
         approval,
         print_mode: false,
     }));
 
-    let agent = Agent::new(provider, registry);
+    let agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        workspace_root.clone(),
+        hook_registry,
+    );
 
     let (agent_event_tx, mut agent_event_rx) = broadcast::channel::<AgentEvent>(32);
 

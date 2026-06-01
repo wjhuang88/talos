@@ -3,10 +3,10 @@
 **User can**: Extend Talos through hooks, MCP servers, and stdio JSON-RPC while existing permission
 and sandbox boundaries remain enforced.
 
-## Status: PLANNED
+## Status: ACTIVE (2026-06-01)
 
-I009 starts only after the R0 remediation gate is closed or explicitly re-triaged in
-`docs/iterations/R0-remediation-gate.md`.
+R0 closed 2026-06-01. I009 starts in execution-plan order: S2 (hook system) → S3 (MCP client) →
+S4 (MCP server) → S5 (JSON-RPC) → S1 (TUI surface).
 
 ## Selected Stories
 

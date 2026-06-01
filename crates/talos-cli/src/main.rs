@@ -47,6 +47,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
+use clap::ValueEnum;
 use serde_json::Value;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
@@ -56,6 +57,7 @@ use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_evolution::store::KnowledgeStore;
 use talos_permission::PermissionDecision;
+use talos_plugin::{HookRegistry, LoggingHandler};
 use talos_provider::AnthropicProvider;
 use talos_provider::openai::OpenAIProvider;
 use talos_session::{IndexError, SessionManager};
@@ -67,6 +69,21 @@ use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
 use crate::evolution_runtime::EvolutionRuntime;
+
+/// Runtime mode selection.
+#[derive(Debug, Clone, ValueEnum)]
+pub enum Mode {
+    /// Print mode.
+    Print,
+    /// TUI mode.
+    Tui,
+    /// Interactive mode.
+    Interactive,
+    /// MCP server placeholder.
+    McpServer,
+    /// JSON-RPC placeholder.
+    Rpc,
+}
 
 /// Permission-aware tool wrapper that checks the permission engine before
 /// executing the underlying tool. In interactive mode, [`PermissionDecision::Ask`]
@@ -184,10 +201,14 @@ struct Cli {
 
     #[arg(long, help = "Display learned patterns from the evolution engine.")]
     learned: bool,
+
+    #[arg(long, value_enum, help = "Explicit runtime mode.")]
+    mode: Option<Mode>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    init_tracing();
     let cli = Cli::parse();
 
     if cli.search.is_some() {
@@ -280,40 +301,14 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let prompt = resolve_prompt(cli.prompt)?;
 
-    let provider = build_provider(&config, &api_key, cli.mock);
-
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::new(),
-    )));
-
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(PathBuf::from("."))),
-        approval,
-        print_mode: true,
-    }));
-
-    let mut agent = Agent::with_security(
-        provider,
-        registry,
+    let hooks = build_hook_registry();
+    let mut agent = Agent::with_security_and_hooks(
+        build_provider(&config, &api_key, cli.mock),
+        build_print_tool_registry(),
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
         PathBuf::from("."),
+        hooks,
     );
 
     if !cli.no_context {
@@ -419,35 +414,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    // Build tool registry once (shared across agent calls)
-    fn build_tool_registry() -> ToolRegistry {
-        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
-            talos_permission::PermissionEngine::new(),
-        )));
-
-        let mut registry = ToolRegistry::new();
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: Arc::new(BashTool::new(PathBuf::from("."))),
-            approval: approval.clone(),
-            print_mode: true,
-        }));
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: Arc::new(ReadTool::new(PathBuf::from("."))),
-            approval: approval.clone(),
-            print_mode: true,
-        }));
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: Arc::new(WriteTool::new(PathBuf::from("."))),
-            approval: approval.clone(),
-            print_mode: true,
-        }));
-        registry.register(Arc::new(PermissionAwareTool {
-            inner: Arc::new(EditTool::new(PathBuf::from("."))),
-            approval,
-            print_mode: true,
-        }));
-        registry
-    }
+    let hooks = build_hook_registry();
 
     let (event_tx, event_rx) = broadcast::channel::<AgentEvent>(32);
 
@@ -466,13 +433,14 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     tokio::spawn(async move {
         while let Some(input) = user_msg_rx.recv().await {
             let provider = build_provider(&config_clone, &api_key_clone, cli.mock);
-            let registry = build_tool_registry();
-            let agent = Agent::with_security(
+            let registry = build_print_tool_registry();
+            let agent = Agent::with_security_and_hooks(
                 provider,
                 registry,
                 Some(Arc::new(talos_permission::PermissionEngine::new())),
                 None,
                 PathBuf::from("."),
+                hooks.clone(),
             );
             let event_tx = event_tx.clone();
             tokio::spawn(async move {
@@ -577,8 +545,59 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             .context("failed to create session")?
     };
 
-    let event_loop = event_loop::EventLoop::new(cli, workspace_root, session, session_manager);
+    let event_loop = event_loop::EventLoop::new(
+        cli,
+        workspace_root,
+        session,
+        session_manager,
+        build_hook_registry(),
+    );
     event_loop.run().await
+}
+
+fn build_hook_registry() -> Arc<HookRegistry> {
+    let mut registry = HookRegistry::new();
+    registry.register(Arc::new(LoggingHandler::new()));
+    Arc::new(registry)
+}
+
+fn build_print_tool_registry() -> ToolRegistry {
+    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::new(),
+    )));
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(BashTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(EditTool::new(PathBuf::from("."))),
+        approval,
+        print_mode: true,
+    }));
+    registry
+}
+
+fn init_tracing() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_writer(std::io::stderr)
+        .try_init();
 }
 
 fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {

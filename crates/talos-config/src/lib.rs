@@ -56,6 +56,52 @@ pub struct Config {
 
     /// Optional API key. If not set, the key is read from environment variables.
     pub api_key: Option<String>,
+
+    /// Hook-system configuration.
+    #[serde(default)]
+    pub hooks: HookConfig,
+
+    /// MCP configuration placeholder for I009-S3.
+    #[serde(default)]
+    pub mcp: McpConfig,
+
+    /// JSON-RPC configuration placeholder for I009-S5.
+    #[serde(default)]
+    pub rpc: RpcConfig,
+}
+
+/// Hook-system configuration placeholder for I009-S2.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct HookConfig {
+    // TODO: I009-S2 will fill this
+}
+
+/// MCP configuration placeholder for I009-S3.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct McpConfig {
+    /// Declared MCP servers.
+    #[serde(default)]
+    pub servers: Vec<McpServerConfig>,
+}
+
+/// MCP server configuration placeholder for I009-S3.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpServerConfig {
+    /// Stable MCP server name.
+    pub name: String,
+    /// Transport kind (`stdio` or `http`).
+    pub transport: String,
+    // TODO: I009-S3 will add command/args/env or url fields
+}
+
+/// JSON-RPC server configuration placeholder for I009-S5.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct RpcConfig {
+    /// Whether RPC mode is enabled.
+    pub enabled: bool,
+    /// Allowed RPC methods.
+    #[serde(default)]
+    pub methods_allowlist: Vec<String>,
 }
 
 impl Config {
@@ -243,6 +289,9 @@ mod tests {
             provider: Provider::Anthropic,
             model: "claude-test".to_string(),
             api_key: Some("config-key".to_string()),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "config-key");
     }
@@ -255,6 +304,9 @@ mod tests {
             provider: Provider::Anthropic,
             model: "claude-test".to_string(),
             api_key: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "env-key-anthropic");
         unsafe { env::remove_var("ANTHROPIC_API_KEY") };
@@ -268,6 +320,9 @@ mod tests {
             provider: Provider::OpenAI,
             model: "gpt-test".to_string(),
             api_key: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "env-key-openai");
         unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -281,6 +336,9 @@ mod tests {
             provider: Provider::Anthropic,
             model: "claude-test".to_string(),
             api_key: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
         };
         let err = config.api_key().unwrap_err();
         assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -305,11 +363,17 @@ mod tests {
             provider: Provider::Anthropic,
             model: "test".to_string(),
             api_key: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
         };
         let config_openai = Config {
             provider: Provider::OpenAI,
             model: "test".to_string(),
             api_key: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
         };
 
         let a_str = toml::to_string(&config_anthropic).unwrap();

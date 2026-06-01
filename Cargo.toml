@@ -5,6 +5,7 @@ members = [
     "crates/talos-config",
     "crates/talos-provider",
     "crates/talos-agent",
+    "crates/talos-plugin",
     "crates/talos-cli",
     "crates/talos-session",
     "crates/talos-tools",

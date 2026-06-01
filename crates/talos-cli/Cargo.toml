@@ -15,6 +15,7 @@ talos-core = { path = "../talos-core" }
 talos-config = { path = "../talos-config" }
 talos-provider = { path = "../talos-provider" }
 talos-agent = { path = "../talos-agent" }
+talos-plugin = { path = "../talos-plugin" }
 talos-tools = { path = "../talos-tools" }
 talos-session = { path = "../talos-session" }
 talos-permission = { path = "../talos-permission" }
@@ -28,6 +29,8 @@ tokio-util = "0.7"
 talos-tui = { path = "../talos-tui" }
 uuid = { version = "1", features = ["v4"] }
 dirs = "5"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [lints]
 workspace = true

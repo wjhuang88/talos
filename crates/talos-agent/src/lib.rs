@@ -19,7 +19,7 @@ pub mod compaction;
 pub mod token;
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod caching;
@@ -27,10 +27,16 @@ pub mod context;
 pub mod prompt;
 
 use futures_util::future::join_all;
-use talos_core::message::{AgentEvent, Message, ToolCall, ToolResult as MessageToolResult};
+use talos_core::message::{
+    AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult,
+};
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolRegistry, ToolResult as ToolExecutionResult};
 use talos_permission::{PermissionDecision, PermissionEngine};
+use talos_plugin::{
+    BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnEndReason,
+    TurnId, TurnStatus,
+};
 use talos_sandbox::{SandboxConfig, SandboxError, SandboxProvider, SandboxResult};
 use talos_skill::SkillIndex;
 use thiserror::Error;
@@ -77,6 +83,10 @@ pub enum AgentError {
     /// identical arguments multiple times in a single turn.
     #[error("doom loop detected: {0}")]
     DoomLoopDetected(String),
+
+    /// A hook denied the current operation.
+    #[error("hook denied operation: {0}")]
+    HookDenied(String),
 }
 
 /// Result alias for agent operations.
@@ -129,6 +139,8 @@ pub struct Agent {
     workspace_root: PathBuf,
     /// Builder for assembling the system prompt.
     prompt_builder: SystemPromptBuilder,
+    /// Per-agent lifecycle hook registry.
+    hook_registry: Arc<HookRegistry>,
 }
 
 impl Agent {
@@ -157,6 +169,7 @@ impl Agent {
             sandbox: None,
             workspace_root: PathBuf::from("."),
             prompt_builder: SystemPromptBuilder::new(),
+            hook_registry: Arc::new(HookRegistry::new()),
         }
     }
 
@@ -211,6 +224,26 @@ impl Agent {
         sandbox: Option<Box<dyn SandboxProvider>>,
         workspace_root: PathBuf,
     ) -> Self {
+        Self::with_security_and_hooks(
+            provider,
+            tools,
+            permission_engine,
+            sandbox,
+            workspace_root,
+            Arc::new(HookRegistry::new()),
+        )
+    }
+
+    /// Creates a new agent with security controls and a shared hook registry.
+    #[must_use]
+    pub fn with_security_and_hooks(
+        provider: Arc<dyn LanguageModel>,
+        tools: ToolRegistry,
+        permission_engine: Option<Arc<PermissionEngine>>,
+        sandbox: Option<Box<dyn SandboxProvider>>,
+        workspace_root: PathBuf,
+        hook_registry: Arc<HookRegistry>,
+    ) -> Self {
         Self {
             provider,
             tools,
@@ -218,6 +251,7 @@ impl Agent {
             sandbox: sandbox.map(Arc::from),
             workspace_root,
             prompt_builder: SystemPromptBuilder::new(),
+            hook_registry,
         }
     }
 
@@ -314,7 +348,22 @@ impl Agent {
         user_message: String,
         event_tx: Option<broadcast::Sender<AgentEvent>>,
     ) -> AgentResult<String> {
-        let system_prompt = self.build_system_prompt();
+        let turn_id = TurnId::new();
+        let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
+
+        let system_prompt = match self
+            .prompt_builder
+            .build_with_hooks(self.hook_registry.as_ref(), &hook_ctx)
+            .await
+        {
+            Ok(prompt) => prompt,
+            Err(reason) => {
+                let error = AgentError::HookDenied(reason);
+                self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
+                return Err(error);
+            }
+        };
+
         let full_message = if system_prompt.is_empty() {
             user_message
         } else {
@@ -327,11 +376,51 @@ impl Agent {
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
 
-        loop {
-            let mut rx = self.provider.stream(&messages).await?;
+        let (result, final_status) = 'turn_loop: loop {
+            match self
+                .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
+                .await
+            {
+                Ok(_) => {}
+                Err(error) => {
+                    break (Err(error), TurnStatus::Denied);
+                }
+            }
+
+            let provider_messages = match self
+                .run_hook(
+                    &hook_ctx,
+                    HookEvent::BeforeProviderCall {
+                        messages: &messages,
+                    },
+                )
+                .await
+            {
+                Ok(HookOutcome::Continue(HookEvent::BeforeProviderCall { messages }))
+                | Ok(HookOutcome::Skip(HookEvent::BeforeProviderCall { messages })) => messages,
+                Ok(_) => messages.as_slice(),
+                Err(error) => {
+                    break (Err(error), TurnStatus::Denied);
+                }
+            };
+
+            let mut rx = match self.provider.stream(provider_messages).await {
+                Ok(rx) => rx,
+                Err(error) => {
+                    let _ = self
+                        .run_hook(
+                            &hook_ctx,
+                            HookEvent::OnProviderError { error: &error },
+                        )
+                        .await;
+                    break (Err(AgentError::ProviderError(error)), TurnStatus::ProviderError);
+                }
+            };
+
             let mut turn_tool_calls: Vec<ToolCall> = Vec::new();
             let mut turn_text = String::new();
             let mut saw_turn_end = false;
+            let mut usage = talos_core::message::Usage::default();
 
             while let Some(event) = rx.recv().await {
                 if let Some(ref tx) = event_tx {
@@ -340,69 +429,203 @@ impl Agent {
 
                 match event {
                     AgentEvent::TextDelta { delta } => {
-                        turn_text.push_str(&delta);
+                        match self
+                            .run_hook(&hook_ctx, HookEvent::OnTextDelta { text: &delta })
+                            .await
+                        {
+                            Ok(HookOutcome::Continue(HookEvent::OnTextDelta { text }))
+                            | Ok(HookOutcome::Skip(HookEvent::OnTextDelta { text })) => {
+                                turn_text.push_str(text);
+                            }
+                            Ok(_) => turn_text.push_str(&delta),
+                            Err(error) => {
+                                break 'turn_loop (Err(error), TurnStatus::Denied);
+                            }
+                        }
                     }
                     AgentEvent::ToolCall { call } => {
-                        turn_tool_calls.push(call);
+                        match self
+                            .run_hook(&hook_ctx, HookEvent::OnToolCallProposed { call: &call })
+                            .await
+                        {
+                            Ok(HookOutcome::Continue(HookEvent::OnToolCallProposed { call }))
+                            | Ok(HookOutcome::Skip(HookEvent::OnToolCallProposed { call })) => {
+                                turn_tool_calls.push(call.clone());
+                            }
+                            Ok(_) => turn_tool_calls.push(call),
+                            Err(error) => {
+                                break 'turn_loop (Err(error), TurnStatus::Denied);
+                            }
+                        }
                     }
-                    AgentEvent::TurnEnd { .. } => {
+                    AgentEvent::TurnEnd { stop_reason, usage: turn_usage } => {
                         saw_turn_end = true;
+                        usage = turn_usage;
+                        let reason = Self::turn_end_reason(stop_reason);
+                        if let Err(error) = self
+                            .run_hook(&hook_ctx, HookEvent::OnTurnEnd { reason })
+                            .await
+                        {
+                            break 'turn_loop (Err(error), TurnStatus::Denied);
+                        }
                     }
                     AgentEvent::Error { message } => {
-                        return Err(AgentError::UnexpectedEvent(message));
+                        let provider_error = ProviderError::InvalidResponse(message.clone());
+                        let _ = self
+                            .run_hook(
+                                &hook_ctx,
+                                HookEvent::OnProviderError {
+                                    error: &provider_error,
+                                },
+                            )
+                            .await;
+                        break 'turn_loop (
+                            Err(AgentError::UnexpectedEvent(message)),
+                            TurnStatus::UnexpectedEvent,
+                        );
                     }
                     AgentEvent::TurnStart | AgentEvent::ToolResult { .. } => {}
                 }
             }
 
+            let _ = self
+                .run_hook(
+                    &hook_ctx,
+                    HookEvent::AfterProviderCall {
+                        tokens_in: usage.input_tokens,
+                        tokens_out: usage.output_tokens,
+                    },
+                )
+                .await;
+
             if !saw_turn_end {
-                return Err(AgentError::UnexpectedEvent(
-                    "channel closed before TurnEnd".into(),
-                ));
+                break 'turn_loop (
+                    Err(AgentError::UnexpectedEvent("channel closed before TurnEnd".into())),
+                    TurnStatus::UnexpectedEvent,
+                );
             }
 
             if turn_tool_calls.is_empty() {
-                return Ok(turn_text);
+                break (Ok(turn_text), TurnStatus::Success);
             }
 
-            total_tool_calls += turn_tool_calls.len();
+            let effective_tool_calls = match self
+                .run_hook(
+                    &hook_ctx,
+                    HookEvent::BeforeToolBatch {
+                        calls: &turn_tool_calls,
+                    },
+                )
+                .await
+            {
+                Ok(HookOutcome::Continue(HookEvent::BeforeToolBatch { calls })) => calls.to_vec(),
+                Ok(HookOutcome::Skip(_)) => Vec::new(),
+                Ok(_) => turn_tool_calls.clone(),
+                Err(error) => {
+                    break 'turn_loop (Err(error), TurnStatus::Denied);
+                }
+            };
+
+            total_tool_calls += effective_tool_calls.len();
             if total_tool_calls > MAX_TOOL_CALLS_PER_TURN {
-                return Err(AgentError::TurnBudgetExceeded);
+                let _ = self
+                    .run_hook(
+                        &hook_ctx,
+                        HookEvent::OnBudgetExceeded {
+                            kind: BudgetKind::ToolCalls,
+                            used: total_tool_calls as u64,
+                            limit: MAX_TOOL_CALLS_PER_TURN as u64,
+                        },
+                    )
+                    .await;
+                break 'turn_loop (Err(AgentError::TurnBudgetExceeded), TurnStatus::BudgetExceeded);
             }
 
-            for call in &turn_tool_calls {
+            for call in &effective_tool_calls {
                 let key = (call.name.clone(), call.input.to_string());
                 let count = doom_tracker.entry(key).or_insert(0);
                 *count += 1;
                 if *count >= DOOM_LOOP_THRESHOLD {
-                    return Err(AgentError::DoomLoopDetected(format!(
+                    let signature = format!(
                         "tool '{}' called {} times with identical arguments",
                         call.name, DOOM_LOOP_THRESHOLD
-                    )));
+                    );
+                    let _ = self
+                        .run_hook(
+                            &hook_ctx,
+                            HookEvent::OnDoomLoopDetected {
+                                signature: &signature,
+                            },
+                        )
+                        .await;
+                    break 'turn_loop (
+                        Err(AgentError::DoomLoopDetected(signature)),
+                        TurnStatus::DoomLoopDetected,
+                    );
                 }
             }
 
-            let tool_results = self.execute_tools(&turn_tool_calls).await;
+            let tool_results = match self.execute_tools(&hook_ctx, &effective_tool_calls).await {
+                Ok(results) => results,
+                Err(error) => {
+                    break 'turn_loop (Err(error), TurnStatus::Denied);
+                }
+            };
+
+            let _ = self
+                .run_hook(
+                    &hook_ctx,
+                    HookEvent::AfterToolBatch {
+                        results: &tool_results,
+                    },
+                )
+                .await;
 
             let assistant_msg = Message::Assistant {
                 content: turn_text.clone(),
-                tool_calls: turn_tool_calls.clone(),
+                tool_calls: effective_tool_calls.clone(),
             };
             messages.push(assistant_msg);
 
-            for (call, result) in turn_tool_calls.iter().zip(tool_results.iter()) {
-                let msg_result = MessageToolResult {
-                    tool_use_id: call.id.clone(),
-                    content: result.content.clone(),
-                    is_error: result.is_error,
+            for (call, result) in effective_tool_calls.iter().zip(tool_results.iter()) {
+                let observation = ToolObservation {
+                    call: call.clone(),
+                    result: result.clone(),
                 };
-                messages.push(Message::Tool { result: msg_result.clone() });
+                let observed = match self
+                    .run_hook(
+                        &hook_ctx,
+                        HookEvent::OnToolResultObserved {
+                            observation: &observation,
+                        },
+                    )
+                    .await
+                {
+                    Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved { observation }))
+                    | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => observation.clone(),
+                    Ok(_) => observation,
+                    Err(error) => {
+                        break 'turn_loop (Err(error), TurnStatus::Denied);
+                    }
+                };
+
+                let msg_result = MessageToolResult {
+                    tool_use_id: observed.call.id.clone(),
+                    content: observed.result.content.clone(),
+                    is_error: observed.result.is_error,
+                };
+                messages.push(Message::Tool {
+                    result: msg_result.clone(),
+                });
 
                 if let Some(ref tx) = event_tx {
                     let _ = tx.send(AgentEvent::ToolResult { result: msg_result });
                 }
             }
-        }
+        };
+
+        self.emit_turn_complete(&hook_ctx, final_status).await;
+        result
     }
 
     /// Executes a batch of tool calls, running read-only tools concurrently
@@ -412,7 +635,15 @@ impl Agent {
     /// sandbox execution (for bash tools), and direct execution.
     ///
     /// Results are returned in the same order as the input calls.
-    async fn execute_tools(&self, calls: &[ToolCall]) -> Vec<ToolExecutionResult> {
+    async fn execute_tools(
+        &self,
+        hook_ctx: &HookContext,
+        calls: &[ToolCall],
+    ) -> AgentResult<Vec<ToolExecutionResult>> {
+        if calls.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut results: Vec<Option<ToolExecutionResult>> = vec![None; calls.len()];
 
         let read_only_indices: Vec<usize> = calls
@@ -443,46 +674,36 @@ impl Agent {
         if !read_only_indices.is_empty() {
             let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_READ_ONLY));
             let registry = &self.tools;
-            let permission = self.permission_engine.clone();
-            let sandbox = self.sandbox.clone();
-            let workspace_root = self.workspace_root.clone();
-
             let futures: Vec<_> = read_only_indices
                 .iter()
                 .map(|&idx| {
                     let call = &calls[idx];
                     let sem = semaphore.clone();
-                    let perm = permission.clone();
-                    let sb = sandbox.clone();
-                    let wr = workspace_root.clone();
+                    let agent = self;
+                    let ctx = hook_ctx.clone();
                     async move {
                         let _permit = sem.acquire().await.expect("semaphore closed");
-                        let result =
-                            Self::execute_single_tool(registry, call, perm.as_deref(), sb.as_deref(), &wr).await;
+                        let result = agent.execute_single_tool(&ctx, registry, call).await;
                         (idx, result)
                     }
                 })
                 .collect();
 
             for (idx, result) in join_all(futures).await {
-                results[idx] = Some(result);
+                results[idx] = Some(result?);
             }
         }
 
         for idx in write_indices {
             let call = &calls[idx];
-            let result = Self::execute_single_tool(
-                &self.tools,
-                call,
-                self.permission_engine.as_deref(),
-                self.sandbox.as_deref(),
-                &self.workspace_root,
-            )
-            .await;
+            let result = self.execute_single_tool(hook_ctx, &self.tools, call).await?;
             results[idx] = Some(result);
         }
 
-        results.into_iter().map(|r| r.expect("all results should be populated")).collect()
+        Ok(results
+            .into_iter()
+            .map(|r| r.expect("all results should be populated"))
+            .collect())
     }
 
     /// Executes a single tool call through the security pipeline.
@@ -498,26 +719,48 @@ impl Agent {
     ///
     /// Returns an error result if the tool is not found in the registry.
     async fn execute_single_tool(
+        &self,
+        hook_ctx: &HookContext,
         registry: &ToolRegistry,
         call: &ToolCall,
-        permission_engine: Option<&PermissionEngine>,
-        sandbox: Option<&dyn SandboxProvider>,
-        workspace_root: &Path,
-    ) -> ToolExecutionResult {
-        if let Some(engine) = permission_engine {
+    ) -> AgentResult<ToolExecutionResult> {
+        let effective_call = match self
+            .run_hook(hook_ctx, HookEvent::BeforeToolCall { call })
+            .await
+        {
+            Ok(HookOutcome::Continue(HookEvent::BeforeToolCall { call })) => Some(call),
+            Ok(HookOutcome::Skip(_)) => return Ok(ToolExecutionResult::success(String::new())),
+            Ok(_) => Some(call),
+            Err(error) => return Err(error),
+        };
+        let call = effective_call.expect("tool call should be present");
+
+        if let Some(engine) = self.permission_engine.as_deref() {
+            self.run_hook(hook_ctx, HookEvent::BeforePermissionCheck { call })
+                .await?;
+
             let decision = engine.evaluate(&call.name, &call.input);
+            self.run_hook(
+                hook_ctx,
+                HookEvent::AfterPermissionCheck {
+                    call,
+                    decision: decision.clone(),
+                },
+            )
+            .await?;
+
             match decision {
                 PermissionDecision::Allow => {}
                 PermissionDecision::Deny(reason) => {
-                    return ToolExecutionResult::error(format!(
+                    return Ok(ToolExecutionResult::error(format!(
                         "permission denied: {reason}"
-                    ));
+                    )));
                 }
                 PermissionDecision::Ask => {
-                    return ToolExecutionResult::error(format!(
+                    return Ok(ToolExecutionResult::error(format!(
                         "permission denied: tool '{}' requires approval (interactive approval not available at agent level)",
                         call.name
-                    ));
+                    )));
                 }
             }
         }
@@ -525,19 +768,41 @@ impl Agent {
         let tool = match registry.get(&call.name) {
             Some(t) => t,
             None => {
-                return ToolExecutionResult::error(format!("tool not found: {}", call.name));
+                return Ok(ToolExecutionResult::error(format!("tool not found: {}", call.name)));
             }
         };
 
-        if call.name == "bash" {
-            if let Some(sb) = sandbox {
+        let result = if call.name == "bash" {
+            if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
-                    return Self::execute_bash_in_sandbox(sb, &call.input, workspace_root).await;
+                    self.execute_bash_in_sandbox(hook_ctx, sb, &call.input).await
+                } else {
+                    tool.execute(call.input.clone()).await
                 }
+            } else {
+                tool.execute(call.input.clone()).await
             }
-        }
+        } else {
+            tool.execute(call.input.clone()).await
+        };
 
-        tool.execute(call.input.clone()).await
+        let result = match self
+            .run_hook(
+                hook_ctx,
+                HookEvent::AfterToolCall {
+                    call,
+                    result: &result,
+                },
+            )
+            .await
+        {
+            Ok(HookOutcome::Continue(HookEvent::AfterToolCall { result, .. }))
+            | Ok(HookOutcome::Skip(HookEvent::AfterToolCall { result, .. })) => result.clone(),
+            Ok(_) => result,
+            Err(error) => return Err(error),
+        };
+
+        Ok(result)
     }
 
     /// Executes a bash command through the sandbox provider.
@@ -546,9 +811,10 @@ impl Agent {
     /// the sandbox environment. Returns a [`ToolExecutionResult`] with the
     /// combined stdout/stderr output.
     async fn execute_bash_in_sandbox(
+        &self,
+        hook_ctx: &HookContext,
         sandbox: &dyn SandboxProvider,
         input: &serde_json::Value,
-        workspace_root: &Path,
     ) -> ToolExecutionResult {
         let command = match input.get("command").and_then(serde_json::Value::as_str) {
             Some(cmd) => cmd.to_owned(),
@@ -559,13 +825,32 @@ impl Agent {
             }
         };
 
+        let command = match self
+            .run_hook(
+                hook_ctx,
+                HookEvent::BeforeBashSandboxExec {
+                    command: &command,
+                },
+            )
+            .await
+        {
+            Ok(HookOutcome::Continue(HookEvent::BeforeBashSandboxExec { command })) => {
+                command.to_string()
+            }
+            Ok(HookOutcome::Skip(_)) => return ToolExecutionResult::success(String::new()),
+            Ok(_) => command,
+            Err(_) => return ToolExecutionResult::error("hook denied bash execution".to_owned()),
+        };
+
         let config = SandboxConfig {
-            workspace_root: workspace_root.to_path_buf(),
+            workspace_root: self.workspace_root.clone(),
             allow_network: false,
             extra_read_paths: vec![],
         };
 
-        match sandbox.execute(&command, &config).await {
+        let start = std::time::Instant::now();
+
+        let result = match sandbox.execute(&command, &config).await {
             Ok(result) => Self::sandbox_result_to_tool_result(result),
             Err(SandboxError::NotAvailable) => {
                 ToolExecutionResult::error(
@@ -578,6 +863,52 @@ impl Agent {
             Err(SandboxError::PermissionDenied(reason)) => {
                 ToolExecutionResult::error(format!("sandbox permission denied: {reason}"))
             }
+        };
+
+        let exit = if result.is_error { 1 } else { 0 };
+        let _ = self
+            .run_hook(
+                hook_ctx,
+                HookEvent::AfterBashSandboxExec {
+                    exit,
+                    duration: start.elapsed(),
+                },
+            )
+            .await;
+
+        result
+    }
+
+    async fn run_hook<'a>(
+        &self,
+        hook_ctx: &HookContext,
+        event: HookEvent<'a>,
+    ) -> AgentResult<HookOutcome<'a>> {
+        let outcome = self.hook_registry.dispatch(hook_ctx, event).await;
+        if let HookOutcome::Deny { reason, .. } = &outcome {
+            return Err(AgentError::HookDenied(reason.clone()));
+        }
+        Ok(outcome)
+    }
+
+    async fn emit_turn_complete(&self, hook_ctx: &HookContext, status: TurnStatus) {
+        let _ = self
+            .hook_registry
+            .dispatch(
+                hook_ctx,
+                HookEvent::TurnComplete {
+                    turn_id: hook_ctx.turn_id,
+                    status,
+                },
+            )
+            .await;
+    }
+
+    fn turn_end_reason(stop_reason: StopReason) -> TurnEndReason {
+        match stop_reason {
+            StopReason::EndTurn => TurnEndReason::EndTurn,
+            StopReason::ToolUse => TurnEndReason::ToolUse,
+            StopReason::MaxTokens => TurnEndReason::MaxTokens,
         }
     }
 
@@ -1869,9 +2200,22 @@ mod tests {
         });
 
         let input = serde_json::json!({});
-        let workspace = PathBuf::from("/tmp");
+        let agent = Agent::with_security(
+            Arc::new(MockModel::new(vec![])),
+            ToolRegistry::new(),
+            None,
+            Some(Box::new(sandbox)),
+            PathBuf::from("/tmp"),
+        );
+        let hook_ctx = HookContext::new(TurnId::new(), PathBuf::from("/tmp"));
 
-        let result = Agent::execute_bash_in_sandbox(&sandbox, &input, &workspace).await;
+        let result = agent
+            .execute_bash_in_sandbox(
+                &hook_ctx,
+                agent.sandbox.as_deref().expect("sandbox should be present"),
+                &input,
+            )
+            .await;
         assert!(result.is_error);
         assert!(result.content.contains("missing required field 'command'"));
     }
