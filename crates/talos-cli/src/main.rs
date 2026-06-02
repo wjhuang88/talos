@@ -518,6 +518,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     // Channel for TUI to send user messages back for agent processing
     let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
     tui.set_message_tx(user_msg_tx);
+    tui.set_model_name(config.model.clone());
 
     // Keep the broadcast channel alive so the TUI doesn't exit when an agent task completes
     let _event_tx_alive = event_tx.clone();

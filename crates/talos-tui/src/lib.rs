@@ -702,10 +702,8 @@ impl Tui {
     ///
     /// # Errors
     ///
-    /// Returns an error if terminal I/O fails or the event channel closes unexpectedly.
+    /// Returns an error if terminal I/O fails and the event channel closes unexpectedly.
     pub async fn run(&mut self, mut event_rx: broadcast::Receiver<AgentEvent>) -> Result<()> {
-        self.state.model_name = "mock".to_string();
-
         let mut event_stream = EventStream::new();
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
 
@@ -762,6 +760,11 @@ impl Tui {
     /// Sets the channel to send user messages to the agent loop.
     pub fn set_message_tx(&mut self, tx: mpsc::UnboundedSender<String>) {
         self.message_tx = Some(tx);
+    }
+
+    /// Sets the model name displayed in the status bar.
+    pub fn set_model_name(&mut self, name: String) {
+        self.state.model_name = name;
     }
 
     /// Toggles the visibility of the skill sidebar.
@@ -871,6 +874,7 @@ impl Tui {
                         let input = self.state.input_submit();
                         if !input.is_empty() {
                             self.state.append_user_message(&input);
+                            self.state.is_processing = true;
                             if let Some(ref tx) = self.message_tx {
                                 let _ = tx.send(input);
                             }
