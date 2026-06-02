@@ -23,6 +23,8 @@ Cargo.lock
 .talos/
 
 # Agent tooling
+.codex/
 .opencode/
-.agent-governance/
+.agent-governance/*
+!.agent-governance/manifest.yaml
 .sisyphus/

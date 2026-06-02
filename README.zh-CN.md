@@ -114,6 +114,9 @@ Talos 遵循简单内核、灵活扩展的设计：
 
 ## 文档
 
+项目治理由 [agent-project-governance](https://github.com/wjhuang88/agent-project-governance)
+skill 辅助建立和审计。
+
 | 路径 | 用途 |
 |------|------|
 | [AGENTS.md](AGENTS.md) | Agent 编码指南、硬性约束、任务路由 |

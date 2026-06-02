@@ -36,9 +36,9 @@ docs/iterations/
 | I001 | Project Scaffold | Complete | ✅ |
 | I002 | Hello Agent | Complete | ✅ |
 | I003 | Tool User | Complete | ✅ |
-| I004 | Safe Agent | Complete | ⚠️ #I004-S5 process hardening built+tested but **unwired** (no runtime effect); see `I004-safe-agent.md` → #ARCH-S3, ADR-007 |
+| I004 | Safe Agent | Complete | ✅ Original #I004-S5 runtime-hardening gap was closed by R0/#ARCH-S3; see `R0-remediation-gate.md` and ADR-007 |
 | I005 | Smart Agent | Complete | ✅ |
-| I006 | Data Agent | Complete | ⚠️ ADR-004 event-loop variants partly unused (dead code); session index/fork residuals tracked by #ARCH-S5/#ARCH-S6/#ARCH-S7 |
+| I006 | Data Agent | Complete | ✅ Session index, fork identity, and search highlight residuals were closed by R0/#ARCH-S5..S7; dead event-loop variant removal remains scoped to I010-S7 |
 | I007 | Skilled Agent | Complete | ✅ |
 | I008 | Learning Agent | **Active** (impl landed 2026-06-01; TUI made default 2026-06-01) | 🛠️ Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all 3 paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). TUI is now the default TTY mode (legacy readline REPL retained as `--repl`). Awaiting final review. See `I008-learning-agent.md` for the new plan + Execution Record. |
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |

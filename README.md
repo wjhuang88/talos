@@ -122,6 +122,10 @@ Talos follows a simple core, flexible extensions design:
 
 ## Documentation
 
+Project governance is guided by the
+[agent-project-governance](https://github.com/wjhuang88/agent-project-governance)
+skill.
+
 | Path | Purpose |
 |------|---------|
 | [AGENTS.md](AGENTS.md) | Agent coding guide, hard constraints, task router |

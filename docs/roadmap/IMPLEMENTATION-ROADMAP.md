@@ -22,21 +22,21 @@ I012 "Portable Tools"    内置POSIX工具子集 + 工具包嵌入接口       �
 
 ## Near-Term Execution Sequence
 
-This sequence records the post-I008 diagnostic plan. It does not add speculative scope; it only
-orders the existing backlog so remediation, extension work, and polish do not block or duplicate
-each other.
+This sequence records the current execution plan after the R0 remediation gate. It does not add
+speculative scope; it orders existing backlog so extension work, polish, and portability do not
+block or duplicate each other.
 
 | Round | State Gate | Primary Scope | Exit Criteria |
 |-------|------------|---------------|---------------|
-| R0 | Before I009 starts | Architecture remediation: `#ARCH-S1`…`#ARCH-S5`, `#ARCH-S7`; assess whether `#ARCH-S6` is self-contained or should wait for `#I010-S7` | Security baseline has no known false-complete items; session search/list correctness is restored; CLI search highlight bug fixed; `cargo test --workspace` passes |
-| R1 | I009 Active | Extensibility vertical slice: hooks, MCP client/server, JSON-RPC, plugin status markers | A user can load at least one hook/plugin path, call an MCP-provided tool, and drive Talos over stdio JSON-RPC with permission gates still enforced |
+| R0 | Done | Architecture remediation: `#ARCH-S1`…`#ARCH-S7` | Security baseline false-complete items closed; session search/list correctness restored; CLI search highlight fixed; runtime evidence recorded |
+| R1 | I009 Review | Extensibility vertical slice: hooks, MCP client/server, JSON-RPC, plugin status markers | Runtime surface landed; TUI provenance marker and `/plugins` consumer follow-up remains before Complete |
 | R2 | First I010 slice | `#I010-S7` AppServerSession convergence, headless/SDK modes, TUI approval protocol, I008 TUI/interactive evolution attach | Print, interactive, TUI, headless, and SDK paths share one session loop; I008 can move from Review to Complete; dead `event_loop.rs` variants are removed |
 | R3 | Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering, Guardian, exec policy DSL | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
 | R4 | I012 Portable Tools | Rust-native POSIX-style tool subset plus embeddable tool-pack interface | Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered and exposed through MCP/RPC without agent-loop changes |
 
 Ordering rules:
-- Do not start I009 until `#ARCH-S1`…`#ARCH-S5` and `#ARCH-S7` are closed or explicitly re-triaged.
-- Do not implement more per-run-path evolution wiring before `#I010-S7`; attach evolution once at the session/EQ seam.
+- R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.
+- Do not implement more per-run-path evolution wiring before `#I010-S7`; current I008 runtime wiring is hook-based, while AppServerSession remains the run-path cleanup target.
 - Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
   move it into the R2 `#I010-S7` slice instead.
 - Treat I012 as the environment-dependency reduction lane: implement only a small POSIX subset first,
