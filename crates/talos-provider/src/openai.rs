@@ -22,7 +22,8 @@ use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
 use tokio::sync::mpsc;
 
-const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
+const OPENAI_API_URL: &str = "https://api.openai.com/v1";
+const CHAT_COMPLETIONS_PATH: &str = "/chat/completions";
 const MAX_RETRIES: u32 = 3;
 const BASE_RETRY_DELAY_MS: u64 = 500;
 
@@ -53,14 +54,26 @@ impl OpenAIProvider {
         }
     }
 
-    /// Set a custom base URL (useful for testing or compatible APIs).
+    /// Set a custom base URL (the OpenAI-compatible gateway root).
+    ///
+    /// `base_url` is the gateway root (e.g. `https://gateway.example.com/v1` or
+    /// `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`).
+    /// The provider automatically appends `/chat/completions` to the URL when
+    /// making the request, matching the OpenAI SDK convention.
     ///
     /// # Arguments
     ///
-    /// * `base_url` — Full URL to the chat completions endpoint.
+    /// * `base_url` — Gateway root, no trailing `/chat/completions`.
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into();
         self
+    }
+
+    /// Compose the chat completions endpoint URL by appending the standard
+    /// path to the configured base.
+    fn endpoint_url(&self) -> String {
+        let base = self.base_url.trim_end_matches('/');
+        format!("{base}{CHAT_COMPLETIONS_PATH}")
     }
 
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
@@ -70,7 +83,7 @@ impl OpenAIProvider {
         loop {
             let response = self
                 .client
-                .post(&self.base_url)
+                .post(self.endpoint_url())
                 .header("Authorization", format!("Bearer {}", &self.api_key))
                 .header("Content-Type", "application/json")
                 .json(&body)
@@ -543,8 +556,32 @@ mod tests {
     #[test]
     fn openai_provider_custom_base_url() {
         let provider =
-            OpenAIProvider::new("sk-test", "gpt-4o").with_base_url("http://localhost:8080/v1/chat/completions");
-        assert_eq!(provider.base_url, "http://localhost:8080/v1/chat/completions");
+            OpenAIProvider::new("sk-test", "gpt-4o").with_base_url("http://localhost:8080/v1");
+        assert_eq!(provider.base_url, "http://localhost:8080/v1");
+    }
+
+    #[test]
+    fn endpoint_url_appends_chat_completions_to_default_base() {
+        let provider = OpenAIProvider::new("sk-test", "gpt-4o");
+        assert_eq!(provider.endpoint_url(), "https://api.openai.com/v1/chat/completions");
+    }
+
+    #[test]
+    fn endpoint_url_appends_chat_completions_to_custom_base() {
+        let provider = OpenAIProvider::new("sk-test", "glm-5").with_base_url(
+            "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        );
+        assert_eq!(
+            provider.endpoint_url(),
+            "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn endpoint_url_strips_trailing_slash_before_appending() {
+        let provider =
+            OpenAIProvider::new("sk-test", "gpt-4o").with_base_url("https://gateway.example.com/v1/");
+        assert_eq!(provider.endpoint_url(), "https://gateway.example.com/v1/chat/completions");
     }
 
     #[test]

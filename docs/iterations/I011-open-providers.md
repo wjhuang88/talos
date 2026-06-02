@@ -102,3 +102,77 @@ The key never touches the working tree, the config file, or git.
 - `docs/proposals/provider-plugin-architecture.md`: new.
 - `docs/proposals/reasoning-thinking-field.md`: new.
 - Verification: see "Verification" above.
+
+### 2026-06-02: S1 bugfix — `with_base_url` now means "gateway root", not "full endpoint"
+
+Found during real-key E2E with Bailian `glm-5`. The S1 `with_base_url` setter
+*stored* the full endpoint URL (default `OPENAI_API_URL` was
+`https://api.openai.com/v1/chat/completions`, with the path baked in), so users
+following the S1 docs and config example and writing
+`base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"`
+ended up with `talos` POSTing to `…/compatible-mode/v1` (no `/chat/completions`),
+and Bailian returned HTTP 400 with
+`"message": "url error, please check url！"`. Curl tests in this session
+*succeeded* only because the manual curl URL was hand-extended to
+`…/v1/chat/completions` — masking the bug.
+
+Aligned the API with the OpenAI SDK convention: `with_base_url` (and the
+`Config::base_url` field) now take the **gateway root only**, and the provider
+appends `/chat/completions` automatically. A small private helper
+`OpenAIProvider::endpoint_url()` composes the final URL and strips a trailing
+`/` from the configured base.
+
+Changes in this commit:
+
+- `crates/talos-provider/src/openai.rs`:
+  - `OPENAI_API_URL` constant changed from `…/v1/chat/completions` to `…/v1`.
+  - New private `const CHAT_COMPLETIONS_PATH: &str = "/chat/completions"`.
+  - New private `OpenAIProvider::endpoint_url()` — formats
+    `{base}/chat/completions`, trimming a trailing `/` from `base`.
+  - `make_request` now calls `self.endpoint_url()` instead of `&self.base_url`.
+  - `with_base_url` docstring rewritten to document the "gateway root" semantic
+    and the auto-append.
+  - `openai_provider_custom_base_url` test updated to use a bare gateway root.
+  - +3 new unit tests: `endpoint_url_appends_chat_completions_to_default_base`,
+    `endpoint_url_appends_chat_completions_to_custom_base`,
+    `endpoint_url_strips_trailing_slash_before_appending`.
+
+Docs/config impact:
+
+- `~/.talos/config.toml` example in this iteration doc needs **no change** —
+  `base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"`
+  is now correct (it always *was* the intended contract; the runtime was the
+  one that was wrong).
+- `docs/backlog/PRODUCT-BACKLOG.md` "Reference" table needs no change for the
+  same reason.
+- `docs/proposals/provider-plugin-architecture.md` future design is unaffected
+  — S2 will reuse the same `Config::base_url` field at the schema level.
+
+Verification (this commit):
+
+- `cargo test -p talos-provider --lib`: 35 passed, 0 failed (was 31; +3 new
+  URL-composition tests; the renamed `openai_provider_custom_base_url` is
+  unchanged in count).
+- `cargo test --workspace`: 322 passed, 0 failed (the 1
+  `talos-sandbox::test_env_sanitization_disabled_does_not_remove_vars` flake
+  passes in isolation and is unrelated to this change).
+- E2E with real Bailian `bailian-token-plan` key against `glm-5` and
+  `qwen3.6-plus`: full hook chain (TurnStart → BeforeProviderCall →
+  OnTextDelta × N → OnTurnEnd → AfterProviderCall → TurnComplete) fires; model
+  returns correct Chinese text. The `reasoning_content` field that Bailian
+  injects for thinking models is silently ignored (serde `#[serde(default)]`
+  on the unused fields) — recorded as a known gap in
+  `docs/proposals/reasoning-thinking-field.md`.
+
+Regression risk for other users:
+
+- **OpenAI / Anthropic defaults**: the `OPENAI_API_URL` constant change still
+  results in the same effective request URL
+  (`https://api.openai.com/v1/chat/completions`) — verified by the new test
+  `endpoint_url_appends_chat_completions_to_default_base`. Anthropic provider
+  is untouched (out of I011 scope).
+- **Anyone who *was* using `with_base_url` with a full endpoint URL** (i.e.
+  pre-bugfix users) would now produce a `…/v1/chat/completions/chat/completions`
+  double-path and break. Given S1 was the first public exposure of this API
+  and the bug was caught the same day, this is acceptable. Note in the
+  migration story below.
