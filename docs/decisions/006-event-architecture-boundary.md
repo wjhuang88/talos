@@ -35,7 +35,7 @@ deceptively attractive.
 | No speculative features; only current iteration scope | Hard | AGENTS.md | No |
 | All write-capable tools gated by permissions; tool/permission events must stay auditable | Hard | AGENTS.md (Hard Constraint #4) | No |
 | `talos-core` depends on nothing; no circular deps; one responsibility per crate | Hard | AGENTS.md | No |
-| I008 evolution attaches at exactly one wiring point (the EQ seam), not per-path | Soft | ADR-005 | No (avoids double-firing) |
+| I008 evolution attaches at exactly one wiring point (the `AppServerSession` seam), not per-path | Soft | ADR-005 | No (avoids double-firing) |
 
 ## Reasoning
 
@@ -65,7 +65,7 @@ subscribers of the same event. The need that would justify C does not exist.
 
 **The duplication problem is already solved by B, not by C.** The real pain — three run paths each
 rebuilding the agent and each wiring evolution separately (ADR-005) — is resolved by converging on
-the `AppServerSession` seam, where evolution attaches **once** at the EQ. A global bus would
+the `AppServerSession` seam, where evolution attaches **once** at the session bridge. A global bus would
 *re-introduce* the multi-subscriber ambiguity (which path's evolution hook fired?) that B was
 designed to eliminate.
 
@@ -80,7 +80,7 @@ one consumer keeps the observer set explicit and auditable; pub/sub does not.
    intra-UI event model. One channel, one consumer, one `AppState`.
 
 2. **Adopt B** — the `AppServerSession` SQ/EQ seam (ADR-005 L2) is the canonical UI↔core boundary.
-   I008 evolution attaches at the EQ, once.
+   I008 evolution attaches at the `AppServerSession` seam, once.
 
 3. **Reject C** — Talos will **not** introduce a global publish/subscribe / app-wide broadcast event
    bus. No "EventBus" abstraction with open many-to-many subscription.
@@ -92,6 +92,11 @@ one consumer keeps the observer set explicit and auditable; pub/sub does not.
    - New event flows MUST be either (A) producer→single-consumer mpsc, or (B) over the SQ/EQ seam.
    - If you believe a second subscriber is needed, **stop** and update this ADR (see Reversal
      Trigger) before writing code — fan-out from the single EQ consumer is the default answer.
+
+> **Clarification (2026-06-01):** "the EQ seam" / "at the EQ" above means the single
+> `AppServerSession` **bridge**, not an output-only EQ observer. Evolution's pre-turn context
+> injection is SQ-side (input); a pure EQ tap cannot carry it. One hook spans both sides. See
+> [ADR-005 → Implementation Clarifications](005-tui-event-architecture.md).
 
 **Rejected alternatives:**
 - *Global pub/sub "EventBus"* — speculative, harms security auditability, introduces hidden coupling.
@@ -106,8 +111,22 @@ Revisit this decision only if **all** of the following hold simultaneously:
   the *same* event stream that genuinely cannot be served by deterministic fan-out from the single
   EQ consumer; **and**
 - The subscriber set is **statically enumerable and typed** (no open `subscribe(Any)` surface); **and**
-- Tool-call and permission-decision events remain routed through an **auditable, gated** path (a
+  - Tool-call and permission-decision events remain routed through an **auditable, gated** path (a
   global bus must never become a side channel around the permission pipeline).
+
+## Evolution is a HookHandler, Not a Global Subscriber (2026-06-01)
+
+ADR-001 establishes evolution as a runtime primitive. This ADR clarifies that evolution is
+*not* an exception to the "no global pub/sub bus" rule: it integrates as an explicit builtin
+`talos_plugin::HookHandler` registered per-Agent via the I009 hook system, not via a global
+event subscription. This preserves ADR-006's principle (explicit, per-Agent observation)
+while satisfying ADR-001 (evolution runs as a runtime primitive, not a skill).
+
+Concretely: `talos-evolution` ships `EvolutionHookHandler` implementing the I009
+`talos_plugin::HookHandler` trait, registered in the same per-Agent `HookRegistry` as
+`LoggingHandler`. The agent loop (`run_inner`) fires the hooks uniformly; there is **no**
+separate evolution-side observer channel and **no** global event bus. ADR-005's
+"Hook-Driven Evolution" subsection (2026-06-01) records the re-scope in full.
 
 Even then, the remedy is a **scoped, typed, named-subscriber** fan-out — never an untyped global
 broadcast.

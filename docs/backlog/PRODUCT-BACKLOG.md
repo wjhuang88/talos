@@ -752,7 +752,14 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ### #I010-S7: Headless and SDK modes
 
-**Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly). Canonical architecture defined in [ADR-005](../decisions/005-tui-event-architecture.md): bounded SQ (cap=512) / unbounded EQ seam; SQ/EQ protocol types in `talos-core`, session actor in `talos-agent`. This story is the convergence point for the three current run paths (`run_print_mode`, `run_interactive_mode`, `run_tui_mode`) and the single wiring point for I008 self-evolution (R1/R2/R4 for the TUI/interactive paths land here, attached at the EQ — not per-path).
+**Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly). Canonical architecture defined in [ADR-005](../decisions/005-tui-event-architecture.md): bounded SQ (cap=512) / unbounded EQ seam; SQ/EQ protocol types in `talos-core`, session actor in `talos-agent`. This story is the convergence point for the three current run paths (`run_print_mode`, `run_interactive_mode`, `run_tui_mode`).
+
+> **Re-scope 2026-06-01:** I008 self-evolution is no longer part of this story. Evolution
+> ships in I008 as a builtin `HookHandler` registered per-Agent (see
+> [ADR-005 → "Hook-Driven Evolution"](../decisions/005-tui-event-architecture.md#hook-driven-evolution-2026-06-01-pre-i008-re-scope)
+> and `docs/iterations/I008-learning-agent.md`). #I010-S7 retains the architectural cleanup
+> for cross-Agent / cross-session correlation, UI status broadcast, and the three-run-path
+> convergence onto a single seam. These remain independently valuable.
 
 **Acceptance Criteria**:
 - [ ] `talos exec "run tests and fix failures" --max-turns 20` runs autonomously

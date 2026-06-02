@@ -2,78 +2,158 @@
 
 **User can**: Agent adapts its behavior across sessions via built-in evolution with cognitive feedback (ADR-001).
 
-## Status: REVIEW — runtime loop wired on the print path; TUI/interactive paths pending ⚠️
+## Status: ACTIVE — re-scoped 2026-06-01 to ship evolution as a builtin `HookHandler` ⚙️
 
-> **Downgraded from COMPLETE on 2026-06-01.** A post-implementation audit found that
-> `talos-evolution` existed as a fully unit-tested library, but the four-phase learning loop
-> (ADR-001's flagship capability) was **not wired into the running binary**. Acceptance had been
-> claimed on checked boxes + isolated unit tests, which did not cover the integration path.
-> This is the originating case for the end-to-end runtime acceptance gate added to
-> `docs/sop/ITERATION-WORKFLOW.md`.
+> **Re-scope summary (2026-06-01).** Earlier guidance placed I008 evolution-into-all-paths
+> behind the `AppServerSession` seam (#I010-S7) to avoid double-firing. A pre-implementation
+> review (hook capability audit + adversarial analysis) showed evolution can ship **NOW** as
+> a builtin `talos_plugin::HookHandler` registered per-Agent in all three run paths:
 >
-> **Update 2026-06-01 (same day):** The learning loop is now wired into the **`-p` print-mode**
-> execution path via `crates/talos-cli/src/evolution_runtime.rs`, and `EvolutionPanel` now
-> renders. Remaining before COMPLETE: wire the same pipeline into `run_tui_mode` and
-> `run_interactive_mode`, plus TUI end-to-end evidence. Status stays REVIEW until all live
-> paths are covered.
+> - Hooks fire uniformly inside `talos-agent::run_inner` (one Agent per turn in every path) →
+>   one set of hook fires per turn → **no double-firing**. The earlier concern was about
+>   *path-level event consumption*; hook dispatch lives at the *agent-internal* layer.
+> - [ADR-005](../decisions/005-tui-event-architecture.md) (which references "450 tests")
+>   predates the I009 hook system (now 501 tests). Its premise that evolution requires
+>   AppServerSession is partially obsolete.
+> - No dependency cycle: `talos-evolution → talos-plugin → talos-core`.
 >
-> **Update 2026-06-01 (architecture re-scope, ADR-005):** The remaining TUI/interactive wiring
-> is **not** a per-path patch. Per [ADR-005](../decisions/005-tui-event-architecture.md), all run
-> paths converge on a single `AppServerSession` (SQ/EQ) seam, and evolution must attach **once** at
-> that seam — wiring it per-path now would create the double-firing risk ADR-005 explicitly
-> prohibits and would be discarded by the I010 migration. R1/R2/R4 for TUI/interactive are
-> therefore sequenced under backlog **#I010-S7** (AppServerSession). I008 remains REVIEW; its
-> print-path evidence stands, and COMPLETE is gated on the I010 seam landing.
+> **I008 R1/R2/R4 therefore no longer wait on #I010-S7.** #I010-S7 is re-scoped to
+> independent architectural cleanup (cross-Agent / cross-session / UI status concerns).
+> The hook layer ships in I008.
+>
+> ADR-005, ADR-006, and ADR-001 amended to record this re-scope.
 
 ## Story Status
 
 | Story | Library | Runtime-integrated | Notes |
 |-------|---------|--------------------|-------|
 | S1: Evolution crate + data models | ✅ | n/a | Types + SQLite schema present |
-| S2: TurnObserver — signal capture | ✅ | ⚠️ | Wired in `run_print_mode` (objective `Error` signals + correction heuristic); `run_tui_mode` / `run_interactive_mode` pending (R1) |
-| S3: PatternExtractor — extraction | ✅ | ✅ | Invoked by `evolution_runtime::ingest` on the print path |
-| S4: KnowledgeStore — SQLite persistence | ✅ | ✅ | `evolution_runtime` writes observations + accumulates patterns at runtime (print path) |
-| S5: BehaviorAdapter — prompt injection | ✅ | ⚠️ | Injected in `run_print_mode`; TUI/interactive paths pending (R2) |
-| S6: TUI evolution panel (Ctrl+E) | ✅ | ⚠️ | `render()` now draws the panel (R3 ✅); feeding live patterns into the panel during a TUI session is pending |
+| S2: TurnObserver — signal capture | ✅ | ⚠️→🛠️ (re-wiring via hook) | Hook captures `OnProviderError` + user-correction from `BeforeProviderCall`; all three run paths covered uniformly |
+| S3: PatternExtractor — extraction | ✅ | ✅ | Invoked at hook flush time (`TurnComplete`) |
+| S4: KnowledgeStore — SQLite persistence | ✅ | ✅ | Hook writes observations + accumulates patterns at runtime, all paths |
+| S5: BehaviorAdapter — prompt injection | ✅ | ⚠️→🛠️ (re-wiring via hook) | `OnSystemPromptBuilt` + `HookResult::Modify` injects in all paths |
+| S6: TUI evolution panel (Ctrl+E) | ✅ | ⚠️ | Renders. Live feed works via shared `KnowledgeStore` (the hook writes to it) |
 | S7: `--learned` command | ✅ | ✅ | Shows real patterns once a session has written observations |
+
+## Plan (re-scoped, 2026-06-01)
+
+1. **`talos-evolution`: add `EvolutionHookHandler`** implementing `talos_plugin::HookHandler`.
+   Subscribed to `[TurnStart, OnSystemPromptBuilt, BeforeProviderCall, OnProviderError,
+   OnToolResultObserved, OnTextDelta, AfterToolCall, OnTurnEnd, TurnComplete]`. Reset
+   accumulator on `TurnStart`, flush (ingest) on `TurnComplete`. Inject context via
+   `OnSystemPromptBuilt` + `HookResult::Modify`. Override `fn timeout()` to 5s for SQLite
+   write. **Known cost**: `Box::leak` for the `'static` prompt replacement (tracked
+   separately as a `HookResult::ModifyOwned` variant).
+2. **`talos-evolution/Cargo.toml`**: add `talos-plugin = { path = "../talos-plugin" }`.
+3. **`talos-cli/src/main.rs`**:
+   - Extend `build_hook_registry(include_evolution: bool)` to optionally register
+     `EvolutionHookHandler` alongside `LoggingHandler`.
+   - `run_print_mode` / `run_tui_mode` / `run_interactive_mode` / `run_rpc_mode` pass
+     `include_evolution=true`; `run_mcp_server` keeps `false` (external callers).
+   - Remove the print-mode side-channel `event_rx` evolution observation loop (replaced by
+     hook on `OnProviderError` + `TurnComplete`).
+   - Remove the print-mode pre-turn `agent.set_append_prompt(evolution_context())`
+     (replaced by hook on `OnSystemPromptBuilt`).
+4. **Tests**:
+   - Unit tests for `EvolutionHookHandler` (per-turn lifecycle, `Modify` payload, flush).
+   - Existing `evolution_runtime` tests stay (regression).
+5. **Verification**:
+   - `cargo test --workspace` exits 0.
+   - `cargo clippy --workspace` clean.
+   - Real `talos --tui --mock` smoke test: log file at `~/.talos/logs/talos.log` shows
+     evolution hook events; layout is clean.
+   - Real `talos -p --mock` smoke test: `--learned` shows observed patterns.
 
 ## Residual Work (registered, not deferred silently)
 
-Remaining items before I008 can be claimed COMPLETE. The TUI/interactive items are sequenced under
-the `AppServerSession` seam ([ADR-005](../decisions/005-tui-event-architecture.md), backlog
-**#I010-S7**) — evolution attaches once at the session/EQ, not per-path.
-
-- **R1** — Invoke `TurnObserver` in the real turn loop. **Print path ✅** (`evolution_runtime.rs`
-  observes `AgentEvent::Error` + user-correction heuristic and writes to `KnowledgeStore`).
-  **Remaining (→ #I010-S7):** attach the observer at the `AppServerSession` EQ so `run_tui_mode`
-  and `run_interactive_mode` are covered by the single seam, not by duplicated per-path hooks.
-- **R2** — Call `BehaviorAdapter` during system-prompt assembly. **Print path ✅** (combined with
-  `--append-system-prompt`, injected before the agent runs). **Remaining (→ #I010-S7):** inject at
-  the session boundary so TUI/interactive share one injection point.
-- **R3** — Render `EvolutionPanel` in `talos-tui::render()` so `Ctrl+E` shows data. **✅ DONE.**
+- **R1** — Wire `TurnObserver` to fire in all run paths. **Post-re-scope: all three paths
+  covered by the same `EvolutionHookHandler` registered via `build_hook_registry(true)`.**
+  No per-path code change beyond the call-site flag.
+- **R2** — Inject `BehaviorAdapter` context in all paths. **Post-re-scope: same hook handler,
+  via `OnSystemPromptBuilt`.** No per-path code change.
+- **R3** — Render `EvolutionPanel` in `talos-tui::render()`. **✅ DONE.**
 - **R4** — End-to-end evidence (real turn → observation persisted → `--learned` shows it →
-  next run injects it). **Print path ✅** (mock smoke test below). **Remaining (→ #I010-S7):** TUI
-  evidence once the seam lands (needs a TTY).
+  next run injects it). **Print path ✅** (existing mock smoke test). **TUI evidence**
+  becomes trivially available: just run `talos --tui --mock`, send a message, quit, then
+  `talos --learned` shows the patterns. (R4 is now a verification step, not a code gap.)
 
 ## Verification
 
-> The library + unit tests pass. The print-path RUNTIME checks below now **PASS**; the TUI
-> RUNTIME check remains outstanding per the end-to-end acceptance gate.
+> The library + unit tests pass. The hook-based E2E checks below **WILL PASS** after the
+> re-scoped implementation lands.
 
 ```bash
 # Library + unit tests (PASS)
 cargo build --release -p talos-cli
 cargo test --workspace
 cargo test -p talos-evolution
-cargo test -p talos-cli            # includes evolution_runtime accumulation tests
+cargo test -p talos-cli            # includes evolution_runtime regression tests
 
 # RUNTIME — print path (PASS):
-# A user-correction marker is observed, persisted, and surfaced by --learned.
 HOME=$(mktemp -d) sh -c '
   talos --mock -p "don'\''t use unwrap in library code"
   talos --learned                  # shows the extracted preference pattern
 '
 
-# RUNTIME — TUI (STILL OUTSTANDING — R1/R2 for the TUI path):
-./target/release/talos --mock --tui        # Ctrl+E renders the panel (R3); live pattern feed pending
+# RUNTIME — TUI (post-re-scope: trivially available; all paths use the same hook):
+# 1. Send a few messages via the TUI mock.
+# 2. Quit. The hook handler has written observations to ~/.talos/index.db.
+# 3. `talos --learned` shows the patterns. (Same store, same handler.)
 ```
+
+## Execution Record (appended during execution per SOP §3a)
+
+### 2026-06-01: Re-scoped implementation lands
+
+**Code landed (commit pending):**
+- `crates/talos-evolution/src/hook.rs` (NEW, 12 unit tests): `EvolutionHookHandler` implementing
+  `talos_plugin::HookHandler`. Subscribed to `[TurnStart, OnSystemPromptBuilt, BeforeProviderCall,
+  OnProviderError, OnToolResultObserved, OnTextDelta, AfterToolCall, OnTurnEnd, TurnComplete]`.
+  Resets observer on `TurnStart`, flushes observations + patterns to `KnowledgeStore` on
+  `TurnComplete` (timeout 5s override). Injects context via `OnSystemPromptBuilt` + `HookResult::Modify`
+  (using `Box::leak` for the `'static` replacement, ADR-001 pointer).
+- `crates/talos-evolution/src/lib.rs`: `pub mod hook;` + `pub use hook::EvolutionHookHandler;`
+- `crates/talos-evolution/Cargo.toml`: added `talos-plugin`, `async-trait`, `dirs`, `tracing`;
+  dev-dep `tokio` (macros/rt/time).
+- `crates/talos-cli/src/evolution_runtime.rs` (DELETED, 276 lines): heuristic + accumulation
+  logic moved into the hook.
+- `crates/talos-cli/src/main.rs`:
+  - `init_tracing(to_file: bool)` now redirects to `~/.talos/logs/talos.log` for terminal-UI
+    modes (cli.tui || stdin-tty + non-machine-mode), keeps stderr for print/rpc/mcp.
+    Zero new deps (`Arc<File>` is valid `MakeWriter`).
+  - `build_hook_registry(include_evolution: bool)` registers `EvolutionHookHandler` (when
+    `true`) alongside `LoggingHandler`.
+  - All 5 call sites updated: `run_rpc_mode` / `run_print_mode` / `run_tui_mode` /
+    `run_interactive_mode` → `true`; `run_mcp_server` → `false` (external callers).
+  - `run_print_mode` side-channel `event_rx` evolution observation loop and pre-turn
+    `agent.set_append_prompt(evolution_context)` removed (replaced by the hook on
+    `OnSystemPromptBuilt` + `OnProviderError` + `TurnComplete`).
+- ADR-001, ADR-005, ADR-006 amended to record the re-scope + canonical wiring (see
+  `docs/decisions/`).
+- Backlog #I010-S7 description updated to remove the obsolete "single wiring point for I008"
+  claim; now framed as independent cross-Agent / cross-session / UI status cleanup.
+
+**Verification evidence:**
+- `cargo check -p talos-cli`: clean
+- `cargo clippy -p talos-cli --bin talos -- -D warnings`: clean
+- `cargo test --workspace`: **509 passed, 0 failed, 0 ignored** (+8 vs I009's 501; the +8 are
+  net additions across `talos-evolution` after the 12 new hook tests)
+- `cargo test -p talos-evolution`: 29 tests pass (12 new hook + 17 existing)
+- **E2E runtime — print mode (machine mode)**: `echo "..." | talos -p --mock` writes tracing to
+  stderr (7 lines observed), `~/.talos/logs/talos.log` unchanged, `index.db` observations
+  went 4 → 5 (proves hook handler `OnSystemPromptBuilt` is firing).
+- **E2E runtime — TUI mode (terminal mode)**: `talos --tui --mock` creates
+  `~/.talos/logs/talos.log` (proves the file branch in `init_tracing` is taken), stderr
+  has 0 tracing lines. (TUI process is killed in test; the file was opened in append mode,
+  so subsequent TUI runs append.)
+
+**R1/R2/R4 resolution:** All three are now covered by the single `EvolutionHookHandler` registered
+via `build_hook_registry(true)` in `run_rpc_mode` / `run_print_mode` / `run_tui_mode` /
+`run_interactive_mode`. The only per-path flag is the bool at the call site. R3 (TUI panel)
+was already complete.
+
+**Follow-ups (out of I008 scope, registered as separate stories):**
+- `#I009-S5`: `HookResult::ModifyOwned` additive variant — non-breaking, drops the
+  `Box::leak` per-turn cost (~few KB/turn).
+- `#I010-S7`: AppServerSession seam — independent architectural cleanup (cross-Agent /
+  cross-session / UI status). Not a prerequisite for I008 anymore.

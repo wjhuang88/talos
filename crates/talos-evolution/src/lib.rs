@@ -10,6 +10,9 @@ pub mod observer;
 pub mod extractor;
 pub mod store;
 pub mod adapter;
+pub mod hook;
+
+pub use hook::EvolutionHookHandler;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

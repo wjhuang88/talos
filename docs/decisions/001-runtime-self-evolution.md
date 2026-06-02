@@ -186,6 +186,28 @@ concepts only. Concrete reference designs (Rust code, formulas, heuristics) are 
    conflict resolution strategies) are **deferred to I005 iteration design**, when we have
    real usage data from I001-I004 to inform the design.
 
+## Evolution Wiring Mechanism (2026-06-01)
+
+Evolution integrates as a builtin `talos_plugin::HookHandler` (`EvolutionHookHandler`),
+subscribed to the lifecycle points needed for the four-phase learning loop:
+
+| Phase | Hook event(s) used |
+|-------|--------------------|
+| **Observe** | `OnProviderError` (objective error signal), `BeforeProviderCall` (user-correction heuristic from latest user message), `OnTextDelta` / `OnToolResultObserved` / `AfterToolCall` (tool call observation) |
+| **Accumulate** | Handler-internal `Arc<Mutex<TurnObserver>>` (reset on `TurnStart`) |
+| **Extract** | `PatternExtractor::extract_from_observation` invoked at flush time |
+| **Apply** | `OnSystemPromptBuilt` + `HookResult::Modify` returns augmented prompt with learned context |
+| **Ingest** | Flush accumulated state in `TurnComplete` (override `fn timeout()` from default 500ms to ~5s for SQLite write) |
+
+**Crate dependency**: `talos-evolution` depends on `talos-plugin` (added 2026-06-01).
+No cycle: `talos-plugin` does not depend on `talos-evolution`. The plugin remains a thin
+primitive; evolution is a consumer.
+
+**Known trade-off**: prompt injection via `HookResult::Modify(HookEvent<'static>)` requires
+`Box::leak` for the augmented `&str`. One small permanent allocation per turn.
+Mitigation tracked separately as a `HookResult::ModifyOwned` variant (out of ADR-001 scope;
+see ADR-005 → "Hook-Driven Evolution" for the full re-scope rationale).
+
 ## Reversal Trigger
 
 Revisit this decision if:

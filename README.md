@@ -6,15 +6,17 @@ English | **[中文](README.zh-CN.md)**
 
 ## Status
 
-**I007 complete; I008 in review; I009 complete; R0 complete.** 501 tests passing across 12 crates. The agent
+**I007 complete; I008 active (impl landed 2026-06-01); I009 complete; R0 complete.** 509 tests passing across 12 crates. The agent
 performs file and shell operations safely with permission gating, supports a TUI, sessions with
 SQLite search, skills, and multiple providers. **I009 ships the extensibility surface**: a
 hook system with 13 lifecycle points (`talos-plugin`), MCP client + server over stdio
 (`talos-mcp`), a stdio JSON-RPC control plane (`talos-rpc`), and `ToolProvenance` tracking so
-consumers can tell native tools apart from MCP-remote tools. The I008 self-evolution engine is
-**wired into the `-p` print-mode runtime** (observes signals, accumulates patterns, injects
-learned context); wiring into the TUI and interactive paths is the remaining residual work — see
-[docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md). R0 closed all
+consumers can tell native tools apart from MCP-remote tools. **I008 self-evolution is wired
+into all four runtime paths** (print, TUI, interactive, RPC) via a builtin
+`EvolutionHookHandler` registered per-Agent — see
+[docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md) and the
+re-scope notes in [ADR-001](docs/decisions/001-runtime-self-evolution.md) / [ADR-005](docs/decisions/005-tui-event-architecture.md) /
+[ADR-006](docs/decisions/006-event-architecture-boundary.md). R0 closed all
 seven architecture-review findings — see
 [docs/iterations/R0-remediation-gate.md](docs/iterations/R0-remediation-gate.md). I009's TUI
 consumer side (provenance marker rendering + `/plugins` slash command) is deferred to a
@@ -33,7 +35,7 @@ testable `talos` binary.
 | ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + basic TUI + context compaction + caching~~ ✅ |
 | ~~I006~~ | ~~Data Agent~~ | ~~TUI tool display + approval + session branching + SQLite search~~ ✅ |
 | ~~I007~~ | ~~Skilled Agent~~ | ~~TUI skill display + SKILL.md + multi-provider support~~ ✅ |
-| I008 | Learning Agent | TUI evolution display + self-evolution engine — 🔶 print-mode runtime wired; TUI/interactive wiring pending |
+| I008 | Learning Agent | TUI evolution display + self-evolution engine — 🛠️ impl landed 2026-06-01 (HookHandler wired into all 4 paths; 509 tests); pending final review |
 | ~~R0~~ | ~~Remediation Gate~~ | ~~Close ARCH findings (sandbox unsafe-ADR link, Agent::new deprecation, ApprovalChoice unification, session index refresh, fork identity, BOLD highlight, ProcessHardening pre_exec)~~ ✅ |
 | ~~I009~~ | ~~Extensible Agent~~ | ~~TUI MCP display + Hook system + MCP + JSON-RPC + ToolProvenance~~ ✅ (501 tests; TUI consumer markers deferred per [ADR-009](docs/decisions/009-tool-provenance.md)) |
 | I010 | Polished Agent | Full TUI polish (Nord theme + markdown + advanced features) |

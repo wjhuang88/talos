@@ -14,7 +14,6 @@
 
 mod approval;
 mod event_loop;
-mod evolution_runtime;
 
 /// Nord theme ANSI color constants for terminal output.
 ///
@@ -59,6 +58,7 @@ use talos_config::McpServerConfig;
 use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_evolution::store::KnowledgeStore;
+use talos_evolution::{EvolutionConfig, EvolutionHookHandler};
 use talos_mcp::client::McpClientManager;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_permission::{PermissionDecision, PermissionRule};
@@ -74,7 +74,6 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
-use crate::evolution_runtime::EvolutionRuntime;
 
 /// Runtime mode selection.
 #[derive(Debug, Clone, ValueEnum)]
@@ -230,7 +229,17 @@ async fn main() -> Result<()> {
         return run_mcp_server().await;
     }
 
-    init_tracing();
+    // Terminal-UI modes (tui, default interactive REPL) own the terminal display,
+    // so tracing must NOT write to stderr (it corrupts the ratatui/REPL layout).
+    // Redirect those to a log file; machine/stdout modes keep stderr.
+    let terminal_ui = cli.tui
+        || (!cli.print
+            && cli.search.is_none()
+            && !cli.list
+            && !cli.learned
+            && !matches!(cli.mode, Some(Mode::Rpc))
+            && io::stdin().is_terminal());
+    init_tracing(terminal_ui);
 
     if cli.search.is_some() {
         return run_search_mode(cli);
@@ -325,7 +334,7 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let hooks = build_hook_registry();
+    let hooks = build_hook_registry(true);
     let agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
         build_print_tool_registry(),
@@ -362,7 +371,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let prompt = resolve_prompt(cli.prompt)?;
 
-    let hooks = build_hook_registry();
+    let hooks = build_hook_registry(true);
     let mut registry = build_print_tool_registry();
     let mut permission_engine = talos_permission::PermissionEngine::new();
     // I009-S3 begin
@@ -438,31 +447,8 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         agent.set_custom_prompt(system_prompt.clone());
     }
 
-    let mut evolution = match EvolutionRuntime::open_default(None) {
-        Ok(runtime) => runtime,
-        Err(e) => {
-            eprintln!("Warning: evolution disabled: {e}");
-            None
-        }
-    };
-
-    let mut append_parts: Vec<String> = Vec::new();
     if let Some(ref append_prompt) = cli.append_system_prompt {
-        append_parts.push(append_prompt.clone());
-    }
-    if let Some(runtime) = evolution.as_ref() {
-        let context = runtime.evolution_context();
-        if !context.is_empty() {
-            append_parts.push(context);
-        }
-    }
-    if !append_parts.is_empty() {
-        agent.set_append_prompt(append_parts.join("\n\n"));
-    }
-
-    if let Some(runtime) = evolution.as_mut() {
-        runtime.start_turn();
-        runtime.observe_user_input(&prompt);
+        agent.set_append_prompt(append_prompt.clone());
     }
 
     let (event_tx, mut event_rx) = broadcast::channel::<AgentEvent>(32);
@@ -478,21 +464,10 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
             }
             Ok(AgentEvent::TurnEnd { .. }) => {
                 println!();
-                if let Some(runtime) = evolution.as_mut() {
-                    if let Err(e) = runtime.ingest() {
-                        eprintln!("Warning: evolution ingest failed: {e}");
-                    }
-                }
                 return Ok(());
             }
             Ok(AgentEvent::Error { message }) => {
                 eprintln!("Error: {message}");
-                if let Some(runtime) = evolution.as_mut() {
-                    runtime.observe_event(&AgentEvent::Error {
-                        message: message.clone(),
-                    });
-                    let _ = runtime.ingest();
-                }
                 std::process::exit(1);
             }
             Ok(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
@@ -527,7 +502,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let hooks = build_hook_registry();
+    let hooks = build_hook_registry(true);
 
     let (event_tx, event_rx) = broadcast::channel::<AgentEvent>(32);
 
@@ -663,14 +638,21 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         workspace_root,
         session,
         session_manager,
-        build_hook_registry(),
+        build_hook_registry(true),
     );
     event_loop.run().await
 }
 
-fn build_hook_registry() -> Arc<HookRegistry> {
+fn build_hook_registry(include_evolution: bool) -> Arc<HookRegistry> {
     let mut registry = HookRegistry::new();
     registry.register(Arc::new(LoggingHandler::new()));
+    if include_evolution {
+        match EvolutionHookHandler::open_default(EvolutionConfig::default(), None) {
+            Ok(Some(handler)) => registry.register(Arc::new(handler)),
+            Ok(None) => {}
+            Err(e) => eprintln!("Warning: evolution disabled: {e}"),
+        }
+    }
     Arc::new(registry)
 }
 
@@ -754,7 +736,7 @@ async fn run_mcp_server() -> Result<()> {
 
     let tool_registry = Arc::new(build_mcp_tool_registry());
     let permission_engine = Arc::new(talos_permission::PermissionEngine::new());
-    let hook_registry = build_hook_registry();
+    let hook_registry = build_hook_registry(false);
     let permission_gate = Arc::new(McpPermissionGate::new(permission_engine, hook_registry));
     let handler = TalosMcpHandler::new(tool_registry, permission_gate);
 
@@ -770,14 +752,34 @@ async fn run_mcp_server() -> Result<()> {
 }
 // I009-S4 end
 
-fn init_tracing() {
+fn init_tracing(to_file: bool) {
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    if to_file && let Some(writer) = open_log_writer() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_ansi(false)
+            .with_writer(writer)
+            .try_init();
+        return;
+    }
+
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
+        .with_env_filter(env_filter)
         .with_writer(std::io::stderr)
         .try_init();
+}
+
+fn open_log_writer() -> Option<Arc<std::fs::File>> {
+    let log_dir = dirs::home_dir()?.join(".talos").join("logs");
+    std::fs::create_dir_all(&log_dir).ok()?;
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_dir.join("talos.log"))
+        .ok()?;
+    Some(Arc::new(file))
 }
 
 fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {
