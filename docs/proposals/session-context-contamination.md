@@ -1,8 +1,11 @@
 # Session Context Contamination (P0)
 
 **Status**: Proposal — P0 (blocking daily use)  
+**Priority**: 🔴 **CRITICAL** — blocks daily use, requires immediate attention  
 **Created**: 2026-06-02  
-**Reporter**: User
+**Reporter**: User  
+**Estimated effort**: 4.5-5.5 days  
+**Recommended start**: ASAP
 
 ## Problem
 
