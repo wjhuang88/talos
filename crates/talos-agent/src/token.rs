@@ -113,7 +113,10 @@ impl TokenEstimator {
             .iter()
             .map(|msg| match msg {
                 Message::User { content } => Self::estimate_text(content),
-                Message::Assistant { content, tool_calls } => {
+                Message::Assistant {
+                    content,
+                    tool_calls,
+                } => {
                     let text_tokens = Self::estimate_text(content);
                     let tool_tokens: u32 = tool_calls
                         .iter()
@@ -125,8 +128,7 @@ impl TokenEstimator {
                     text_tokens + tool_tokens
                 }
                 Message::Tool { result } => {
-                    Self::estimate_text(&result.content)
-                        + Self::estimate_text(&result.tool_use_id)
+                    Self::estimate_text(&result.content) + Self::estimate_text(&result.tool_use_id)
                 }
             })
             .sum()
@@ -328,7 +330,10 @@ mod tests {
         let text = "The quick brown fox jumps over the lazy dog. This is a longer sentence to test token estimation accuracy for English text.";
         let tokens = TokenEstimator::estimate_text(text);
         // Verify it's in a reasonable range (actual would be ~25-35)
-        assert!(tokens >= 20 && tokens <= 40, "English estimation should be reasonable");
+        assert!(
+            tokens >= 20 && tokens <= 40,
+            "English estimation should be reasonable"
+        );
     }
 
     #[test]

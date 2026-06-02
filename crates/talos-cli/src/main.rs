@@ -43,18 +43,18 @@ use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use async_trait::async_trait;
 use clap::Parser;
 use clap::ValueEnum;
 use rmcp::ServiceExt;
 use serde_json::Value;
+use talos_agent::Agent;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
-use talos_agent::Agent;
-use talos_config::{Config, Provider};
 #[cfg(debug_assertions)]
 use talos_config::McpServerConfig;
+use talos_config::{Config, Provider};
 use talos_core::message::AgentEvent;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_evolution::store::KnowledgeStore;
@@ -143,7 +143,9 @@ impl AgentTool for PermissionAwareTool {
                 ToolResult::error(format!("Permission denied: {reason}"))
             }
             PermissionDecision::Ask => {
-                unreachable!("Ask decision should have been resolved by prompt or print-mode default")
+                unreachable!(
+                    "Ask decision should have been resolved by prompt or print-mode default"
+                )
             }
         }
     }
@@ -159,10 +161,18 @@ struct Cli {
     #[arg(help = "The prompt to send to the agent.")]
     prompt: Option<String>,
 
-    #[arg(short, long, help = "Print mode: stream the response to stdout and exit.")]
+    #[arg(
+        short,
+        long,
+        help = "Print mode: stream the response to stdout and exit."
+    )]
     print: bool,
 
-    #[arg(short, long, help = "Override the model name (e.g., `claude-sonnet-4-20250514`).")]
+    #[arg(
+        short,
+        long,
+        help = "Override the model name (e.g., `claude-sonnet-4-20250514`)."
+    )]
     model: Option<String>,
 
     #[arg(long, help = "Override the provider (`anthropic` or `openai`).")]
@@ -171,7 +181,11 @@ struct Cli {
     #[arg(long, help = "Launch terminal UI instead of readline loop.")]
     tui: bool,
 
-    #[arg(long, conflicts_with = "tui", help = "Force the readline interactive REPL (default is TUI on a TTY).")]
+    #[arg(
+        long,
+        conflicts_with = "tui",
+        help = "Force the readline interactive REPL (default is TUI on a TTY)."
+    )]
     repl: bool,
 
     #[arg(long, help = "Skip loading workspace context.")]
@@ -195,7 +209,11 @@ struct Cli {
     #[arg(long, help = "List recent sessions from the index.")]
     list: bool,
 
-    #[arg(long, default_value = "20", help = "Maximum results for --search or --list.")]
+    #[arg(
+        long,
+        default_value = "20",
+        help = "Maximum results for --search or --list."
+    )]
     limit: usize,
 
     #[arg(long, help = "Override the default system prompt entirely.")]
@@ -204,7 +222,10 @@ struct Cli {
     #[arg(long, help = "Append additional instructions to the system prompt.")]
     append_system_prompt: Option<String>,
 
-    #[arg(long, help = "Use mock LLM provider for testing (no API key required).")]
+    #[arg(
+        long,
+        help = "Use mock LLM provider for testing (no API key required)."
+    )]
     mock: bool,
 
     #[arg(long, help = "Display learned patterns from the evolution engine.")]
@@ -389,9 +410,10 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
             transport: "stdio".to_string(),
             command: path.to_string_lossy().to_string(),
             args: Vec::new(),
-            env: std::collections::HashMap::from([
-                ("ECHO_PREFIX".to_string(), "fixture".to_string()),
-            ]),
+            env: std::collections::HashMap::from([(
+                "ECHO_PREFIX".to_string(),
+                "fixture".to_string(),
+            )]),
             cwd: std::env::current_dir().ok(),
         }];
     }
@@ -409,11 +431,13 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         );
     }
     for tool in mcp_manager.discover_tools().await {
-        permission_engine.add_rule(PermissionRule::new(
-            tool.name(),
-            None,
-            PermissionDecision::Allow,
-        ));
+        if tool.is_read_only() {
+            permission_engine.add_rule(PermissionRule::new(
+                tool.name(),
+                None,
+                PermissionDecision::Allow,
+            ));
+        }
         registry.register(tool);
     }
     // I009-S3 end
@@ -440,8 +464,11 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     );
 
     if !cli.no_context {
-        let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
-        let context = ContextLoader::new(workspace_root).load().map_err(|e| anyhow!("{e}"))?;
+        let workspace_root =
+            std::env::current_dir().context("failed to determine working directory")?;
+        let context = ContextLoader::new(workspace_root)
+            .load()
+            .map_err(|e| anyhow!("{e}"))?;
         if !context.is_empty() {
             agent.set_context_files(vec![ContextFile {
                 path: "AGENTS.md".into(),
@@ -477,7 +504,9 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }
-            Ok(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
+            Ok(
+                AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. },
+            ) => {}
             Ok(_) => {}
             Err(broadcast::error::RecvError::Lagged(n)) => {
                 eprintln!("Warning: dropped {n} event(s) due to slow consumer");
@@ -550,7 +579,8 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 }
 
 async fn run_interactive_mode(cli: Cli) -> Result<()> {
-    let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
+    let workspace_root =
+        std::env::current_dir().context("failed to determine working directory")?;
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
 
@@ -619,10 +649,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             io::stdin()
                 .read_line(&mut input)
                 .context("failed to read input")?;
-            let choice: usize = input
-                .trim()
-                .parse()
-                .context("invalid selection")?;
+            let choice: usize = input.trim().parse().context("invalid selection")?;
             if choice < 1 || choice > sessions.len() {
                 bail!("selection out of range");
             }
@@ -816,11 +843,17 @@ pub(crate) fn parse_provider(s: &str) -> Result<Provider> {
     match s.to_lowercase().as_str() {
         "anthropic" => Ok(Provider::Anthropic),
         "openai" => Ok(Provider::OpenAI),
-        other => Err(anyhow!("unknown provider '{other}': supported values are 'anthropic' and 'openai'")),
+        other => Err(anyhow!(
+            "unknown provider '{other}': supported values are 'anthropic' and 'openai'"
+        )),
     }
 }
 
-pub(crate) fn build_provider(config: &Config, api_key: &str, mock: bool) -> Arc<dyn talos_core::provider::LanguageModel> {
+pub(crate) fn build_provider(
+    config: &Config,
+    api_key: &str,
+    mock: bool,
+) -> Arc<dyn talos_core::provider::LanguageModel> {
     if mock {
         use talos_provider::mock::MockProvider;
         return Arc::new(MockProvider::new()
@@ -843,7 +876,9 @@ fn run_search_mode(cli: Cli) -> Result<()> {
     let manager = SessionManager::new().context("failed to initialize session manager")?;
 
     let results = manager.search(query, cli.limit).map_err(|e| match e {
-        IndexError::SqliteError(e) => anyhow!("search error: {e}\nHint: run a session first to build the index."),
+        IndexError::SqliteError(e) => {
+            anyhow!("search error: {e}\nHint: run a session first to build the index.")
+        }
         IndexError::IoError(e) => anyhow!("I/O error: {e}"),
         IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
     })?;
@@ -888,15 +923,17 @@ fn run_search_mode(cli: Cli) -> Result<()> {
 /// Replaces FTS5 `<b>...</b>` markers with ANSI color codes.
 fn highlight_snippet(snippet: &str) -> String {
     snippet
-        .replace("<b>", &format!("{}{}BOLD{}{}", colors::NORD13, colors::BOLD, colors::RESET, colors::NORD13))
-        .replace("</b>", colors::RESET)
+        .replace("<b>", &format!("{}{}", colors::NORD13, colors::BOLD))
+        .replace("</b>", &format!("{}{}", colors::RESET, colors::NORD13))
 }
 
 fn run_list_mode(cli: Cli) -> Result<()> {
     let manager = SessionManager::new().context("failed to initialize session manager")?;
 
     let sessions = manager.list_recent(cli.limit).map_err(|e| match e {
-        IndexError::SqliteError(e) => anyhow!("list error: {e}\nHint: run `talos --search <term>` first to build the index."),
+        IndexError::SqliteError(e) => {
+            anyhow!("list error: {e}\nHint: run `talos --search <term>` first to build the index.")
+        }
         IndexError::IoError(e) => anyhow!("I/O error: {e}"),
         IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
     })?;
@@ -936,7 +973,10 @@ fn run_list_mode(cli: Cli) -> Result<()> {
 
 /// Fork an existing session, creating a new session file with entries up to the
 /// fork point. Records the fork relationship in the SQLite index.
-fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<talos_session::Session> {
+fn fork_session(
+    manager: &SessionManager,
+    source_session_id: &str,
+) -> Result<talos_session::Session> {
     use std::fs::OpenOptions;
     use std::io::Write;
     use talos_session::Session;
@@ -945,12 +985,18 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<tal
         .resume_session(source_session_id)
         .with_context(|| format!("failed to load source session {source_session_id}"))?;
 
-    let entries = source.read_entries().context("failed to read source entries")?;
+    let entries = source
+        .read_entries()
+        .context("failed to read source entries")?;
     if entries.is_empty() {
         bail!("cannot fork an empty session");
     }
 
-    let fork_entry_id = entries.last().expect("entries checked non-empty above").id.clone();
+    let fork_entry_id = entries
+        .last()
+        .expect("entries checked non-empty above")
+        .id
+        .clone();
 
     let new_id = Uuid::new_v4();
     let project_dir = manager
@@ -961,8 +1007,7 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<tal
         .map(|s| s.project.clone())
         .unwrap_or_else(|| "default".to_string());
 
-    let home = std::env::var("HOME").map_err(|e| anyhow!("{e}"))?;
-    let sessions_dir = PathBuf::from(home).join(".talos").join("sessions");
+    let sessions_dir = manager.sessions_dir();
     let project_path = sessions_dir.join(&project_dir);
     std::fs::create_dir_all(&project_path).context("failed to create project directory")?;
 
@@ -980,11 +1025,11 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<tal
         writeln!(file, "{line}").context("failed to write fork entry")?;
     }
 
-    new_session.fork(&fork_entry_id).context("failed to create fork branch")?;
+    new_session
+        .fork(&fork_entry_id)
+        .context("failed to create fork branch")?;
 
-    if let Ok(mut index) = talos_session::SessionIndex::new(
-        &sessions_dir.join("index.db"),
-    ) {
+    if let Ok(mut index) = talos_session::SessionIndex::new(&sessions_dir.join("index.db")) {
         let _ = index.init_schema();
         let _ = index.record_fork(source_session_id, &new_id.to_string(), &fork_entry_id);
         let _ = index.index_session(&new_session);
@@ -1001,9 +1046,18 @@ mod tests {
 
     #[test]
     fn parse_provider_anthropic() {
-        assert!(matches!(parse_provider("anthropic"), Ok(Provider::Anthropic)));
-        assert!(matches!(parse_provider("Anthropic"), Ok(Provider::Anthropic)));
-        assert!(matches!(parse_provider("ANTHROPIC"), Ok(Provider::Anthropic)));
+        assert!(matches!(
+            parse_provider("anthropic"),
+            Ok(Provider::Anthropic)
+        ));
+        assert!(matches!(
+            parse_provider("Anthropic"),
+            Ok(Provider::Anthropic)
+        ));
+        assert!(matches!(
+            parse_provider("ANTHROPIC"),
+            Ok(Provider::Anthropic)
+        ));
     }
 
     #[test]
@@ -1026,6 +1080,7 @@ mod tests {
         let output = highlight_snippet(input);
         assert!(output.contains(colors::NORD13));
         assert!(output.contains(colors::BOLD));
+        assert!(!output.contains("BOLD"));
         assert!(!output.contains("<b>"));
         assert!(!output.contains("</b>"));
     }
@@ -1036,7 +1091,10 @@ mod tests {
         let output = highlight_snippet(input);
         // Each match produces 2 NORD13 sequences (before and after BOLD/RESET)
         let nord13_count = output.matches(colors::NORD13).count();
-        assert_eq!(nord13_count, 4, "Should have 4 NORD13 sequences (2 per match)");
+        assert_eq!(
+            nord13_count, 4,
+            "Should have 4 NORD13 sequences (2 per match)"
+        );
     }
 
     #[test]
@@ -1063,11 +1121,7 @@ mod tests {
 
     #[test]
     fn session_id_invalid_uuid_fails() {
-        let invalid_ids = vec![
-            "not-a-uuid",
-            "550e8400-e29b-41d4-a716",
-            "",
-        ];
+        let invalid_ids = vec!["not-a-uuid", "550e8400-e29b-41d4-a716", ""];
         for invalid_id in invalid_ids {
             let result = uuid::Uuid::parse_str(invalid_id);
             assert!(result.is_err(), "Should fail to parse: {invalid_id}");
@@ -1089,12 +1143,7 @@ mod tests {
     #[test]
     fn color_constants_contain_ansi_escape() {
         // All color constants should start with the ANSI escape sequence
-        for color in [
-            colors::NORD3,
-            colors::NORD8,
-            colors::NORD13,
-            colors::NORD14,
-        ] {
+        for color in [colors::NORD3, colors::NORD8, colors::NORD13, colors::NORD14] {
             assert!(
                 color.starts_with("\x1b["),
                 "Color constant should start with ANSI escape: {color:?}"

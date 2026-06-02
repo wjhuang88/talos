@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use talos_core::message::{AgentEvent, Message, StopReason, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
 use tokio::sync::mpsc;
@@ -72,10 +72,7 @@ impl AnthropicProvider {
                 return Ok(response);
             }
 
-            let body_text = response
-                .text()
-                .await
-                .unwrap_or_default();
+            let body_text = response.text().await.unwrap_or_default();
 
             if status.as_u16() == 401 {
                 return Err(ProviderError::AuthenticationFailed(body_text));
@@ -111,10 +108,7 @@ impl AnthropicProvider {
 
 #[async_trait::async_trait]
 impl LanguageModel for AnthropicProvider {
-    async fn stream(
-        &self,
-        messages: &[Message],
-    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
 
         let (tx, rx) = mpsc::channel(32);
@@ -133,7 +127,10 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
                 "role": "user",
                 "content": content,
             }),
-            Message::Assistant { content, tool_calls } => {
+            Message::Assistant {
+                content,
+                tool_calls,
+            } => {
                 let mut blocks = Vec::new();
                 if !content.is_empty() {
                     blocks.push(json!({
@@ -290,17 +287,32 @@ fn extract_usage_from_message_start(data: &Value) -> Option<Usage> {
     data.get("message")
         .and_then(|msg| msg.get("usage"))
         .map(|usage| Usage {
-            input_tokens: usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            output_tokens: usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            cache_read_tokens: usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            cache_write_tokens: usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+            input_tokens: usage
+                .get("input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32,
+            output_tokens: usage
+                .get("output_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32,
+            cache_read_tokens: usage
+                .get("cache_read_input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32,
+            cache_write_tokens: usage
+                .get("cache_creation_input_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32,
         })
 }
 
 fn extract_usage_from_message_delta(data: &Value) -> Option<Usage> {
     data.get("usage").map(|usage| Usage {
         input_tokens: 0,
-        output_tokens: usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        output_tokens: usage
+            .get("output_tokens")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32,
         cache_read_tokens: 0,
         cache_write_tokens: 0,
     })

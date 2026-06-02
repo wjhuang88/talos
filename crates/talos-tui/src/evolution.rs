@@ -1,11 +1,11 @@
 //! Evolution insights panel for TUI.
 
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// A learned pattern for display.
@@ -72,10 +72,7 @@ impl EvolutionPanel {
                         .add_modifier(Modifier::BOLD),
                 )));
 
-                lines.push(Line::from(Span::raw(format!(
-                    "   {}",
-                    pattern.instruction
-                ))));
+                lines.push(Line::from(Span::raw(format!("   {}", pattern.instruction))));
 
                 if i < self.patterns.len() - 1 {
                     lines.push(Line::from(""));

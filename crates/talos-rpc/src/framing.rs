@@ -5,7 +5,9 @@ use serde::Serialize;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 /// Reads one NDJSON line from an async reader.
-pub async fn read_line<R: tokio::io::AsyncRead + Unpin>(reader: &mut BufReader<R>) -> Result<Option<String>> {
+pub async fn read_line<R: tokio::io::AsyncRead + Unpin>(
+    reader: &mut BufReader<R>,
+) -> Result<Option<String>> {
     let mut line = String::new();
     let bytes = reader
         .read_line(&mut line)

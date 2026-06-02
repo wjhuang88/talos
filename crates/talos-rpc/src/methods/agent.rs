@@ -1,14 +1,14 @@
 //! Agent RPC methods.
 
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use talos_core::message::AgentEvent;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::RpcError;
 use crate::methods::{MethodContext, MethodResult};
-use crate::protocol::{JsonRpcNotification, JSON_RPC_VERSION};
+use crate::protocol::{JSON_RPC_VERSION, JsonRpcNotification};
 
 #[derive(Debug, Deserialize)]
 struct AgentRunParams {
@@ -27,63 +27,60 @@ pub fn list_tools(ctx: &MethodContext) -> Result<MethodResult, RpcError> {
     let _ = ctx;
     Ok(MethodResult {
         result: json!([
-        {
-            "name": "bash",
-            "description": "Execute shell commands in sandboxed environment",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": { "type": "string" }
-                },
-                "required": ["command"]
+            {
+                "name": "bash",
+                "description": "Execute shell commands in sandboxed environment",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "command": { "type": "string" }
+                    },
+                    "required": ["command"]
+                }
+            },
+            {
+                "name": "read",
+                "description": "Read files and directories from filesystem",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "filePath": { "type": "string" }
+                    },
+                    "required": ["filePath"]
+                }
+            },
+            {
+                "name": "write",
+                "description": "Write file contents",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "filePath": { "type": "string" },
+                        "content": { "type": "string" }
+                    },
+                    "required": ["filePath", "content"]
+                }
+            },
+            {
+                "name": "edit",
+                "description": "Apply textual edits to files",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "filePath": { "type": "string" },
+                        "old_text": { "type": "string" },
+                        "new_text": { "type": "string" }
+                    },
+                    "required": ["filePath", "old_text", "new_text"]
+                }
             }
-        },
-        {
-            "name": "read",
-            "description": "Read files and directories from filesystem",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "filePath": { "type": "string" }
-                },
-                "required": ["filePath"]
-            }
-        },
-        {
-            "name": "write",
-            "description": "Write file contents",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "filePath": { "type": "string" },
-                    "content": { "type": "string" }
-                },
-                "required": ["filePath", "content"]
-            }
-        },
-        {
-            "name": "edit",
-            "description": "Apply textual edits to files",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "filePath": { "type": "string" },
-                    "old_text": { "type": "string" },
-                    "new_text": { "type": "string" }
-                },
-                "required": ["filePath", "old_text", "new_text"]
-            }
-        }
-    ]),
+        ]),
         notifications: Vec::new(),
     })
 }
 
 /// Handles `agent.run`.
-pub async fn run(
-    ctx: &MethodContext,
-    params: Option<Value>,
-) -> Result<MethodResult, RpcError> {
+pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodResult, RpcError> {
     let params = params.ok_or_else(|| RpcError::InvalidParams("missing params".to_string()))?;
     let params: AgentRunParams =
         serde_json::from_value(params).map_err(|e| RpcError::InvalidParams(e.to_string()))?;

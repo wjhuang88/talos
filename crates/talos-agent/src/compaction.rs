@@ -379,7 +379,11 @@ impl Compactor {
 
         let mut result = Vec::with_capacity(1 + recent_messages.len());
         result.push(Message::User {
-            content: format!("[Conversation summary of {} earlier turns]\n{}", total_turns - COLLAPSE_TURN_THRESHOLD, summary),
+            content: format!(
+                "[Conversation summary of {} earlier turns]\n{}",
+                total_turns - COLLAPSE_TURN_THRESHOLD,
+                summary
+            ),
         });
         result.extend(recent_messages);
 
@@ -427,16 +431,14 @@ impl Compactor {
         provider: &dyn LanguageModel,
     ) -> CompactionResult<String> {
         let conversation_text = messages_to_text(messages);
-        let prompt_messages = vec![
-            Message::User {
-                content: format!(
-                    "Summarize the following conversation concisely. \
+        let prompt_messages = vec![Message::User {
+            content: format!(
+                "Summarize the following conversation concisely. \
                      Preserve key decisions, tool call outcomes, and important context. \
                      Keep the summary under 500 words.\n\n\
                      Conversation:\n{conversation_text}"
-                ),
-            },
-        ];
+            ),
+        }];
 
         let mut rx = provider
             .stream(&prompt_messages)
@@ -522,7 +524,10 @@ fn messages_to_text(messages: &[Message]) -> String {
         .iter()
         .map(|msg| match msg {
             Message::User { content } => format!("User: {content}"),
-            Message::Assistant { content, tool_calls } => {
+            Message::Assistant {
+                content,
+                tool_calls,
+            } => {
                 let mut text = format!("Assistant: {content}");
                 for tc in tool_calls {
                     text.push_str(&format!("\n  [Tool call: {}({})]", tc.name, tc.input));
@@ -582,7 +587,11 @@ mod tests {
     }
 
     /// Helper: create a full turn (user + assistant + tool results).
-    fn make_turn(user_content: &str, assistant_content: &str, tool_results: Vec<(&str, &str)>) -> Vec<Message> {
+    fn make_turn(
+        user_content: &str,
+        assistant_content: &str,
+        tool_results: Vec<(&str, &str)>,
+    ) -> Vec<Message> {
         let mut msgs = vec![user_msg(user_content)];
         let tool_calls: Vec<ToolCall> = tool_results
             .iter()
@@ -620,11 +629,7 @@ mod tests {
             let summary = self.summary.clone();
             tokio::spawn(async move {
                 let _ = tx.send(AgentEvent::TurnStart).await;
-                let _ = tx
-                    .send(AgentEvent::TextDelta {
-                        delta: summary,
-                    })
-                    .await;
+                let _ = tx.send(AgentEvent::TextDelta { delta: summary }).await;
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
                         stop_reason: talos_core::message::StopReason::EndTurn,
@@ -811,8 +816,12 @@ mod tests {
         let result = compactor.apply_collapse(messages, &provider).await.unwrap();
 
         // First message should be the summary
-        assert!(matches!(&result[0], Message::User { content } if content.contains("Conversation summary")));
-        assert!(matches!(&result[0], Message::User { content } if content.contains("Summary of old turns")));
+        assert!(
+            matches!(&result[0], Message::User { content } if content.contains("Conversation summary"))
+        );
+        assert!(
+            matches!(&result[0], Message::User { content } if content.contains("Summary of old turns"))
+        );
 
         // Remaining messages should be the last 10 turns (30 messages: 10 * 3)
         let recent_count = result.len() - 1;
@@ -825,7 +834,10 @@ mod tests {
         let messages = make_turn("query", "response", vec![("call_1", "result")]);
 
         let provider = SummaryMockProvider::new("summary");
-        let result = compactor.apply_collapse(messages.clone(), &provider).await.unwrap();
+        let result = compactor
+            .apply_collapse(messages.clone(), &provider)
+            .await
+            .unwrap();
 
         assert_eq!(result, messages);
     }
@@ -853,7 +865,9 @@ mod tests {
             .unwrap();
 
         // First message should be the summary
-        assert!(matches!(&result[0], Message::User { content } if content.contains("Full conversation summary")));
+        assert!(
+            matches!(&result[0], Message::User { content } if content.contains("Full conversation summary"))
+        );
 
         // Remaining messages should be the last 10 turns
         let recent_count = result.len() - 1;
@@ -957,7 +971,10 @@ mod tests {
         }
 
         let provider = SummaryMockProvider::new("summary");
-        let result = compactor.compact(messages.clone(), &provider).await.unwrap();
+        let result = compactor
+            .compact(messages.clone(), &provider)
+            .await
+            .unwrap();
 
         // The last 30 messages (10 turns * 3) should match the original last 30
         let original_recent = &messages[messages.len() - 30..];
@@ -981,12 +998,16 @@ mod tests {
             ));
         }
 
-        let provider = SummaryMockProvider::new("Summary: user asked about files, assistant read them");
+        let provider =
+            SummaryMockProvider::new("Summary: user asked about files, assistant read them");
         let compacted = compactor.compact(messages, &provider).await.unwrap();
 
         assert!(compacted.len() > 1);
         if let Message::User { content } = &compacted[0] {
-            assert!(content.contains("Summary"), "first message content: {content}");
+            assert!(
+                content.contains("Summary"),
+                "first message content: {content}"
+            );
         } else {
             panic!("first message is not User: {:?}", compacted[0]);
         }

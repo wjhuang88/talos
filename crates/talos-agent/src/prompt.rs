@@ -50,12 +50,11 @@
 //! assert!(prompt.contains("# Skills"));
 //! ```
 
-use talos_skill::SkillIndex;
 use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
+use talos_skill::SkillIndex;
 
 /// Default identity text for the Talos agent.
-pub const DEFAULT_IDENTITY: &str =
-    "You are Talos, an AI coding assistant. You help users with programming tasks \
+pub const DEFAULT_IDENTITY: &str = "You are Talos, an AI coding assistant. You help users with programming tasks \
      by using tools to read, write, and execute code.";
 
 /// A description of a tool for inclusion in the system prompt.
@@ -267,10 +266,7 @@ impl SystemPromptBuilder {
         } else {
             let mut skills_section = String::from("# Skills\n");
             for skill in &self.skill_index {
-                skills_section.push_str(&format!(
-                    "- **{}**: {}\n",
-                    skill.name, skill.description
-                ));
+                skills_section.push_str(&format!("- **{}**: {}\n", skill.name, skill.description));
             }
             skills_section.push('\n');
             parts.push(skills_section);
@@ -282,20 +278,14 @@ impl SystemPromptBuilder {
         } else {
             let mut context_section = String::from("# Context\n");
             for file in &self.context_files {
-                context_section.push_str(&format!(
-                    "--- {} ---\n{}\n\n",
-                    file.path, file.content
-                ));
+                context_section.push_str(&format!("--- {} ---\n{}\n\n", file.path, file.content));
             }
             parts.push(context_section);
         }
 
         // 5. User preferences
         if !self.user_preferences.is_empty() {
-            parts.push(format!(
-                "# User Preferences\n{}\n",
-                self.user_preferences
-            ));
+            parts.push(format!("# User Preferences\n{}\n", self.user_preferences));
         }
 
         // 6. Append prompt
@@ -434,9 +424,7 @@ impl SystemPromptBuilder {
         let prompt = self.build();
         let char_count = prompt.chars().count();
         let token_estimate = self.total_tokens();
-        eprintln!(
-            "System prompt: {char_count} characters, ~{token_estimate} tokens"
-        );
+        eprintln!("System prompt: {char_count} characters, ~{token_estimate} tokens");
     }
 }
 
@@ -512,8 +500,8 @@ mod tests {
 
     #[test]
     fn test_custom_prompt_replaces_identity() {
-        let builder = SystemPromptBuilder::new()
-            .with_custom_prompt("You are a custom assistant.".into());
+        let builder =
+            SystemPromptBuilder::new().with_custom_prompt("You are a custom assistant.".into());
 
         let prompt = builder.build();
 
@@ -540,15 +528,16 @@ mod tests {
 
     #[test]
     fn test_append_prompt_added_at_end() {
-        let builder = SystemPromptBuilder::new()
-            .with_append_prompt("Always be concise.".into());
+        let builder = SystemPromptBuilder::new().with_append_prompt("Always be concise.".into());
 
         let prompt = builder.build();
 
         assert!(prompt.contains("# Additional Instructions"));
         assert!(prompt.contains("Always be concise."));
         // Append should be the last section
-        let append_pos = prompt.find("# Additional Instructions").expect("append not found");
+        let append_pos = prompt
+            .find("# Additional Instructions")
+            .expect("append not found");
         let remaining = &prompt[append_pos..];
         assert!(!remaining[1..].contains("# Identity"));
         assert!(!remaining[1..].contains("# Tools"));
@@ -649,18 +638,20 @@ mod tests {
 
     #[test]
     fn test_prompt_ordering_identity_first() {
-        let builder = SystemPromptBuilder::new()
-            .with_tools(vec![ToolDescription {
-                name: "bash".into(),
-                description: "Run commands".into(),
-            }]);
+        let builder = SystemPromptBuilder::new().with_tools(vec![ToolDescription {
+            name: "bash".into(),
+            description: "Run commands".into(),
+        }]);
 
         let prompt = builder.build();
 
         let identity_pos = prompt.find("# Identity").expect("identity not found");
         let tools_pos = prompt.find("# Tools").expect("tools not found");
 
-        assert!(identity_pos < tools_pos, "identity should come before tools");
+        assert!(
+            identity_pos < tools_pos,
+            "identity should come before tools"
+        );
     }
 
     #[test]
@@ -704,7 +695,10 @@ mod tests {
         let skills_pos = prompt.find("# Skills").expect("skills not found");
         let context_pos = prompt.find("# Context").expect("context not found");
 
-        assert!(skills_pos < context_pos, "skills should come before context");
+        assert!(
+            skills_pos < context_pos,
+            "skills should come before context"
+        );
     }
 
     #[test]
@@ -721,7 +715,10 @@ mod tests {
         let context_pos = prompt.find("# Context").expect("context not found");
         let prefs_pos = prompt.find("# User Preferences").expect("prefs not found");
 
-        assert!(context_pos < prefs_pos, "context should come before preferences");
+        assert!(
+            context_pos < prefs_pos,
+            "context should come before preferences"
+        );
     }
 
     #[test]
@@ -737,7 +734,10 @@ mod tests {
             .find("# Additional Instructions")
             .expect("append not found");
 
-        assert!(prefs_pos < append_pos, "preferences should come before append");
+        assert!(
+            prefs_pos < append_pos,
+            "preferences should come before append"
+        );
     }
 
     // --- Tools sorting tests ---
@@ -791,11 +791,10 @@ mod tests {
 
     #[test]
     fn test_builder_clone() {
-        let builder = SystemPromptBuilder::new()
-            .with_tools(vec![ToolDescription {
-                name: "read".into(),
-                description: "Read a file".into(),
-            }]);
+        let builder = SystemPromptBuilder::new().with_tools(vec![ToolDescription {
+            name: "read".into(),
+            description: "Read a file".into(),
+        }]);
 
         let cloned = builder.clone();
         let prompt1 = builder.build();

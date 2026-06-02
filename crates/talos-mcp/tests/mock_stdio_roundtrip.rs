@@ -80,7 +80,10 @@ async fn mock_stdio_roundtrip_tools_list_and_call() {
     let transport = McpTransport::from_io("mock".to_string(), client_reader, client_writer);
     let dispatcher = Arc::new(McpDispatcher::new("mock".to_string(), transport));
 
-    let tools = dispatcher.list_tools().await.expect("list tools should succeed");
+    let tools = dispatcher
+        .list_tools()
+        .await
+        .expect("list tools should succeed");
     assert_eq!(tools.len(), 1);
 
     let called = dispatcher

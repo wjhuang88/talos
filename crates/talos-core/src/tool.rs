@@ -296,10 +296,7 @@ mod tests {
         }
 
         async fn execute(&self, input: Value) -> ToolResult {
-            let name = input
-                .get("name")
-                .and_then(Value::as_str)
-                .unwrap_or("World");
+            let name = input.get("name").and_then(Value::as_str).unwrap_or("World");
             ToolResult::success(format!("Hello, {name}!"))
         }
     }
@@ -351,10 +348,12 @@ mod tests {
         let input = serde_json::json!({});
         let result = registry.validate_input("echo", &input);
         assert!(matches!(result, Err(ToolError::InvalidInput(_))));
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("missing required field 'message'"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("missing required field 'message'")
+        );
     }
 
     #[test]
@@ -373,7 +372,9 @@ mod tests {
         registry.register(Arc::new(MockTool::new("echo", "Echoes a message")));
 
         let tool = registry.get("echo").unwrap();
-        let result = tool.execute(serde_json::json!({ "message": "hello" })).await;
+        let result = tool
+            .execute(serde_json::json!({ "message": "hello" }))
+            .await;
         assert!(!result.is_error);
         assert_eq!(result.content, "echo: hello");
     }

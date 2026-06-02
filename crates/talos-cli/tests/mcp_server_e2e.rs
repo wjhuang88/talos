@@ -14,7 +14,10 @@ struct CapturingTransport {
 }
 
 impl CapturingTransport {
-    fn new(inner: TokioChildProcess, sent_frames: std::sync::Arc<tokio::sync::Mutex<Vec<String>>>) -> Self {
+    fn new(
+        inner: TokioChildProcess,
+        sent_frames: std::sync::Arc<tokio::sync::Mutex<Vec<String>>>,
+    ) -> Self {
         Self { inner, sent_frames }
     }
 }
@@ -37,7 +40,8 @@ impl Transport<rmcp::RoleClient> for CapturingTransport {
 
     fn receive(
         &mut self,
-    ) -> impl std::future::Future<Output = Option<rmcp::service::RxJsonRpcMessage<rmcp::RoleClient>>> + Send {
+    ) -> impl std::future::Future<Output = Option<rmcp::service::RxJsonRpcMessage<rmcp::RoleClient>>>
+    + Send {
         self.inner.receive()
     }
 
@@ -58,24 +62,30 @@ async fn mcp_server_e2e() {
     let transport = TokioChildProcess::new(child).expect("spawn talos mcp server");
     let frames = std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
     let transport = CapturingTransport::new(transport, frames.clone());
-    let client = ()
-        .serve(transport)
-        .await
-        .expect("connect rmcp client to talos");
+    let client = ().serve(transport).await.expect("connect rmcp client to talos");
 
     let tools = client
         .peer()
         .list_tools(Some(PaginatedRequestParams::default()))
         .await
         .expect("tools/list succeeds");
-    assert!(tools.tools.len() >= 5, "expected >=5 tools, got {}", tools.tools.len());
+    assert!(
+        tools.tools.len() >= 5,
+        "expected >=5 tools, got {}",
+        tools.tools.len()
+    );
 
     let denied = client
         .peer()
         .call_tool(CallToolRequestParams {
             meta: None,
             name: "bash".into(),
-            arguments: Some(serde_json::json!({"command": "echo denied"}).as_object().cloned().expect("object")),
+            arguments: Some(
+                serde_json::json!({"command": "echo denied"})
+                    .as_object()
+                    .cloned()
+                    .expect("object"),
+            ),
             task: None,
         })
         .await;
@@ -84,7 +94,10 @@ async fn mcp_server_e2e() {
     let sent = frames.lock().await;
     assert!(!sent.is_empty(), "expected outbound JSON-RPC frames");
     for frame in sent.iter() {
-        assert!(serde_json::from_str::<serde_json::Value>(frame).is_ok(), "non-json frame: {frame}");
+        assert!(
+            serde_json::from_str::<serde_json::Value>(frame).is_ok(),
+            "non-json frame: {frame}"
+        );
     }
 
     let _ = client.cancel().await;

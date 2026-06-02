@@ -229,7 +229,8 @@ impl Session {
 
     /// Append an agent event to the current branch and persist it to the JSONL file.
     pub fn append_event(&self, event: &AgentEvent) -> Result<(), SessionError> {
-        let content = serde_json::to_string(event).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
+        let content =
+            serde_json::to_string(event).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
         let role = "system".to_string();
 
         let entries = self.read_entries()?;
@@ -299,12 +300,7 @@ impl Session {
     /// * `new_id` - The new session [`Uuid`] (must match the JSONL filename).
     /// * `new_file_path` - The path to the new JSONL file the fork was written to.
     /// * `branch_id` - The branch ID to mark as currently active on the fork.
-    pub fn with_fork_identity(
-        &mut self,
-        new_id: Uuid,
-        new_file_path: PathBuf,
-        branch_id: String,
-    ) {
+    pub fn with_fork_identity(&mut self, new_id: Uuid, new_file_path: PathBuf, branch_id: String) {
         self.id = new_id;
         self.file_path = new_file_path;
         self.current_branch = branch_id;
@@ -361,7 +357,9 @@ impl Session {
                                 Message::Assistant { content, .. } => {
                                     ("assistant".to_string(), content.clone())
                                 }
-                                Message::Tool { result } => ("system".to_string(), result.content.clone()),
+                                Message::Tool { result } => {
+                                    ("system".to_string(), result.content.clone())
+                                }
                             };
 
                             let id = format!("synthetic-{synthetic_counter}");
@@ -474,7 +472,8 @@ pub struct SessionManager {
 impl SessionManager {
     /// Create a new `SessionManager` with the default sessions directory (`~/.talos/sessions/`).
     pub fn new() -> Result<Self, SessionError> {
-        let home = std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
+        let home =
+            std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
         let dir = PathBuf::from(home).join(".talos").join("sessions");
         Ok(Self {
             sessions_dir: dir,
@@ -488,6 +487,12 @@ impl SessionManager {
             sessions_dir,
             index: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Return the root directory used for session JSONL files and the colocated index.
+    #[must_use]
+    pub fn sessions_dir(&self) -> &Path {
+        &self.sessions_dir
     }
 
     /// Create a new session for the given project.
@@ -670,7 +675,9 @@ impl SessionManager {
         Ok((count, last_preview))
     }
 
-    fn get_or_create_index(&self) -> Result<std::sync::MutexGuard<'_, Option<SessionIndex>>, IndexError> {
+    fn get_or_create_index(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, Option<SessionIndex>>, IndexError> {
         let mut guard = self.index.lock().expect("index lock poisoned");
         if guard.is_none() {
             let db_path = self.sessions_dir.join("index.db");
@@ -769,10 +776,13 @@ mod tests {
         let messages = session.read_messages().unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0], msg1);
-        assert_eq!(messages[1], Message::Assistant {
-            content: "Hi there!".into(),
-            tool_calls: vec![],
-        });
+        assert_eq!(
+            messages[1],
+            Message::Assistant {
+                content: "Hi there!".into(),
+                tool_calls: vec![],
+            }
+        );
     }
 
     #[test]
@@ -898,12 +908,18 @@ mod tests {
 
         let messages = session.read_messages().unwrap();
         assert_eq!(messages.len(), 2);
-        assert_eq!(messages[0].clone(), Message::User {
-            content: "valid".into(),
-        });
-        assert_eq!(messages[1].clone(), Message::User {
-            content: "also valid".into(),
-        });
+        assert_eq!(
+            messages[0].clone(),
+            Message::User {
+                content: "valid".into(),
+            }
+        );
+        assert_eq!(
+            messages[1].clone(),
+            Message::User {
+                content: "also valid".into(),
+            }
+        );
     }
 
     #[test]
@@ -932,10 +948,13 @@ mod tests {
         let messages = session.read_messages().unwrap();
         assert_eq!(messages.len(), 1);
         // Content is preserved, tool_calls are not in the new format
-        assert_eq!(messages[0], Message::Assistant {
-            content: "Let me check that file.".into(),
-            tool_calls: vec![],
-        });
+        assert_eq!(
+            messages[0],
+            Message::Assistant {
+                content: "Let me check that file.".into(),
+                tool_calls: vec![],
+            }
+        );
     }
 
     #[test]
@@ -956,13 +975,16 @@ mod tests {
         let messages = session.read_messages().unwrap();
         assert_eq!(messages.len(), 1);
         // Tool messages are stored as system role with content
-        assert_eq!(messages[0], Message::Tool {
-            result: ToolResult {
-                tool_use_id: "unknown".into(),
-                content: "fn main() {}".into(),
-                is_error: false,
-            },
-        });
+        assert_eq!(
+            messages[0],
+            Message::Tool {
+                result: ToolResult {
+                    tool_use_id: "unknown".into(),
+                    content: "fn main() {}".into(),
+                    is_error: false,
+                },
+            }
+        );
     }
 
     // === Branching Tests ===
@@ -1226,14 +1248,24 @@ mod tests {
         assert_eq!(sessions.len(), 2);
 
         // Verify both sessions are found
-        let alpha = sessions.iter().find(|s| s.project == "project-alpha").unwrap();
-        let beta = sessions.iter().find(|s| s.project == "project-beta").unwrap();
+        let alpha = sessions
+            .iter()
+            .find(|s| s.project == "project-alpha")
+            .unwrap();
+        let beta = sessions
+            .iter()
+            .find(|s| s.project == "project-beta")
+            .unwrap();
 
         assert_eq!(alpha.message_count, 1);
         assert_eq!(beta.message_count, 2);
 
         // Verify previews
-        assert!(alpha.last_message_preview.contains("First message in alpha"));
+        assert!(
+            alpha
+                .last_message_preview
+                .contains("First message in alpha")
+        );
         assert!(beta.last_message_preview.contains("Reply in beta"));
     }
 
@@ -1428,8 +1460,7 @@ mod tests {
 
         manager.update_index(&source).expect("index fork");
         let recent = manager.list_recent(10).expect("list_recent");
-        let by_id: std::collections::HashSet<Uuid> =
-            recent.iter().map(|s| s.id).collect();
+        let by_id: std::collections::HashSet<Uuid> = recent.iter().map(|s| s.id).collect();
         assert!(
             by_id.contains(&fork_id),
             "list_recent should contain fork id {fork_id}; got {by_id:?}"
@@ -1469,8 +1500,7 @@ mod tests {
             })
             .expect("append should write to fork file");
 
-        let fork_contents =
-            std::fs::read_to_string(&fork_path).expect("read fork file");
+        let fork_contents = std::fs::read_to_string(&fork_path).expect("read fork file");
         assert!(
             fork_contents.contains("after fork"),
             "fork file should contain the new entry; got {fork_contents:?}"

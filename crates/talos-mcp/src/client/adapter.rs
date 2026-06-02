@@ -90,12 +90,7 @@ impl AgentTool for McpToolAdapter {
         );
         let _ = self
             .hook_registry
-            .dispatch(
-                &ctx,
-                HookEvent::OnToolCallProposed {
-                    call: &call,
-                },
-            )
+            .dispatch(&ctx, HookEvent::OnToolCallProposed { call: &call })
             .await;
 
         let result = match self.original_name() {

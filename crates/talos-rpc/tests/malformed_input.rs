@@ -18,9 +18,7 @@ async fn malformed_frames_return_expected_codes() {
     let server_task = tokio::spawn(async move { server.run(server_in, server_out).await });
 
     client_in
-        .write_all(
-            b"not json\n{\"foo\":\"bar\"}\n{\"jsonrpc\":\"1.0\",\"method\":\"x\"}\n",
-        )
+        .write_all(b"not json\n{\"foo\":\"bar\"}\n{\"jsonrpc\":\"1.0\",\"method\":\"x\"}\n")
         .await
         .expect("write malformed frames");
     client_in.shutdown().await.expect("close input");

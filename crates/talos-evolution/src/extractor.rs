@@ -175,7 +175,13 @@ mod tests {
         pattern.evidence_count = 1;
 
         let observations = vec![
-            Observation::new(SignalType::Correction, 0.7, "context1".to_string(), None, None),
+            Observation::new(
+                SignalType::Correction,
+                0.7,
+                "context1".to_string(),
+                None,
+                None,
+            ),
             Observation::new(SignalType::Error, 0.6, "context2".to_string(), None, None),
         ];
 

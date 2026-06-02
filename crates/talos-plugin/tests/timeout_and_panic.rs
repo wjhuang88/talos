@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use talos_plugin::{HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId};
+use talos_plugin::{
+    HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId,
+};
 
 struct SlowHandler {
     log: Arc<Mutex<Vec<String>>>,
@@ -25,7 +27,10 @@ impl HookHandler for SlowHandler {
 
     async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
         tokio::time::sleep(Duration::from_millis(50)).await;
-        self.log.lock().expect("log lock").push("slow-finished".to_string());
+        self.log
+            .lock()
+            .expect("log lock")
+            .push("slow-finished".to_string());
         HookResult::Continue
     }
 }
@@ -79,11 +84,19 @@ async fn timeout_fires_per_handler() {
     registry.register(Arc::new(NextHandler { log: log.clone() }));
 
     let outcome = registry
-        .dispatch(&hook_context(), HookEvent::TurnStart { turn_id: TurnId::new() })
+        .dispatch(
+            &hook_context(),
+            HookEvent::TurnStart {
+                turn_id: TurnId::new(),
+            },
+        )
         .await;
 
     assert!(matches!(outcome, talos_plugin::HookOutcome::Continue(_)));
-    assert_eq!(log.lock().expect("log lock").as_slice(), ["next".to_string()]);
+    assert_eq!(
+        log.lock().expect("log lock").as_slice(),
+        ["next".to_string()]
+    );
 }
 
 #[tokio::test]
@@ -94,7 +107,12 @@ async fn panic_aborts_chain_fail_safe() {
     registry.register(Arc::new(NextHandler { log: log.clone() }));
 
     let outcome = registry
-        .dispatch(&hook_context(), HookEvent::TurnStart { turn_id: TurnId::new() })
+        .dispatch(
+            &hook_context(),
+            HookEvent::TurnStart {
+                turn_id: TurnId::new(),
+            },
+        )
         .await;
 
     assert!(matches!(outcome, talos_plugin::HookOutcome::Continue(_)));

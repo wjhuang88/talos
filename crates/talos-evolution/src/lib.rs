@@ -6,11 +6,11 @@
 //! 3. Store: Persist patterns with confidence scores
 //! 4. Apply: Inject high-confidence patterns into system prompt
 
-pub mod observer;
-pub mod extractor;
-pub mod store;
 pub mod adapter;
+pub mod extractor;
 pub mod hook;
+pub mod observer;
+pub mod store;
 
 pub use hook::EvolutionHookHandler;
 
@@ -148,11 +148,7 @@ impl Observation {
 
 impl Pattern {
     /// Create a new pattern with the current timestamp.
-    pub fn new(
-        description: String,
-        instruction: String,
-        category: String,
-    ) -> Self {
+    pub fn new(description: String, instruction: String, category: String) -> Self {
         let now = Utc::now();
         Self {
             id: uuid::Uuid::new_v4().to_string(),

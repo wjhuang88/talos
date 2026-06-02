@@ -155,10 +155,9 @@ mod linux {
                 return Err(SandboxError::NotAvailable);
             }
 
-            let workspace = config
-                .workspace_root
-                .to_str()
-                .ok_or_else(|| SandboxError::ExecutionFailed("workspace path is not valid UTF-8".into()))?;
+            let workspace = config.workspace_root.to_str().ok_or_else(|| {
+                SandboxError::ExecutionFailed("workspace path is not valid UTF-8".into())
+            })?;
 
             let mut cmd = Command::new("bwrap");
 
@@ -181,10 +180,9 @@ mod linux {
             cmd.arg("--die-with-parent");
             cmd.args(["--", "sh", "-c", command]);
 
-            let output = cmd
-                .output()
-                .await
-                .map_err(|e| SandboxError::ExecutionFailed(format!("failed to spawn bwrap: {e}")))?;
+            let output = cmd.output().await.map_err(|e| {
+                SandboxError::ExecutionFailed(format!("failed to spawn bwrap: {e}"))
+            })?;
 
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -245,13 +243,12 @@ mod macos {
 
         /// Generates a Seatbelt profile string based on the configuration.
         pub(crate) fn generate_profile(config: &SandboxConfig) -> Result<String, SandboxError> {
-            let workspace = config
-                .workspace_root
-                .canonicalize()
-                .map_err(|e| SandboxError::ExecutionFailed(format!("cannot canonicalize workspace: {e}")))?;
-            let workspace = workspace
-                .to_str()
-                .ok_or_else(|| SandboxError::ExecutionFailed("workspace path is not valid UTF-8".into()))?;
+            let workspace = config.workspace_root.canonicalize().map_err(|e| {
+                SandboxError::ExecutionFailed(format!("cannot canonicalize workspace: {e}"))
+            })?;
+            let workspace = workspace.to_str().ok_or_else(|| {
+                SandboxError::ExecutionFailed("workspace path is not valid UTF-8".into())
+            })?;
 
             let mut profile = String::new();
 
@@ -298,17 +295,17 @@ mod macos {
 
             let profile = Self::generate_profile(config)?;
 
-            let mut profile_file = tempfile::NamedTempFile::new()
-                .map_err(|e| SandboxError::ExecutionFailed(format!("failed to create temp profile: {e}")))?;
+            let mut profile_file = tempfile::NamedTempFile::new().map_err(|e| {
+                SandboxError::ExecutionFailed(format!("failed to create temp profile: {e}"))
+            })?;
 
-            profile_file
-                .write_all(profile.as_bytes())
-                .map_err(|e| SandboxError::ExecutionFailed(format!("failed to write profile: {e}")))?;
+            profile_file.write_all(profile.as_bytes()).map_err(|e| {
+                SandboxError::ExecutionFailed(format!("failed to write profile: {e}"))
+            })?;
 
-            let profile_path = profile_file
-                .path()
-                .to_str()
-                .ok_or_else(|| SandboxError::ExecutionFailed("profile path is not valid UTF-8".into()))?;
+            let profile_path = profile_file.path().to_str().ok_or_else(|| {
+                SandboxError::ExecutionFailed("profile path is not valid UTF-8".into())
+            })?;
 
             let output = Command::new("sandbox-exec")
                 .arg("-f")
@@ -316,7 +313,9 @@ mod macos {
                 .args(["sh", "-c", command])
                 .output()
                 .await
-                .map_err(|e| SandboxError::ExecutionFailed(format!("failed to spawn sandbox-exec: {e}")))?;
+                .map_err(|e| {
+                    SandboxError::ExecutionFailed(format!("failed to spawn sandbox-exec: {e}"))
+                })?;
 
             drop(profile_file);
 

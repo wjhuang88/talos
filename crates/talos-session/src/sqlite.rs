@@ -11,7 +11,7 @@
 //! - `messages_fts` FTS5 virtual table: full-text searchable message content
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension, Result as RusqliteResult};
+use rusqlite::{Connection, OptionalExtension, Result as RusqliteResult, params};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use uuid::Uuid;
@@ -159,9 +159,9 @@ impl SessionIndex {
     ///
     /// Returns an error if the index cannot be updated.
     pub fn index_session(&mut self, session: &Session) -> Result<(), IndexError> {
-        let entries = session.read_entries().map_err(|e| {
-            IndexError::IoError(std::io::Error::other(e.to_string()))
-        })?;
+        let entries = session
+            .read_entries()
+            .map_err(|e| IndexError::IoError(std::io::Error::other(e.to_string())))?;
 
         let tx = self.conn.transaction()?;
 
@@ -298,8 +298,13 @@ impl SessionIndex {
                 let message_count: i64 = row.get(2)?;
                 let updated_at_str: String = row.get(3)?;
 
-                let id = Uuid::parse_str(&id_str)
-                    .map_err(|_e| rusqlite::Error::InvalidColumnType(0, "uuid".to_string(), rusqlite::types::Type::Text))?;
+                let id = Uuid::parse_str(&id_str).map_err(|_e| {
+                    rusqlite::Error::InvalidColumnType(
+                        0,
+                        "uuid".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?;
 
                 let timestamp = DateTime::parse_from_rfc3339(&updated_at_str)
                     .map(|dt| dt.with_timezone(&Utc))
@@ -345,8 +350,13 @@ impl SessionIndex {
                 let message_count: i64 = row.get(2)?;
                 let updated_at_str: String = row.get(3)?;
 
-                let id = Uuid::parse_str(&id_str)
-                    .map_err(|_e| rusqlite::Error::InvalidColumnType(0, "uuid".to_string(), rusqlite::types::Type::Text))?;
+                let id = Uuid::parse_str(&id_str).map_err(|_e| {
+                    rusqlite::Error::InvalidColumnType(
+                        0,
+                        "uuid".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?;
 
                 let timestamp = DateTime::parse_from_rfc3339(&updated_at_str)
                     .map(|dt| dt.with_timezone(&Utc))
@@ -499,7 +509,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(table_count, 2, "Both sessions and messages_fts tables should exist");
+        assert_eq!(
+            table_count, 2,
+            "Both sessions and messages_fts tables should exist"
+        );
     }
 
     #[test]
@@ -542,7 +555,10 @@ mod tests {
         index.index_session(&session).unwrap();
 
         let results = index.search("ranking BM25", 10).unwrap();
-        assert!(!results.is_empty(), "Should find results for 'ranking BM25'");
+        assert!(
+            !results.is_empty(),
+            "Should find results for 'ranking BM25'"
+        );
 
         for i in 1..results.len() {
             assert!(
@@ -561,7 +577,10 @@ mod tests {
         index.index_session(&session).unwrap();
 
         let results = index.search("nonexistent_term_xyz_12345", 10).unwrap();
-        assert!(results.is_empty(), "Should return empty results for non-matching query");
+        assert!(
+            results.is_empty(),
+            "Should return empty results for non-matching query"
+        );
     }
 
     #[test]
@@ -576,7 +595,10 @@ mod tests {
         let results_limited = index.search("session", 2).unwrap();
 
         assert!(results_limited.len() <= 2, "Should respect limit");
-        assert!(results_limited.len() <= results_all.len(), "Limited results should not exceed all results");
+        assert!(
+            results_limited.len() <= results_all.len(),
+            "Limited results should not exceed all results"
+        );
     }
 
     #[test]
@@ -591,7 +613,10 @@ mod tests {
         assert!(!results.is_empty(), "Should find results for 'Rust'");
 
         let found_highlight = results.iter().any(|r| r.snippet.contains("<b>"));
-        assert!(found_highlight, "Snippet should contain highlighted matches");
+        assert!(
+            found_highlight,
+            "Snippet should contain highlighted matches"
+        );
     }
 
     #[test]
@@ -621,7 +646,10 @@ mod tests {
         let recent = index.list_recent(10).unwrap();
         assert_eq!(recent.len(), 2, "Should return both sessions");
 
-        assert_eq!(recent[0].id, session2.id, "Most recent session should be first");
+        assert_eq!(
+            recent[0].id, session2.id,
+            "Most recent session should be first"
+        );
         assert_eq!(recent[1].id, session1.id, "Older session should be second");
     }
 
@@ -633,7 +661,9 @@ mod tests {
         index.init_schema().unwrap();
 
         for i in 0..5 {
-            let session = manager.create_session(&format!("project-limit-{i}")).unwrap();
+            let session = manager
+                .create_session(&format!("project-limit-{i}"))
+                .unwrap();
             session
                 .append(&Message::User {
                     content: format!("Message in project {i}"),
@@ -668,7 +698,10 @@ mod tests {
         let (index, _dir) = temp_index();
 
         let info = index.get_session_info("nonexistent-id").unwrap();
-        assert!(info.is_none(), "Should return None for non-existent session");
+        assert!(
+            info.is_none(),
+            "Should return None for non-existent session"
+        );
     }
 
     #[test]
@@ -695,10 +728,17 @@ mod tests {
 
         let info = index.get_session_info(&session.id.to_string()).unwrap();
         assert!(info.is_some());
-        assert_eq!(info.unwrap().message_count, 2, "Message count should be updated");
+        assert_eq!(
+            info.unwrap().message_count,
+            2,
+            "Message count should be updated"
+        );
 
         let results = index.search("message", 100).unwrap();
-        let unique_count = results.iter().filter(|r| r.session_id == session.id.to_string()).count();
+        let unique_count = results
+            .iter()
+            .filter(|r| r.session_id == session.id.to_string())
+            .count();
         assert_eq!(unique_count, 2, "Should not have duplicate entries");
     }
 
@@ -726,7 +766,10 @@ mod tests {
         assert!(!results.is_empty());
 
         for result in &results {
-            assert!(result.timestamp.year() > 2020, "Timestamp should be reasonable");
+            assert!(
+                result.timestamp.year() > 2020,
+                "Timestamp should be reasonable"
+            );
         }
     }
 
@@ -821,6 +864,9 @@ mod tests {
         let fork = &forks[0];
         assert_eq!(fork.fork_entry_id, "entry-123");
         assert_eq!(fork.forked_session_id, "forked-1");
-        assert!(fork.forked_at.year() > 2020, "Timestamp should be reasonable");
+        assert!(
+            fork.forked_at.year() > 2020,
+            "Timestamp should be reasonable"
+        );
     }
 }

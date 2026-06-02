@@ -68,7 +68,11 @@ impl HookRegistry {
     }
 
     /// Dispatches a hook event sequentially to all subscribed handlers.
-    pub async fn dispatch<'a>(&self, ctx: &HookContext, mut event: HookEvent<'a>) -> HookOutcome<'a> {
+    pub async fn dispatch<'a>(
+        &self,
+        ctx: &HookContext,
+        mut event: HookEvent<'a>,
+    ) -> HookOutcome<'a> {
         let kind = event.kind();
         let Some(handlers) = self.handlers.get(&kind) else {
             return HookOutcome::Continue(event);
@@ -137,9 +141,17 @@ mod tests {
             .expect("runtime");
         runtime.block_on(async {
             let outcome = registry
-                .dispatch(&ctx, HookEvent::TurnStart { turn_id: ctx.turn_id })
+                .dispatch(
+                    &ctx,
+                    HookEvent::TurnStart {
+                        turn_id: ctx.turn_id,
+                    },
+                )
                 .await;
-            assert!(matches!(outcome, HookOutcome::Continue(HookEvent::TurnStart { .. })));
+            assert!(matches!(
+                outcome,
+                HookOutcome::Continue(HookEvent::TurnStart { .. })
+            ));
         });
     }
 }

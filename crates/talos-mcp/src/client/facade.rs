@@ -13,14 +13,11 @@ pub fn decode_tools_list(result: Value, server: &str) -> Result<Vec<Tool>> {
     let raw_tools = if let Some(array) = result.as_array() {
         Value::Array(array.clone())
     } else {
-        result
-            .get("tools")
-            .cloned()
-            .ok_or_else(|| McpError::Rpc {
-                server: server.to_string(),
-                method: "tools/list".to_string(),
-                message: "missing 'tools' field in result".to_string(),
-            })?
+        result.get("tools").cloned().ok_or_else(|| McpError::Rpc {
+            server: server.to_string(),
+            method: "tools/list".to_string(),
+            message: "missing 'tools' field in result".to_string(),
+        })?
     };
 
     serde_json::from_value(raw_tools).map_err(McpError::from)
@@ -66,7 +63,10 @@ pub fn tool_is_read_only(tool: &Tool) -> bool {
     value
         .get("annotations")
         .and_then(Value::as_object)
-        .and_then(|ann| ann.get("readOnlyHint").or_else(|| ann.get("read_only_hint")))
+        .and_then(|ann| {
+            ann.get("readOnlyHint")
+                .or_else(|| ann.get("read_only_hint"))
+        })
         .and_then(Value::as_bool)
         .unwrap_or(false)
 }

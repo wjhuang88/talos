@@ -42,9 +42,10 @@ docs/iterations/
 | I007 | Skilled Agent | Complete | ✅ |
 | I008 | Learning Agent | **Active** (impl landed 2026-06-01; TUI made default 2026-06-01) | 🛠️ Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all 3 paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). TUI is now the default TTY mode (legacy readline REPL retained as `--repl`). Awaiting final review. See `I008-learning-agent.md` for the new plan + Execution Record. |
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
-| I009 | Extensible Agent | **Complete** (2026-06-01) | 5/5 stories shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance); 501 tests pass; E2E runtime evidence in `I009-extensible-agent.md` Execution Record. S1 TUI consumer markers + `/plugins` command deferred to a follow-up per ADR-009. |
+| I009 | Extensible Agent | **Review** (runtime surface landed 2026-06-01) | Backend/runtime surface shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance producers); E2E runtime evidence in `I009-extensible-agent.md`. TUI consumer markers + `/plugins` command remain follow-up work, so I009 is not Complete yet. |
 | I010 | Polished Agent | Planned | See `I010-polished-agent.md` |
 | I011 | Open Providers | **Active** (S1 landed 2026-06-02) | 🛠️ OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var. S1 (base_url plumbing) shipped; S2 (provider-plugin architecture) is a separate follow-up. See `I011-open-providers.md`. |
+| I012 | Portable Tools | Planned | Native POSIX-style tool subset plus embeddable tool-pack registration to reduce host environment dependency. See `I012-portable-tools.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -57,6 +58,7 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | Round | When | Work Items | Promotion Rule |
 |-------|------|------------|----------------|
 | R0: Remediation Gate | ✅ Done (2026-06-01) | `R0-remediation-gate.md` | All 7 ARCH stories closed; runtime evidence recorded |
-| R1: I009 Extensibility | ✅ Done (2026-06-01) | `I009-extensible-agent.md` | All 5 stories shipped; E2E runtime evidence recorded; 501 tests pass |
+| R1: I009 Extensibility | Review | `I009-extensible-agent.md` | Runtime surface landed; TUI provenance consumer work remains before Complete |
 | R2: I010 Architecture Slice | After I008 Review | `I010-polished-agent.md` / Slice R2 | I008 no longer blocks on this round (re-scoped 2026-06-01: AppServerSession seam is for cross-Agent / cross-session / UI status cleanup, not evolution wiring) |
 | R3: I010 Product Polish | After R2 | `I010-polished-agent.md` / Slice R3 | Move I010 to Review when daily-use TUI workflows are verified end-to-end |
+| R4: I012 Portable Tools | After I010/R3 or when environment-dependency reduction becomes release-critical | `I012-portable-tools.md` | Native POSIX subset works on a minimal `PATH`; tool-pack interface supports future plugin-provided local tools |

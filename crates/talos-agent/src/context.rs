@@ -326,7 +326,7 @@ mod tests {
     fn test_missing_agents_md_skipped_gracefully() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let fake_home = TempDir::new().expect("failed to create fake home");
-        
+
         unsafe {
             std::env::set_var("HOME", fake_home.path());
         }
@@ -409,7 +409,8 @@ mod tests {
     #[test]
     fn test_whitespace_only_agents_md_skipped() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        fs::write(temp_dir.path().join(AGENTS_MD), "   \n\n  ").expect("failed to write whitespace file");
+        fs::write(temp_dir.path().join(AGENTS_MD), "   \n\n  ")
+            .expect("failed to write whitespace file");
 
         let loader = ContextLoader::new(temp_dir.path().to_path_buf());
         let context = loader.load().expect("load failed");

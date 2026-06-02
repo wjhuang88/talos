@@ -149,6 +149,7 @@ Closes the #I004-S5 false-complete. Real runtime effect (no longer a security il
   - `</b>` → `{RESET}{NORD13}` (closes the styling)
 - Test `highlight_snippet_replaces_b_tags` extended with
   `assert!(!output.contains("BOLD"), "Output should not contain literal 'BOLD' text")`.
+- Re-verified after follow-up review: the implementation and test now match this record.
 
 ### Verification
 

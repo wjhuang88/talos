@@ -97,15 +97,18 @@ impl<'de> Deserialize<'de> for PermissionDecision {
             },
             Value::Object(mut map) => {
                 if let Some(reason) = map.remove("Deny") {
-                    let reason = reason.as_str().map(String::from).ok_or_else(|| {
-                        Error::custom("Deny reason must be a string")
-                    })?;
+                    let reason = reason
+                        .as_str()
+                        .map(String::from)
+                        .ok_or_else(|| Error::custom("Deny reason must be a string"))?;
                     Ok(PermissionDecision::Deny(reason))
                 } else {
                     Err(Error::custom("expected Deny variant"))
                 }
             }
-            _ => Err(Error::custom("expected string or object for PermissionDecision")),
+            _ => Err(Error::custom(
+                "expected string or object for PermissionDecision",
+            )),
         }
     }
 }
@@ -153,9 +156,8 @@ impl PermissionRule {
                 )
             })?;
 
-            let glob = Pattern::new(pattern).map_err(|e| {
-                PermissionError::InvalidGlobPattern(format!("{pattern}: {e}"))
-            })?;
+            let glob = Pattern::new(pattern)
+                .map_err(|e| PermissionError::InvalidGlobPattern(format!("{pattern}: {e}")))?;
 
             return Ok(glob.matches(path));
         }
@@ -288,16 +290,13 @@ impl PermissionEngine {
             .get("rules")
             .and_then(Value::as_array)
             .ok_or_else(|| {
-                PermissionError::InvalidRule(
-                    "config must contain a 'rules' array".to_owned(),
-                )
+                PermissionError::InvalidRule("config must contain a 'rules' array".to_owned())
             })?;
 
         let mut custom_rules = Vec::new();
         for (i, rule_value) in rules_array.iter().enumerate() {
-            let rule: PermissionRule = serde_json::from_value(rule_value.clone()).map_err(|e| {
-                PermissionError::InvalidRule(format!("rule at index {i}: {e}"))
-            })?;
+            let rule: PermissionRule = serde_json::from_value(rule_value.clone())
+                .map_err(|e| PermissionError::InvalidRule(format!("rule at index {i}: {e}")))?;
             custom_rules.push(rule);
         }
 
@@ -478,7 +477,10 @@ mod tests {
         });
 
         let decision = engine.evaluate("write", &serde_json::json!({"path": "tests/main.rs"}));
-        assert_eq!(decision, PermissionDecision::Deny("only src allowed".to_owned()));
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("only src allowed".to_owned())
+        );
 
         let decision = engine.evaluate("write", &serde_json::json!({"path": "src/lib.rs"}));
         assert_eq!(decision, PermissionDecision::Allow);
@@ -522,7 +524,10 @@ mod tests {
         assert_eq!(decision, PermissionDecision::Allow);
 
         let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
-        assert_eq!(decision, PermissionDecision::Deny("write not allowed".to_owned()));
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("write not allowed".to_owned())
+        );
     }
 
     // --- Load from config tests ---
@@ -545,7 +550,9 @@ mod tests {
             ]
         });
 
-        engine.load_from_config(&config).expect("config should load");
+        engine
+            .load_from_config(&config)
+            .expect("config should load");
 
         // Custom bash rule is prepended, so it matches first
         let decision = engine.evaluate("bash", &serde_json::json!({"command": "ls"}));

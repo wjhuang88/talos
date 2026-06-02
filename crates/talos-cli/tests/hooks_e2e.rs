@@ -8,7 +8,11 @@ fn logging_handler_emits_hook_lines_in_print_mode() {
         .output()
         .expect("run talos binary");
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("LoggingHandler"), "stderr: {stderr}");

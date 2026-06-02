@@ -58,14 +58,14 @@ async fn server_handshake_lists_tools() {
     let (server_read, server_write) = tokio::io::split(server_io);
 
     let server_task = tokio::spawn(async move {
-        let running = handler.serve((server_read, server_write)).await.expect("server starts");
+        let running = handler
+            .serve((server_read, server_write))
+            .await
+            .expect("server starts");
         let _ = running.waiting().await;
     });
 
-    let client = ()
-        .serve((client_read, client_write))
-        .await
-        .expect("client starts");
+    let client = ().serve((client_read, client_write)).await.expect("client starts");
     let tools = client
         .peer()
         .list_tools(Some(PaginatedRequestParams::default()))

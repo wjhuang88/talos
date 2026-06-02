@@ -59,14 +59,14 @@ async fn server_permission_deny_returns_error_and_no_execution() {
     let (server_read, server_write) = tokio::io::split(server_io);
 
     let server_task = tokio::spawn(async move {
-        let running = handler.serve((server_read, server_write)).await.expect("server starts");
+        let running = handler
+            .serve((server_read, server_write))
+            .await
+            .expect("server starts");
         let _ = running.waiting().await;
     });
 
-    let client = ()
-        .serve((client_read, client_write))
-        .await
-        .expect("client starts");
+    let client = ().serve((client_read, client_write)).await.expect("client starts");
 
     let _tools = client
         .peer()
@@ -86,7 +86,10 @@ async fn server_permission_deny_returns_error_and_no_execution() {
         .expect_err("permission denied must return error");
 
     let msg = error.to_string();
-    assert!(msg.contains("-326") || msg.contains("-320") || msg.contains("-32"), "{msg}");
+    assert!(
+        msg.contains("-326") || msg.contains("-320") || msg.contains("-32"),
+        "{msg}"
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0, "tool should not execute");
 
     let _ = client.cancel().await;

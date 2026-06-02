@@ -2,7 +2,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use talos_plugin::{HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId};
+use talos_plugin::{
+    HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId,
+};
 
 struct RecordingHandler {
     name: &'static str,
@@ -21,7 +23,10 @@ impl HookHandler for RecordingHandler {
     }
 
     async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
-        self.log.lock().expect("log lock").push(self.name.to_string());
+        self.log
+            .lock()
+            .expect("log lock")
+            .push(self.name.to_string());
         match &self.result {
             HookResult::Continue => HookResult::Continue,
             HookResult::Skip => HookResult::Skip,
@@ -95,7 +100,10 @@ async fn skip_short_circuits() {
         .await;
 
     assert!(matches!(outcome, talos_plugin::HookOutcome::Skip(_)));
-    assert_eq!(log.lock().expect("log lock").as_slice(), ["first".to_string()]);
+    assert_eq!(
+        log.lock().expect("log lock").as_slice(),
+        ["first".to_string()]
+    );
 }
 
 #[tokio::test]

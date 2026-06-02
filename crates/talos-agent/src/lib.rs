@@ -40,8 +40,8 @@ use talos_plugin::{
 use talos_sandbox::{SandboxConfig, SandboxError, SandboxProvider, SandboxResult};
 use talos_skill::SkillIndex;
 use thiserror::Error;
-use tokio::sync::broadcast;
 use tokio::sync::Semaphore;
+use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 pub use prompt::{ContextFile, SystemPromptBuilder, ToolDescription};
@@ -376,17 +376,15 @@ impl Agent {
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
 
-        let (result, final_status) = 'turn_loop: loop {
-            match self
-                .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
-                .await
-            {
-                Ok(_) => {}
-                Err(error) => {
-                    break (Err(error), TurnStatus::Denied);
-                }
-            }
+        if let Err(error) = self
+            .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
+            .await
+        {
+            self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
+            return Err(error);
+        }
 
+        let (result, final_status) = 'turn_loop: loop {
             let provider_messages = match self
                 .run_hook(
                     &hook_ctx,
@@ -408,12 +406,12 @@ impl Agent {
                 Ok(rx) => rx,
                 Err(error) => {
                     let _ = self
-                        .run_hook(
-                            &hook_ctx,
-                            HookEvent::OnProviderError { error: &error },
-                        )
+                        .run_hook(&hook_ctx, HookEvent::OnProviderError { error: &error })
                         .await;
-                    break (Err(AgentError::ProviderError(error)), TurnStatus::ProviderError);
+                    break (
+                        Err(AgentError::ProviderError(error)),
+                        TurnStatus::ProviderError,
+                    );
                 }
             };
 
@@ -458,7 +456,10 @@ impl Agent {
                             }
                         }
                     }
-                    AgentEvent::TurnEnd { stop_reason, usage: turn_usage } => {
+                    AgentEvent::TurnEnd {
+                        stop_reason,
+                        usage: turn_usage,
+                    } => {
                         saw_turn_end = true;
                         usage = turn_usage;
                         let reason = Self::turn_end_reason(stop_reason);
@@ -501,7 +502,9 @@ impl Agent {
 
             if !saw_turn_end {
                 break 'turn_loop (
-                    Err(AgentError::UnexpectedEvent("channel closed before TurnEnd".into())),
+                    Err(AgentError::UnexpectedEvent(
+                        "channel closed before TurnEnd".into(),
+                    )),
                     TurnStatus::UnexpectedEvent,
                 );
             }
@@ -539,7 +542,10 @@ impl Agent {
                         },
                     )
                     .await;
-                break 'turn_loop (Err(AgentError::TurnBudgetExceeded), TurnStatus::BudgetExceeded);
+                break 'turn_loop (
+                    Err(AgentError::TurnBudgetExceeded),
+                    TurnStatus::BudgetExceeded,
+                );
             }
 
             for call in &effective_tool_calls {
@@ -603,7 +609,9 @@ impl Agent {
                     .await
                 {
                     Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved { observation }))
-                    | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => observation.clone(),
+                    | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => {
+                        observation.clone()
+                    }
                     Ok(_) => observation,
                     Err(error) => {
                         break 'turn_loop (Err(error), TurnStatus::Denied);
@@ -697,7 +705,9 @@ impl Agent {
 
         for idx in write_indices {
             let call = &calls[idx];
-            let result = self.execute_single_tool(hook_ctx, &self.tools, call).await?;
+            let result = self
+                .execute_single_tool(hook_ctx, &self.tools, call)
+                .await?;
             results[idx] = Some(result);
         }
 
@@ -769,14 +779,18 @@ impl Agent {
         let tool = match registry.get(&call.name) {
             Some(t) => t,
             None => {
-                return Ok(ToolExecutionResult::error(format!("tool not found: {}", call.name)));
+                return Ok(ToolExecutionResult::error(format!(
+                    "tool not found: {}",
+                    call.name
+                )));
             }
         };
 
         let result = if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
-                    self.execute_bash_in_sandbox(hook_ctx, sb, &call.input).await
+                    self.execute_bash_in_sandbox(hook_ctx, sb, &call.input)
+                        .await
                 } else {
                     tool.execute(call.input.clone()).await
                 }
@@ -829,9 +843,7 @@ impl Agent {
         let command = match self
             .run_hook(
                 hook_ctx,
-                HookEvent::BeforeBashSandboxExec {
-                    command: &command,
-                },
+                HookEvent::BeforeBashSandboxExec { command: &command },
             )
             .await
         {
@@ -854,9 +866,7 @@ impl Agent {
         let result = match sandbox.execute(&command, &config).await {
             Ok(result) => Self::sandbox_result_to_tool_result(result),
             Err(SandboxError::NotAvailable) => {
-                ToolExecutionResult::error(
-                    "sandbox became unavailable during execution".to_owned(),
-                )
+                ToolExecutionResult::error("sandbox became unavailable during execution".to_owned())
             }
             Err(SandboxError::ExecutionFailed(reason)) => {
                 ToolExecutionResult::error(format!("sandbox execution failed: {reason}"))
@@ -951,8 +961,8 @@ mod tests {
     use talos_core::message::StopReason;
     use talos_core::provider::ProviderResult;
     use talos_core::tool::{AgentTool, ToolResult as ToolExecutionResult};
-    use tokio::sync::mpsc;
     use tokio::sync::Mutex;
+    use tokio::sync::mpsc;
 
     type Receiver<T> = mpsc::Receiver<T>;
 
@@ -1041,9 +1051,36 @@ mod tests {
         }
     }
 
+    struct CountingHook {
+        events: Arc<Mutex<Vec<talos_plugin::HookEventKind>>>,
+    }
 
+    #[async_trait]
+    impl talos_plugin::HookHandler for CountingHook {
+        fn name(&self) -> &str {
+            "counting"
+        }
+
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[
+                talos_plugin::HookEventKind::TurnStart,
+                talos_plugin::HookEventKind::BeforeProviderCall,
+                talos_plugin::HookEventKind::TurnComplete,
+            ]
+        }
+
+        async fn on_event(
+            &self,
+            _ctx: &talos_plugin::HookContext,
+            event: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            self.events.lock().await.push(event.kind());
+            talos_plugin::HookResult::Continue
+        }
+    }
 
     #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_run_collects_text_deltas() {
         let events = vec![
             AgentEvent::TurnStart,
@@ -1062,6 +1099,83 @@ mod tests {
         let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
         let response = agent.run("Hi".into()).await.unwrap();
         assert_eq!(response, "Hello, world!");
+    }
+
+    #[tokio::test]
+    async fn test_turn_start_hook_fires_once_for_tool_turn() {
+        let call = ToolCall {
+            id: "call-1".into(),
+            name: "read".into(),
+            input: serde_json::json!({}),
+        };
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call,
+                    provenance: Default::default(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "done".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let mut hooks = HookRegistry::new();
+        hooks.register(Arc::new(CountingHook {
+            events: events.clone(),
+        }));
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "read".into(),
+            read_only: true,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("file content"),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+        }));
+
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(MockModel::new(responses)),
+            registry,
+            Some(Arc::new(PermissionEngine::new())),
+            None,
+            PathBuf::from("/tmp"),
+            Arc::new(hooks),
+        );
+
+        let response = agent.run("read file".into()).await.unwrap();
+        assert_eq!(response, "done");
+
+        let events = events.lock().await;
+        let turn_start_count = events
+            .iter()
+            .filter(|kind| **kind == talos_plugin::HookEventKind::TurnStart)
+            .count();
+        let provider_call_count = events
+            .iter()
+            .filter(|kind| **kind == talos_plugin::HookEventKind::BeforeProviderCall)
+            .count();
+        assert_eq!(
+            turn_start_count, 1,
+            "TurnStart should fire once per user turn"
+        );
+        assert_eq!(
+            provider_call_count, 2,
+            "provider can be called multiple times in one user turn"
+        );
     }
 
     #[tokio::test]
@@ -1137,7 +1251,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1181,14 +1296,16 @@ mod tests {
                         name: "read".into(),
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "read".into(),
                         input: serde_json::json!({ "path": "b.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1232,21 +1349,24 @@ mod tests {
                         name: "fast_read".into(),
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "fast_read".into(),
                         input: serde_json::json!({ "path": "b.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_3".into(),
                         name: "fast_read".into(),
                         input: serde_json::json!({ "path": "c.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1278,13 +1398,22 @@ mod tests {
         let _response = agent.run("Read files".into()).await.unwrap();
 
         let log_entries = log.lock().await;
-        let starts: Vec<_> = log_entries.iter().filter(|e| e.starts_with("start:")).collect();
-        let ends: Vec<_> = log_entries.iter().filter(|e| e.starts_with("end:")).collect();
+        let starts: Vec<_> = log_entries
+            .iter()
+            .filter(|e| e.starts_with("start:"))
+            .collect();
+        let ends: Vec<_> = log_entries
+            .iter()
+            .filter(|e| e.starts_with("end:"))
+            .collect();
 
         assert_eq!(starts.len(), 3);
         assert_eq!(ends.len(), 3);
 
-        let last_start_idx = log_entries.iter().position(|e| e.starts_with("end:")).unwrap_or(3);
+        let last_start_idx = log_entries
+            .iter()
+            .position(|e| e.starts_with("end:"))
+            .unwrap_or(3);
         assert!(
             last_start_idx >= 3,
             "Expected all starts before any end, but log was: {:?}",
@@ -1304,14 +1433,16 @@ mod tests {
                         name: "write".into(),
                         input: serde_json::json!({ "path": "a.txt", "content": "a" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "write".into(),
                         input: serde_json::json!({ "path": "b.txt", "content": "b" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1362,7 +1493,8 @@ mod tests {
                     name: "echo".into(),
                     input: serde_json::json!({ "message": format!("msg_{i}") }),
                 },
-            provenance: Default::default(),});
+                provenance: Default::default(),
+            });
         }
         events.push(AgentEvent::TurnEnd {
             stop_reason: StopReason::ToolUse,
@@ -1398,7 +1530,8 @@ mod tests {
                     name: "echo".into(),
                     input: serde_json::json!({ "message": format!("msg_{i}") }),
                 },
-            provenance: Default::default(),});
+                provenance: Default::default(),
+            });
         }
         tool_events.push(AgentEvent::TurnEnd {
             stop_reason: StopReason::ToolUse,
@@ -1443,7 +1576,8 @@ mod tests {
                 name: "echo".into(),
                 input: serde_json::json!({ "message": "same" }),
             },
-        provenance: Default::default(),};
+            provenance: Default::default(),
+        };
 
         let responses = vec![
             vec![
@@ -1502,7 +1636,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "first" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1516,7 +1651,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "second" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1560,7 +1696,8 @@ mod tests {
                         name: "nonexistent_tool".into(),
                         input: serde_json::json!({}),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1578,10 +1715,7 @@ mod tests {
             ],
         ];
 
-        let agent = Agent::new(
-            Arc::new(MockModel::new(responses)),
-            ToolRegistry::new(),
-        );
+        let agent = Agent::new(Arc::new(MockModel::new(responses)), ToolRegistry::new());
         let result = agent.run("Missing tool".into()).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Tool not available");
@@ -1599,7 +1733,8 @@ mod tests {
                         name: "failing".into(),
                         input: serde_json::json!({}),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1644,21 +1779,24 @@ mod tests {
                         name: "read".into(),
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_2".into(),
                         name: "write".into(),
                         input: serde_json::json!({ "path": "b.txt", "content": "b" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "call_3".into(),
                         name: "read".into(),
                         input: serde_json::json!({ "path": "c.txt" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1699,8 +1837,14 @@ mod tests {
         assert_eq!(result.unwrap(), "Mixed tools done");
 
         let log_entries = log.lock().await;
-        let write_start_idx = log_entries.iter().position(|e| e.starts_with("start:write:")).unwrap();
-        let write_end_idx = log_entries.iter().position(|e| e.starts_with("end:write:")).unwrap();
+        let write_start_idx = log_entries
+            .iter()
+            .position(|e| e.starts_with("start:write:"))
+            .unwrap();
+        let write_end_idx = log_entries
+            .iter()
+            .position(|e| e.starts_with("end:write:"))
+            .unwrap();
         assert_eq!(
             write_end_idx,
             write_start_idx + 1,
@@ -1712,10 +1856,7 @@ mod tests {
     #[tokio::test]
     #[allow(deprecated)] // Agent::new is correct for unit tests
     async fn test_cancellation_token_is_created() {
-        let agent = Agent::new(
-            Arc::new(MockModel::new(vec![])),
-            ToolRegistry::new(),
-        );
+        let agent = Agent::new(Arc::new(MockModel::new(vec![])), ToolRegistry::new());
         let token = agent.cancellation_token();
         assert!(!token.is_cancelled());
         token.cancel();
@@ -1734,7 +1875,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "test" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1782,8 +1924,6 @@ mod tests {
             events
         );
     }
-
-
 
     /// Mock sandbox that tracks execution and returns configurable results.
     struct MockSandbox {
@@ -1854,7 +1994,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1912,7 +2053,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -1970,7 +2112,8 @@ mod tests {
                         name: "echo".into(),
                         input: serde_json::json!({ "message": "hello" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -2029,7 +2172,8 @@ mod tests {
                         name: "bash".into(),
                         input: serde_json::json!({ "command": "echo hello" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -2088,7 +2232,8 @@ mod tests {
                         name: "bash".into(),
                         input: serde_json::json!({ "command": "echo hello" }),
                     },
-                provenance: Default::default(),},
+                    provenance: Default::default(),
+                },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
                     usage: talos_core::message::Usage::default(),
@@ -2194,11 +2339,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_bash_in_sandbox_missing_command() {
-        let sandbox = MockSandbox::new(true, SandboxResult {
-            stdout: String::new(),
-            stderr: String::new(),
-            exit_code: 0,
-        });
+        let sandbox = MockSandbox::new(
+            true,
+            SandboxResult {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+            },
+        );
 
         let input = serde_json::json!({});
         let agent = Agent::with_security(

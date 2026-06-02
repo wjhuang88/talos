@@ -51,10 +51,5 @@ pub trait LanguageModel: Send + Sync {
     ///
     /// Returns a [`ProviderError`] if the request cannot be initiated
     /// (e.g., authentication failure, network error, invalid response).
-    async fn stream(
-        &self,
-        messages: &[Message],
-    ) -> ProviderResult<Receiver<AgentEvent>>;
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>>;
 }
-
-

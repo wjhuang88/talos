@@ -40,7 +40,7 @@
 1. **`talos-evolution`: add `EvolutionHookHandler`** implementing `talos_plugin::HookHandler`.
    Subscribed to `[TurnStart, OnSystemPromptBuilt, BeforeProviderCall, OnProviderError,
    OnToolResultObserved, OnTextDelta, AfterToolCall, OnTurnEnd, TurnComplete]`. Reset
-   accumulator on `TurnStart`, flush (ingest) on `TurnComplete`. Inject context via
+   accumulator once on `TurnStart`, flush (ingest) on `TurnComplete`. Inject context via
    `OnSystemPromptBuilt` + `HookResult::Modify`. Override `fn timeout()` to 5s for SQLite
    write. **Known cost**: `Box::leak` for the `'static` prompt replacement (tracked
    separately as a `HookResult::ModifyOwned` variant).
@@ -110,7 +110,8 @@ HOME=$(mktemp -d) sh -c '
   `talos_plugin::HookHandler`. Subscribed to `[TurnStart, OnSystemPromptBuilt, BeforeProviderCall,
   OnProviderError, OnToolResultObserved, OnTextDelta, AfterToolCall, OnTurnEnd, TurnComplete]`.
   Resets observer on `TurnStart`, flushes observations + patterns to `KnowledgeStore` on
-  `TurnComplete` (timeout 5s override). Injects context via `OnSystemPromptBuilt` + `HookResult::Modify`
+  `TurnComplete` (timeout 5s override). `TurnStart` now fires once per user turn, outside the
+  provider/tool loop, so tool-using turns do not reset the observer mid-turn. Injects context via `OnSystemPromptBuilt` + `HookResult::Modify`
   (using `Box::leak` for the `'static` replacement, ADR-001 pointer).
 - `crates/talos-evolution/src/lib.rs`: `pub mod hook;` + `pub use hook::EvolutionHookHandler;`
 - `crates/talos-evolution/Cargo.toml`: added `talos-plugin`, `async-trait`, `dirs`, `tracing`;

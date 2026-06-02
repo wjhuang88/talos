@@ -5,8 +5,8 @@
 //! 2. Resource limits (e.g. `RLIMIT_CORE`) are **active** in the child.
 //! 3. The parent process is **not** affected by child-side hardening.
 
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 
 use talos_core::tool::AgentTool;
 use talos_tools::BashTool;
@@ -64,7 +64,8 @@ async fn test_child_core_dump_limit_is_zero() {
         result.content
     );
     assert_eq!(
-        result.content.trim(), "0",
+        result.content.trim(),
+        "0",
         "RLIMIT_CORE should be 0 in child, got: {:?}",
         result.content
     );

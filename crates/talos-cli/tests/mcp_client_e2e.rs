@@ -26,7 +26,9 @@ fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("event") && stderr.contains("OnToolCallProposed") && stderr.contains("turn_id"),
+        stderr.contains("event")
+            && stderr.contains("OnToolCallProposed")
+            && stderr.contains("turn_id"),
         "stderr missing hook events: {stderr}"
     );
 

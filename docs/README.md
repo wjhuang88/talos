@@ -7,7 +7,7 @@
 | `backlog/` | Planned work and story tracking | `PRODUCT-BACKLOG.md` |
 | `iterations/` | Iteration plans, progress, and retrospectives | `README.md` |
 | `decisions/` | Architecture Decision Records (ADRs) | `README.md` |
-| `roadmap/` | Phased implementation plan | `IMPLEMENTATION-ROADMAP.md` |
+| `roadmap/` | Phased implementation plan and requirement traceability | `IMPLEMENTATION-ROADMAP.md`, `REQUIREMENT-CONVERGENCE.md` |
 | `proposals/` | Uncommitted ideas for future consideration | `README.md` |
 | `reference/` | Stable facts: architecture, contracts, config | `ARCHITECTURE.md`, `REFERENCE-PROJECTS.md` |
 | `sop/` | Standard Operating Procedures | See below |
@@ -29,5 +29,6 @@
 ## Quick Reference
 
 - **Agent rules**: See `AGENTS.md` at project root
+- **Requirement closure**: See `docs/roadmap/REQUIREMENT-CONVERGENCE.md`
 - **Lessons learned**: See `EVOLUTION.md` at project root
 - **Governance state**: See `.agent-governance/manifest.yaml`

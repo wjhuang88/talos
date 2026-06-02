@@ -5,7 +5,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use talos_core::message::ToolCall;
 use talos_permission::PermissionDecision;
-use talos_plugin::{HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId};
+use talos_plugin::{
+    HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId,
+};
 use tracing_subscriber::fmt::MakeWriter;
 
 #[derive(Clone, Default)]

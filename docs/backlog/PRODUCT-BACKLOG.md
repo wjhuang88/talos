@@ -658,7 +658,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ## I010: "Polished Agent"
 
-**Delivers**: Release-ready TUI with Nord theme, markdown rendering, diff display, and advanced features.
+**Delivers**: Release-ready terminal experience with Codex-like CLI/TUI integration, Nord theme, markdown rendering, diff display, and advanced features.
 
 ### #I010-S1: Nord theme application
 
@@ -752,7 +752,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 ### #I010-S7: Headless and SDK modes
 
-**Description**: Three execution modes. Interactive: full TUI. Headless (`talos exec`): autonomous execution for CI/automation, no TUI. SDK: Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly). Canonical architecture defined in [ADR-005](../decisions/005-tui-event-architecture.md): bounded SQ (cap=512) / unbounded EQ seam; SQ/EQ protocol types in `talos-core`, session actor in `talos-agent`. This story is the convergence point for the three current run paths (`run_print_mode`, `run_interactive_mode`, `run_tui_mode`).
+**Description**: Three execution modes plus a Codex-like terminal UX. Interactive supports both full-screen TUI and inline/no-alt-screen terminal mode that preserves normal scrollback and feels like a natural CLI extension. Headless (`talos exec`) runs autonomously for CI/automation, no TUI. SDK exposes Talos as a Rust library for embedding. All modes share the same core agent loop via AppServerSession abstraction (Codex pattern: TUI never calls agent loop directly). Canonical architecture defined in [ADR-005](../decisions/005-tui-event-architecture.md): bounded SQ (cap=512) / unbounded EQ seam; SQ/EQ protocol types in `talos-core`, session actor in `talos-agent`. This story is the convergence point for the three current run paths (`run_print_mode`, `run_interactive_mode`, `run_tui_mode`).
 
 > **Re-scope 2026-06-01:** I008 self-evolution is no longer part of this story. Evolution
 > ships in I008 as a builtin `HookHandler` registered per-Agent (see
@@ -769,6 +769,9 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Headless mode supports `--json` for machine-readable output
 - [ ] All three run paths drive the agent only via `AppServerSession` (no direct `tokio::spawn` of the agent turn inside a run path)
 - [ ] TUI approval requests flow through the canonical `AppServerSession`/EQ approval protocol, not through a `PermissionAwareTool { print_mode: true }` default-deny shim
+- [ ] Inline/no-alt-screen mode preserves terminal scrollback and does not feel like a separate full-screen application
+- [ ] Full-screen TUI and inline mode consume the same ordered EQ event stream, so assistant deltas, tool output, approvals, and status updates share one rendering contract
+- [ ] Command output and approval prompts can be interleaved with the conversation without losing shell-like terminal ergonomics
 - [ ] I008 evolution `TurnObserver`/`BehaviorAdapter` attach once at the session/EQ seam; TUI + interactive paths observe, persist, inject, and surface patterns with no double-firing (closes I008 R1/R2/R4)
 - [ ] `event_loop.rs` dead variants removed (`ApprovalRequested`, `ApprovalResolved`, `ToggleSkillSidebar`, `SkillsUpdated`, `ApprovalChoice`)
 - [ ] `cargo test --workspace` green after each path migration (ADR-005 phased-migration invariant)
@@ -1162,3 +1165,73 @@ for the design sketch.
 config)
 
 **Estimate**: L
+
+---
+
+## I012: "Portable Tools"
+
+**Theme**: Reduce Talos' dependency on the host shell environment by shipping a small,
+Rust-native POSIX-style tool subset, and make that tool set embeddable through the same
+tool/plugin surfaces used by MCP and future local tool extensions.
+
+### #I012-S1: Built-in POSIX basic tools subset
+
+**Description**: Implement a conservative subset of common POSIX/coreutils-like commands
+as native `AgentTool` implementations instead of always relying on `bash` and host
+executables. This is not a shell replacement. The goal is dependable, cross-platform
+building blocks for common agent actions when the external environment is minimal,
+locked down, or inconsistent.
+
+**Initial command set**:
+- Read-only: `pwd`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`
+- Write-capable: `mkdir`, `cp`, `mv`, `rm`
+
+**MUST DO**:
+- Implement each command as a structured tool with explicit JSON parameters, not by
+  passing a command string through a shell.
+- Route every write-capable command through the existing permission pipeline.
+- Reuse workspace path validation rules from existing file tools where possible.
+- Mark read-only commands as `is_read_only() == true`; write-capable commands must be
+  serialised like other write tools.
+- Keep semantics intentionally small and documented; unsupported POSIX flags should
+  return a clear error instead of silently falling back to host commands.
+
+**MUST NOT DO**:
+- Do NOT implement a general shell parser, pipelines, redirects, glob expansion, or
+  environment-variable expansion in this story.
+- Do NOT bypass sandbox/permission policy because a command is "built-in".
+- Do NOT remove the existing `bash` tool; native POSIX tools are the portable default
+  building blocks, while `bash` remains the escape hatch for user-approved commands.
+
+**Acceptance Criteria**:
+- [ ] `agent.list_tools` exposes the native POSIX subset with stable tool names and schemas.
+- [ ] Read-only tools can run without host `ls`, `cat`, `grep`, etc. being present.
+- [ ] Write-capable tools require approval under the default permission policy.
+- [ ] Tool outputs are deterministic enough for model consumption and session replay.
+- [ ] Unit tests cover each command's happy path, path escape rejection, and unsupported
+      option errors.
+- [ ] `cargo test --workspace` exits 0.
+
+**Depends on**: #I003-S1, #I004-S1, #I004-S6
+**Estimate**: L
+
+### #I012-S2: Embeddable tool pack interface
+
+**Description**: Define how built-in native tool packs are registered and exposed so the
+same mechanism can support future local plugin-provided tools. The POSIX subset should
+be packaged as a first-class tool pack that can be enabled, disabled, listed, and
+surfaced through MCP/RPC without special-case code in the agent loop.
+
+**Acceptance Criteria**:
+- [ ] A `ToolPack` or equivalent lightweight registration abstraction can register a
+      named group of `AgentTool`s into `ToolRegistry`.
+- [ ] The POSIX tool pack can be enabled by default and disabled through config for
+      constrained deployments.
+- [ ] MCP server and JSON-RPC tool listing expose tool provenance so clients can
+      distinguish native built-in, native tool-pack, and MCP-remote tools.
+- [ ] Tool-pack registration does not introduce dynamic language runtimes or FFI.
+- [ ] Plugin-provided tools use the same registration path in the future; no agent-loop
+      changes are required for a new local tool pack.
+
+**Depends on**: #I009-S3, #I009-S4, #I009-S5, #I012-S1
+**Estimate**: M

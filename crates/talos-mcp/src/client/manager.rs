@@ -42,15 +42,13 @@ impl McpClientManager {
 
         for server in &config.servers {
             match Self::start_one(server).await {
-                Ok(client) => {
-                    match client.dispatcher.list_tools().await {
-                        Ok(_) => clients.push(client),
-                        Err(error) => startup_failures.push(McpStartupFailure {
-                            server: server.name.clone(),
-                            error: error.to_string(),
-                        }),
-                    }
-                }
+                Ok(client) => match client.dispatcher.list_tools().await {
+                    Ok(_) => clients.push(client),
+                    Err(error) => startup_failures.push(McpStartupFailure {
+                        server: server.name.clone(),
+                        error: error.to_string(),
+                    }),
+                },
                 Err(error) => startup_failures.push(McpStartupFailure {
                     server: server.name.clone(),
                     error: error.to_string(),

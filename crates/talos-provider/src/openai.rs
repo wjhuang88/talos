@@ -17,7 +17,7 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
 use tokio::sync::mpsc;
@@ -133,10 +133,7 @@ impl OpenAIProvider {
 
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIProvider {
-    async fn stream(
-        &self,
-        messages: &[Message],
-    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
 
         let (tx, rx) = mpsc::channel(32);
@@ -233,7 +230,10 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
                 tool_calls: None,
                 tool_call_id: None,
             },
-            Message::Assistant { content, tool_calls } => {
+            Message::Assistant {
+                content,
+                tool_calls,
+            } => {
                 let openai_tool_calls = if tool_calls.is_empty() {
                     None
                 } else {
@@ -253,7 +253,11 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
                 };
                 OpenAIMessage {
                     role: "assistant".into(),
-                    content: if content.is_empty() { None } else { Some(content.clone()) },
+                    content: if content.is_empty() {
+                        None
+                    } else {
+                        Some(content.clone())
+                    },
                     tool_calls: openai_tool_calls,
                     tool_call_id: None,
                 }
@@ -338,7 +342,11 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             // Extract text delta
             if let Some(ref text) = choice.delta.content {
                 if !text.is_empty() {
-                    let _ = tx.send(AgentEvent::TextDelta { delta: text.clone() }).await;
+                    let _ = tx
+                        .send(AgentEvent::TextDelta {
+                            delta: text.clone(),
+                        })
+                        .await;
                 }
             }
 
@@ -380,8 +388,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 // Emit accumulated tool calls
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_ids[i].is_empty() && !tool_call_names[i].is_empty() {
-                        let args: Value = serde_json::from_str(&tool_call_args[i])
-                            .unwrap_or_else(|_| json!({}));
+                        let args: Value =
+                            serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -389,7 +397,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                     name: tool_call_names[i].clone(),
                                     input: args,
                                 },
-                            provenance: Default::default(),})
+                                provenance: Default::default(),
+                            })
                             .await;
                     }
                 }
@@ -435,7 +444,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         name: tool_call_names[i].clone(),
                         input: args,
                     },
-                provenance: Default::default(),})
+                    provenance: Default::default(),
+                })
                 .await;
         }
     }
@@ -563,14 +573,16 @@ mod tests {
     #[test]
     fn endpoint_url_appends_chat_completions_to_default_base() {
         let provider = OpenAIProvider::new("sk-test", "gpt-4o");
-        assert_eq!(provider.endpoint_url(), "https://api.openai.com/v1/chat/completions");
+        assert_eq!(
+            provider.endpoint_url(),
+            "https://api.openai.com/v1/chat/completions"
+        );
     }
 
     #[test]
     fn endpoint_url_appends_chat_completions_to_custom_base() {
-        let provider = OpenAIProvider::new("sk-test", "glm-5").with_base_url(
-            "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
-        );
+        let provider = OpenAIProvider::new("sk-test", "glm-5")
+            .with_base_url("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1");
         assert_eq!(
             provider.endpoint_url(),
             "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"
@@ -579,9 +591,12 @@ mod tests {
 
     #[test]
     fn endpoint_url_strips_trailing_slash_before_appending() {
-        let provider =
-            OpenAIProvider::new("sk-test", "gpt-4o").with_base_url("https://gateway.example.com/v1/");
-        assert_eq!(provider.endpoint_url(), "https://gateway.example.com/v1/chat/completions");
+        let provider = OpenAIProvider::new("sk-test", "gpt-4o")
+            .with_base_url("https://gateway.example.com/v1/");
+        assert_eq!(
+            provider.endpoint_url(),
+            "https://gateway.example.com/v1/chat/completions"
+        );
     }
 
     #[test]
@@ -664,7 +679,10 @@ mod tests {
         let tool_calls = chunk.choices[0].delta.tool_calls.clone().unwrap();
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, Some("call_abc123".into()));
-        assert_eq!(tool_calls[0].function.as_ref().unwrap().name, Some("bash".into()));
+        assert_eq!(
+            tool_calls[0].function.as_ref().unwrap().name,
+            Some("bash".into())
+        );
         assert_eq!(
             tool_calls[0].function.as_ref().unwrap().arguments,
             Some("{\"command\": \"ls\"}".into())

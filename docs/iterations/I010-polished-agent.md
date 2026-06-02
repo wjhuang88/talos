@@ -1,7 +1,7 @@
 # Iteration I010: Polished Agent
 
-**User can**: Use Talos as a daily coding companion with a polished TUI, unified run paths, headless
-automation, SDK embedding, and higher-level approval policy controls.
+**User can**: Use Talos as a daily coding companion with a Codex-like terminal experience, unified
+run paths, headless automation, SDK embedding, and higher-level approval policy controls.
 
 ## Status: PLANNED
 
@@ -20,6 +20,11 @@ AppServerSession seam.
 
 - [ ] Print, interactive, TUI, headless, and SDK paths drive the agent through `AppServerSession`.
 - [ ] TUI approval requests flow through the canonical session/EQ approval protocol.
+- [ ] Talos supports a Codex-like inline terminal mode that preserves scrollback and feels like a
+      natural CLI extension instead of a disconnected full-screen app.
+- [ ] The terminal UI renders over the same ordered session event stream as print/headless paths;
+      tool output, approvals, status updates, and assistant deltas do not require separate run-path
+      logic.
 - [ ] I008 `TurnObserver` / `BehaviorAdapter` attach once at the session/EQ seam.
 - [ ] I008 can move from Review to Complete after TUI/interactive runtime evidence is recorded.
 - [ ] Dead `event_loop.rs` variants are removed as part of the ADR-005 migration.
@@ -39,7 +44,8 @@ AppServerSession seam.
 
 ### Acceptance Criteria
 
-- [ ] Daily TUI workflow is visually coherent and verified end-to-end.
+- [ ] Daily TUI workflow is visually coherent and verified end-to-end in both full-screen and
+      inline/no-alt-screen terminal modes.
 - [ ] Assistant markdown, code blocks, diffs, and command output render without layout overlap.
 - [ ] Slash commands cover common session, model, status, compact, fork, diff, and quit workflows.
 - [ ] Guardian can auto-approve low-risk tool calls with a circuit breaker.

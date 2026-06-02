@@ -280,10 +280,9 @@ impl SkillManager {
             )))
         })?;
 
-        let skill_dir = skill
-            .source_path
-            .parent()
-            .ok_or_else(|| SkillError::InvalidFrontmatter("skill has no parent directory".into()))?;
+        let skill_dir = skill.source_path.parent().ok_or_else(|| {
+            SkillError::InvalidFrontmatter("skill has no parent directory".into())
+        })?;
 
         let ref_path = skill_dir.join(file_path);
         if !ref_path.exists() {
@@ -836,11 +835,8 @@ Body V2.
             .expect("failed to write skill");
 
         fs::create_dir_all(skills_dir.join("nested")).expect("failed to create nested dir");
-        fs::write(
-            skills_dir.join("nested/SKILL.md"),
-            "no frontmatter",
-        )
-        .expect("failed to write invalid skill");
+        fs::write(skills_dir.join("nested/SKILL.md"), "no frontmatter")
+            .expect("failed to write invalid skill");
 
         let mut loader = SkillLoader {
             skills: Vec::new(),
@@ -884,10 +880,8 @@ Body B.
 
         fs::create_dir(skills_dir.join("skill-a")).expect("failed to create skill-a dir");
         fs::create_dir(skills_dir.join("skill-b")).expect("failed to create skill-b dir");
-        fs::write(skills_dir.join("skill-a/SKILL.md"), skill_a)
-            .expect("failed to write skill A");
-        fs::write(skills_dir.join("skill-b/SKILL.md"), skill_b)
-            .expect("failed to write skill B");
+        fs::write(skills_dir.join("skill-a/SKILL.md"), skill_a).expect("failed to write skill A");
+        fs::write(skills_dir.join("skill-b/SKILL.md"), skill_b).expect("failed to write skill B");
 
         let mut loader = SkillLoader {
             skills: Vec::new(),
@@ -1039,7 +1033,8 @@ Body.
 
     #[test]
     fn split_frontmatter_multiline_yaml() {
-        let content = "---\nname: test\ndescription: A skill\ntriggers:\n  - a\n  - b\n---\n\nBody.";
+        let content =
+            "---\nname: test\ndescription: A skill\ntriggers:\n  - a\n  - b\n---\n\nBody.";
         let (fm, body) = split_frontmatter(content).expect("split should succeed");
         assert!(fm.contains("name: test"));
         assert!(fm.contains("description: A skill"));
@@ -1244,7 +1239,12 @@ Body.
 
     #[test]
     fn skill_manager_load_skill_level1() {
-        let skill = make_skill("my-skill", "Does something", &["do"], "# Full body\n\nInstructions here.");
+        let skill = make_skill(
+            "my-skill",
+            "Does something",
+            &["do"],
+            "# Full body\n\nInstructions here.",
+        );
         let loader = SkillLoader {
             skills: vec![skill],
             search_paths: Vec::new(),
@@ -1340,13 +1340,24 @@ Body.
 
         let manager = SkillManager::new(loader);
 
-        assert_eq!(manager.match_skill("I need to git push"), Some("git".to_string()));
-        assert_eq!(manager.match_skill("run unit tests"), Some("test".to_string()));
+        assert_eq!(
+            manager.match_skill("I need to git push"),
+            Some("git".to_string())
+        );
+        assert_eq!(
+            manager.match_skill("run unit tests"),
+            Some("test".to_string())
+        );
     }
 
     #[test]
     fn skill_manager_match_skill_case_insensitive() {
-        let skills = vec![make_skill("git", "Git operations", &["git", "commit"], "body")];
+        let skills = vec![make_skill(
+            "git",
+            "Git operations",
+            &["git", "commit"],
+            "body",
+        )];
         let loader = SkillLoader {
             skills,
             search_paths: Vec::new(),
@@ -1354,8 +1365,14 @@ Body.
 
         let manager = SkillManager::new(loader);
 
-        assert_eq!(manager.match_skill("I need to GIT push"), Some("git".to_string()));
-        assert_eq!(manager.match_skill("Let me Commit changes"), Some("git".to_string()));
+        assert_eq!(
+            manager.match_skill("I need to GIT push"),
+            Some("git".to_string())
+        );
+        assert_eq!(
+            manager.match_skill("Let me Commit changes"),
+            Some("git".to_string())
+        );
     }
 
     #[test]
@@ -1383,7 +1400,10 @@ Body.
 
         let manager = SkillManager::new(loader);
         // First matching skill wins
-        assert_eq!(manager.match_skill("write some code"), Some("git".to_string()));
+        assert_eq!(
+            manager.match_skill("write some code"),
+            Some("git".to_string())
+        );
     }
 
     #[test]

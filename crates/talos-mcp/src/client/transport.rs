@@ -83,7 +83,8 @@ impl McpTransport {
             loop {
                 match lines.next_line().await {
                     Ok(Some(line)) => {
-                        let parsed: std::result::Result<RpcResponse, _> = serde_json::from_str(&line);
+                        let parsed: std::result::Result<RpcResponse, _> =
+                            serde_json::from_str(&line);
                         match parsed {
                             Ok(resp) => {
                                 let tx = {
@@ -193,14 +194,12 @@ pub async fn spawn_stdio_transport(
         source,
     })?;
 
-    let child_stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| McpError::InvalidConfig(format!("MCP server '{server}' missing stdout pipe")))?;
-    let child_stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| McpError::InvalidConfig(format!("MCP server '{server}' missing stdin pipe")))?;
+    let child_stdout = child.stdout.take().ok_or_else(|| {
+        McpError::InvalidConfig(format!("MCP server '{server}' missing stdout pipe"))
+    })?;
+    let child_stdin = child.stdin.take().ok_or_else(|| {
+        McpError::InvalidConfig(format!("MCP server '{server}' missing stdin pipe"))
+    })?;
 
     let transport = McpTransport::from_io(server.to_string(), child_stdout, child_stdin);
     Ok((transport, child))

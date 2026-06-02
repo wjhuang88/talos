@@ -1,58 +1,101 @@
 # Talos
 
-A safety-first, minimal-core agent runtime in Rust. CLI-first, evolving into a full agent platform with built-in self-evolution.
+A safety-first, minimal-core agent runtime in Rust. Talos starts as a CLI coding
+assistant and is converging toward a full agent runtime with self-evolution,
+extension surfaces, portable tools, and a terminal experience that feels native to
+the command line.
 
 English | **[中文](README.zh-CN.md)**
 
-## Status
+## Current Status
 
-**I007 complete; I008 active (impl + TUI default landed 2026-06-01); I009 complete; I011 active (S1 landed 2026-06-02); R0 complete.** 515 tests passing across 12 crates. The agent
-performs file and shell operations safely with permission gating, **launches a Nord-themed
-TUI by default on a TTY** (`--repl` to use the legacy readline loop), supports sessions
-with SQLite search, skills, and multiple providers. **I011 S1 ships OpenAI-compatible
-`base_url` override**: point `talos` at any OpenAI-compatible gateway (DashScope /
-Bailian / Z.ai / self-hosted vLLM) via `~/.talos/config.toml` + `OPENAI_COMPAT_API_KEY`
-env var, no Rust changes. **I009 ships the extensibility surface**: a hook system with
-13 lifecycle points (`talos-plugin`), MCP client + server over stdio (`talos-mcp`), a
-stdio JSON-RPC control plane (`talos-rpc`), and `ToolProvenance` tracking so consumers
-can tell native tools apart from MCP-remote tools. **I008 self-evolution is wired into
-all four runtime paths** (print, TUI, interactive, RPC) via a builtin
-`EvolutionHookHandler` registered per-Agent — see
-[docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md) and the
-re-scope notes in [ADR-001](docs/decisions/001-runtime-self-evolution.md) / [ADR-005](docs/decisions/005-tui-event-architecture.md) /
-[ADR-006](docs/decisions/006-event-architecture-boundary.md). R0 closed all
-seven architecture-review findings — see
-[docs/iterations/R0-remediation-gate.md](docs/iterations/R0-remediation-gate.md). I009's TUI
-consumer side (provenance marker rendering + `/plugins` slash command) is deferred to a
-follow-up per [ADR-009](docs/decisions/009-tool-provenance.md); producers are in place.
-Implementation follows an agile vertical-slice roadmap — each iteration produces a runnable,
-testable `talos` binary.
+| Area | State | Notes |
+|------|-------|-------|
+| Runtime | Active | 515 tests passing across 12 crates. TTY launches the Nord-themed TUI by default; `--repl` keeps the legacy readline loop. |
+| I008 Learning Agent | Active / Review pending | `EvolutionHookHandler` is wired into print, TUI, interactive, and RPC paths. |
+| I009 Extensible Agent | Review | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers are implemented. TUI provenance markers and `/plugins` remain follow-up work. |
+| I010 Polished Agent | Planned | Codex-like inline terminal mode, AppServerSession convergence, TUI polish, markdown, diff display, slash commands. |
+| I011 Open Providers | Active | OpenAI-compatible `base_url` override shipped through config and `OPENAI_COMPAT_API_KEY`. |
+| I012 Portable Tools | Planned | Rust-native POSIX-style tool subset plus embeddable tool-pack registration to reduce host environment dependency. |
+
+Recent remediation work closed R0 architecture findings around permission safety,
+session index correctness, fork identity, search highlighting, and process hardening.
+See [R0 remediation](docs/iterations/R0-remediation-gate.md).
+
+## Quick Start
+
+```bash
+cargo build -p talos-cli
+```
+
+Configure a provider token:
+
+```bash
+export ANTHROPIC_API_KEY="<your key>"
+# or
+export OPENAI_API_KEY="<your key>"
+```
+
+Run the default TUI:
+
+```bash
+cargo run -p talos-cli -- "help me inspect this repository"
+```
+
+Use print mode for shell-style output:
+
+```bash
+cargo run -p talos-cli -- -p "summarize the project status"
+```
+
+Use an OpenAI-compatible gateway:
+
+```toml
+# ~/.talos/config.toml
+provider = "openai"
+model = "your-model"
+base_url = "https://your-gateway.example.com/v1"
+```
+
+```bash
+export OPENAI_COMPAT_API_KEY="<your gateway key>"
+cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
+```
+
+## What Works
+
+- Safe file and shell operations through the permission pipeline.
+- Session storage with JSONL source-of-truth and bundled SQLite search/indexing.
+- Skills via `SKILL.md`, progressive disclosure, and prompt integration.
+- Multi-provider support with Anthropic, OpenAI, and OpenAI-compatible gateways.
+- Runtime self-evolution through Observe -> Accumulate -> Extract -> Apply.
+- Extension surfaces: hooks, MCP client/server, stdio JSON-RPC, typed tool provenance.
 
 ## Roadmap
 
-| Iteration | Codename | User can... |
-|-----------|----------|-------------|
-| ~~I001~~ | ~~Project Scaffold~~ | ~~`cargo check --workspace` passes~~ ✅ |
-| ~~I002~~ | ~~Hello Agent~~ | ~~`talos "What is 2+2?" -p` and get an LLM response~~ ✅ |
-| ~~I003~~ | ~~Tool User~~ | ~~Ask the agent to perform file and shell operations~~ ✅ |
-| ~~I004~~ | ~~Safe Agent~~ | ~~Dangerous operations get intercepted by permissions~~ ✅ |
-| ~~I005~~ | ~~Smart Agent~~ | ~~Mock LLM + basic TUI + context compaction + caching~~ ✅ |
-| ~~I006~~ | ~~Data Agent~~ | ~~TUI tool display + approval + session branching + SQLite search~~ ✅ |
-| ~~I007~~ | ~~Skilled Agent~~ | ~~TUI skill display + SKILL.md + multi-provider support~~ ✅ |
-| I008 | Learning Agent | TUI evolution display + self-evolution engine — 🛠️ impl landed 2026-06-01 (HookHandler wired into all 4 paths; 509 tests); pending final review |
-| ~~R0~~ | ~~Remediation Gate~~ | ~~Close ARCH findings (sandbox unsafe-ADR link, Agent::new deprecation, ApprovalChoice unification, session index refresh, fork identity, BOLD highlight, ProcessHardening pre_exec)~~ ✅ |
-| ~~I009~~ | ~~Extensible Agent~~ | ~~TUI MCP display + Hook system + MCP + JSON-RPC + ToolProvenance~~ ✅ (501 tests; TUI consumer markers deferred per [ADR-009](docs/decisions/009-tool-provenance.md)) |
-| I010 | Polished Agent | Full TUI polish (Nord theme + markdown + advanced features) |
-| I011 | Open Providers | 🛠️ OpenAI-compatible `base_url` override (shipped 2026-06-02) — point `talos` at any OpenAI-compatible gateway (DashScope / Bailian / Z.ai / self-hosted vLLM) via `~/.talos/config.toml` + `OPENAI_COMPAT_API_KEY` env var, no Rust changes |
+| Iteration | Codename | Status | Outcome |
+|-----------|----------|--------|---------|
+| I001-I007 | Foundation through Skilled Agent | Complete | CLI, tools, permissions, TUI base, sessions, SQLite search, skills, multi-provider support. |
+| R0 | Remediation Gate | Complete | Architecture/security/session correctness findings closed. |
+| I008 | Learning Agent | Active | Runtime learning is implemented; awaiting final review evidence. |
+| I009 | Extensible Agent | Review | Backend/runtime extensibility is implemented; TUI consumer work remains. |
+| I010 | Polished Agent | Planned | Codex-like terminal UX and release-grade TUI workflows. |
+| I011 | Open Providers | Active | Configurable OpenAI-compatible gateway support; provider plugin architecture planned. |
+| I012 | Portable Tools | Planned | Built-in POSIX-style tools and tool-pack embedding. |
+
+Implementation follows vertical slices: every iteration should produce a runnable,
+testable `talos` binary. Requirement closure is tracked in
+[Requirement Convergence](docs/roadmap/REQUIREMENT-CONVERGENCE.md).
 
 ## Architecture
 
-Talos follows a **simple core, flexible extensions** design philosophy:
+Talos follows a simple core, flexible extensions design:
 
-- **Core** (5 crates): Minimal turn loop — config, provider, agent, CLI, and foundation types.
-- **Extensions** (10 crates): Introduced on demand — tools, session, sandbox, permissions, TUI, skills, evolution, plugins, MCP, RPC.
+- **Core crates**: config, provider, agent, CLI, and shared protocol/types.
+- **Extension crates**: tools, session, sandbox, permissions, TUI, skills,
+  evolution, plugins, MCP, and RPC.
 
-```
+```text
 [ talos-cli / talos-rpc ]
           |
           v
@@ -68,34 +111,38 @@ Talos follows a **simple core, flexible extensions** design philosophy:
                [ talos-evolution ]
 ```
 
-### Key Design Decisions
+## Design Decisions
 
-- **Streaming-first**: All LLM communication via SSE streaming. Dual-channel async (SQ/EQ).
-- **Safety at every layer**: Permission pipeline, sandboxed tool execution, crash-safe session storage.
-- **Built-in self-evolution**: Runtime-level learning loop (Observe → Accumulate → Extract → Apply), not a skill feature. [ADR-001](docs/decisions/001-runtime-self-evolution.md).
-- **Progressive storage**: Pure files (I001–I005) → SQLite index (I006) → SQLite evolution tables (I008). [ADR-002](docs/decisions/002-local-storage-architecture.md).
-- **Bundled SQLite**: `rusqlite/bundled` is an ADR-approved storage exception; Talos does not require a system SQLite installation. [ADR-008](docs/decisions/008-sqlite-bundled-storage.md).
-- **File-based by default**: Config (TOML), skills (Markdown), sessions (JSONL). Human-editable, git-friendly.
+- **Streaming-first**: LLM communication is built around SSE streaming and dual-channel async flow.
+- **Safety at every layer**: Tool calls pass through permissions, sandboxing, and approval policy.
+- **Self-evolution is runtime-level**: learning is a first-class runtime primitive, not a skill feature. See [ADR-001](docs/decisions/001-runtime-self-evolution.md).
+- **Progressive storage**: JSONL first, SQLite when FTS/index/query behavior is needed. See [ADR-002](docs/decisions/002-local-storage-architecture.md).
+- **Bundled SQLite**: `rusqlite/bundled` is an approved storage exception; Talos does not require system SQLite. See [ADR-008](docs/decisions/008-sqlite-bundled-storage.md).
+- **Tool provenance**: native and MCP-remote tools carry typed provenance for future TUI/plugin/RPC consumers. See [ADR-009](docs/decisions/009-tool-provenance.md).
 
 ## Documentation
 
 | Path | Purpose |
 |------|---------|
 | [AGENTS.md](AGENTS.md) | Agent coding guide, hard constraints, task router |
-| [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) | Full architecture reference |
-| [docs/roadmap/IMPLEMENTATION-ROADMAP.md](docs/roadmap/IMPLEMENTATION-ROADMAP.md) | Iteration-by-iteration plan, including the current R0–R3 execution sequence |
-| [docs/backlog/PRODUCT-BACKLOG.md](docs/backlog/PRODUCT-BACKLOG.md) | User stories and acceptance criteria |
+| [docs/README.md](docs/README.md) | Documentation map |
+| [docs/roadmap/REQUIREMENT-CONVERGENCE.md](docs/roadmap/REQUIREMENT-CONVERGENCE.md) | Requirement-to-implementation closure tracking |
+| [docs/roadmap/IMPLEMENTATION-ROADMAP.md](docs/roadmap/IMPLEMENTATION-ROADMAP.md) | Iteration plan and execution sequence |
+| [docs/backlog/PRODUCT-BACKLOG.md](docs/backlog/PRODUCT-BACKLOG.md) | Stories, acceptance criteria, and planned work |
+| [docs/iterations/](docs/iterations/) | Iteration plans, status, and execution evidence |
 | [docs/decisions/](docs/decisions/) | Architecture Decision Records |
-| [docs/reference/REFERENCE-PROJECTS.md](docs/reference/REFERENCE-PROJECTS.md) | Reference project patterns and source links |
+| [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) | Full architecture reference |
 
 ## Tech Stack
 
-- **Language**: Rust (stable, edition 2024)
-- **Async**: tokio
-- **Serialization**: serde + schemars
-- **Errors**: thiserror (libraries), anyhow (CLI)
-- **Storage**: JSONL (sessions), TOML (config), SQLite via `rusqlite/bundled` (index, evolution)
-- **TUI**: ratatui + crossterm (I005+, evolving progressively, Nord theme)
+| Layer | Choice |
+|-------|--------|
+| Language | Rust stable, edition 2024 |
+| Async | tokio |
+| Serialization | serde + schemars |
+| Errors | thiserror for libraries, anyhow for CLI |
+| Storage | JSONL, TOML, SQLite via `rusqlite/bundled` |
+| TUI | ratatui + crossterm |
 
 ## License
 

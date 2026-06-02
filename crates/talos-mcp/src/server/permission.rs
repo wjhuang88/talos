@@ -34,17 +34,13 @@ impl McpPermissionGate {
 
         self.run_hook(
             hook_context,
-            HookEvent::OnToolCallProposed {
-                call: &tool_call,
-            },
+            HookEvent::OnToolCallProposed { call: &tool_call },
         )
         .await?;
 
         self.run_hook(
             hook_context,
-            HookEvent::BeforePermissionCheck {
-                call: &tool_call,
-            },
+            HookEvent::BeforePermissionCheck { call: &tool_call },
         )
         .await?;
 
@@ -53,7 +49,9 @@ impl McpPermissionGate {
             .clone()
             .map(serde_json::Value::Object)
             .unwrap_or_else(|| serde_json::json!({}));
-        let decision = self.permission_engine.evaluate(request.name.as_ref(), &input);
+        let decision = self
+            .permission_engine
+            .evaluate(request.name.as_ref(), &input);
 
         self.run_hook(
             hook_context,

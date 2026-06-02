@@ -36,7 +36,10 @@ enum QueuedEvent {
     /// Emit a single text response (wrapped as a single delta).
     Text(String),
     /// Emit a tool_use event.
-    ToolCall { name: String, input: serde_json::Value },
+    ToolCall {
+        name: String,
+        input: serde_json::Value,
+    },
     /// Emit an error event with the given message.
     Error(String),
 }
@@ -88,9 +91,11 @@ impl MockProvider {
     /// When consumed, this will emit: `TurnStart` → `TextDelta { delta: text }` → `TurnEnd`.
     #[must_use]
     pub fn with_response(self, text: impl Into<String>) -> Self {
-        self.state.lock().expect("mock state lock poisoned").queue.push_back(
-            QueuedEvent::Text(text.into()),
-        );
+        self.state
+            .lock()
+            .expect("mock state lock poisoned")
+            .queue
+            .push_back(QueuedEvent::Text(text.into()));
         self
     }
 
@@ -103,12 +108,14 @@ impl MockProvider {
     /// incrementing counter.
     #[must_use]
     pub fn with_tool_call(self, name: impl Into<String>, input: serde_json::Value) -> Self {
-        self.state.lock().expect("mock state lock poisoned").queue.push_back(
-            QueuedEvent::ToolCall {
+        self.state
+            .lock()
+            .expect("mock state lock poisoned")
+            .queue
+            .push_back(QueuedEvent::ToolCall {
                 name: name.into(),
                 input,
-            },
-        );
+            });
         self
     }
 
@@ -129,9 +136,11 @@ impl MockProvider {
             500 => "internal server error".into(),
             other => format!("mock error (status: {other})"),
         };
-        self.state.lock().expect("mock state lock poisoned").queue.push_back(
-            QueuedEvent::Error(message),
-        );
+        self.state
+            .lock()
+            .expect("mock state lock poisoned")
+            .queue
+            .push_back(QueuedEvent::Error(message));
         self
     }
 
@@ -140,9 +149,11 @@ impl MockProvider {
     /// When consumed, this will emit: `TurnStart` → `TextDelta` for each chunk → `TurnEnd`.
     #[must_use]
     pub fn with_streaming(self, chunks: Vec<String>) -> Self {
-        self.state.lock().expect("mock state lock poisoned").queue.push_back(
-            QueuedEvent::Streaming(chunks),
-        );
+        self.state
+            .lock()
+            .expect("mock state lock poisoned")
+            .queue
+            .push_back(QueuedEvent::Streaming(chunks));
         self
     }
 
@@ -150,7 +161,11 @@ impl MockProvider {
     ///
     /// Useful for inspecting the current queue state in tests.
     pub fn queue_len(&self) -> usize {
-        self.state.lock().expect("mock state lock poisoned").queue.len()
+        self.state
+            .lock()
+            .expect("mock state lock poisoned")
+            .queue
+            .len()
     }
 }
 
@@ -162,10 +177,7 @@ impl Default for MockProvider {
 
 #[async_trait::async_trait]
 impl LanguageModel for MockProvider {
-    async fn stream(
-        &self,
-        _messages: &[Message],
-    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(32);
 
         let event = {
@@ -225,7 +237,8 @@ async fn emit_tool_call_response(
                 name: name.to_string(),
                 input,
             },
-        provenance: Default::default(),})
+            provenance: Default::default(),
+        })
         .await;
     let _ = tx
         .send(AgentEvent::TurnEnd {
@@ -315,10 +328,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_call_response() {
-        let provider = MockProvider::new().with_tool_call(
-            "read_file",
-            serde_json::json!({"path": "test.rs"}),
-        );
+        let provider =
+            MockProvider::new().with_tool_call("read_file", serde_json::json!({"path": "test.rs"}));
         let rx = provider.stream(&[]).await.expect("stream should succeed");
         let events = collect_events(rx).await;
 
@@ -384,11 +395,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_response() {
-        let provider = MockProvider::new().with_streaming(vec![
-            "Hello".into(),
-            ", ".into(),
-            "world!".into(),
-        ]);
+        let provider =
+            MockProvider::new().with_streaming(vec!["Hello".into(), ", ".into(), "world!".into()]);
         let rx = provider.stream(&[]).await.expect("stream should succeed");
         let events = collect_events(rx).await;
 
@@ -473,7 +481,9 @@ mod tests {
         // 3: error
         let rx = provider.stream(&[]).await.unwrap();
         let events = collect_events(rx).await;
-        assert!(matches!(&events[1], AgentEvent::Error { message } if message.contains("authentication")));
+        assert!(
+            matches!(&events[1], AgentEvent::Error { message } if message.contains("authentication"))
+        );
 
         // 4: streaming
         let rx = provider.stream(&[]).await.unwrap();
@@ -483,9 +493,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_queue_len() {
-        let provider = MockProvider::new()
-            .with_response("a")
-            .with_response("b");
+        let provider = MockProvider::new().with_response("a").with_response("b");
 
         assert_eq!(provider.queue_len(), 2);
 

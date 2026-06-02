@@ -97,11 +97,7 @@ impl ServerHandler for TalosMcpHandler {
 }
 
 fn to_mcp_tool(tool: &dyn talos_core::tool::AgentTool) -> Tool {
-    let input_schema = tool
-        .parameters()
-        .as_object()
-        .cloned()
-        .unwrap_or_default();
+    let input_schema = tool.parameters().as_object().cloned().unwrap_or_default();
 
     Tool {
         name: Cow::Owned(tool.name().to_string()),

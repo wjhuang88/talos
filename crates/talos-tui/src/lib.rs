@@ -14,23 +14,25 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind,
+    },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use evolution::EvolutionPanel;
+use futures::StreamExt;
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
-    Frame, Terminal,
 };
-use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use talos_core::ApprovalChoice;
+use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use tokio::sync::{broadcast, mpsc};
-use futures::StreamExt;
-use evolution::EvolutionPanel;
 
 pub mod evolution;
 
@@ -141,9 +143,7 @@ impl SkillSidebar {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
         if self.skills.is_empty() {
-            let empty_style = Style::default()
-                .fg(nord::NORD3)
-                .add_modifier(Modifier::DIM);
+            let empty_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
             lines.push(Line::from(Span::styled("No skills loaded", empty_style)));
         } else {
             for skill in &self.skills {
@@ -157,9 +157,7 @@ impl SkillSidebar {
                 let name_style = Style::default()
                     .fg(nord::NORD8)
                     .add_modifier(Modifier::BOLD);
-                let desc_style = Style::default()
-                    .fg(nord::NORD4)
-                    .add_modifier(Modifier::DIM);
+                let desc_style = Style::default().fg(nord::NORD4).add_modifier(Modifier::DIM);
 
                 lines.push(Line::from(vec![
                     Span::styled(status_icon.to_string(), status_style),
@@ -167,7 +165,8 @@ impl SkillSidebar {
                     Span::styled(skill.name.clone(), name_style),
                 ]));
 
-                let desc_display = truncate(&skill.description, self.width.saturating_sub(4) as usize);
+                let desc_display =
+                    truncate(&skill.description, self.width.saturating_sub(4) as usize);
                 lines.push(Line::from(Span::styled(
                     format!("  {desc_display}"),
                     desc_style,
@@ -205,12 +204,11 @@ impl SkillSidebar {
             Style::default().fg(nord::NORD3)
         };
 
-        let paragraph = Paragraph::new(Text::from(Span::styled(text, style)))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(nord::NORD2)),
-            );
+        let paragraph = Paragraph::new(Text::from(Span::styled(text, style))).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(nord::NORD2)),
+        );
 
         frame.render_widget(paragraph, area);
     }
@@ -294,11 +292,12 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
             tool_name_style,
         )));
 
-        let args_style = Style::default()
-            .fg(nord::NORD3)
-            .add_modifier(Modifier::DIM);
+        let args_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
         let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
-        lines.push(Line::from(Span::styled(format!("  {args_display}"), args_style)));
+        lines.push(Line::from(Span::styled(
+            format!("  {args_display}"),
+            args_style,
+        )));
 
         if let Some(is_error) = self.result_status {
             let (icon, style) = if is_error {
@@ -420,19 +419,15 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
             } else {
                 Style::default().fg(nord::NORD4)
             };
-            lines.push(Line::from(Span::styled(
-                format!("[{key}] {label}"),
-                style,
-            )));
+            lines.push(Line::from(Span::styled(format!("[{key}] {label}"), style)));
         }
 
-        let paragraph = Paragraph::new(Text::from(lines))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(nord::NORD9))
-                    .title(" Approval "),
-            );
+        let paragraph = Paragraph::new(Text::from(lines)).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(nord::NORD9))
+                .title(" Approval "),
+        );
 
         paragraph.render(overlay_area, buf);
     }
@@ -499,7 +494,8 @@ impl TuiState {
 
     fn finalize_turn(&mut self) {
         if !self.current_turn_text.is_empty() {
-            self.chat_lines.push(ChatLine::Text(self.current_turn_text.clone()));
+            self.chat_lines
+                .push(ChatLine::Text(self.current_turn_text.clone()));
             self.current_turn_text.clear();
         }
     }
@@ -509,11 +505,13 @@ impl TuiState {
     }
 
     fn append_error(&mut self, message: &str) {
-        self.chat_lines.push(ChatLine::Text(format!("[Error] {message}")));
+        self.chat_lines
+            .push(ChatLine::Text(format!("[Error] {message}")));
     }
 
     fn append_system(&mut self, message: &str) {
-        self.chat_lines.push(ChatLine::Text(format!("[System] {message}")));
+        self.chat_lines
+            .push(ChatLine::Text(format!("[System] {message}")));
     }
 
     fn append_tool_call(&mut self, call: &ToolCall) {
@@ -543,7 +541,10 @@ impl TuiState {
 
     /// Appends a character to the input buffer at the cursor position.
     fn input_append_char(&mut self, ch: char) {
-        let byte_pos = self.input_buffer.char_indices().nth(self.cursor_pos)
+        let byte_pos = self
+            .input_buffer
+            .char_indices()
+            .nth(self.cursor_pos)
             .map(|(i, _)| i)
             .unwrap_or(self.input_buffer.len());
         self.input_buffer.insert(byte_pos, ch);
@@ -554,7 +555,10 @@ impl TuiState {
     fn input_backspace(&mut self) {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
-            let byte_pos = self.input_buffer.char_indices().nth(self.cursor_pos)
+            let byte_pos = self
+                .input_buffer
+                .char_indices()
+                .nth(self.cursor_pos)
                 .map(|(i, _)| i)
                 .unwrap_or(self.input_buffer.len());
             self.input_buffer.remove(byte_pos);
@@ -711,7 +715,8 @@ impl Tui {
             let state = &self.state;
             let sidebar = &self.skill_sidebar;
             let evo = &self.evolution_panel;
-            self.terminal.draw(|frame| render(frame, state, sidebar, evo))?;
+            self.terminal
+                .draw(|frame| render(frame, state, sidebar, evo))?;
 
             tokio::select! {
                 _ = render_interval.tick() => {}
@@ -840,7 +845,9 @@ impl Tui {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.toggle_evolution_panel();
                     }
-                    KeyCode::Char(c) if !matches!(self.state.approval_state, ApprovalState::Hidden) => {
+                    KeyCode::Char(c)
+                        if !matches!(self.state.approval_state, ApprovalState::Hidden) =>
+                    {
                         if let Some(choice) = self.handle_approval_key(c) {
                             self.hide_approval();
                             self.state.append_system(&format!(
@@ -894,17 +901,21 @@ impl Tui {
     }
 }
 
-fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar, evolution_panel: &evolution::EvolutionPanel) {
+fn render(
+    frame: &mut Frame,
+    state: &TuiState,
+    skill_sidebar: &SkillSidebar,
+    evolution_panel: &evolution::EvolutionPanel,
+) {
     let full_area = frame.area();
 
     // If the evolution panel is visible, carve a right column for it first.
     let main_area = if evolution_panel.visible {
-        let evo_width = evolution_panel.width.min(full_area.width.saturating_sub(40));
-        let cols = Layout::horizontal([
-            Constraint::Min(40),
-            Constraint::Length(evo_width),
-        ])
-        .split(full_area);
+        let evo_width = evolution_panel
+            .width
+            .min(full_area.width.saturating_sub(40));
+        let cols = Layout::horizontal([Constraint::Min(40), Constraint::Length(evo_width)])
+            .split(full_area);
 
         evolution_panel.render(frame, cols[1]);
         cols[0]
@@ -915,11 +926,8 @@ fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar, evo
     // If sidebar is visible, split off the right portion
     let (chat_area, input_area, status_area) = if skill_sidebar.visible {
         let sidebar_width = skill_sidebar.width.min(main_area.width.saturating_sub(40));
-        let chunks = Layout::horizontal([
-            Constraint::Min(40),
-            Constraint::Length(sidebar_width),
-        ])
-        .split(main_area);
+        let chunks = Layout::horizontal([Constraint::Min(40), Constraint::Length(sidebar_width)])
+            .split(main_area);
 
         skill_sidebar.render(frame, chunks[1]);
 
@@ -950,13 +958,16 @@ fn render(frame: &mut Frame, state: &TuiState, skill_sidebar: &SkillSidebar, evo
     frame.render_widget(chat_paragraph, chat_area);
 
     let input_text = build_input_text(state);
-    let input_paragraph = Paragraph::new(input_text)
-        .block(Block::default().borders(Borders::ALL).title(" Input (Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution) "));
+    let input_paragraph = Paragraph::new(input_text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Input (Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution) "),
+    );
     frame.render_widget(input_paragraph, input_area);
 
     let status_text = build_status_text(state);
-    let status_paragraph = Paragraph::new(status_text)
-        .style(Style::default().add_modifier(Modifier::REVERSED));
+    let status_paragraph =
+        Paragraph::new(status_text).style(Style::default().add_modifier(Modifier::REVERSED));
     frame.render_widget(status_paragraph, status_area);
 
     if let ApprovalState::Visible {
@@ -993,10 +1004,7 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
                     let mut spans = Vec::new();
                     for x in 0..buf.area.width {
                         let cell = buf.cell((x, y)).expect("cell within buffer bounds");
-                        spans.push(Span::styled(
-                            cell.symbol().to_string(),
-                            cell.style(),
-                        ));
+                        spans.push(Span::styled(cell.symbol().to_string(), cell.style()));
                     }
                     lines.push(Line::from(spans));
                 }
@@ -1009,7 +1017,9 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
     }
 
     if lines.is_empty() {
-        lines.push(Line::from("Welcome to Talos. Type a message and press Enter."));
+        lines.push(Line::from(
+            "Welcome to Talos. Type a message and press Enter.",
+        ));
     }
 
     Text::from(lines)
@@ -1017,9 +1027,13 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
 
 fn chat_scroll_offset(state: &TuiState, viewport_height: usize) -> u16 {
     let total_lines = state.chat_lines.len()
-        + if state.current_turn_text.is_empty() { 0 } else { 1 };
+        + if state.current_turn_text.is_empty() {
+            0
+        } else {
+            1
+        };
     let total_lines = if total_lines == 0 { 1 } else { total_lines };
-    
+
     if total_lines <= viewport_height {
         0
     } else {
@@ -1038,7 +1052,10 @@ fn build_input_text(state: &TuiState) -> Text<'static> {
     let mut spans = Vec::new();
     spans.push(Span::raw(before));
     if after.is_empty() {
-        spans.push(Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED)));
+        spans.push(Span::styled(
+            " ",
+            Style::default().add_modifier(Modifier::REVERSED),
+        ));
     } else {
         let mut chars = after.chars();
         if let Some(first) = chars.next() {
@@ -1049,7 +1066,10 @@ fn build_input_text(state: &TuiState) -> Text<'static> {
             ));
             spans.push(Span::raw(rest));
         } else {
-            spans.push(Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED)));
+            spans.push(Span::styled(
+                " ",
+                Style::default().add_modifier(Modifier::REVERSED),
+            ));
         }
     }
 
@@ -1099,11 +1119,7 @@ impl Drop for Tui {
 /// Restores the terminal to its original state.
 fn restore_terminal() -> Result<()> {
     disable_raw_mode()?;
-    execute!(
-        io::stdout(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
+    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
     Ok(())
 }
 
@@ -1137,7 +1153,10 @@ mod tests {
         let mut state = TuiState::new();
         state.append_delta("Assistant response");
         state.finalize_turn();
-        assert_eq!(state.chat_lines, vec![ChatLine::Text("Assistant response".into())]);
+        assert_eq!(
+            state.chat_lines,
+            vec![ChatLine::Text("Assistant response".into())]
+        );
         assert!(state.current_turn_text.is_empty());
     }
 
@@ -1159,14 +1178,20 @@ mod tests {
     fn test_append_error() {
         let mut state = TuiState::new();
         state.append_error("Something failed");
-        assert_eq!(state.chat_lines, vec![ChatLine::Text("[Error] Something failed".into())]);
+        assert_eq!(
+            state.chat_lines,
+            vec![ChatLine::Text("[Error] Something failed".into())]
+        );
     }
 
     #[test]
     fn test_append_system() {
         let mut state = TuiState::new();
         state.append_system("Turn cancelled");
-        assert_eq!(state.chat_lines, vec![ChatLine::Text("[System] Turn cancelled".into())]);
+        assert_eq!(
+            state.chat_lines,
+            vec![ChatLine::Text("[System] Turn cancelled".into())]
+        );
     }
 
     #[test]
@@ -1303,8 +1328,12 @@ mod tests {
     #[test]
     fn test_handle_event_text_delta() {
         let mut state = TuiState::new();
-        state.handle_event(&AgentEvent::TextDelta { delta: "Hello".into() });
-        state.handle_event(&AgentEvent::TextDelta { delta: " world".into() });
+        state.handle_event(&AgentEvent::TextDelta {
+            delta: "Hello".into(),
+        });
+        state.handle_event(&AgentEvent::TextDelta {
+            delta: " world".into(),
+        });
         assert_eq!(state.current_turn_text, "Hello world");
     }
 
@@ -1322,7 +1351,11 @@ mod tests {
         });
         assert_eq!(state.chat_lines.len(), 1);
         match &state.chat_lines[0] {
-            ChatLine::ToolCall { tool_name, arguments, result } => {
+            ChatLine::ToolCall {
+                tool_name,
+                arguments,
+                result,
+            } => {
                 assert_eq!(tool_name, "bash");
                 assert!(arguments.contains("command"));
                 assert!(arguments.contains("ls"));
@@ -1349,10 +1382,14 @@ mod tests {
             content: "fn main() {}".into(),
             is_error: false,
         };
-        state.handle_event(&AgentEvent::ToolResult { result: result.clone() });
+        state.handle_event(&AgentEvent::ToolResult {
+            result: result.clone(),
+        });
         assert_eq!(state.chat_lines.len(), 1);
         match &state.chat_lines[0] {
-            ChatLine::ToolCall { result: Some(r), .. } => {
+            ChatLine::ToolCall {
+                result: Some(r), ..
+            } => {
                 assert_eq!(r.content, "fn main() {}");
                 assert!(!r.is_error);
             }
@@ -1375,7 +1412,10 @@ mod tests {
             },
         });
         assert!(!state.is_processing);
-        assert_eq!(state.chat_lines, vec![ChatLine::Text("Response text".into())]);
+        assert_eq!(
+            state.chat_lines,
+            vec![ChatLine::Text("Response text".into())]
+        );
         assert_eq!(state.usage.input_tokens, 100);
         assert_eq!(state.usage.output_tokens, 50);
     }
@@ -1385,10 +1425,15 @@ mod tests {
         let mut state = TuiState::new();
         state.handle_event(&AgentEvent::TurnStart);
         state.append_delta("Partial");
-        state.handle_event(&AgentEvent::Error { message: "API error".into() });
+        state.handle_event(&AgentEvent::Error {
+            message: "API error".into(),
+        });
         assert!(!state.is_processing);
         assert!(state.current_turn_text.is_empty());
-        assert_eq!(state.chat_lines, vec![ChatLine::Text("[Error] API error".into())]);
+        assert_eq!(
+            state.chat_lines,
+            vec![ChatLine::Text("[Error] API error".into())]
+        );
     }
 
     #[test]
@@ -1443,7 +1488,10 @@ mod tests {
             arguments: "{}".into(),
             selected: ApprovalChoice::ApproveOnce,
         };
-        assert!(matches!(state.approval_state, ApprovalState::Visible { .. }));
+        assert!(matches!(
+            state.approval_state,
+            ApprovalState::Visible { .. }
+        ));
 
         state.approval_state = ApprovalState::Hidden;
         assert!(matches!(state.approval_state, ApprovalState::Hidden));

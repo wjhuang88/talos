@@ -30,11 +30,11 @@ use talos_core::message::Message;
 use talos_plugin::event::{HookEvent, HookEventKind};
 use talos_plugin::handler::{HookContext, HookHandler, HookResult};
 
+use crate::EvolutionConfig;
 use crate::adapter::BehaviorAdapter;
 use crate::extractor::PatternExtractor;
 use crate::observer::TurnObserver;
 use crate::store::KnowledgeStore;
-use crate::EvolutionConfig;
 
 const ERROR_INTENSITY: f64 = 1.0;
 const CORRECTION_INTENSITY: f64 = 0.8;
@@ -72,11 +72,7 @@ pub struct EvolutionHookHandler {
 impl EvolutionHookHandler {
     /// Build a handler backed by the given store, config, and session ID.
     #[must_use]
-    pub fn new(
-        store: KnowledgeStore,
-        config: EvolutionConfig,
-        session_id: Option<String>,
-    ) -> Self {
+    pub fn new(store: KnowledgeStore, config: EvolutionConfig, session_id: Option<String>) -> Self {
         Self {
             store: Mutex::new(store),
             config,
@@ -264,11 +260,8 @@ mod tests {
     async fn turn_start_then_turn_complete_with_no_observations_is_noop() {
         let h = handler();
         let c = ctx();
-        h.on_event(
-            &c,
-            &mut HookEvent::TurnStart { turn_id: c.turn_id },
-        )
-        .await;
+        h.on_event(&c, &mut HookEvent::TurnStart { turn_id: c.turn_id })
+            .await;
         h.on_event(
             &c,
             &mut HookEvent::TurnComplete {
@@ -384,7 +377,10 @@ mod tests {
         let outcome = h.on_event(&c, &mut event).await;
         match outcome {
             HookResult::Modify(HookEvent::OnSystemPromptBuilt { prompt }) => {
-                assert!(prompt.contains("BASE"), "augmented prompt must keep the original prefix");
+                assert!(
+                    prompt.contains("BASE"),
+                    "augmented prompt must keep the original prefix"
+                );
                 assert!(prompt.contains("Learned Patterns"));
                 assert!(prompt.contains("Avoid global mutable state"));
             }
@@ -401,7 +397,9 @@ mod tests {
         }];
         h.on_event(
             &c,
-            &mut HookEvent::BeforeProviderCall { messages: &messages },
+            &mut HookEvent::BeforeProviderCall {
+                messages: &messages,
+            },
         )
         .await;
         h.on_event(
@@ -427,7 +425,9 @@ mod tests {
         }];
         h.on_event(
             &c,
-            &mut HookEvent::BeforeProviderCall { messages: &messages },
+            &mut HookEvent::BeforeProviderCall {
+                messages: &messages,
+            },
         )
         .await;
         h.on_event(

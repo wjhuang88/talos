@@ -1,7 +1,7 @@
 //! BehaviorAdapter — injects high-confidence patterns into system prompt.
 
-use crate::{EvolutionConfig, Pattern};
 use crate::store::KnowledgeStore;
+use crate::{EvolutionConfig, Pattern};
 
 /// Injects learned patterns into the system prompt.
 pub struct BehaviorAdapter<'a> {
@@ -33,7 +33,8 @@ impl<'a> BehaviorAdapter<'a> {
         }
 
         let mut context = String::from("## Learned Patterns\n\n");
-        context.push_str("Based on past interactions, the following patterns have been learned:\n\n");
+        context
+            .push_str("Based on past interactions, the following patterns have been learned:\n\n");
 
         for (i, pattern) in filtered.iter().enumerate() {
             context.push_str(&format!(

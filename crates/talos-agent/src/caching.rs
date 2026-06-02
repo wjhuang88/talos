@@ -35,7 +35,7 @@
 //! let anthropic_format = system_prompt.to_anthropic_format();
 //! ```
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// A tool definition for inclusion in the system prompt.
 ///
@@ -358,11 +358,7 @@ mod tests {
     #[test]
     fn test_breakpoints_are_increasing() {
         let cache = PromptCache::new();
-        let tools = vec![ToolDefinition::new(
-            "bash",
-            "Execute commands",
-            json!({}),
-        )];
+        let tools = vec![ToolDefinition::new("bash", "Execute commands", json!({}))];
         let prompt = cache.build_system_prompt("Identity.", &tools, "Context.");
 
         let bps = prompt.cache_control_breakpoints();
@@ -413,11 +409,7 @@ mod tests {
     #[test]
     fn test_to_anthropic_format_produces_valid_json() {
         let cache = PromptCache::new();
-        let tools = vec![ToolDefinition::new(
-            "bash",
-            "Execute commands",
-            json!({}),
-        )];
+        let tools = vec![ToolDefinition::new("bash", "Execute commands", json!({}))];
         let prompt = cache.build_system_prompt("Identity.", &tools, "Context.");
         let anthropic = prompt.to_anthropic_format();
 
@@ -570,7 +562,11 @@ mod tests {
         let tools = vec![
             ToolDefinition::new("bash", "Run shell commands", json!({"command": "string"})),
             ToolDefinition::new("read", "Read files", json!({"path": "string"})),
-            ToolDefinition::new("write", "Write files", json!({"path": "string", "content": "string"})),
+            ToolDefinition::new(
+                "write",
+                "Write files",
+                json!({"path": "string", "content": "string"}),
+            ),
         ];
         let identity = "You are Talos, a safety-first agent runtime.";
         let context = "# AGENTS.md\nFollow the coding guide.";

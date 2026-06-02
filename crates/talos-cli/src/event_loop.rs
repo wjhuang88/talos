@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context, Result};
-use talos_agent::context::ContextLoader;
+use anyhow::{Context, Result, bail};
 use talos_agent::Agent;
+use talos_agent::context::ContextLoader;
 use talos_config::Config;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::tool::ToolRegistry;
@@ -19,7 +19,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::approval::ApprovalPrompt;
-use crate::{build_provider, parse_provider, Cli, PermissionAwareTool};
+use crate::{Cli, PermissionAwareTool, build_provider, parse_provider};
 
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
@@ -251,7 +251,13 @@ impl EventLoop {
                 self.state = AppState::WaitingForInput;
             }
 
-            (AppState::WaitingForInput, AppEvent::ForkCompleted { new_session_id, branch_id }) => {
+            (
+                AppState::WaitingForInput,
+                AppEvent::ForkCompleted {
+                    new_session_id,
+                    branch_id,
+                },
+            ) => {
                 self.branch_id = Some(branch_id.clone());
                 // Reload the fork from disk so subsequent turns append to the new file.
                 // Without this, `self.session` still points at the source session's id/path
@@ -352,6 +358,7 @@ impl EventLoop {
         let session = self.session.clone();
         let _workspace = self.workspace_root.clone();
         let event_tx = self.event_tx.clone();
+        let sessions_dir = self.session_manager.sessions_dir().to_path_buf();
 
         std::thread::spawn(move || {
             let result = (|| -> anyhow::Result<(String, String)> {
@@ -368,14 +375,16 @@ impl EventLoop {
                             anyhow::bail!("entry not found: {id}");
                         }
                     }
-                    None => entries.last().expect("entries checked non-empty above").id.clone(),
+                    None => entries
+                        .last()
+                        .expect("entries checked non-empty above")
+                        .id
+                        .clone(),
                 };
 
                 let mut forked = session.clone();
                 let branch_id = forked.fork(&fork_from_id)?;
 
-                let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-                let sessions_dir = std::path::PathBuf::from(home).join(".talos").join("sessions");
                 let project_dir = sessions_dir.join(&forked.project);
                 std::fs::create_dir_all(&project_dir)?;
 
@@ -402,7 +411,11 @@ impl EventLoop {
 
                 if let Ok(mut index) = SessionIndex::new(&sessions_dir.join("index.db")) {
                     let _ = index.init_schema();
-                    let _ = index.record_fork(&session.id.to_string(), &new_id.to_string(), &fork_from_id);
+                    let _ = index.record_fork(
+                        &session.id.to_string(),
+                        &new_id.to_string(),
+                        &fork_from_id,
+                    );
                     // Re-stamp `forked` with the new identity BEFORE indexing so the
                     // SQLite FTS5 index points at the fork's id/file_path/branch_id,
                     // not the source's. Without this, search and list_recent would
@@ -416,7 +429,10 @@ impl EventLoop {
 
             match result {
                 Ok((new_session_id, branch_id)) => {
-                    let _ = event_tx.send(AppEvent::ForkCompleted { new_session_id, branch_id });
+                    let _ = event_tx.send(AppEvent::ForkCompleted {
+                        new_session_id,
+                        branch_id,
+                    });
                 }
                 Err(e) => {
                     let _ = event_tx.send(AppEvent::AgentError(format!("Fork failed: {e}")));

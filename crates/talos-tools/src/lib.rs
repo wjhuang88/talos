@@ -451,8 +451,8 @@ impl AgentTool for ReadTool {
 
 impl ReadTool {
     async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
-        let read_input: ReadInput =
-            serde_json::from_value(input).map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+        let read_input: ReadInput = serde_json::from_value(input)
+            .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
         let path = resolve_workspace_path(&self.workspace_root, &read_input.path)?;
 
@@ -534,8 +534,8 @@ impl AgentTool for WriteTool {
 
 impl WriteTool {
     async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
-        let write_input: WriteInput =
-            serde_json::from_value(input).map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+        let write_input: WriteInput = serde_json::from_value(input)
+            .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
         let path = resolve_workspace_path(&self.workspace_root, &write_input.path)?;
 
@@ -596,8 +596,8 @@ impl AgentTool for EditTool {
 
 impl EditTool {
     async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
-        let edit_input: EditInput =
-            serde_json::from_value(input).map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+        let edit_input: EditInput = serde_json::from_value(input)
+            .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
         let path = resolve_workspace_path(&self.workspace_root, &edit_input.path)?;
 
@@ -648,7 +648,11 @@ mod file_tool_tests {
     #[tokio::test]
     async fn test_read_tool_line_range() {
         let temp_dir = tempfile::tempdir().unwrap();
-        fs::write(temp_dir.path().join("test.txt"), "line1\nline2\nline3\nline4\n").unwrap();
+        fs::write(
+            temp_dir.path().join("test.txt"),
+            "line1\nline2\nline3\nline4\n",
+        )
+        .unwrap();
 
         let tool = ReadTool::new(temp_dir.path().to_path_buf());
         let result = tool

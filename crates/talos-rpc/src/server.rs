@@ -5,13 +5,13 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use tokio::io::{stdin, stdout, AsyncRead, AsyncWrite, BufReader};
+use tokio::io::{AsyncRead, AsyncWrite, BufReader, stdin, stdout};
 
 use crate::cancel::CancelRegistry;
 use crate::error::RpcError;
 use crate::framing::{read_line, write_json_line};
-use crate::methods::{dispatch_method, response_id_or_null, MethodContext};
-use crate::protocol::{JsonRpcRequest, JsonRpcResponse, JSON_RPC_VERSION};
+use crate::methods::{MethodContext, dispatch_method, response_id_or_null};
+use crate::protocol::{JSON_RPC_VERSION, JsonRpcRequest, JsonRpcResponse};
 
 /// JSON-RPC server.
 pub struct RpcServer {

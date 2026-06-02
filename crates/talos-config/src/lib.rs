@@ -5,17 +5,19 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::collections::HashMap;
 use thiserror::Error;
 
 /// Error types for configuration operations.
 #[derive(Debug, Error)]
 pub enum ConfigError {
     /// The API key is missing from both config and environment variables.
-    #[error("missing API key for provider '{0}': set the {1} environment variable or add it to config")]
+    #[error(
+        "missing API key for provider '{0}': set the {1} environment variable or add it to config"
+    )]
     MissingApiKey(String, String),
 
     /// The configuration failed JSON Schema validation.
@@ -165,7 +167,8 @@ impl Config {
 
         let raw = fs::read_to_string(&path)?;
         let substituted = substitute_env_vars(&raw);
-        let config: Config = toml::from_str(&substituted).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        let config: Config =
+            toml::from_str(&substituted).map_err(|e| ConfigError::ParseError(e.to_string()))?;
 
         config.validate()?;
         Ok(config)
@@ -407,7 +410,9 @@ mod tests {
             provider: Provider::OpenAI,
             model: "glm-5".to_string(),
             api_key: None,
-            base_url: Some("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1".to_string()),
+            base_url: Some(
+                "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1".to_string(),
+            ),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),

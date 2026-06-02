@@ -60,7 +60,11 @@ impl ApprovalPrompt {
     /// # Errors
     ///
     /// Returns an error if reading from stdin fails.
-    pub fn prompt(&mut self, tool_name: &str, input: &serde_json::Value) -> Result<PermissionDecision> {
+    pub fn prompt(
+        &mut self,
+        tool_name: &str,
+        input: &serde_json::Value,
+    ) -> Result<PermissionDecision> {
         let formatted = Self::format_input(input);
 
         loop {
