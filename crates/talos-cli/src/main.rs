@@ -171,6 +171,9 @@ struct Cli {
     #[arg(long, help = "Launch terminal UI instead of readline loop.")]
     tui: bool,
 
+    #[arg(long, conflicts_with = "tui", help = "Force the readline interactive REPL (default is TUI on a TTY).")]
+    repl: bool,
+
     #[arg(long, help = "Skip loading workspace context.")]
     no_context: bool,
 
@@ -265,11 +268,15 @@ async fn main() -> Result<()> {
         return run_tui_mode(cli).await;
     }
 
+    if cli.repl {
+        return run_interactive_mode(cli).await;
+    }
+
     if !io::stdin().is_terminal() {
         return run_print_mode(cli).await;
     }
 
-    run_interactive_mode(cli).await
+    run_tui_mode(cli).await
 }
 
 fn run_learned_mode(_cli: Cli) -> Result<()> {

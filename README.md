@@ -6,10 +6,11 @@ English | **[中文](README.zh-CN.md)**
 
 ## Status
 
-**I007 complete; I008 active (impl landed 2026-06-01); I009 complete; R0 complete.** 509 tests passing across 12 crates. The agent
-performs file and shell operations safely with permission gating, supports a TUI, sessions with
-SQLite search, skills, and multiple providers. **I009 ships the extensibility surface**: a
-hook system with 13 lifecycle points (`talos-plugin`), MCP client + server over stdio
+**I007 complete; I008 active (impl + TUI default landed 2026-06-01); I009 complete; R0 complete.** 509 tests passing across 12 crates. The agent
+performs file and shell operations safely with permission gating, **launches a Nord-themed
+TUI by default on a TTY** (`--repl` to use the legacy readline loop), supports sessions
+with SQLite search, skills, and multiple providers. **I009 ships the extensibility surface**:
+a hook system with 13 lifecycle points (`talos-plugin`), MCP client + server over stdio
 (`talos-mcp`), a stdio JSON-RPC control plane (`talos-rpc`), and `ToolProvenance` tracking so
 consumers can tell native tools apart from MCP-remote tools. **I008 self-evolution is wired
 into all four runtime paths** (print, TUI, interactive, RPC) via a builtin

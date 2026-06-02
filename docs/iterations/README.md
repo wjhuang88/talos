@@ -40,7 +40,7 @@ docs/iterations/
 | I005 | Smart Agent | Complete | ✅ |
 | I006 | Data Agent | Complete | ⚠️ ADR-004 event-loop variants partly unused (dead code); session index/fork residuals tracked by #ARCH-S5/#ARCH-S6/#ARCH-S7 |
 | I007 | Skilled Agent | Complete | ✅ |
-| I008 | Learning Agent | **Active** (impl landed 2026-06-01) | 🛠️ Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all 3 paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). Awaiting final review. See `I008-learning-agent.md` for the new plan + Execution Record. |
+| I008 | Learning Agent | **Active** (impl landed 2026-06-01; TUI made default 2026-06-01) | 🛠️ Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all 3 paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). TUI is now the default TTY mode (legacy readline REPL retained as `--repl`). Awaiting final review. See `I008-learning-agent.md` for the new plan + Execution Record. |
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
 | I009 | Extensible Agent | **Complete** (2026-06-01) | 5/5 stories shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance); 501 tests pass; E2E runtime evidence in `I009-extensible-agent.md` Execution Record. S1 TUI consumer markers + `/plugins` command deferred to a follow-up per ADR-009. |
 | I010 | Polished Agent | Planned | See `I010-polished-agent.md` |

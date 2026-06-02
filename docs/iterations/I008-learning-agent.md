@@ -157,3 +157,40 @@ was already complete.
   `Box::leak` per-turn cost (~few KB/turn).
 - `#I010-S7`: AppServerSession seam — independent architectural cleanup (cross-Agent /
   cross-session / UI status). Not a prerequisite for I008 anymore.
+
+### 2026-06-01: TUI is now the default TTY mode
+
+**Decision (soft migration, option B).** The TUI is now the default for TTY users; the
+legacy readline REPL is retained as `--repl` for users who want the lighter-weight path
+(accessibility, screen readers, minimal terminals, debugging).
+
+**Code change (one commit):**
+- `crates/talos-cli/src/main.rs`:
+  - Added `repl: bool` to `Cli` with `conflicts_with = "tui"` and help text
+    *"Force the readline interactive REPL (default is TUI on a TTY)."*
+  - Main dispatch updated: `cli.tui` → TUI (unchanged, redundant with new default);
+    `cli.repl` → REPL (new); `!is_terminal()` → print (unchanged); **default TTY → TUI**
+    (was: REPL).
+
+**New dispatch table:**
+
+| Invocation | Mode |
+|---|---|
+| `talos --mcp-server` | MCP server |
+| `talos --search <q>` | Search (lists matching messages) |
+| `talos --list` | List recent sessions |
+| `talos --learned` | Show evolution patterns |
+| `talos --mode=print …` / `talos -p …` | Print (stream + exit) |
+| `talos --tui …` | TUI (explicit, now redundant with default) |
+| `talos --repl …` | Readline REPL (explicit) |
+| `echo "..." \| talos` (stdin not a TTY) | Print (pipe-friendly fallback) |
+| **`talos` (TTY, no flags)** | **TUI (new default — was REPL)** |
+
+**Verification:**
+- `cargo test --workspace`: 509 passed, 0 failed
+- `cargo clippy -p talos-cli --bin talos -- -D warnings`: clean
+- E2E: `--tui --repl` rejected by clap (`cannot be used with`)
+- E2E: TTY + no flags → log file created (proves TUI is the new default)
+- E2E: TTY + `--repl` → routes to `run_interactive_mode` (verified by code review of dispatch)
+- E2E: TTY + `--tui --mock` (explicit) → log file created (unchanged)
+- E2E: stdin pipe + no flags → print mode (unchanged)
