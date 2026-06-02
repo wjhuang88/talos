@@ -44,6 +44,7 @@ docs/iterations/
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
 | I009 | Extensible Agent | **Complete** (2026-06-01) | 5/5 stories shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance); 501 tests pass; E2E runtime evidence in `I009-extensible-agent.md` Execution Record. S1 TUI consumer markers + `/plugins` command deferred to a follow-up per ADR-009. |
 | I010 | Polished Agent | Planned | See `I010-polished-agent.md` |
+| I011 | Open Providers | **Active** (S1 landed 2026-06-02) | 🛠️ OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var. S1 (base_url plumbing) shipped; S2 (provider-plugin architecture) is a separate follow-up. See `I011-open-providers.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.

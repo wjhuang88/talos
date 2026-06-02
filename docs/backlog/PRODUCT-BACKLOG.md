@@ -1052,3 +1052,113 @@ absence of the marker text.
 
 **Depends on**: #I006-S4
 **Estimate**: XS
+
+## Iteration I011: Open Providers
+
+**Theme**: Decouple `talos` from hard-coded provider lists so it can talk to any
+OpenAI-compatible gateway (DashScope, Bailian, Z.ai, self-hosted vLLM) without code
+changes. Foundation for the longer-term **provider plugin architecture** (see
+[docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md)).
+
+### #I011-S1: OpenAI-compatible `base_url` override
+
+**Description**: `talos` currently hard-codes the Anthropic and OpenAI base URLs in
+`talos-provider`. Many production gateways (Alibaba Cloud Bailian / DashScope, Z.ai,
+self-hosted vLLM, LocalAI, etc.) expose the OpenAI chat-completions protocol at a
+different URL. Allow users to override the base URL via `~/.talos/config.toml` without
+touching code or env vars beyond the auth token.
+
+**Files & anchors**:
+- `crates/talos-config/src/lib.rs:50-72` (`Config` struct)
+- `crates/talos-config/src/lib.rs:172-190` (`api_key()` resolution)
+- `crates/talos-cli/src/main.rs:822-832` (`build_provider()`)
+
+**MUST DO**:
+- Add `base_url: Option<String>` to `Config` (`#[serde(default)]` so existing configs
+  load unchanged).
+- Add `Config::base_url() -> Option<&str>` getter.
+- Extend `Config::api_key()` resolution chain for the OpenAI provider with a
+  `OPENAI_COMPAT_API_KEY` env var fallback, checked **after** `OPENAI_API_KEY` so
+  existing setups are unaffected.
+- Wire `config.base_url()` into `talos-cli::build_provider()` for `Provider::OpenAI`
+  only (Anthropic provider keeps its hard-coded URL for this iteration).
+- Add unit tests in `talos-config` for the new field, the new env var, and the
+  precedence (`config.api_key` > `OPENAI_API_KEY` > `OPENAI_COMPAT_API_KEY`).
+- Update the missing-key error message to mention `OPENAI_COMPAT_API_KEY` when
+  applicable.
+
+**MUST NOT DO**:
+- Do NOT add a new `Provider::*` variant. `provider = "openai"` is the gateway for all
+  OpenAI-compatible endpoints. Adding a new variant per gateway is the scope of
+  #I011-S2 / provider-plugin-architecture.
+- Do NOT add a `--base-url` CLI flag. The config file is the canonical override
+  surface; CLI flag is out of scope.
+- Do NOT touch Anthropic provider. The hard-coded `https://api.anthropic.com/...` is
+  fine.
+- Do NOT add support for `thinking` / `reasoning` / `budgetTokens` fields. Out of scope
+  for this iteration; tracked separately (see proposal docs).
+- Do NOT add new env vars other than `OPENAI_COMPAT_API_KEY`. Naming: "compat" signals
+  "OpenAI-compatible protocol" without committing to a specific gateway.
+
+**Acceptance Criteria**:
+- [ ] `~/.talos/config.toml` accepts `base_url = "https://..."`; loaded config exposes
+      it via `Config::base_url()`.
+- [ ] `Provider::OpenAI` with `base_url` set sends requests to that URL.
+- [ ] `Provider::OpenAI` with no `base_url` keeps the hard-coded OpenAI URL.
+- [ ] `OPENAI_API_KEY` is checked before `OPENAI_COMPAT_API_KEY`; the latter is a
+      fallback only.
+- [ ] `Provider::Anthropic` never reads `OPENAI_COMPAT_API_KEY` (or any openai env var).
+- [ ] Missing-key error message for the OpenAI provider mentions both
+      `OPENAI_API_KEY` and `OPENAI_COMPAT_API_KEY`.
+- [ ] `cargo test --workspace` exits 0; 6 new tests in `talos-config`.
+- [ ] `cargo clippy -p talos-cli --bin talos -p talos-config -- -D warnings` clean.
+
+**Reference (well-known OpenAI-compatible gateways this enables)**:
+
+The following public endpoints are known to follow the OpenAI chat-completions protocol
+and work with this story out of the box. The list is illustrative, not exhaustive — any
+endpoint that follows the same protocol works.
+
+| Gateway | Base URL (compatible mode) | Notable models |
+|---|---|---|
+| Alibaba Cloud Bailian (token plan) | `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` | `glm-5`, `qwen3.6-plus`, `MiniMax-M2.5`, `deepseek-v3.2` |
+| Alibaba Cloud DashScope | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus`, `qwen-coder-plus`, `qwen3.5-plus` |
+| Z.ai (Zhipu) coding plan | (OpenAI-compatible; URL published by the vendor) | `glm-4.7`, `kimi-k2.5` |
+| Self-hosted vLLM | depends on deployment | any |
+
+Example (Bailian):
+```toml
+# ~/.talos/config.toml
+provider = "openai"
+model = "glm-5"
+base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+```
+```bash
+export OPENAI_COMPAT_API_KEY="<your key from the gateway's dashboard>"
+cargo run -p talos-cli -- -p "用中文回答:1+1=?"
+```
+The key never appears in the repo, config file, or git history.
+
+**Depends on**: none (no blocker; standalone)
+**Estimate**: S
+
+### #I011-S2: Provider plugin architecture (foundation, not full plugin system)
+
+**Description**: A long-term direction. Today each new provider requires a Rust
+compile-time addition to `talos-provider` and a hard-coded `Provider::*` enum variant
+in `talos-config`. The plugin architecture would let users register providers at
+runtime via a `~/.talos/providers.toml` (or similar) that mirrors the opencode config
+schema (`options.baseURL`, `models.{name,options,limit}`, auth via env var per provider).
+This story is the **first slice** of that direction: capture the opencode config
+schema as a Rust type and write a one-way migration from opencode's `provider` block
+into `talos`'s `Config` shape. Full dynamic loading (a fresh binary that can hot-load a
+provider written in another language) is out of scope.
+
+**Status**: Backlog only. No code yet. See
+[docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md)
+for the design sketch.
+
+**Depends on**: #I011-S1 (provides the runtime base_url wiring that S2 will surface via
+config)
+
+**Estimate**: L

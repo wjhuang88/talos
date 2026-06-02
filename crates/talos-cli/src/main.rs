@@ -823,11 +823,17 @@ pub(crate) fn build_provider(config: &Config, api_key: &str, mock: bool) -> Arc<
     if mock {
         use talos_provider::mock::MockProvider;
         return Arc::new(MockProvider::new()
-            .with_response("I'm a mock LLM. I can help you with testing and development without making real API calls."));
+            .with_response("I'm a mock LLM. I can help with testing and development without making real API calls."));
     }
     match config.provider {
         Provider::Anthropic => Arc::new(AnthropicProvider::new(api_key, &config.model)),
-        Provider::OpenAI => Arc::new(OpenAIProvider::new(api_key, &config.model)),
+        Provider::OpenAI => {
+            let mut provider = OpenAIProvider::new(api_key, &config.model);
+            if let Some(base_url) = config.base_url() {
+                provider = provider.with_base_url(base_url);
+            }
+            Arc::new(provider)
+        }
     }
 }
 

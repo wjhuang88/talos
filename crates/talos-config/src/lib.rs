@@ -58,6 +58,13 @@ pub struct Config {
     /// Optional API key. If not set, the key is read from environment variables.
     pub api_key: Option<String>,
 
+    /// Optional base URL override. When set together with `provider = "openai"`,
+    /// `talos` sends requests to this URL using the OpenAI chat-completions
+    /// protocol. Use this to point at OpenAI-compatible gateways (DashScope,
+    /// Bailian, Z.ai, self-hosted vLLM, etc.). Ignored for `provider = "anthropic"`.
+    #[serde(default)]
+    pub base_url: Option<String>,
+
     /// Hook-system configuration.
     #[serde(default)]
     pub hooks: HookConfig,
@@ -166,9 +173,13 @@ impl Config {
 
     /// Returns the API key for the current provider.
     ///
-    /// Checks the config file first, then falls back to environment variables:
-    /// - `ANTHROPIC_API_KEY` for the Anthropic provider
-    /// - `OPENAI_API_KEY` for the OpenAI provider
+    /// Resolution order:
+    /// 1. `config.api_key` (explicit).
+    /// 2. Provider-specific env var: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
+    /// 3. For the OpenAI provider only, additionally `OPENAI_COMPAT_API_KEY`.
+    ///    This is the conventional name for keys issued by OpenAI-compatible
+    ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
+    ///    after `OPENAI_API_KEY` so existing setups are unaffected.
     pub fn api_key(&self) -> Result<String, ConfigError> {
         if let Some(key) = &self.api_key {
             if !key.is_empty() {
@@ -176,17 +187,41 @@ impl Config {
             }
         }
 
-        let env_var = match self.provider {
+        let primary = match self.provider {
             Provider::Anthropic => "ANTHROPIC_API_KEY",
             Provider::OpenAI => "OPENAI_API_KEY",
         };
 
-        env::var(env_var).map_err(|_| {
-            ConfigError::MissingApiKey(
-                format!("{:?}", self.provider),
-                env_var.to_string(),
-            )
-        })
+        if let Ok(key) = env::var(primary) {
+            if !key.is_empty() {
+                return Ok(key);
+            }
+        }
+
+        if matches!(self.provider, Provider::OpenAI) {
+            if let Ok(key) = env::var("OPENAI_COMPAT_API_KEY") {
+                if !key.is_empty() {
+                    return Ok(key);
+                }
+            }
+        }
+
+        Err(ConfigError::MissingApiKey(
+            format!("{:?}", self.provider),
+            match self.provider {
+                Provider::Anthropic => "ANTHROPIC_API_KEY".to_string(),
+                Provider::OpenAI => "OPENAI_API_KEY or OPENAI_COMPAT_API_KEY".to_string(),
+            },
+        ))
+    }
+
+    /// Returns the optional base URL override.
+    ///
+    /// `None` means "use the provider's hard-coded default endpoint".
+    /// `Some(url)` is sent verbatim to the provider's HTTP client via
+    /// `with_base_url()`. Currently honored only for the OpenAI provider.
+    pub fn base_url(&self) -> Option<&str> {
+        self.base_url.as_deref()
     }
 
     /// Validates the configuration against its JSON Schema.
@@ -312,6 +347,7 @@ mod tests {
         assert_eq!(config.provider, Provider::Anthropic);
         assert!(config.model.is_empty());
         assert!(config.api_key.is_none());
+        assert!(config.base_url.is_none());
     }
 
     #[test]
@@ -320,6 +356,7 @@ mod tests {
             provider: Provider::Anthropic,
             model: "claude-test".to_string(),
             api_key: Some("config-key".to_string()),
+            base_url: None,
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -335,6 +372,7 @@ mod tests {
             provider: Provider::Anthropic,
             model: "claude-test".to_string(),
             api_key: None,
+            base_url: None,
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -351,12 +389,72 @@ mod tests {
             provider: Provider::OpenAI,
             model: "gpt-test".to_string(),
             api_key: None,
+            base_url: None,
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "env-key-openai");
         unsafe { env::remove_var("OPENAI_API_KEY") };
+    }
+
+    #[test]
+    fn test_api_key_from_env_openai_compat() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::remove_var("OPENAI_API_KEY") };
+        unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-style-key") };
+        let config = Config {
+            provider: Provider::OpenAI,
+            model: "glm-5".to_string(),
+            api_key: None,
+            base_url: Some("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1".to_string()),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+        assert_eq!(config.api_key().unwrap(), "bailian-style-key");
+        unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
+    }
+
+    #[test]
+    fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::set_var("OPENAI_API_KEY", "real-openai-key") };
+        unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-key") };
+        let config = Config {
+            provider: Provider::OpenAI,
+            model: "gpt-4o".to_string(),
+            api_key: None,
+            base_url: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+        assert_eq!(config.api_key().unwrap(), "real-openai-key");
+        unsafe { env::remove_var("OPENAI_API_KEY") };
+        unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
+    }
+
+    #[test]
+    fn test_api_key_anthropic_does_not_check_openai_compat_env() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::remove_var("ANTHROPIC_API_KEY") };
+        unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "should-not-be-used") };
+        let config = Config {
+            provider: Provider::Anthropic,
+            model: "claude-test".to_string(),
+            api_key: None,
+            base_url: None,
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+        let err = config.api_key().unwrap_err();
+        assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
+        let msg = err.to_string();
+        assert!(msg.contains("ANTHROPIC_API_KEY"));
+        assert!(!msg.contains("OPENAI_COMPAT_API_KEY"));
+        unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
     }
 
     #[test]
@@ -367,6 +465,7 @@ mod tests {
             provider: Provider::Anthropic,
             model: "claude-test".to_string(),
             api_key: None,
+            base_url: None,
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -375,6 +474,40 @@ mod tests {
         assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
         let msg = err.to_string();
         assert!(msg.contains("ANTHROPIC_API_KEY"));
+    }
+
+    #[test]
+    fn test_base_url_getter() {
+        let config = Config {
+            provider: Provider::OpenAI,
+            model: "glm-5".to_string(),
+            api_key: None,
+            base_url: Some("https://example.com/v1".to_string()),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+        assert_eq!(config.base_url(), Some("https://example.com/v1"));
+    }
+
+    #[test]
+    fn test_base_url_default_is_none() {
+        let config = Config::default();
+        assert_eq!(config.base_url(), None);
+    }
+
+    #[test]
+    fn test_base_url_parsed_from_toml() {
+        let toml_str = r#"
+            provider = "openai"
+            model = "glm-5"
+            base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            config.base_url(),
+            Some("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
+        );
     }
 
     #[test]
@@ -394,6 +527,7 @@ mod tests {
             provider: Provider::Anthropic,
             model: "test".to_string(),
             api_key: None,
+            base_url: None,
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -402,6 +536,7 @@ mod tests {
             provider: Provider::OpenAI,
             model: "test".to_string(),
             api_key: None,
+            base_url: None,
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),

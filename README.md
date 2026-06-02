@@ -6,14 +6,17 @@ English | **[中文](README.zh-CN.md)**
 
 ## Status
 
-**I007 complete; I008 active (impl + TUI default landed 2026-06-01); I009 complete; R0 complete.** 509 tests passing across 12 crates. The agent
+**I007 complete; I008 active (impl + TUI default landed 2026-06-01); I009 complete; I011 active (S1 landed 2026-06-02); R0 complete.** 515 tests passing across 12 crates. The agent
 performs file and shell operations safely with permission gating, **launches a Nord-themed
 TUI by default on a TTY** (`--repl` to use the legacy readline loop), supports sessions
-with SQLite search, skills, and multiple providers. **I009 ships the extensibility surface**:
-a hook system with 13 lifecycle points (`talos-plugin`), MCP client + server over stdio
-(`talos-mcp`), a stdio JSON-RPC control plane (`talos-rpc`), and `ToolProvenance` tracking so
-consumers can tell native tools apart from MCP-remote tools. **I008 self-evolution is wired
-into all four runtime paths** (print, TUI, interactive, RPC) via a builtin
+with SQLite search, skills, and multiple providers. **I011 S1 ships OpenAI-compatible
+`base_url` override**: point `talos` at any OpenAI-compatible gateway (DashScope /
+Bailian / Z.ai / self-hosted vLLM) via `~/.talos/config.toml` + `OPENAI_COMPAT_API_KEY`
+env var, no Rust changes. **I009 ships the extensibility surface**: a hook system with
+13 lifecycle points (`talos-plugin`), MCP client + server over stdio (`talos-mcp`), a
+stdio JSON-RPC control plane (`talos-rpc`), and `ToolProvenance` tracking so consumers
+can tell native tools apart from MCP-remote tools. **I008 self-evolution is wired into
+all four runtime paths** (print, TUI, interactive, RPC) via a builtin
 `EvolutionHookHandler` registered per-Agent — see
 [docs/iterations/I008-learning-agent.md](docs/iterations/I008-learning-agent.md) and the
 re-scope notes in [ADR-001](docs/decisions/001-runtime-self-evolution.md) / [ADR-005](docs/decisions/005-tui-event-architecture.md) /
@@ -40,6 +43,7 @@ testable `talos` binary.
 | ~~R0~~ | ~~Remediation Gate~~ | ~~Close ARCH findings (sandbox unsafe-ADR link, Agent::new deprecation, ApprovalChoice unification, session index refresh, fork identity, BOLD highlight, ProcessHardening pre_exec)~~ ✅ |
 | ~~I009~~ | ~~Extensible Agent~~ | ~~TUI MCP display + Hook system + MCP + JSON-RPC + ToolProvenance~~ ✅ (501 tests; TUI consumer markers deferred per [ADR-009](docs/decisions/009-tool-provenance.md)) |
 | I010 | Polished Agent | Full TUI polish (Nord theme + markdown + advanced features) |
+| I011 | Open Providers | 🛠️ OpenAI-compatible `base_url` override (shipped 2026-06-02) — point `talos` at any OpenAI-compatible gateway (DashScope / Bailian / Z.ai / self-hosted vLLM) via `~/.talos/config.toml` + `OPENAI_COMPAT_API_KEY` env var, no Rust changes |
 
 ## Architecture
 
