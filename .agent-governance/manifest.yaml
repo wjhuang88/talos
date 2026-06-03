@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-03"
-status_note: "Governance baseline repaired after R0 remediation. R1 Review Closure is the active operating round: close I008/I009 review drift, pause I011 S2, and keep I010 R2 as the next mainline implementation slice. I008 runtime learning is implemented through a builtin HookHandler across print, TUI, interactive, and RPC paths; I009 backend/runtime extensibility is in Review with TUI consumer follow-up tracked; I010/I012 planned requirements are recorded in backlog, iteration docs, roadmap, and requirement convergence."
+status_note: "R1 Review Closure complete (2026-06-03). I008 and I009 are Complete. I009 TUI consumer work deferred to #I009-S6. I010 R2 Architecture Convergence is the next mainline implementation slice. I011 S2 provider plugin architecture remains paused. 519 tests passing across 12 crates."
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -51,14 +51,14 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "R1 active: close I008/I009 review drift before starting I010 R2"
+    - "R1 complete: I010 R2 Architecture Convergence is the next mainline slice"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
-    - "Complete I009 consumer follow-up: TUI provenance markers and /plugins command, or move them through change control into a numbered follow-up story"
+    - "Implement #I009-S6 TUI provenance markers and /plugins command in I010 R2/R3 or a dedicated follow-up"
     - "Resolved: ADR-006 draws the event-architecture boundary (adopt single-consumer loop + AppServerSession seam; reject global pub/sub bus) — guardrail for implementers"
     - "Resolved: ADR-007 records & justifies the four talos-sandbox process-hardening unsafe sites (satisfies Hard Constraint #2)"
     - "Resolved: ADR-005 fixes the canonical TUI event architecture (two-layer: L1 mpsc AppEvent bus + L2 AppServerSession SQ/EQ seam); ADR-004 amended"
     - "Resolved: R0 remediation closed ARCH-S1..S7, including process hardening runtime wiring, Agent::new deprecation, ApprovalChoice unification, session index refresh, fork identity/path repair, and search highlight cleanup"
-    - "After R1 closure, implement #I010-S7 AppServerSession seam (ADR-005 phased migration): SQ/EQ types in talos-core, session actor in talos-agent; converge run_print_mode/run_interactive_mode/run_tui_mode"
-    - "Close I008 review with current hook-based runtime evidence, then move I008 to COMPLETE when verification is accepted"
+    - "Resolved: R1 Review Closure completed I008/I009; I009 TUI consumer work in #I009-S6"
+    - "Implement #I010-S7 AppServerSession seam (ADR-005 phased migration): SQ/EQ types in talos-core, session actor in talos-agent; converge run_print_mode/run_interactive_mode/run_tui_mode"
     - "Remove ADR-004 dead event-loop variants during interactive-path migration (approval/fork/skill events never constructed)"
     - "Add CI pipeline (cargo test + clippy on push)"

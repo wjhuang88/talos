@@ -23,20 +23,21 @@ verification evidence, and public status all agree.
 | Requirement | Decision / Reference | Backlog / Iteration | Current State | Closure Condition |
 |---|---|---|---|---|
 | Bundled SQLite must be static/self-contained and not require system SQLite | ADR-008; ADR-002 storage architecture | I006 SQLite search; README storage note | Implemented and documented | Keep `rusqlite/bundled`; verify binary has no system SQLite dependency when release packaging is cut |
-| I008/I009 review closure before new mainline work | I008/I009 execution records; R1 review closure | R1 Review Closure; I008 Review; I009 Review | Active | I008/I009 move to Complete or residual work is moved through change control; I011 S2 stays paused; I010 R2 is then activated |
-| I009 extensibility must not bypass permissions | ADR-009 provenance; I009 execution record | #I009-S3/S4/S5; I009 Review | Backend/runtime implemented; TUI consumer work pending under R1 | TUI provenance markers and `/plugins` command land or move through change control |
+| I008/I009 review closure before new mainline work | I008/I009 execution records; R1 review closure | R1 Review Closure | Complete (2026-06-03) | I008/I009 moved to Complete; I009 TUI consumer work deferred to #I009-S6; I010 R2 is next |
+| I009 extensibility must not bypass permissions | ADR-009 provenance; I009 execution record | #I009-S3/S4/S5; #I009-S6 (deferred TUI consumer) | Backend/runtime complete; TUI consumer deferred to #I009-S6 | #I009-S6 lands in I010 R2/R3 or a dedicated follow-up |
 | Codex-like terminal experience | ADR-005 / ADR-006 session seam; reference project Codex patterns | #I010-S7; I010 R2/R3 | Planned after R1 closure | R2 first: full-screen and inline/no-alt-screen modes share one session event stream; scrollback-preserving mode verified before R3 polish |
 | Native POSIX-style basic tools to reduce host environment dependency | ADR required before implementation if tool-pack, provenance, config, or public tool listing changes | #I012-S1; I012 Portable Tools | Planned | Native POSIX subset works on minimal `PATH`; write tools remain permission-gated |
 | Embeddable local tool packs linked to pluginized tools | ADR-009 provenance; future plugin registration design; likely I012 ADR | #I012-S2 | Planned | ADR records native tool-pack boundary; native POSIX pack registers through same path future local plugins can use |
 | Provider openness without recompilation | Provider plugin proposal | #I011-S1 implemented; #I011-S2 backlog | S1 implemented; S2 paused/deferred | Configurable provider schema and migration path are implemented without hard-coded provider variants; S2 resumes after R1/I010 or explicit priority change |
-| Self-evolution runtime wiring | ADR-001; ADR-005 hook-driven evolution clarification | I008 Review | Implemented, awaiting review close | I008 review evidence confirms all runtime paths behave correctly and status moves to Complete |
+| Self-evolution runtime wiring | ADR-001; ADR-005 hook-driven evolution clarification | I008 Complete | Complete (2026-06-03) | Hook-based EvolutionHookHandler registered uniformly across all paths; runtime evidence recorded |
 
-## Open Documentation Corrections
+## Closed Documentation Corrections
 
-- I009 remains **Review**, not Complete, until consumer-side TUI work is closed or
-  formally moved to a new story.
-- R1 is the active operating round. It exists to close I008/I009 Review drift before I010 R2 starts.
-- I011 S2 is paused while R1 is active; do not treat provider plugin architecture as active work
+- I008 is **Complete** (2026-06-03). Hook-based runtime evidence recorded; all paths verified.
+- I009 is **Complete** (2026-06-03). Backend/runtime extensibility shipped. TUI consumer work
+  (provenance markers + `/plugins`) deferred to `#I009-S6` through change control.
+- R1 Review Closure is **Complete** (2026-06-03). I010 R2 Architecture Convergence is next.
+- I011 S2 remains paused; do not treat provider plugin architecture as active work
   without a priority-change update.
 - I012 is a planned requirement created from the environment-dependency reduction goal;
   it must not be implemented opportunistically inside unrelated polish work.

@@ -3,14 +3,14 @@
 **User can**: Extend Talos through hooks, MCP servers, and stdio JSON-RPC while existing permission
 and sandbox boundaries remain enforced.
 
-## Status: REVIEW (backend/runtime surface landed 2026-06-01; TUI consumer follow-up pending)
+## Status: COMPLETE (2026-06-03) — backend/runtime surface shipped; TUI consumer work deferred to #I009-S6
 
 R0 closed 2026-06-01. I009 starts in execution-plan order: S2 (hook system) → S3 (MCP client) →
 S4 (MCP server) → S5 (JSON-RPC) → S1 (TUI surface).
 
 ## Selected Stories
 
-- [ ] #I009-S1: TUI MCP tool markers + plugin status (producers landed; TUI markers + `/plugins` command deferred to follow-up per ADR-009)
+- [ ] #I009-S1: TUI MCP tool markers + plugin status → **deferred to #I009-S6** (producers landed; consumer work moved through change control to a numbered follow-up story)
 - [x] #I009-S2: Hook system (20+ extension points)
 - [x] #I009-S3: MCP client
 - [x] #I009-S4: MCP server
@@ -31,7 +31,7 @@ S4 (MCP server) → S5 (JSON-RPC) → S1 (TUI surface).
 - [x] Talos can call at least one MCP-provided tool.
 - [x] Talos can expose at least one permission-gated capability through MCP server mode.
 - [x] `talos --mode rpc` accepts a stdio JSON-RPC request and returns a machine-readable response.
-- [ ] TUI marks MCP-provided tools distinctly from built-in tools. (Deferred: producers wire `ToolProvenance`; consumer-side rendering tracked in a follow-up. See ADR-009 "Out of Scope".)
+- [ ] TUI marks MCP-provided tools distinctly from built-in tools. → **Deferred to #I009-S6** through change control during R1 Review Closure. See ADR-009 "Out of Scope" and PRODUCT-BACKLOG.md #I009-S6.
 - [x] Extension paths do not bypass permission checks, sandboxing, or command approval. MCP client tools are registered through the normal agent permission engine; only remote tools that declare `readOnlyHint=true` are auto-allowed in print/mock fixture mode, while write-capable/unknown remote tools fail closed through the default `Ask` policy.
 - [x] `cargo test --workspace` exits 0.
 
@@ -150,9 +150,21 @@ Scope").
 
 ### Review Closure Options
 
-1. Implement the remaining S1 consumer work inside I009: TUI marker rendering plus `/plugins`.
+1. ~~Implement the remaining S1 consumer work inside I009: TUI marker rendering plus `/plugins`.~~
 2. Move the remaining S1 consumer work into a numbered follow-up story through
    `docs/sop/CHANGE-CONTROL.md`, then update I009 acceptance criteria and status accordingly.
+
+**Decision (2026-06-03, R1 Review Closure)**: Option 2. TUI provenance marker rendering and
+`/plugins` command moved to `#I009-S6` in PRODUCT-BACKLOG.md through change control.
+I009 backend/runtime extensibility is complete (S2 hooks, S3 MCP client, S4 MCP server,
+S5 JSON-RPC, S1 provenance producers). The remaining consumer work is a visual-layer task
+that does not block any downstream iteration.
+
+**Verification evidence (R1 closure)**:
+- `cargo test --workspace`: **519 passed, 0 failed, 0 ignored**.
+- `cargo clippy --workspace -- -D warnings`: **clean**.
+- All backend acceptance criteria verified in the 2026-06-01 execution record.
+- I009 moves from Review to Complete with explicit residual work registered in #I009-S6.
 
 ### Lessons Learned
 

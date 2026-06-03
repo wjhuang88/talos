@@ -654,6 +654,21 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Depends on**: #I002-S3
 **Estimate**: M
 
+### #I009-S6: TUI provenance markers + `/plugins` command (deferred from I009)
+
+**Description**: Consumer-side rendering of the `ToolProvenance` data already produced by the backend (ADR-009). MCP-provided tools should display with a distinct marker/icon in tool call bubbles. A `/plugins` slash command should list all loaded plugins and their hook registrations. This work was deferred from I009 through change control during R1 Review Closure; I009's backend/runtime surface is complete and the remaining gap is TUI consumption only.
+
+**Status**: Deferred (moved through change control from I009 during R1 Review Closure). Resume in I010 R2/R3 or a dedicated follow-up iteration.
+
+**Acceptance Criteria**:
+- [ ] MCP-provided tools display with distinct marker/icon in TUI tool call bubbles
+- [ ] `/plugins` command lists all loaded plugins and their hook registrations
+- [ ] Plugin status indicator visible in TUI status bar when hooks are active
+- [ ] Hook execution logged subtly in TUI (not intrusive)
+
+**Depends on**: #I009-S1 (producer side, already complete), #I005-S2
+**Estimate**: S
+
 ---
 
 ## I010: "Polished Agent"
