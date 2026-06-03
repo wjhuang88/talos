@@ -68,6 +68,9 @@ These are immutable facts that every change must respect:
 
 1. **Review staged diff** before committing: `git diff --cached`
 2. **Conventional commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+   Format: `type(scope): description (#story-id) [model:<model-name>]`
+   Scope = crate name (`core`, `agent`, `cli`, `tui`, `provider`, `session`, `tools`, etc.) or `workspace`.
+   `[model:...]` required when Agent authored the commit.
 3. **One logical change per commit.** No mixed concerns.
 4. **Never commit secrets.** Check for API keys, tokens, passwords.
 5. **Never force-push to main.**
