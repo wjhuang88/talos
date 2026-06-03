@@ -2,7 +2,7 @@
 
 **User can**: Agent adapts its behavior across sessions via built-in evolution with cognitive feedback (ADR-001).
 
-## Status: ACTIVE — re-scoped 2026-06-01 to ship evolution as a builtin `HookHandler` ⚙️
+## Status: REVIEW — hook-based runtime wiring landed; final evidence/status sync pending
 
 > **Re-scope summary (2026-06-01).** Earlier guidance placed I008 evolution-into-all-paths
 > behind the `AppServerSession` seam (#I010-S7) to avoid double-firing. A pre-implementation
@@ -28,11 +28,11 @@
 | Story | Library | Runtime-integrated | Notes |
 |-------|---------|--------------------|-------|
 | S1: Evolution crate + data models | ✅ | n/a | Types + SQLite schema present |
-| S2: TurnObserver — signal capture | ✅ | ⚠️→🛠️ (re-wiring via hook) | Hook captures `OnProviderError` + user-correction from `BeforeProviderCall`; all three run paths covered uniformly |
+| S2: TurnObserver — signal capture | ✅ | ✅ | Hook captures `OnProviderError` + user-correction from `BeforeProviderCall`; all runtime paths covered uniformly |
 | S3: PatternExtractor — extraction | ✅ | ✅ | Invoked at hook flush time (`TurnComplete`) |
 | S4: KnowledgeStore — SQLite persistence | ✅ | ✅ | Hook writes observations + accumulates patterns at runtime, all paths |
-| S5: BehaviorAdapter — prompt injection | ✅ | ⚠️→🛠️ (re-wiring via hook) | `OnSystemPromptBuilt` + `HookResult::Modify` injects in all paths |
-| S6: TUI evolution panel (Ctrl+E) | ✅ | ⚠️ | Renders. Live feed works via shared `KnowledgeStore` (the hook writes to it) |
+| S5: BehaviorAdapter — prompt injection | ✅ | ✅ | `OnSystemPromptBuilt` + `HookResult::Modify` injects in all paths |
+| S6: TUI evolution panel (Ctrl+E) | ✅ | ✅ / Review evidence pending | Renders. Live feed works via shared `KnowledgeStore` (the hook writes to it) |
 | S7: `--learned` command | ✅ | ✅ | Shows real patterns once a session has written observations |
 
 ## Plan (re-scoped, 2026-06-01)
@@ -73,14 +73,15 @@
   via `OnSystemPromptBuilt`.** No per-path code change.
 - **R3** — Render `EvolutionPanel` in `talos-tui::render()`. **✅ DONE.**
 - **R4** — End-to-end evidence (real turn → observation persisted → `--learned` shows it →
-  next run injects it). **Print path ✅** (existing mock smoke test). **TUI evidence**
-  becomes trivially available: just run `talos --tui --mock`, send a message, quit, then
-  `talos --learned` shows the patterns. (R4 is now a verification step, not a code gap.)
+  next run injects it). **Print path ✅** (existing mock smoke test). **TUI evidence** must be
+  recorded in the Review closure notes before I008 moves to Complete. R4 is now a verification
+  step, not a code gap.
 
 ## Verification
 
-> The library + unit tests pass. The hook-based E2E checks below **WILL PASS** after the
-> re-scoped implementation lands.
+The hook-based implementation has landed. I008 can move from Review to Complete only after the
+current command output is recorded and the status is synchronized across the iteration index,
+roadmap, backlog, and README.
 
 ```bash
 # Library + unit tests (PASS)
@@ -95,11 +96,20 @@ HOME=$(mktemp -d) sh -c '
   talos --learned                  # shows the extracted preference pattern
 '
 
-# RUNTIME — TUI (post-re-scope: trivially available; all paths use the same hook):
+# RUNTIME — TUI (review gate; all paths use the same hook):
 # 1. Send a few messages via the TUI mock.
 # 2. Quit. The hook handler has written observations to ~/.talos/index.db.
 # 3. `talos --learned` shows the patterns. (Same store, same handler.)
 ```
+
+## Review Closure Checklist
+
+- [ ] `cargo test --workspace` command output recorded for the current Review close.
+- [ ] `cargo clippy --workspace` or equivalent scoped clippy evidence recorded.
+- [ ] Print/mock runtime evidence confirms observation persistence and `--learned` output.
+- [ ] TUI/mock runtime evidence confirms hook events are emitted and persisted without layout or
+      logging regressions.
+- [ ] README, iteration index, roadmap, backlog, and requirement convergence status all agree.
 
 ## Execution Record (appended during execution per SOP §3a)
 

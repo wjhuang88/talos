@@ -145,6 +145,14 @@ Scope").
 - TUI provenance marker rendering and `/plugins` command remain incomplete. I009 should stay in
   Review until this consumer work is either implemented or explicitly moved into a numbered backlog
   story through change control.
+- Do not add new extensibility surface while I009 is in Review. The remaining gap is consumer-side
+  closure for the already-landed provenance data.
+
+### Review Closure Options
+
+1. Implement the remaining S1 consumer work inside I009: TUI marker rendering plus `/plugins`.
+2. Move the remaining S1 consumer work into a numbered follow-up story through
+   `docs/sop/CHANGE-CONTROL.md`, then update I009 acceptance criteria and status accordingly.
 
 ### Lessons Learned
 

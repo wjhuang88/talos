@@ -17,6 +17,7 @@ I007 "Skilled Agent"     TUI技能侧栏 + SKILL.md + OpenAI        会技能
 I008 "Learning Agent"    TUI进化洞察面板 + 自进化引擎             会学习 ✅
 I009 "Extensible Agent"  TUI MCP标记 + Hook + MCP + JSON-RPC   可扩展
 I010 "Polished Agent"    TUI打磨 (Nord + markdown + 高级功能)    可发布
+I011 "Open Providers"    OpenAI-compatible base_url + provider plugin  可接入
 I012 "Portable Tools"    内置POSIX工具子集 + 工具包嵌入接口       降低环境依赖
 ```
 
@@ -30,17 +31,20 @@ block or duplicate each other.
 |-------|------------|---------------|---------------|
 | R0 | Done | Architecture remediation: `#ARCH-S1`…`#ARCH-S7` | Security baseline false-complete items closed; session search/list correctness restored; CLI search highlight fixed; runtime evidence recorded |
 | R1 | I009 Review | Extensibility vertical slice: hooks, MCP client/server, JSON-RPC, plugin status markers | Runtime surface landed; TUI provenance marker and `/plugins` consumer follow-up remains before Complete |
-| R2 | First I010 slice | `#I010-S7` AppServerSession convergence, headless/SDK modes, TUI approval protocol, I008 TUI/interactive evolution attach | Print, interactive, TUI, headless, and SDK paths share one session loop; I008 can move from Review to Complete; dead `event_loop.rs` variants are removed |
-| R3 | Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering, Guardian, exec policy DSL | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
-| R4 | I012 Portable Tools | Rust-native POSIX-style tool subset plus embeddable tool-pack interface | Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered and exposed through MCP/RPC without agent-loop changes |
+| R2 | First I010 slice | `#I010-S7` AppServerSession convergence, Codex-like inline terminal, headless/SDK modes, canonical approval/event protocol | Print, interactive, TUI, headless, and SDK paths share one session loop; approvals/tool output/status share one event protocol; dead `event_loop.rs` variants are removed |
+| R3 | Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
+| R4 | I012 Portable Tools | Rust-native POSIX-style tool subset plus embeddable tool-pack interface | ADR recorded if public API/provenance/config changes; Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered without agent-loop changes |
 
 Ordering rules:
 - R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.
-- Do not implement more per-run-path evolution wiring before `#I010-S7`; current I008 runtime wiring is hook-based, while AppServerSession remains the run-path cleanup target.
+- Do not reopen I008 evolution wiring unless new evidence shows the hook-based path fails;
+  `#I010-S7` is run-path cleanup, not a prerequisite for I008 Review closure.
 - Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
   move it into the R2 `#I010-S7` slice instead.
 - Treat I012 as the environment-dependency reduction lane: implement only a small POSIX subset first,
   then connect it to the tool-pack/plugin registration path.
+- Do not absorb Guardian or exec policy DSL into the first I010 product-polish pass unless a
+  change-control update explicitly activates those backlog stories.
 - Each round ends with `cargo test --workspace`; security-sensitive rounds also require `cargo check --workspace`
   and explicit verification notes in `docs/iterations/`.
 
@@ -293,16 +297,16 @@ echo '{"method":"thread/start","params":{"prompt":"hello"}}' | talos --mode rpc
 **User can**: Use Talos as a daily coding companion with fully polished TUI.
 
 **Scope**:
+- **R2 architecture convergence**: AppServerSession run-path convergence, Codex-like inline/no-alt-screen
+  terminal mode, headless mode (`talos exec`), SDK embedding, and canonical approval/event protocol.
 - **Nord theme**: Full Nord color scheme application across all TUI components (per REFERENCE-PROJECTS.md §19)
 - **Markdown rendering**: Rich markdown display in assistant messages (code blocks, lists, headers, links)
 - **Diff display**: Visual diff rendering for file changes in chat viewport
 - **Steering + follow-up** message queues with ChatComposer queue mode
 - **Slash commands**: 10+ commands with fuzzy filtering (`/model`, `/new`, `/resume`, `/fork`, `/compact`, `/diff`, `/status`, `/vim`, `/help`, `/quit`)
-- **Guardian AI** sub-agent for auto-approval (with circuit breaker)
-- **Codex-like terminal mode**: inline/no-alt-screen rendering that preserves scrollback and keeps
-  approvals, tool output, and assistant deltas in the same terminal flow
-- **Headless mode** (`talos exec`) and **SDK mode** (library embedding) via AppServerSession abstraction
-- **Exec policy DSL** rules in `.talos/rules/`
+
+**Deferred backlog stories**: Guardian auto-approval and exec policy DSL remain valid backlog items,
+but are not part of the first I010 product-polish pass unless activated through change control.
 
 **Not in scope**: Desktop app, web UI, mobile, multi-agent side threads (future)
 
@@ -336,7 +340,7 @@ The TUI grows progressively from I005. Each iteration adds visualization for the
 | I007 | 技能索引侧栏 + /model 切换 | 加载 SKILL.md 后显示技能列表 |
 | I008 | 进化洞察面板 + /learned 命令 | 自进化后显示学到的模式 |
 | I009 | MCP 工具标记 + 插件状态 + Hook 日志 | MCP 工具有特殊标识 |
-| I010 | Codex-like inline terminal mode + Nord 主题 + markdown + diff + steering + slash + Guardian + headless + DSL | 发布级打磨 |
+| I010 | Codex-like inline terminal mode + AppServerSession + headless/SDK + Nord 主题 + markdown + diff + steering + slash | 发布级打磨 |
 
 ## Iteration Transition Rules
 

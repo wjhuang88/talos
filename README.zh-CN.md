@@ -9,7 +9,7 @@
 | 范围 | 状态 | 说明 |
 |------|------|------|
 | Runtime | Active | 12 个 crate 共 515 个测试通过。TTY 默认启动 Nord 主题 TUI；`--repl` 保留旧 readline 模式。 |
-| I008 Learning Agent | Active / 等待 Review | `EvolutionHookHandler` 已接入 print、TUI、interactive、RPC 四条路径。 |
+| I008 Learning Agent | Review | `EvolutionHookHandler` 已接入 print、TUI、interactive、RPC 四条路径；剩余最终 review 证据和状态同步。 |
 | I009 Extensible Agent | Review | Hook、MCP client/server、JSON-RPC、`ToolProvenance` producer 已实现；TUI provenance marker 与 `/plugins` 仍是 follow-up。 |
 | I010 Polished Agent | Planned | Codex-like inline terminal mode、AppServerSession 收敛、TUI 打磨、Markdown、diff、slash commands。 |
 | I011 Open Providers | Active | OpenAI-compatible `base_url` override 已通过配置和 `OPENAI_COMPAT_API_KEY` 落地。 |
@@ -72,7 +72,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 |------|------|------|------|
 | I001-I007 | Foundation through Skilled Agent | Complete | CLI、工具、权限、TUI 基础、会话、SQLite 搜索、技能、多 provider。 |
 | R0 | Remediation Gate | Complete | 架构、安全、会话正确性问题关闭。 |
-| I008 | Learning Agent | Active | 运行时学习已实现，等待最终 review 证据。 |
+| I008 | Learning Agent | Review | 运行时学习已实现，等待最终 review 证据。 |
 | I009 | Extensible Agent | Review | 后端/runtime 扩展能力已实现；TUI consumer 工作待完成。 |
 | I010 | Polished Agent | Planned | Codex-like 终端体验和发布级 TUI 工作流。 |
 | I011 | Open Providers | Active | 可配置 OpenAI-compatible gateway；Provider 插件架构后续规划。 |

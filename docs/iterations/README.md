@@ -40,7 +40,7 @@ docs/iterations/
 | I005 | Smart Agent | Complete | ✅ |
 | I006 | Data Agent | Complete | ✅ Session index, fork identity, and search highlight residuals were closed by R0/#ARCH-S5..S7; dead event-loop variant removal remains scoped to I010-S7 |
 | I007 | Skilled Agent | Complete | ✅ |
-| I008 | Learning Agent | **Active** (impl landed 2026-06-01; TUI made default 2026-06-01) | 🛠️ Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all 3 paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). TUI is now the default TTY mode (legacy readline REPL retained as `--repl`). Awaiting final review. See `I008-learning-agent.md` for the new plan + Execution Record. |
+| I008 | Learning Agent | **Review** (impl landed 2026-06-01; TUI made default 2026-06-01) | Re-scoped 2026-06-01: evolution ships as a builtin `HookHandler` (per-Agent registration covers all paths uniformly). Implementation landed 2026-06-01 (509 tests, E2E print + TUI mode verified). TUI is now the default TTY mode (legacy readline REPL retained as `--repl`). Awaiting final review evidence/status sync. See `I008-learning-agent.md` for the new plan + Execution Record. |
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
 | I009 | Extensible Agent | **Review** (runtime surface landed 2026-06-01) | Backend/runtime surface shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance producers); E2E runtime evidence in `I009-extensible-agent.md`. TUI consumer markers + `/plugins` command remain follow-up work, so I009 is not Complete yet. |
 | I010 | Polished Agent | Planned | See `I010-polished-agent.md` |
@@ -59,6 +59,6 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 |-------|------|------------|----------------|
 | R0: Remediation Gate | ✅ Done (2026-06-01) | `R0-remediation-gate.md` | All 7 ARCH stories closed; runtime evidence recorded |
 | R1: I009 Extensibility | Review | `I009-extensible-agent.md` | Runtime surface landed; TUI provenance consumer work remains before Complete |
-| R2: I010 Architecture Slice | After I008 Review | `I010-polished-agent.md` / Slice R2 | I008 no longer blocks on this round (re-scoped 2026-06-01: AppServerSession seam is for cross-Agent / cross-session / UI status cleanup, not evolution wiring) |
-| R3: I010 Product Polish | After R2 | `I010-polished-agent.md` / Slice R3 | Move I010 to Review when daily-use TUI workflows are verified end-to-end |
+| R2: I010 Architecture Slice | After I008 review closure | `I010-polished-agent.md` / Slice R2 | AppServerSession seam is for run-path cleanup and Codex-like terminal mode, not I008 evolution wiring |
+| R3: I010 Product Polish | After R2 | `I010-polished-agent.md` / Slice R3 | Move I010 to Review when daily-use TUI workflows are verified end-to-end; Guardian/DSL require change control before entering this slice |
 | R4: I012 Portable Tools | After I010/R3 or when environment-dependency reduction becomes release-critical | `I012-portable-tools.md` | Native POSIX subset works on a minimal `PATH`; tool-pack interface supports future plugin-provided local tools |

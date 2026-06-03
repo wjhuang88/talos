@@ -740,6 +740,9 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 **Description**: Auto-approve low-risk tool calls using a lightweight LLM call. Guardian reviews tool call + context and decides approve/deny. Circuit breaker: 3 consecutive denials blocks Guardian.
 
+**Planning note**: Valid backlog story, but not part of the first I010 product-polish pass unless
+activated through change control.
+
 **Acceptance Criteria**:
 - [ ] Guardian reviews tool calls when enabled in config
 - [ ] Low-risk operations auto-approved without user prompt
@@ -772,7 +775,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 - [ ] Inline/no-alt-screen mode preserves terminal scrollback and does not feel like a separate full-screen application
 - [ ] Full-screen TUI and inline mode consume the same ordered EQ event stream, so assistant deltas, tool output, approvals, and status updates share one rendering contract
 - [ ] Command output and approval prompts can be interleaved with the conversation without losing shell-like terminal ergonomics
-- [ ] I008 evolution `TurnObserver`/`BehaviorAdapter` attach once at the session/EQ seam; TUI + interactive paths observe, persist, inject, and surface patterns with no double-firing (closes I008 R1/R2/R4)
+- [ ] Existing I008 hook-based evolution remains stable during migration; no duplicate `TurnStart`/`TurnComplete` lifecycle events are introduced
 - [ ] `event_loop.rs` dead variants removed (`ApprovalRequested`, `ApprovalResolved`, `ToggleSkillSidebar`, `SkillsUpdated`, `ApprovalChoice`)
 - [ ] `cargo test --workspace` green after each path migration (ADR-005 phased-migration invariant)
 
@@ -782,6 +785,9 @@ functionality. Story format: `#I{iteration}-S{story}`.
 ### #I010-S8: Exec policy DSL rules
 
 **Description**: Full DSL for command approval rules in `.talos/rules/*.rules`. Pattern matching on command name, arguments, paths. Support for trusted commands, forbidden patterns, and conditional rules.
+
+**Planning note**: Valid backlog story, but not part of the first I010 product-polish pass unless
+activated through change control.
 
 **Acceptance Criteria**:
 - [ ] Rule files loaded from `.talos/rules/` and `~/.talos/rules/`
@@ -1204,6 +1210,8 @@ locked down, or inconsistent.
   building blocks, while `bash` remains the escape hatch for user-approved commands.
 
 **Acceptance Criteria**:
+- [ ] ADR recorded before implementation if `ToolPack`, `ToolProvenance`, `AgentTool`, config,
+      MCP/RPC listing, or other public boundaries change.
 - [ ] `agent.list_tools` exposes the native POSIX subset with stable tool names and schemas.
 - [ ] Read-only tools can run without host `ls`, `cat`, `grep`, etc. being present.
 - [ ] Write-capable tools require approval under the default permission policy.
@@ -1223,6 +1231,7 @@ be packaged as a first-class tool pack that can be enabled, disabled, listed, an
 surfaced through MCP/RPC without special-case code in the agent loop.
 
 **Acceptance Criteria**:
+- [ ] ADR records the native tool-pack boundary before public API/provenance/config changes land.
 - [ ] A `ToolPack` or equivalent lightweight registration abstraction can register a
       named group of `AgentTool`s into `ToolRegistry`.
 - [ ] The POSIX tool pack can be enabled by default and disabled through config for

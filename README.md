@@ -12,7 +12,7 @@ English | **[中文](README.zh-CN.md)**
 | Area | State | Notes |
 |------|-------|-------|
 | Runtime | Active | 515 tests passing across 12 crates. TTY launches the Nord-themed TUI by default; `--repl` keeps the legacy readline loop. |
-| I008 Learning Agent | Active / Review pending | `EvolutionHookHandler` is wired into print, TUI, interactive, and RPC paths. |
+| I008 Learning Agent | Review | `EvolutionHookHandler` is wired into print, TUI, interactive, and RPC paths; final review evidence/status sync remains. |
 | I009 Extensible Agent | Review | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers are implemented. TUI provenance markers and `/plugins` remain follow-up work. |
 | I010 Polished Agent | Planned | Codex-like inline terminal mode, AppServerSession convergence, TUI polish, markdown, diff display, slash commands. |
 | I011 Open Providers | Active | OpenAI-compatible `base_url` override shipped through config and `OPENAI_COMPAT_API_KEY`. |
@@ -77,7 +77,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 |-----------|----------|--------|---------|
 | I001-I007 | Foundation through Skilled Agent | Complete | CLI, tools, permissions, TUI base, sessions, SQLite search, skills, multi-provider support. |
 | R0 | Remediation Gate | Complete | Architecture/security/session correctness findings closed. |
-| I008 | Learning Agent | Active | Runtime learning is implemented; awaiting final review evidence. |
+| I008 | Learning Agent | Review | Runtime learning is implemented; awaiting final review evidence. |
 | I009 | Extensible Agent | Review | Backend/runtime extensibility is implemented; TUI consumer work remains. |
 | I010 | Polished Agent | Planned | Codex-like terminal UX and release-grade TUI workflows. |
 | I011 | Open Providers | Active | Configurable OpenAI-compatible gateway support; provider plugin architecture planned. |
