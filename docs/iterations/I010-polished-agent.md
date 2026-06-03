@@ -3,7 +3,7 @@
 **User can**: Use Talos as a daily coding companion with a Codex-like terminal experience, unified
 run paths, headless automation, SDK embedding, and release-grade TUI workflows.
 
-## Status: PLANNED
+## Status: ACTIVE — R2 Architecture Convergence (started 2026-06-03)
 
 I010 has two planned slices. R2 is architecture convergence: make all run paths share one
 session/event/approval surface and add the Codex-like inline terminal mode. R3 is product polish.
@@ -59,6 +59,23 @@ verification evidence, not by waiting for `AppServerSession`.
 ### R2 Verification Notes
 
 Append command outputs, runtime transcripts, and screenshots here during execution.
+
+### R2 Execution Record
+
+#### 2026-06-03: R2 started
+
+Execution plan created at `.sisyphus/plans/i010-r2-architecture-convergence.md`.
+
+7 phases, 15 tasks, 14 commits. Phased migration per ADR-005:
+- Phase 0: Prerequisites (clear_append_prompt, ARCH-S4 cleanup)
+- Phase 1: Protocol types in talos-core (SessionOp, SessionEvent, SessionHandle, SessionConfig)
+- Phase 2: AppServerSession actor in talos-agent
+- Phase 3: Print mode canary migration
+- Phase 4: Interactive mode + approval through session
+- Phase 5: TUI migration + approval fix + inline terminal mode
+- Phase 6: Dead code deletion + RPC migration
+
+Baseline: 519 tests passing, 0 failed; cargo clippy clean.
 
 ### R2 Non-Goals
 

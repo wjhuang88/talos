@@ -1,41 +1,22 @@
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
-use talos_agent::Agent;
-use talos_agent::context::ContextLoader;
-use talos_config::Config;
-use talos_core::message::{AgentEvent, Message};
-use talos_core::tool::ToolRegistry;
-use talos_permission::PermissionEngine;
-use talos_plugin::HookRegistry;
+use anyhow::Result;
+use talos_core::message::Message;
+use talos_core::session::{SessionEvent, SessionOp, TurnCompletionStatus};
 use talos_session::{Session, SessionManager};
-use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
-use talos_tui::SkillInfo;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::approval::ApprovalPrompt;
-use crate::{Cli, PermissionAwareTool, build_provider, parse_provider};
+use crate::event_loop::AppEvent::{
+    AgentCompleted, AgentError, AgentTextDelta, AgentToolCall, AgentToolResult, UserInput,
+    UserInterrupt,
+};
 
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
-/// User's choice when resolving an approval prompt.
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum ApprovalChoice {
-    /// Approve this tool call once.
-    ApproveOnce,
-    /// Always approve this tool (add a rule).
-    AlwaysApprove,
-    /// Deny the tool call.
-    Deny,
-}
-
-#[allow(dead_code)]
 pub enum AppEvent {
     UserInput(String),
     UserInterrupt,
@@ -44,13 +25,6 @@ pub enum AppEvent {
     AgentToolResult(bool),
     AgentCompleted,
     AgentError(String),
-    /// TUI requests approval for a tool call.
-    ApprovalRequested {
-        tool_name: String,
-        arguments: String,
-    },
-    /// TUI resolved an approval prompt.
-    ApprovalResolved(ApprovalChoice),
     /// Request to fork the current session from a specific entry.
     ForkSession {
         entry_id: Option<String>,
@@ -60,10 +34,6 @@ pub enum AppEvent {
         new_session_id: String,
         branch_id: String,
     },
-    /// Toggle the skill sidebar visibility.
-    ToggleSkillSidebar,
-    /// Skills have been loaded or updated.
-    SkillsUpdated(Vec<SkillInfo>),
 }
 
 pub enum AppState {
@@ -80,34 +50,86 @@ pub struct EventLoop {
     event_rx: mpsc::UnboundedReceiver<AppEvent>,
     state: AppState,
     first_ctrl_c_time: Option<Instant>,
-    cli: Cli,
     workspace_root: PathBuf,
     session: Session,
     branch_id: Option<String>,
     session_manager: SessionManager,
-    hook_registry: Arc<HookRegistry>,
+    /// Clone-able sender for submitting turns to the session actor.
+    sq_tx: mpsc::Sender<SessionOp>,
+    /// Accumulates assistant text deltas per turn for session logging.
+    assistant_text: String,
 }
 
 impl EventLoop {
     pub fn new(
-        cli: Cli,
         workspace_root: PathBuf,
         session: Session,
         session_manager: SessionManager,
-        hook_registry: Arc<HookRegistry>,
+        handle: talos_core::session::SessionHandle,
     ) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
+        let sq_tx = handle.sq_tx;
+
+        // Spawn a single long-lived forwarding task that translates
+        // SessionEvent → AppEvent for the lifetime of the EventLoop.
+        let mut eq_rx = handle.eq_rx;
+        let event_tx_forward = event_tx.clone();
+        tokio::spawn(async move {
+            while let Some(session_event) = eq_rx.recv().await {
+                match session_event {
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::TextDelta {
+                        delta,
+                    }) => {
+                        let _ = event_tx_forward.send(AgentTextDelta(delta));
+                    }
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::ToolCall {
+                        call,
+                        ..
+                    }) => {
+                        let _ = event_tx_forward.send(AgentToolCall(call.name.clone()));
+                    }
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::ToolResult {
+                        result,
+                    }) => {
+                        let _ = event_tx_forward.send(AgentToolResult(result.is_error));
+                    }
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::TurnEnd { .. }) => {
+                        let _ = event_tx_forward.send(AgentCompleted);
+                    }
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::Error { message }) => {
+                        let _ = event_tx_forward.send(AgentError(message));
+                    }
+                    SessionEvent::TurnCompleted { status, .. } => match status {
+                        TurnCompletionStatus::Success => {
+                            let _ = event_tx_forward.send(AgentCompleted);
+                        }
+                        TurnCompletionStatus::Cancelled => {
+                            // Turn was cancelled; L1 transitions back to WaitingForInput
+                            // via the existing cancel_token flow.
+                        }
+                        TurnCompletionStatus::Error { message } => {
+                            let _ = event_tx_forward.send(AgentError(message));
+                        }
+                    },
+                    SessionEvent::Error { message } => {
+                        let _ = event_tx_forward.send(AgentError(message));
+                    }
+                    _ => {}
+                }
+            }
+        });
+
         Self {
             event_tx,
             event_rx,
             state: AppState::WaitingForInput,
             first_ctrl_c_time: None,
-            cli,
             workspace_root,
             session,
             branch_id: None,
             session_manager,
-            hook_registry,
+            sq_tx,
+            assistant_text: String::new(),
         }
     }
 
@@ -156,7 +178,7 @@ impl EventLoop {
                     Ok(0) => break,
                     Ok(_) => {
                         let input = line.trim().to_string();
-                        if tx.send(AppEvent::UserInput(input)).is_err() {
+                        if tx.send(UserInput(input)).is_err() {
                             break;
                         }
                     }
@@ -171,7 +193,7 @@ impl EventLoop {
         tokio::spawn(async move {
             loop {
                 tokio::signal::ctrl_c().await.ok();
-                if tx.send(AppEvent::UserInterrupt).is_err() {
+                if tx.send(UserInterrupt).is_err() {
                     break;
                 }
             }
@@ -180,7 +202,7 @@ impl EventLoop {
 
     fn handle_event(&mut self, event: AppEvent) {
         match (&mut self.state, event) {
-            (AppState::WaitingForInput, AppEvent::UserInput(input)) => {
+            (AppState::WaitingForInput, UserInput(input)) => {
                 if input.is_empty() {
                     return;
                 }
@@ -194,7 +216,7 @@ impl EventLoop {
                 self.start_agent_turn(input);
             }
 
-            (AppState::WaitingForInput, AppEvent::UserInterrupt) => {
+            (AppState::WaitingForInput, UserInterrupt) => {
                 print!("\r");
                 io::stdout().flush().ok();
                 let now = Instant::now();
@@ -214,39 +236,60 @@ impl EventLoop {
                     cancel_token,
                     task_handle,
                 },
-                AppEvent::UserInterrupt,
+                UserInterrupt,
             ) => {
                 print!("\r");
                 io::stdout().flush().ok();
                 cancel_token.cancel();
+                // Send interrupt to the session actor.
+                let sq_tx = self.sq_tx.clone();
+                tokio::spawn(async move {
+                    let _ = sq_tx.send(SessionOp::Interrupt).await;
+                });
+                // Abort the dummy task handle (no-op, but keeps the enum contract).
                 task_handle.abort();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
                 self.first_ctrl_c_time = None;
             }
 
-            (AppState::AgentRunning { .. }, AppEvent::AgentTextDelta(delta)) => {
+            (AppState::AgentRunning { .. }, AgentTextDelta(delta)) => {
                 print!("{delta}");
                 io::stdout().flush().ok();
+                // Accumulate for session logging.
+                self.assistant_text.push_str(&delta);
             }
 
-            (AppState::AgentRunning { .. }, AppEvent::AgentToolCall(name)) => {
+            (AppState::AgentRunning { .. }, AgentToolCall(name)) => {
                 print!("\r\x1b[0K\r\n[tool: {name}]\r\n");
                 io::stdout().flush().ok();
             }
 
-            (AppState::AgentRunning { .. }, AppEvent::AgentToolResult(is_error)) => {
+            (AppState::AgentRunning { .. }, AgentToolResult(is_error)) => {
                 let status = if is_error { "error" } else { "ok" };
                 print!("[tool result: {status}]\r\n");
                 io::stdout().flush().ok();
             }
 
-            (AppState::AgentRunning { .. }, AppEvent::AgentCompleted) => {
+            (AppState::AgentRunning { .. }, AgentCompleted) => {
                 println!();
+                // Write accumulated assistant text to session.
+                if !self.assistant_text.is_empty() {
+                    let assistant_msg = Message::Assistant {
+                        content: std::mem::take(&mut self.assistant_text),
+                        tool_calls: vec![],
+                    };
+                    if let Err(e) = self.session.append(&assistant_msg) {
+                        eprintln!("Warning: failed to log assistant message: {e}");
+                    }
+                }
+                if let Err(e) = self.session_manager.update_index(&self.session) {
+                    eprintln!("Warning: failed to refresh session index: {e}");
+                }
                 self.state = AppState::WaitingForInput;
             }
 
-            (AppState::AgentRunning { .. }, AppEvent::AgentError(msg)) => {
+            (AppState::AgentRunning { .. }, AgentError(msg)) => {
                 eprintln!("Error: {msg}");
                 self.state = AppState::WaitingForInput;
             }
@@ -290,43 +333,26 @@ impl EventLoop {
                 self.handle_fork_session(entry_id);
             }
 
-            (_, AppEvent::ToggleSkillSidebar) => {
-                // Forwarded to TUI layer; CLI event loop acknowledges the event.
-            }
-
-            (_, AppEvent::SkillsUpdated(skills)) => {
-                eprintln!("Skills updated: {} loaded", skills.len());
-            }
-
             _ => {}
         }
     }
 
     fn start_agent_turn(&mut self, input: String) {
         let cancel_token = CancellationToken::new();
-        let token = cancel_token.clone();
-        let session = self.session.clone();
-        let cli = self.cli.clone();
-        let workspace = self.workspace_root.clone();
-        let event_tx = self.event_tx.clone();
-        let session_manager = self.session_manager.clone();
-        let hook_registry = self.hook_registry.clone();
+        self.assistant_text.clear();
 
+        // Log user message to session.
+        let user_msg = Message::User {
+            content: input.clone(),
+        };
+        if let Err(e) = self.session.append(&user_msg) {
+            eprintln!("Warning: failed to log user message: {e}");
+        }
+
+        // Submit through session.
+        let sq_tx = self.sq_tx.clone();
         let task_handle = tokio::spawn(async move {
-            let result = run_agent_turn_inner(
-                input,
-                cli,
-                workspace,
-                session,
-                session_manager,
-                token,
-                event_tx.clone(),
-                hook_registry,
-            )
-            .await;
-            if let Err(e) = result {
-                let _ = event_tx.send(AppEvent::AgentError(e.to_string()));
-            }
+            let _ = sq_tx.send(SessionOp::Submit { message: input }).await;
         });
 
         self.state = AppState::AgentRunning {
@@ -435,13 +461,16 @@ impl EventLoop {
                     });
                 }
                 Err(e) => {
-                    let _ = event_tx.send(AppEvent::AgentError(format!("Fork failed: {e}")));
+                    let _ = event_tx.send(AgentError(format!("Fork failed: {e}")));
                 }
             }
         });
     }
 
     async fn shutdown(&mut self) {
+        // Send shutdown to the session actor.
+        let _ = self.sq_tx.send(SessionOp::Shutdown).await;
+
         if let AppState::AgentRunning {
             cancel_token,
             task_handle,
@@ -450,179 +479,6 @@ impl EventLoop {
             cancel_token.cancel();
             task_handle.abort();
             let _ = task_handle.await;
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn run_agent_turn_inner(
-    prompt: String,
-    cli: Cli,
-    workspace_root: PathBuf,
-    session: Session,
-    session_manager: SessionManager,
-    cancel_token: CancellationToken,
-    event_tx: mpsc::UnboundedSender<AppEvent>,
-    hook_registry: Arc<HookRegistry>,
-) -> Result<()> {
-    let mut config = Config::load().context("failed to load configuration")?;
-
-    if let Some(ref model) = cli.model {
-        config.model = model.clone();
-    }
-    if let Some(ref provider_str) = cli.provider {
-        config.provider = parse_provider(provider_str)?;
-    }
-
-    if config.model.is_empty() && !cli.mock {
-        bail!("no model configured");
-    }
-
-    let api_key = if cli.mock {
-        String::new()
-    } else {
-        config.api_key().map_err(|e| anyhow::anyhow!("{e}"))?
-    };
-
-    let prompt = if cli.no_context {
-        prompt
-    } else {
-        let context = ContextLoader::new(workspace_root.clone())
-            .load()
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
-        if context.is_empty() {
-            prompt
-        } else {
-            format!("{context}\n\n{prompt}")
-        }
-    };
-
-    let provider = build_provider(&config, &api_key, cli.mock);
-
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
-
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root.clone())),
-        approval,
-        print_mode: false,
-    }));
-
-    let agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(PermissionEngine::new())),
-        None,
-        workspace_root.clone(),
-        hook_registry,
-    );
-
-    let (agent_event_tx, mut agent_event_rx) = broadcast::channel::<AgentEvent>(32);
-
-    let user_msg = Message::User {
-        content: prompt.clone(),
-    };
-    session
-        .append(&user_msg)
-        .context("failed to log user message to session")?;
-
-    let mut run_handle =
-        tokio::spawn(async move { agent.run_streaming(prompt, agent_event_tx).await });
-
-    let mut assistant_text = String::new();
-
-    loop {
-        tokio::select! {
-            _ = cancel_token.cancelled() => {
-                return Ok(());
-            }
-            event = agent_event_rx.recv() => {
-                match event {
-                    Ok(AgentEvent::TextDelta { delta }) => {
-                        assistant_text.push_str(&delta);
-                        let _ = event_tx.send(AppEvent::AgentTextDelta(delta));
-                    }
-                    Ok(AgentEvent::ToolCall { call, .. }) => {
-                        let _ = event_tx.send(AppEvent::AgentToolCall(call.name.clone()));
-                        session
-                            .append_event(&AgentEvent::ToolCall {
-                                call,
-                                provenance: Default::default(),
-                            })
-                            .context("failed to log tool call to session")?;
-                    }
-                    Ok(AgentEvent::ToolResult { result }) => {
-                        let is_error = result.is_error;
-                        let _ = event_tx.send(AppEvent::AgentToolResult(is_error));
-                        session
-                            .append_event(&AgentEvent::ToolResult { result })
-                            .context("failed to log tool result to session")?;
-                    }
-                    Ok(AgentEvent::TurnEnd { .. }) => {
-                        if !assistant_text.is_empty() {
-                            let assistant_msg = Message::Assistant {
-                                content: assistant_text,
-                                tool_calls: vec![],
-                            };
-                            session
-                                .append(&assistant_msg)
-                                .context("failed to log assistant message to session")?;
-                        }
-                        if let Err(e) = session_manager.update_index(&session) {
-                            eprintln!("Warning: failed to refresh session index: {e}");
-                        }
-                        let _ = event_tx.send(AppEvent::AgentCompleted);
-                        return Ok(());
-                    }
-                    Ok(AgentEvent::Error { message }) => {
-                        let _ = event_tx.send(AppEvent::AgentError(message.clone()));
-                        bail!("{message}");
-                    }
-                    Ok(AgentEvent::TurnStart) => {}
-                    Ok(_) => {}
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        eprintln!("Warning: dropped {n} event(s) due to slow consumer");
-                    }
-                    Err(broadcast::error::RecvError::Closed) => {
-                        bail!("event channel closed before TurnEnd");
-                    }
-                }
-            }
-            run_result = &mut run_handle => {
-                match run_result {
-                    Ok(Ok(_)) => {
-                        if let Err(e) = session_manager.update_index(&session) {
-                            eprintln!("Warning: failed to refresh session index: {e}");
-                        }
-                        let _ = event_tx.send(AppEvent::AgentCompleted);
-                        return Ok(());
-                    }
-                    Ok(Err(e)) => {
-                        bail!("agent error: {e}");
-                    }
-                    Err(e) => {
-                        if e.is_cancelled() {
-                            return Ok(());
-                        }
-                        bail!("agent task panicked: {e}");
-                    }
-                }
-            }
         }
     }
 }

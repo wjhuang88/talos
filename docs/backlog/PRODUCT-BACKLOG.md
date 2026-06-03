@@ -1050,6 +1050,85 @@ session, and later turns continuing on the original session rather than the fork
 **Depends on**: #I006-S2, #I006-S3, #I006-S5
 **Estimate**: M
 
+### #ARCH-S8: Production-grade logging system (P2)
+
+**Description**: Talos already uses `tracing` + `tracing-subscriber` across multiple crates, but
+log initialization is ad-hoc in `main.rs` (three different init patterns at lines 902–941), with
+no centralized configuration, no file output, no per-concern level control, and no structured
+output option. This story builds a production-ready logging layer in three progressive phases.
+
+**Current state**:
+- `tracing = "0.1"` already in: `talos-cli`, `talos-agent`, `talos-evolution`, `talos-mcp`, `talos-rpc`, `talos-plugin`
+- `tracing-subscriber` in: `talos-cli` (env-filter + fmt), `talos-plugin` (fmt only)
+- Init is scattered: `main.rs` has three different `tracing_subscriber::fmt()` calls with slight variations
+- Default filter: `info` level for everything, no per-crate granularity
+- No file output, no rotation, no JSON/structured format option
+
+**Phases**:
+
+**R1: Centralized init + env/config level control**
+- Single `init_logger()` function in `talos-cli` (or new `talos-logging` crate) replaces all ad-hoc init calls
+- Support `RUST_LOG` env var with sensible defaults per concern:
+  - `talos_agent=info` — turn lifecycle, tool execution, approval decisions
+  - `talos_provider=debug` — request/response tracing, token usage
+  - `talos_mcp=warn` — connection failures only
+  - `talos_evolution=info` — pattern observations, extraction events
+  - `talos_tui=warn` — render errors only
+  - `talos_rpc=warn` — RPC connection lifecycle
+- Optional `[log]` section in `~/.talos/config.toml`:
+  ```toml
+  [log]
+  level = "info"              # default level
+  format = "pretty"           # pretty | compact | json
+  filter = "talos_provider=debug,talos_agent=info"  # per-crate overrides
+  ```
+- Config and env compose: env takes precedence, config provides defaults
+
+**R2: File output + rotation**
+- `[log.file]` section: `path`, `max_size_mb`, `max_files`, `rotation` (daily/size)
+- Use `tracing-appender` for non-blocking file writes
+- File output can be combined with console (dual sink)
+
+**R3: Structured JSON + tracing spans**
+- JSON format for machine consumption (log shipping, observability)
+- Key spans: `turn` (session_id, turn_id), `tool_call` (tool_name, duration), `provider_request` (model, latency, tokens), `permission` (tool, decision), `evolution` (signal_type, pattern_id)
+- Span fields auto-included in structured output
+
+**Files & anchors**:
+- `crates/talos-cli/src/main.rs:902-941` (three ad-hoc logger init calls — consolidate)
+- `crates/talos-config/src/lib.rs` (add `[log]` config section)
+- New: `crates/talos-logging/` (or keep in `talos-cli/src/logging.rs`)
+
+**MUST DO**:
+- Single entry point `pub fn init_logger(config: Option<&LogConfig>) -> Result<...>` replaces all `tracing_subscriber::fmt()` calls
+- Default filter preset provides per-concern defaults (agent=info, provider=debug, mcp=warn, evolution=info, tui=warn, rpc=warn)
+- `RUST_LOG` env var overrides all defaults (standard tracing behavior)
+- Config `[log]` section is optional — existing configs load unchanged
+- R1 must not change any existing `info!`/`debug!`/`warn!`/`error!` call sites
+- Each phase is independently testable; R1 ships first
+
+**MUST NOT DO**:
+- Do NOT create a new `talos-logging` crate unless R2/R3 require it as a shared dependency (R1 can live in `talos-cli`)
+- Do NOT change the `tracing` API used by existing crates — only the subscriber/initialization layer changes
+- Do NOT add log shipping, syslog, or external observability integrations (out of scope)
+- Do NOT introduce `log` crate facade — `tracing` is the canonical logging primitive
+
+**Acceptance Criteria**:
+- [ ] Single `init_logger()` function; no direct `tracing_subscriber::fmt()` calls outside it
+- [ ] `RUST_LOG=talos_provider=debug cargo run` filters correctly
+- [ ] `[log]` section in config.toml controls level and format
+- [ ] Config + env compose correctly (env > config > defaults)
+- [ ] `cargo test --workspace` exits 0
+- [ ] R2: `[log.file]` writes to file with rotation; dual console+file works
+- [ ] R3: JSON format output is valid JSONL; key spans include structured fields
+- [ ] No `#[allow(deprecated)]` or `as any` suppressions introduced
+
+**Depends on**: none (uses existing `tracing` + `tracing-subscriber` dependencies)
+**Estimate**: R1=S, R2=M, R3=M
+**Risk gate**: logging change → verify no performance regression on interactive mode (subscriber overhead < 1ms per event)
+
+---
+
 ### #ARCH-S7: Fix CLI search highlight output leaking literal `BOLD` (P4)
 
 **Description**: Search snippets replace `<b>` with an ANSI-color string that includes the literal

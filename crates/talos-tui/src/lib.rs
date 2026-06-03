@@ -31,6 +31,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
 };
 use talos_core::ApprovalChoice;
+use talos_core::TuiApprovalRequest;
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use tokio::sync::{broadcast, mpsc};
 
@@ -479,6 +480,7 @@ struct TuiState {
     model_name: String,
     approval_state: ApprovalState,
     branch_id: Option<String>,
+    pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
 }
 
 impl TuiState {
@@ -748,6 +750,60 @@ impl Tui {
         Ok(())
     }
 
+    /// Runs the TUI with approval channel support.
+    ///
+    /// Like [`Tui::run`], but also listens for [`TuiApprovalRequest`] on
+    /// `approval_rx`. When a request arrives, shows the approval overlay
+    /// and sends the user's choice back via the request's oneshot channel.
+    pub async fn run_with_approval(
+        &mut self,
+        mut event_rx: broadcast::Receiver<AgentEvent>,
+        mut approval_rx: mpsc::UnboundedReceiver<TuiApprovalRequest>,
+    ) -> Result<()> {
+        let mut event_stream = EventStream::new();
+        let mut render_interval = tokio::time::interval(Duration::from_millis(50));
+
+        loop {
+            let state = &self.state;
+            let sidebar = &self.skill_sidebar;
+            let evo = &self.evolution_panel;
+            self.terminal
+                .draw(|frame| render(frame, state, sidebar, evo))?;
+
+            tokio::select! {
+                _ = render_interval.tick() => {}
+                Some(Ok(event)) = event_stream.next() => {
+                    if self.handle_input_event(&event) {
+                        break;
+                    }
+                }
+                event = event_rx.recv() => {
+                    match event {
+                        Ok(agent_event) => {
+                            self.state.handle_event(&agent_event);
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            self.state.append_system(&format!("Warning: dropped {n} event(s)"));
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            break;
+                        }
+                    }
+                }
+                Some(request) = approval_rx.recv() => {
+                    self.state.pending_approval_response = Some(request.response);
+                    self.show_approval(&request.tool_name, &request.arguments);
+                }
+            }
+
+            if self.state.should_exit {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Shows the approval overlay with the given tool info.
     pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
         self.state.approval_state = ApprovalState::Visible {
@@ -849,6 +905,9 @@ impl Tui {
                         if !matches!(self.state.approval_state, ApprovalState::Hidden) =>
                     {
                         if let Some(choice) = self.handle_approval_key(c) {
+                            if let Some(response_tx) = self.state.pending_approval_response.take() {
+                                let _ = response_tx.send(choice.clone());
+                            }
                             self.hide_approval();
                             self.state.append_system(&format!(
                                 "Tool call {}",

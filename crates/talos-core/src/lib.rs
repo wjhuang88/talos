@@ -3,6 +3,7 @@
 pub mod approval;
 pub mod message;
 pub mod provider;
+pub mod session;
 pub mod tool;
 
-pub use approval::ApprovalChoice;
+pub use approval::{ApprovalChoice, TuiApprovalRequest};

@@ -50,13 +50,17 @@ use clap::ValueEnum;
 use rmcp::ServiceExt;
 use serde_json::Value;
 use talos_agent::Agent;
+use talos_agent::session::AppServerSession;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 #[cfg(debug_assertions)]
 use talos_config::McpServerConfig;
 use talos_config::{Config, Provider};
 use talos_core::message::AgentEvent;
+use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
+use talos_core::ApprovalChoice;
+use talos_core::TuiApprovalRequest;
 use talos_evolution::store::KnowledgeStore;
 use talos_evolution::{EvolutionConfig, EvolutionHookHandler};
 use talos_mcp::client::McpClientManager;
@@ -74,6 +78,109 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
+
+/// Non-blocking approval handler for TUI mode.
+///
+/// Sends approval requests to the TUI via a channel and awaits responses
+/// via oneshot channels. Unlike [`ApprovalPrompt`], this does not block
+/// on stdin — the TUI renders an overlay and handles user interaction.
+pub(crate) struct TuiApprovalHandler {
+    approval_tx: mpsc::UnboundedSender<TuiApprovalRequest>,
+    engine: Mutex<talos_permission::PermissionEngine>,
+}
+
+impl TuiApprovalHandler {
+    fn new(approval_tx: mpsc::UnboundedSender<TuiApprovalRequest>) -> Self {
+        Self {
+            approval_tx,
+            engine: Mutex::new(talos_permission::PermissionEngine::new()),
+        }
+    }
+
+    async fn request_approval(
+        &self,
+        tool_name: &str,
+        input: &serde_json::Value,
+    ) -> ApprovalChoice {
+        let decision = {
+            let engine = self.engine.lock().expect("engine lock poisoned");
+            engine.evaluate(tool_name, input)
+        };
+        match decision {
+            talos_permission::PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
+            talos_permission::PermissionDecision::Deny(_) => ApprovalChoice::Deny,
+            talos_permission::PermissionDecision::Ask => {
+                let formatted = ApprovalPrompt::format_input(input);
+                let (response, response_rx) = tokio::sync::oneshot::channel();
+
+                let request = TuiApprovalRequest {
+                    tool_name: tool_name.to_string(),
+                    arguments: formatted,
+                    response,
+                };
+
+                if self.approval_tx.send(request).is_err() {
+                    return ApprovalChoice::Deny;
+                }
+
+                match response_rx.await {
+                    Ok(choice) => choice,
+                    Err(_) => ApprovalChoice::Deny,
+                }
+            }
+        }
+    }
+
+    fn add_always_allow_rule(&self, tool_name: &str) {
+        use talos_permission::{PermissionDecision, PermissionRule};
+        let mut engine = self.engine.lock().expect("engine lock poisoned");
+        engine.add_rule(PermissionRule::new(tool_name, None, PermissionDecision::Allow));
+    }
+}
+
+/// Permission-aware tool wrapper for TUI mode.
+///
+/// Unlike [`PermissionAwareTool`], this uses [`TuiApprovalHandler`] for
+/// non-blocking approval via channels instead of blocking on stdin.
+pub(crate) struct TuiPermissionAwareTool {
+    inner: Arc<dyn AgentTool>,
+    approval: Arc<TuiApprovalHandler>,
+}
+
+#[async_trait]
+impl AgentTool for TuiPermissionAwareTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+
+    fn parameters(&self) -> Value {
+        self.inner.parameters()
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let tool_name = self.inner.name().to_owned();
+        let choice = self.approval.request_approval(&tool_name, &input).await;
+
+        match choice {
+            ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
+            ApprovalChoice::AlwaysApprove => {
+                self.approval.add_always_allow_rule(&tool_name);
+                self.inner.execute(input).await
+            }
+            ApprovalChoice::Deny => {
+                ToolResult::error("Permission denied: User denied".to_string())
+            }
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.inner.is_read_only()
+    }
+}
 
 /// Runtime mode selection.
 #[derive(Debug, Clone, ValueEnum)]
@@ -183,6 +290,13 @@ struct Cli {
 
     #[arg(
         long,
+        conflicts_with_all = ["tui", "repl", "print"],
+        help = "Inline terminal mode: Codex-like UX, no alt-screen, preserves scrollback."
+    )]
+    inline: bool,
+
+    #[arg(
+        long,
         conflicts_with = "tui",
         help = "Force the readline interactive REPL (default is TUI on a TTY)."
     )]
@@ -287,6 +401,10 @@ async fn main() -> Result<()> {
 
     if cli.tui {
         return run_tui_mode(cli).await;
+    }
+
+    if cli.inline {
+        return run_inline_mode(cli).await;
     }
 
     if cli.repl {
@@ -485,37 +603,57 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         agent.set_append_prompt(append_prompt.clone());
     }
 
-    let (event_tx, mut event_rx) = broadcast::channel::<AgentEvent>(32);
+    let session_config = SessionConfig {
+        print_mode: true,
+        workspace_root: std::env::current_dir()
+            .context("failed to determine working directory")?,
+    };
+    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
+    tokio::spawn(async move { actor.run().await });
 
-    let _run_handle = tokio::spawn(async move { agent.run_streaming(prompt, event_tx).await });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit { message: prompt })
+        .await
+        .context("failed to submit message to session")?;
 
     let mut stdout = io::stdout().lock();
-    loop {
-        match event_rx.recv().await {
-            Ok(AgentEvent::TextDelta { delta }) => {
+    while let Some(event) = handle.eq_rx.recv().await {
+        match event {
+            SessionEvent::AgentEvent(AgentEvent::TextDelta { delta }) => {
                 print!("{delta}");
                 stdout.flush().context("failed to flush stdout")?;
             }
-            Ok(AgentEvent::TurnEnd { .. }) => {
+            SessionEvent::AgentEvent(AgentEvent::TurnEnd { .. }) => {
                 println!();
                 return Ok(());
             }
-            Ok(AgentEvent::Error { message }) => {
+            SessionEvent::AgentEvent(AgentEvent::Error { message }) => {
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }
-            Ok(
-                AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. },
-            ) => {}
-            Ok(_) => {}
-            Err(broadcast::error::RecvError::Lagged(n)) => {
-                eprintln!("Warning: dropped {n} event(s) due to slow consumer");
+            SessionEvent::TurnCompleted { status, .. } => match status {
+                talos_core::session::TurnCompletionStatus::Success => {
+                    println!();
+                    return Ok(());
+                }
+                talos_core::session::TurnCompletionStatus::Cancelled => {
+                    return Ok(());
+                }
+                talos_core::session::TurnCompletionStatus::Error { message } => {
+                    eprintln!("Error: {message}");
+                    std::process::exit(1);
+                }
+            },
+            SessionEvent::Error { message } => {
+                eprintln!("Error: {message}");
+                std::process::exit(1);
             }
-            Err(broadcast::error::RecvError::Closed) => {
-                bail!("event channel closed before TurnEnd");
-            }
+            SessionEvent::AgentEvent(_) => {}
+            _ => {}
         }
     }
+    bail!("session event channel closed unexpectedly");
 }
 
 async fn run_tui_mode(cli: Cli) -> Result<()> {
@@ -538,44 +676,235 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let hooks = build_hook_registry(true);
+    let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
 
-    let (event_tx, event_rx) = broadcast::channel::<AgentEvent>(32);
+    // TUI approval channel: tools send requests here, TUI handles them
+    let (approval_tx, approval_rx) = mpsc::unbounded_channel::<TuiApprovalRequest>();
+    let approval_handler = Arc::new(TuiApprovalHandler::new(approval_tx));
+
+    let hooks = build_hook_registry(true);
+    let provider = build_provider(&config, &api_key, cli.mock);
+    let registry = build_tui_tool_registry(approval_handler, workspace_root.clone());
+
+    let mut agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.clone(),
+        hooks,
+    );
+
+    if !cli.no_context {
+        let context = ContextLoader::new(workspace_root.clone())
+            .load()
+            .map_err(|e| anyhow!("{e}"))?;
+        if !context.is_empty() {
+            agent.set_context_files(vec![ContextFile {
+                path: "AGENTS.md".into(),
+                content: context,
+            }]);
+        }
+    }
+
+    let session_config = SessionConfig {
+        print_mode: false,
+        workspace_root,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    tokio::spawn(async move { actor.run().await });
+
+    // Bridge: SessionEvent EQ → broadcast<AgentEvent> for TUI
+    let (bridge_tx, bridge_rx) = broadcast::channel::<AgentEvent>(32);
+    let mut bridge_forwarder = handle.eq_rx;
+    tokio::spawn(async move {
+        while let Some(session_event) = bridge_forwarder.recv().await {
+            match session_event {
+                SessionEvent::AgentEvent(agent_event) => {
+                    let _ = bridge_tx.send(agent_event);
+                }
+                SessionEvent::TurnCompleted {
+                    status: talos_core::session::TurnCompletionStatus::Error { message },
+                    ..
+                } => {
+                    let _ = bridge_tx.send(AgentEvent::Error { message });
+                }
+                SessionEvent::TurnCompleted { .. } => {}
+                SessionEvent::Error { message } => {
+                    let _ = bridge_tx.send(AgentEvent::Error { message });
+                }
+                _ => {}
+            }
+        }
+    });
 
     let mut tui = Tui::new().context("failed to initialize TUI")?;
 
-    // Channel for TUI to send user messages back for agent processing
     let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
     tui.set_message_tx(user_msg_tx);
     tui.set_model_name(config.model.clone());
 
-    // Keep the broadcast channel alive so the TUI doesn't exit when an agent task completes
-    let _event_tx_alive = event_tx.clone();
-
-    // Spawn a task to handle user messages from TUI and spawn agent tasks
-    let config_clone = config.clone();
-    let api_key_clone = api_key.clone();
+    let sq_tx = handle.sq_tx.clone();
     tokio::spawn(async move {
         while let Some(input) = user_msg_rx.recv().await {
-            let provider = build_provider(&config_clone, &api_key_clone, cli.mock);
-            let registry = build_print_tool_registry();
-            let agent = Agent::with_security_and_hooks(
-                provider,
-                registry,
-                Some(Arc::new(talos_permission::PermissionEngine::new())),
-                None,
-                PathBuf::from("."),
-                hooks.clone(),
-            );
-            let event_tx = event_tx.clone();
-            tokio::spawn(async move {
-                let _ = agent.run_streaming(input, event_tx).await;
-            });
+            let _ = sq_tx.send(SessionOp::Submit { message: input }).await;
+        }
+        let _ = sq_tx.send(SessionOp::Shutdown).await;
+    });
+
+    tui.run_with_approval(bridge_rx, approval_rx).await
+}
+
+async fn run_inline_mode(cli: Cli) -> Result<()> {
+    let mut config = Config::load().context("failed to load configuration")?;
+
+    if let Some(ref model) = cli.model {
+        config.model = model.clone();
+    }
+    if let Some(ref provider_str) = cli.provider {
+        config.provider = parse_provider(provider_str)?;
+    }
+
+    if config.model.is_empty() && !cli.mock {
+        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
+    }
+
+    let api_key = if cli.mock {
+        String::new()
+    } else {
+        config.api_key().map_err(|e| anyhow!("{e}"))?
+    };
+
+    let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
+    let hooks = build_hook_registry(true);
+    let provider = build_provider(&config, &api_key, cli.mock);
+    let registry = build_print_tool_registry();
+
+    let mut agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.clone(),
+        hooks,
+    );
+
+    if !cli.no_context {
+        let context = ContextLoader::new(workspace_root.clone())
+            .load()
+            .map_err(|e| anyhow!("{e}"))?;
+        if !context.is_empty() {
+            agent.set_context_files(vec![ContextFile {
+                path: "AGENTS.md".into(),
+                content: context,
+            }]);
+        }
+    }
+
+    if let Some(ref prompt) = cli.system_prompt {
+        agent.set_custom_prompt(prompt.clone());
+    }
+    if let Some(ref append) = cli.append_system_prompt {
+        agent.set_append_prompt(append.clone());
+    }
+
+    let session_config = SessionConfig {
+        print_mode: true,
+        workspace_root,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    tokio::spawn(async move { actor.run().await });
+
+    let sq_tx = handle.sq_tx.clone();
+    let mut eq_rx = handle.eq_rx;
+
+    let stdin = io::stdin();
+
+    tokio::spawn(async move {
+        loop {
+            tokio::signal::ctrl_c().await.ok();
+            let _ = sq_tx.try_send(SessionOp::Interrupt);
         }
     });
 
-    // Run TUI in the main task (blocking until user exits)
-    tui.run(event_rx).await
+    println!("Talos inline mode. Type /quit to exit.");
+    println!();
+
+    loop {
+        print!("> ");
+        let _ = io::stdout().flush();
+
+        let mut line = String::new();
+        match stdin.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(e) => bail!("stdin error: {e}"),
+        }
+
+        let input = line.trim();
+        if input.is_empty() {
+            continue;
+        }
+        if input == "/quit" || input == "/exit" {
+            break;
+        }
+
+        let _ = handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: input.to_string(),
+            })
+            .await;
+
+        let mut turn_done = false;
+        while let Some(event) = eq_rx.recv().await {
+            match event {
+                SessionEvent::AgentEvent(agent_event) => match agent_event {
+                    AgentEvent::TextDelta { delta } => {
+                        print!("{delta}");
+                        let _ = io::stdout().flush();
+                    }
+                    AgentEvent::TurnEnd { .. } => {
+                        println!();
+                        turn_done = true;
+                        break;
+                    }
+                    AgentEvent::Error { message } => {
+                        eprintln!("\nError: {message}");
+                        turn_done = true;
+                        break;
+                    }
+                    _ => {}
+                },
+                SessionEvent::TurnCompleted { status, .. } => {
+                    match status {
+                        talos_core::session::TurnCompletionStatus::Success => {}
+                        talos_core::session::TurnCompletionStatus::Cancelled => {
+                            println!("\n(turn cancelled)");
+                        }
+                        talos_core::session::TurnCompletionStatus::Error { message } => {
+                            eprintln!("\nError: {message}");
+                        }
+                    }
+                    turn_done = true;
+                    break;
+                }
+                SessionEvent::Error { message } => {
+                    eprintln!("\nError: {message}");
+                    turn_done = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        if !turn_done {
+            break;
+        }
+    }
+
+    let _ = handle.sq_tx.send(SessionOp::Shutdown).await;
+    Ok(())
 }
 
 async fn run_interactive_mode(cli: Cli) -> Result<()> {
@@ -668,12 +997,94 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             .context("failed to create session")?
     };
 
+    let mut config = Config::load().context("failed to load configuration")?;
+
+    if let Some(ref model) = cli.model {
+        config.model = model.clone();
+    }
+    if let Some(ref provider_str) = cli.provider {
+        config.provider = parse_provider(provider_str)?;
+    }
+
+    if config.model.is_empty() && !cli.mock {
+        bail!("no model configured");
+    }
+
+    let api_key = if cli.mock {
+        String::new()
+    } else {
+        config.api_key().map_err(|e| anyhow!("{e}"))?
+    };
+
+    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::new(),
+    )));
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(BashTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ReadTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(WriteTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(EditTool::new(workspace_root.clone())),
+        approval,
+        print_mode: false,
+    }));
+
+    let hooks = build_hook_registry(true);
+
+    let mut agent = Agent::with_security_and_hooks(
+        build_provider(&config, &api_key, cli.mock),
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.clone(),
+        hooks,
+    );
+
+    if !cli.no_context {
+        let context = ContextLoader::new(workspace_root.clone())
+            .load()
+            .map_err(|e| anyhow!("{e}"))?;
+        if !context.is_empty() {
+            agent.set_context_files(vec![ContextFile {
+                path: "AGENTS.md".into(),
+                content: context,
+            }]);
+        }
+    }
+
+    if let Some(ref system_prompt) = cli.system_prompt {
+        agent.set_custom_prompt(system_prompt.clone());
+    }
+
+    if let Some(ref append_prompt) = cli.append_system_prompt {
+        agent.set_append_prompt(append_prompt.clone());
+    }
+
+    let session_config = SessionConfig {
+        print_mode: false,
+        workspace_root: workspace_root.clone(),
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    tokio::spawn(async move { actor.run().await });
+
     let event_loop = event_loop::EventLoop::new(
-        cli,
         workspace_root,
         session,
         session_manager,
-        build_hook_registry(true),
+        handle,
     );
     event_loop.run().await
 }
@@ -716,6 +1127,30 @@ fn build_print_tool_registry() -> ToolRegistry {
         inner: Arc::new(EditTool::new(PathBuf::from("."))),
         approval,
         print_mode: true,
+    }));
+    registry
+}
+
+fn build_tui_tool_registry(
+    approval_handler: Arc<TuiApprovalHandler>,
+    workspace_root: PathBuf,
+) -> ToolRegistry {
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(BashTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(ReadTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(WriteTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(EditTool::new(workspace_root)),
+        approval: approval_handler,
     }));
     registry
 }

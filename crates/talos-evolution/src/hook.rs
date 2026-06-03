@@ -93,9 +93,9 @@ impl EvolutionHookHandler {
         let Some(home) = dirs::home_dir() else {
             return Ok(None);
         };
-        let dir = home.join(".talos");
-        std::fs::create_dir_all(&dir).context("failed to create .talos directory")?;
-        let db_path = dir.join("index.db");
+        let dir = home.join(".talos").join("evolution");
+        std::fs::create_dir_all(&dir).context("failed to create .talos/evolution directory")?;
+        let db_path = dir.join("knowledge.db");
         let store = KnowledgeStore::open(db_path.to_str().unwrap_or_default())
             .context("failed to open knowledge store")?;
         Ok(Some(Self::new(store, config, session_id)))

@@ -224,6 +224,18 @@ impl SystemPromptBuilder {
         self
     }
 
+    /// Clears the append prompt, removing any previously set value.
+    pub fn clear_append_prompt(&mut self) {
+        self.append_prompt = None;
+    }
+
+    /// Sets the append prompt to an optional value.
+    ///
+    /// Use `None` to clear the append prompt, or `Some(prompt)` to set it.
+    pub fn set_append_prompt_opt(&mut self, prompt: Option<String>) {
+        self.append_prompt = prompt;
+    }
+
     /// Assembles and returns the final system prompt as a string.
     ///
     /// Components are assembled in the optimal order for caching:

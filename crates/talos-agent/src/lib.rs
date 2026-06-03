@@ -25,6 +25,7 @@ use std::sync::Arc;
 pub mod caching;
 pub mod context;
 pub mod prompt;
+pub mod session;
 
 use futures_util::future::join_all;
 use talos_core::message::{
@@ -292,6 +293,18 @@ impl Agent {
     /// Sets an append prompt that is added at the end of the system prompt.
     pub fn set_append_prompt(&mut self, prompt: String) {
         self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_append_prompt(prompt);
+    }
+
+    /// Clears the append prompt, removing any previously set value.
+    pub fn clear_append_prompt(&mut self) {
+        self.prompt_builder.clear_append_prompt();
+    }
+
+    /// Sets the append prompt to an optional value.
+    ///
+    /// Use `None` to clear the append prompt, or `Some(prompt)` to set it.
+    pub fn set_append_prompt_opt(&mut self, prompt: Option<String>) {
+        self.prompt_builder.set_append_prompt_opt(prompt);
     }
 
     /// Assembles and returns the full system prompt from all configured components.
@@ -2367,5 +2380,55 @@ mod tests {
             .await;
         assert!(result.is_error);
         assert!(result.content.contains("missing required field 'command'"));
+    }
+
+    #[test]
+    fn test_clear_append_prompt() {
+        let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
+        let tools = ToolRegistry::new();
+
+        let mut agent = Agent::new(provider, tools);
+
+        // Set an append prompt
+        agent.set_append_prompt("test".to_string());
+
+        // Verify it is set
+        let prompt = agent.prompt_builder.build();
+        assert!(prompt.contains("test"), "Append prompt should be set");
+
+        // Clear the append prompt
+        agent.clear_append_prompt();
+
+        // Verify it is cleared
+        let prompt = agent.prompt_builder.build();
+        assert!(
+            !prompt.contains("test"),
+            "Append prompt should be cleared after clear_append_prompt()"
+        );
+    }
+
+    #[test]
+    fn test_set_append_prompt_opt_none() {
+        let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
+        let tools = ToolRegistry::new();
+
+        let mut agent = Agent::new(provider, tools);
+
+        // Set an append prompt
+        agent.set_append_prompt("test".to_string());
+
+        // Verify it is set
+        let prompt = agent.prompt_builder.build();
+        assert!(prompt.contains("test"), "Append prompt should be set");
+
+        // Clear using set_append_prompt_opt(None)
+        agent.set_append_prompt_opt(None);
+
+        // Verify it is cleared (same as clear_append_prompt)
+        let prompt = agent.prompt_builder.build();
+        assert!(
+            !prompt.contains("test"),
+            "Append prompt should be cleared after set_append_prompt_opt(None)"
+        );
     }
 }
