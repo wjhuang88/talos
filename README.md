@@ -12,10 +12,11 @@ English | **[中文](README.zh-CN.md)**
 | Area | State | Notes |
 |------|-------|-------|
 | Runtime | Active | 515 tests passing across 12 crates. TTY launches the Nord-themed TUI by default; `--repl` keeps the legacy readline loop. |
+| R1 Review Closure | Active | Current operating round: close I008/I009 review drift, pause I011 S2, then activate I010 R2. |
 | I008 Learning Agent | Review | `EvolutionHookHandler` is wired into print, TUI, interactive, and RPC paths; final review evidence/status sync remains. |
 | I009 Extensible Agent | Review | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers are implemented. TUI provenance markers and `/plugins` remain follow-up work. |
 | I010 Polished Agent | Planned | Codex-like inline terminal mode, AppServerSession convergence, TUI polish, markdown, diff display, slash commands. |
-| I011 Open Providers | Active | OpenAI-compatible `base_url` override shipped through config and `OPENAI_COMPAT_API_KEY`. |
+| I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override shipped; S2 provider plugin architecture deferred. |
 | I012 Portable Tools | Planned | Rust-native POSIX-style tool subset plus embeddable tool-pack registration to reduce host environment dependency. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
@@ -77,10 +78,11 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 |-----------|----------|--------|---------|
 | I001-I007 | Foundation through Skilled Agent | Complete | CLI, tools, permissions, TUI base, sessions, SQLite search, skills, multi-provider support. |
 | R0 | Remediation Gate | Complete | Architecture/security/session correctness findings closed. |
+| R1 | Review Closure | Active | Close I008/I009 review drift before starting I010 R2. |
 | I008 | Learning Agent | Review | Runtime learning is implemented; awaiting final review evidence. |
 | I009 | Extensible Agent | Review | Backend/runtime extensibility is implemented; TUI consumer work remains. |
 | I010 | Polished Agent | Planned | Codex-like terminal UX and release-grade TUI workflows. |
-| I011 | Open Providers | Active | Configurable OpenAI-compatible gateway support; provider plugin architecture planned. |
+| I011 | Open Providers | Paused | Configurable OpenAI-compatible gateway support shipped; provider plugin architecture deferred. |
 | I012 | Portable Tools | Planned | Built-in POSIX-style tools and tool-pack embedding. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,

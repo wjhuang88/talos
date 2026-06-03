@@ -19,6 +19,20 @@ verification evidence, not by waiting for `AppServerSession`.
 - [ ] #I010-S7: AppServerSession convergence, Codex-like inline terminal, headless and SDK modes
 - [ ] Deferred #ARCH-S6 work, if interactive fork continuation requires run-path migration
 
+### R2 Execution Order
+
+1. Establish the `AppServerSession` seam and keep the old run paths compiling behind the new
+   abstraction.
+2. Move print and interactive execution onto the seam first, because they already exercise the
+   shared approval and event flow.
+3. Migrate TUI onto the same session/event stream and verify the canonical approval protocol is
+   preserved.
+4. Add the inline/no-alt-screen terminal mode on top of the same stream, preserving scrollback and
+   shell-like ergonomics.
+5. Remove dead `event_loop.rs` variants once the shared path is stable.
+6. Re-run `cargo test --workspace` after each migration step and record the runtime evidence in this
+   file.
+
 ### Acceptance Criteria
 
 - [ ] Print, interactive, TUI, headless, and SDK paths drive the agent through `AppServerSession`.
@@ -32,6 +46,19 @@ verification evidence, not by waiting for `AppServerSession`.
       `TurnStart` / `TurnComplete` lifecycle events are introduced.
 - [ ] Dead `event_loop.rs` variants are removed as part of the ADR-005 migration.
 - [ ] `cargo test --workspace` exits 0 after each path migration step.
+
+### R2 Risks
+
+- Shared-session migration can accidentally duplicate lifecycle events if a path keeps its own
+  observer or event sink. Verify I008 hook behavior after each seam change.
+- Inline terminal mode can drift into a second TUI implementation if it is treated as a fork instead
+  of a rendering mode over the same event stream.
+- Dead variant cleanup can hide regressions if removed before the new path is exercised end to end.
+  Do not treat compiler dead-code warnings as proof of safety.
+
+### R2 Verification Notes
+
+Append command outputs, runtime transcripts, and screenshots here during execution.
 
 ### R2 Non-Goals
 

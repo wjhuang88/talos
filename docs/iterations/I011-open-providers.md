@@ -4,7 +4,7 @@
 — no Rust changes, no provider recompile. Foundation for a future provider plugin
 architecture.
 
-## Status: ACTIVE — first slice (S1) landed 2026-06-02 🛠️
+## Status: PAUSED — first slice (S1) landed 2026-06-02; S2 deferred
 
 > **Origin.** Drove this iteration to let the team run `talos` against Bailian's
 > OpenAI-compatible endpoint using the existing `bailian-token-plan` API key from
@@ -12,6 +12,9 @@ architecture.
 > adding a `Provider::Bailian` variant. The S1 slice is the minimal plumbing to make
 > that work; S2 and beyond are documented in
 > [docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md).
+> As of 2026-06-03, I011 is paused so R1 can close I008/I009 review drift and I010 R2 can
+> become the next mainline implementation slice. S2 remains valid backlog work and should resume
+> only after R1/I010 or an explicit priority change.
 
 ## Story Status
 

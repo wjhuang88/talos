@@ -1064,12 +1064,19 @@ absence of the marker text.
 
 ## Iteration I011: Open Providers
 
+**Status**: Paused after S1. `#I011-S1` is implemented and verified; `#I011-S2` remains valid
+backlog work but is deferred while R1 closes I008/I009 review drift and I010 R2 prepares to
+become the next mainline implementation slice.
+
 **Theme**: Decouple `talos` from hard-coded provider lists so it can talk to any
 OpenAI-compatible gateway (DashScope, Bailian, Z.ai, self-hosted vLLM) without code
 changes. Foundation for the longer-term **provider plugin architecture** (see
 [docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md)).
 
 ### #I011-S1: OpenAI-compatible `base_url` override
+
+**Status**: Done. See `docs/iterations/I011-open-providers.md` for verification evidence and the
+2026-06-02 gateway-root bugfix.
 
 **Description**: `talos` currently hard-codes the Anthropic and OpenAI base URLs in
 `talos-provider`. Many production gateways (Alibaba Cloud Bailian / DashScope, Z.ai,
@@ -1110,17 +1117,17 @@ touching code or env vars beyond the auth token.
   "OpenAI-compatible protocol" without committing to a specific gateway.
 
 **Acceptance Criteria**:
-- [ ] `~/.talos/config.toml` accepts `base_url = "https://..."`; loaded config exposes
+- [x] `~/.talos/config.toml` accepts `base_url = "https://..."`; loaded config exposes
       it via `Config::base_url()`.
-- [ ] `Provider::OpenAI` with `base_url` set sends requests to that URL.
-- [ ] `Provider::OpenAI` with no `base_url` keeps the hard-coded OpenAI URL.
-- [ ] `OPENAI_API_KEY` is checked before `OPENAI_COMPAT_API_KEY`; the latter is a
+- [x] `Provider::OpenAI` with `base_url` set sends requests to that URL.
+- [x] `Provider::OpenAI` with no `base_url` keeps the hard-coded OpenAI URL.
+- [x] `OPENAI_API_KEY` is checked before `OPENAI_COMPAT_API_KEY`; the latter is a
       fallback only.
-- [ ] `Provider::Anthropic` never reads `OPENAI_COMPAT_API_KEY` (or any openai env var).
-- [ ] Missing-key error message for the OpenAI provider mentions both
+- [x] `Provider::Anthropic` never reads `OPENAI_COMPAT_API_KEY` (or any openai env var).
+- [x] Missing-key error message for the OpenAI provider mentions both
       `OPENAI_API_KEY` and `OPENAI_COMPAT_API_KEY`.
-- [ ] `cargo test --workspace` exits 0; 6 new tests in `talos-config`.
-- [ ] `cargo clippy -p talos-cli --bin talos -p talos-config -- -D warnings` clean.
+- [x] `cargo test --workspace` exits 0; 6 new tests in `talos-config`.
+- [x] `cargo clippy -p talos-cli --bin talos -p talos-config -- -D warnings` clean.
 
 **Reference (well-known OpenAI-compatible gateways this enables)**:
 
@@ -1163,9 +1170,9 @@ schema as a Rust type and write a one-way migration from opencode's `provider` b
 into `talos`'s `Config` shape. Full dynamic loading (a fresh binary that can hot-load a
 provider written in another language) is out of scope.
 
-**Status**: Backlog only. No code yet. See
+**Status**: Deferred backlog work. No code yet. See
 [docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md)
-for the design sketch.
+for the design sketch. Resume after R1/I010 or an explicit priority-change update.
 
 **Depends on**: #I011-S1 (provides the runtime base_url wiring that S2 will surface via
 config)

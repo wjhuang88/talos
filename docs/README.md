@@ -12,6 +12,12 @@
 | `reference/` | Stable facts: architecture, contracts, config | `ARCHITECTURE.md`, `REFERENCE-PROJECTS.md` |
 | `sop/` | Standard Operating Procedures | See below |
 
+## Operating View
+
+| File | Purpose | Source-of-truth Rule |
+|------|---------|----------------------|
+| `BOARD.md` | Current Now / Review / Paused / Next / Later view | Derived view only. Owner docs define state, scope, gates, and evidence. |
+
 ## SOP Index
 
 | SOP | When to Use |
@@ -29,6 +35,7 @@
 ## Quick Reference
 
 - **Agent rules**: See `AGENTS.md` at project root
+- **Current operating board**: See `docs/BOARD.md` (derived view; verify owner docs)
 - **Requirement closure**: See `docs/roadmap/REQUIREMENT-CONVERGENCE.md`
 - **Lessons learned**: See `EVOLUTION.md` at project root
 - **Governance state**: See `.agent-governance/manifest.yaml`

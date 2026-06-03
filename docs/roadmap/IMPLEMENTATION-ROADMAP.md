@@ -30,7 +30,7 @@ block or duplicate each other.
 | Round | State Gate | Primary Scope | Exit Criteria |
 |-------|------------|---------------|---------------|
 | R0 | Done | Architecture remediation: `#ARCH-S1`…`#ARCH-S7` | Security baseline false-complete items closed; session search/list correctness restored; CLI search highlight fixed; runtime evidence recorded |
-| R1 | I009 Review | Extensibility vertical slice: hooks, MCP client/server, JSON-RPC, plugin status markers | Runtime surface landed; TUI provenance marker and `/plugins` consumer follow-up remains before Complete |
+| R1 | Active Review Closure | Close I008/I009 review drift; either finish I009 TUI provenance consumers or defer them through change control; pause I011 S2 | I008/I009 are Complete or have explicit residual-work records; I011 S2 remains deferred; I010 R2 is ready to activate |
 | R2 | First I010 slice | `#I010-S7` AppServerSession convergence, Codex-like inline terminal, headless/SDK modes, canonical approval/event protocol | Print, interactive, TUI, headless, and SDK paths share one session loop; approvals/tool output/status share one event protocol; dead `event_loop.rs` variants are removed |
 | R3 | Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
 | R4 | I012 Portable Tools | Rust-native POSIX-style tool subset plus embeddable tool-pack interface | ADR recorded if public API/provenance/config changes; Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered without agent-loop changes |
@@ -39,6 +39,8 @@ Ordering rules:
 - R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.
 - Do not reopen I008 evolution wiring unless new evidence shows the hook-based path fails;
   `#I010-S7` is run-path cleanup, not a prerequisite for I008 Review closure.
+- While R1 is active, do not start I011 S2, I012, or I010 implementation work; close or formally
+  defer the existing Review gaps first.
 - Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
   move it into the R2 `#I010-S7` slice instead.
 - Treat I012 as the environment-dependency reduction lane: implement only a small POSIX subset first,
