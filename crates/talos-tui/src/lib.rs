@@ -739,6 +739,86 @@ impl TuiState {
             _ => {}
         }
     }
+
+    const SLASH_COMMANDS: &[&str] = &[
+        "/help",
+        "/quit",
+        "/exit",
+        "/status",
+        "/new",
+        "/compact",
+        "/diff",
+        "/model",
+        "/resume",
+        "/fork",
+        "/vim",
+    ];
+
+    fn handle_slash_command(&mut self, input: &str) {
+        let parts: Vec<&str> = input.splitn(2, ' ').collect();
+        let cmd = parts[0];
+        let _arg = parts.get(1).copied().unwrap_or("");
+
+        match cmd {
+            "/help" => {
+                self.append_system("Available commands:");
+                self.append_system("  /help       — Show this help");
+                self.append_system("  /quit       — Exit Talos");
+                self.append_system("  /status     — Show session info");
+                self.append_system("  /new        — Start fresh session");
+                self.append_system("  /compact    — Compact conversation context");
+                self.append_system("  /diff       — Show git diff");
+                self.append_system("  /model      — Switch model");
+                self.append_system("  /resume     — Resume a session");
+                self.append_system("  /fork       — Fork current session");
+                self.append_system("  /vim        — Toggle vim keybindings");
+            }
+            "/quit" | "/exit" => {
+                self.should_exit = true;
+            }
+            "/status" => {
+                let usage = &self.usage;
+                self.append_system(&format!(
+                    "Model: {} | Input: {} | Output: {} tokens",
+                    self.model_name,
+                    usage.input_tokens,
+                    usage.output_tokens,
+                ));
+            }
+            "/new" => {
+                self.chat_lines.clear();
+                self.current_turn_text.clear();
+                self.usage = Usage::default();
+                self.branch_id = None;
+                self.append_system("New session started.");
+            }
+            _ => {
+                self.append_error(&format!(
+                    "Unknown command: {cmd}. Type /help for available commands."
+                ));
+            }
+        }
+    }
+
+    fn complete_slash_command(&mut self) {
+        let input = &self.input_buffer;
+        let matches: Vec<&&str> = Self::SLASH_COMMANDS
+            .iter()
+            .filter(|c| c.starts_with(input.as_str()))
+            .collect();
+        if matches.len() == 1 {
+            self.input_buffer = matches[0].to_string();
+            self.cursor_pos = self.input_buffer.len();
+            self.input_append_char(' ');
+        } else if !matches.is_empty() {
+            let listing = matches
+                .iter()
+                .map(|m| m.to_string())
+                .collect::<Vec<_>>()
+                .join("  ");
+            self.append_system(&format!("Commands: {listing}"));
+        }
+    }
 }
 
 /// Main TUI application for the Talos agent.
@@ -1022,11 +1102,21 @@ impl Tui {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         let input = self.state.input_submit();
                         if !input.is_empty() {
-                            self.state.append_user_message(&input);
-                            self.state.is_processing = true;
-                            if let Some(ref tx) = self.message_tx {
-                                let _ = tx.send(input);
+                            if input.starts_with('/') {
+                                self.state.handle_slash_command(&input);
+                            } else {
+                                self.state.append_user_message(&input);
+                                self.state.is_processing = true;
+                                if let Some(ref tx) = self.message_tx {
+                                    let _ = tx.send(input);
+                                }
                             }
+                        }
+                    }
+                    KeyCode::Tab => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        if self.state.input_buffer.starts_with('/') {
+                            self.state.complete_slash_command();
                         }
                     }
                     KeyCode::Esc => {
@@ -1976,5 +2066,74 @@ mod tests {
 
         sidebar.width = SkillSidebar::COLLAPSE_THRESHOLD + 1;
         assert!(!sidebar.is_collapsed());
+    }
+
+    #[test]
+    fn test_slash_command_help() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/help");
+        assert!(state.chat_lines.iter().any(|l| matches!(l, ChatLine::Text(t) if t.contains("/help"))));
+        assert!(state.chat_lines.iter().any(|l| matches!(l, ChatLine::Text(t) if t.contains("/quit"))));
+    }
+
+    #[test]
+    fn test_slash_command_quit() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/quit");
+        assert!(state.should_exit);
+    }
+
+    #[test]
+    fn test_slash_command_exit() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/exit");
+        assert!(state.should_exit);
+    }
+
+    #[test]
+    fn test_slash_command_status() {
+        let mut state = TuiState::new();
+        state.model_name = "test-model".to_string();
+        state.handle_slash_command("/status");
+        assert!(state.chat_lines.iter().any(|l| matches!(l, ChatLine::Text(t) if t.contains("test-model"))));
+    }
+
+    #[test]
+    fn test_slash_command_new_clears_chat() {
+        let mut state = TuiState::new();
+        state.append_user_message("hello");
+        assert!(!state.chat_lines.is_empty());
+        state.handle_slash_command("/new");
+        assert_eq!(state.chat_lines.len(), 1);
+        if let ChatLine::Text(msg) = &state.chat_lines[0] {
+            assert!(msg.contains("New session started"));
+        } else {
+            panic!("expected system message");
+        }
+    }
+
+    #[test]
+    fn test_slash_command_unknown() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/foobar");
+        assert!(state.chat_lines.iter().any(|l| matches!(l, ChatLine::Text(t) if t.contains("Unknown command"))));
+    }
+
+    #[test]
+    fn test_tab_completion_single_match() {
+        let mut state = TuiState::new();
+        state.input_buffer = "/hel".to_string();
+        state.cursor_pos = 4;
+        state.complete_slash_command();
+        assert_eq!(state.input_buffer, "/help ");
+    }
+
+    #[test]
+    fn test_tab_completion_multiple_matches() {
+        let mut state = TuiState::new();
+        state.input_buffer = "/".to_string();
+        state.cursor_pos = 1;
+        state.complete_slash_command();
+        assert!(state.chat_lines.iter().any(|l| matches!(l, ChatLine::Text(t) if t.contains("Commands:"))));
     }
 }
