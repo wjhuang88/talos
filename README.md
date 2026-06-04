@@ -11,11 +11,11 @@ English | **[中文](README.zh-CN.md)**
 
 | Area | State | Notes |
 |------|-------|-------|
-| Runtime | Active | 532 tests passing across 12 crates. TTY launches the Nord-themed TUI by default; `--repl` keeps the legacy readline loop. |
-| R1 Review Closure | Complete | I008/I009 closed. I009 TUI consumer work deferred to #I009-S6. I010 R2 is complete; R3 product polish is next. |
+| Runtime | Active | 567 tests passing across 12 crates. Nord-themed TUI with markdown rendering, diff display, slash commands, and steering queues. |
+| R1 Review Closure | Complete | I008/I009 closed. I009 TUI consumer work deferred to #I009-S6. I010 R3 product polish complete. |
 | I008 Learning Agent | Complete | `EvolutionHookHandler` wired into all run paths; runtime evidence recorded. |
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers deferred to #I009-S6. |
-| I010 Polished Agent | Active (R3 planned) | R2 AppServerSession convergence and inline mode complete; R3 covers TUI polish, markdown, diff display, and slash commands. |
+| I010 Polished Agent | Active (R3 complete) | R2 AppServerSession convergence; R3 Nord theme, markdown rendering, diff display, steering queues, slash commands. |
 | I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override shipped; S2 provider plugin architecture deferred. |
 | I012 Portable Tools | Planned | Rust-native POSIX-style tool subset plus embeddable tool-pack registration to reduce host environment dependency. |
 
@@ -81,7 +81,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | R1 | Review Closure | Complete | I008/I009 closed; I009 TUI consumer work deferred to #I009-S6. |
 | I008 | Learning Agent | Complete | Runtime self-evolution via hook-based `EvolutionHookHandler` across all paths. |
 | I009 | Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, provenance producers shipped. |
-| I010 | Polished Agent | Active (R3 planned) | R2 Codex-like terminal UX complete; R3 targets release-grade TUI workflows. |
+| I010 | Polished Agent | Active (R3 complete) | R2 AppServerSession convergence + inline mode; R3 Nord theme, markdown, diff display, steering queues, slash commands. |
 | I011 | Open Providers | Paused | Configurable OpenAI-compatible gateway support shipped; provider plugin architecture deferred. |
 | I012 | Portable Tools | Planned | Built-in POSIX-style tools and tool-pack embedding. |
 

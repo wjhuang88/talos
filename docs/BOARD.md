@@ -16,12 +16,13 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I010 R3 Product Polish | Planned | [I010 Polished Agent](iterations/I010-polished-agent.md) | R2 complete (532 tests); activate for Nord theme, markdown, diff, slash commands |
+| (no active work) | — | — | — |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I010 R3 Product Polish | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All 5 stories done; 567 tests, clippy clean |
 | I010 R2 Architecture Convergence | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All acceptance criteria met; 532 tests, clippy clean |
 
 ## Blocked / Paused
@@ -35,7 +36,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I010 R3 Product Polish | Planned | [I010 Polished Agent](iterations/I010-polished-agent.md) | Start after I010 R2 complete |
+| ARCH-S8 Production Logging | Planned | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Start after I010 R3 or explicit priority change |
+| I012 Portable Tools | Planned | [I012 Portable Tools](iterations/I012-portable-tools.md) | Start after I010 or when environment-dependency reduction becomes release-critical |
 
 ## Later
 

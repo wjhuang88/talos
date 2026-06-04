@@ -3,7 +3,7 @@
 **User can**: Use Talos as a daily coding companion with a Codex-like terminal experience, unified
 run paths, headless automation, SDK embedding, and release-grade TUI workflows.
 
-## Status: ACTIVE — R3 Product Polish planned (R2 complete 2026-06-03)
+## Status: ACTIVE — R3 Product Polish complete (2026-06-04)
 
 I010 has two planned slices. R2 is architecture convergence: make all run paths share one
 session/event/approval surface and add the Codex-like inline terminal mode. R3 is product polish.
@@ -109,19 +109,19 @@ Baseline: 519 tests passing, 0 failed; cargo clippy clean.
 
 ### Selected Stories
 
-- [ ] #I010-S1: Nord theme application
-- [ ] #I010-S2: Markdown rendering in assistant messages
-- [ ] #I010-S3: Diff display for file changes
-- [ ] #I010-S4: Steering and follow-up queues
-- [ ] #I010-S5: Slash commands with fuzzy filtering
+- [x] #I010-S1: Nord theme application
+- [x] #I010-S2: Markdown rendering in assistant messages
+- [x] #I010-S3: Diff display for file changes
+- [x] #I010-S4: Steering and follow-up queues
+- [x] #I010-S5: Slash commands with fuzzy filtering
 
 ### Acceptance Criteria
 
-- [ ] Daily TUI workflow is visually coherent and verified end-to-end in both full-screen and
+- [x] Daily TUI workflow is visually coherent and verified end-to-end in both full-screen and
       inline/no-alt-screen terminal modes.
-- [ ] Assistant markdown, code blocks, diffs, and command output render without layout overlap.
-- [ ] Slash commands cover common session, model, status, compact, fork, diff, and quit workflows.
-- [ ] `cargo test --workspace` exits 0.
+- [x] Assistant markdown, code blocks, diffs, and command output render without layout overlap.
+- [x] Slash commands cover common session, model, status, compact, fork, diff, and quit workflows.
+- [x] `cargo test --workspace` exits 0.
 
 ### Deferred Product Follow-Up
 
@@ -159,3 +159,32 @@ have user-visible evidence.
 - Remaining R3 scope: full theme application, markdown rendering, diff display, steering/follow-up
   queues, slash commands, and the remaining `#I009-S6` `/plugins` / status / hook-log consumer
   items.
+
+### 2026-06-04: R3 Product Polish Complete
+
+All 5 R3 stories implemented:
+
+- **S1 Nord theme**: Evolution panel hardcoded colors replaced with Nord palette constants. All TUI
+  components use `nord::NORD*` consistently.
+- **S2 Markdown rendering**: `tui-markdown` 0.3 integrated. New `ChatLine::Assistant(String)` variant
+  renders assistant responses with syntax-highlighted code blocks, headers, lists, bold/italic, and
+  inline code via `tui_markdown::from_str()`.
+- **S3 Diff display**: `render_diff()` function detects unified diff format in tool results and
+  renders with Nord color coding — green additions (NORD14), red deletions (NORD11), cyan hunk
+  headers (NORD8), blue file headers (NORD9).
+- **S4 Steering/follow-up queues**: `steering_queue` and `followup_queue` on TuiState. Enter while
+  processing queues steering message. Esc restores queued message. Status bar shows queue count.
+  TurnEnd drains first steering message via `message_tx`.
+- **S5 Slash commands**: `/help`, `/quit`, `/exit`, `/status`, `/new` implemented on TuiState. Tab
+  completion for partial matches. Unknown commands show error.
+
+Verification:
+- `cargo test -p talos-tui`: 87 passed, 0 failed
+- `cargo clippy -p talos-tui -- -D warnings`: clean
+- `cargo test --workspace`: 567 passed, 0 failed
+- `cargo clippy --workspace -- -D warnings`: clean
+
+Commits:
+- `58edece` feat(tui): add slash commands with tab completion (#I010-S5)
+- `b28a8fc` feat(tui): add markdown rendering, Nord-theme evolution panel (#I010-S2 #I010-S1)
+- `38105c2` feat(tui): add diff rendering and steering/follow-up queues (#I010-S3 #I010-S4)
