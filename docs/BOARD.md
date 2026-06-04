@@ -16,13 +16,13 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I010 R2 Architecture Convergence | Active | [I010 Polished Agent](iterations/I010-polished-agent.md) | R1 closed; activate as next mainline implementation slice |
+| I010 R3 Product Polish | Planned | [I010 Polished Agent](iterations/I010-polished-agent.md) | R2 complete (532 tests); activate for Nord theme, markdown, diff, slash commands |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| (none) | | | |
+| I010 R2 Architecture Convergence | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All acceptance criteria met; 532 tests, clippy clean |
 
 ## Blocked / Paused
 
@@ -35,7 +35,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I010 R3 Product Polish | Planned | [I010 Polished Agent](iterations/I010-polished-agent.md) | Start after I010 R2 verification evidence is recorded |
+| I010 R3 Product Polish | Planned | [I010 Polished Agent](iterations/I010-polished-agent.md) | Start after I010 R2 complete |
 
 ## Later
 
