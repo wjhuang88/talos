@@ -389,12 +389,16 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
             lines.push(Line::from(Span::styled(format!("  {icon}"), style)));
 
             if let Some(content) = self.result_content {
-                let content_style = Style::default().fg(nord::NORD4);
-                let content_display = truncate(content, MAX_RESULT_LENGTH);
-                lines.push(Line::from(Span::styled(
-                    format!("  {content_display}"),
-                    content_style,
-                )));
+                if let Some(diff_lines) = render_diff(content) {
+                    lines.extend(diff_lines);
+                } else {
+                    let content_style = Style::default().fg(nord::NORD4);
+                    let content_display = truncate(content, MAX_RESULT_LENGTH);
+                    lines.push(Line::from(Span::styled(
+                        format!("  {content_display}"),
+                        content_style,
+                    )));
+                }
             }
         }
 
@@ -524,6 +528,66 @@ fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
+/// Detects unified diff content and renders it with color-coded lines.
+///
+/// Returns `Some` when the content appears to be a unified diff, `None` otherwise.
+/// Detection heuristic: content contains lines starting with `diff --git`, `@@`,
+/// or starts with `--- a/` / `+++ b/`.
+fn render_diff(content: &str) -> Option<Vec<Line<'static>>> {
+    let mut is_diff = false;
+    for line in content.lines() {
+        if line.starts_with("diff --git")
+            || line.starts_with("@@")
+            || line.starts_with("--- a/")
+            || line.starts_with("+++ b/")
+        {
+            is_diff = true;
+            break;
+        }
+    }
+    if !is_diff {
+        return None;
+    }
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    for line in content.lines() {
+        let styled_line = if line.starts_with("diff --git")
+            || line.starts_with("--- a/")
+            || line.starts_with("+++ b/")
+        {
+            Line::from(Span::styled(
+                line.to_string(),
+                Style::default()
+                    .fg(nord::NORD9)
+                    .add_modifier(Modifier::BOLD),
+            ))
+        } else if line.starts_with("@@") {
+            Line::from(Span::styled(
+                line.to_string(),
+                Style::default().fg(nord::NORD8),
+            ))
+        } else if line.starts_with('+') && !line.starts_with("+++") {
+            Line::from(Span::styled(
+                line.to_string(),
+                Style::default().fg(nord::NORD14),
+            ))
+        } else if line.starts_with('-') && !line.starts_with("---") {
+            Line::from(Span::styled(
+                line.to_string(),
+                Style::default().fg(nord::NORD11),
+            ))
+        } else {
+            Line::from(Span::styled(
+                line.to_string(),
+                Style::default().fg(nord::NORD4).add_modifier(Modifier::DIM),
+            ))
+        };
+        lines.push(styled_line);
+    }
+
+    Some(lines)
+}
+
 /// Duration window for detecting double Ctrl+C press.
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
@@ -563,6 +627,10 @@ struct TuiState {
     approval_state: ApprovalState,
     branch_id: Option<String>,
     pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
+    /// Messages queued for steering (delivered after current tool batch).
+    steering_queue: Vec<String>,
+    /// Messages queued for follow-up (delivered when agent would stop).
+    followup_queue: Vec<String>,
 }
 
 impl TuiState {
@@ -676,6 +744,31 @@ impl TuiState {
         let content = self.input_buffer.clone();
         self.input_clear();
         content
+    }
+
+    #[allow(dead_code)]
+    /// Drains the first message from the steering queue (FIFO).
+    fn drain_steering_queue(&mut self) -> Option<String> {
+        if self.steering_queue.is_empty() {
+            None
+        } else {
+            Some(self.steering_queue.remove(0))
+        }
+    }
+
+    /// Restores the most recent queued message to the input buffer.
+    fn restore_last_queued(&mut self) -> bool {
+        if let Some(msg) = self.steering_queue.pop() {
+            self.input_buffer = msg;
+            self.cursor_pos = self.input_buffer.chars().count();
+            true
+        } else if let Some(msg) = self.followup_queue.pop() {
+            self.input_buffer = msg;
+            self.cursor_pos = self.input_buffer.chars().count();
+            true
+        } else {
+            false
+        }
     }
 
     /// Handles a Ctrl+C press, returning whether to exit.
@@ -894,7 +987,15 @@ impl Tui {
                 event = event_rx.recv() => {
                     match event {
                         Ok(agent_event) => {
+                            let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
                             self.state.handle_event(&agent_event);
+                            if is_turn_end {
+                                if let Some(msg) = self.state.drain_steering_queue() {
+                                    if let Some(ref tx) = self.message_tx {
+                                        let _ = tx.send(msg);
+                                    }
+                                }
+                            }
                         }
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             self.state.append_system(&format!("Warning: dropped {n} event(s)"));
@@ -944,7 +1045,15 @@ impl Tui {
                 event = event_rx.recv() => {
                     match event {
                         Ok(agent_event) => {
+                            let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
                             self.state.handle_event(&agent_event);
+                            if is_turn_end {
+                                if let Some(msg) = self.state.drain_steering_queue() {
+                                    if let Some(ref tx) = self.message_tx {
+                                        let _ = tx.send(msg);
+                                    }
+                                }
+                            }
                         }
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             self.state.append_system(&format!("Warning: dropped {n} event(s)"));
@@ -1105,6 +1214,11 @@ impl Tui {
                         if !input.is_empty() {
                             if input.starts_with('/') {
                                 self.state.handle_slash_command(&input);
+                            } else if self.state.is_processing {
+                                self.state.steering_queue.push(input.clone());
+                                self.state.append_system(
+                                    "Message queued (steering). Press Esc to cancel.",
+                                );
                             } else {
                                 self.state.append_user_message(&input);
                                 self.state.is_processing = true;
@@ -1122,7 +1236,11 @@ impl Tui {
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        self.state.input_clear();
+                        if self.state.restore_last_queued() {
+                            self.state.append_system("Queued message restored to input.");
+                        } else {
+                            self.state.input_clear();
+                        }
                     }
                     _ => {}
                 }
@@ -1350,8 +1468,21 @@ fn build_status_text(state: &TuiState) -> Text<'static> {
         })
         .unwrap_or_default();
 
+    let queue_info = if !state.steering_queue.is_empty() || !state.followup_queue.is_empty() {
+        let mut parts = Vec::new();
+        if !state.steering_queue.is_empty() {
+            parts.push(format!("Steering: {}", state.steering_queue.len()));
+        }
+        if !state.followup_queue.is_empty() {
+            parts.push(format!("Follow-up: {}", state.followup_queue.len()));
+        }
+        format!(" | {}", parts.join(", "))
+    } else {
+        String::new()
+    };
+
     let text = format!(
-        " {processing_indicator}{status} | Model: {} | Tokens: {}{branch_info} | Cost: {}",
+        " {processing_indicator}{status}{queue_info} | Model: {} | Tokens: {}{branch_info} | Cost: {}",
         state.model_name, total_tokens, cost
     );
 
@@ -2224,5 +2355,211 @@ mod tests {
             }
             _ => panic!("expected ChatLine::Assistant, got {:?}", state.chat_lines[0]),
         }
+    }
+
+    #[test]
+    fn test_render_diff_detects_unified_diff() {
+        let diff = "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,4 @@\n fn main() {\n-    println!(\"old\");\n+    println!(\"new\");\n+    println!(\"added\");\n }\n";
+        let result = render_diff(diff);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_render_diff_rejects_plain_text() {
+        let plain = "This is just plain text.\nNo diff markers here.\nJust some content.";
+        let result = render_diff(plain);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_render_diff_rejects_text_with_plus_minus() {
+        let text = "The result is +5 degrees.\nThe temperature dropped -3 degrees.";
+        let result = render_diff(text);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_render_diff_colors_additions_green() {
+        let diff = "diff --git a/f.txt b/f.txt\n@@ -1 +1 @@\n-old\n+new\n";
+        let lines = render_diff(diff).expect("diff detected");
+        let addition_line = lines.iter().find(|l| {
+            l.spans.first().is_some_and(|s| s.content.as_ref() == "+new")
+        });
+        assert!(addition_line.is_some());
+        let span = addition_line.unwrap().spans.first().unwrap();
+        assert_eq!(span.style.fg, Some(nord::NORD14));
+    }
+
+    #[test]
+    fn test_render_diff_colors_deletions_red() {
+        let diff = "diff --git a/f.txt b/f.txt\n@@ -1 +1 @@\n-old\n+new\n";
+        let lines = render_diff(diff).expect("diff detected");
+        let deletion_line = lines.iter().find(|l| {
+            l.spans.first().is_some_and(|s| s.content.as_ref() == "-old")
+        });
+        assert!(deletion_line.is_some());
+        let span = deletion_line.unwrap().spans.first().unwrap();
+        assert_eq!(span.style.fg, Some(nord::NORD11));
+    }
+
+    #[test]
+    fn test_render_diff_colors_hunk_header() {
+        let diff = "diff --git a/f.txt b/f.txt\n@@ -1,3 +1,4 @@\n context\n";
+        let lines = render_diff(diff).expect("diff detected");
+        let hunk_line = lines.iter().find(|l| {
+            l.spans.first().is_some_and(|s| s.content.as_ref() == "@@ -1,3 +1,4 @@")
+        });
+        assert!(hunk_line.is_some());
+        let span = hunk_line.unwrap().spans.first().unwrap();
+        assert_eq!(span.style.fg, Some(nord::NORD8));
+    }
+
+    #[test]
+    fn test_render_diff_file_header_blue_bold() {
+        let diff = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n";
+        let lines = render_diff(diff).expect("diff detected");
+
+        let diff_header = lines.iter().find(|l| {
+            l.spans.first().is_some_and(|s| s.content.as_ref() == "diff --git a/src/lib.rs b/src/lib.rs")
+        });
+        assert!(diff_header.is_some());
+        let span = diff_header.unwrap().spans.first().unwrap();
+        assert_eq!(span.style.fg, Some(nord::NORD9));
+        assert!(span.style.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn test_render_diff_context_lines_dim() {
+        let diff = "diff --git a/f.txt b/f.txt\n@@ -1 +1 @@\n context line\n";
+        let lines = render_diff(diff).expect("diff detected");
+        let context_line = lines.iter().find(|l| {
+            l.spans.first().is_some_and(|s| s.content.as_ref() == " context line")
+        });
+        assert!(context_line.is_some());
+        let span = context_line.unwrap().spans.first().unwrap();
+        assert_eq!(span.style.fg, Some(nord::NORD4));
+        assert!(span.style.add_modifier.contains(Modifier::DIM));
+    }
+
+    // ── Steering / Follow-up Queue Tests ─────────────────────────────────────
+
+    #[test]
+    fn test_steering_queue_empty_by_default() {
+        let state = TuiState::new();
+        assert!(state.steering_queue.is_empty());
+        assert!(state.followup_queue.is_empty());
+    }
+
+    #[test]
+    fn test_steering_queue_drain_fifo() {
+        let mut state = TuiState::new();
+        state.steering_queue.push("first".into());
+        state.steering_queue.push("second".into());
+        state.steering_queue.push("third".into());
+
+        assert_eq!(state.drain_steering_queue(), Some("first".into()));
+        assert_eq!(state.drain_steering_queue(), Some("second".into()));
+        assert_eq!(state.drain_steering_queue(), Some("third".into()));
+        assert_eq!(state.drain_steering_queue(), None);
+    }
+
+    #[test]
+    fn test_restore_last_queued_from_steering() {
+        let mut state = TuiState::new();
+        state.steering_queue.push("queued message".into());
+        state.steering_queue.push("another queued".into());
+
+        let restored = state.restore_last_queued();
+        assert!(restored);
+        assert_eq!(state.input_buffer, "another queued");
+        assert_eq!(state.cursor_pos, 14);
+        assert_eq!(state.steering_queue.len(), 1);
+    }
+
+    #[test]
+    fn test_restore_last_queued_from_followup_when_steering_empty() {
+        let mut state = TuiState::new();
+        state.followup_queue.push("followup msg".into());
+
+        let restored = state.restore_last_queued();
+        assert!(restored);
+        assert_eq!(state.input_buffer, "followup msg");
+        assert!(state.steering_queue.is_empty());
+        assert!(state.followup_queue.is_empty());
+    }
+
+    #[test]
+    fn test_restore_last_queued_nothing_to_restore() {
+        let mut state = TuiState::new();
+        let restored = state.restore_last_queued();
+        assert!(!restored);
+        assert!(state.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn test_queue_indicator_in_status_when_steering_queued() {
+        let mut state = TuiState::new();
+        state.steering_queue.push("msg1".into());
+        state.steering_queue.push("msg2".into());
+
+        let text = build_status_text(&state);
+        let content: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(content.contains("Steering: 2"));
+    }
+
+    #[test]
+    fn test_queue_indicator_in_status_when_followup_queued() {
+        let mut state = TuiState::new();
+        state.followup_queue.push("followup1".into());
+
+        let text = build_status_text(&state);
+        let content: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(content.contains("Follow-up: 1"));
+    }
+
+    #[test]
+    fn test_queue_indicator_absent_when_no_queues() {
+        let state = TuiState::new();
+        let text = build_status_text(&state);
+        let content: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(!content.contains("Steering:"));
+        assert!(!content.contains("Follow-up:"));
+    }
+
+    #[test]
+    fn test_queue_indicator_shows_both_queues() {
+        let mut state = TuiState::new();
+        state.steering_queue.push("s1".into());
+        state.followup_queue.push("f1".into());
+        state.followup_queue.push("f2".into());
+
+        let text = build_status_text(&state);
+        let content: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+
+        assert!(content.contains("Steering: 1"));
+        assert!(content.contains("Follow-up: 2"));
     }
 }
