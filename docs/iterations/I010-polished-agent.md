@@ -142,3 +142,20 @@ Baseline: 519 tests passing, 0 failed; cargo clippy clean.
 Append TUI screenshots or terminal recordings, command outputs, and SDK/headless examples here during
 execution. I010 should not move to Review until the architecture slice and product polish slice both
 have user-visible evidence.
+
+### 2026-06-04: R3 Foundation Slice
+
+- `crates/talos-tui/src/lib.rs`: completed the Nord palette constants (`NORD0`..`NORD15`) as
+  public Ratatui `Color::Rgb` values and added WCAG AA contrast tests for primary dark-mode text
+  pairs.
+- `crates/talos-tui/src/lib.rs`: TUI tool call bubbles now retain `ToolProvenance` from
+  `AgentEvent::ToolCall` and render MCP-origin markers such as `[mcp:filesystem]`.
+- Verification:
+  - `cargo test -p talos-tui`: 57 passed, 0 failed
+  - `cargo clippy -p talos-tui -- -D warnings`: clean
+  - `cargo test --workspace`: passed after rerun outside the sandbox network restriction required
+    by provider mock HTTP tests
+  - `cargo clippy --workspace -- -D warnings`: clean
+- Remaining R3 scope: full theme application, markdown rendering, diff display, steering/follow-up
+  queues, slash commands, and the remaining `#I009-S6` `/plugins` / status / hook-log consumer
+  items.

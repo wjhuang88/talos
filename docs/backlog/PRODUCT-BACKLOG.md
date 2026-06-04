@@ -658,10 +658,10 @@ functionality. Story format: `#I{iteration}-S{story}`.
 
 **Description**: Consumer-side rendering of the `ToolProvenance` data already produced by the backend (ADR-009). MCP-provided tools should display with a distinct marker/icon in tool call bubbles. A `/plugins` slash command should list all loaded plugins and their hook registrations. This work was deferred from I009 through change control during R1 Review Closure; I009's backend/runtime surface is complete and the remaining gap is TUI consumption only.
 
-**Status**: Deferred (moved through change control from I009 during R1 Review Closure). Resume in I010 R2/R3 or a dedicated follow-up iteration.
+**Status**: Deferred (moved through change control from I009 during R1 Review Closure). Resume in I010 R2/R3 or a dedicated follow-up iteration. Partial consumer rendering landed 2026-06-04: TUI tool call bubbles preserve `ToolProvenance` and render MCP-origin markers.
 
 **Acceptance Criteria**:
-- [ ] MCP-provided tools display with distinct marker/icon in TUI tool call bubbles
+- [x] MCP-provided tools display with distinct marker/icon in TUI tool call bubbles
 - [ ] `/plugins` command lists all loaded plugins and their hook registrations
 - [ ] Plugin status indicator visible in TUI status bar when hooks are active
 - [ ] Hook execution logged subtly in TUI (not intrusive)
@@ -680,7 +680,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Description**: Apply the Nord color scheme (https://www.nordtheme.com/) across all TUI components per REFERENCE-PROJECTS.md §19. Define Ratatui `Color::Rgb` constants for all Nord palette colors. Verify WCAG AA contrast ratios for all text/background combinations.
 
 **Acceptance Criteria**:
-- [ ] Nord color palette defined as Ratatui `Color::Rgb` constants module
+- [x] Nord color palette defined as Ratatui `Color::Rgb` constants module
 - [ ] All TUI components use Nord colors (no hardcoded hex values)
 - [ ] Chat viewport, status bar, sidebar, overlays all themed consistently
 - [ ] WCAG AA contrast ratio verified for all text/background combinations

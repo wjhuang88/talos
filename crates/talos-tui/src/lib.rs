@@ -33,34 +33,87 @@ use ratatui::{
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
+use talos_core::tool::ToolProvenance;
 use tokio::sync::{broadcast, mpsc};
 
 pub mod evolution;
 
-// Nord theme colors — reference: https://www.nordtheme.com/docs/colors-and-palettes
-#[allow(dead_code)]
-mod nord {
+/// Nord theme colors for Talos terminal surfaces.
+///
+/// Reference: <https://www.nordtheme.com/docs/colors-and-palettes>
+pub mod nord {
     use ratatui::style::Color;
 
-    // Polar Night (dark backgrounds)
+    /// Polar Night darkest background.
     pub const NORD0: Color = Color::Rgb(46, 52, 64);
+    /// Polar Night elevated background.
     pub const NORD1: Color = Color::Rgb(59, 66, 82);
+    /// Polar Night selected background.
     pub const NORD2: Color = Color::Rgb(67, 76, 94);
+    /// Polar Night muted foreground.
     pub const NORD3: Color = Color::Rgb(76, 86, 106);
 
-    // Snow Storm (light text)
+    /// Snow Storm primary foreground.
     pub const NORD4: Color = Color::Rgb(216, 222, 233);
+    /// Snow Storm brighter foreground.
     pub const NORD5: Color = Color::Rgb(229, 233, 240);
+    /// Snow Storm brightest foreground.
     pub const NORD6: Color = Color::Rgb(236, 239, 244);
 
-    // Frost (blue accents)
+    /// Frost green-blue accent.
+    pub const NORD7: Color = Color::Rgb(143, 188, 187);
+    /// Frost cyan accent.
     pub const NORD8: Color = Color::Rgb(136, 192, 208);
+    /// Frost blue accent.
     pub const NORD9: Color = Color::Rgb(129, 161, 193);
+    /// Frost dark blue accent.
+    pub const NORD10: Color = Color::Rgb(94, 129, 172);
 
-    // Aurora (semantic colors)
+    /// Aurora red error color.
     pub const NORD11: Color = Color::Rgb(191, 97, 106);
+    /// Aurora orange warning color.
+    pub const NORD12: Color = Color::Rgb(208, 135, 112);
+    /// Aurora yellow warning color.
     pub const NORD13: Color = Color::Rgb(235, 203, 139);
+    /// Aurora green success color.
     pub const NORD14: Color = Color::Rgb(163, 190, 140);
+    /// Aurora purple accent color.
+    pub const NORD15: Color = Color::Rgb(180, 142, 173);
+}
+
+#[cfg(test)]
+fn rgb_components(color: ratatui::style::Color) -> Option<(u8, u8, u8)> {
+    use ratatui::style::Color;
+
+    match color {
+        Color::Rgb(r, g, b) => Some((r, g, b)),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+fn relative_luminance(color: ratatui::style::Color) -> Option<f64> {
+    let (r, g, b) = rgb_components(color)?;
+    let channel = |value: u8| {
+        let normalized = f64::from(value) / 255.0;
+        if normalized <= 0.04045 {
+            normalized / 12.92
+        } else {
+            ((normalized + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    Some(0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b))
+}
+
+#[cfg(test)]
+fn contrast_ratio(
+    foreground: ratatui::style::Color,
+    background: ratatui::style::Color,
+) -> Option<f64> {
+    let fg = relative_luminance(foreground)?;
+    let bg = relative_luminance(background)?;
+    let (lighter, darker) = if fg >= bg { (fg, bg) } else { (bg, fg) };
+    Some((lighter + 0.05) / (darker + 0.05))
 }
 
 // ── Skill Sidebar ────────────────────────────────────────────────────────────
@@ -260,6 +313,8 @@ pub struct ToolCallBubble<'a> {
     result_status: Option<bool>,
     /// Result content (may be truncated).
     result_content: Option<&'a str>,
+    /// Origin of the tool.
+    provenance: ToolProvenance,
 }
 
 impl<'a> ToolCallBubble<'a> {
@@ -270,7 +325,14 @@ impl<'a> ToolCallBubble<'a> {
             arguments,
             result_status: None,
             result_content: None,
+            provenance: ToolProvenance::Native,
         }
+    }
+
+    /// Sets the provenance marker for this bubble.
+    pub fn with_provenance(mut self, provenance: ToolProvenance) -> Self {
+        self.provenance = provenance;
+        self
     }
 
     /// Sets the result status and content for this bubble.
@@ -281,6 +343,16 @@ impl<'a> ToolCallBubble<'a> {
     }
 }
 
+fn provenance_marker(provenance: &ToolProvenance) -> String {
+    match provenance {
+        ToolProvenance::Native => "native".to_string(),
+        ToolProvenance::McpRemote { server } => {
+            let server = truncate(server, 24);
+            format!("mcp:{server}")
+        }
+    }
+}
+
 impl ratatui::widgets::Widget for ToolCallBubble<'_> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let mut lines: Vec<Line<'static>> = Vec::new();
@@ -288,10 +360,18 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
         let tool_name_style = Style::default()
             .fg(nord::NORD8)
             .add_modifier(Modifier::BOLD);
-        lines.push(Line::from(Span::styled(
-            format!("▸ {}", self.tool_name),
-            tool_name_style,
-        )));
+        let marker = provenance_marker(&self.provenance);
+        let marker_style = match &self.provenance {
+            ToolProvenance::Native => Style::default().fg(nord::NORD3),
+            ToolProvenance::McpRemote { .. } => Style::default()
+                .fg(nord::NORD15)
+                .add_modifier(Modifier::BOLD),
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!("▸ {}", self.tool_name), tool_name_style),
+            Span::raw(" "),
+            Span::styled(format!("[{marker}]"), marker_style),
+        ]));
 
         let args_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
         let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
@@ -463,6 +543,7 @@ enum ChatLine {
     ToolCall {
         tool_name: String,
         arguments: String,
+        provenance: ToolProvenance,
         result: Option<ToolResult>,
     },
 }
@@ -516,11 +597,12 @@ impl TuiState {
             .push(ChatLine::Text(format!("[System] {message}")));
     }
 
-    fn append_tool_call(&mut self, call: &ToolCall) {
+    fn append_tool_call(&mut self, call: &ToolCall, provenance: &ToolProvenance) {
         self.chat_lines.push(ChatLine::ToolCall {
             tool_name: call.name.clone(),
             arguments: serde_json::to_string_pretty(&call.input)
                 .unwrap_or_else(|_| call.input.to_string()),
+            provenance: provenance.clone(),
             result: None,
         });
     }
@@ -530,6 +612,7 @@ impl TuiState {
             if let ChatLine::ToolCall {
                 tool_name: _,
                 arguments: _,
+                provenance: _,
                 result: slot,
             } = line
             {
@@ -637,8 +720,8 @@ impl TuiState {
             AgentEvent::TextDelta { delta } => {
                 self.append_delta(delta);
             }
-            AgentEvent::ToolCall { call, .. } => {
-                self.append_tool_call(call);
+            AgentEvent::ToolCall { call, provenance } => {
+                self.append_tool_call(call, provenance);
             }
             AgentEvent::ToolResult { result } => {
                 self.set_tool_result(result);
@@ -1051,9 +1134,11 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
             ChatLine::ToolCall {
                 tool_name,
                 arguments,
+                provenance,
                 result,
             } => {
-                let mut bubble = ToolCallBubble::new(tool_name, arguments);
+                let mut bubble =
+                    ToolCallBubble::new(tool_name, arguments).with_provenance(provenance.clone());
                 if let Some(result) = result {
                     bubble = bubble.with_result(result.is_error, &result.content);
                 }
@@ -1413,15 +1498,72 @@ mod tests {
             ChatLine::ToolCall {
                 tool_name,
                 arguments,
+                provenance,
                 result,
             } => {
                 assert_eq!(tool_name, "bash");
                 assert!(arguments.contains("command"));
                 assert!(arguments.contains("ls"));
+                assert_eq!(provenance, &ToolProvenance::Native);
                 assert!(result.is_none());
             }
             _ => panic!("expected ToolCall variant"),
         }
+    }
+
+    #[test]
+    fn test_handle_event_tool_call_preserves_mcp_provenance() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "remote_search".into(),
+            input: serde_json::json!({"query": "talos"}),
+        };
+        let provenance = ToolProvenance::McpRemote {
+            server: "filesystem".into(),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: provenance.clone(),
+        });
+
+        match &state.chat_lines[0] {
+            ChatLine::ToolCall {
+                tool_name,
+                provenance: actual,
+                ..
+            } => {
+                assert_eq!(tool_name, "remote_search");
+                assert_eq!(actual, &provenance);
+            }
+            _ => panic!("expected ToolCall variant"),
+        }
+    }
+
+    #[test]
+    fn test_build_chat_text_renders_mcp_provenance_marker() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "remote_search".into(),
+            input: serde_json::json!({"query": "talos"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::McpRemote {
+                server: "filesystem".into(),
+            },
+        });
+
+        let rendered = build_chat_text(&state)
+            .lines
+            .iter()
+            .flat_map(|line| line.spans.iter())
+            .map(|span| span.content.as_ref())
+            .collect::<String>();
+
+        assert!(rendered.contains("remote_search"));
+        assert!(rendered.contains("[mcp:filesystem]"));
     }
 
     #[test]
@@ -1620,7 +1762,20 @@ mod tests {
     fn test_tool_call_bubble_creation() {
         let bubble = ToolCallBubble::new("read", r#"{"path": "src/main.rs"}"#);
         assert_eq!(bubble.tool_name, "read");
+        assert_eq!(bubble.provenance, ToolProvenance::Native);
         assert!(bubble.result_status.is_none());
+    }
+
+    #[test]
+    fn test_tool_call_bubble_with_mcp_provenance() {
+        let bubble = ToolCallBubble::new("remote_search", r#"{"query": "talos"}"#)
+            .with_provenance(ToolProvenance::McpRemote {
+                server: "filesystem".into(),
+            });
+        assert_eq!(
+            provenance_marker(&bubble.provenance),
+            "mcp:filesystem".to_string()
+        );
     }
 
     #[test]
@@ -1637,6 +1792,46 @@ mod tests {
         let bubble = ToolCallBubble::new("bash", r#"{"command": "rm -rf /"}"#)
             .with_result(true, "Permission denied");
         assert_eq!(bubble.result_status, Some(true));
+    }
+
+    #[test]
+    fn test_nord_palette_defines_all_colors() {
+        let colors = [
+            nord::NORD0,
+            nord::NORD1,
+            nord::NORD2,
+            nord::NORD3,
+            nord::NORD4,
+            nord::NORD5,
+            nord::NORD6,
+            nord::NORD7,
+            nord::NORD8,
+            nord::NORD9,
+            nord::NORD10,
+            nord::NORD11,
+            nord::NORD12,
+            nord::NORD13,
+            nord::NORD14,
+            nord::NORD15,
+        ];
+        assert_eq!(colors.len(), 16);
+        assert!(colors.iter().all(|color| rgb_components(*color).is_some()));
+    }
+
+    #[test]
+    fn test_nord_primary_text_contrast_is_wcag_aa() {
+        let pairs = [
+            (nord::NORD4, nord::NORD0),
+            (nord::NORD5, nord::NORD0),
+            (nord::NORD6, nord::NORD0),
+            (nord::NORD8, nord::NORD0),
+            (nord::NORD14, nord::NORD0),
+        ];
+
+        for (foreground, background) in pairs {
+            let ratio = contrast_ratio(foreground, background).expect("rgb Nord color");
+            assert!(ratio >= 4.5, "contrast ratio {ratio:.2} below WCAG AA");
+        }
     }
 
     fn handle_approval_key_event(state: &mut TuiState, key: char) -> Option<ApprovalChoice> {
