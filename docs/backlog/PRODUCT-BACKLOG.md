@@ -814,6 +814,51 @@ activated through change control.
 **Depends on**: #I004-S1
 **Estimate**: M
 
+### #I010-S9: TUI clipboard copy/export commands (Codex CLI parity)
+
+**Description**: Add application-level copy/export support to the full-screen TUI so users can copy
+assistant output without relying on terminal mouse selection. Codex CLI supports this class of
+workflow by preserving message text in the app model and explicitly writing it to the clipboard
+(for example via OSC 52 or platform clipboard commands). Talos should do the same rather than
+depending on alternate-screen scrollback or mouse selection.
+
+**Status**: Planned follow-up. Added after the 2026-06-04 TUI module-structure audit.
+
+**MUST DO**:
+- Add a small TUI clipboard/output module with clear fallback behavior.
+- Prefer OSC 52 for terminal clipboard support when available; support macOS `pbcopy` as a
+  pragmatic fallback for local developer use. Linux/Windows fallbacks may be added if they stay
+  optional and do not introduce non-Rust runtimes.
+- Preserve plain-text assistant/message content in `TuiState` helpers so copy/export reads source
+  text, not rendered `ratatui` buffers.
+- Add slash commands:
+  - `/copy last` copies the latest assistant response.
+  - `/copy all` copies the current chat transcript as plain text.
+  - `/export <path>` writes the current chat transcript to Markdown/plain text through the normal
+    permission-gated write path or an explicitly reviewed TUI export path.
+- Show a concise system status line after copy/export succeeds or fails.
+
+**MUST NOT DO**:
+- Do NOT rely on terminal mouse selection as the primary copy mechanism.
+- Do NOT disable alternate-screen or mouse capture globally just to make selection easier.
+- Do NOT copy secrets automatically; copying must require an explicit user command/key action.
+- Do NOT add Python/Node helpers or arbitrary native bindings.
+- Do NOT bypass the permission pipeline for write-capable export behavior.
+
+**Acceptance Criteria**:
+- [ ] `/copy last` copies the latest assistant message text when at least one assistant message exists
+- [ ] `/copy all` copies a deterministic plain-text transcript including user, assistant, tool, and
+  system lines
+- [ ] `/export <path>` writes the transcript without bypassing write permissions
+- [ ] Copy failure reports the failing mechanism and leaves TUI state intact
+- [ ] Unit tests cover transcript extraction and command parsing
+- [ ] Platform-specific clipboard behavior is covered by narrow tests or documented manual
+  verification; `cargo test -p talos-tui` exits 0
+
+**Depends on**: #I010-S5
+**Estimate**: S
+**Risk gate**: write-capable export must pass permission-path review (AGENTS.md #4)
+
 ---
 
 ## ARCH: Architecture Review Remediation

@@ -36,6 +36,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I010-S9 TUI Clipboard Copy/Export | Planned | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Start after current TUI module split is committed or an explicit priority change |
 | ARCH-S8 Production Logging | Planned | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Start after I010 R3 or explicit priority change |
 | I012 Portable Tools | Planned | [I012 Portable Tools](iterations/I012-portable-tools.md) | Start after I010 or when environment-dependency reduction becomes release-critical |
 
