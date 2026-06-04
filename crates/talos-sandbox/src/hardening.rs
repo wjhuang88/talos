@@ -344,6 +344,16 @@ impl Default for ProcessHardening {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    static ENV_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn env_test_guard() -> MutexGuard<'static, ()> {
+        ENV_TEST_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("env test mutex poisoned")
+    }
 
     // --- Default configuration tests ---
 
@@ -427,6 +437,8 @@ mod tests {
 
     #[test]
     fn test_env_sanitization_removes_dangerous_vars() {
+        let _guard = env_test_guard();
+
         // Set dangerous env vars
         unsafe {
             env::set_var("LD_PRELOAD", "/tmp/evil.so");
@@ -453,6 +465,8 @@ mod tests {
 
     #[test]
     fn test_env_sanitization_preserves_safe_vars() {
+        let _guard = env_test_guard();
+
         // Set a safe env var
         unsafe {
             env::set_var("MY_SAFE_VAR", "safe_value");
@@ -479,6 +493,8 @@ mod tests {
 
     #[test]
     fn test_env_sanitization_skips_unset_vars() {
+        let _guard = env_test_guard();
+
         // Ensure these are not set (they shouldn't be in a normal environment)
         unsafe {
             env::remove_var("LD_AUDIT");
@@ -498,6 +514,8 @@ mod tests {
 
     #[test]
     fn test_env_sanitization_disabled_does_not_remove_vars() {
+        let _guard = env_test_guard();
+
         unsafe {
             env::set_var("LD_PRELOAD", "/tmp/evil.so");
         }
@@ -521,6 +539,8 @@ mod tests {
 
     #[test]
     fn test_apply_with_defaults() {
+        let _guard = env_test_guard();
+
         let h = ProcessHardening::new();
         // This may fail on some systems due to permission restrictions,
         // but it should not panic.
@@ -536,6 +556,8 @@ mod tests {
 
     #[test]
     fn test_apply_env_only() {
+        let _guard = env_test_guard();
+
         unsafe {
             env::set_var("LD_PRELOAD", "/tmp/evil.so");
         }
