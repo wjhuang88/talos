@@ -8,11 +8,11 @@
 
 | 范围 | 状态 | 说明 |
 |------|------|------|
-| Runtime | Active | 12 个 crate 共 515 个测试通过。TTY 默认启动 Nord 主题 TUI；`--repl` 保留旧 readline 模式。 |
-| R1 Review Closure | Active | 当前执行轮：收口 I008/I009 review 漂移，暂停 I011 S2，然后进入 I010 R2。 |
-| I008 Learning Agent | Review | `EvolutionHookHandler` 已接入 print、TUI、interactive、RPC 四条路径；剩余最终 review 证据和状态同步。 |
-| I009 Extensible Agent | Review | Hook、MCP client/server、JSON-RPC、`ToolProvenance` producer 已实现；TUI provenance marker 与 `/plugins` 仍是 follow-up。 |
-| I010 Polished Agent | Planned | Codex-like inline terminal mode、AppServerSession 收敛、TUI 打磨、Markdown、diff、slash commands。 |
+| Runtime | Active | 12 个 crate 共 532 个测试通过。TTY 默认启动 Nord 主题 TUI；`--repl` 保留旧 readline 模式。 |
+| R1 Review Closure | Complete | I008/I009 已关闭；I009 TUI consumer 工作已延期到 #I009-S6；I010 R2 已完成，R3 产品打磨是下一步。 |
+| I008 Learning Agent | Complete | `EvolutionHookHandler` 已通过 hook 方式覆盖所有运行路径；运行时证据已记录。 |
+| I009 Extensible Agent | Complete | Hook、MCP client/server、JSON-RPC、`ToolProvenance` producer 已交付；TUI provenance marker 与 `/plugins` 延期到 #I009-S6。 |
+| I010 Polished Agent | Active (R3 planned) | R2 AppServerSession 收敛和 inline mode 已完成；R3 覆盖 TUI 打磨、Markdown、diff 和 slash commands。 |
 | I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override 已落地；S2 provider plugin architecture 暂缓。 |
 | I012 Portable Tools | Planned | Rust-native POSIX 基本工具子集 + 工具包嵌入接口，降低外部环境依赖。 |
 
@@ -73,10 +73,10 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 |------|------|------|------|
 | I001-I007 | Foundation through Skilled Agent | Complete | CLI、工具、权限、TUI 基础、会话、SQLite 搜索、技能、多 provider。 |
 | R0 | Remediation Gate | Complete | 架构、安全、会话正确性问题关闭。 |
-| R1 | Review Closure | Active | 在启动 I010 R2 前收口 I008/I009 review 漂移。 |
-| I008 | Learning Agent | Review | 运行时学习已实现，等待最终 review 证据。 |
-| I009 | Extensible Agent | Review | 后端/runtime 扩展能力已实现；TUI consumer 工作待完成。 |
-| I010 | Polished Agent | Planned | Codex-like 终端体验和发布级 TUI 工作流。 |
+| R1 | Review Closure | Complete | I008/I009 已关闭；I009 TUI consumer 工作延期到 #I009-S6。 |
+| I008 | Learning Agent | Complete | 运行时自进化通过 hook-based `EvolutionHookHandler` 覆盖所有路径。 |
+| I009 | Extensible Agent | Complete | Hook、MCP client/server、JSON-RPC、provenance producer 已交付。 |
+| I010 | Polished Agent | Active (R3 planned) | R2 Codex-like 终端体验已完成；R3 目标是发布级 TUI 工作流。 |
 | I011 | Open Providers | Paused | 可配置 OpenAI-compatible gateway 已交付；Provider 插件架构暂缓。 |
 | I012 | Portable Tools | Planned | 内置 POSIX-style 工具和工具包嵌入。 |
 

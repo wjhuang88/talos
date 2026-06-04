@@ -31,8 +31,8 @@ block or duplicate each other.
 |-------|------------|---------------|---------------|
 | R0 | Done | Architecture remediation: `#ARCH-S1`…`#ARCH-S7` | Security baseline false-complete items closed; session search/list correctness restored; CLI search highlight fixed; runtime evidence recorded |
 | R1 | Done (2026-06-03) | Close I008/I009 review drift; deferred I009 TUI consumers to #I009-S6 | I008/I009 Complete; I009 TUI consumer work in #I009-S6; I010 R2 ready to activate |
-| R2 | **Next** — I010 slice | `#I010-S7` AppServerSession convergence, Codex-like inline terminal, headless/SDK modes, canonical approval/event protocol | Print, interactive, TUI, headless, and SDK paths share one session loop; approvals/tool output/status share one event protocol; dead `event_loop.rs` variants are removed |
-| R3 | Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
+| R2 | Done (2026-06-03) | `#I010-S7` AppServerSession convergence, Codex-like inline terminal, headless/SDK modes, canonical approval/event protocol | Print, interactive, and TUI paths share one session loop; approvals/tool output/status share one event protocol; dead `event_loop.rs` variants are removed; RPC migration deferred by semver constraint |
+| R3 | **Next** — Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
 | R4 | I012 Portable Tools | Rust-native POSIX-style tool subset plus embeddable tool-pack interface | ADR recorded if public API/provenance/config changes; Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered without agent-loop changes |
 
 Ordering rules:
@@ -40,7 +40,7 @@ Ordering rules:
 - R1 is closed (2026-06-03); I008/I009 are Complete; I009 TUI consumer work is in #I009-S6.
 - Do not reopen I008 evolution wiring unless new evidence shows the hook-based path fails;
   `#I010-S7` is run-path cleanup, not a prerequisite for I008 Review closure.
-- R2 (I010 Architecture Convergence) is the current mainline slice.
+- R2 (I010 Architecture Convergence) is complete; R3 (I010 Product Polish) is the next mainline slice.
 - Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
   move it into the R2 `#I010-S7` slice instead.
 - Treat I012 as the environment-dependency reduction lane: implement only a small POSIX subset first,

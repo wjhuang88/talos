@@ -3,7 +3,7 @@
 **User can**: Use Talos as a daily coding companion with a Codex-like terminal experience, unified
 run paths, headless automation, SDK embedding, and release-grade TUI workflows.
 
-## Status: ACTIVE — R2 Architecture Convergence (started 2026-06-03)
+## Status: ACTIVE — R3 Product Polish planned (R2 complete 2026-06-03)
 
 I010 has two planned slices. R2 is architecture convergence: make all run paths share one
 session/event/approval surface and add the Codex-like inline terminal mode. R3 is product polish.
