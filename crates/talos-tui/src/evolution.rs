@@ -3,10 +3,12 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
+
+use crate::nord;
 
 /// A learned pattern for display.
 #[derive(Debug, Clone)]
@@ -52,7 +54,7 @@ impl EvolutionPanel {
         if self.patterns.is_empty() {
             lines.push(Line::from(Span::styled(
                 "No patterns learned yet",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(nord::NORD3),
             )));
         } else {
             for (i, pattern) in self.patterns.iter().enumerate() {
@@ -68,7 +70,7 @@ impl EvolutionPanel {
                 lines.push(Line::from(Span::styled(
                     header,
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(nord::NORD8)
                         .add_modifier(Modifier::BOLD),
                 )));
 
@@ -85,7 +87,7 @@ impl EvolutionPanel {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(" Evolution Insights (Ctrl+E to toggle) ")
-                    .style(Style::default().fg(Color::Magenta)),
+                    .style(Style::default().fg(nord::NORD15)),
             )
             .wrap(Wrap { trim: false });
 

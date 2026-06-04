@@ -540,6 +540,7 @@ enum CtrlCState {
 #[derive(Debug, Clone, PartialEq)]
 enum ChatLine {
     Text(String),
+    Assistant(String),
     ToolCall {
         tool_name: String,
         arguments: String,
@@ -578,7 +579,7 @@ impl TuiState {
     fn finalize_turn(&mut self) {
         if !self.current_turn_text.is_empty() {
             self.chat_lines
-                .push(ChatLine::Text(self.current_turn_text.clone()));
+                .push(ChatLine::Assistant(self.current_turn_text.clone()));
             self.current_turn_text.clear();
         }
     }
@@ -1221,6 +1222,17 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
             ChatLine::Text(text) => {
                 lines.push(Line::from(text.clone()));
             }
+            ChatLine::Assistant(text) => {
+                let rendered = tui_markdown::from_str(text);
+                for line in rendered.lines {
+                    let owned_spans: Vec<Span<'static>> = line
+                        .spans
+                        .into_iter()
+                        .map(|s| Span::styled(s.content.into_owned(), s.style))
+                        .collect();
+                    lines.push(Line::from(owned_spans));
+                }
+            }
             ChatLine::ToolCall {
                 tool_name,
                 arguments,
@@ -1247,7 +1259,15 @@ fn build_chat_text(state: &TuiState) -> Text<'static> {
     }
 
     if !state.current_turn_text.is_empty() {
-        lines.push(Line::from(state.current_turn_text.clone()));
+        let rendered = tui_markdown::from_str(&state.current_turn_text);
+        for line in rendered.lines {
+            let owned_spans: Vec<Span<'static>> = line
+                .spans
+                .into_iter()
+                .map(|s| Span::styled(s.content.into_owned(), s.style))
+                .collect();
+            lines.push(Line::from(owned_spans));
+        }
     }
 
     if lines.is_empty() {
@@ -1389,7 +1409,7 @@ mod tests {
         state.finalize_turn();
         assert_eq!(
             state.chat_lines,
-            vec![ChatLine::Text("Assistant response".into())]
+            vec![ChatLine::Assistant("Assistant response".into())]
         );
         assert!(state.current_turn_text.is_empty());
     }
@@ -1705,7 +1725,7 @@ mod tests {
         assert!(!state.is_processing);
         assert_eq!(
             state.chat_lines,
-            vec![ChatLine::Text("Response text".into())]
+            vec![ChatLine::Assistant("Response text".into())]
         );
         assert_eq!(state.usage.input_tokens, 100);
         assert_eq!(state.usage.output_tokens, 50);
@@ -2135,5 +2155,74 @@ mod tests {
         state.cursor_pos = 1;
         state.complete_slash_command();
         assert!(state.chat_lines.iter().any(|l| matches!(l, ChatLine::Text(t) if t.contains("Commands:"))));
+    }
+
+    // ── Markdown Rendering Tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_assistant_line_renders_markdown() {
+        let mut state = TuiState::new();
+        state.chat_lines.push(ChatLine::Assistant("**bold text** and *italic*".into()));
+        let rendered = build_chat_text(&state);
+        assert!(!rendered.lines.is_empty());
+        let all_spans: Vec<&str> = rendered
+            .lines
+            .iter()
+            .flat_map(|line| line.spans.iter())
+            .map(|span| span.content.as_ref())
+            .collect();
+        let combined: String = all_spans.join("");
+        assert!(combined.contains("bold text"));
+    }
+
+    #[test]
+    fn test_assistant_line_renders_code_block() {
+        let mut state = TuiState::new();
+        let code = "Here is some code:\n```rust\nfn main() {\n    println!(\"hello\");\n}\n```";
+        state.chat_lines.push(ChatLine::Assistant(code.into()));
+        let rendered = build_chat_text(&state);
+        assert!(!rendered.lines.is_empty());
+    }
+
+    #[test]
+    fn test_assistant_line_renders_heading() {
+        let mut state = TuiState::new();
+        state.chat_lines.push(ChatLine::Assistant("# Main Heading\n## Sub Heading".into()));
+        let rendered = build_chat_text(&state);
+        assert!(!rendered.lines.is_empty());
+        let all_spans: Vec<&str> = rendered
+            .lines
+            .iter()
+            .flat_map(|line| line.spans.iter())
+            .map(|span| span.content.as_ref())
+            .collect();
+        let combined: String = all_spans.join("");
+        assert!(combined.contains("Main Heading"));
+        assert!(combined.contains("Sub Heading"));
+    }
+
+    #[test]
+    fn test_text_line_remains_plain() {
+        let mut state = TuiState::new();
+        state.chat_lines.push(ChatLine::Text("**not bold**".into()));
+        let rendered = build_chat_text(&state);
+        assert_eq!(rendered.lines.len(), 1);
+        let spans = &rendered.lines[0].spans;
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].content, "**not bold**");
+    }
+
+    #[test]
+    fn test_finalize_turn_creates_assistant_variant() {
+        let mut state = TuiState::new();
+        state.append_delta("Hello from assistant");
+        state.finalize_turn();
+        assert_eq!(state.chat_lines.len(), 1);
+        match &state.chat_lines[0] {
+            ChatLine::Assistant(text) => {
+                assert_eq!(text, "Hello from assistant");
+            }
+            _ => panic!("expected ChatLine::Assistant, got {:?}", state.chat_lines[0]),
+        }
     }
 }
