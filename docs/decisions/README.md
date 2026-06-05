@@ -62,3 +62,10 @@ Which Assumptions need validation?]
 8. [008: Bundled SQLite for Local Storage](008-sqlite-bundled-storage.md) — Accepted. Approves `rusqlite/bundled` as a scoped exception to the no-C/C++-bindings rule for local storage only; SQLite is statically linked so Talos does not require a system SQLite installation.
 9. [009: Tool Provenance Tracking](009-tool-provenance.md) — Accepted. Adds typed provenance for native and MCP-remote tools so TUI/RPC/plugin consumers can distinguish tool sources without changing the agent loop.
 10. [010: Git and Search Tool Dependency Boundary](010-git-search-tool-dependency-boundary.md) — Accepted. Rejects `git2`/libgit2 for the first I012 search/Git slices; search starts Rust-native, read-only Git tools target `gix`, and host `git` is fallback/temporary bridge only.
+11. [011: Guardian Approval Boundary](011-guardian-approval-boundary.md) — Accepted. Keeps Guardian AI inside the existing permission pipeline, disabled by default, and forbids first-slice write-capable auto-approval.
+12. [012: Exec Policy DSL Boundary](012-exec-policy-dsl-boundary.md) — Accepted. Defines the policy DSL as typed permission input, not a shell parser; complex shell features fail back to Ask.
+13. [013: Provider Config Schema Boundary](013-provider-config-schema-boundary.md) — Accepted. Limits provider openness to schema/config in #I011-S2 and defers dynamic provider loading to a future ADR.
+14. [014: Log Retention and Rotation Boundary](014-log-retention-and-rotation.md) — Accepted. Requires bounded local log files and in-process rotation/cleanup for #ARCH-S8 R2.
+15. [015: Embedded Prompt Asset Boundary](015-embedded-prompt-assets.md) — Accepted. Extracts built-in prompts into standalone files embedded at compile time.
+16. [016: Layered Agent Memory Architecture](016-layered-memory-architecture.md) — Accepted for architecture. Defines working, episodic, semantic, and procedural memory with explicit consolidation.
+17. [017: Exploration and Library Storage Architecture](017-exploration-library-storage.md) — Accepted for direction. Starts research-library storage on SQLite/FTS with vector/graph stores gated by Spike.

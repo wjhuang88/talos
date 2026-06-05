@@ -17,7 +17,9 @@ English | **[中文](README.zh-CN.md)**
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers deferred to #I009-S6. |
 | I010 Polished Agent | Active (R3 complete) | R2 AppServerSession convergence; R3 Nord theme, markdown rendering, diff display, steering queues, slash commands. |
 | I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override shipped; S2 provider plugin architecture deferred. |
-| I012 Portable Tools | Planned | Rust-native POSIX-style tools, workspace search, `gix`-first Git tools, and embeddable tool-pack registration to reduce host environment dependency. |
+| I013 Boundary Control | Complete | Guardian/exec/provider ADRs recorded; logging R1 centralized. |
+| I014-I017 Follow-up Plan | Planned | TUI completion, provider schema, portable file/search tools, and embedded Git tools. |
+| I018-I020 Architecture Plan | Planned | Bounded logs, embedded prompt assets, layered memory, and local research library. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.
@@ -83,7 +85,9 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I009 | Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, provenance producers shipped. |
 | I010 | Polished Agent | Active (R3 complete) | R2 AppServerSession convergence + inline mode; R3 Nord theme, markdown, diff display, steering queues, slash commands. |
 | I011 | Open Providers | Paused | Configurable OpenAI-compatible gateway support shipped; provider plugin architecture deferred. |
-| I012 | Portable Tools | Planned | Built-in POSIX-style tools, Rust-native workspace search, `gix`-first Git tools, and tool-pack embedding. |
+| I013 | Boundary Control | Complete | Guardian/exec/provider ADRs plus centralized logging R1. |
+| I014-I017 | Follow-up Plan | Planned | TUI completion, provider schema, portable file/search tools, embedded Git tools. |
+| I018-I020 | Memory/Research Plan | Planned | Log retention, prompt assets, layered memory foundation, exploration library. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in
@@ -121,6 +125,10 @@ Talos follows a simple core, flexible extensions design:
 - **Progressive storage**: JSONL first, SQLite when FTS/index/query behavior is needed. See [ADR-002](docs/decisions/002-local-storage-architecture.md).
 - **Bundled SQLite**: `rusqlite/bundled` is an approved storage exception; Talos does not require system SQLite. See [ADR-008](docs/decisions/008-sqlite-bundled-storage.md).
 - **Tool provenance**: native and MCP-remote tools carry typed provenance for future TUI/plugin/RPC consumers. See [ADR-009](docs/decisions/009-tool-provenance.md).
+- **Bounded local observability**: file logs must rotate and clean up in-process. See [ADR-014](docs/decisions/014-log-retention-and-rotation.md).
+- **Embedded prompt assets**: built-in prompts are standalone files embedded at compile time. See [ADR-015](docs/decisions/015-embedded-prompt-assets.md).
+- **Layered memory**: working, episodic, semantic, and procedural memory are separate and consolidated explicitly. See [ADR-016](docs/decisions/016-layered-memory-architecture.md).
+- **Exploration library**: research artifacts persist locally with source/claim/synthesis provenance; vector/graph stores are Spike-gated. See [ADR-017](docs/decisions/017-exploration-library-storage.md).
 
 ## Documentation
 

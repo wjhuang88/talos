@@ -14,6 +14,7 @@
 
 mod approval;
 mod event_loop;
+mod logging;
 
 /// Nord theme ANSI color constants for terminal output.
 ///
@@ -50,17 +51,17 @@ use clap::ValueEnum;
 use rmcp::ServiceExt;
 use serde_json::Value;
 use talos_agent::Agent;
-use talos_agent::session::AppServerSession;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
+use talos_agent::session::AppServerSession;
 #[cfg(debug_assertions)]
 use talos_config::McpServerConfig;
 use talos_config::{Config, Provider};
+use talos_core::ApprovalChoice;
+use talos_core::TuiApprovalRequest;
 use talos_core::message::AgentEvent;
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
-use talos_core::ApprovalChoice;
-use talos_core::TuiApprovalRequest;
 use talos_evolution::store::KnowledgeStore;
 use talos_evolution::{EvolutionConfig, EvolutionHookHandler};
 use talos_mcp::client::McpClientManager;
@@ -78,6 +79,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
+use crate::logging::init_logger;
 
 /// Non-blocking approval handler for TUI mode.
 ///
@@ -97,11 +99,7 @@ impl TuiApprovalHandler {
         }
     }
 
-    async fn request_approval(
-        &self,
-        tool_name: &str,
-        input: &serde_json::Value,
-    ) -> ApprovalChoice {
+    async fn request_approval(&self, tool_name: &str, input: &serde_json::Value) -> ApprovalChoice {
         let decision = {
             let engine = self.engine.lock().expect("engine lock poisoned");
             engine.evaluate(tool_name, input)
@@ -134,7 +132,11 @@ impl TuiApprovalHandler {
     fn add_always_allow_rule(&self, tool_name: &str) {
         use talos_permission::{PermissionDecision, PermissionRule};
         let mut engine = self.engine.lock().expect("engine lock poisoned");
-        engine.add_rule(PermissionRule::new(tool_name, None, PermissionDecision::Allow));
+        engine.add_rule(PermissionRule::new(
+            tool_name,
+            None,
+            PermissionDecision::Allow,
+        ));
     }
 }
 
@@ -171,9 +173,7 @@ impl AgentTool for TuiPermissionAwareTool {
                 self.approval.add_always_allow_rule(&tool_name);
                 self.inner.execute(input).await
             }
-            ApprovalChoice::Deny => {
-                ToolResult::error("Permission denied: User denied".to_string())
-            }
+            ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
         }
     }
 
@@ -377,7 +377,11 @@ async fn main() -> Result<()> {
             && !cli.learned
             && !matches!(cli.mode, Some(Mode::Rpc))
             && io::stdin().is_terminal());
-    init_tracing(terminal_ui);
+    let config_for_logging = Config::load().ok();
+    init_logger(
+        config_for_logging.as_ref().map(|config| &config.log),
+        terminal_ui,
+    );
 
     if cli.search.is_some() {
         return run_search_mode(cli);
@@ -605,8 +609,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let session_config = SessionConfig {
         print_mode: true,
-        workspace_root: std::env::current_dir()
-            .context("failed to determine working directory")?,
+        workspace_root: std::env::current_dir().context("failed to determine working directory")?,
     };
     let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -676,7 +679,8 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
+    let workspace_root =
+        std::env::current_dir().context("failed to determine working directory")?;
 
     // TUI approval channel: tools send requests here, TUI handles them
     let (approval_tx, approval_rx) = mpsc::unbounded_channel::<TuiApprovalRequest>();
@@ -775,7 +779,8 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let workspace_root = std::env::current_dir().context("failed to determine working directory")?;
+    let workspace_root =
+        std::env::current_dir().context("failed to determine working directory")?;
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);
     let registry = build_print_tool_registry();
@@ -1080,12 +1085,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
 
-    let event_loop = event_loop::EventLoop::new(
-        workspace_root,
-        session,
-        session_manager,
-        handle,
-    );
+    let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);
     event_loop.run().await
 }
 
@@ -1196,13 +1196,8 @@ fn build_mcp_tool_registry() -> ToolRegistry {
 
 // I009-S4 begin
 async fn run_mcp_server() -> Result<()> {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .with_writer(std::io::stderr)
-        .try_init();
+    let config_for_logging = Config::load().ok();
+    init_logger(config_for_logging.as_ref().map(|config| &config.log), false);
 
     let tool_registry = Arc::new(build_mcp_tool_registry());
     let permission_engine = Arc::new(talos_permission::PermissionEngine::new());
@@ -1221,36 +1216,6 @@ async fn run_mcp_server() -> Result<()> {
     Ok(())
 }
 // I009-S4 end
-
-fn init_tracing(to_file: bool) {
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-
-    if to_file && let Some(writer) = open_log_writer() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(env_filter)
-            .with_ansi(false)
-            .with_writer(writer)
-            .try_init();
-        return;
-    }
-
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .with_writer(std::io::stderr)
-        .try_init();
-}
-
-fn open_log_writer() -> Option<Arc<std::fs::File>> {
-    let log_dir = dirs::home_dir()?.join(".talos").join("logs");
-    std::fs::create_dir_all(&log_dir).ok()?;
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_dir.join("talos.log"))
-        .ok()?;
-    Some(Arc::new(file))
-}
 
 fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {
     if let Some(prompt) = cli_prompt {

@@ -30,10 +30,14 @@ verification evidence, and public status all agree.
 | Embeddable local tool packs linked to pluginized tools | ADR-009 provenance; future plugin registration design; likely I012 ADR | #I012-S2 | Planned | ADR records native tool-pack boundary; native POSIX pack registers through same path future local plugins can use |
 | Built-in workspace search without host utilities | ADR-010; built-in search proposal; fff reference design | #I012-S3 | Planned | `find_files` and `grep` work without host `find`/`grep`/`rg`, stay workspace-bounded, respect ignore rules, and enforce output budgets |
 | Self-contained Git operations without `git2`/libgit2 | ADR-010 | #I012-S4 | Planned | Read-only Git tools target `gix`; host `git` is fallback/temporary bridge only; `git2`/libgit2 deferred unless a later ADR approves native dependency |
-| Provider openness without recompilation | Provider plugin proposal; ADR required before #I011-S2 implementation | #I011-S1 implemented; #I011-S2 backlog | S1 implemented; S2 paused/deferred | Configurable provider schema and migration path are implemented without hard-coded provider variants; S2 resumes after R1/I010 or explicit priority change |
-| AI-mediated approval policy | ADR required before implementation | #I010-S6 Guardian AI sub-agent | Planned/deferred | Guardian approval scope, denial/default behavior, audit trail, prompt privacy, and permission-pipeline composition are recorded before any auto-approval code lands |
-| Exec approval policy DSL | ADR required before implementation | #I010-S8 Exec policy DSL rules | Planned/deferred | DSL grammar, matching order, bypass behavior, path/env handling, and `PermissionDecision` mapping are recorded before rule files affect approvals |
-| Production logging outputs | ADR required before R2/R3; R1 may proceed if centralized-only | #ARCH-S8 Production-grade logging system | Planned | R1 centralizes existing tracing init; file output/rotation/JSON/span contracts wait for ADR |
+| Provider openness without recompilation | ADR-013; provider plugin proposal | #I011-S1 implemented; #I011-S2 backlog; I015 Provider Schema | S1 implemented; S2 paused/deferred | Configurable provider schema and migration path are implemented without hard-coded provider variants; S2 resumes in I015 or explicit priority change |
+| AI-mediated approval policy | ADR-011 | #I010-S6 Guardian AI sub-agent | Planned/deferred | Guardian approval scope, denial/default behavior, audit trail, prompt privacy, and permission-pipeline composition are recorded before any auto-approval code lands |
+| Exec approval policy DSL | ADR-012 | #I010-S8 Exec policy DSL rules | Planned/deferred | DSL grammar, matching order, bypass behavior, path/env handling, and `PermissionDecision` mapping are recorded before rule files affect approvals |
+| Production logging outputs | I013 logging R1; ADR required before R2/R3 | #ARCH-S8 Production-grade logging system | R1 implemented; R2/R3 planned | R1 centralizes existing tracing init; file output/rotation/JSON/span contracts wait for ADR |
+| Bounded log retention and cleanup | ADR-014 | #ARCH-S8 R2; I018 Observability and Prompt Assets | Planned | TUI/default file logging cannot grow unbounded; rotation and retention are implemented in-process |
+| Built-in prompts as reviewable assets | ADR-015 | #I018-S1; I018 Observability and Prompt Assets | Planned | Built-in prompt text lives in standalone files embedded at compile time; runtime overrides remain explicit |
+| Four-layer memory architecture | ADR-016 | #I019-S1/S2; I019 Layered Memory Foundation | Planned | Working, episodic, semantic, and procedural memory are separate; consolidation is explicit and provenance-backed |
+| Built-in exploration and local research library | ADR-017 | #I020-S1/S2; I020 Exploration Library | Planned | Research runs store sources, claims, syntheses, and unresolved questions locally; vector/graph stores stay Spike-gated |
 | Reasoning/thinking provider fields | Reasoning proposal; ADR required before story implementation | Future story after #I011-S2 or explicit activation | Proposal | Provider request schema, stream event shape, persistence, TUI/RPC exposure, and evolution hook impact are recorded before code |
 | Self-evolution runtime wiring | ADR-001; ADR-005 hook-driven evolution clarification | I008 Complete | Complete (2026-06-03) | Hook-based EvolutionHookHandler registered uniformly across all paths; runtime evidence recorded |
 
@@ -53,13 +57,16 @@ verification evidence, and public status all agree.
 - Any native Git/search dependency beyond the ADR-010 `gix` direction (`git2`, persistent search
   DB, watcher, frecency store, content index) must follow ADR-010 and get an explicit follow-up
   decision.
-- Guardian auto-approval and exec policy DSL must not start implementation without dedicated ADRs;
-  both can change the effective permission boundary.
-- Provider plugin S2 and reasoning/thinking support must not use proposals alone as execution
-  authority when they change config schema, provider protocol, persisted session fields, or public
-  stream/RPC events.
-- Logging R1 can centralize current subscriber setup, but file output, rotation, JSON logs, span
-  contracts, or a shared logging crate require an ADR first.
+- Guardian auto-approval and exec policy DSL must follow ADR-011 and ADR-012 respectively.
+- Provider plugin S2 must follow ADR-013. Reasoning/thinking support must not use proposals alone
+  as execution authority when it changes config schema, provider protocol, persisted session fields,
+  or public stream/RPC events.
+- Logging R2 file output and cleanup must follow ADR-014. JSON logs, span contracts, or a shared
+  logging crate require follow-up decision coverage if they expand the public observability contract.
+- Embedded prompt assets must follow ADR-015; user-editable prompt packs require a separate
+  permission/provenance decision.
+- Memory and exploration work must follow ADR-016/ADR-017; vector or graph database dependencies
+  require Spike evidence and a follow-up dependency ADR before code.
 
 ## Operating Rule
 

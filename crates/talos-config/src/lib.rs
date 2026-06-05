@@ -67,6 +67,10 @@ pub struct Config {
     #[serde(default)]
     pub base_url: Option<String>,
 
+    /// Logging configuration.
+    #[serde(default)]
+    pub log: LogConfig,
+
     /// Hook-system configuration.
     #[serde(default)]
     pub hooks: HookConfig,
@@ -78,6 +82,33 @@ pub struct Config {
     /// JSON-RPC configuration placeholder for I009-S5.
     #[serde(default)]
     pub rpc: RpcConfig,
+}
+
+/// Logging configuration.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct LogConfig {
+    /// Default logging level used when neither `RUST_LOG` nor `filter` is set.
+    #[serde(default)]
+    pub level: Option<String>,
+
+    /// Output format for console/log-file subscribers.
+    #[serde(default)]
+    pub format: LogFormat,
+
+    /// Full tracing filter expression. Overrides `level` when set.
+    #[serde(default)]
+    pub filter: Option<String>,
+}
+
+/// Supported log output formats for the R1 logging baseline.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
+    /// Human-readable tracing output.
+    #[default]
+    Pretty,
+    /// Compact single-line tracing output.
+    Compact,
 }
 
 /// Hook-system configuration placeholder for I009-S2.
@@ -351,6 +382,7 @@ mod tests {
         assert!(config.model.is_empty());
         assert!(config.api_key.is_none());
         assert!(config.base_url.is_none());
+        assert_eq!(config.log, LogConfig::default());
     }
 
     #[test]
@@ -360,6 +392,7 @@ mod tests {
             model: "claude-test".to_string(),
             api_key: Some("config-key".to_string()),
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -376,6 +409,7 @@ mod tests {
             model: "claude-test".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -393,6 +427,7 @@ mod tests {
             model: "gpt-test".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -413,6 +448,7 @@ mod tests {
             base_url: Some(
                 "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1".to_string(),
             ),
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -431,6 +467,7 @@ mod tests {
             model: "gpt-4o".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -450,6 +487,7 @@ mod tests {
             model: "claude-test".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -471,6 +509,7 @@ mod tests {
             model: "claude-test".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -488,6 +527,7 @@ mod tests {
             model: "glm-5".to_string(),
             api_key: None,
             base_url: Some("https://example.com/v1".to_string()),
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -516,6 +556,34 @@ mod tests {
     }
 
     #[test]
+    fn test_log_config_parsed_from_toml() {
+        let toml_str = r#"
+            provider = "openai"
+            model = "glm-5"
+
+            [log]
+            level = "warn"
+            format = "compact"
+            filter = "talos_provider=debug,talos_agent=info"
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.log.level.as_deref(), Some("warn"));
+        assert_eq!(config.log.format, LogFormat::Compact);
+        assert_eq!(
+            config.log.filter.as_deref(),
+            Some("talos_provider=debug,talos_agent=info")
+        );
+    }
+
+    #[test]
+    fn test_log_config_defaults() {
+        let config = Config::default();
+        assert_eq!(config.log.level, None);
+        assert_eq!(config.log.format, LogFormat::Pretty);
+        assert_eq!(config.log.filter, None);
+    }
+
+    #[test]
     fn test_load_nonexistent_file() {
         let path = Config::default_path();
         if path.exists() {
@@ -533,6 +601,7 @@ mod tests {
             model: "test".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
@@ -542,6 +611,7 @@ mod tests {
             model: "test".to_string(),
             api_key: None,
             base_url: None,
+            log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),

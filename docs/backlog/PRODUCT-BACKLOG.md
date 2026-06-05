@@ -758,10 +758,7 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Planning note**: Valid backlog story, but not part of the first I010 product-polish pass unless
 activated through change control.
 
-**ADR gate**: Must create an ADR before implementation. The ADR must define whether Guardian can
-replace user approval, which tool classes it may auto-approve, how it composes with the existing
-permission pipeline, default-deny behavior on uncertainty/failure, audit logging, prompt/context
-privacy, and circuit-breaker semantics.
+**Design record**: `docs/decisions/011-guardian-approval-boundary.md`
 
 **Acceptance Criteria**:
 - [ ] Guardian reviews tool calls when enabled in config
@@ -809,9 +806,7 @@ privacy, and circuit-breaker semantics.
 **Planning note**: Valid backlog story, but not part of the first I010 product-polish pass unless
 activated through change control.
 
-**ADR gate**: Must create an ADR before implementation. The ADR must define DSL grammar, matching
-order, default behavior, path canonicalization, environment-variable handling, shell-feature
-bypass rules, config file trust boundaries, and how rule outcomes map onto `PermissionDecision`.
+**Design record**: `docs/decisions/012-exec-policy-dsl-boundary.md`
 
 **Acceptance Criteria**:
 - [ ] Rule files loaded from `.talos/rules/` and `~/.talos/rules/`
@@ -1117,9 +1112,12 @@ no centralized configuration, no file output, no per-concern level control, and 
 output option. This story builds a production-ready logging layer in three progressive phases.
 
 **ADR gate**: R1 centralized initialization may proceed without a new ADR if it stays inside
-existing `tracing` dependencies and `talos-cli`. R2/R3 require an ADR before implementation because
-file output, rotation, structured JSON, span contracts, and any shared logging crate create
-persistent-output and public-observability boundaries.
+existing `tracing` dependencies and `talos-cli`. R2 file output and cleanup must follow
+ADR-014. R3 structured JSON, span contracts, and any shared logging crate require either ADR-014
+coverage or a follow-up ADR if the public observability contract grows.
+
+**Status**: R1 implemented in I013. R2 is planned for I018 under ADR-014. R3 remains planned and
+requires follow-up decision coverage before code if it expands beyond ADR-014.
 
 **Current state**:
 - `tracing = "0.1"` already in: `talos-cli`, `talos-agent`, `talos-evolution`, `talos-mcp`, `talos-rpc`, `talos-plugin`
@@ -1143,14 +1141,15 @@ persistent-output and public-observability boundaries.
   ```toml
   [log]
   level = "info"              # default level
-  format = "pretty"           # pretty | compact | json
+  format = "pretty"           # pretty | compact (json deferred to R3)
   filter = "talos_provider=debug,talos_agent=info"  # per-crate overrides
   ```
 - Config and env compose: env takes precedence, config provides defaults
 
 **R2: File output + rotation**
 - `[log.file]` section: `path`, `max_size_mb`, `max_files`, `rotation` (daily/size)
-- Use `tracing-appender` for non-blocking file writes
+- In-process cleanup/rotation; no host `logrotate` dependency
+- Consider `tracing-appender` only if it satisfies retention bounds without custom cleanup gaps
 - File output can be combined with console (dual sink)
 
 **R3: Structured JSON + tracing spans**
@@ -1178,16 +1177,16 @@ persistent-output and public-observability boundaries.
 - Do NOT introduce `log` crate facade — `tracing` is the canonical logging primitive
 
 **Acceptance Criteria**:
-- [ ] Single `init_logger()` function; no direct `tracing_subscriber::fmt()` calls outside it
-- [ ] `RUST_LOG=talos_provider=debug cargo run` filters correctly
-- [ ] `[log]` section in config.toml controls level and format
-- [ ] Config + env compose correctly (env > config > defaults)
-- [ ] `cargo test --workspace` exits 0
+- [x] R1: Single `init_logger()` function; no direct `tracing_subscriber::fmt()` calls outside it
+- [x] R1: `RUST_LOG=talos_provider=debug cargo run` filter path is centralized through `EnvFilter`
+- [x] R1: `[log]` section in config.toml controls level and `pretty|compact` format
+- [x] R1: Config + env compose correctly (env > config > defaults)
+- [x] R1: `cargo test -p talos-config -p talos-cli` exits 0
 - [ ] R2: `[log.file]` writes to file with rotation; dual console+file works
 - [ ] R3: JSON format output is valid JSONL; key spans include structured fields
 - [ ] No `#[allow(deprecated)]` or `as any` suppressions introduced
 
-**Depends on**: none (uses existing `tracing` + `tracing-subscriber` dependencies)
+**Depends on**: ADR-014 for R2, follow-up ADR coverage for R3 if scope expands
 **Estimate**: R1=S, R2=M, R3=M
 **Risk gate**: logging change → verify no performance regression on interactive mode (subscriber overhead < 1ms per event)
 
@@ -1332,9 +1331,7 @@ provider written in another language) is out of scope.
 [docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md)
 for the design sketch. Resume after R1/I010 or an explicit priority-change update.
 
-**ADR gate**: Must create an ADR before implementation of S2. The ADR must define the provider
-config/schema boundary, migration behavior, provider/model name resolution, auth env-var rules,
-protocol adapter scope, compatibility promises, and what remains out of scope for dynamic loading.
+**Design record**: `docs/decisions/013-provider-config-schema-boundary.md`
 
 **Depends on**: #I011-S1 (provides the runtime base_url wiring that S2 will surface via
 config)
@@ -1519,3 +1516,181 @@ reviewed.
 
 **Depends on**: #I004-S1, #I012-S2, #I012-S3, ADR-010
 **Estimate**: M
+
+---
+
+## I018: "Observability and Prompt Assets"
+
+**Theme**: Bound local logs and make built-in prompts reviewable without making runtime behavior
+depend on host files.
+
+### #I018-S1: Embedded built-in prompt assets
+
+**Description**: Extract Talos built-in prompt text out of Rust string literals into standalone
+prompt asset files embedded at compile time. This prepares the system prompt surface for memory,
+exploration, and tool-library prompts while preserving self-contained binary behavior.
+
+**Design record**: `docs/decisions/015-embedded-prompt-assets.md`
+
+**MUST DO**:
+- Move built-in prompt sections into `crates/talos-agent/prompts/*.md` or an equivalent
+  crate-local asset directory.
+- Embed prompt assets with `include_str!` or equivalent compile-time embedding.
+- Preserve existing CLI `--system-prompt` and `--append-system-prompt` behavior.
+- Add tests proving required prompt assets are present, non-empty, and wired into prompt assembly.
+- Keep prompt section names stable enough for prompt-cache behavior.
+
+**MUST NOT DO**:
+- Do NOT load built-in prompt files from the user's filesystem at runtime.
+- Do NOT create a runtime prompt-pack/plugin system in this story.
+- Do NOT allow local files to silently override safety/tool/memory prompt sections.
+
+**Acceptance Criteria**:
+- [ ] Built-in prompt text is reviewable in standalone files.
+- [ ] The compiled binary embeds the default prompt assets.
+- [ ] Existing prompt override/append CLI behavior is preserved.
+- [ ] `cargo test -p talos-agent -p talos-cli` exits 0.
+
+**Depends on**: ADR-015
+**Estimate**: S
+
+---
+
+## I019: "Layered Memory Foundation"
+
+**Theme**: Introduce a four-layer memory architecture without turning memory into prompt stuffing
+or an unreviewed vector-store dependency.
+
+### #I019-S1: Memory crate and typed memory records
+
+**Description**: Define the first `talos-memory` boundary and typed records for working,
+episodic, semantic, and procedural memory. This story is schema/API foundation only; it must
+remain small and auditable.
+
+**Design record**: `docs/decisions/016-layered-memory-architecture.md`
+
+**Acceptance Criteria**:
+- [ ] Memory layers are distinct types or modules with documented responsibilities.
+- [ ] Semantic/procedural records include provenance/evidence fields.
+- [ ] Raw session JSONL remains source-of-truth for episodes.
+- [ ] No vector or graph DB dependency is added.
+- [ ] `cargo test --workspace` exits 0.
+
+**Depends on**: ADR-016, ADR-002, ADR-008
+**Estimate**: M
+
+### #I019-S2: Explicit memory consolidation baseline
+
+**Description**: Add the first end-of-session or manual consolidation path that can convert
+selected episodic evidence into semantic facts or procedural candidates with confidence and
+contradiction metadata.
+
+**Acceptance Criteria**:
+- [ ] Consolidation creates semantic/procedural candidates only with evidence links.
+- [ ] Contradictions are recorded explicitly rather than overwritten.
+- [ ] Retrieval output is bounded by count/tokens and includes provenance.
+- [ ] Tests cover stale, contradictory, and low-confidence memory items.
+
+**Depends on**: #I019-S1
+**Estimate**: M
+
+### #I019-S3: Bounded memory retrieval for prompt assembly
+
+**Description**: Add the first retrieval path that selects memory items for prompt assembly without
+stuffing raw history into context. Retrieval must be bounded, provenance-aware, and separated from
+the provider request layer.
+
+**Acceptance Criteria**:
+- [ ] Retrieval accepts task/query context and returns typed memory candidates.
+- [ ] Output is bounded by item count and token estimate.
+- [ ] Results include layer, provenance, confidence, freshness, and contradiction metadata.
+- [ ] Prompt assembly can include selected memory through a stable section boundary.
+- [ ] Tests cover empty memory, over-budget memory, and contradictory memory candidates.
+
+**Depends on**: #I019-S1, #I019-S2, ADR-016
+**Estimate**: M
+
+### #I019-S4: Procedural memory candidate review path
+
+**Description**: Define how repeated successful workflows become procedural memory candidates
+without silently rewriting built-in prompts or skills. This story records candidates and review
+metadata; automatic behavior changes remain a later slice.
+
+**Acceptance Criteria**:
+- [ ] Procedural candidates store trigger, steps, evidence sessions, success/failure counts, and confidence.
+- [ ] Candidates are reviewable and can be disabled or rejected.
+- [ ] No candidate automatically modifies embedded prompt assets or `SKILL.md` files.
+- [ ] Tests cover candidate creation, rejection, and retrieval filtering.
+
+**Depends on**: #I019-S1, #I019-S2, ADR-016, ADR-015
+**Estimate**: M
+
+---
+
+## I020: "Exploration Library"
+
+**Theme**: Give Talos a local research library for exploration results, source cards, claims,
+syntheses, and future memory consolidation.
+
+### #I020-S1: Research library schema
+
+**Description**: Implement the first local library schema for research runs, sources, chunks,
+claims, claim edges, syntheses, caveats, and unresolved questions.
+
+**Design record**: `docs/decisions/017-exploration-library-storage.md`
+
+**Acceptance Criteria**:
+- [ ] SQLite schema stores research runs, sources, source chunks, claims, edges, and syntheses.
+- [ ] Source chunks are indexed with FTS5.
+- [ ] Every synthesis links back to source IDs or unresolved-question records.
+- [ ] No external database server is required.
+- [ ] `cargo test --workspace` exits 0.
+
+**Depends on**: ADR-017, ADR-008
+**Estimate**: M
+
+### #I020-S2: Vector/graph storage Spike
+
+**Description**: Compare SQLite vector extension, LanceDB, and graph-database options against
+Talos' self-contained-first and no-arbitrary-native-dependency constraints. This Spike does not
+land production dependencies.
+
+**Acceptance Criteria**:
+- [ ] Spike report compares SQLite `vec1`/similar, LanceDB, Kuzu, and no-new-dependency SQLite.
+- [ ] Report includes build/linking implications, Rust API maturity, storage layout, query needs,
+      and migration/reversal costs.
+- [ ] Any proposed dependency has a follow-up ADR before code.
+
+**Depends on**: ADR-017
+**Estimate**: S
+
+### #I020-S3: Permission-aware research artifact writer
+
+**Description**: Add a structured write path for research artifacts so exploration results can be
+stored locally without bypassing storage policy, permissions, or provenance requirements.
+
+**Acceptance Criteria**:
+- [ ] Research artifact writes go through a typed API, not ad-hoc file writes.
+- [ ] The writer records tool/model/source provenance and timestamps.
+- [ ] Writes are bounded and reject oversized source chunks.
+- [ ] Network search/fetch tools can be disabled independently from local library reads.
+- [ ] Tests cover denied writes, oversized artifacts, and source provenance persistence.
+
+**Depends on**: #I020-S1, ADR-017
+**Estimate**: M
+
+### #I020-S4: Exploration synthesis workflow
+
+**Description**: Implement the first explicit workflow that turns a research query into source
+cards, extracted claims, a synthesis, caveats, and unresolved questions. This is a supervised
+workflow, not unattended crawling.
+
+**Acceptance Criteria**:
+- [ ] Research run stores query, plan, source cards, claims, synthesis, caveats, and unresolved questions.
+- [ ] Synthesis cites source IDs and distinguishes evidence from inference.
+- [ ] The workflow can run without vector or graph DB dependencies.
+- [ ] Failed or partial research runs are persisted with status and error reason.
+- [ ] Tests cover complete, partial, and no-source research runs.
+
+**Depends on**: #I020-S1, #I020-S3, ADR-017
+**Estimate**: L

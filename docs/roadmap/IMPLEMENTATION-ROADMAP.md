@@ -19,6 +19,14 @@ I009 "Extensible Agent"  TUI MCP标记 + Hook + MCP + JSON-RPC   可扩展
 I010 "Polished Agent"    TUI打磨 (Nord + markdown + 高级功能)    可发布
 I011 "Open Providers"    OpenAI-compatible base_url + provider plugin  可接入
 I012 "Portable Tools"    POSIX工具子集 + 搜索/gix优先Git工具 + 工具包嵌入接口 降低环境依赖
+I013 "Boundary Control"  Guardian/DSL/Provider ADR + logging R1    边界稳固 ✅
+I014 "TUI Completion"    provenance + /plugins + copy/export       TUI收尾
+I015 "Provider Schema"   多 provider schema + import               可配置
+I016 "Portable Search"   native POSIX/file/search tools             少依赖
+I017 "Embedded Git"      gix-first read-only Git tools              自包含Git
+I018 "Obs+Prompts"       log retention + embedded prompt assets     可观测与提示词资产
+I019 "Memory Foundation" four-layer memory foundation               分层记忆
+I020 "Research Library"  exploration + local library storage        探索与研究
 ```
 
 ## Near-Term Execution Sequence
@@ -32,22 +40,31 @@ block or duplicate each other.
 | R0 | Done | Architecture remediation: `#ARCH-S1`…`#ARCH-S7` | Security baseline false-complete items closed; session search/list correctness restored; CLI search highlight fixed; runtime evidence recorded |
 | R1 | Done (2026-06-03) | Close I008/I009 review drift; deferred I009 TUI consumers to #I009-S6 | I008/I009 Complete; I009 TUI consumer work in #I009-S6; I010 R2 ready to activate |
 | R2 | Done (2026-06-03) | `#I010-S7` AppServerSession convergence, Codex-like inline terminal, headless/SDK modes, canonical approval/event protocol | Print, interactive, and TUI paths share one session loop; approvals/tool output/status share one event protocol; dead `event_loop.rs` variants are removed; RPC migration deferred by semver constraint |
-| R3 | **Next** — Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
-| R4 | I012 Portable Tools | Rust-native POSIX-style tool subset, built-in workspace search, `gix`-first structured Git tools, and embeddable tool-pack interface | ADR-010 followed for Git/search dependencies; Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered without agent-loop changes |
+| R3 | Done (2026-06-04) | Remaining I010 polish: Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | User-facing TUI workflows verified; 567 tests |
+| R4 | Done (2026-06-05) | I013 Boundary Control: Guardian/DSL/provider ADRs and logging R1 | High-risk boundaries recorded before implementation; centralized logging R1 landed |
+| R5 | Next product-facing slice | I014 TUI Completion: provenance, `/plugins`, copy/export | TUI can show tool/plugin provenance and supports explicit transcript copy/export |
+| R6 | Provider schema slice | I015 Provider Schema | Multiple OpenAI-compatible providers configurable without recompilation under ADR-013 |
+| R7 | Portable file/search slice | I016 Portable File And Search Tools | Native POSIX subset and search tools work on a minimal `PATH` |
+| R8 | Embedded Git slice | I017 Embedded Git Tools | Read-only Git tools target `gix` per ADR-010 |
+| R9 | Observability/prompt asset slice | I018 Observability and Prompt Assets | File logs are bounded under ADR-014; built-in prompts are embedded assets under ADR-015 |
+| R10 | Memory foundation slice | I019 Layered Memory Foundation | Working/episodic/semantic/procedural memory foundation lands under ADR-016 |
+| R11 | Exploration library slice | I020 Exploration Library | Research artifacts persist locally under ADR-017; vector/graph stores remain Spike-gated |
 
 Ordering rules:
 - R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.
 - R1 is closed (2026-06-03); I008/I009 are Complete; I009 TUI consumer work is in #I009-S6.
 - Do not reopen I008 evolution wiring unless new evidence shows the hook-based path fails;
   `#I010-S7` is run-path cleanup, not a prerequisite for I008 Review closure.
-- R2 (I010 Architecture Convergence) is complete; R3 (I010 Product Polish) is the next mainline slice.
+- R2 (I010 Architecture Convergence), R3 (I010 Product Polish), and R4 (I013 Boundary Control) are complete.
 - Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
   move it into the R2 `#I010-S7` slice instead.
-- Treat I012 as the environment-dependency reduction lane: implement only a small POSIX/search/Git
-  subset first, follow ADR-010 for dependency boundaries, then connect it to the tool-pack/plugin
-  registration path.
-- Do not absorb Guardian or exec policy DSL into the first I010 product-polish pass unless a
-  change-control update explicitly activates those backlog stories.
+- Treat I012 as the original environment-dependency reduction requirement, now split into I016
+  file/search work and I017 embedded Git work.
+- Guardian and exec policy DSL must follow ADR-011 and ADR-012 before any implementation starts.
+- File logging cleanup must follow ADR-014; no unbounded local log files after #ARCH-S8 R2.
+- Built-in prompts must follow ADR-015; runtime prompt packs need a separate decision.
+- Memory features must follow ADR-016 and preserve source/evidence links.
+- Exploration/library storage must follow ADR-017; vector/graph database adoption requires Spike evidence.
 - Each round ends with `cargo test --workspace`; security-sensitive rounds also require `cargo check --workspace`
   and explicit verification notes in `docs/iterations/`.
 
