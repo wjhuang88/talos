@@ -81,7 +81,7 @@ These are immutable facts that every change must respect:
 2. **Conventional commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
    Format: `type(scope): description (#story-id) [model:<model-name>]`
    Scope = crate name (`core`, `agent`, `cli`, `tui`, `provider`, `session`, `tools`, etc.) or `workspace`.
-   `[model:...]` required when Agent authored the commit.
+   `[model:<model-name>]` is required for Agent-authored or Agent-assisted commits.
 3. **One logical change per commit.** No mixed concerns.
 4. **Never commit secrets.** Check for API keys, tokens, passwords.
 5. **Never force-push to main.**
@@ -106,6 +106,7 @@ These are immutable facts that every change must respect:
 | "Where is `unsafe` allowed and why?" | `docs/decisions/007-process-hardening-unsafe.md` |
 | "Why is bundled SQLite allowed?" | `docs/decisions/008-sqlite-bundled-storage.md` |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
+| "A session exposed a reusable lesson, failed validation, or user correction" | `docs/sop/EVOLUTION-FEEDBACK.md` → `EVOLUTION.md` |
 | "I have an idea for later" | `docs/proposals/` |
 | "What's the implementation plan?" | `docs/roadmap/IMPLEMENTATION-ROADMAP.md` |
 | "What work is planned?" | `docs/backlog/PRODUCT-BACKLOG.md` |
@@ -118,7 +119,7 @@ Before ending a session, verify:
 1. **Status sync**: Update backlog story status, iteration progress in `docs/iterations/`.
 2. **Verification evidence**: Did tests pass? Did you run `cargo check --workspace`?
 3. **Residual work**: Record incomplete items in the backlog or iteration notes.
-4. **Lessons**: If you hit a non-obvious problem, add a lesson to `EVOLUTION.md`.
+4. **Lessons**: If you hit a non-obvious problem, failed validation, or user correction, follow `docs/sop/EVOLUTION-FEEDBACK.md` before updating `EVOLUTION.md`.
 5. **Decision records**: Did this session make a technical choice affecting Soft/Assumption constraints? If yes, record in `docs/decisions/`.
 6. **Commit readiness**: Staged diff reviewed? No secrets? Conventional commit message?
 7. **No orphaned changes**: All modified files trace to a requirement.

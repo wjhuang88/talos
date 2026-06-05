@@ -26,8 +26,18 @@ repeating known mistakes.
 | 15 | Delegation | 并行委派代理会"顺手"实现兄弟任务范围，需用 marker 协议隔离 | I009 |
 | 16 | Planning | `task()` 调用必须二选一：`category` 或 `subagent_type`，不可同时给 | I009 |
 | 17 | TUI | visual-engineering 任务在 R0 级别并行委派下 30 分钟不够（结构+消费两个 scope） | I009 |
+| 18 | Governance | 更新 skill 后必须重新跑 governance validator 并修复 conformant 漂移 | I013 |
 
 ## Lessons
+
+### 18. 2026-06-05 - 更新 skill 后必须重新跑 governance validator
+
+- Trigger: 用户提示 skill 已更新并要求重新载入、纠偏。
+- Symptom: 项目刚提交治理/迭代更新后，重新加载 `agent-project-governance` skill 并运行 validator，发现 `docs/sop/EVOLUTION-FEEDBACK.md` 缺失、AGENTS 未路由 lesson feedback、Git Rules 对 `[model:...]` 的要求不符合新版措辞。
+- Root cause: 上一轮治理更新前使用了旧版 skill 认知，没有在最终完成声明前运行新版 governance validator，也没有同步 manifest 中 conformant capability 的必需文件。
+- Fix: 新增 `docs/sop/EVOLUTION-FEEDBACK.md`，更新 AGENTS 路由和 Git Rules，刷新 manifest 状态，并登记 backlog compaction 债务。
+- Prevention: 用户提示 skill 更新、治理规则更新、或任何 governance artifact 变更后，必须重新读取 skill 并运行 `validate_project_governance.sh`，通过后才能声称治理闭环完成。
+- Promoted to rule/check: `docs/sop/EVOLUTION-FEEDBACK.md`; governance validator; AGENTS.md Session End Checklist.
 
 ### 1. Cooked mode Ctrl+C 需要 `exit_token` 模式 (I005)
 
