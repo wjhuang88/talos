@@ -46,7 +46,7 @@ docs/iterations/
 | I009 | Extensible Agent | **Complete** (2026-06-03) | Backend/runtime surface shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance producers). TUI consumer markers + `/plugins` deferred to #I009-S6. See `I009-extensible-agent.md`. |
 | I010 | Polished Agent | **Active** (R3 Complete 2026-06-04) | R2: AppServerSession convergence, TUI approval, inline mode. R3: Nord theme, markdown rendering, diff display, steering queues, slash commands. 567 tests. See `I010-polished-agent.md`. |
 | I011 | Open Providers | **Paused** (S1 landed 2026-06-02; S2 deferred) | OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var shipped. S2 provider-plugin architecture is deferred until after R1/I010 or explicit priority change. See `I011-open-providers.md`. |
-| I012 | Portable Tools | Planned | Native POSIX-style tool subset plus embeddable tool-pack registration to reduce host environment dependency. See `I012-portable-tools.md`. |
+| I012 | Portable Tools | Planned | Native POSIX-style tool subset, embeddable tool-pack registration, Rust-native workspace search, and `gix`-first structured Git tools without first-slice `git2`/libgit2. See `I012-portable-tools.md` and ADR-010. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -62,4 +62,4 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R1: Review Closure | ✅ Done (2026-06-03) | `R1-review-closure.md` | I008/I009 Complete; I009 TUI consumer work in #I009-S6 |
 | R2: I010 Architecture Slice | ✅ Done (2026-06-03) | `I010-polished-agent.md` / Slice R2 | AppServerSession seam, TUI approval, inline mode. 532 tests |
 | R3: I010 Product Polish | ✅ Done (2026-06-04) | `I010-polished-agent.md` / Slice R3 | All 5 stories done (S1-S5); 567 tests; move I010 to Review/Complete |
-| R4: I012 Portable Tools | After I010/R3 or when environment-dependency reduction becomes release-critical | `I012-portable-tools.md` | Native POSIX subset works on a minimal `PATH`; tool-pack interface supports future plugin-provided local tools |
+| R4: I012 Portable Tools | After I010/R3 or when environment-dependency reduction becomes release-critical | `I012-portable-tools.md` | Native POSIX subset and search tools work on a minimal `PATH`; tool-pack interface supports future plugin-provided local tools; Git read-only tools target `gix` per ADR-010 |

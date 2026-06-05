@@ -17,7 +17,7 @@ English | **[中文](README.zh-CN.md)**
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers deferred to #I009-S6. |
 | I010 Polished Agent | Active (R3 complete) | R2 AppServerSession convergence; R3 Nord theme, markdown rendering, diff display, steering queues, slash commands. |
 | I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override shipped; S2 provider plugin architecture deferred. |
-| I012 Portable Tools | Planned | Rust-native POSIX-style tool subset plus embeddable tool-pack registration to reduce host environment dependency. |
+| I012 Portable Tools | Planned | Rust-native POSIX-style tools, workspace search, `gix`-first Git tools, and embeddable tool-pack registration to reduce host environment dependency. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.
@@ -83,7 +83,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I009 | Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, provenance producers shipped. |
 | I010 | Polished Agent | Active (R3 complete) | R2 AppServerSession convergence + inline mode; R3 Nord theme, markdown, diff display, steering queues, slash commands. |
 | I011 | Open Providers | Paused | Configurable OpenAI-compatible gateway support shipped; provider plugin architecture deferred. |
-| I012 | Portable Tools | Planned | Built-in POSIX-style tools and tool-pack embedding. |
+| I012 | Portable Tools | Planned | Built-in POSIX-style tools, Rust-native workspace search, `gix`-first Git tools, and tool-pack embedding. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in

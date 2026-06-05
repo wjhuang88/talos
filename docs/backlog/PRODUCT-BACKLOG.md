@@ -758,6 +758,11 @@ functionality. Story format: `#I{iteration}-S{story}`.
 **Planning note**: Valid backlog story, but not part of the first I010 product-polish pass unless
 activated through change control.
 
+**ADR gate**: Must create an ADR before implementation. The ADR must define whether Guardian can
+replace user approval, which tool classes it may auto-approve, how it composes with the existing
+permission pipeline, default-deny behavior on uncertainty/failure, audit logging, prompt/context
+privacy, and circuit-breaker semantics.
+
 **Acceptance Criteria**:
 - [ ] Guardian reviews tool calls when enabled in config
 - [ ] Low-risk operations auto-approved without user prompt
@@ -804,6 +809,10 @@ activated through change control.
 **Planning note**: Valid backlog story, but not part of the first I010 product-polish pass unless
 activated through change control.
 
+**ADR gate**: Must create an ADR before implementation. The ADR must define DSL grammar, matching
+order, default behavior, path canonicalization, environment-variable handling, shell-feature
+bypass rules, config file trust boundaries, and how rule outcomes map onto `PermissionDecision`.
+
 **Acceptance Criteria**:
 - [ ] Rule files loaded from `.talos/rules/` and `~/.talos/rules/`
 - [ ] Rules match on command name, glob patterns, path prefixes
@@ -823,6 +832,10 @@ workflow by preserving message text in the app model and explicitly writing it t
 depending on alternate-screen scrollback or mouse selection.
 
 **Status**: Planned follow-up. Added after the 2026-06-04 TUI module-structure audit.
+
+**Dependency gate**: Follow `AGENTS.md` dependency discipline. OSC 52 is the preferred
+self-contained path. Host clipboard commands such as `pbcopy` are optional fallbacks only and must
+have documented unavailable-host behavior.
 
 **MUST DO**:
 - Add a small TUI clipboard/output module with clear fallback behavior.
@@ -857,7 +870,8 @@ depending on alternate-screen scrollback or mouse selection.
 
 **Depends on**: #I010-S5
 **Estimate**: S
-**Risk gate**: write-capable export must pass permission-path review (AGENTS.md #4)
+**Risk gate**: write-capable export must pass permission-path review (AGENTS.md #4); host clipboard
+fallbacks must not become the primary implementation path.
 
 ---
 
@@ -1102,6 +1116,11 @@ log initialization is ad-hoc in `main.rs` (three different init patterns at line
 no centralized configuration, no file output, no per-concern level control, and no structured
 output option. This story builds a production-ready logging layer in three progressive phases.
 
+**ADR gate**: R1 centralized initialization may proceed without a new ADR if it stays inside
+existing `tracing` dependencies and `talos-cli`. R2/R3 require an ADR before implementation because
+file output, rotation, structured JSON, span contracts, and any shared logging crate create
+persistent-output and public-observability boundaries.
+
 **Current state**:
 - `tracing = "0.1"` already in: `talos-cli`, `talos-agent`, `talos-evolution`, `talos-mcp`, `talos-rpc`, `talos-plugin`
 - `tracing-subscriber` in: `talos-cli` (env-filter + fmt), `talos-plugin` (fmt only)
@@ -1313,6 +1332,10 @@ provider written in another language) is out of scope.
 [docs/proposals/provider-plugin-architecture.md](../proposals/provider-plugin-architecture.md)
 for the design sketch. Resume after R1/I010 or an explicit priority-change update.
 
+**ADR gate**: Must create an ADR before implementation of S2. The ADR must define the provider
+config/schema boundary, migration behavior, provider/model name resolution, auth env-var rules,
+protocol adapter scope, compatibility promises, and what remains out of scope for dynamic loading.
+
 **Depends on**: #I011-S1 (provides the runtime base_url wiring that S2 will surface via
 config)
 
@@ -1389,4 +1412,110 @@ surfaced through MCP/RPC without special-case code in the agent loop.
       changes are required for a new local tool pack.
 
 **Depends on**: #I009-S3, #I009-S4, #I009-S5, #I012-S1
+**Estimate**: M
+
+### #I012-S3: Built-in workspace search tools
+
+**Description**: Implement agent-oriented workspace search tools inspired by `fff`'s
+architecture, without taking `fff-search` as a direct dependency in the first slice.
+This story adds structured `find_files` and `grep` tools that work without host `find`,
+`grep`, `rg`, shell globbing, or shell pipelines. The first implementation is stateless:
+no persistent index, no filesystem watcher, no frecency database, and no bigram content
+index.
+
+**Design record**: `docs/proposals/builtin-workspace-search-tools.md`
+**Dependency decision**: `docs/decisions/010-git-search-tool-dependency-boundary.md`
+
+**MUST DO**:
+- Implement `find_files` and agent-oriented `grep` as structured `AgentTool`s with
+  explicit JSON schemas.
+- Keep all input paths workspace-root bounded and reject path escapes before walking
+  or reading files.
+- Respect ignore rules by default (`.gitignore` / common ignored directories) unless a
+  later story adds explicit opt-in ignored-file search.
+- Skip binary and oversized files by default; report skipped counts.
+- Enforce result count and output-byte budgets; set `truncated: true` when clipping.
+- Keep ranking deterministic. Use explicit tiebreakers after score.
+- Search must work when the workspace is not a Git repository and when `git` is absent.
+
+**MUST NOT DO**:
+- Do NOT add `fff-search`, `git2`, LMDB/heed, filesystem watcher, frecency store, or
+  persistent search database in this story.
+- Do NOT use `sh -c`, host `find`, host `grep`, or host `rg` to implement the tools.
+- Do NOT follow symlinks by default.
+- Do NOT treat persistent query/index history as read-only behavior.
+- Do NOT implement fuzzy/SIMD/bigram optimization before the bounded baseline is proven.
+
+**Acceptance Criteria**:
+- [ ] `find_files(query, path?, glob?, limit?, mode?)` returns deterministic,
+      workspace-relative path results with scores and truncation metadata.
+- [ ] `grep(pattern, path?, glob?, mode?, context?, limit?)` returns deterministic,
+      workspace-relative matches with line/column, bounded context, and truncation metadata.
+- [ ] Both tools reject path escape and do not follow symlinks by default.
+- [ ] Ignored files, binary files, oversized files, empty wildcard-only patterns, and
+      output truncation have regression tests.
+- [ ] Search tools are read-only and can run concurrently with other read-only tools.
+- [ ] `cargo test -p talos-tools` and `cargo test --workspace` exit 0.
+
+**Depends on**: #I003-S1, #I004-S1, #I012-S2
+**Estimate**: M
+
+### #I012-S4: Self-contained structured Git tools and dependency spike
+
+**Description**: Add a small structured Git tool surface while preserving the self-contained-first
+principle. ADR-010 rejects `git2`/libgit2 for the first I012 slices and selects `gix` as
+the preferred target for initial read-only Git tools. Host `git` may be used only as a
+structured compatibility fallback or temporary bridge, without shell interpolation, using
+allowlisted operation shapes, workspace root, timeout, and clear permission classification.
+
+**Initial read-only command set**:
+- `git_status`
+- `git_diff`
+- `git_log`
+- `git_show`
+- `git_branch_list`
+
+**Deferred write-capable command set**:
+- `git_apply`
+- `git_checkout` / `git_switch`
+- `git_commit`
+- `git_stash`
+- `git_reset`
+- `git_clean`
+
+Write-capable Git operations require a follow-up activation after permission behavior is
+reviewed.
+
+**Design record**: `docs/decisions/010-git-search-tool-dependency-boundary.md`
+
+**MUST DO**:
+- Implement read-only Git tools as structured arguments, not raw command strings.
+- Prefer `gix` for repository discovery, HEAD/branch, status, diff/log/show, and branch listing
+  when the required API mapping is practical in the first slice.
+- If host `git` fallback is used, invoke it directly via process APIs, not through `sh -c`.
+- Run all Git providers with explicit workspace root and bounded output/time behavior.
+- Mark read-only Git tools read-only only when their argument surface cannot mutate the
+  repository.
+- Return clear errors when Git metadata is unavailable or the workspace is not a repository.
+- Record any operation-level host-`git` fallback with rationale and a replacement trigger.
+
+**MUST NOT DO**:
+- Do NOT add `git2`/libgit2 in this story.
+- Do NOT make host `git` the primary implementation without an ADR/update explaining why the
+  self-contained-first path is not viable.
+- Do NOT add write-capable Git operations without permission review and acceptance criteria.
+- Do NOT expose a generic `git(args: Vec<String>)` escape hatch.
+- Do NOT let Git status become required for search correctness; it is a ranking hint only.
+
+**Acceptance Criteria**:
+- [ ] Read-only Git tools are available with stable names and schemas.
+- [ ] Tools reject unsupported flags and do not expose raw argument passthrough.
+- [ ] Tools run on a deliberately minimal `PATH` through the `gix` provider, or each fallback has
+      an explicit unavailable-host behavior test.
+- [ ] Search tools can optionally consume Git status as ranking metadata without failing when
+      Git is unavailable.
+- [ ] Spike note records `gix` API coverage, any host-`git` fallback, and the `git2` rejection.
+- [ ] `cargo test -p talos-tools` and `cargo test --workspace` exit 0.
+
+**Depends on**: #I004-S1, #I012-S2, #I012-S3, ADR-010
 **Estimate**: M

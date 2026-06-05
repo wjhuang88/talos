@@ -54,6 +54,17 @@ These are immutable facts that every change must respect:
 - For multi-step tasks, state the plan with verification checkpoints.
 - Loop until verified, not until "it looks right."
 
+### Dependency Discipline
+
+- Prefer self-contained capabilities over host environment assumptions. When choosing between
+  a Rust-native/library-backed implementation and invoking host utilities, default to the
+  self-contained path.
+- Host utilities (`git`, `find`, `grep`, shell features, platform tools) may be used as
+  compatibility fallbacks, temporary bridges, or explicit escape hatches only when the rationale,
+  unavailable-host behavior, and replacement trigger are recorded.
+- If a primary implementation depends on host capabilities, classify that as a Soft constraint
+  tradeoff and record it in the relevant ADR, backlog story, or iteration note before coding.
+
 ## Rust-Specific Rules
 
 - **Error handling**: Use `thiserror` for library crates, `anyhow` for binary crates only. Never `unwrap()` in library code.

@@ -43,4 +43,12 @@ docs/proposals/
 
 ## Current Proposals
 
-No proposals yet.
+- [Built-in Workspace Search Tools](builtin-workspace-search-tools.md) — detailed design for
+  I012 `find_files` / `grep` tools and fff-inspired ranking/indexing follow-ups.
+- [Provider Plugin Architecture](provider-plugin-architecture.md) — long-term provider config
+  and plugin direction behind I011-S2.
+- [Reasoning / Thinking Field](reasoning-thinking-field.md) — provider-specific reasoning field
+  handling.
+- [Session Context Contamination](session-context-contamination.md) — context contamination
+  investigation and mitigation direction.
+- [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.

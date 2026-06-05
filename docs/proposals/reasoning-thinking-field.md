@@ -5,6 +5,11 @@
 Proposal. Captured 2026-06-02 from a gap surfaced while wiring
 [#I011-S1](../iterations/) OpenAI-compatible `base_url` support.
 
+This proposal is not sufficient as an implementation authority. If it becomes a
+backlog story, create an ADR before code when the design changes provider
+request schemas, session persistence, stream event types, TUI rendering,
+JSON-RPC payloads, or evolution hook contracts.
+
 ## Problem
 
 Many modern LLM providers expose a "reasoning" / "thinking" field that lets the
@@ -44,6 +49,9 @@ Trigger conditions (any one is enough):
   `glm-5` and notices missing reasoning.
 - Provider-plugin-architecture (#I011-S2) lands and at least one external provider
   exposes a thinking field; we need to forward it.
+- A story proposes adding `ReasoningDelta`, persisted reasoning fields, or
+  provider-specific request options. That story must reference the ADR gate
+  above before implementation.
 
 ## Sketch (when we DO pick it up)
 

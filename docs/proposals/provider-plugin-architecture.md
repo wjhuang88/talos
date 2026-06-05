@@ -6,6 +6,11 @@ Proposal. Captured 2026-06-02 as the long-term direction behind
 [#I011-S1](../iterations/) (base_url override) and [#I011-S2](../iterations/)
 (schema import foundation).
 
+This proposal is not sufficient as an implementation authority. Before #I011-S2
+lands code, create an ADR that records the provider config/schema boundary,
+migration behavior, provider/model name resolution, auth env-var rules,
+protocol adapter scope, compatibility promises, and dynamic-loading non-goals.
+
 ## Motivation
 
 Today `talos` supports exactly two LLM providers, both hard-coded in

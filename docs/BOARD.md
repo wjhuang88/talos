@@ -38,10 +38,10 @@ acceptance criteria, verification evidence, or iteration state.
 |---|---|---|---|
 | I010-S9 TUI Clipboard Copy/Export | Planned | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Start after current TUI module split is committed or an explicit priority change |
 | ARCH-S8 Production Logging | Planned | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Start after I010 R3 or explicit priority change |
-| I012 Portable Tools | Planned | [I012 Portable Tools](iterations/I012-portable-tools.md) | Start after I010 or when environment-dependency reduction becomes release-critical |
+| I012 Portable Tools | Planned | [I012 Portable Tools](iterations/I012-portable-tools.md) | Start after I010 or when native POSIX/search/Git tool portability becomes release-critical; follow ADR-010 for Git/search dependencies |
 
 ## Later
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I012 Portable Tools | Planned | [I012 Portable Tools](iterations/I012-portable-tools.md) | Start after I010/R3 or when environment-dependency reduction becomes release-critical |
+| I012 Portable Tools | Planned | [I012 Portable Tools](iterations/I012-portable-tools.md) | Start after I010/R3 or when native POSIX/search/Git tool portability becomes release-critical |

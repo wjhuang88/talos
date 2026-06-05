@@ -18,7 +18,7 @@ I008 "Learning Agent"    TUI进化洞察面板 + 自进化引擎             会
 I009 "Extensible Agent"  TUI MCP标记 + Hook + MCP + JSON-RPC   可扩展
 I010 "Polished Agent"    TUI打磨 (Nord + markdown + 高级功能)    可发布
 I011 "Open Providers"    OpenAI-compatible base_url + provider plugin  可接入
-I012 "Portable Tools"    内置POSIX工具子集 + 工具包嵌入接口       降低环境依赖
+I012 "Portable Tools"    POSIX工具子集 + 搜索/gix优先Git工具 + 工具包嵌入接口 降低环境依赖
 ```
 
 ## Near-Term Execution Sequence
@@ -33,7 +33,7 @@ block or duplicate each other.
 | R1 | Done (2026-06-03) | Close I008/I009 review drift; deferred I009 TUI consumers to #I009-S6 | I008/I009 Complete; I009 TUI consumer work in #I009-S6; I010 R2 ready to activate |
 | R2 | Done (2026-06-03) | `#I010-S7` AppServerSession convergence, Codex-like inline terminal, headless/SDK modes, canonical approval/event protocol | Print, interactive, and TUI paths share one session loop; approvals/tool output/status share one event protocol; dead `event_loop.rs` variants are removed; RPC migration deferred by semver constraint |
 | R3 | **Next** — Remaining I010 polish | Nord theme, markdown, diff display, steering/follow-up queues, slash command filtering | Talos is ready for daily use as a release candidate; user-facing TUI workflows are verified end-to-end |
-| R4 | I012 Portable Tools | Rust-native POSIX-style tool subset plus embeddable tool-pack interface | ADR recorded if public API/provenance/config changes; Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered without agent-loop changes |
+| R4 | I012 Portable Tools | Rust-native POSIX-style tool subset, built-in workspace search, `gix`-first structured Git tools, and embeddable tool-pack interface | ADR-010 followed for Git/search dependencies; Talos can perform common file/search/list operations on a minimal `PATH`; native tool packs can be registered without agent-loop changes |
 
 Ordering rules:
 - R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.
@@ -43,8 +43,9 @@ Ordering rules:
 - R2 (I010 Architecture Convergence) is complete; R3 (I010 Product Polish) is the next mainline slice.
 - Keep `#ARCH-S6` small if fixed before I010. If it requires changing the agent turn-loop spawn model,
   move it into the R2 `#I010-S7` slice instead.
-- Treat I012 as the environment-dependency reduction lane: implement only a small POSIX subset first,
-  then connect it to the tool-pack/plugin registration path.
+- Treat I012 as the environment-dependency reduction lane: implement only a small POSIX/search/Git
+  subset first, follow ADR-010 for dependency boundaries, then connect it to the tool-pack/plugin
+  registration path.
 - Do not absorb Guardian or exec policy DSL into the first I010 product-polish pass unless a
   change-control update explicitly activates those backlog stories.
 - Each round ends with `cargo test --workspace`; security-sensitive rounds also require `cargo check --workspace`
