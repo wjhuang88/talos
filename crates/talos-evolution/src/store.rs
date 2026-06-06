@@ -88,6 +88,33 @@ impl KnowledgeStore {
             );",
         )?;
 
+        // I021-S4: Detect v1 schema (missing pattern.key) and hard-reset if needed.
+        let has_key_column: i64 = self.conn.prepare(
+            "SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = 'key'",
+        )?.query_row([], |row| row.get(0))?;
+
+        if has_key_column == 0 {
+            let obs_count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM observations", [], |row| row.get(0),
+            ).unwrap_or(0);
+            let pat_count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM patterns", [], |row| row.get(0),
+            ).unwrap_or(0);
+
+            if obs_count > 0 || pat_count > 0 {
+                let _ = self.conn.execute("DELETE FROM observations", []);
+                let _ = self.conn.execute("DELETE FROM patterns", []);
+                let _ = self.conn.execute("DELETE FROM conflicts", []);
+                let _ = self.conn.execute("DELETE FROM signals", []);
+                let _ = self.conn.execute("DELETE FROM turn_observations", []);
+                tracing::warn!(
+                    observations = obs_count,
+                    patterns = pat_count,
+                    "knowledge.db schema migration: hard-reset, removed observations and patterns"
+                );
+            }
+        }
+
         // Add content_hash column to existing databases (SQLite ALTER doesn't support IF NOT EXISTS).
         // We catch the "duplicate column" error to make this idempotent.
         let has_column = self.conn.prepare(
@@ -489,5 +516,72 @@ mod tests {
         let patterns = store.get_active_patterns(0.0).unwrap();
         assert_eq!(patterns.len(), 1);
         assert_eq!(patterns[0].content_hash, original_hash);
+    }
+
+    #[test]
+    fn test_hard_reset_on_v1_schema_db() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("knowledge.db");
+
+        // Create a v1-schema database (without the new MenteDB columns).
+        {
+            let conn = Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE observations (
+                    id TEXT PRIMARY KEY, signal_type TEXT NOT NULL, intensity REAL NOT NULL,
+                    context TEXT NOT NULL, timestamp TEXT NOT NULL, session_id TEXT, turn_number INTEGER
+                );
+                CREATE TABLE patterns (
+                    id TEXT PRIMARY KEY, description TEXT NOT NULL, instruction TEXT NOT NULL,
+                    confidence REAL NOT NULL, evidence_count INTEGER NOT NULL,
+                    first_observed TEXT NOT NULL, last_updated TEXT NOT NULL,
+                    category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+                    content_hash TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE conflicts (
+                    id TEXT PRIMARY KEY, pattern_a_id TEXT NOT NULL, pattern_b_id TEXT NOT NULL,
+                    description TEXT NOT NULL, detected_at TEXT NOT NULL,
+                    resolved INTEGER NOT NULL DEFAULT 0, winner_id TEXT
+                );",
+            )
+            .unwrap();
+
+            // Insert v1 data.
+            conn.execute(
+                "INSERT INTO observations (id, signal_type, intensity, context, timestamp, session_id, turn_number)
+                 VALUES ('v1-obs', 'Correction', 0.8, 'v1 context', '2026-01-01T00:00:00Z', 'sess-1', 1)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash)
+                 VALUES ('v1-pat', 'v1 pattern', 'v1 instruction', 0.9, 5, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 'preference', 1, 'hash123')",
+                [],
+            )
+            .unwrap();
+        }
+
+        // Open with new code — should detect v1 schema and hard-reset.
+        let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("open v1 db");
+
+        // Data should be wiped.
+        let observations = store.get_observations().unwrap();
+        assert!(
+            observations.is_empty(),
+            "v1 observations should be wiped, got {:?}",
+            observations
+        );
+        let patterns = store.get_all_patterns().unwrap();
+        assert!(
+            patterns.is_empty(),
+            "v1 patterns should be wiped, got {:?}",
+            patterns
+        );
+
+        // Second open should be idempotent (no re-reset, schema is now v2).
+        drop(store);
+        let store2 = KnowledgeStore::open(db_path.to_str().unwrap()).expect("reopen v2 db");
+        let observations2 = store2.get_observations().unwrap();
+        assert!(observations2.is_empty(), "second open should not re-reset");
     }
 }
