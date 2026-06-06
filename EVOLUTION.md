@@ -28,6 +28,7 @@ repeating known mistakes.
 | 17 | TUI | visual-engineering 任务在 R0 级别并行委派下 30 分钟不够（结构+消费两个 scope） | I009 |
 | 18 | Governance | 更新 skill 后必须重新跑 governance validator 并修复 conformant 漂移 | I013 |
 | 19 | Evolution | 持久化任何"用户输入上下文"前必须 byte-cap，dedup 必须含内容指纹 | I008/I015 |
+| 20 | Evolution | `Signal.context` 字段语义 = signal 周围短窗口,不是整条 user message; 7470ac5 是 defense layer,真治根在 I021 | I008/I021 |
 
 ## Lessons
 
@@ -301,5 +302,33 @@ repeating known mistakes.
 3. **任何"注入到 prompt 的内容"在源头和出口都要有 byte-cap**。源头（cap observation）、中段（cap pattern extraction）、出口（cap adapter output）三层都加，单层失守另两层兜底。
 4. **持久化层的迁移不只是 schema**。加新字段/约束时，也要写一次性数据迁移（`open()` / `migrate()` 之后跑），把已存在的脏数据标 `active=0` 而非 DELETE，保留审计轨迹。SQLite 不会自动 VACUUM，241MB 文件大小不会变，但新增数据不会再膨胀。
 5. **涉及 system prompt 注入的运行时回路要有运行时证据**。这次发现 5MB 的过程是用户实际跑 `cargo run -- -p "你好"` 才暴露的 — 单测全过 + 单元/集成测试 = 看似完成，但 system_prompt 大小是端到端运行才能看出的属性。Lesson #11 早就提过"端到端运行时证据"，这次仍走了 4 轮 commit 才暴露问题。
+
+> **Note (2026-06-06)**: 本 lesson 的 prevention 规则 1 已被 lesson #20 部分修正 — byte-cap 是 defense layer,不是 root-cause fix。真治根在 iteration `I021-evolution-mentedb-realignment.md`(数据结构对齐 MenteDB 蓝图)。这条 lesson 保留作 defense-in-depth 的依据,但**不要把 byte-cap 当成完整修复**。
+
+---
+
+### 20. `Signal.context` 字段语义 = signal 周围短窗口,不是整条 user message (I008/I021)
+
+**Symptom**: 实施 7470ac5 之后,knowledge.db 从 241MB 降到 13MB,system_prompt 从 5MB 降到 13KB,模型能正常响应。但是 — 翻看 active patterns 列表(共 9 个),其中 1 个 `preference` 类 pattern 的 instruction 内容是 `Remember: # Identity\nYou are Talos, an AI coding assistant. You help users with programming tasks by using tools to read, write, and execute code.\n# Tools\nNo tools available.\n# Skills...` (整整 4KB,全是 system_prompt 头)。这条 pattern 没有任何用户偏好信号,纯噪声。
+
+**Cause**: 7470ac5 的 `truncate_context` 实现是 `context[..truncate_at]` — 保留**前 4KB**。但根据 MenteDB 原始设计(`docs/reference/REFERENCE-PROJECTS.md` §17),`Signal.context` 字段的语义是"the user showed the correct behavior" 的那一句 + 短窗口,通常 < 500 字节,不是整条 5MB user message。`Signal.context` 的语义在实现时偏离了 MenteDB 蓝图:
+- 期望: signal 周围短窗口(marker 居中,前后 200 字节)
+- 实际: 整条 5MB user.content
+- 7470ac5 折中: 整条 5MB 截到前 4KB → 仍是 system_prompt 头,无用户信号
+
+7470ac5 是 **defense layer**(防 storage 暴涨、注入溢出),**不是 root-cause fix**(治不了字段语义错用)。Lesson #19 的 prevention 规则 1 ("byte-cap 默认 ≤ 8KB") 在此失效 — 因为正确的字段值本就 < 500 字节,任何 cap 都只是兜底。
+
+**Remedy**: 新 iteration `I021-evolution-mentedb-realignment.md`,5 个 story:
+- #I021-S1: `Observation` → `TurnObservation` (parent) + `Signal` (child),Signal 用 MenteDB 字段
+- #I021-S2: Hook 捕获改用 `find_marker + capture_window(text, marker_pos, 200)`,marker 居中
+- #I021-S3: `Pattern` 加 `key`/`value`/`contradicting_count`/`source_sessions`
+- #I021-S4: `knowledge.db` 一次性硬重置(schema 不兼容,无法软迁移)
+- #I021-S5: 保留 7470ac5 的 byte-cap 作为 defense-in-depth,文档说明真治根在 I021
+
+**Prevention**:
+1. **字段语义对齐参考设计的优先级 > 防御层**。7470ac5 防住了 storage 暴涨,但掩盖了"字段语义错"这个更深的 bug — 后续 review 容易误以为已经修好。规则:**先修字段语义,再加 cap**。如果字段本来就只存 < 500 字节,cap 是不必要的复杂度。
+2. **Defense-in-depth 修复必须在文档里标注 "this is not the root cause"**。7470ac5 的 commit message 和 lesson #19 都没清楚区分 "防 storage 暴涨" 和 "治字段语义",导致这次 evidence-driven 复查才发现问题。规则:**defense layer 修复的 commit message 和对应 lesson 必须包含 "real fix is in <future iteration>" 的明确指向**。
+3. **数据结构的"实现 vs 设计"差距应该定期审查**。MenteDB reference 文档(`docs/reference/REFERENCE-PROJECTS.md` §17) 写了 `Signal.context: String` 是短窗口,但实现时把它当成 5MB 容器用 — 这种 reference-vs-impl drift 应该在每次 evolution-engine 相关 PR 时 check 一次。规则:**任何修改 `talos-evolution` 的 PR 必须在 PR 描述里对照 `docs/reference/REFERENCE-PROJECTS.md` §17 列出字段语义是否保持**。
+4. **`EVOLUTION.md` lesson 应该能被指向,而不是只被阅读**。Lesson #19 现在被 I021 README "Required Reads" 引用,以后任何相关 PR 都能找到 — 这条 lesson 之前的预防规则 1 已经被 #20 修正("byte-cap 不是治根"),不要盲信旧规则。
 
 ---

@@ -55,6 +55,7 @@ docs/iterations/
 | I018 | Observability and Prompt Assets | Planned | Bounded file-log retention and compile-time embedded prompt assets. See `I018-observability-prompt-assets.md`. |
 | I019 | Layered Memory Foundation | Planned | Four-layer memory foundation under ADR-016. See `I019-layered-memory-foundation.md`. |
 | I020 | Exploration Library | Planned | Local research library, source/claim/synthesis storage, and vector/graph storage Spike under ADR-017. See `I020-exploration-library.md`. |
+| I021 | Evolution MenteDB Realignment | Planned | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. Realigns `talos-evolution` data structure with the MenteDB blueprint (`Signal.context` becomes a small window, `TurnObservation` aggregates per-turn, `Pattern` gets `key`/`value`/`contradicting_count`/`source_sessions`). Defense layer from commit 7470ac5 stays as belt-and-suspenders. See `I021-evolution-mentedb-realignment.md`; EVOLUTION.md lesson #19. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -78,3 +79,4 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R9: I018 Observability and Prompt Assets | Before memory/exploration prompt expansion | `I018-observability-prompt-assets.md` | Log files are bounded; built-in prompts are standalone embedded assets |
 | R10: I019 Layered Memory Foundation | Before durable research conclusions affect agent behavior | `I019-layered-memory-foundation.md` | Memory writes/retrieval are layered, bounded, and provenance-backed |
 | R11: I020 Exploration Library | After I019 or explicit research priority | `I020-exploration-library.md` | Research artifacts persist locally with sources, claims, synthesis, and storage Spike results |
+| R12: I021 Evolution MenteDB Realignment | Before EVOL-001 cognitive rigor stories; independent of R5–R11 ordering | `I021-evolution-mentedb-realignment.md` | `talos-evolution` data structure aligned with MenteDB blueprint; `knowledge.db` cannot grow past 1MB during 20-turn stress test; 5MB bloat and `400 Bad Request` loop cannot recur |

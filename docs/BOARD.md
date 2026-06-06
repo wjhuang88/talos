@@ -37,6 +37,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I021 Evolution MenteDB Realignment | Planned | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | Start when user requests I021 implementation; defense layer (commit `7470ac5`) already shipped; `knowledge.db` 221MB → 13MB after manual cleanup |
 | I014 TUI Completion | Planned | [TUI-001 TUI Completion](backlog/active/TUI-001-completion.md) | Start when next product-facing TUI slice is selected |
 | I015 Provider Schema | Planned | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Start after I014 or explicit provider priority; follow ADR-013 |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
