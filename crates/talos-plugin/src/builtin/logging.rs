@@ -28,7 +28,7 @@ impl HookHandler for LoggingHandler {
     }
 
     async fn on_event(&self, ctx: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
-        tracing::info!(
+        tracing::debug!(
             handler = self.name(),
             event = %event.kind(),
             turn_id = ctx.turn_id.0,

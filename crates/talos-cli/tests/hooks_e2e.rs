@@ -4,7 +4,7 @@ use std::process::Command;
 fn logging_handler_emits_hook_lines_in_print_mode() {
     let output = Command::new(env!("CARGO_BIN_EXE_talos"))
         .args(["--print", "--mock", "echo hi"])
-        .env("RUST_LOG", "info")
+        .env("RUST_LOG", "debug")
         .output()
         .expect("run talos binary");
 

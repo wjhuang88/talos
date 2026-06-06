@@ -13,7 +13,7 @@ fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
             fixture_bin.to_string_lossy().as_ref(),
             "call fixture echo",
         ])
-        .env("RUST_LOG", "info")
+        .env("RUST_LOG", "debug")
         .output()
         .expect("run talos binary with MCP fixture");
 
