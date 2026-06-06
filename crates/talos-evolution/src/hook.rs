@@ -206,20 +206,32 @@ impl HookHandler for EvolutionHookHandler {
                 if let Some(text) = messages.iter().find_map(|m| match m {
                     Message::User { content } => Some(content.as_str()),
                     _ => None,
-                }) && let Some(intensity) = detect_correction(text) {
+                }) && let Some((intensity, _marker)) = detect_correction_with_marker(text) {
                     let mut observer =
                         self.observer.lock().expect("evolution observer poisoned");
-                    let truncated = TurnObserver::truncate_context(
-                        text.to_string(),
-                        self.config.max_context_bytes,
-                    );
-                    observer.record_correction(truncated, intensity);
+                    let context = if let Some(marker_pos) =
+                        TurnObserver::find_marker(text, CORRECTION_MARKERS)
+                    {
+                        TurnObserver::capture_window(
+                            text,
+                            marker_pos,
+                            self.config.max_context_bytes.min(500),
+                        )
+                    } else {
+                        #[allow(deprecated)]
+                        TurnObserver::truncate_context(
+                            text.to_string(),
+                            self.config.max_context_bytes,
+                        )
+                    };
+                    observer.record_correction(context, intensity);
                 }
                 HookResult::Continue
             }
             HookEvent::OnProviderError { error } => {
                 let message = format!("{error:?}");
                 let mut observer = self.observer.lock().expect("evolution observer poisoned");
+                #[allow(deprecated)]
                 let truncated = TurnObserver::truncate_context(
                     message,
                     self.config.max_context_bytes,
@@ -241,15 +253,17 @@ impl HookHandler for EvolutionHookHandler {
 }
 
 fn detect_correction(input: &str) -> Option<f64> {
+    detect_correction_with_marker(input).map(|(intensity, _)| intensity)
+}
+
+fn detect_correction_with_marker(input: &str) -> Option<(f64, &str)> {
     let lower = input.to_lowercase();
-    if CORRECTION_MARKERS
-        .iter()
-        .any(|marker| lower.contains(marker))
-    {
-        Some(CORRECTION_INTENSITY)
-    } else {
-        None
+    for marker in CORRECTION_MARKERS {
+        if lower.contains(&marker.to_lowercase()) {
+            return Some((CORRECTION_INTENSITY, marker));
+        }
     }
+    None
 }
 
 #[cfg(test)]
@@ -626,5 +640,49 @@ mod tests {
             "oversized pattern should be deactivated after migration"
         );
         assert_eq!(patterns[0].id, pattern_id, "row should still exist");
+    }
+
+    #[tokio::test]
+    async fn test_hook_capture_window_5mb_input_chinese_marker() {
+        let store = KnowledgeStore::open_memory().expect("in-memory store");
+        let h = EvolutionHookHandler::new(store, EvolutionConfig::default(), Some("test".into()));
+
+        let c = ctx();
+        let prefix = "system_prompt content ".repeat(200_000);
+        let big_text = format!("{}{}", prefix, "不要用 sed");
+        let messages = vec![Message::User {
+            content: big_text.into(),
+        }];
+        h.on_event(&c, &mut HookEvent::TurnStart { turn_id: c.turn_id })
+            .await;
+        h.on_event(
+            &c,
+            &mut HookEvent::BeforeProviderCall {
+                messages: &messages,
+            },
+        )
+        .await;
+        h.on_event(
+            &c,
+            &mut HookEvent::TurnComplete {
+                turn_id: c.turn_id,
+                status: TurnStatus::Success,
+            },
+        )
+        .await;
+
+        let store = h.store.lock().expect("store poisoned");
+        let observations = store.get_observations().unwrap();
+        assert_eq!(observations.len(), 1);
+        assert!(
+            observations[0].context.len() < 500,
+            "context {} bytes exceeds 500 for 5MB input",
+            observations[0].context.len()
+        );
+        assert!(
+            observations[0].context.contains("不要用 sed"),
+            "context must contain '不要用 sed', got: {:?}",
+            observations[0].context
+        );
     }
 }
