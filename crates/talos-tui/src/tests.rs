@@ -7,7 +7,7 @@ mod tests {
 
     use crate::app::{build_chat_text, build_status_text, calculate_cost};
     use crate::sidebar::{SkillInfo, SkillSidebar};
-    use crate::state::{ApprovalState, ChatLine, CtrlCState, TuiState};
+    use crate::state::{ApprovalState, ChatLine, CtrlCState, TuiState, plugin_observation_key};
     use crate::theme::nord;
     use crate::widgets::{ToolCallBubble, provenance_marker, render_diff, truncate};
     use crate::{contrast_ratio, rgb_components};
@@ -1103,5 +1103,241 @@ mod tests {
 
         assert!(content.contains("Steering: 1"));
         assert!(content.contains("Follow-up: 2"));
+    }
+
+    // ── I009-S6: Plugin provenance observation tests ──────────────────────────
+
+    #[test]
+    fn test_plugin_observation_key_native() {
+        assert_eq!(plugin_observation_key(&ToolProvenance::Native), "native");
+    }
+
+    #[test]
+    fn test_plugin_observation_key_mcp_remote() {
+        let provenance = ToolProvenance::McpRemote {
+            server: "filesystem".into(),
+        };
+        assert_eq!(plugin_observation_key(&provenance), "mcp:filesystem");
+    }
+
+    #[test]
+    fn test_plugin_observation_key_truncates_long_server() {
+        let long_server = "a".repeat(40);
+        let provenance = ToolProvenance::McpRemote {
+            server: long_server.clone(),
+        };
+        let key = plugin_observation_key(&provenance);
+        assert!(key.starts_with("mcp:"));
+        assert!(key.ends_with('…'));
+        // Total length: 4 (mcp:) + 23 + 1 (…) = 28
+        assert!(key.chars().count() <= 28);
+    }
+
+    #[test]
+    fn test_append_tool_call_records_provenance() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "ls"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::Native,
+        });
+
+        assert_eq!(state.plugin_observations.len(), 1);
+        assert_eq!(state.plugin_observations[0].key, "native");
+        assert_eq!(state.plugin_observations[0].count, 1);
+    }
+
+    #[test]
+    fn test_append_tool_call_increments_existing_provenance() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "ls"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call.clone(),
+            provenance: ToolProvenance::Native,
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call.clone(),
+            provenance: ToolProvenance::Native,
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::Native,
+        });
+
+        assert_eq!(state.plugin_observations.len(), 1);
+        assert_eq!(state.plugin_observations[0].key, "native");
+        assert_eq!(state.plugin_observations[0].count, 3);
+    }
+
+    #[test]
+    fn test_append_tool_call_groups_mcp_servers() {
+        let mut state = TuiState::new();
+        let call_a = ToolCall {
+            id: "a".into(),
+            name: "remote_search".into(),
+            input: serde_json::json!({}),
+        };
+        let call_b = ToolCall {
+            id: "b".into(),
+            name: "remote_fetch".into(),
+            input: serde_json::json!({}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call_a.clone(),
+            provenance: ToolProvenance::McpRemote {
+                server: "filesystem".into(),
+            },
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call_a.clone(),
+            provenance: ToolProvenance::McpRemote {
+                server: "filesystem".into(),
+            },
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call_b,
+            provenance: ToolProvenance::McpRemote {
+                server: "weather".into(),
+            },
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call_a,
+            provenance: ToolProvenance::Native,
+        });
+
+        assert_eq!(state.plugin_observations.len(), 3);
+        assert_eq!(state.plugin_observations[0].key, "mcp:filesystem");
+        assert_eq!(state.plugin_observations[0].count, 2);
+        assert_eq!(state.plugin_observations[1].key, "mcp:weather");
+        assert_eq!(state.plugin_observations[1].count, 1);
+        assert_eq!(state.plugin_observations[2].key, "native");
+        assert_eq!(state.plugin_observations[2].count, 1);
+    }
+
+    #[test]
+    fn test_slash_command_plugins_empty() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/plugins");
+        assert!(
+            state
+                .chat_lines
+                .iter()
+                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("No tool provenance observed yet"))),
+            "expected empty-state message; chat_lines = {:?}",
+            state.chat_lines,
+        );
+    }
+
+    #[test]
+    fn test_slash_command_plugins_lists_observations() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "ls"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call.clone(),
+            provenance: ToolProvenance::Native,
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::McpRemote {
+                server: "filesystem".into(),
+            },
+        });
+
+        state.handle_slash_command("/plugins");
+        let lines: Vec<&str> = state
+            .chat_lines
+            .iter()
+            .filter_map(|l| match l {
+                ChatLine::Text(t) => Some(t.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(lines.iter().any(|t| t.contains("Observed tool provenance")));
+        assert!(lines.iter().any(|t| t.contains("native (1 call)")));
+        assert!(lines.iter().any(|t| t.contains("mcp:filesystem (1 call)")));
+    }
+
+    #[test]
+    fn test_slash_command_plugins_pluralizes() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "ls"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call: call.clone(),
+            provenance: ToolProvenance::Native,
+        });
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::Native,
+        });
+
+        state.handle_slash_command("/plugins");
+        let lines: Vec<&str> = state
+            .chat_lines
+            .iter()
+            .filter_map(|l| match l {
+                ChatLine::Text(t) => Some(t.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            lines.iter().any(|t| t.contains("native (2 calls)")),
+            "expected plural form; lines = {:?}",
+            lines,
+        );
+    }
+
+    #[test]
+    fn test_slash_command_new_clears_plugin_observations() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "ls"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::Native,
+        });
+        assert!(!state.plugin_observations.is_empty());
+
+        state.handle_slash_command("/new");
+        assert!(
+            state.plugin_observations.is_empty(),
+            "/new should reset plugin observations",
+        );
+    }
+
+    #[test]
+    fn test_slash_commands_list_includes_plugins() {
+        assert!(TuiState::SLASH_COMMANDS.contains(&"/plugins"));
+    }
+
+    #[test]
+    fn test_slash_command_help_lists_plugins() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/help");
+        assert!(
+            state.chat_lines.iter().any(|l| matches!(
+                l,
+                ChatLine::Text(t) if t.contains("/plugins")
+            )),
+            "/help should describe /plugins",
+        );
     }
 }

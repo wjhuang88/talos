@@ -6,6 +6,30 @@ use talos_core::ApprovalChoice;
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use talos_core::tool::ToolProvenance;
 
+/// Plugin/tool provenance observation summary.
+///
+/// `key` is the display identifier: `native` or `mcp:<server>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PluginObservation {
+    pub key: String,
+    pub count: usize,
+}
+
+pub(crate) fn plugin_observation_key(provenance: &ToolProvenance) -> String {
+    match provenance {
+        ToolProvenance::Native => "native".to_string(),
+        ToolProvenance::McpRemote { server } => {
+            let server = if server.chars().count() > 24 {
+                let truncated: String = server.chars().take(23).collect();
+                format!("{truncated}…")
+            } else {
+                server.clone()
+            };
+            format!("mcp:{server}")
+        }
+    }
+}
+
 /// Duration window for detecting double Ctrl+C press.
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
@@ -66,6 +90,7 @@ pub(crate) struct TuiState {
     pub(crate) steering_queue: Vec<String>,
     /// Messages queued for follow-up (delivered when agent would stop).
     pub(crate) followup_queue: Vec<String>,
+    pub(crate) plugin_observations: Vec<PluginObservation>,
 }
 
 impl TuiState {
@@ -102,6 +127,7 @@ impl TuiState {
     }
 
     pub(crate) fn append_tool_call(&mut self, call: &ToolCall, provenance: &ToolProvenance) {
+        self.record_provenance(provenance);
         self.chat_lines.push(ChatLine::ToolCall {
             tool_name: call.name.clone(),
             arguments: serde_json::to_string_pretty(&call.input)
@@ -109,6 +135,19 @@ impl TuiState {
             provenance: provenance.clone(),
             result: None,
         });
+    }
+
+    fn record_provenance(&mut self, provenance: &ToolProvenance) {
+        let key = plugin_observation_key(provenance);
+        if let Some(entry) = self
+            .plugin_observations
+            .iter_mut()
+            .find(|entry| entry.key == key)
+        {
+            entry.count += 1;
+        } else {
+            self.plugin_observations.push(PluginObservation { key, count: 1 });
+        }
     }
 
     pub(crate) fn set_tool_result(&mut self, result: &ToolResult) {
@@ -271,7 +310,7 @@ impl TuiState {
 
     pub(crate) const SLASH_COMMANDS: &[&str] = &[
         "/help", "/quit", "/exit", "/status", "/new", "/compact", "/diff", "/model", "/resume",
-        "/fork", "/vim",
+        "/fork", "/vim", "/plugins",
     ];
 
     pub(crate) fn handle_slash_command(&mut self, input: &str) {
@@ -292,6 +331,7 @@ impl TuiState {
                 self.append_system("  /resume     — Resume a session");
                 self.append_system("  /fork       — Fork current session");
                 self.append_system("  /vim        — Toggle vim keybindings");
+                self.append_system("  /plugins    — List observed tool provenance");
             }
             "/quit" | "/exit" => {
                 self.should_exit = true;
@@ -308,13 +348,40 @@ impl TuiState {
                 self.current_turn_text.clear();
                 self.usage = Usage::default();
                 self.branch_id = None;
+                self.plugin_observations.clear();
                 self.append_system("New session started.");
+            }
+            "/plugins" => {
+                self.handle_plugins_command();
             }
             _ => {
                 self.append_error(&format!(
                     "Unknown command: {cmd}. Type /help for available commands."
                 ));
             }
+        }
+    }
+
+    fn handle_plugins_command(&mut self) {
+        if self.plugin_observations.is_empty() {
+            self.append_system("No tool provenance observed yet.");
+            return;
+        }
+        self.append_system("Observed tool provenance (this session):");
+        let lines: Vec<String> = self
+            .plugin_observations
+            .iter()
+            .map(|entry| {
+                format!(
+                    "  {} ({} call{})",
+                    entry.key,
+                    entry.count,
+                    if entry.count == 1 { "" } else { "s" },
+                )
+            })
+            .collect();
+        for line in lines {
+            self.append_system(&line);
         }
     }
 
