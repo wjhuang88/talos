@@ -16,12 +16,12 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I014 TUI Completion | Active | [I014 TUI Completion](iterations/I014-tui-completion.md) | Start date 2026-06-06; stories #I009-S6 (provenance markers + `/plugins`) and #I010-S9 (clipboard copy/export) |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I014 TUI Completion | Complete | [I014 TUI Completion](iterations/I014-tui-completion.md) | Both stories landed (2 atomic commits: 7f783fa #I009-S6, 3b526c8 #I010-S9); 652 tests pass workspace-wide (was 615; +37 from talos-tui); runtime evidence recorded |
 | I021 Evolution MenteDB Realignment | Complete | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | All 5 stories landed; 615 tests pass; runtime regression confirmed (model responds to `cargo run -p talos-cli -- -p "你好"`); 5 atomic commits #I021-S1..S5; defense layer (commit `7470ac5`) preserved |
 | I013 Boundary Control | Complete | [I013 Boundary Control](iterations/I013-boundary-control.md) | Boundary ADRs recorded; #ARCH-S8 R1 implemented |
 | I010 R3 Product Polish | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All 5 stories done; 567 tests, clippy clean |
@@ -32,7 +32,6 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I011 S2 Provider Plugin Architecture | Paused | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Resume as I015 schema-only work under ADR-013 |
-| I009-S6 TUI Provenance Markers + /plugins | In-Flight (resumed via I014) | [EXT-001 TUI Provenance](backlog/active/EXT-001-tui-provenance-plugins.md) | Now Active inside I014 (2026-06-06) |
 
 ## Next
 

@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-06"
-status_note: "Governance validator drift repaired (2026-06-05): EVOLUTION-FEEDBACK SOP restored, AGENTS.md routes lesson feedback, Agent-authored/Agent-assisted model-tag wording fixed. I013 is complete; I014-I020 are planned follow-up iterations. GOV-001 backlog compaction completed. I021 Evolution MenteDB Realignment complete (2026-06-06): 5 atomic commits #I021-S1..S5 realigned talos-evolution data structure with MenteDB blueprint; 615 tests pass; runtime regression confirmed (no 400 Bad Request on cargo run -- -p '你好'). EVOL-001 (MenteDB cognitive rigor Phase 2) remains P3 in backlog for future I022 selection."
+status_note: "Governance validator drift repaired (2026-06-05): EVOLUTION-FEEDBACK SOP restored, AGENTS.md routes lesson feedback, Agent-authored/Agent-assisted model-tag wording fixed. I013 is complete; I014-I020 are planned follow-up iterations. GOV-001 backlog compaction completed. I021 Evolution MenteDB Realignment complete (2026-06-06): 5 atomic commits #I021-S1..S5 realigned talos-evolution data structure with MenteDB blueprint; 615 tests pass; runtime regression confirmed (no 400 Bad Request on cargo run -- -p '你好'). I014 TUI Completion complete (2026-06-06): 2 atomic commits #I009-S6 and #I010-S9 landed; tool provenance markers + /plugins + /copy last/all + /export with OSC 52 + pbcopy + permission gating; 652 tests pass workspace-wide (was 615; +37 from talos-tui). EVOL-001 (MenteDB cognitive rigor Phase 2) remains P3 in backlog for future I022 selection."
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -52,6 +52,7 @@ migration:
   legacy_assets: []
   next_actions:
     - "I013 complete: boundary ADRs and logging R1 landed; I014-I020 are planned follow-up iterations"
+    - "I014 TUI Completion complete (2026-06-06): provenance markers + /plugins + /copy + /export landed via 2 atomic commits; 652 tests pass"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
     - "Resolved: GOV-001 compacted PRODUCT-BACKLOG.md into a routing surface with active item files and archive index"
     - "Implement #I009-S6 TUI provenance markers and /plugins command in I010 R2/R3 or a dedicated follow-up"
