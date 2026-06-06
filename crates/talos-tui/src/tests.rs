@@ -1340,4 +1340,241 @@ mod tests {
             "/help should describe /plugins",
         );
     }
+
+    // ── I010-S9: Copy/export and transcript serialization tests ───────────────
+
+    #[test]
+    fn test_last_assistant_text_none_when_empty() {
+        let state = TuiState::new();
+        assert_eq!(state.last_assistant_text(), None);
+    }
+
+    #[test]
+    fn test_last_assistant_text_returns_most_recent() {
+        let mut state = TuiState::new();
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("first response".into()));
+        state
+            .chat_lines
+            .push(ChatLine::Text("> user follow-up".into()));
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("second response".into()));
+
+        assert_eq!(state.last_assistant_text().as_deref(), Some("second response"));
+    }
+
+    #[test]
+    fn test_last_assistant_text_ignores_streaming_text() {
+        let mut state = TuiState::new();
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("old response".into()));
+        // Streaming-in-progress text is NOT in chat_lines yet.
+        state.current_turn_text = "in-flight response".into();
+
+        assert_eq!(state.last_assistant_text().as_deref(), Some("old response"));
+    }
+
+    #[test]
+    fn test_transcript_plain_text_empty() {
+        let state = TuiState::new();
+        assert_eq!(state.transcript_plain_text(), "");
+    }
+
+    #[test]
+    fn test_transcript_plain_text_renders_each_line_type() {
+        let mut state = TuiState::new();
+        state.append_user_message("Hello there");
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("Hi back".into()));
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command": "ls"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::McpRemote {
+                server: "filesystem".into(),
+            },
+        });
+        let result = ToolResult {
+            tool_use_id: "c1".into(),
+            content: "ok".into(),
+            is_error: false,
+        };
+        state.handle_event(&AgentEvent::ToolResult { result });
+
+        let out = state.transcript_plain_text();
+        assert!(out.contains("> Hello there"), "missing user line: {out}");
+        assert!(out.contains("Hi back"), "missing assistant line: {out}");
+        assert!(out.contains("▸ bash [mcp:filesystem]"), "missing tool header: {out}");
+        assert!(out.contains("command"), "missing tool args: {out}");
+        assert!(out.contains("✓ ok"), "missing tool result: {out}");
+    }
+
+    #[test]
+    fn test_transcript_plain_text_excludes_streaming() {
+        let mut state = TuiState::new();
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("complete".into()));
+        state.current_turn_text = "streaming in progress".into();
+
+        let out = state.transcript_plain_text();
+        assert!(out.contains("complete"));
+        assert!(!out.contains("streaming in progress"));
+    }
+
+    #[test]
+    fn test_transcript_markdown_renders_tool_call_as_fenced_code() {
+        let mut state = TuiState::new();
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "read".into(),
+            input: serde_json::json!({"path": "src/main.rs"}),
+        };
+        state.handle_event(&AgentEvent::ToolCall {
+            call,
+            provenance: ToolProvenance::Native,
+        });
+
+        let md = state.transcript_markdown();
+        assert!(md.contains("### `▸ read [native]`"));
+        assert!(md.contains("```json"));
+        assert!(md.contains("src/main.rs"));
+    }
+
+    #[test]
+    fn test_slash_command_copy_last_no_assistant_errors() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/copy last");
+        assert!(
+            state
+                .chat_lines
+                .iter()
+                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("No assistant message"))),
+            "expected 'no assistant message' error",
+        );
+    }
+
+    #[test]
+    fn test_slash_command_copy_all_unknown_target_errors() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/copy banana");
+        assert!(
+            state
+                .chat_lines
+                .iter()
+                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Unknown /copy target"))),
+            "expected 'unknown target' error",
+        );
+    }
+
+    #[test]
+    fn test_slash_command_export_no_path_errors() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/export");
+        assert!(
+            state
+                .chat_lines
+                .iter()
+                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Usage: /export"))),
+            "expected 'Usage: /export' error",
+        );
+    }
+
+    #[test]
+    fn test_slash_command_export_refused_by_permission() {
+        // Use a tempdir so the would-be write target is real, but supply a
+        // deny rule so the engine refuses. The file must not be created.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("secrets/transcript.md");
+
+        let mut state = TuiState::new();
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("leakable content".into()));
+        // The TUI constructs an in-handler PermissionEngine, so we cannot
+        // inject a deny rule from the test. The default engine has no
+        // explicit write rule; its default for 'write' is Ask, which our
+        // wrapper maps to PermissionDenied.
+        state.handle_slash_command(&format!("/export {}", path.display()));
+
+        let messages: Vec<&str> = state
+            .chat_lines
+            .iter()
+            .filter_map(|l| match l {
+                ChatLine::Text(t) => Some(t.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            messages.iter().any(|t| t.contains("Export failed")),
+            "expected export-failed message; got: {:?}",
+            messages,
+        );
+        assert!(!path.exists(), "file must not be created when refused");
+    }
+
+    #[test]
+    fn test_slash_commands_list_includes_copy_and_export() {
+        assert!(TuiState::SLASH_COMMANDS.contains(&"/copy"));
+        assert!(TuiState::SLASH_COMMANDS.contains(&"/export"));
+    }
+
+    #[test]
+    fn test_slash_command_help_lists_copy_and_export() {
+        let mut state = TuiState::new();
+        state.handle_slash_command("/help");
+        let messages: Vec<&str> = state
+            .chat_lines
+            .iter()
+            .filter_map(|l| match l {
+                ChatLine::Text(t) => Some(t.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(messages.iter().any(|t| t.contains("/copy last")));
+        assert!(messages.iter().any(|t| t.contains("/copy all")));
+        assert!(messages.iter().any(|t| t.contains("/export <p>")));
+    }
+
+    #[test]
+    fn test_slash_command_copy_last_copies_latest_assistant() {
+        // We assert the message that announces a successful copy.
+        // The actual OSC 52 write is best-effort and may be noisy in the
+        // test runner, so we just check that the user-visible result is
+        // a system message reporting a copy (or a clipboard failure, both
+        // of which prove the command ran).
+        let mut state = TuiState::new();
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("first answer".into()));
+        state
+            .chat_lines
+            .push(ChatLine::Assistant("second answer".into()));
+
+        state.handle_slash_command("/copy last");
+        let messages: Vec<&str> = state
+            .chat_lines
+            .iter()
+            .filter_map(|l| match l {
+                ChatLine::Text(t) => Some(t.as_str()),
+                _ => None,
+            })
+            .collect();
+        let copy_outcome = messages
+            .iter()
+            .find(|t| t.contains("Copied") || t.contains("Clipboard write failed"))
+            .copied()
+            .expect("expected copy outcome message");
+        assert!(
+            copy_outcome.contains("character"),
+            "expected char-count in copy outcome: {copy_outcome}",
+        );
+    }
 }

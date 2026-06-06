@@ -4,7 +4,9 @@
 //! permission approval overlays, slash commands, and status panels.
 
 mod app;
+mod clipboard;
 pub mod evolution;
+mod export;
 mod sidebar;
 mod state;
 mod theme;

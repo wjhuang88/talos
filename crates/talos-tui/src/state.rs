@@ -310,13 +310,13 @@ impl TuiState {
 
     pub(crate) const SLASH_COMMANDS: &[&str] = &[
         "/help", "/quit", "/exit", "/status", "/new", "/compact", "/diff", "/model", "/resume",
-        "/fork", "/vim", "/plugins",
+        "/fork", "/vim", "/plugins", "/copy", "/export",
     ];
 
     pub(crate) fn handle_slash_command(&mut self, input: &str) {
         let parts: Vec<&str> = input.splitn(2, ' ').collect();
         let cmd = parts[0];
-        let _arg = parts.get(1).copied().unwrap_or("");
+        let arg = parts.get(1).copied().unwrap_or("");
 
         match cmd {
             "/help" => {
@@ -332,6 +332,9 @@ impl TuiState {
                 self.append_system("  /fork       — Fork current session");
                 self.append_system("  /vim        — Toggle vim keybindings");
                 self.append_system("  /plugins    — List observed tool provenance");
+                self.append_system("  /copy last  — Copy last assistant message");
+                self.append_system("  /copy all   — Copy full transcript");
+                self.append_system("  /export <p> — Export transcript to path");
             }
             "/quit" | "/exit" => {
                 self.should_exit = true;
@@ -353,6 +356,12 @@ impl TuiState {
             }
             "/plugins" => {
                 self.handle_plugins_command();
+            }
+            "/copy" => {
+                self.handle_copy_command(arg);
+            }
+            "/export" => {
+                self.handle_export_command(arg);
             }
             _ => {
                 self.append_error(&format!(
@@ -382,6 +391,170 @@ impl TuiState {
             .collect();
         for line in lines {
             self.append_system(&line);
+        }
+    }
+
+    fn handle_copy_command(&mut self, arg: &str) {
+        let arg = arg.trim();
+        let text = match arg {
+            "last" => match self.last_assistant_text() {
+                Some(text) => text,
+                None => {
+                    self.append_error("No assistant message to copy.");
+                    return;
+                }
+            },
+            "all" => self.transcript_plain_text(),
+            other => {
+                self.append_error(&format!(
+                    "Unknown /copy target: '{other}'. Use 'last' or 'all'."
+                ));
+                return;
+            }
+        };
+
+        if text.is_empty() {
+            self.append_error("Nothing to copy (empty content).");
+            return;
+        }
+
+        match crate::clipboard::copy_text(&text) {
+            Ok(backend) => {
+                let label = match backend {
+                    crate::clipboard::ClipboardBackend::Osc52 => "OSC 52",
+                    crate::clipboard::ClipboardBackend::Pbcopy => "pbcopy",
+                };
+                self.append_system(&format!(
+                    "Copied {} character(s) to clipboard via {label}.",
+                    text.chars().count(),
+                ));
+            }
+            Err(e) => {
+                self.append_error(&format!("Clipboard write failed: {e:?}"));
+            }
+        }
+    }
+
+    fn handle_export_command(&mut self, arg: &str) {
+        let path_str = arg.trim();
+        if path_str.is_empty() {
+            self.append_error("Usage: /export <path>");
+            return;
+        }
+
+        let path = std::path::PathBuf::from(path_str);
+        let content = self.transcript_markdown();
+        let engine = talos_permission::PermissionEngine::new();
+
+        match crate::export::export_transcript(&engine, &path, &content) {
+            Ok(()) => {
+                self.append_system(&format!(
+                    "Exported transcript ({} character(s)) to {}.",
+                    content.chars().count(),
+                    path.display(),
+                ));
+            }
+            Err(e) => {
+                self.append_error(&format!("Export failed: {e:?}"));
+            }
+        }
+    }
+
+    /// Returns the source text of the most recent [`ChatLine::Assistant`],
+    /// if any. Streaming-in-progress text (`current_turn_text`) is excluded.
+    pub(crate) fn last_assistant_text(&self) -> Option<String> {
+        self.chat_lines.iter().rev().find_map(|line| match line {
+            ChatLine::Assistant(text) => Some(text.clone()),
+            _ => None,
+        })
+    }
+
+    /// Renders the full transcript as deterministic plain text.
+    ///
+    /// Source message text is preserved verbatim — the function never reads
+    /// from the rendered buffer. `current_turn_text` is excluded so
+    /// in-flight streaming turns do not produce half-copied output.
+    pub(crate) fn transcript_plain_text(&self) -> String {
+        let mut out = String::new();
+        for line in &self.chat_lines {
+            Self::append_line_plain(&mut out, line);
+        }
+        out
+    }
+
+    /// Renders the full transcript as Markdown for `/export` consumers.
+    ///
+    /// Assistant text is emitted verbatim (it is already Markdown).
+    /// Tool calls are rendered as fenced code blocks for downstream
+    /// processors.
+    pub(crate) fn transcript_markdown(&self) -> String {
+        let mut out = String::new();
+        for line in &self.chat_lines {
+            Self::append_line_markdown(&mut out, line);
+        }
+        out
+    }
+
+    fn append_line_plain(out: &mut String, line: &ChatLine) {
+        match line {
+            ChatLine::Text(text) => {
+                out.push_str(text);
+                out.push('\n');
+            }
+            ChatLine::Assistant(text) => {
+                out.push_str(text);
+                if !text.ends_with('\n') {
+                    out.push('\n');
+                }
+            }
+            ChatLine::ToolCall {
+                tool_name,
+                arguments,
+                provenance,
+                result,
+            } => {
+                let marker = plugin_observation_key(provenance);
+                out.push_str(&format!("▸ {tool_name} [{marker}]\n"));
+                out.push_str(&format!("  {arguments}\n"));
+                if let Some(result) = result {
+                    let icon = if result.is_error { "✗" } else { "✓" };
+                    out.push_str(&format!("  {icon} {}\n", result.content));
+                }
+            }
+        }
+    }
+
+    fn append_line_markdown(out: &mut String, line: &ChatLine) {
+        match line {
+            ChatLine::Text(text) => {
+                out.push_str(text);
+                out.push('\n');
+            }
+            ChatLine::Assistant(text) => {
+                out.push_str(text);
+                if !text.ends_with('\n') {
+                    out.push('\n');
+                }
+            }
+            ChatLine::ToolCall {
+                tool_name,
+                arguments,
+                provenance,
+                result,
+            } => {
+                let marker = plugin_observation_key(provenance);
+                out.push_str(&format!("### `▸ {tool_name} [{marker}]`\n\n"));
+                out.push_str("```json\n");
+                out.push_str(arguments);
+                out.push_str("\n```\n");
+                if let Some(result) = result {
+                    let label = if result.is_error { "Error" } else { "Result" };
+                    out.push_str(&format!("\n**{label}:**\n\n"));
+                    out.push_str("```\n");
+                    out.push_str(&result.content);
+                    out.push_str("\n```\n");
+                }
+            }
         }
     }
 
