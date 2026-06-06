@@ -252,6 +252,7 @@ impl HookHandler for EvolutionHookHandler {
     }
 }
 
+#[cfg(test)]
 fn detect_correction(input: &str) -> Option<f64> {
     detect_correction_with_marker(input).map(|(intensity, _)| intensity)
 }

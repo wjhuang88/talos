@@ -303,7 +303,7 @@ repeating known mistakes.
 4. **持久化层的迁移不只是 schema**。加新字段/约束时，也要写一次性数据迁移（`open()` / `migrate()` 之后跑），把已存在的脏数据标 `active=0` 而非 DELETE，保留审计轨迹。SQLite 不会自动 VACUUM，241MB 文件大小不会变，但新增数据不会再膨胀。
 5. **涉及 system prompt 注入的运行时回路要有运行时证据**。这次发现 5MB 的过程是用户实际跑 `cargo run -- -p "你好"` 才暴露的 — 单测全过 + 单元/集成测试 = 看似完成，但 system_prompt 大小是端到端运行才能看出的属性。Lesson #11 早就提过"端到端运行时证据"，这次仍走了 4 轮 commit 才暴露问题。
 
-> **Note (2026-06-06)**: 本 lesson 的 prevention 规则 1 已被 lesson #20 部分修正 — byte-cap 是 defense layer,不是 root-cause fix。真治根在 iteration `I021-evolution-mentedb-realignment.md`(数据结构对齐 MenteDB 蓝图)。这条 lesson 保留作 defense-in-depth 的依据,但**不要把 byte-cap 当成完整修复**。
+> **Note (2026-06-06)**: 本 lesson 的 prevention 规则 1 已被 lesson #20 部分修正 — byte-cap 是 defense layer,不是 root-cause fix。真治根已在 I021 落地 (commit: see `git log --oneline -- crates/talos-evolution/src/`)。byte-cap 仍是 defense-in-depth,但已不再是唯一防线。这条 lesson 保留作 defense-in-depth 的依据,但**不要把 byte-cap 当成完整修复**。
 
 ---
 
@@ -324,6 +324,9 @@ repeating known mistakes.
 - #I021-S3: `Pattern` 加 `key`/`value`/`contradicting_count`/`source_sessions`
 - #I021-S4: `knowledge.db` 一次性硬重置(schema 不兼容,无法软迁移)
 - #I021-S5: 保留 7470ac5 的 byte-cap 作为 defense-in-depth,文档说明真治根在 I021
+
+**Remedy** (已落地 2026-06-06):
+- #I021-S1..S5: Signal/TurnObservation/Pattern schema alignment with MenteDB (data structure root-cause fix, landed 2026-06-06)
 
 **Prevention**:
 1. **字段语义对齐参考设计的优先级 > 防御层**。7470ac5 防住了 storage 暴涨,但掩盖了"字段语义错"这个更深的 bug — 后续 review 容易误以为已经修好。规则:**先修字段语义,再加 cap**。如果字段本来就只存 < 500 字节,cap 是不必要的复杂度。
