@@ -22,6 +22,27 @@ impl TurnObserver {
         }
     }
 
+    /// Truncate context to fit `max_bytes`, appending a marker if truncated.
+    pub fn truncate_context(context: String, max_bytes: usize) -> String {
+        if max_bytes == 0 {
+            return format!("... [truncated, original was {} bytes]", context.len());
+        }
+        let byte_len = context.len();
+        if byte_len <= max_bytes {
+            return context;
+        }
+        let marker = format!("... [truncated, original was {byte_len} bytes]");
+        let marker_len = marker.len();
+        if marker_len >= max_bytes {
+            return marker;
+        }
+        let truncate_at = max_bytes - marker_len;
+        let mut result = String::with_capacity(max_bytes);
+        result.push_str(&context[..truncate_at]);
+        result.push_str(&marker);
+        result
+    }
+
     /// Start a new turn.
     pub fn start_turn(&mut self) {
         self.turn_number += 1;
@@ -145,5 +166,34 @@ mod tests {
 
         observer.start_turn();
         assert_eq!(observer.turn_number(), 2);
+    }
+
+    #[test]
+    fn test_truncate_context_under_limit_unchanged() {
+        let input = "short text".to_string();
+        let result = TurnObserver::truncate_context(input.clone(), 4096);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_truncate_context_over_limit_truncated_with_marker() {
+        let input = "a".repeat(5000);
+        let result = TurnObserver::truncate_context(input.clone(), 4096);
+        assert!(result.len() <= 4096);
+        assert!(result.contains("[truncated, original was 5000 bytes]"));
+    }
+
+    #[test]
+    fn test_truncate_context_exact_limit_unchanged() {
+        let input = "a".repeat(100);
+        let result = TurnObserver::truncate_context(input.clone(), 100);
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_truncate_context_empty_max_bytes_returns_marker_only() {
+        let input = "some context".to_string();
+        let result = TurnObserver::truncate_context(input, 0);
+        assert!(result.contains("[truncated, original was 12 bytes]"));
     }
 }

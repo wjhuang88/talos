@@ -49,7 +49,8 @@ impl KnowledgeStore {
                 first_observed TEXT NOT NULL,
                 last_updated TEXT NOT NULL,
                 category TEXT NOT NULL,
-                active INTEGER NOT NULL DEFAULT 1
+                active INTEGER NOT NULL DEFAULT 1,
+                content_hash TEXT NOT NULL DEFAULT ''
             );
 
             CREATE TABLE IF NOT EXISTS conflicts (
@@ -62,6 +63,19 @@ impl KnowledgeStore {
                 winner_id TEXT
             );",
         )?;
+
+        // Add content_hash column to existing databases (SQLite ALTER doesn't support IF NOT EXISTS).
+        // We catch the "duplicate column" error to make this idempotent.
+        let has_column = self.conn.prepare(
+            "SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = 'content_hash'",
+        )?.query_row([], |row| row.get::<_, i64>(0))?;
+        if has_column == 0 {
+            let _ = self.conn.execute(
+                "ALTER TABLE patterns ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''",
+                [],
+            );
+        }
+
         Ok(())
     }
 
@@ -124,8 +138,8 @@ impl KnowledgeStore {
     /// Insert a pattern.
     pub fn insert_pattern(&self, pattern: &Pattern) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 pattern.id,
                 pattern.description,
@@ -136,6 +150,7 @@ impl KnowledgeStore {
                 pattern.last_updated.to_rfc3339(),
                 pattern.category,
                 pattern.active as i32,
+                pattern.content_hash,
             ],
         )?;
         Ok(())
@@ -144,7 +159,7 @@ impl KnowledgeStore {
     /// Get active patterns with confidence above threshold.
     pub fn get_active_patterns(&self, min_confidence: f64) -> Result<Vec<Pattern>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active
+            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash
              FROM patterns WHERE active = 1 AND confidence >= ?1 ORDER BY confidence DESC",
         )?;
 
@@ -170,6 +185,7 @@ impl KnowledgeStore {
                     last_updated,
                     category: row.get(7)?,
                     active: row.get::<_, i32>(8)? == 1,
+                    content_hash: row.get(9)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -201,10 +217,19 @@ impl KnowledgeStore {
         Ok(())
     }
 
+    /// Deactivate patterns whose instruction exceeds `max_bytes`. Returns count.
+    pub fn delete_oversized_patterns(&self, max_bytes: usize) -> Result<usize> {
+        let changes = self.conn.execute(
+            "UPDATE patterns SET active = 0 WHERE length(instruction) > ?1",
+            params![max_bytes as i64],
+        )?;
+        Ok(changes)
+    }
+
     /// Get all patterns (including inactive).
     pub fn get_all_patterns(&self) -> Result<Vec<Pattern>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active
+            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash
              FROM patterns ORDER BY confidence DESC",
         )?;
 
@@ -230,6 +255,7 @@ impl KnowledgeStore {
                     last_updated,
                     category: row.get(7)?,
                     active: row.get::<_, i32>(8)? == 1,
+                    content_hash: row.get(9)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -292,5 +318,61 @@ mod tests {
         let patterns = store.get_all_patterns().unwrap();
         assert_eq!(patterns[0].confidence, 0.9);
         assert_eq!(patterns[0].evidence_count, 10);
+    }
+
+    #[test]
+    fn test_delete_oversized_patterns_deactivates_but_keeps_row() {
+        let store = KnowledgeStore::open_memory().unwrap();
+
+        let mut pattern = Pattern::new(
+            "Big pattern".to_string(),
+            "x".repeat(10_000),
+            "test".to_string(),
+        );
+        pattern.confidence = 0.9;
+        store.insert_pattern(&pattern).unwrap();
+
+        let count = store.delete_oversized_patterns(4096).unwrap();
+        assert_eq!(count, 1);
+
+        let all = store.get_all_patterns().unwrap();
+        assert_eq!(all.len(), 1);
+        assert!(!all[0].active, "pattern should be deactivated, not deleted");
+    }
+
+    #[test]
+    fn test_delete_oversized_patterns_returns_count() {
+        let store = KnowledgeStore::open_memory().unwrap();
+
+        for i in 0..3 {
+            let mut pattern = Pattern::new(
+                format!("pattern {i}"),
+                "x".repeat(5000 + i * 1000),
+                "test".to_string(),
+            );
+            pattern.confidence = 0.9;
+            store.insert_pattern(&pattern).unwrap();
+        }
+
+        let count = store.delete_oversized_patterns(5500).unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_pattern_roundtrip_preserves_content_hash() {
+        let store = KnowledgeStore::open_memory().unwrap();
+
+        let mut pattern = Pattern::new(
+            "Test".to_string(),
+            "Test instruction content".to_string(),
+            "test".to_string(),
+        );
+        pattern.confidence = 0.8;
+        let original_hash = pattern.content_hash.clone();
+        store.insert_pattern(&pattern).unwrap();
+
+        let patterns = store.get_active_patterns(0.0).unwrap();
+        assert_eq!(patterns.len(), 1);
+        assert_eq!(patterns[0].content_hash, original_hash);
     }
 }

@@ -70,6 +70,8 @@ pub struct Pattern {
     pub category: String,
     /// Whether this pattern is active (can be injected into prompts)
     pub active: bool,
+    /// Normalized fingerprint for content-based dedup: "{category}|{first 1KB of instruction}"
+    pub content_hash: String,
 }
 
 /// A conflict between two patterns.
@@ -104,6 +106,12 @@ pub struct EvolutionConfig {
     pub max_patterns: usize,
     /// Whether to enable automatic pattern extraction
     pub auto_extract: bool,
+    /// Maximum bytes stored per observation.context (defense layer 1).
+    /// Observations longer than this are truncated with a marker.
+    pub max_context_bytes: usize,
+    /// Maximum bytes injected into system prompt by BehaviorAdapter (defense layer 2).
+    /// Final output is truncated to fit; oversized patterns are dropped first.
+    pub max_output_bytes: usize,
 }
 
 impl Default for EvolutionConfig {
@@ -114,6 +122,8 @@ impl Default for EvolutionConfig {
             half_life_days: 70.0,
             max_patterns: 5,
             auto_extract: true,
+            max_context_bytes: 4096,
+            max_output_bytes: 8192,
         }
     }
 }
@@ -146,10 +156,29 @@ impl Observation {
     }
 }
 
+/// Compute a normalized fingerprint for content-based dedup.
+/// Format: "{category}|{first 1KB of instruction}" hashed via DefaultHasher.
+pub fn compute_content_hash(category: &str, instruction: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let prefix = if instruction.len() > 1024 {
+        &instruction[..1024]
+    } else {
+        instruction
+    };
+    let fingerprint = format!("{category}|{prefix}");
+
+    let mut hasher = DefaultHasher::new();
+    fingerprint.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
 impl Pattern {
     /// Create a new pattern with the current timestamp.
     pub fn new(description: String, instruction: String, category: String) -> Self {
         let now = Utc::now();
+        let content_hash = compute_content_hash(&category, &instruction);
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             description,
@@ -160,6 +189,7 @@ impl Pattern {
             last_updated: now,
             category,
             active: true,
+            content_hash,
         }
     }
 
@@ -224,5 +254,24 @@ mod tests {
         assert_eq!(config.min_confidence, 0.7);
         assert_eq!(config.min_evidence, 3);
         assert_eq!(config.half_life_days, 70.0);
+    }
+
+    #[test]
+    fn test_evolution_config_default_has_byte_caps() {
+        let config = EvolutionConfig::default();
+        assert_eq!(config.max_context_bytes, 4096);
+        assert_eq!(config.max_output_bytes, 8192);
+    }
+
+    #[test]
+    fn test_evolution_config_max_context_bytes_default_4kb() {
+        let config = EvolutionConfig::default();
+        assert_eq!(config.max_context_bytes, 4 * 1024);
+    }
+
+    #[test]
+    fn test_evolution_config_max_output_bytes_default_8kb() {
+        let config = EvolutionConfig::default();
+        assert_eq!(config.max_output_bytes, 8 * 1024);
     }
 }

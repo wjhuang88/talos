@@ -98,6 +98,14 @@ impl EvolutionHookHandler {
         let db_path = dir.join("knowledge.db");
         let store = KnowledgeStore::open(db_path.to_str().unwrap_or_default())
             .context("failed to open knowledge store")?;
+
+        let purged = store
+            .delete_oversized_patterns(config.max_output_bytes)
+            .context("failed to purge oversized patterns")?;
+        if purged > 0 {
+            tracing::info!(count = purged, "evolution: purged oversized patterns on open");
+        }
+
         Ok(Some(Self::new(store, config, session_id)))
     }
 
@@ -132,7 +140,7 @@ impl EvolutionHookHandler {
                 }
             };
             let matched = existing.into_iter().find(|p| {
-                p.category == candidate.category && p.description == candidate.description
+                p.category == candidate.category && p.content_hash == candidate.content_hash
             });
             let result = match matched {
                 Some(mut pattern) => {
@@ -198,19 +206,25 @@ impl HookHandler for EvolutionHookHandler {
                 if let Some(text) = messages.iter().find_map(|m| match m {
                     Message::User { content } => Some(content.as_str()),
                     _ => None,
-                }) {
-                    if let Some(intensity) = detect_correction(text) {
-                        let mut observer =
-                            self.observer.lock().expect("evolution observer poisoned");
-                        observer.record_correction(text.to_string(), intensity);
-                    }
+                }) && let Some(intensity) = detect_correction(text) {
+                    let mut observer =
+                        self.observer.lock().expect("evolution observer poisoned");
+                    let truncated = TurnObserver::truncate_context(
+                        text.to_string(),
+                        self.config.max_context_bytes,
+                    );
+                    observer.record_correction(truncated, intensity);
                 }
                 HookResult::Continue
             }
             HookEvent::OnProviderError { error } => {
                 let message = format!("{error:?}");
                 let mut observer = self.observer.lock().expect("evolution observer poisoned");
-                observer.record_error(message, ERROR_INTENSITY);
+                let truncated = TurnObserver::truncate_context(
+                    message,
+                    self.config.max_context_bytes,
+                );
+                observer.record_error(truncated, ERROR_INTENSITY);
                 HookResult::Continue
             }
             HookEvent::TurnComplete { .. } => {
@@ -505,5 +519,112 @@ mod tests {
     fn timeout_allows_sqlite_flush() {
         let h = handler();
         assert!(h.timeout() >= Duration::from_secs(1));
+    }
+
+    #[tokio::test]
+    async fn test_hook_truncates_correction_context_before_recording() {
+        let store = KnowledgeStore::open_memory().expect("in-memory store");
+        let mut config = EvolutionConfig::default();
+        config.max_context_bytes = 100;
+        let h = EvolutionHookHandler::new(store, config, Some("test".into()));
+
+        let c = ctx();
+        let big_text = "No, don't do that, use a HashMap instead of this very long explanation about data structures and why they matter";
+        let messages = vec![Message::User {
+            content: big_text.into(),
+        }];
+        h.on_event(&c, &mut HookEvent::TurnStart { turn_id: c.turn_id })
+            .await;
+        h.on_event(
+            &c,
+            &mut HookEvent::BeforeProviderCall {
+                messages: &messages,
+            },
+        )
+        .await;
+        h.on_event(
+            &c,
+            &mut HookEvent::TurnComplete {
+                turn_id: c.turn_id,
+                status: TurnStatus::Success,
+            },
+        )
+        .await;
+
+        let store = h.store.lock().expect("store poisoned");
+        let observations = store.get_observations().unwrap();
+        assert_eq!(observations.len(), 1);
+        assert!(
+            observations[0].context.len() <= 100,
+            "context {} exceeds max 100 bytes",
+            observations[0].context.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_hook_dedup_via_content_hash_collapses_near_duplicates() {
+        let h = handler();
+        let c = ctx();
+
+        for _ in 0..3 {
+            let err = ProviderError::ServerError("compilation failed".into());
+            h.on_event(&c, &mut HookEvent::TurnStart { turn_id: c.turn_id })
+                .await;
+            h.on_event(&c, &mut HookEvent::OnProviderError { error: &err })
+                .await;
+            h.on_event(
+                &c,
+                &mut HookEvent::TurnComplete {
+                    turn_id: c.turn_id,
+                    status: TurnStatus::ProviderError,
+                },
+            )
+            .await;
+        }
+
+        let store = h.store.lock().expect("store poisoned");
+        let patterns = store.get_all_patterns().unwrap();
+        assert_eq!(
+            patterns.len(),
+            1,
+            "identical errors should collapse via content hash, got {} patterns",
+            patterns.len()
+        );
+        assert_eq!(
+            patterns[0].evidence_count, 3,
+            "evidence should accumulate to 3"
+        );
+    }
+
+    #[test]
+    fn test_hook_migration_purges_oversized_on_open() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("knowledge.db");
+
+        let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("open store");
+
+        let mut pattern = Pattern::new(
+            "Big".to_string(),
+            "x".repeat(10_000),
+            "test".to_string(),
+        );
+        pattern.confidence = 0.9;
+        pattern.evidence_count = 5;
+        store.insert_pattern(&pattern).unwrap();
+
+        let pattern_id = pattern.id.clone();
+        drop(store);
+
+        let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("reopen store");
+        let purged = store.delete_oversized_patterns(4096).expect("purge");
+        assert_eq!(purged, 1, "one oversized pattern should be deactivated");
+
+        let patterns = store.get_all_patterns().unwrap();
+        assert_eq!(patterns.len(), 1);
+        assert!(
+            !patterns[0].active,
+            "oversized pattern should be deactivated after migration"
+        );
+        assert_eq!(patterns[0].id, pattern_id, "row should still exist");
     }
 }
