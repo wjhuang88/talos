@@ -16,7 +16,7 @@ FTS5 and no runtime dependency on a system SQLite installation.
 
 The current dependency graph confirms:
 
-- `talos-session` and `talos-evolution` depend on `rusqlite = { version = "0.37", features =
+- `talos-session` and `talos-evolution` depend on `rusqlite = { version = "0.40", features =
   ["bundled"] }`.
 - `rusqlite/bundled` enables `libsqlite3-sys/bundled`, compiling SQLite into the final binary.
 - On macOS, `otool -L target/debug/talos` shows no `libsqlite3.dylib` dependency. The binary still

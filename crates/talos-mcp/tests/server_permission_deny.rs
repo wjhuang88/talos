@@ -76,12 +76,7 @@ async fn server_permission_deny_returns_error_and_no_execution() {
 
     let error = client
         .peer()
-        .call_tool(CallToolRequestParams {
-            meta: None,
-            name: "counting".into(),
-            arguments: Some(serde_json::Map::new()),
-            task: None,
-        })
+        .call_tool(CallToolRequestParams::new("counting").with_arguments(serde_json::Map::new()))
         .await
         .expect_err("permission denied must return error");
 

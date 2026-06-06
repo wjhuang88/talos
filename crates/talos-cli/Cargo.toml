@@ -34,10 +34,10 @@ anyhow = "1"
 tokio-util = "0.7"
 talos-tui = { path = "../talos-tui" }
 uuid = { version = "1", features = ["v4"] }
-dirs = "5"
+dirs = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-rmcp = "=0.16.0"
+rmcp = "1.7.0"
 
 [lints]
 workspace = true
@@ -45,5 +45,5 @@ workspace = true
 [dev-dependencies]
 tempfile = "3"
 # I009-S4 begin
-rmcp = { version = "=0.16.0", default-features = false, features = ["client", "transport-child-process", "transport-async-rw"] }
+rmcp = { version = "1.7.0", default-features = false, features = ["client", "transport-child-process", "transport-async-rw"] }
 # I009-S4 end

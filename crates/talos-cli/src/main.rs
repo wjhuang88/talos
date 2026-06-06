@@ -56,7 +56,7 @@ use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 #[cfg(debug_assertions)]
 use talos_config::McpServerConfig;
-use talos_config::{Config, Provider};
+use talos_config::{Config, ProviderProtocol};
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::AgentEvent;
@@ -1239,14 +1239,12 @@ fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {
     ))
 }
 
-pub(crate) fn parse_provider(s: &str) -> Result<Provider> {
-    match s.to_lowercase().as_str() {
-        "anthropic" => Ok(Provider::Anthropic),
-        "openai" => Ok(Provider::OpenAI),
-        other => Err(anyhow!(
-            "unknown provider '{other}': supported values are 'anthropic' and 'openai'"
-        )),
+pub(crate) fn parse_provider(s: &str) -> Result<String> {
+    let provider = s.trim().to_lowercase();
+    if provider.is_empty() {
+        bail!("provider must be non-empty");
     }
+    Ok(provider)
 }
 
 pub(crate) fn build_provider(
@@ -1259,9 +1257,11 @@ pub(crate) fn build_provider(
         return Arc::new(MockProvider::new()
             .with_response("I'm a mock LLM. I can help with testing and development without making real API calls."));
     }
-    match config.provider {
-        Provider::Anthropic => Arc::new(AnthropicProvider::new(api_key, &config.model)),
-        Provider::OpenAI => {
+    match config.provider_protocol() {
+        ProviderProtocol::AnthropicMessages => {
+            Arc::new(AnthropicProvider::new(api_key, &config.model))
+        }
+        ProviderProtocol::OpenAIChat => {
             let mut provider = OpenAIProvider::new(api_key, &config.model);
             if let Some(base_url) = config.base_url() {
                 provider = provider.with_base_url(base_url);
@@ -1446,29 +1446,20 @@ mod tests {
 
     #[test]
     fn parse_provider_anthropic() {
-        assert!(matches!(
-            parse_provider("anthropic"),
-            Ok(Provider::Anthropic)
-        ));
-        assert!(matches!(
-            parse_provider("Anthropic"),
-            Ok(Provider::Anthropic)
-        ));
-        assert!(matches!(
-            parse_provider("ANTHROPIC"),
-            Ok(Provider::Anthropic)
-        ));
+        assert_eq!(parse_provider("anthropic").unwrap(), "anthropic");
+        assert_eq!(parse_provider("Anthropic").unwrap(), "anthropic");
+        assert_eq!(parse_provider("ANTHROPIC").unwrap(), "anthropic");
     }
 
     #[test]
     fn parse_provider_openai() {
-        assert!(matches!(parse_provider("openai"), Ok(Provider::OpenAI)));
-        assert!(matches!(parse_provider("OpenAI"), Ok(Provider::OpenAI)));
+        assert_eq!(parse_provider("openai").unwrap(), "openai");
+        assert_eq!(parse_provider("OpenAI").unwrap(), "openai");
     }
 
     #[test]
-    fn parse_provider_unknown() {
-        assert!(parse_provider("unknown").is_err());
+    fn parse_provider_custom_name() {
+        assert_eq!(parse_provider("DashScope").unwrap(), "dashscope");
         assert!(parse_provider("").is_err());
     }
 

@@ -7,7 +7,8 @@ provider loading remains deferred.
 
 ## Status
 
-Planned. Selected into I015; I011 S2 remains paused until this slice is activated.
+Active. First schema slice landed on 2026-06-06: named provider/model config, env-var-only
+secrets, built-in defaults, and local config migration. Opencode import remains pending.
 
 ## Priority
 
@@ -22,13 +23,12 @@ P2.
 
 ## Acceptance Criteria
 
-- [ ] Provider/model schema is represented as typed config data with serde + schemars.
-- [ ] Secrets are referenced by env var names only; config stores no API keys.
-- [ ] Model resolution behavior follows ADR-013.
-- [ ] Dynamic loading, FFI, Node/Python runtimes, and package managers remain out of scope.
+- [x] Provider/model schema is represented as typed config data with serde + schemars.
+- [x] Secrets are referenced by env var names only; config stores no API keys.
+- [x] Model resolution behavior follows ADR-013 for active provider/model selection.
+- [x] Dynamic loading, FFI, Node/Python runtimes, and package managers remain out of scope.
 - [ ] Migration/import behavior is covered by tests.
 
 ## Residual Work Destination
 
 Dynamic provider loading requires a future ADR and a new item.
-

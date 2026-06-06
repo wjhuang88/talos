@@ -30,7 +30,8 @@
 
 ### I001-S1: Initialize Cargo workspace
 - Cargo workspace with 5 crates: talos-core, talos-config, talos-provider, talos-agent, talos-cli
-- Edition 2024, rust-version 1.85
+- Edition 2024, rust-version 1.85 at initial scaffold time; current workspace MSRV is 1.95 after
+  the 2026-06-06 dependency migration.
 - `talos` binary with clap-based --version and --help
 - `cargo check --workspace` ✅, `cargo build -p talos-cli` ✅
 

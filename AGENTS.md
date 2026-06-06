@@ -18,7 +18,12 @@ These are immutable facts that every change must respect:
 
 1. **Rust first.** No arbitrary C/C++ bindings, Python FFI, or Node.js runtime. Approved exceptions are limited to ADR-recorded system/runtime dependencies: OS ABI access via `libc` (ADR-007) and bundled SQLite for local storage via `rusqlite/bundled` (ADR-008).
 2. **No `unsafe` without ADR.** Any use of `unsafe` requires a decision record in `docs/decisions/`.
-3. **No secrets in code or config.** All credentials via env vars or secret stores. Config supports `${ENV_VAR}` substitution.
+3. **No secrets in build, source, or distribution.** Hardcoded credentials must never be
+   committed, baked into the binary, or shipped in default/sample config files. The user's
+   local `~/.talos/config.toml` is their own file — they may put an `api_key` (or any
+   other credential) there for their own use, and `talos-config` exposes `api_key` as a
+   `skip_serializing` field so keys are not echoed back on round-trip. Config also
+   supports `${ENV_VAR}` substitution for users who prefer env-var-based credentials.
 4. **All write-capable tools gated by permissions.** No tool can modify files without going through the permission pipeline.
 5. **Sandbox code requires security review.** All changes to `talos-sandbox`, `talos-permission`, or process-hardening code must be reviewed against escape vectors.
 6. **Crate public APIs are semver-bound.** Breaking changes require a decision record and a migration plan.

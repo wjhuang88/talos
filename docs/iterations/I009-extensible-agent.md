@@ -55,7 +55,7 @@ Append end-to-end commands, mock MCP fixtures, and JSON-RPC examples here during
 | Story | Commit | Tests | Notes |
 |-------|--------|-------|-------|
 | S2 (hooks) | `fbc3a25` | 11 new | `talos-plugin` crate + 13 lifecycle hook points; `LoggingHandler` builtin |
-| S3 (MCP client) | `a3b4cde` | 3 new | rmcp =0.16.0 facade; `McpToolAdapter` bridges remote tools into `AgentTool` |
+| S3 (MCP client) | `a3b4cde` | 3 new | Original rmcp =0.16.0 facade; migrated to rmcp 1.7.0 during 2026-06-06 dependency update. `McpToolAdapter` bridges remote tools into `AgentTool` |
 | S4 (MCP server) | `a79b8ac` | 3 new | `Ask` policy → `Deny` in headless `--mcp-server` mode (fail-closed) |
 | S5 (JSON-RPC) | `3fc3f07` | 4 new | stdio transport, framed by Content-Length; methods: `system.version`, `agent.list_tools`, `agent.run`, `agent.cancel` |
 | S1 (provenance) | `74f2530` | 0 new (additive) | `ToolProvenance` enum, `AgentEvent::ToolCall` gains `provenance` field, `AgentEvent` marked `#[non_exhaustive]`, ADR-009. TUI consumer markers remain follow-up work. |

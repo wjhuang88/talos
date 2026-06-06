@@ -43,11 +43,10 @@ impl TalosMcpHandler {
 
 impl ServerHandler for TalosMcpHandler {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            instructions: Some("Talos MCP server exposing local tools".to_string()),
-            ..ServerInfo::default()
-        }
+        let mut info = ServerInfo::default();
+        info.capabilities = ServerCapabilities::builder().enable_tools().build();
+        info.instructions = Some("Talos MCP server exposing local tools".to_string());
+        info
     }
 
     async fn list_tools(
@@ -99,21 +98,10 @@ impl ServerHandler for TalosMcpHandler {
 fn to_mcp_tool(tool: &dyn talos_core::tool::AgentTool) -> Tool {
     let input_schema = tool.parameters().as_object().cloned().unwrap_or_default();
 
-    Tool {
-        name: Cow::Owned(tool.name().to_string()),
-        title: None,
-        description: Some(Cow::Owned(tool.description().to_string())),
-        input_schema: Arc::new(input_schema),
-        output_schema: None,
-        annotations: Some(ToolAnnotations {
-            title: None,
-            read_only_hint: Some(tool.is_read_only()),
-            destructive_hint: None,
-            idempotent_hint: None,
-            open_world_hint: None,
-        }),
-        execution: None,
-        icons: None,
-        meta: None,
-    }
+    Tool::new(
+        Cow::Owned(tool.name().to_string()),
+        Cow::Owned(tool.description().to_string()),
+        Arc::new(input_schema),
+    )
+    .with_annotations(ToolAnnotations::new().read_only(tool.is_read_only()))
 }

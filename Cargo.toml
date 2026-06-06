@@ -26,7 +26,7 @@ members = [
 edition = "2024"
 version = "0.1.0"
 license = "Apache-2.0"
-rust-version = "1.85"
+rust-version = "1.95"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"

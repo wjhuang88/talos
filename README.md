@@ -16,7 +16,7 @@ English | **[中文](README.zh-CN.md)**
 | I008 Learning Agent | Complete | `EvolutionHookHandler` wired into all run paths; runtime evidence recorded. |
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers deferred to #I009-S6. |
 | I010 Polished Agent | Active (R3 complete) | R2 AppServerSession convergence; R3 Nord theme, markdown rendering, diff display, steering queues, slash commands. |
-| I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override shipped; S2 provider plugin architecture deferred. |
+| I011/I015 Providers | Active | Named provider/model schema landed for built-in and OpenAI-compatible providers; dynamic provider loading remains deferred. |
 | I013 Boundary Control | Complete | Guardian/exec/provider ADRs recorded; logging R1 centralized. |
 | I014-I017 Follow-up Plan | Planned | TUI completion, provider schema, portable file/search tools, and embedded Git tools. |
 | I018-I020 Architecture Plan | Planned | Bounded logs, embedded prompt assets, layered memory, and local research library. |
@@ -31,13 +31,27 @@ See [R0 remediation](docs/iterations/R0-remediation-gate.md).
 cargo build -p talos-cli
 ```
 
-Configure a provider token:
+Configure a provider token — either via environment variable or directly in your local
+`~/.talos/config.toml`:
 
 ```bash
+# Environment variable (recommended for shared/CI environments)
 export ANTHROPIC_API_KEY="<your key>"
 # or
 export OPENAI_API_KEY="<your key>"
 ```
+
+```toml
+# ~/.talos/config.toml — inline api_key is also supported
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[providers.anthropic]
+api_key = "<your key>"   # not echoed back when config is re-serialized
+```
+
+When both are set, the inline `api_key` takes precedence. Set
+`chmod 600 ~/.talos/config.toml` if you store credentials there.
 
 Run the default TUI:
 
@@ -55,9 +69,17 @@ Use an OpenAI-compatible gateway:
 
 ```toml
 # ~/.talos/config.toml
-provider = "openai"
+provider = "my-gateway"
 model = "your-model"
+
+[providers.my-gateway]
+protocol = "openai-chat"
 base_url = "https://your-gateway.example.com/v1"
+api_key_env = "OPENAI_COMPAT_API_KEY"
+
+[providers.my-gateway.models.your-model]
+context_limit = 202752
+output_limit = 4096
 ```
 
 ```bash
@@ -70,7 +92,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 - Safe file and shell operations through the permission pipeline.
 - Session storage with JSONL source-of-truth and bundled SQLite search/indexing.
 - Skills via `SKILL.md`, progressive disclosure, and prompt integration.
-- Multi-provider support with Anthropic, OpenAI, and OpenAI-compatible gateways.
+- Multi-provider support with named Anthropic, OpenAI, and OpenAI-compatible gateway configs.
 - Runtime self-evolution through Observe -> Accumulate -> Extract -> Apply.
 - Extension surfaces: hooks, MCP client/server, stdio JSON-RPC, typed tool provenance.
 
@@ -84,7 +106,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I008 | Learning Agent | Complete | Runtime self-evolution via hook-based `EvolutionHookHandler` across all paths. |
 | I009 | Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, provenance producers shipped. |
 | I010 | Polished Agent | Active (R3 complete) | R2 AppServerSession convergence + inline mode; R3 Nord theme, markdown, diff display, steering queues, slash commands. |
-| I011 | Open Providers | Paused | Configurable OpenAI-compatible gateway support shipped; provider plugin architecture deferred. |
+| I011/I015 | Providers | Active | Named provider/model schema for built-in and OpenAI-compatible gateways; provider plugin architecture deferred. |
 | I013 | Boundary Control | Complete | Guardian/exec/provider ADRs plus centralized logging R1. |
 | I014-I017 | Follow-up Plan | Planned | TUI completion, provider schema, portable file/search tools, embedded Git tools. |
 | I018-I020 | Memory/Research Plan | Planned | Log retention, prompt assets, layered memory foundation, exploration library. |

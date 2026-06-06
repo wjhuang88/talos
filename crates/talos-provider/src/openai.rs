@@ -26,6 +26,10 @@ const OPENAI_API_URL: &str = "https://api.openai.com/v1";
 const CHAT_COMPLETIONS_PATH: &str = "/chat/completions";
 const MAX_RETRIES: u32 = 3;
 const BASE_RETRY_DELAY_MS: u64 = 500;
+const EMPTY_USER_MESSAGE: &str = "[empty user message]";
+const EMPTY_ASSISTANT_MESSAGE: &str = "[empty assistant message]";
+const EMPTY_ASSISTANT_TOOL_CALL_MESSAGE: &str = "[assistant requested tool calls]";
+const EMPTY_TOOL_RESULT_MESSAGE: &str = "[tool returned no output]";
 
 /// OpenAI Chat Completions provider implementing [`LanguageModel`].
 ///
@@ -226,7 +230,7 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
         .map(|msg| match msg {
             Message::User { content } => OpenAIMessage {
                 role: "user".into(),
-                content: Some(content.clone()),
+                content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
                 tool_calls: None,
                 tool_call_id: None,
             },
@@ -253,8 +257,12 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
                 };
                 OpenAIMessage {
                     role: "assistant".into(),
-                    content: if content.is_empty() {
-                        None
+                    content: if content.trim().is_empty() {
+                        Some(if openai_tool_calls.is_some() {
+                            EMPTY_ASSISTANT_TOOL_CALL_MESSAGE.to_string()
+                        } else {
+                            EMPTY_ASSISTANT_MESSAGE.to_string()
+                        })
                     } else {
                         Some(content.clone())
                     },
@@ -264,7 +272,10 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
             }
             Message::Tool { result } => OpenAIMessage {
                 role: "tool".into(),
-                content: Some(result.content.clone()),
+                content: Some(non_empty_content(
+                    &result.content,
+                    EMPTY_TOOL_RESULT_MESSAGE,
+                )),
                 tool_calls: None,
                 tool_call_id: Some(result.tool_use_id.clone()),
             },
@@ -276,6 +287,14 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
         "messages": openai_messages,
         "stream": true,
     })
+}
+
+fn non_empty_content(content: &str, fallback: &str) -> String {
+    if content.trim().is_empty() {
+        fallback.to_string()
+    } else {
+        content.to_string()
+    }
 }
 
 async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEvent>) {
@@ -555,6 +574,50 @@ mod tests {
         assert_eq!(body["messages"][0]["role"], "assistant");
         assert_eq!(body["messages"][0]["content"], "I'll help with that.");
         assert!(body["messages"][0]["tool_calls"].is_null());
+    }
+
+    #[test]
+    fn build_request_body_replaces_empty_text_content() {
+        let messages = vec![
+            Message::User {
+                content: " ".into(),
+            },
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![],
+            },
+            Message::Tool {
+                result: talos_core::message::ToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: String::new(),
+                    is_error: false,
+                },
+            },
+        ];
+        let body = build_request_body("gpt-4o", &messages);
+
+        assert_eq!(body["messages"][0]["content"], EMPTY_USER_MESSAGE);
+        assert_eq!(body["messages"][1]["content"], EMPTY_ASSISTANT_MESSAGE);
+        assert_eq!(body["messages"][2]["content"], EMPTY_TOOL_RESULT_MESSAGE);
+    }
+
+    #[test]
+    fn build_request_body_assistant_tool_call_has_non_empty_content() {
+        let messages = vec![Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![ToolCall {
+                id: "call_1".into(),
+                name: "bash".into(),
+                input: json!({"command": "true"}),
+            }],
+        }];
+        let body = build_request_body("gpt-4o", &messages);
+
+        assert_eq!(
+            body["messages"][0]["content"],
+            EMPTY_ASSISTANT_TOOL_CALL_MESSAGE
+        );
+        assert!(body["messages"][0]["tool_calls"].is_array());
     }
 
     #[test]

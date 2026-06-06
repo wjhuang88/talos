@@ -33,39 +33,73 @@ pub enum ConfigError {
     ParseError(String),
 }
 
-/// Supported LLM providers.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Provider {
-    /// Anthropic Claude provider.
+/// Wire protocol used to talk to a provider.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProviderProtocol {
+    /// Anthropic Messages API.
+    #[serde(rename = "anthropic-messages")]
+    AnthropicMessages,
+    /// OpenAI Chat Completions compatible API.
     #[default]
-    Anthropic,
-    /// OpenAI provider.
-    OpenAI,
+    #[serde(rename = "openai-chat")]
+    OpenAIChat,
+}
+
+/// Per-model runtime limits.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+pub struct ModelConfig {
+    /// Maximum provider input context accepted by this model.
+    #[serde(default)]
+    pub context_limit: Option<u32>,
+    /// Maximum output tokens to request from this model.
+    #[serde(default)]
+    pub output_limit: Option<u32>,
+}
+
+/// Named provider configuration.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+pub struct ProviderConfig {
+    /// Protocol implementation used by this provider.
+    #[serde(default)]
+    pub protocol: ProviderProtocol,
+    /// Provider base URL. Built-in providers supply defaults when omitted.
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// Inline API key written directly in the config file.
+    ///
+    /// When set, takes precedence over the env-var lookup. The field is
+    /// `skip_serializing`, so calling `toml::to_string(&config)` on a
+    /// deserialized config will not echo the key back into the output.
+    /// Set `chmod 600` on the config file if you use this field.
+    #[serde(default, skip_serializing)]
+    pub api_key: Option<String>,
+    /// Environment variable containing the API key. Used as a fallback when
+    /// `api_key` is not set.
+    #[serde(default)]
+    pub api_key_env: Option<String>,
+    /// Provider-specific model configuration keyed by model name.
+    #[serde(default)]
+    pub models: HashMap<String, ModelConfig>,
 }
 
 /// Talos configuration.
 ///
 /// Contains the model provider, model name, and optional API key.
 /// API keys can be specified in the config file or via environment variables.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
-    /// The LLM provider to use (defaults to `anthropic`).
-    #[serde(default)]
-    pub provider: Provider,
+    /// Active provider name. Built-ins include `anthropic` and `openai`.
+    #[serde(default = "default_provider_name")]
+    pub provider: String,
 
     /// The model name to use (e.g., `claude-sonnet-4-20250514`).
+    #[serde(default)]
     pub model: String,
 
-    /// Optional API key. If not set, the key is read from environment variables.
-    pub api_key: Option<String>,
-
-    /// Optional base URL override. When set together with `provider = "openai"`,
-    /// `talos` sends requests to this URL using the OpenAI chat-completions
-    /// protocol. Use this to point at OpenAI-compatible gateways (DashScope,
-    /// Bailian, Z.ai, self-hosted vLLM, etc.). Ignored for `provider = "anthropic"`.
+    /// Named provider definitions.
     #[serde(default)]
-    pub base_url: Option<String>,
+    pub providers: HashMap<String, ProviderConfig>,
 
     /// Logging configuration.
     #[serde(default)]
@@ -82,6 +116,24 @@ pub struct Config {
     /// JSON-RPC configuration placeholder for I009-S5.
     #[serde(default)]
     pub rpc: RpcConfig,
+}
+
+fn default_provider_name() -> String {
+    "anthropic".to_string()
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            provider: default_provider_name(),
+            model: String::new(),
+            providers: HashMap::new(),
+            log: LogConfig::default(),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        }
+    }
 }
 
 /// Logging configuration.
@@ -208,31 +260,40 @@ impl Config {
     /// Returns the API key for the current provider.
     ///
     /// Resolution order:
-    /// 1. `config.api_key` (explicit).
-    /// 2. Provider-specific env var: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
-    /// 3. For the OpenAI provider only, additionally `OPENAI_COMPAT_API_KEY`.
+    /// 1. Inline `providers.<name>.api_key` from the config file.
+    /// 2. Provider-specific env var from `providers.<name>.api_key_env`.
+    /// 3. Built-in provider env var: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
+    /// 4. For the built-in OpenAI provider only, additionally `OPENAI_COMPAT_API_KEY`.
     ///    This is the conventional name for keys issued by OpenAI-compatible
     ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
     ///    after `OPENAI_API_KEY` so existing setups are unaffected.
     pub fn api_key(&self) -> Result<String, ConfigError> {
-        if let Some(key) = &self.api_key {
+        let provider = self.active_provider_config();
+
+        if let Some(key) = provider.api_key.as_deref() {
             if !key.is_empty() {
-                return Ok(key.clone());
+                return Ok(key.to_string());
             }
         }
 
-        let primary = match self.provider {
-            Provider::Anthropic => "ANTHROPIC_API_KEY",
-            Provider::OpenAI => "OPENAI_API_KEY",
-        };
+        let primary = provider
+            .api_key_env
+            .as_deref()
+            .unwrap_or(match self.provider.as_str() {
+                "anthropic" => "ANTHROPIC_API_KEY",
+                "openai" => "OPENAI_API_KEY",
+                _ => "",
+            });
 
-        if let Ok(key) = env::var(primary) {
-            if !key.is_empty() {
-                return Ok(key);
+        if !primary.is_empty() {
+            if let Ok(key) = env::var(primary) {
+                if !key.is_empty() {
+                    return Ok(key);
+                }
             }
         }
 
-        if matches!(self.provider, Provider::OpenAI) {
+        if self.provider == "openai" {
             if let Ok(key) = env::var("OPENAI_COMPAT_API_KEY") {
                 if !key.is_empty() {
                     return Ok(key);
@@ -241,10 +302,13 @@ impl Config {
         }
 
         Err(ConfigError::MissingApiKey(
-            format!("{:?}", self.provider),
-            match self.provider {
-                Provider::Anthropic => "ANTHROPIC_API_KEY".to_string(),
-                Provider::OpenAI => "OPENAI_API_KEY or OPENAI_COMPAT_API_KEY".to_string(),
+            self.provider.clone(),
+            if self.provider == "openai" {
+                "OPENAI_API_KEY or OPENAI_COMPAT_API_KEY".to_string()
+            } else if primary.is_empty() {
+                format!("providers.{}.api_key or api_key_env", self.provider)
+            } else {
+                primary.to_string()
             },
         ))
     }
@@ -254,8 +318,62 @@ impl Config {
     /// `None` means "use the provider's hard-coded default endpoint".
     /// `Some(url)` is sent verbatim to the provider's HTTP client via
     /// `with_base_url()`. Currently honored only for the OpenAI provider.
-    pub fn base_url(&self) -> Option<&str> {
-        self.base_url.as_deref()
+    pub fn base_url(&self) -> Option<String> {
+        self.providers
+            .get(&self.provider)
+            .and_then(|p| p.base_url.clone())
+            .or_else(|| builtin_provider_config(&self.provider).and_then(|p| p.base_url))
+    }
+
+    /// Returns the active provider protocol.
+    #[must_use]
+    pub fn provider_protocol(&self) -> ProviderProtocol {
+        self.active_provider_config().protocol
+    }
+
+    /// Returns the configured context limit for the active provider/model.
+    #[must_use]
+    pub fn context_limit(&self) -> Option<u32> {
+        self.active_model_config()
+            .and_then(|model| model.context_limit)
+    }
+
+    /// Returns the configured output limit for the active provider/model.
+    #[must_use]
+    pub fn output_limit(&self) -> Option<u32> {
+        self.active_model_config()
+            .and_then(|model| model.output_limit)
+    }
+
+    /// Returns the active provider config with built-in defaults applied.
+    #[must_use]
+    pub fn active_provider_config(&self) -> ProviderConfig {
+        let mut config = builtin_provider_config(&self.provider).unwrap_or_default();
+        if let Some(user_config) = self.providers.get(&self.provider) {
+            if !matches!(user_config.protocol, ProviderProtocol::OpenAIChat)
+                || builtin_provider_config(&self.provider).is_none()
+            {
+                config.protocol = user_config.protocol.clone();
+            }
+            if user_config.base_url.is_some() {
+                config.base_url = user_config.base_url.clone();
+            }
+            if user_config.api_key.is_some() {
+                config.api_key = user_config.api_key.clone();
+            }
+            if user_config.api_key_env.is_some() {
+                config.api_key_env = user_config.api_key_env.clone();
+            }
+            config.models.extend(user_config.models.clone());
+        }
+        config
+    }
+
+    fn active_model_config(&self) -> Option<ModelConfig> {
+        self.active_provider_config()
+            .models
+            .get(&self.model)
+            .cloned()
     }
 
     /// Validates the configuration against its JSON Schema.
@@ -267,13 +385,80 @@ impl Config {
         let _schema = schemars::schema_for!(Config);
 
         // Manual validation of required constraints
-        if self.model.is_empty() {
+        if self.provider.trim().is_empty() {
+            return Err(ConfigError::InvalidConfig(
+                "'provider' is required and must be non-empty".to_string(),
+            ));
+        }
+
+        if self.model.trim().is_empty() {
             return Err(ConfigError::InvalidConfig(
                 "'model' is required and must be non-empty".to_string(),
             ));
         }
 
+        let provider = self.active_provider_config();
+        if self.providers.contains_key(&self.provider)
+            && provider.api_key.is_none()
+            && provider.api_key_env.is_none()
+        {
+            return Err(ConfigError::InvalidConfig(format!(
+                "provider '{}' must set api_key or api_key_env",
+                self.provider
+            )));
+        }
+
         Ok(())
+    }
+}
+
+fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
+    match name {
+        "anthropic" => Some(ProviderConfig {
+            protocol: ProviderProtocol::AnthropicMessages,
+            base_url: None,
+            api_key: None,
+            api_key_env: Some("ANTHROPIC_API_KEY".to_string()),
+            models: HashMap::from([
+                (
+                    "claude-sonnet-4-20250514".to_string(),
+                    ModelConfig {
+                        context_limit: Some(200_000),
+                        output_limit: Some(4096),
+                    },
+                ),
+                (
+                    "claude-opus-4-20250514".to_string(),
+                    ModelConfig {
+                        context_limit: Some(200_000),
+                        output_limit: Some(4096),
+                    },
+                ),
+            ]),
+        }),
+        "openai" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            base_url: None,
+            api_key: None,
+            api_key_env: Some("OPENAI_API_KEY".to_string()),
+            models: HashMap::from([
+                (
+                    "gpt-4o".to_string(),
+                    ModelConfig {
+                        context_limit: Some(128_000),
+                        output_limit: Some(4096),
+                    },
+                ),
+                (
+                    "gpt-4o-mini".to_string(),
+                    ModelConfig {
+                        context_limit: Some(128_000),
+                        output_limit: Some(4096),
+                    },
+                ),
+            ]),
+        }),
+        _ => None,
     }
 }
 
@@ -378,26 +563,14 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        assert_eq!(config.provider, Provider::Anthropic);
+        assert_eq!(config.provider, "anthropic");
         assert!(config.model.is_empty());
-        assert!(config.api_key.is_none());
-        assert!(config.base_url.is_none());
+        assert!(config.providers.is_empty());
         assert_eq!(config.log, LogConfig::default());
-    }
-
-    #[test]
-    fn test_api_key_from_config() {
-        let config = Config {
-            provider: Provider::Anthropic,
-            model: "claude-test".to_string(),
-            api_key: Some("config-key".to_string()),
-            base_url: None,
-            log: LogConfig::default(),
-            hooks: HookConfig::default(),
-            mcp: McpConfig::default(),
-            rpc: RpcConfig::default(),
-        };
-        assert_eq!(config.api_key().unwrap(), "config-key");
+        assert_eq!(
+            config.provider_protocol(),
+            ProviderProtocol::AnthropicMessages
+        );
     }
 
     #[test]
@@ -405,10 +578,9 @@ mod tests {
         let _lock = ENV_MUTEX.lock().unwrap();
         unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key-anthropic") };
         let config = Config {
-            provider: Provider::Anthropic,
+            provider: "anthropic".to_string(),
             model: "claude-test".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -423,10 +595,9 @@ mod tests {
         let _lock = ENV_MUTEX.lock().unwrap();
         unsafe { env::set_var("OPENAI_API_KEY", "env-key-openai") };
         let config = Config {
-            provider: Provider::OpenAI,
+            provider: "openai".to_string(),
             model: "gpt-test".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -442,12 +613,9 @@ mod tests {
         unsafe { env::remove_var("OPENAI_API_KEY") };
         unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-style-key") };
         let config = Config {
-            provider: Provider::OpenAI,
+            provider: "openai".to_string(),
             model: "glm-5".to_string(),
-            api_key: None,
-            base_url: Some(
-                "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1".to_string(),
-            ),
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -463,10 +631,9 @@ mod tests {
         unsafe { env::set_var("OPENAI_API_KEY", "real-openai-key") };
         unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-key") };
         let config = Config {
-            provider: Provider::OpenAI,
+            provider: "openai".to_string(),
             model: "gpt-4o".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -483,10 +650,9 @@ mod tests {
         unsafe { env::remove_var("ANTHROPIC_API_KEY") };
         unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "should-not-be-used") };
         let config = Config {
-            provider: Provider::Anthropic,
+            provider: "anthropic".to_string(),
             model: "claude-test".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -505,10 +671,9 @@ mod tests {
         let _lock = ENV_MUTEX.lock().unwrap();
         unsafe { env::remove_var("ANTHROPIC_API_KEY") };
         let config = Config {
-            provider: Provider::Anthropic,
+            provider: "anthropic".to_string(),
             model: "claude-test".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -523,16 +688,23 @@ mod tests {
     #[test]
     fn test_base_url_getter() {
         let config = Config {
-            provider: Provider::OpenAI,
+            provider: "dashscope".to_string(),
             model: "glm-5".to_string(),
-            api_key: None,
-            base_url: Some("https://example.com/v1".to_string()),
+            providers: HashMap::from([(
+                "dashscope".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    base_url: Some("https://example.com/v1".to_string()),
+                    api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
+                    ..Default::default()
+                },
+            )]),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
         };
-        assert_eq!(config.base_url(), Some("https://example.com/v1"));
+        assert_eq!(config.base_url().as_deref(), Some("https://example.com/v1"));
     }
 
     #[test]
@@ -544,15 +716,86 @@ mod tests {
     #[test]
     fn test_base_url_parsed_from_toml() {
         let toml_str = r#"
-            provider = "openai"
+            provider = "dashscope"
             model = "glm-5"
+
+            [providers.dashscope]
+            protocol = "openai-chat"
             base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+            api_key_env = "DASHSCOPE_API_KEY"
         "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(
-            config.base_url(),
+            config.base_url().as_deref(),
             Some("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1")
         );
+    }
+
+    #[test]
+    fn test_custom_provider_api_key_env() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::set_var("DASHSCOPE_API_KEY", "dashscope-key") };
+        let config = Config {
+            provider: "dashscope".to_string(),
+            model: "glm-5".to_string(),
+            providers: HashMap::from([(
+                "dashscope".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    base_url: Some("https://example.com/v1".to_string()),
+                    api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            log: LogConfig::default(),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+
+        assert_eq!(config.api_key().unwrap(), "dashscope-key");
+        unsafe { env::remove_var("DASHSCOPE_API_KEY") };
+    }
+
+    #[test]
+    fn test_model_limits_from_builtin_and_custom_providers() {
+        let builtin = Config {
+            provider: "openai".to_string(),
+            model: "gpt-4o".to_string(),
+            providers: HashMap::new(),
+            log: LogConfig::default(),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+        assert_eq!(builtin.context_limit(), Some(128_000));
+
+        let custom = Config {
+            provider: "dashscope".to_string(),
+            model: "glm-5".to_string(),
+            providers: HashMap::from([(
+                "dashscope".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    base_url: Some("https://example.com/v1".to_string()),
+                    api_key: None,
+                    api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
+                    models: HashMap::from([(
+                        "glm-5".to_string(),
+                        ModelConfig {
+                            context_limit: Some(202_752),
+                            output_limit: Some(4096),
+                        },
+                    )]),
+                },
+            )]),
+            log: LogConfig::default(),
+            hooks: HookConfig::default(),
+            mcp: McpConfig::default(),
+            rpc: RpcConfig::default(),
+        };
+        assert_eq!(custom.context_limit(), Some(202_752));
+        assert_eq!(custom.output_limit(), Some(4096));
     }
 
     #[test]
@@ -590,27 +833,25 @@ mod tests {
             return;
         }
         let config = Config::load().unwrap();
-        assert_eq!(config.provider, Provider::Anthropic);
+        assert_eq!(config.provider, "anthropic");
         assert!(config.model.is_empty());
     }
 
     #[test]
     fn test_provider_serialization() {
         let config_anthropic = Config {
-            provider: Provider::Anthropic,
+            provider: "anthropic".to_string(),
             model: "test".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
         };
         let config_openai = Config {
-            provider: Provider::OpenAI,
+            provider: "openai".to_string(),
             model: "test".to_string(),
-            api_key: None,
-            base_url: None,
+            providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
@@ -629,11 +870,131 @@ mod tests {
         let toml_str = r#"
             provider = "openai"
             model = "gpt-4"
-            api_key = "sk-test"
         "#;
         let config: Config = toml::from_str(toml_str).unwrap();
-        assert_eq!(config.provider, Provider::OpenAI);
+        assert_eq!(config.provider, "openai");
         assert_eq!(config.model, "gpt-4");
-        assert_eq!(config.api_key, Some("sk-test".to_string()));
+    }
+
+    #[test]
+    fn test_inline_api_key_parsed_from_toml() {
+        let toml_str = r#"
+            provider = "dashscope"
+            model = "glm-5"
+
+            [providers.dashscope]
+            protocol = "openai-chat"
+            base_url = "https://example.com/v1"
+            api_key = "sk-inline-secret"
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.api_key().unwrap(), "sk-inline-secret");
+    }
+
+    #[test]
+    fn test_inline_api_key_precedence_over_env() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::set_var("DASHSCOPE_API_KEY", "env-key-should-not-be-used") };
+        let config: Config = toml::from_str(
+            r#"
+            provider = "dashscope"
+            model = "glm-5"
+
+            [providers.dashscope]
+            protocol = "openai-chat"
+            api_key = "inline-key-wins"
+            api_key_env = "DASHSCOPE_API_KEY"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_key().unwrap(), "inline-key-wins");
+        unsafe { env::remove_var("DASHSCOPE_API_KEY") };
+    }
+
+    #[test]
+    fn test_inline_api_key_anthropic_overrides_builtin() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::remove_var("ANTHROPIC_API_KEY") };
+        let config: Config = toml::from_str(
+            r#"
+            provider = "anthropic"
+            model = "claude-test"
+
+            [providers.anthropic]
+            api_key = "inline-anthropic-key"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.api_key().unwrap(), "inline-anthropic-key");
+    }
+
+    #[test]
+    fn test_validate_accepts_either_api_key_or_api_key_env() {
+        let with_inline = Config {
+            provider: "custom".to_string(),
+            model: "model-x".to_string(),
+            providers: HashMap::from([(
+                "custom".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    api_key: Some("inline".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(with_inline.validate().is_ok());
+
+        let with_env = Config {
+            provider: "custom".to_string(),
+            model: "model-x".to_string(),
+            providers: HashMap::from([(
+                "custom".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    api_key_env: Some("CUSTOM_KEY".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(with_env.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_rejects_neither_api_key_nor_api_key_env() {
+        let config = Config {
+            provider: "custom".to_string(),
+            model: "model-x".to_string(),
+            providers: HashMap::from([(
+                "custom".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("api_key or api_key_env"));
+    }
+
+    #[test]
+    fn test_inline_api_key_not_serialized_back() {
+        let config: Config = toml::from_str(
+            r#"
+            provider = "dashscope"
+            model = "glm-5"
+
+            [providers.dashscope]
+            protocol = "openai-chat"
+            api_key = "sk-very-secret"
+            api_key_env = "DASHSCOPE_API_KEY"
+        "#,
+        )
+        .unwrap();
+        let serialized = toml::to_string(&config).unwrap();
+        assert!(!serialized.contains("sk-very-secret"));
+        assert!(!serialized.contains("api_key ="));
     }
 }

@@ -77,17 +77,14 @@ async fn mcp_server_e2e() {
 
     let denied = client
         .peer()
-        .call_tool(CallToolRequestParams {
-            meta: None,
-            name: "bash".into(),
-            arguments: Some(
+        .call_tool(
+            CallToolRequestParams::new("bash").with_arguments(
                 serde_json::json!({"command": "echo denied"})
                     .as_object()
                     .cloned()
                     .expect("object"),
             ),
-            task: None,
-        })
+        )
         .await;
     assert!(denied.is_err(), "expected denied tool call to return error");
 

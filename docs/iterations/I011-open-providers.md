@@ -6,6 +6,10 @@ architecture.
 
 ## Status: PAUSED — first slice (S1) landed 2026-06-02; S2 deferred
 
+> 2026-06-06 note: I015 supersedes the S1 top-level `base_url` config shape with named
+> provider/model config. Keep this file as historical S1 evidence; use
+> `docs/iterations/I015-provider-schema.md` for the current config format.
+
 > **Origin.** Drove this iteration to let the team run `talos` against Bailian's
 > OpenAI-compatible endpoint using the existing `bailian-token-plan` API key from
 > the cluster secret store, without committing any secret to the repo and without
