@@ -27,6 +27,7 @@ repeating known mistakes.
 | 16 | Planning | `task()` 调用必须二选一：`category` 或 `subagent_type`，不可同时给 | I009 |
 | 17 | TUI | visual-engineering 任务在 R0 级别并行委派下 30 分钟不够（结构+消费两个 scope） | I009 |
 | 18 | Governance | 更新 skill 后必须重新跑 governance validator 并修复 conformant 漂移 | I013 |
+| 19 | Evolution | 持久化任何"用户输入上下文"前必须 byte-cap，dedup 必须含内容指纹 | I008/I015 |
 
 ## Lessons
 
@@ -275,3 +276,30 @@ repeating known mistakes.
 - A security concern was discovered during implementation.
 - A crate boundary or API design caused unexpected coupling.
 - Build, test, or CI behavior surprised you.
+
+---
+
+### 19. 持久化任何"用户输入上下文"前必须 byte-cap，dedup 必须含内容指纹 (I008/I015)
+
+**Symptom**: 用户的 `~/.talos/evolution/knowledge.db` 涨到 241MB；首次 `cargo run -- -p "你好"` 立刻收到 provider `400 Bad Request: Range of input length should be [1, 202752]`。Debug 后发现 system_prompt 是 5,151,386 字节（5MB），user message 是 5,146,164 字节 — 都比 context_limit 大 25 倍。
+
+**Cause**: 三段逻辑 bug 串联成指数膨胀循环，每轮 turn 都让 prompt 变大、pattern 变大、再次注入后下一轮变得更大：
+1. **Hook 捕获整条 user message 当 context**。`EvolutionHookHandler` 在 `BeforeProviderCall` 抓 `Message::User.content`，但 agent 早已把 system_prompt 拼进了 user.content（5MB），所以每次"用户说了一句话"实际存进去的是 5MB。
+2. **Pattern 提取原样保留 context**。`extract_correction_pattern` 把 `instruction` 设为 `"Remember: " + context`，pattern.instruction 直接变成 5MB。
+3. **Dedup 只看 category+description**。每轮 turn 拼接出的 description 都略有不同（system_prompt 每次增长 25MB），40 个 pattern 都是 5MB 级。
+4. **BehaviorAdapter 只有数量上限没有字节上限**。`max_patterns=5` × 5MB = 25MB 注入 system_prompt。
+
+**Remedy**: 4 个修复（commit `7470ac5`）：
+1. `EvolutionConfig.max_context_bytes` (default 4096) + `TurnObserver::truncate_context` — 写入前 byte-cap，截断带 marker。
+2. `EvolutionConfig.max_output_bytes` (default 8192) + `BehaviorAdapter::get_evolution_context` — 输出 byte-cap，超大单条 pattern 丢弃并 warn。
+3. `patterns.content_hash` 列 + `DefaultHasher(category + first 1KB instruction)` — dedup 键包含内容指纹，防止近重复累积。
+4. `KnowledgeStore::delete_oversized_patterns` 在 `open()` 一次性迁移 — 把现有 30 个 5MB pattern 标记 `active=0`，下次启动输出 `purged oversized patterns on open, count: 30`。
+
+**Prevention**:
+1. **任何把"用户输入片段"持久化到本地存储的代码路径**（evolution、log、session 摘要），都必须在写之前 byte-cap，cap 默认值 ≤ 8KB。理由：用户输入理论上可以包含任何上游 prompt 拼进来的内容，size 是对手（用户、provider、设计变更）能制造的维度。
+2. **Dedup 键必须包含内容指纹**（hash、embedding、normalized window），不能只看用户可控字段（category、description）。理由：用户可控字段会被内容膨胀污染。
+3. **任何"注入到 prompt 的内容"在源头和出口都要有 byte-cap**。源头（cap observation）、中段（cap pattern extraction）、出口（cap adapter output）三层都加，单层失守另两层兜底。
+4. **持久化层的迁移不只是 schema**。加新字段/约束时，也要写一次性数据迁移（`open()` / `migrate()` 之后跑），把已存在的脏数据标 `active=0` 而非 DELETE，保留审计轨迹。SQLite 不会自动 VACUUM，241MB 文件大小不会变，但新增数据不会再膨胀。
+5. **涉及 system prompt 注入的运行时回路要有运行时证据**。这次发现 5MB 的过程是用户实际跑 `cargo run -- -p "你好"` 才暴露的 — 单测全过 + 单元/集成测试 = 看似完成，但 system_prompt 大小是端到端运行才能看出的属性。Lesson #11 早就提过"端到端运行时证据"，这次仍走了 4 轮 commit 才暴露问题。
+
+---
