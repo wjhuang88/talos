@@ -3,7 +3,7 @@
 **User can**: Use the TUI as the primary daily interface with clear provenance visibility and
 explicit copy/export workflows.
 
-## Status: PLANNED
+## Status: ACTIVE (2026-06-06)
 
 ## Selected Stories
 

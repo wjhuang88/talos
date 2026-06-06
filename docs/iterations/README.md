@@ -48,7 +48,7 @@ docs/iterations/
 | I011 | Open Providers | **Paused** (S1 landed 2026-06-02; S2 deferred) | OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var shipped. S2 provider-plugin architecture is deferred until after R1/I010 or explicit priority change. See `I011-open-providers.md`. |
 | I012 | Portable Tools | Planned | Native POSIX-style tool subset, embeddable tool-pack registration, Rust-native workspace search, and `gix`-first structured Git tools without first-slice `git2`/libgit2. See `I012-portable-tools.md` and ADR-010. |
 | I013 | Boundary Control | **Complete** (2026-06-05) | Front-loaded high-risk boundary work: ADR-011 Guardian, ADR-012 exec DSL, ADR-013 provider schema, and #ARCH-S8 R1 centralized logging. See `I013-boundary-control.md`. |
-| I014 | TUI Completion | Planned | Finish TUI provenance/plugin visibility and copy/export workflows. See `I014-tui-completion.md`. |
+| I014 | TUI Completion | **Active** (2026-06-06) | Finish TUI provenance/plugin visibility and copy/export workflows. Two stories: #I009-S6 (provenance markers + `/plugins`) and #I010-S9 (clipboard copy/export). See `I014-tui-completion.md`; EXT-001 backlog; ADR-009. |
 | I015 | Provider Schema | Planned | Implement schema-only provider config foundation under ADR-013. See `I015-provider-schema.md`. |
 | I016 | Portable File And Search Tools | Planned | Split I012 file/tool-pack/search work into a smaller native tools iteration. See `I016-portable-file-search.md`. |
 | I017 | Embedded Git Tools | Planned | Split I012 Git work into a dedicated `gix`-first read-only Git tools iteration. See `I017-embedded-git-tools.md`. |

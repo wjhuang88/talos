@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| (no active work) | — | — | — |
+| I014 TUI Completion | Active | [I014 TUI Completion](iterations/I014-tui-completion.md) | Start date 2026-06-06; stories #I009-S6 (provenance markers + `/plugins`) and #I010-S9 (clipboard copy/export) |
 
 ## Review
 
@@ -32,13 +32,12 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I011 S2 Provider Plugin Architecture | Paused | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Resume as I015 schema-only work under ADR-013 |
-| I009-S6 TUI Provenance Markers + /plugins | Deferred | [EXT-001 TUI Provenance](backlog/active/EXT-001-tui-provenance-plugins.md) | Resume through TUI-001/I014 |
+| I009-S6 TUI Provenance Markers + /plugins | In-Flight (resumed via I014) | [EXT-001 TUI Provenance](backlog/active/EXT-001-tui-provenance-plugins.md) | Now Active inside I014 (2026-06-06) |
 
 ## Next
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I014 TUI Completion | Planned | [TUI-001 TUI Completion](backlog/active/TUI-001-completion.md) | Start when next product-facing TUI slice is selected |
 | I015 Provider Schema | Planned | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Start after I014 or explicit provider priority; follow ADR-013 |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
