@@ -22,6 +22,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I021 Evolution MenteDB Realignment | Complete | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | All 5 stories landed; 615 tests pass; runtime regression confirmed (model responds to `cargo run -p talos-cli -- -p "你好"`); 5 atomic commits #I021-S1..S5; defense layer (commit `7470ac5`) preserved |
 | I013 Boundary Control | Complete | [I013 Boundary Control](iterations/I013-boundary-control.md) | Boundary ADRs recorded; #ARCH-S8 R1 implemented |
 | I010 R3 Product Polish | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All 5 stories done; 567 tests, clippy clean |
 | I010 R2 Architecture Convergence | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All acceptance criteria met; 532 tests, clippy clean |
@@ -37,7 +38,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I021 Evolution MenteDB Realignment | Planned | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | Start when user requests I021 implementation; defense layer (commit `7470ac5`) already shipped; `knowledge.db` 221MB → 13MB after manual cleanup |
 | I014 TUI Completion | Planned | [TUI-001 TUI Completion](backlog/active/TUI-001-completion.md) | Start when next product-facing TUI slice is selected |
 | I015 Provider Schema | Planned | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Start after I014 or explicit provider priority; follow ADR-013 |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
