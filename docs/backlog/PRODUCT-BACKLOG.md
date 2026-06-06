@@ -7,12 +7,14 @@ decision context; executable details live in item files listed under Required Re
 
 | Priority | Focus | Why Now | Required Reads |
 | --- | --- | --- | --- |
-| 1 | TUI completion | Completes deferred user-facing extensibility and copy/export workflows before deeper runtime work. | `docs/backlog/active/TUI-001-completion.md`; `docs/iterations/I014-tui-completion.md` |
-| 2 | Observability and prompt assets | Bounded logs and embedded prompts should land before memory/exploration increase log and prompt surface area. | `docs/backlog/active/OBS-001-observability-prompt-assets.md`; ADR-014; ADR-015 |
-| 3 | Provider schema | Provider openness is paused until schema-only foundation follows ADR-013. | `docs/backlog/active/PROV-001-provider-schema.md`; ADR-013 |
-| 4 | Portable file/search tools | Reduces host environment dependency without mixing Git implementation risk into the same slice. | `docs/backlog/active/TOOL-001-portable-file-search.md`; ADR-010 |
-| 5 | Embedded Git tools | Dedicated `gix`-first slice after file/search baseline or explicit Git priority. | `docs/backlog/active/GIT-001-embedded-git-tools.md`; ADR-010 |
-| 6 | Layered memory and exploration | Memory must precede durable research conclusions; research library follows memory or explicit research priority. | `docs/backlog/active/MEM-001-layered-memory-foundation.md`; `docs/backlog/active/RES-001-exploration-library.md`; ADR-016; ADR-017 |
+| 1 | Evolution MenteDB realignment (root-cause fix) | The 7470ac5 defense layer caps the 5MB bloat, but the underlying `Signal.context` field semantics are wrong by construction. I021 realigns the data structure with the MenteDB blueprint so the bloat and 400-error loop cannot recur. | `docs/iterations/I021-evolution-mentedb-realignment.md`; `docs/reference/REFERENCE-PROJECTS.md` §17; EVOLUTION.md lesson #19 |
+| 2 | TUI completion | Completes deferred user-facing extensibility and copy/export workflows before deeper runtime work. | `docs/backlog/active/TUI-001-completion.md`; `docs/iterations/I014-tui-completion.md` |
+| 3 | Observability and prompt assets | Bounded logs and embedded prompts should land before memory/exploration increase log and prompt surface area. | `docs/backlog/active/OBS-001-observability-prompt-assets.md`; ADR-014; ADR-015 |
+| 4 | Provider schema | Provider openness is paused until schema-only foundation follows ADR-013. | `docs/backlog/active/PROV-001-provider-schema.md`; ADR-013 |
+| 5 | Portable file/search tools | Reduces host environment dependency without mixing Git implementation risk into the same slice. | `docs/backlog/active/TOOL-001-portable-file-search.md`; ADR-010 |
+| 6 | Embedded Git tools | Dedicated `gix`-first slice after file/search baseline or explicit Git priority. | `docs/backlog/active/GIT-001-embedded-git-tools.md`; ADR-010 |
+| 7 | Layered memory and exploration | Memory must precede durable research conclusions; research library follows memory or explicit research priority. | `docs/backlog/active/MEM-001-layered-memory-foundation.md`; `docs/backlog/active/RES-001-exploration-library.md`; ADR-016; ADR-017 |
+| 8 | Evolution cognitive rigor (MenteDB Phase 2) | 6 SignalKinds, Bayesian confidence, time decay, cross-session provenance, outcome tracking. **Independent of I021** — does not solve the bloat / 400 / signal-loss problems. Schedule after I021 lands. | `docs/backlog/active/EVOL-001-evolution-cognitive-rigor.md`; `docs/iterations/I021-evolution-mentedb-realignment.md`; `docs/reference/REFERENCE-PROJECTS.md` §17 |
 
 ## Active Items
 
@@ -25,6 +27,7 @@ decision context; executable details live in item files listed under Required Re
 | GIT-001 | Embedded Git tools | Planned | P2 | Git work is split from file/search so `gix` API mapping and fallback behavior stay auditable. | `docs/backlog/active/GIT-001-embedded-git-tools.md`; `docs/iterations/I017-embedded-git-tools.md`; ADR-010 |
 | MEM-001 | Layered memory foundation | Planned | P2 | Memory architecture must separate working, episodic, semantic, and procedural memory with explicit consolidation. | `docs/backlog/active/MEM-001-layered-memory-foundation.md`; `docs/iterations/I019-layered-memory-foundation.md`; ADR-016; ADR-002; ADR-008 |
 | RES-001 | Exploration library | Planned | P2 | Research artifacts need local source/claim/synthesis provenance; vector/graph stores remain Spike-gated. | `docs/backlog/active/RES-001-exploration-library.md`; `docs/iterations/I020-exploration-library.md`; ADR-017; ADR-008 |
+| EVOL-001 | Evolution cognitive rigor (MenteDB Phase 2) | Planned | P3 | 6 SignalKinds, Bayesian confidence, time decay, cross-session provenance, outcome tracking. **Independent of the I021 root-cause fix** — does not solve the 5MB bloat / 400 error / signal-loss problems. Schedule after I021 lands. | `docs/backlog/active/EVOL-001-evolution-cognitive-rigor.md`; `docs/iterations/I021-evolution-mentedb-realignment.md`; `docs/reference/REFERENCE-PROJECTS.md` §17 |
 
 ## Blocked Items
 
