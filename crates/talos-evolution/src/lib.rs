@@ -17,7 +17,131 @@ pub use hook::EvolutionHookHandler;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+// ─── MenteDB-aligned types (I021-S1) ────────────────────────────────────────
+
+/// The kind of learning signal captured during agent execution.
+/// Four base variants per the MenteDB cognitive-feedback blueprint
+/// (`docs/reference/REFERENCE-PROJECTS.md` §17).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum SignalKind {
+    /// User corrected the agent's behavior ("don't do that", "use X instead")
+    Correction,
+    /// Agent encountered an error (tool failure, provider error, etc.)
+    Error,
+    /// User expressed satisfaction or approval
+    Satisfaction,
+    /// Agent identified inefficiency in its own behavior
+    Inefficiency,
+}
+
+impl std::fmt::Display for SignalKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SignalKind::Correction => write!(f, "Correction"),
+            SignalKind::Error => write!(f, "Error"),
+            SignalKind::Satisfaction => write!(f, "Satisfaction"),
+            SignalKind::Inefficiency => write!(f, "Inefficiency"),
+        }
+    }
+}
+
+/// A single learning signal captured during agent execution.
+///
+/// Per the MenteDB blueprint, `context` is a **small window** (typically
+/// < 500 bytes) centered on the marker phrase that triggered the signal,
+/// NOT the full user message.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Signal {
+    /// What kind of signal this is
+    pub kind: SignalKind,
+    /// Signal intensity (0.0 – 1.0)
+    pub intensity: f32,
+    /// Small context window around the marker phrase (typically < 500 bytes)
+    pub context: String,
+    /// Which tool was involved, if applicable
+    pub tool_name: Option<String>,
+}
+
+/// Outcome of a single agent turn.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TurnOutcome {
+    /// Turn completed successfully
+    Success,
+    /// Turn completed but with partial results
+    PartialSuccess,
+    /// Turn failed (error, provider failure, etc.)
+    Failure,
+    /// User corrected the agent's output during this turn
+    UserCorrected,
+}
+
+/// Record of a tool invocation during a turn.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ToolUsage {
+    /// Name of the tool that was called
+    pub tool_name: String,
+    /// Hash of the tool arguments (for dedup / comparison)
+    pub arguments_hash: u64,
+    /// Brief summary of the tool result
+    pub result_summary: String,
+}
+
+/// Per-turn observation that aggregates multiple signals with turn-level metadata.
+///
+/// This is the MenteDB-aligned replacement for the legacy [`Observation`] type.
+/// A `TurnObservation` is the parent (per-turn), containing child [`Signal`]s
+/// (per-event) plus tool usage, outcome, and timing data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TurnObservation {
+    /// Signals captured during this turn
+    pub signals: Vec<Signal>,
+    /// Tools that were used during this turn
+    pub tools_used: Vec<ToolUsage>,
+    /// How the turn ended
+    pub outcome: TurnOutcome,
+    /// Turn duration in milliseconds
+    pub duration_ms: u64,
+    /// Session this turn belongs to
+    pub session_id: uuid::Uuid,
+    /// Turn number within the session
+    pub turn_number: u32,
+}
+
+impl TurnObservation {
+    /// Create a new `TurnObservation` with the given turn-level metadata.
+    pub fn new(
+        session_id: uuid::Uuid,
+        turn_number: u32,
+        outcome: TurnOutcome,
+        duration_ms: u64,
+    ) -> Self {
+        Self {
+            signals: Vec::new(),
+            tools_used: Vec::new(),
+            outcome,
+            duration_ms,
+            session_id,
+            turn_number,
+        }
+    }
+
+    /// Add a signal to this turn observation.
+    pub fn add_signal(&mut self, signal: Signal) {
+        self.signals.push(signal);
+    }
+
+    /// Record a tool usage for this turn.
+    pub fn add_tool_usage(&mut self, usage: ToolUsage) {
+        self.tools_used.push(usage);
+    }
+}
+
+// ─── Legacy types (backward-compatible, kept for migration) ─────────────────
+
 /// A signal captured during agent execution.
+///
+/// **Deprecated**: Use [`Signal`] + [`TurnObservation`] instead.
+/// This type is retained for backward compatibility with the pre-I021 schema.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SignalType {
     /// User corrected the agent's behavior
@@ -31,6 +155,9 @@ pub enum SignalType {
 }
 
 /// An observation captured from a single turn.
+///
+/// **Deprecated**: Use [`TurnObservation`] + [`Signal`] instead.
+/// This type is retained for backward compatibility with the pre-I021 schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Observation {
     /// Unique identifier
@@ -273,5 +400,90 @@ mod tests {
     fn test_evolution_config_max_output_bytes_default_8kb() {
         let config = EvolutionConfig::default();
         assert_eq!(config.max_output_bytes, 8 * 1024);
+    }
+
+    // ─── I021-S1: New MenteDB-aligned type tests ────────────────────────────
+
+    #[test]
+    fn test_signal_roundtrip_preserves_all_fields() {
+        let signal = Signal {
+            kind: SignalKind::Correction,
+            intensity: 0.85,
+            context: "不要用 sed".to_string(),
+            tool_name: Some("bash".to_string()),
+        };
+
+        // Serialize and deserialize roundtrip
+        let json = serde_json::to_string(&signal).expect("serialize Signal");
+        let restored: Signal = serde_json::from_str(&json).expect("deserialize Signal");
+
+        assert_eq!(restored.kind, SignalKind::Correction);
+        assert!((restored.intensity - 0.85).abs() < f32::EPSILON);
+        assert_eq!(restored.context, "不要用 sed");
+        assert_eq!(restored.tool_name, Some("bash".to_string()));
+    }
+
+    #[test]
+    fn test_turn_observation_multi_signal_flush() {
+        let session_id = uuid::Uuid::new_v4();
+        let mut turn = TurnObservation::new(session_id, 3, TurnOutcome::Success, 1500);
+
+        turn.add_signal(Signal {
+            kind: SignalKind::Correction,
+            intensity: 0.9,
+            context: "use HashMap".to_string(),
+            tool_name: None,
+        });
+        turn.add_signal(Signal {
+            kind: SignalKind::Inefficiency,
+            intensity: 0.4,
+            context: "took 10 steps".to_string(),
+            tool_name: Some("bash".to_string()),
+        });
+        turn.add_tool_usage(ToolUsage {
+            tool_name: "read".to_string(),
+            arguments_hash: 42,
+            result_summary: "file contents".to_string(),
+        });
+
+        assert_eq!(turn.signals.len(), 2);
+        assert_eq!(turn.tools_used.len(), 1);
+        assert_eq!(turn.outcome, TurnOutcome::Success);
+        assert_eq!(turn.duration_ms, 1500);
+        assert_eq!(turn.session_id, session_id);
+        assert_eq!(turn.turn_number, 3);
+
+        // Roundtrip
+        let json = serde_json::to_string(&turn).expect("serialize TurnObservation");
+        let restored: TurnObservation =
+            serde_json::from_str(&json).expect("deserialize TurnObservation");
+        assert_eq!(restored.signals.len(), 2);
+        assert_eq!(restored.signals[0].kind, SignalKind::Correction);
+        assert_eq!(restored.signals[1].kind, SignalKind::Inefficiency);
+        assert_eq!(restored.tools_used[0].tool_name, "read");
+    }
+
+    #[test]
+    fn test_signal_kind_display() {
+        assert_eq!(format!("{}", SignalKind::Correction), "Correction");
+        assert_eq!(format!("{}", SignalKind::Error), "Error");
+        assert_eq!(format!("{}", SignalKind::Satisfaction), "Satisfaction");
+        assert_eq!(format!("{}", SignalKind::Inefficiency), "Inefficiency");
+    }
+
+    #[test]
+    fn test_tool_usage_roundtrip() {
+        let usage = ToolUsage {
+            tool_name: "write".to_string(),
+            arguments_hash: 12345,
+            result_summary: "wrote 50 bytes".to_string(),
+        };
+
+        let json = serde_json::to_string(&usage).expect("serialize ToolUsage");
+        let restored: ToolUsage = serde_json::from_str(&json).expect("deserialize ToolUsage");
+
+        assert_eq!(restored.tool_name, "write");
+        assert_eq!(restored.arguments_hash, 12345);
+        assert_eq!(restored.result_summary, "wrote 50 bytes");
     }
 }

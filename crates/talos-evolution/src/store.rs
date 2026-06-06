@@ -61,6 +61,30 @@ impl KnowledgeStore {
                 detected_at TEXT NOT NULL,
                 resolved INTEGER NOT NULL DEFAULT 0,
                 winner_id TEXT
+            );
+
+            -- I021-S1: MenteDB-aligned tables
+            CREATE TABLE IF NOT EXISTS signals (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                intensity REAL NOT NULL,
+                context TEXT NOT NULL,
+                tool_name TEXT,
+                turn_observation_id TEXT REFERENCES turn_observations(id),
+                timestamp TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS turn_observations (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                turn_number INTEGER NOT NULL,
+                outcome TEXT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                timestamp TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER NOT NULL
             );",
         )?;
 
@@ -72,6 +96,19 @@ impl KnowledgeStore {
         if has_column == 0 {
             let _ = self.conn.execute(
                 "ALTER TABLE patterns ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''",
+                [],
+            );
+        }
+
+        // Initialize schema_version if empty (new database).
+        let version_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM schema_version",
+            [],
+            |row| row.get(0),
+        )?;
+        if version_count == 0 {
+            let _ = self.conn.execute(
+                "INSERT INTO schema_version (version) VALUES (2)",
                 [],
             );
         }
