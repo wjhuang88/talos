@@ -100,6 +100,25 @@ impl KnowledgeStore {
             );
         }
 
+        // I021-S3: Add MenteDB-aligned columns to patterns table.
+        for (col, default) in [
+            ("key", "''"),
+            ("value", "'null'"),
+            ("contradicting_count", "0"),
+            ("last_reinforced", "''"),
+            ("source_sessions", "'[]'"),
+        ] {
+            let has_col: i64 = self.conn.prepare(
+                &format!("SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = '{col}'"),
+            )?.query_row([], |row| row.get(0))?;
+            if has_col == 0 {
+                let _ = self.conn.execute(
+                    &format!("ALTER TABLE patterns ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}"),
+                    [],
+                );
+            }
+        }
+
         // Initialize schema_version if empty (new database).
         let version_count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM schema_version",
@@ -174,9 +193,11 @@ impl KnowledgeStore {
 
     /// Insert a pattern.
     pub fn insert_pattern(&self, pattern: &Pattern) -> Result<()> {
+        let value_json = serde_json::to_string(&pattern.value).unwrap_or_else(|_| "null".into());
+        let sessions_json = serde_json::to_string(&pattern.source_sessions).unwrap_or_else(|_| "[]".into());
         self.conn.execute(
-            "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash, key, value, contradicting_count, last_reinforced, source_sessions)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 pattern.id,
                 pattern.description,
@@ -188,6 +209,11 @@ impl KnowledgeStore {
                 pattern.category,
                 pattern.active as i32,
                 pattern.content_hash,
+                pattern.key,
+                value_json,
+                pattern.contradicting_count as i32,
+                pattern.last_reinforced.to_rfc3339(),
+                sessions_json,
             ],
         )?;
         Ok(())
@@ -196,7 +222,7 @@ impl KnowledgeStore {
     /// Get active patterns with confidence above threshold.
     pub fn get_active_patterns(&self, min_confidence: f64) -> Result<Vec<Pattern>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash
+            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash, key, value, contradicting_count, last_reinforced, source_sessions
              FROM patterns WHERE active = 1 AND confidence >= ?1 ORDER BY confidence DESC",
         )?;
 
@@ -212,6 +238,27 @@ impl KnowledgeStore {
                     .map(|dt| dt.with_timezone(&Utc))
                     .unwrap_or_else(|_| Utc::now());
 
+                let key: String = row.get(10)?;
+                let value_str: String = row.get(11)?;
+                let value: serde_json::Value =
+                    serde_json::from_str(&value_str).unwrap_or(serde_json::Value::Null);
+                let contradicting_raw: String = row.get(12)?;
+                let contradicting_count: u32 =
+                    contradicting_raw.parse().unwrap_or(0);
+
+                let last_reinforced_str: String = row.get(13)?;
+                let last_reinforced = if last_reinforced_str.is_empty() {
+                    first_observed
+                } else {
+                    DateTime::parse_from_rfc3339(&last_reinforced_str)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .unwrap_or(first_observed)
+                };
+
+                let sessions_str: String = row.get(14)?;
+                let source_sessions: Vec<uuid::Uuid> =
+                    serde_json::from_str(&sessions_str).unwrap_or_default();
+
                 Ok(Pattern {
                     id: row.get(0)?,
                     description: row.get(1)?,
@@ -223,6 +270,11 @@ impl KnowledgeStore {
                     category: row.get(7)?,
                     active: row.get::<_, i32>(8)? == 1,
                     content_hash: row.get(9)?,
+                    key,
+                    value,
+                    contradicting_count,
+                    last_reinforced,
+                    source_sessions,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -266,7 +318,7 @@ impl KnowledgeStore {
     /// Get all patterns (including inactive).
     pub fn get_all_patterns(&self) -> Result<Vec<Pattern>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash
+            "SELECT id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash, key, value, contradicting_count, last_reinforced, source_sessions
              FROM patterns ORDER BY confidence DESC",
         )?;
 
@@ -282,6 +334,27 @@ impl KnowledgeStore {
                     .map(|dt| dt.with_timezone(&Utc))
                     .unwrap_or_else(|_| Utc::now());
 
+                let key: String = row.get(10)?;
+                let value_str: String = row.get(11)?;
+                let value: serde_json::Value =
+                    serde_json::from_str(&value_str).unwrap_or(serde_json::Value::Null);
+                let contradicting_raw: String = row.get(12)?;
+                let contradicting_count: u32 =
+                    contradicting_raw.parse().unwrap_or(0);
+
+                let last_reinforced_str: String = row.get(13)?;
+                let last_reinforced = if last_reinforced_str.is_empty() {
+                    first_observed
+                } else {
+                    DateTime::parse_from_rfc3339(&last_reinforced_str)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .unwrap_or(first_observed)
+                };
+
+                let sessions_str: String = row.get(14)?;
+                let source_sessions: Vec<uuid::Uuid> =
+                    serde_json::from_str(&sessions_str).unwrap_or_default();
+
                 Ok(Pattern {
                     id: row.get(0)?,
                     description: row.get(1)?,
@@ -293,6 +366,11 @@ impl KnowledgeStore {
                     category: row.get(7)?,
                     active: row.get::<_, i32>(8)? == 1,
                     content_hash: row.get(9)?,
+                    key,
+                    value,
+                    contradicting_count,
+                    last_reinforced,
+                    source_sessions,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

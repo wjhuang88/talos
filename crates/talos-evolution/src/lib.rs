@@ -199,6 +199,17 @@ pub struct Pattern {
     pub active: bool,
     /// Normalized fingerprint for content-based dedup: "{category}|{first 1KB of instruction}"
     pub content_hash: String,
+    // ─── I021-S3: MenteDB-aligned fields ────────────────────────────────────
+    /// Structured key identifying this pattern (e.g., "prefer_functional_style")
+    pub key: String,
+    /// Structured value as JSON (replaces free-text instruction at the data level)
+    pub value: serde_json::Value,
+    /// Number of contradicting observations
+    pub contradicting_count: u32,
+    /// When this pattern was last reinforced by a matching signal
+    pub last_reinforced: DateTime<Utc>,
+    /// Session IDs where this pattern was observed (traceability)
+    pub source_sessions: Vec<uuid::Uuid>,
 }
 
 /// A conflict between two patterns.
@@ -303,9 +314,14 @@ pub fn compute_content_hash(category: &str, instruction: &str) -> String {
 
 impl Pattern {
     /// Create a new pattern with the current timestamp.
+    ///
+    /// Backward-compatible constructor. Derives `key` and `value` from
+    /// `description` and `instruction` for migration purposes.
     pub fn new(description: String, instruction: String, category: String) -> Self {
         let now = Utc::now();
         let content_hash = compute_content_hash(&category, &instruction);
+        let key = category.clone();
+        let value = serde_json::json!({ "instruction": instruction });
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             description,
@@ -317,6 +333,48 @@ impl Pattern {
             category,
             active: true,
             content_hash,
+            key,
+            value,
+            contradicting_count: 0,
+            last_reinforced: now,
+            source_sessions: Vec::new(),
+        }
+    }
+
+    /// Create a pattern with MenteDB-aligned fields.
+    ///
+    /// `description` and `instruction` are derived from `key` + `value`
+    /// rendering, keeping the BehaviorAdapter output format unchanged.
+    pub fn new_with_key(
+        key: String,
+        value: serde_json::Value,
+        category: String,
+        source_session: Option<uuid::Uuid>,
+    ) -> Self {
+        let now = Utc::now();
+        let description = format!("Pattern: {key}");
+        let instruction = value.to_string();
+        let content_hash = compute_content_hash(&category, &instruction);
+        let mut source_sessions = Vec::new();
+        if let Some(sid) = source_session {
+            source_sessions.push(sid);
+        }
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            description,
+            instruction,
+            confidence: 0.0,
+            evidence_count: 0,
+            first_observed: now,
+            last_updated: now,
+            category,
+            active: true,
+            content_hash,
+            key,
+            value,
+            contradicting_count: 0,
+            last_reinforced: now,
+            source_sessions,
         }
     }
 
@@ -485,5 +543,29 @@ mod tests {
         assert_eq!(restored.tool_name, "write");
         assert_eq!(restored.arguments_hash, 12345);
         assert_eq!(restored.result_summary, "wrote 50 bytes");
+    }
+
+    #[test]
+    fn test_pattern_roundtrip_with_mentedb_fields() {
+        let session_id = uuid::Uuid::new_v4();
+        let mut pattern = Pattern::new(
+            "Prefer functional style".to_string(),
+            "Use functional programming patterns".to_string(),
+            "preference".to_string(),
+        );
+        pattern.key = "prefer_functional_style".to_string();
+        pattern.value = serde_json::json!({ "style": "functional", "language": "rust" });
+        pattern.contradicting_count = 2;
+        pattern.last_reinforced = Utc::now();
+        pattern.source_sessions = vec![session_id];
+
+        let json = serde_json::to_string(&pattern).expect("serialize Pattern");
+        let restored: Pattern = serde_json::from_str(&json).expect("deserialize Pattern");
+
+        assert_eq!(restored.key, "prefer_functional_style");
+        assert_eq!(restored.value["style"], "functional");
+        assert_eq!(restored.contradicting_count, 2);
+        assert_eq!(restored.source_sessions.len(), 1);
+        assert_eq!(restored.source_sessions[0], session_id);
     }
 }
