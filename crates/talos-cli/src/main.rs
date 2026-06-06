@@ -363,6 +363,8 @@ struct Cli {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+
+
     if matches!(cli.mode, Some(Mode::McpServer)) {
         return run_mcp_server().await;
     }
