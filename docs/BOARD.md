@@ -37,6 +37,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I022 TUI Inline-by-Default | Planned | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Start as next TUI architecture slice; sub-slice A of [TUI-002](backlog/active/TUI-002-codex-overhaul.md); SIGTSTP site pre-authorized by [ADR-018](decisions/018-tui-job-control-unsafe.md); 652/652 baseline |
 | I015 Provider Schema | Planned | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Start after I014 or explicit provider priority; follow ADR-013 |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |

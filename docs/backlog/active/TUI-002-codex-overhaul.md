@@ -28,11 +28,13 @@ already is the transcript.
 
 ## Status
 
-Planned. **Sub-slice A is unblocked and can land first**; sub-slices B-E
-remain blocked behind I015-I017 (R6-R8) so the new history cells can render
-the new provider/tool/git output formats from day one. Natural iteration
-slot for sub-slice A: **I022 or a dedicated small iteration**. Sub-slices
-B-E: I023+.
+Planned. **Sub-slice A is unblocked and lands as dedicated iteration I022**
+(plan added 2026-06-07; see `docs/iterations/I022-tui-inline-default.md`).
+The `unsafe` boundary in `tui/job_control.rs` (`libc::raise(SIGTSTP)`) is
+pre-authorized by [ADR-018](../decisions/018-tui-job-control-unsafe.md).
+Sub-slices B-E remain blocked behind I015-I017 (R6-R8) so the new history
+cells can render the new provider/tool/git output formats from day one.
+Sub-slices B-E: I023+.
 
 ## Priority
 
@@ -135,7 +137,9 @@ architectural foundation and must land first.**
   Removes `EnterAlternateScreen`; adds `tui/` subdir plumbing (custom
   terminal, insert_history, frame_requester, frame_rate_limiter,
   event_stream, job_control, keyboard_modes) + `history_cell/` base
-  cells + slims `app.rs`. Absorbs TUI-003. ~1 week.
+  cells + slims `app.rs`. Absorbs TUI-003. ~1 week. **Lands as
+  dedicated iteration I022** (plan: `docs/iterations/I022-tui-inline-default.md`;
+  SIGTSTP site pre-authorized by [ADR-018](../decisions/018-tui-job-control-unsafe.md)).
 - **B (P2, blocked behind I015-I017)** — `tui/` subdir plumbing
   refinements (e.g. better SynchronizedUpdate handling, 60 FPS
   fallback for low-end terminals).
