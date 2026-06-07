@@ -495,7 +495,7 @@ impl TuiState {
         out
     }
 
-    fn append_line_plain(out: &mut String, line: &ChatLine) {
+    pub(crate) fn append_line_plain(out: &mut String, line: &ChatLine) {
         match line {
             ChatLine::Text(text) => {
                 out.push_str(text);

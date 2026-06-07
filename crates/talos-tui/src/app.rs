@@ -1,14 +1,16 @@
 //! TUI application loop and layout rendering.
 
-use std::io::{self, Stdout};
+use std::io::{self, Stdout, Write};
 use std::time::Duration;
 
 use anyhow::Result;
 use crossterm::{
+    cursor::position,
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind,
     },
-    execute,
+    execute, queue,
+    style::Print,
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use futures::StreamExt;
@@ -45,6 +47,8 @@ pub struct Tui {
     evolution_panel: EvolutionPanel,
     /// Channel to send user messages to the agent loop.
     message_tx: Option<mpsc::UnboundedSender<String>>,
+    viewport_top: u16,
+    last_pushed_history: usize,
 }
 
 impl Tui {
@@ -65,12 +69,16 @@ impl Tui {
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
+        let viewport_top = position().map(|(_, y)| y).unwrap_or(0);
+
         Ok(Self {
             state: TuiState::new(),
             terminal,
             skill_sidebar: SkillSidebar::new(),
             evolution_panel: evolution::EvolutionPanel::new(),
             message_tx: None,
+            viewport_top,
+            last_pushed_history: 0,
         })
     }
 
@@ -109,6 +117,9 @@ impl Tui {
                             let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
                             self.state.handle_event(&agent_event);
                             if is_turn_end {
+                                if let Err(e) = self.push_history() {
+                                    eprintln!("warning: push history failed: {e}");
+                                }
                                 if let Some(msg) = self.state.drain_steering_queue() {
                                     if let Some(ref tx) = self.message_tx {
                                         let _ = tx.send(msg);
@@ -167,6 +178,9 @@ impl Tui {
                             let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
                             self.state.handle_event(&agent_event);
                             if is_turn_end {
+                                if let Err(e) = self.push_history() {
+                                    eprintln!("warning: push history failed: {e}");
+                                }
                                 if let Some(msg) = self.state.drain_steering_queue() {
                                     if let Some(ref tx) = self.message_tx {
                                         let _ = tx.send(msg);
@@ -370,6 +384,51 @@ impl Tui {
         }
         false
     }
+
+    /// Pushes any un-pushed chat lines into the terminal's native scrollback
+    /// using the `SetScrollRegion` algorithm. Idempotent: subsequent calls
+    /// with no new chat lines are no-ops.
+    pub fn push_history(&mut self) -> Result<()> {
+        let viewport_top = self.viewport_top;
+        let start = self.last_pushed_history.min(self.state.chat_lines.len());
+        let lines: Vec<String> = self.state.chat_lines[start..]
+            .iter()
+            .flat_map(chat_line_to_text_lines)
+            .collect();
+        self.last_pushed_history = self.state.chat_lines.len();
+
+        if lines.is_empty() || viewport_top == 0 {
+            return Ok(());
+        }
+
+        let mut stdout = io::stdout();
+        push_history_to(&mut stdout, viewport_top, &lines)
+    }
+}
+
+pub(crate) fn chat_line_to_text_lines(line: &ChatLine) -> Vec<String> {
+    let mut buf = String::new();
+    TuiState::append_line_plain(&mut buf, line);
+    buf.lines().map(String::from).collect()
+}
+
+pub(crate) fn push_history_to<W: Write>(
+    out: &mut W,
+    viewport_top: u16,
+    lines: &[String],
+) -> Result<()> {
+    if viewport_top == 0 || lines.is_empty() {
+        return Ok(());
+    }
+    queue!(out, Print(format!("\x1b[1;{viewport_top}r")))?;
+    for line in lines {
+        queue!(out, Print(format!("\x1b[1;{viewport_top}H")))?;
+        queue!(out, Print("\r\n"))?;
+        queue!(out, Print(line))?;
+    }
+    queue!(out, Print("\x1b[r"))?;
+    out.flush()?;
+    Ok(())
 }
 
 pub(crate) fn render(
@@ -629,4 +688,121 @@ pub(crate) fn restore_terminal() -> Result<()> {
     disable_raw_mode()?;
     execute!(io::stdout(), DisableMouseCapture)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::ChatLine;
+    use talos_core::message::ToolResult;
+    use talos_core::tool::ToolProvenance;
+
+    #[test]
+    fn push_history_to_writes_expected_ansi_sequence() {
+        let mut buf: Vec<u8> = Vec::new();
+        push_history_to(&mut buf, 20, &["line1".to_string(), "line2".to_string()]).unwrap();
+        let s = String::from_utf8_lossy(&buf);
+        assert_eq!(
+            s,
+            "\x1b[1;20r\x1b[1;20H\r\nline1\x1b[1;20H\r\nline2\x1b[r",
+        );
+    }
+
+    #[test]
+    fn push_history_to_empty_lines_is_noop() {
+        let mut buf: Vec<u8> = Vec::new();
+        push_history_to(&mut buf, 20, &[]).unwrap();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn push_history_to_zero_viewport_is_noop() {
+        let mut buf: Vec<u8> = Vec::new();
+        push_history_to(&mut buf, 0, &["line".to_string()]).unwrap();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn chat_line_to_text_lines_user_text() {
+        let line = ChatLine::Text("> hello".to_string());
+        assert_eq!(chat_line_to_text_lines(&line), vec!["> hello".to_string()]);
+    }
+
+    #[test]
+    fn chat_line_to_text_lines_user_text_multiline() {
+        let line = ChatLine::Text("> line1\n> line2".to_string());
+        assert_eq!(
+            chat_line_to_text_lines(&line),
+            vec!["> line1".to_string(), "> line2".to_string()],
+        );
+    }
+
+    #[test]
+    fn chat_line_to_text_lines_assistant() {
+        let line = ChatLine::Assistant("response".to_string());
+        assert_eq!(
+            chat_line_to_text_lines(&line),
+            vec!["response".to_string()],
+        );
+    }
+
+    #[test]
+    fn chat_line_to_text_lines_tool_call_pending() {
+        let line = ChatLine::ToolCall {
+            tool_name: "echo".to_string(),
+            arguments: "{}".to_string(),
+            provenance: ToolProvenance::Native,
+            result: None,
+        };
+        assert_eq!(
+            chat_line_to_text_lines(&line),
+            vec!["▸ echo [native]".to_string(), "  {}".to_string()],
+        );
+    }
+
+    #[test]
+    fn chat_line_to_text_lines_tool_call_with_result() {
+        let line = ChatLine::ToolCall {
+            tool_name: "echo".to_string(),
+            arguments: "{}".to_string(),
+            provenance: ToolProvenance::Native,
+            result: Some(ToolResult {
+                tool_use_id: "x".to_string(),
+                content: "ok".to_string(),
+                is_error: false,
+            }),
+        };
+        assert_eq!(
+            chat_line_to_text_lines(&line),
+            vec![
+                "▸ echo [native]".to_string(),
+                "  {}".to_string(),
+                "  ✓ ok".to_string(),
+            ],
+        );
+    }
+
+    #[test]
+    fn chat_line_to_text_lines_tool_call_with_error() {
+        let line = ChatLine::ToolCall {
+            tool_name: "bad".to_string(),
+            arguments: "{}".to_string(),
+            provenance: ToolProvenance::McpRemote {
+                server: "srv".to_string(),
+            },
+            result: Some(ToolResult {
+                tool_use_id: "x".to_string(),
+                content: "boom".to_string(),
+                is_error: true,
+            }),
+        };
+        assert_eq!(
+            chat_line_to_text_lines(&line),
+            vec![
+                "▸ bad [mcp:srv]".to_string(),
+                "  {}".to_string(),
+                "  ✗ boom".to_string(),
+            ],
+        );
+    }
 }
