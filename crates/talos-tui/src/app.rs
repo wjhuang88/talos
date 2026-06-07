@@ -9,7 +9,7 @@ use crossterm::{
         self, DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind,
     },
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode},
 };
 use futures::StreamExt;
 use ratatui::{
@@ -50,6 +50,10 @@ pub struct Tui {
 impl Tui {
     /// Creates a new TUI instance, setting up the terminal in raw mode.
     ///
+    /// I022 sub-slice A (2026-06-07): alt-screen is intentionally not entered;
+    /// the viewport sits at the user's current cursor y. See
+    /// `docs/proposals/tui-codex-overhaul.md` for the rationale.
+    ///
     /// # Errors
     ///
     /// Returns an error if the terminal cannot be initialized or
@@ -57,7 +61,7 @@ impl Tui {
     pub fn new() -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        execute!(stdout, EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
@@ -618,8 +622,11 @@ impl Drop for Tui {
 }
 
 /// Restores the terminal to its original state.
+///
+/// I022 sub-slice A (2026-06-07): the inverse of `Tui::new`; we never entered
+/// alt-screen in the first place, so there is nothing to leave.
 pub(crate) fn restore_terminal() -> Result<()> {
     disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(io::stdout(), DisableMouseCapture)?;
     Ok(())
 }
