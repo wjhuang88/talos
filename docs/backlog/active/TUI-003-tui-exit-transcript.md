@@ -1,165 +1,147 @@
 # TUI-003: TUI exit transcript into terminal scrollback
 
-## Outcome
+> **Status: SUPERSEDED by TUI-002 sub-slice A (inline-by-default refactor).**
+>
+> This story is retained for historical reference. The behavior it
+> intended — "transcript visible in the host scrollback on TUI exit" — is
+> achieved **by construction** once `Tui::new` no longer calls
+> `EnterAlternateScreen` (TUI-002 sub-slice A). The terminal's native
+> scrollback already contains every finalized chat turn; no "dump on
+> exit" step is needed.
+>
+> **Do not implement this story.** Land TUI-002 sub-slice A instead.
+> See `docs/backlog/active/TUI-002-codex-overhaul.md` and
+> `docs/proposals/tui-codex-overhaul.md`.
+
+---
+
+## Original Outcome (historical)
 
 When the user exits the TUI, the session transcript remains visible in the
 host terminal's scrollback — matching the Codex TUI behavior. The TUI no
-longer "swallows" the conversation on exit; the user can scroll up in their
-shell to see what happened.
+longer "swallows" the conversation on exit; the user can scroll up in
+their shell to see what happened.
 
-## Status
+## Why it was wrong
 
-Planned. **No blockers.** This is a TUI lifecycle fix, not a structural
-refactor: it touches `Tui::Drop` and the TUI entry/exit sequence, not
-`state.rs` / `widgets.rs` / `app.rs` event loop. Can land as the next
-iteration (I015 or a dedicated small iteration) ahead of the I015-I017
-foundations and ahead of TUI-002.
+The 2026-06-06 framing proposed achieving this by **keeping
+`EnterAlternateScreen`** and adding a transcript-dump step in
+`impl Drop for Tui` after `LeaveAlternateScreen`. After reading the
+Codex TUI source end-to-end on 2026-06-06, this is not how Codex works:
 
-## Priority
+- Codex TUI never enters alt-screen in the first place. The viewport is
+  inline; the scrollback already contains the transcript.
+- A dump step would print the transcript **after** leaving alt-screen,
+  which is fragile (timing, panic exits, TTY detection, character
+  truncation, sensitive-arg redaction, stdout-vs-stderr, transcript
+  length caps — all of which this story's `Open Questions` section
+  enumerated but could not cleanly resolve).
+- It also conflicted with the user's design principle:
 
-P1. The current "transcript discarded on exit" behavior is the single
-biggest day-to-day UX gap: every TUI session loses its context on quit,
-forcing users to `/export <path>` manually before exit if they want a
-record.
+  > "我们整体的ui设计必须是信息流驱动的,不是框架分割的而是行追加的风格"
+  >
+  > "codex就是流式的呀,整体上一直是当前终端追加内容,只是追加的内容可以是复杂格式或者组件块"
 
-## Required Reads
+  The UI is an information flow, line-appended into the terminal's
+  scrollback. Cells are not widgets in a frame-segmented layout; they
+  are line blocks pushed to the host terminal as the conversation
+  grows.
 
-- `docs/proposals/tui-codex-overhaul.md` — adjacent structural work (TUI-002)
-  that this story does **not** depend on. TUI-003 is lifecycle-layer,
-  TUI-002 is structure-layer.
-- `docs/iterations/I014-tui-completion.md` — provides the
-  `TuiState::transcript_plain_text()` and `transcript_markdown()` methods
-  that the fix reuses.
-- `crates/talos-tui/src/app.rs:50-71` — `Tui::new` (terminal init: alt-screen
-  + raw mode + mouse capture).
-- `crates/talos-tui/src/app.rs:614-625` — `impl Drop for Tui` +
-  `restore_terminal` (terminal teardown: leave alt-screen, disable raw mode,
-  disable mouse capture). **This is where the fix lands.**
-- `crates/talos-tui/src/state.rs:477-503` — `transcript_plain_text` and
-  `transcript_markdown` serializers (deterministic source text, not
-  rendered buffers).
-- `docs/reference/REFERENCE-PROJECTS.md` §687-741 — Codex TUI PRIMARY
-  reference. TBD: confirm the exact Codex mechanism (alt-screen + transcript
-  dump on exit, or no-alt-screen, or custom terminal wrapper) before
-  implementation.
+## What survives in TUI-002 sub-slice A
 
-## Acceptance Criteria
+| Original TUI-003 requirement | How TUI-002 sub-slice A satisfies it |
+|---|---|
+| Transcript visible in scrollback on clean exit | Scrollback **is** the transcript by construction; every finalized turn is appended via `insert_history_lines` (Codex: `codex-rs/tui/src/insert_history.rs`) with `SetScrollRegion(1..viewport.top())`. |
+| No transcript on panic | The scrollback simply contains the turns that were finalized before the panic; the partial streaming state lives in the viewport (which is discarded on panic) and is not pushed to scrollback. No explicit gating needed. |
+| Transcript not dumped in `--print` / `-p` mode | Print mode never enters the TUI; stdout already contains the conversation. |
+| Transcript not dumped in inline mode | Inline mode never enters alt-screen; the conversation is in scrollback by definition. (After TUI-002 sub-slice A, the TUI **is** inline by default; the `--inline` flag becomes the default behavior and a future `--alt-screen` flag opts in to full-screen sub-views only.) |
+| `--no-transcript-on-exit` opt-out | No longer needed. Users who want a clean scrollback can use `--alt-screen` mode for sub-views only, or `clear` their scrollback manually. |
+| Transcript markers (`--- Talos session transcript (N turns) ---` / `--- end of session ---`) | Not needed; the scrollback contains the conversation directly, line by line, with no separator. |
+| `/export <path>` still works | Preserved unchanged. I014's `crates/talos-tui/src/export.rs` (thin permission wrapper around `TuiState::transcript_plain_text`/`transcript_markdown`) is the canonical save path; remains the right way to capture a transcript to disk. |
+
+## Original Acceptance Criteria (for audit trail)
+
+The original acceptance criteria from the 2026-06-06 version of this
+file were:
 
 - [ ] When the TUI exits cleanly (double Ctrl+C, `/quit`, `/exit`),
       the conversation transcript is appended to the host terminal's
       scrollback in plain text form.
-- [ ] When the TUI exits via panic or signal, no transcript is dumped
-      (avoid spamming scrollback with partial data on crash).
-- [ ] Transcript is **not** dumped when `--print` / `-p` is used (the
-      user is in print mode, not TUI; transcript goes to stdout already).
-- [ ] Transcript is **not** dumped when `--inline` is used (inline mode
-      does not use alt-screen; the conversation is already in scrollback).
-- [ ] Transcript dump respects a `--no-transcript-on-exit` opt-out flag
-      for users who want a clean scrollback.
-- [ ] The transcript dump shows a clear marker (e.g. `--- Talos session
-      transcript (12 turns) ---` and `--- end of session ---`) so users
-      can grep / scroll past it.
-- [ ] The transcript dump goes to **stdout** (not stderr) so it is
-      captured by shell redirects and tmux/screen scrollback.
-- [ ] `cargo test -p talos-tui` passes; the new code path is covered by
-      at least 3 unit tests (clean exit dumps, panic exit does not dump,
-      flag opt-out works).
+- [ ] When the TUI exits via panic or signal, no transcript is dumped.
+- [ ] Transcript is **not** dumped when `--print` / `-p` is used.
+- [ ] Transcript is **not** dumped when `--inline` is used.
+- [ ] Transcript dump respects a `--no-transcript-on-exit` opt-out flag.
+- [ ] The transcript dump shows clear markers.
+- [ ] The transcript dump goes to **stdout** (not stderr).
+- [ ] `cargo test -p talos-tui` passes; new code path covered by
+      at least 3 unit tests.
 - [ ] `cargo test --workspace` passes with no regressions.
 - [ ] Pre-existing 5 × `clippy::collapsible_if` warnings on `talos-tui`
-      are unchanged or reduced; no new warnings.
+      are unchanged or reduced.
 - [ ] I008 hook-based learning still observes the same `HookEvent`
-      ordering (verified by `crates/talos-cli/tests/hooks_e2e.rs` at
-      `RUST_LOG=debug`).
+      ordering.
 
-## Proposed Approach (Reference for the Iteration)
+**Status of these criteria**: all are subsumed by TUI-002 sub-slice A's
+acceptance criteria. See `docs/backlog/active/TUI-002-codex-overhaul.md`.
 
-The minimal fix reuses I014's transcript serializers. In
-`crates/talos-tui/src/app.rs`, the `impl Drop for Tui` block (lines 614-618)
-currently calls `restore_terminal()` and returns. The fix:
+## Required Reads (for historical context)
 
-```rust
-impl Drop for Tui {
-    fn drop(&mut self) {
-        let _ = restore_terminal();
-        // New: dump transcript to scrollback unless opted out.
-        // Guard: only dump on clean exit (state.should_exit == true).
-        if self.state.should_exit && transcript_on_exit_enabled() {
-            let transcript = self.state.transcript_plain_text();
-            if !transcript.is_empty() {
-                println!(
-                    "\n--- Talos session transcript ({} chars) ---\n{}\
-                     \n--- end of session ---\n",
-                    transcript.chars().count(),
-                    transcript,
-                );
-                let _ = io::stdout().flush();
-            }
-        }
-    }
-}
-```
+- `docs/proposals/tui-codex-overhaul.md` — full proposal including
+  sub-slice A's architectural foundation.
+- `docs/reference/codex-tui-architecture.md` — authoritative record of
+  Codex TUI's verified implementation as of the 2026-06-06 source read.
+- `docs/iterations/I014-tui-completion.md` — provides the
+  `TuiState::transcript_plain_text()` and `transcript_markdown()` methods
+  that `/copy` and `/export` reuse (unchanged in the refactor).
+- `crates/talos-tui/src/app.rs:50-71` — `Tui::new` (the
+  `EnterAlternateScreen` call that TUI-002 sub-slice A removes).
+- `crates/talos-tui/src/app.rs:614-625` — `impl Drop for Tui` +
+  `restore_terminal` (the `LeaveAlternateScreen` call that TUI-002
+  sub-slice A removes).
+- `crates/talos-tui/src/state.rs:477-503` — `transcript_plain_text` and
+  `transcript_markdown` serializers (preserved unchanged; reused by
+  `/copy all`/`/export` and by `/copy last` for
+  `last_assistant_text`).
+- `crates/talos-tui/src/export.rs` — thin permission wrapper around
+  `transcript_plain_text`/`transcript_markdown` (preserved unchanged;
+  `/export <path>` is the canonical save path).
+- `docs/reference/REFERENCE-PROJECTS.md` §687-741 — Codex TUI PRIMARY
+  reference. Verified 2026-06-06 to confirm the inline-by-default model
+  (alt-screen is opt-in for sub-views only; `EnterAlternateScreen` is
+  not called in the default code path).
 
-The `transcript_on_exit_enabled()` helper consults:
-1. CLI flag `--no-transcript-on-exit` (highest priority).
-2. Config field `tui.transcript_on_exit: bool` (default `true`).
-3. **The `should_exit` flag** (skipped on panic — panics do not set
-   `should_exit`, so the dump is automatically skipped).
+## Original Open Questions (resolved by TUI-002 sub-slice A)
 
-Why this works:
-- `TuiState::transcript_plain_text()` already produces deterministic
-  source text (excludes `current_turn_text` streaming, includes all
-  `ChatLine::{Text, Assistant, ToolCall}` entries).
-- The transcript is written to stdout, after `LeaveAlternateScreen`, so
-  it lands in the host shell's scrollback.
-- The `should_exit` check naturally filters out panic and signal-induced
-  exits.
-- The transcript contains no terminal escape sequences (it's plain text),
-  so it does not corrupt the scrollback.
+- **Exact Codex mechanism**: Resolved. Codex uses
+  "no-alt-screen at all" with `SetScrollRegion(1..viewport.top())`
+  push-append for finalized turns. The terminal's scrollback is the
+  transcript; no dump step exists.
+- **Transcript length**: N/A. The scrollback is the terminal's own
+  scrollback (typically 10k+ rows); the user's terminal handles
+  retention. The `/export <path>` path is the way to capture a full
+  transcript to disk.
+- **Redaction**: Out of scope for sub-slice A. Tool call cells can
+  redact sensitive arguments at the cell-render layer (future work;
+  tracked as residual work in TUI-002).
+- **Timing**: N/A. There is no dump step; the scrollback is updated
+  continuously as turns finalize.
+- **TTY check**: N/A. There is no dump step; the scrollback is the
+  terminal's own scrollback, so TTY semantics are inherited from the
+  host terminal.
 
-## Open Questions
+## Original Non-Goals (re-asserted for TUI-002 sub-slice A)
 
-- **Exact Codex mechanism**: I should confirm whether Codex uses
-  "alt-screen + transcript dump" (our proposed approach) or
-  "no-alt-screen at all" (which is a much larger change). Look at
-  `codex-rs/tui/src/tui.rs` and `custom_terminal.rs` before implementation.
-- **Transcript length**: long sessions may produce MB-scale transcripts.
-  Should we cap at N characters with a `(...truncated, use /export for
-  full transcript)` notice?
-- **Redaction**: tool calls can include sensitive arguments (paths, env
-  vars, file contents). Codex appears to dump raw. We should at minimum
-  document the behavior; `--redact-on-exit` is a follow-up.
-- **Timing**: the dump happens in `Drop`. If `Drop` is called during
-  stack unwinding from a panic, the dump will be skipped via the
-  `should_exit` check. Verify this is sufficient.
-- **TTY check**: should we dump only when stdout is a TTY? Or always?
-  Dumping to a piped stdout (e.g. `talos --tui | tee session.log`)
-  would write the transcript to the pipe, which is probably what the
-  user wants.
-
-## Non-Goals
-
-- No new TUI features (only exit behavior change).
-- No changes to TUI internals (state, widgets, key handling) — pure
-  lifecycle fix.
-- No removal of the alt-screen mode (we keep it; we add a transcript
-  dump on exit).
-- No changes to `/export <path>` (still the canonical way to save a
-  transcript to disk).
-- No interaction with the I008 hook layer (hooks fire during the
-  turn, not on exit; the transcript serializer does not invoke hooks).
+- No new TUI features beyond the architectural flip.
+- No changes to TUI internals (state, widgets, key handling) beyond what
+  sub-slice A requires.
+- No changes to `/export <path>` (still the canonical save path).
+- No interaction with the I008 hook layer.
 
 ## Scheduling
 
-- **Next iteration slot** (I015-equivalent or a small dedicated iteration).
-- Not blocked by I015-I017 (foundations). Not blocked by TUI-002
-  (structural refactor). Can land independently.
-- Estimated effort: 0.5-1 day (1 file in `crates/talos-tui/src/app.rs`,
-  3-4 unit tests, 1 docs commit, 1 atomic code commit).
+- **Do not schedule independently.** Sub-slice A is the replacement;
+  land it via TUI-002 (I022 or a dedicated small iteration).
+- Estimated effort for sub-slice A: ~1 week (1 new `tui/` subdir with
+  7 files, 1 new `history_cell/` subdir with 2 files, slim `app.rs`,
+  10+ unit tests, 1 docs commit, 1 atomic code commit).
 - Should ship as a single atomic commit on `main`.
-
-## Residual Work Destination
-
-Per-user preferences for transcript formatting (e.g. colored markdown vs
-plain text, character-level truncation, sensitive-arg redaction) stay in
-this story's notes. The behavior flip — "transcript visible in scrollback
-on exit" — is the DoD.

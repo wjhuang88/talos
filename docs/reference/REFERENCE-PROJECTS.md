@@ -686,7 +686,21 @@ https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc.md
 
 #### Codex (Rust, adopt directly — PRIMARY REFERENCE for TUI)
 
-**Architecture**: Full-screen ratatui TUI, 80+ source modules in `codex-rs/tui/src/`.
+**Architecture**: **Inline-by-default** ratatui TUI with a custom terminal
+wrapper (Codex forks `ratatui::Terminal` from MIT-licensed source to add
+inline-viewport support; see `codex-rs/tui/src/custom_terminal.rs`). The
+viewport sits at the cursor's current y; finalized chat turns are
+appended to the scrollback above the viewport via `insert_history_lines`
+(`codex-rs/tui/src/insert_history.rs`) using
+`SetScrollRegion(1..viewport.top())`. The terminal's native scrollback **is
+the transcript**. Alt-screen is opt-in for full-screen sub-views only
+(model picker, theme picker, keymap remapper, plugin browser, onboarding)
+and is gated by `alt_screen_enabled: bool` (default `true` in sub-views).
+80+ source modules in `codex-rs/tui/src/`.
+
+> **Authoritative technical reference for the verified 2026-06-06 source
+> read**: `docs/reference/codex-tui-architecture.md` (11 sections,
+> file:line evidence, gap analysis, Talos mapping table).
 
 ```
 https://github.com/openai/codex/tree/main/codex-rs/tui/src/
@@ -697,8 +711,8 @@ https://github.com/openai/codex/tree/main/codex-rs/tui/src/
 - `app_event.rs` — `AppEvent` enum with 100+ variants (internal message bus)
 - `chatwidget.rs` — Main conversation interface (ChatWidget + HistoryCell)
 - `bottom_pane/` — Interactive footer: ChatComposer, ApprovalOverlay, SlashCommands
-- `history_cell/` — Per-type session record renderers (messages, exec, approvals, patches, MCP, plans)
-- `tui/` — Terminal backend: EventBroker, FrameRateLimiter, keyboard modes
+- `history_cell/` — Per-type session record renderers (messages, exec, approvals, patches, MCP, plans). Each cell produces `Vec<Line<'static>>` (lines as data, not widgets); the cell stream is push-appended to scrollback by `ChatWidget`.
+- `tui/` — Terminal backend: custom `Terminal` (inline-viewport), `insert_history` (SetScrollRegion push-append), `EventBroker` (stdin pause/resume for `$EDITOR` handoff), `FrameRequester` (actor-style rate-limited redraw), `FrameRateLimiter` (120 FPS cap), `JobControl` (SIGTSTP with alt-screen awareness), `KeyboardModes` (enhancement flags).
 - `keymap.rs` — Context-aware keymaps with Vim mode
 - `markdown_render.rs` — Markdown → ratatui Lines conversion
 - `diff_render.rs` — Git-style diff display
