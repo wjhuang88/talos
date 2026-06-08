@@ -5,7 +5,10 @@ append into scrollback as the conversation grows (information-flow driven, line-
 and resume the shell's previous content after the TUI exits — matching the Codex TUI
 experience.
 
-## Status: PLANNED (2026-06-07)
+## Status: ACTIVE (2026-06-08)
+
+Core architectural flip landed (3 atomic commits: `5ed0e5e`, `684600f`, `8cd0756`).
+Infrastructure work (tui/ subdir, history_cell/ subdir, widget migration) deferred to I023.
 
 ## Decision Gate
 
@@ -32,25 +35,23 @@ Required reading before implementation:
 
 ## Selected Stories
 
-- [ ] #I022-S1: New `tui/` subdir with custom terminal, `insert_history`, `EventBroker`,
-      `FrameRequester`, `FrameRateLimiter`, `JobControl` (per ADR-018), and
-      `KeyboardModes`. `Tui::new` and `impl Drop for Tui` no longer call
+- [x] #I022-S1: Architectural flip — `Tui::new` and `impl Drop for Tui` no longer call
       `EnterAlternateScreen` / `LeaveAlternateScreen`; the viewport sits at the user's
-      current cursor y.
-- [ ] #I022-S2: New `history_cell/` subdir with the `HistoryCell` trait, `HistoryRenderMode`,
-      and base cells (`PlainHistoryCell`, `PrefixedWrappedHistoryCell`,
-      `CompositeHistoryCell`, `WebHyperlinkHistoryCell`).
-- [ ] #I022-S3: A finalized chat turn produces a `Vec<Line<'static>>` and is **appended to
-      the scrollback** via `insert_history_lines` (`SetScrollRegion(1..viewport.top())` +
-      `MoveTo` + `Print("\r\n")` per line + `ResetScrollRegion`), **not** drawn into a
-      ratatui frame. `schedule_frame()` is called so the viewport redraws below the new
-      history rows.
-- [ ] #I022-S4: Existing widgets (`ToolCallBubble`, `ApprovalOverlay`, etc.) become
-      history cells; the render loop becomes a cell-stream consumer. `state::handle_slash_command`
-      match-on-`&str` (`crates/talos-tui/src/state.rs:316-372`) becomes a cell push.
-- [ ] #I022-S5: Verification, documentation sync, and runtime evidence recorded in this
-      file. README updated. `EVOLUTION.md` lessons recorded if any non-obvious problems
-      were encountered.
+      current cursor y. (Commit `5ed0e5e`, 2026-06-07)
+- [x] #I022-S2: Push-to-scrollback mechanism — `Tui::push_history` writes finalized
+      chat lines to the terminal's native scrollback via raw ANSI `SetScrollRegion`
+      escape codes (crossterm 0.29 lacks the high-level API). Hooked into both `run()`
+      and `run_with_approval()` on `AgentEvent::TurnEnd`. 9 unit tests added.
+      (Commit `684600f`, 2026-06-08)
+- [x] #I022-S3: Chat paragraph slim — `build_chat_text` and `chat_scroll_offset` now
+      only render `chat_lines[turn_start_chat_index..]` (the current turn). Past turns
+      are in scrollback. `turn_start_chat_index` set on user submit and reset on TurnEnd
+      and `/new`. (Commit `8cd0756`, 2026-06-08)
+- [ ] #I022-S4: **Deferred to I023** — New `tui/` subdir with custom terminal,
+      `insert_history`, `EventBroker`, `FrameRequester`, `FrameRateLimiter`, `JobControl`
+      (per ADR-018), and `KeyboardModes`.
+- [ ] #I022-S5: **Deferred to I023** — New `history_cell/` subdir with the `HistoryCell`
+      trait, `HistoryRenderMode`, and base cells. Existing widgets become history cells.
 
 ## Scope
 
@@ -212,17 +213,35 @@ dependency, just making the transitive dep explicit).
 - **Cell-level redaction** of sensitive tool call arguments (paths, env vars, file
   contents) — TUI-002 notes.
 
-## Verification (template; filled in at completion)
+## Verification (filled in at completion)
 
-- `cargo test --workspace` exits 0: ___ tests pass (baseline 652).
-- `cargo clippy --workspace` is clean: no new warnings.
-- `cargo run -p talos-cli` (TUI mode) does not clear the host terminal.
-- Chat turn appends into scrollback above the viewport; visible in manual transcript.
-- `Ctrl+Z` suspends the TUI; `fg %1` resumes it; no scrollback corruption.
-- I008 hook ordering unchanged: `cargo test -p talos-cli --test hooks_e2e` passes at
-  `RUST_LOG=debug`.
-- `/copy last`, `/copy all`, `/export <path>`, `/plugins` all work in the new architecture.
-- Pre-existing 5 × `clippy::collapsible_if` warnings on `talos-tui` are unchanged or
-  reduced.
+- `cargo test --workspace` exits 0: **661 tests pass** (baseline 652; +9 from push_history_to and chat_line_to_text_lines unit tests).
+- `cargo clippy -p talos-tui --lib`: 3 pre-existing `collapsible_if` warnings unchanged (was reported as 5 in earlier summary; actual count is 3: 2 in app.rs, 1 in state.rs). No new warnings.
+- `cargo test -p talos-cli --test hooks_e2e` at `RUST_LOG=debug`: **passes** (I008 hook ordering preserved).
+- `Tui::new` does **not** call `EnterAlternateScreen` (verified in `crates/talos-tui/src/app.rs:65-79`).
+- `impl Drop for Tui` does **not** call `LeaveAlternateScreen` (verified in `crates/talos-tui/src/app.rs:683-691`).
+- `Tui::push_history` writes finalized chat lines to scrollback via raw ANSI `SetScrollRegion` escape codes (verified in `crates/talos-tui/src/app.rs:391-406`).
+- `build_chat_text` only renders `chat_lines[turn_start_chat_index..]` (verified in `crates/talos-tui/src/app.rs:515-578`).
+- Public API of `talos-tui` unchanged: 5 re-exports at `lib.rs:15-19` (`Tui`, `SkillInfo`, `SkillSidebar`, `ApprovalState`, `nord`).
+- `TuiState::append_line_plain` promoted from `fn` to `pub(crate) fn` (needed by `chat_line_to_text_lines` for `/copy all` parity).
+- `TuiState::turn_start_chat_index: usize` added (default 0); set on user submit, reset on TurnEnd and `/new`.
+- `/copy last`, `/copy all`, `/export <path>`, `/plugins` all work (verified via unit tests in `tests.rs`).
 - `README.md` updated to reflect the new TUI behavior.
-- This file updated with execution results and runtime evidence.
+- This file updated with execution results.
+
+### Runtime Evidence (manual transcript pending)
+
+The inline-by-default behavior requires a manual runtime test to verify:
+- `cargo run -p talos-cli` (TUI mode) does not clear the host terminal.
+- Chat turns append into scrollback above the viewport.
+- Exiting returns the cursor to the entry anchor.
+
+**Pending**: manual runtime test with a real terminal emulator (iTerm2, gnome-terminal, or similar).
+
+### Deferred to I023
+
+- `tui/` subdir with custom terminal, `insert_history`, `EventBroker`, `FrameRequester`, `FrameRateLimiter`, `JobControl` (per ADR-018), and `KeyboardModes`.
+- `history_cell/` subdir with `HistoryCell` trait, `HistoryRenderMode`, and base cells.
+- Widget migration (`ToolCallBubble`, `ApprovalOverlay` → history cells).
+- MIT attribution header in `custom_terminal.rs`.
+- `// SAFETY:` comment in `tui/job_control.rs` referencing ADR-018.
