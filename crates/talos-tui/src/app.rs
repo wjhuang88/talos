@@ -353,6 +353,7 @@ impl Tui {
                                     "Message queued (steering). Press Esc to cancel.",
                                 );
                             } else {
+                                self.state.turn_start_chat_index = self.state.chat_lines.len();
                                 self.state.append_user_message(&input);
                                 self.state.is_processing = true;
                                 if let Some(ref tx) = self.message_tx {
@@ -514,7 +515,8 @@ pub(crate) fn render(
 pub(crate) fn build_chat_text(state: &TuiState) -> Text<'static> {
     let mut lines: Vec<Line<'static>> = Vec::new();
 
-    for line in &state.chat_lines {
+    let start = state.turn_start_chat_index.min(state.chat_lines.len());
+    for line in &state.chat_lines[start..] {
         match line {
             ChatLine::Text(text) => {
                 lines.push(Line::from(text.clone()));
@@ -577,7 +579,8 @@ pub(crate) fn build_chat_text(state: &TuiState) -> Text<'static> {
 }
 
 pub(crate) fn chat_scroll_offset(state: &TuiState, viewport_height: usize) -> u16 {
-    let total_lines = state.chat_lines.len()
+    let start = state.turn_start_chat_index.min(state.chat_lines.len());
+    let total_lines = (state.chat_lines.len() - start)
         + if state.current_turn_text.is_empty() {
             0
         } else {

@@ -91,6 +91,7 @@ pub(crate) struct TuiState {
     /// Messages queued for follow-up (delivered when agent would stop).
     pub(crate) followup_queue: Vec<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
+    pub(crate) turn_start_chat_index: usize,
 }
 
 impl TuiState {
@@ -297,6 +298,7 @@ impl TuiState {
             AgentEvent::TurnEnd { usage, .. } => {
                 self.is_processing = false;
                 self.finalize_turn();
+                self.turn_start_chat_index = self.chat_lines.len();
                 self.usage = usage.clone();
             }
             AgentEvent::Error { message } => {
@@ -352,6 +354,7 @@ impl TuiState {
                 self.usage = Usage::default();
                 self.branch_id = None;
                 self.plugin_observations.clear();
+                self.turn_start_chat_index = 0;
                 self.append_system("New session started.");
             }
             "/plugins" => {
