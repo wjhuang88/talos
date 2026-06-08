@@ -26,6 +26,7 @@ acceptance criteria, verification evidence, or iteration state.
 | I013 Boundary Control | Complete | [I013 Boundary Control](iterations/I013-boundary-control.md) | Boundary ADRs recorded; #ARCH-S8 R1 implemented |
 | I010 R3 Product Polish | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All 5 stories done; 567 tests, clippy clean |
 | I010 R2 Architecture Convergence | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All acceptance criteria met; 532 tests, clippy clean |
+| I015 Provider Schema | Complete | [I015 Provider Schema](iterations/I015-provider-schema.md) | Schema types and built-in defaults landed 2026-06-06; one-way opencode import with 9 tests landed 2026-06-08; `cargo test -p talos-config -p talos-provider -p talos-cli` passes |
 
 ## Blocked / Paused
 
@@ -38,7 +39,6 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I022 TUI Inline-by-Default | Planned | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Start as next TUI architecture slice; sub-slice A of [TUI-002](backlog/active/TUI-002-codex-overhaul.md); SIGTSTP site pre-authorized by [ADR-018](decisions/018-tui-job-control-unsafe.md); 652/652 baseline |
-| I015 Provider Schema | Planned | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Start after I014 or explicit provider priority; follow ADR-013 |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 

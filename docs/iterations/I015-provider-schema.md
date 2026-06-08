@@ -3,7 +3,7 @@
 **User can**: Configure multiple OpenAI-compatible providers without recompiling Talos, while
 keeping provider configuration self-contained and secrets out of files.
 
-## Status: ACTIVE
+## Status: COMPLETE
 
 ## Decision Gate
 
@@ -12,7 +12,7 @@ boundary requires a new ADR and is out of scope for this iteration.
 
 ## Selected Stories
 
-- [~] #I011-S2: Provider plugin architecture foundation
+- [x] #I011-S2: Provider plugin architecture foundation
 - [ ] Reasoning/thinking field follow-up only if it stays within the schema contract and receives
       its own ADR before public protocol/event changes.
 
@@ -36,8 +36,8 @@ boundary requires a new ADR and is out of scope for this iteration.
 - [x] Config schema supports named providers and models.
 - [x] API keys remain env-var references only.
 - [x] Active provider/model resolution is deterministic.
-- [ ] Migration/import path is one-way and tested.
-- [ ] `cargo test -p talos-config -p talos-provider -p talos-cli` passes.
+- [x] Migration/import path is one-way and tested.
+- [x] `cargo test -p talos-config -p talos-provider -p talos-cli` passes.
 
 ## 2026-06-06 Progress
 
@@ -50,8 +50,19 @@ boundary requires a new ADR and is out of scope for this iteration.
 - Local Bailian test config was migrated to `provider = "bailian"` with `glm-5` limits
   `context_limit = 202752` and `output_limit = 4096`.
 
+## 2026-06-08 Progress
+
+- Added `opencode` module to `talos-config` with `import_opencode_providers()`.
+- Translates opencode JSON provider blocks into Talos `ProviderConfig`/`ModelConfig`.
+- Supports full config (`{ "provider": { ... } }`) or bare provider object.
+- Maps `npm` field to `ProviderProtocol` (anthropic → `AnthropicMessages`, default → `OpenAIChat`).
+- Merges imported providers into existing `Config` via `Config::import_opencode_providers()`.
+- 9 unit tests cover: single/multiple provider import, bare object, missing fields, unknown npm,
+  invalid JSON/schema, and partial model limits.
+- 36 tests pass in `talos-config` (was 27; +9 from opencode import), 37 in `talos-provider`,
+  24 in `talos-cli`.
+
 ## Residual Work
 
-- Add one-way importer or explicit migration tool for opencode-style provider config.
 - Consider exposing configured `context_limit` to the future compaction trigger after the system
   prompt and conversation history are separated enough to compact safely.

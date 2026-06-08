@@ -7,8 +7,9 @@ provider loading remains deferred.
 
 ## Status
 
-Active. First schema slice landed on 2026-06-06: named provider/model config, env-var-only
-secrets, built-in defaults, and local config migration. Opencode import remains pending.
+Complete. Schema slice and opencode import landed on 2026-06-08: named provider/model config,
+env-var-only secrets, built-in defaults, local config migration, and one-way opencode import with
+9 unit tests. `cargo test -p talos-config -p talos-provider -p talos-cli` passes.
 
 ## Priority
 
@@ -27,7 +28,7 @@ P2.
 - [x] Secrets are referenced by env var names only; config stores no API keys.
 - [x] Model resolution behavior follows ADR-013 for active provider/model selection.
 - [x] Dynamic loading, FFI, Node/Python runtimes, and package managers remain out of scope.
-- [ ] Migration/import behavior is covered by tests.
+- [x] Migration/import behavior is covered by tests.
 
 ## Residual Work Destination
 
