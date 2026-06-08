@@ -15,7 +15,7 @@ use crossterm::{
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame, Terminal,
+    Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
@@ -67,9 +67,17 @@ impl Tui {
         let mut stdout = io::stdout();
         execute!(stdout, EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend)?;
-
+        
         let viewport_top = position().map(|(_, y)| y).unwrap_or(0);
+        let terminal_height = crossterm::terminal::size().map(|(_, h)| h).unwrap_or(24);
+        let available_height = terminal_height.saturating_sub(viewport_top);
+        
+        let terminal = Terminal::with_options(
+            backend,
+            TerminalOptions {
+                viewport: Viewport::Inline(available_height),
+            },
+        )?;
 
         Ok(Self {
             state: TuiState::new(),
