@@ -11,6 +11,8 @@ use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
 
+pub mod opencode;
+
 /// Error types for configuration operations.
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -408,6 +410,22 @@ impl Config {
             )));
         }
 
+        Ok(())
+    }
+
+    /// Import opencode-style provider definitions and merge them into this config.
+    ///
+    /// Imports are one-way: opencode config is translated into Talos
+    /// `ProviderConfig` values, but Talos config remains the source of truth
+    /// after import.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::ParseError`] if the input is not valid JSON or
+    /// does not match the expected opencode provider schema.
+    pub fn import_opencode_providers(&mut self, json: &str) -> Result<(), ConfigError> {
+        let imported = opencode::import_opencode_providers(json)?;
+        self.providers.extend(imported);
         Ok(())
     }
 }
