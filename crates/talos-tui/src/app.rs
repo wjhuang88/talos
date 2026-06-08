@@ -1,22 +1,17 @@
 //! TUI application loop and layout rendering.
 
-use std::io::{self, Stdout, Write};
+use std::io::{self, Write};
 use std::time::Duration;
 
 use anyhow::Result;
 use crossterm::{
-    cursor::position,
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind,
-    },
+    event::{self, Event, EventStream, KeyCode, KeyEventKind},
     execute, queue,
     style::Print,
-    terminal::{disable_raw_mode, enable_raw_mode},
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame, Terminal,
-    backend::CrosstermBackend,
+    Frame,
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span, Text},
@@ -27,6 +22,7 @@ use talos_core::TuiApprovalRequest;
 use talos_core::message::{AgentEvent, Usage};
 use tokio::sync::{broadcast, mpsc};
 
+use crate::custom_terminal::CustomTerminal;
 use crate::evolution::{self, EvolutionPanel};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, ChatLine, CtrlCState, TuiState};
@@ -40,7 +36,7 @@ pub struct Tui {
     /// Internal state of the TUI.
     state: TuiState,
     /// Terminal backend.
-    terminal: Terminal<CrosstermBackend<Stdout>>,
+    terminal: CustomTerminal,
     /// Skill sidebar panel.
     skill_sidebar: SkillSidebar,
     /// Evolution insights panel.
@@ -63,13 +59,8 @@ impl Tui {
     /// Returns an error if the terminal cannot be initialized or
     /// raw mode cannot be enabled.
     pub fn new() -> Result<Self> {
-        enable_raw_mode()?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnableMouseCapture)?;
-        let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend)?;
-        
-        let viewport_top = position().map(|(_, y)| y).unwrap_or(0);
+        let terminal = CustomTerminal::new()?;
+        let viewport_top = terminal.viewport_area.top();
 
         Ok(Self {
             state: TuiState::new(),
@@ -678,22 +669,6 @@ pub(crate) fn calculate_cost(usage: &Usage) -> String {
     let total = usage.input_tokens + usage.output_tokens;
     let cost = (total as f64) * 0.003 / 1000.0;
     format!("${cost:.4}")
-}
-
-impl Drop for Tui {
-    fn drop(&mut self) {
-        let _ = restore_terminal();
-    }
-}
-
-/// Restores the terminal to its original state.
-///
-/// I022 sub-slice A (2026-06-07): the inverse of `Tui::new`; we never entered
-/// alt-screen in the first place, so there is nothing to leave.
-pub(crate) fn restore_terminal() -> Result<()> {
-    disable_raw_mode()?;
-    execute!(io::stdout(), DisableMouseCapture)?;
-    Ok(())
 }
 
 #[cfg(test)]
