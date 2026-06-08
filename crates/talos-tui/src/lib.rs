@@ -5,9 +5,9 @@
 
 mod app;
 mod clipboard;
-mod custom_terminal;
 pub mod evolution;
 mod export;
+mod inline_terminal;
 mod sidebar;
 mod state;
 mod theme;

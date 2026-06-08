@@ -1,66 +1,72 @@
 //! TUI application loop and layout rendering.
+//!
+//! Inline-by-default rendering model (I022):
+//! - No alternate screen; content is appended to the terminal's native scrollback.
+//! - Finalized turns are pushed above the viewport via `insert_history`.
+//! - The viewport only contains the active streaming area + input + status bar.
+//! - Exit leaves all content in the terminal for native scrollback review.
 
-use std::io::{self, Write};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, EventStream, KeyCode, KeyEventKind},
-    execute, queue,
-    style::Print,
+    terminal::enable_raw_mode,
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout},
     style::{Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Widget, Wrap},
+    widgets::{Block, Borders, Paragraph},
 };
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::{AgentEvent, Usage};
 use tokio::sync::{broadcast, mpsc};
 
-use crate::custom_terminal::CustomTerminal;
 use crate::evolution::{self, EvolutionPanel};
+use crate::inline_terminal::InlineTerminal;
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, ChatLine, CtrlCState, TuiState};
-use crate::widgets::{ApprovalOverlay, ToolCallBubble};
+use crate::widgets::ApprovalOverlay;
 
 /// Main TUI application for the Talos agent.
 ///
 /// Provides a terminal-based chat interface with streaming output,
-/// input handling, and status display.
+/// input handling, and status display. Uses inline-by-default rendering:
+/// content appends to the terminal, not to an alternate screen buffer.
 pub struct Tui {
     /// Internal state of the TUI.
     state: TuiState,
     /// Terminal backend.
-    terminal: CustomTerminal,
+    terminal: InlineTerminal,
     /// Skill sidebar panel.
     skill_sidebar: SkillSidebar,
     /// Evolution insights panel.
     evolution_panel: EvolutionPanel,
     /// Channel to send user messages to the agent loop.
     message_tx: Option<mpsc::UnboundedSender<String>>,
-    viewport_top: u16,
+    /// Index into chat_lines up to which content has been pushed to scrollback.
     last_pushed_history: usize,
 }
 
 impl Tui {
-    /// Creates a new TUI instance, setting up the terminal in raw mode.
+    /// Creates a new TUI instance with an inline viewport.
     ///
-    /// I022 sub-slice A (2026-06-07): alt-screen is intentionally not entered;
-    /// the viewport sits at the user's current cursor y. See
-    /// `docs/proposals/tui-codex-overhaul.md` for the rationale.
+    /// The viewport is anchored at the current cursor position with height = 0,
+    /// so no blank lines are produced on initialization.
     ///
     /// # Errors
     ///
     /// Returns an error if the terminal cannot be initialized or
     /// raw mode cannot be enabled.
     pub fn new() -> Result<Self> {
-        let terminal = CustomTerminal::new()?;
-        let viewport_top = terminal.viewport_area.top();
+        print_banner();
+
+        enable_raw_mode()?;
+
+        let terminal = InlineTerminal::new()?;
 
         Ok(Self {
             state: TuiState::new(),
@@ -68,7 +74,6 @@ impl Tui {
             skill_sidebar: SkillSidebar::new(),
             evolution_panel: evolution::EvolutionPanel::new(),
             message_tx: None,
-            viewport_top,
             last_pushed_history: 0,
         })
     }
@@ -76,27 +81,16 @@ impl Tui {
     /// Runs the main TUI event loop, receiving agent events from the broadcast channel.
     ///
     /// This method blocks until the user exits via double Ctrl+C.
-    ///
-    /// # Arguments
-    ///
-    /// * `event_rx` — A receiver for [`AgentEvent`] from the agent's broadcast channel.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if terminal I/O fails and the event channel closes unexpectedly.
     pub async fn run(&mut self, mut event_rx: broadcast::Receiver<AgentEvent>) -> Result<()> {
         let mut event_stream = EventStream::new();
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
 
         loop {
-            let state = &self.state;
-            let sidebar = &self.skill_sidebar;
-            let evo = &self.evolution_panel;
-            self.terminal
-                .draw(|frame| render(frame, state, sidebar, evo))?;
-            
-            let mut stdout = io::stdout();
-            let _ = execute!(stdout, crossterm::style::Print("\n"));
+            self.state.expire_status_message();
+            if let Err(e) = self.flush_scrollback() {
+                eprintln!("warning: flush scrollback failed: {e}");
+            }
+            self.draw_frame()?;
 
             tokio::select! {
                 _ = render_interval.tick() => {}
@@ -106,27 +100,8 @@ impl Tui {
                     }
                 }
                 event = event_rx.recv() => {
-                    match event {
-                        Ok(agent_event) => {
-                            let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
-                            self.state.handle_event(&agent_event);
-                            if is_turn_end {
-                                if let Err(e) = self.push_history() {
-                                    eprintln!("warning: push history failed: {e}");
-                                }
-                                if let Some(msg) = self.state.drain_steering_queue() {
-                                    if let Some(ref tx) = self.message_tx {
-                                        let _ = tx.send(msg);
-                                    }
-                                }
-                            }
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            self.state.append_system(&format!("Warning: dropped {n} event(s)"));
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            break;
-                        }
+                    if self.handle_agent_event(event) {
+                        break;
                     }
                 }
             }
@@ -136,14 +111,11 @@ impl Tui {
             }
         }
 
+        self.restore();
         Ok(())
     }
 
     /// Runs the TUI with approval channel support.
-    ///
-    /// Like [`Tui::run`], but also listens for [`TuiApprovalRequest`] on
-    /// `approval_rx`. When a request arrives, shows the approval overlay
-    /// and sends the user's choice back via the request's oneshot channel.
     pub async fn run_with_approval(
         &mut self,
         mut event_rx: broadcast::Receiver<AgentEvent>,
@@ -153,11 +125,11 @@ impl Tui {
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
 
         loop {
-            let state = &self.state;
-            let sidebar = &self.skill_sidebar;
-            let evo = &self.evolution_panel;
-            self.terminal
-                .draw(|frame| render(frame, state, sidebar, evo))?;
+            self.state.expire_status_message();
+            if let Err(e) = self.flush_scrollback() {
+                eprintln!("warning: flush scrollback failed: {e}");
+            }
+            self.draw_frame()?;
 
             tokio::select! {
                 _ = render_interval.tick() => {}
@@ -167,27 +139,8 @@ impl Tui {
                     }
                 }
                 event = event_rx.recv() => {
-                    match event {
-                        Ok(agent_event) => {
-                            let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
-                            self.state.handle_event(&agent_event);
-                            if is_turn_end {
-                                if let Err(e) = self.push_history() {
-                                    eprintln!("warning: push history failed: {e}");
-                                }
-                                if let Some(msg) = self.state.drain_steering_queue() {
-                                    if let Some(ref tx) = self.message_tx {
-                                        let _ = tx.send(msg);
-                                    }
-                                }
-                            }
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            self.state.append_system(&format!("Warning: dropped {n} event(s)"));
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            break;
-                        }
+                    if self.handle_agent_event(event) {
+                        break;
                     }
                 }
                 Some(request) = approval_rx.recv() => {
@@ -201,8 +154,149 @@ impl Tui {
             }
         }
 
+        self.restore();
         Ok(())
     }
+
+    // ── Drawing ──────────────────────────────────────────────────────
+
+    fn draw_frame(&mut self) -> Result<()> {
+        let state = &self.state;
+        let viewport_height = 4u16;
+
+        self.terminal.draw(viewport_height, |frame| {
+            let main_area = frame.area();
+            let chunks = Layout::vertical([
+                Constraint::Length(3),
+                Constraint::Length(1),
+            ])
+            .split(main_area);
+
+            let input_text = build_input_text(state);
+            let input_paragraph = Paragraph::new(input_text).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Input (Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution) "),
+            );
+            frame.render_widget(input_paragraph, chunks[0]);
+
+            let status_text = build_status_text(state);
+            let status_paragraph = Paragraph::new(status_text)
+                .style(Style::default().add_modifier(Modifier::REVERSED));
+            frame.render_widget(status_paragraph, chunks[1]);
+
+            if let ApprovalState::Visible {
+                tool_name,
+                arguments,
+                selected,
+            } = &state.approval_state
+            {
+                let overlay = ApprovalOverlay::new(tool_name, arguments, selected);
+                frame.render_widget(overlay, chunks[0]);
+            }
+        })?;
+
+        Ok(())
+    }
+
+    fn flush_scrollback(&mut self) -> Result<()> {
+        let lines = self.extract_new_scrollback_lines();
+        if lines.is_empty() {
+            return Ok(());
+        }
+        self.terminal.insert_history(&lines)?;
+        Ok(())
+    }
+
+    fn extract_new_scrollback_lines(&mut self) -> Vec<String> {
+        let mut new_lines = Vec::new();
+
+        let start = self.last_pushed_history.min(self.state.chat_lines.len());
+        for line in &self.state.chat_lines[start..] {
+            new_lines.extend(chat_line_to_text_lines(line));
+        }
+        self.last_pushed_history = self.state.chat_lines.len();
+
+        if !self.state.current_turn_text.is_empty() {
+            let all_lines: Vec<&str> = self.state.current_turn_text.split('\n').collect();
+            let already_scrolled = self.state.scrollback.scrolled_line_count;
+            let complete_count = all_lines.len().saturating_sub(1);
+
+            if complete_count > already_scrolled {
+                for line in all_lines[already_scrolled..complete_count].iter() {
+                    new_lines.push(line.to_string());
+                }
+                self.state.scrollback.scrolled_line_count = complete_count;
+            }
+        }
+
+        new_lines
+    }
+
+    fn finalize_scrollback(&mut self) -> Result<()> {
+        if self.state.current_turn_text.is_empty() {
+            return Ok(());
+        }
+
+        let text = std::mem::take(&mut self.state.current_turn_text);
+        let remaining_start = self.state.scrollback.scrolled_line_count;
+        let all_lines: Vec<&str> = text.split('\n').collect();
+
+        if remaining_start < all_lines.len() {
+            let tail: Vec<String> = all_lines[remaining_start..]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            if !tail.is_empty() {
+                self.terminal.insert_history(&tail)?;
+            }
+        }
+
+        self.state.scrollback.scrolled_line_count = 0;
+
+        if !text.is_empty() {
+            self.state
+                .chat_lines
+                .push(ChatLine::Assistant(text));
+            self.last_pushed_history = self.state.chat_lines.len();
+        }
+
+        Ok(())
+    }
+
+    // ── Agent event handling ─────────────────────────────────────────
+
+    fn handle_agent_event(&mut self, event: std::result::Result<AgentEvent, broadcast::error::RecvError>) -> bool {
+        match event {
+            Ok(agent_event) => {
+                let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
+
+                if is_turn_end {
+                    if let Err(e) = self.finalize_scrollback() {
+                        eprintln!("warning: finalize scrollback failed: {e}");
+                    }
+                }
+
+                self.state.handle_event(&agent_event);
+
+                if is_turn_end {
+                    if let Some(msg) = self.state.drain_steering_queue() {
+                        if let Some(ref tx) = self.message_tx {
+                            let _ = tx.send(msg);
+                        }
+                    }
+                }
+                false
+            }
+            Err(broadcast::error::RecvError::Lagged(n)) => {
+                self.state.status_message = Some((format!("Warning: dropped {n} event(s)"), Instant::now()));
+                false
+            }
+            Err(broadcast::error::RecvError::Closed) => true,
+        }
+    }
+
+    // ── Public API ───────────────────────────────────────────────────
 
     /// Shows the approval overlay with the given tool info.
     pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
@@ -280,6 +374,8 @@ impl Tui {
         }
     }
 
+    // ── Input handling ───────────────────────────────────────────────
+
     /// Handles a terminal input event.
     ///
     /// Returns `true` if the TUI should exit.
@@ -309,14 +405,14 @@ impl Tui {
                                 let _ = response_tx.send(choice.clone());
                             }
                             self.hide_approval();
-                            self.state.append_system(&format!(
+                            self.state.status_message = Some((format!(
                                 "Tool call {}",
                                 match choice {
                                     ApprovalChoice::ApproveOnce => "approved once",
                                     ApprovalChoice::AlwaysApprove => "always approved",
                                     ApprovalChoice::Deny => "denied",
                                 }
-                            ));
+                            ), Instant::now()));
                         }
                     }
                     KeyCode::Char(c) => {
@@ -343,15 +439,15 @@ impl Tui {
                                 self.state.handle_slash_command(&input);
                             } else if self.state.is_processing {
                                 self.state.steering_queue.push(input.clone());
-                                self.state.append_system(
-                                    "Message queued (steering). Press Esc to cancel.",
-                                );
+                                self.state.status_message = Some(("Message queued (steering). Press Esc to cancel.".into(), Instant::now()));
                             } else {
-                                self.state.turn_start_chat_index = self.state.chat_lines.len();
                                 self.state.append_user_message(&input);
                                 self.state.is_processing = true;
                                 if let Some(ref tx) = self.message_tx {
                                     let _ = tx.send(input);
+                                }
+                                if let Err(e) = self.flush_scrollback() {
+                                    eprintln!("warning: flush scrollback failed: {e}");
                                 }
                             }
                         }
@@ -365,8 +461,7 @@ impl Tui {
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         if self.state.restore_last_queued() {
-                            self.state
-                                .append_system("Queued message restored to input.");
+                            self.state.status_message = Some(("Queued message restored to input.".into(), Instant::now()));
                         } else {
                             self.state.input_clear();
                         }
@@ -380,214 +475,36 @@ impl Tui {
         false
     }
 
-    /// Pushes any un-pushed chat lines into the terminal's native scrollback
-    /// using the `SetScrollRegion` algorithm. Idempotent: subsequent calls
-    /// with no new chat lines are no-ops.
-    pub fn push_history(&mut self) -> Result<()> {
-        let viewport_top = self.viewport_top;
-        let start = self.last_pushed_history.min(self.state.chat_lines.len());
-        let lines: Vec<String> = self.state.chat_lines[start..]
-            .iter()
-            .flat_map(chat_line_to_text_lines)
-            .collect();
-        self.last_pushed_history = self.state.chat_lines.len();
+    // ── Teardown ─────────────────────────────────────────────────────
 
-        if lines.is_empty() || viewport_top == 0 {
-            return Ok(());
-        }
-
-        let mut stdout = io::stdout();
-        push_history_to(&mut stdout, viewport_top, &lines)
+    /// Restores the terminal to its original state.
+    ///
+    /// Content in the scrollback buffer is preserved so the user can
+    /// scroll up to review the conversation after exit.
+    fn restore(&self) {
+        self.terminal.restore();
     }
 }
 
-pub(crate) fn chat_line_to_text_lines(line: &ChatLine) -> Vec<String> {
-    let mut buf = String::new();
-    TuiState::append_line_plain(&mut buf, line);
-    buf.lines().map(String::from).collect()
-}
-
-pub(crate) fn push_history_to<W: Write>(
-    out: &mut W,
-    viewport_top: u16,
-    lines: &[String],
-) -> Result<()> {
-    if viewport_top == 0 || lines.is_empty() {
-        return Ok(());
-    }
-    queue!(out, Print(format!("\x1b[1;{viewport_top}r")))?;
-    for line in lines {
-        queue!(out, Print(format!("\x1b[1;{viewport_top}H")))?;
-        queue!(out, Print("\r\n"))?;
-        queue!(out, Print(line))?;
-    }
-    queue!(out, Print("\x1b[r"))?;
-    out.flush()?;
-    Ok(())
-}
-
-pub(crate) fn render(
-    frame: &mut Frame,
-    state: &TuiState,
-    skill_sidebar: &SkillSidebar,
-    evolution_panel: &evolution::EvolutionPanel,
-) {
-    let full_area = frame.area();
-
-    // If the evolution panel is visible, carve a right column for it first.
-    let main_area = if evolution_panel.visible {
-        let evo_width = evolution_panel
-            .width
-            .min(full_area.width.saturating_sub(40));
-        let cols = Layout::horizontal([Constraint::Min(40), Constraint::Length(evo_width)])
-            .split(full_area);
-
-        evolution_panel.render(frame, cols[1]);
-        cols[0]
-    } else {
-        full_area
-    };
-
-    // If sidebar is visible, split off the right portion
-    let (chat_area, input_area, status_area) = if skill_sidebar.visible {
-        let sidebar_width = skill_sidebar.width.min(main_area.width.saturating_sub(40));
-        let chunks = Layout::horizontal([Constraint::Min(40), Constraint::Length(sidebar_width)])
-            .split(main_area);
-
-        skill_sidebar.render(frame, chunks[1]);
-
-        let main_chunks = Layout::vertical([
-            Constraint::Min(1),
-            Constraint::Length(3),
-            Constraint::Length(1),
-        ])
-        .split(chunks[0]);
-
-        (main_chunks[0], main_chunks[1], main_chunks[2])
-    } else {
-        let chunks = Layout::vertical([
-            Constraint::Min(1),
-            Constraint::Length(3),
-            Constraint::Length(1),
-        ])
-        .split(main_area);
-
-        (chunks[0], chunks[1], chunks[2])
-    };
-
-    let chat_text = build_chat_text(state);
-    let chat_paragraph = Paragraph::new(chat_text)
-        .block(Block::default().borders(Borders::ALL).title(" Chat "))
-        .wrap(Wrap { trim: false })
-        .scroll((chat_scroll_offset(state, chat_area.height as usize), 0));
-    frame.render_widget(chat_paragraph, chat_area);
-
-    let input_text = build_input_text(state);
-    let input_paragraph = Paragraph::new(input_text).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Input (Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution) "),
-    );
-    frame.render_widget(input_paragraph, input_area);
-
-    let status_text = build_status_text(state);
-    let status_paragraph =
-        Paragraph::new(status_text).style(Style::default().add_modifier(Modifier::REVERSED));
-    frame.render_widget(status_paragraph, status_area);
-
-    if let ApprovalState::Visible {
-        tool_name,
-        arguments,
-        selected,
-    } = &state.approval_state
-    {
-        let overlay = ApprovalOverlay::new(tool_name, arguments, selected);
-        frame.render_widget(overlay, chat_area);
+impl Drop for Tui {
+    fn drop(&mut self) {
+        self.restore();
     }
 }
 
-pub(crate) fn build_chat_text(state: &TuiState) -> Text<'static> {
-    let mut lines: Vec<Line<'static>> = Vec::new();
+// ── Banner ───────────────────────────────────────────────────────────
 
-    let start = state.turn_start_chat_index.min(state.chat_lines.len());
-    for line in &state.chat_lines[start..] {
-        match line {
-            ChatLine::Text(text) => {
-                lines.push(Line::from(text.clone()));
-            }
-            ChatLine::Assistant(text) => {
-                let rendered = tui_markdown::from_str(text.as_str());
-                for line in rendered.lines {
-                    let owned_spans: Vec<Span<'static>> = line
-                        .spans
-                        .into_iter()
-                        .map(|s| Span::styled(s.content.into_owned(), s.style))
-                        .collect();
-                    lines.push(Line::from(owned_spans));
-                }
-            }
-            ChatLine::ToolCall {
-                tool_name,
-                arguments,
-                provenance,
-                result,
-            } => {
-                let mut bubble = ToolCallBubble::new(tool_name.as_str(), arguments.as_str())
-                    .with_provenance(provenance.clone());
-                if let Some(result) = result {
-                    bubble = bubble.with_result(result.is_error, &result.content);
-                }
-                let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 40, 6));
-                bubble.render(buf.area, &mut buf);
-                for y in 0..buf.area.height {
-                    let mut spans = Vec::new();
-                    for x in 0..buf.area.width {
-                        let cell = buf.cell((x, y)).expect("cell within buffer bounds");
-                        spans.push(Span::styled(cell.symbol().to_string(), cell.style()));
-                    }
-                    lines.push(Line::from(spans));
-                }
-            }
-        }
-    }
-
-    if !state.current_turn_text.is_empty() {
-        let rendered = tui_markdown::from_str(&state.current_turn_text);
-        for line in rendered.lines {
-            let owned_spans: Vec<Span<'static>> = line
-                .spans
-                .into_iter()
-                .map(|s| Span::styled(s.content.into_owned(), s.style))
-                .collect();
-            lines.push(Line::from(owned_spans));
-        }
-    }
-
-    if lines.is_empty() {
-        lines.push(Line::from(
-            "Welcome to Talos. Type a message and press Enter.",
-        ));
-    }
-
-    Text::from(lines)
+/// Prints the Talos startup banner to stdout *before* raw mode is entered,
+/// so it becomes part of the terminal's native scrollback.
+fn print_banner() {
+    let version = env!("CARGO_PKG_VERSION");
+    println!();
+    println!("  \u{1f6e0} Talos v{version}");
+    println!("  Safety-first agent runtime");
+    println!();
 }
 
-pub(crate) fn chat_scroll_offset(state: &TuiState, viewport_height: usize) -> u16 {
-    let start = state.turn_start_chat_index.min(state.chat_lines.len());
-    let total_lines = (state.chat_lines.len() - start)
-        + if state.current_turn_text.is_empty() {
-            0
-        } else {
-            1
-        };
-    let total_lines = if total_lines == 0 { 1 } else { total_lines };
-
-    if total_lines <= viewport_height {
-        0
-    } else {
-        (total_lines - viewport_height) as u16
-    }
-}
+// ── Rendering ────────────────────────────────────────────────────────
 
 pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
     let buffer = &state.input_buffer;
@@ -657,8 +574,14 @@ pub(crate) fn build_status_text(state: &TuiState) -> Text<'static> {
         String::new()
     };
 
+    let status_msg = state
+        .status_message
+        .as_ref()
+        .map(|(m, _)| format!(" | {}", m))
+        .unwrap_or_default();
+
     let text = format!(
-        " {processing_indicator}{status}{queue_info} | Model: {} | Tokens: {}{branch_info} | Cost: {}",
+        " {processing_indicator}{status}{queue_info} | Model: {} | Tokens: {}{branch_info} | Cost: {}{status_msg}",
         state.model_name, total_tokens, cost
     );
 
@@ -671,37 +594,43 @@ pub(crate) fn calculate_cost(usage: &Usage) -> String {
     format!("${cost:.4}")
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+/// Converts a [`ChatLine`] to plain-text lines suitable for scrollback.
+pub(crate) fn chat_line_to_text_lines(line: &ChatLine) -> Vec<String> {
+    let mut buf = String::new();
+    TuiState::append_line_plain(&mut buf, line);
+    buf.lines().map(String::from).collect()
+}
+
+/// Truncates a string to fit within `max_width` terminal columns.
+#[allow(dead_code)]
+fn truncate_to_width(s: &str, max_width: u16) -> String {
+    let max = max_width as usize;
+    if unicode_width::UnicodeWidthStr::width(s) <= max {
+        return s.to_string();
+    }
+    let mut width = 0;
+    let mut result = String::new();
+    for ch in s.chars() {
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + cw > max {
+            break;
+        }
+        result.push(ch);
+        width += cw;
+    }
+    result
+}
+
+// ── Tests ────────────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::state::ChatLine;
     use talos_core::message::ToolResult;
     use talos_core::tool::ToolProvenance;
-
-    #[test]
-    fn push_history_to_writes_expected_ansi_sequence() {
-        let mut buf: Vec<u8> = Vec::new();
-        push_history_to(&mut buf, 20, &["line1".to_string(), "line2".to_string()]).unwrap();
-        let s = String::from_utf8_lossy(&buf);
-        assert_eq!(
-            s,
-            "\x1b[1;20r\x1b[1;20H\r\nline1\x1b[1;20H\r\nline2\x1b[r",
-        );
-    }
-
-    #[test]
-    fn push_history_to_empty_lines_is_noop() {
-        let mut buf: Vec<u8> = Vec::new();
-        push_history_to(&mut buf, 20, &[]).unwrap();
-        assert!(buf.is_empty());
-    }
-
-    #[test]
-    fn push_history_to_zero_viewport_is_noop() {
-        let mut buf: Vec<u8> = Vec::new();
-        push_history_to(&mut buf, 0, &["line".to_string()]).unwrap();
-        assert!(buf.is_empty());
-    }
 
     #[test]
     fn chat_line_to_text_lines_user_text() {
@@ -785,5 +714,20 @@ mod tests {
                 "  ✗ boom".to_string(),
             ],
         );
+    }
+
+    #[test]
+    fn truncate_to_width_ascii() {
+        assert_eq!(truncate_to_width("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_to_width_cjk() {
+        assert_eq!(truncate_to_width("你好世界", 4), "你好");
+    }
+
+    #[test]
+    fn truncate_to_width_short_enough() {
+        assert_eq!(truncate_to_width("hi", 10), "hi");
     }
 }

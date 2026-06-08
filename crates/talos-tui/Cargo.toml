@@ -9,7 +9,8 @@ rust-version.workspace = true
 [dependencies]
 talos-core = { path = "../talos-core" }
 talos-permission = { path = "../talos-permission" }
-ratatui = "0.30"
+ratatui = { version = "0.30", features = ["scrolling-regions"] }
+unicode-width = "0.2"
 crossterm = { version = "0.29", features = ["event-stream"] }
 tokio = { version = "1", features = ["sync", "macros", "time"] }
 anyhow = "1"

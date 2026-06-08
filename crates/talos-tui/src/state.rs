@@ -72,6 +72,11 @@ pub(crate) enum ChatLine {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(crate) struct ScrollbackState {
+    pub(crate) scrolled_line_count: usize,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct TuiState {
     pub(crate) chat_lines: Vec<ChatLine>,
@@ -86,12 +91,11 @@ pub(crate) struct TuiState {
     pub(crate) approval_state: ApprovalState,
     pub(crate) branch_id: Option<String>,
     pub(crate) pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
-    /// Messages queued for steering (delivered after current tool batch).
     pub(crate) steering_queue: Vec<String>,
-    /// Messages queued for follow-up (delivered when agent would stop).
     pub(crate) followup_queue: Vec<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
-    pub(crate) turn_start_chat_index: usize,
+    pub(crate) scrollback: ScrollbackState,
+    pub(crate) status_message: Option<(String, Instant)>,
 }
 
 impl TuiState {
@@ -107,8 +111,6 @@ impl TuiState {
 
     pub(crate) fn finalize_turn(&mut self) {
         if !self.current_turn_text.is_empty() {
-            self.chat_lines
-                .push(ChatLine::Assistant(self.current_turn_text.clone()));
             self.current_turn_text.clear();
         }
     }
@@ -255,9 +257,9 @@ impl TuiState {
         match &self.ctrl_c_state {
             CtrlCState::Idle => {
                 if self.is_processing {
-                    self.append_system("Turn cancelled. Press Ctrl+C again to exit.");
+                    self.status_message = Some(("Turn cancelled. Press Ctrl+C again to exit.".into(), now));
                 } else {
-                    self.append_system("Press Ctrl+C again within 2 seconds to exit.");
+                    self.status_message = Some(("Press Ctrl+C again within 2 seconds to exit.".into(), now));
                 }
                 self.ctrl_c_state = CtrlCState::Waiting(now);
                 false
@@ -267,7 +269,7 @@ impl TuiState {
                     self.should_exit = true;
                     true
                 } else {
-                    self.append_system("Press Ctrl+C again within 2 seconds to exit.");
+                    self.status_message = Some(("Press Ctrl+C again within 2 seconds to exit.".into(), now));
                     self.ctrl_c_state = CtrlCState::Waiting(now);
                     false
                 }
@@ -275,9 +277,13 @@ impl TuiState {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn set_branch_id(&mut self, branch_id: String) {
-        self.branch_id = Some(branch_id);
+    pub(crate) fn expire_status_message(&mut self) {
+        const STATUS_TTL: Duration = Duration::from_secs(2);
+        if let Some((_, set_at)) = &self.status_message {
+            if Instant::now().duration_since(*set_at) >= STATUS_TTL {
+                self.status_message = None;
+            }
+        }
     }
 
     pub(crate) fn handle_event(&mut self, event: &AgentEvent) {
@@ -285,6 +291,7 @@ impl TuiState {
             AgentEvent::TurnStart => {
                 self.is_processing = true;
                 self.current_turn_text.clear();
+                self.status_message = None;
             }
             AgentEvent::TextDelta { delta } => {
                 self.append_delta(delta);
@@ -298,7 +305,7 @@ impl TuiState {
             AgentEvent::TurnEnd { usage, .. } => {
                 self.is_processing = false;
                 self.finalize_turn();
-                self.turn_start_chat_index = self.chat_lines.len();
+                self.status_message = None;
                 self.usage = usage.clone();
             }
             AgentEvent::Error { message } => {
@@ -354,7 +361,7 @@ impl TuiState {
                 self.usage = Usage::default();
                 self.branch_id = None;
                 self.plugin_observations.clear();
-                self.turn_start_chat_index = 0;
+                self.scrollback.scrolled_line_count = 0;
                 self.append_system("New session started.");
             }
             "/plugins" => {

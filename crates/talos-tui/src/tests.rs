@@ -5,7 +5,7 @@ mod tests {
     use talos_core::message::{AgentEvent, StopReason, ToolCall, ToolResult, Usage};
     use talos_core::tool::ToolProvenance;
 
-    use crate::app::{build_chat_text, build_status_text, calculate_cost};
+    use crate::app::{build_status_text, calculate_cost};
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, ChatLine, CtrlCState, TuiState, plugin_observation_key};
     use crate::theme::nord;
@@ -37,10 +37,7 @@ mod tests {
         let mut state = TuiState::new();
         state.append_delta("Assistant response");
         state.finalize_turn();
-        assert_eq!(
-            state.chat_lines,
-            vec![ChatLine::Assistant("Assistant response".into())]
-        );
+        assert!(state.chat_lines.is_empty());
         assert!(state.current_turn_text.is_empty());
     }
 
@@ -281,32 +278,6 @@ mod tests {
     }
 
     #[test]
-    fn test_build_chat_text_renders_mcp_provenance_marker() {
-        let mut state = TuiState::new();
-        let call = ToolCall {
-            id: "c1".into(),
-            name: "remote_search".into(),
-            input: serde_json::json!({"query": "talos"}),
-        };
-        state.handle_event(&AgentEvent::ToolCall {
-            call,
-            provenance: ToolProvenance::McpRemote {
-                server: "filesystem".into(),
-            },
-        });
-
-        let rendered = build_chat_text(&state)
-            .lines
-            .iter()
-            .flat_map(|line| line.spans.iter())
-            .map(|span| span.content.as_ref())
-            .collect::<String>();
-
-        assert!(rendered.contains("remote_search"));
-        assert!(rendered.contains("[mcp:filesystem]"));
-    }
-
-    #[test]
     fn test_handle_event_tool_result_sets_on_last_tool_call() {
         let mut state = TuiState::new();
         let call = ToolCall {
@@ -353,10 +324,7 @@ mod tests {
             },
         });
         assert!(!state.is_processing);
-        assert_eq!(
-            state.chat_lines,
-            vec![ChatLine::Assistant("Response text".into())]
-        );
+        assert!(state.current_turn_text.is_empty());
         assert_eq!(state.usage.input_tokens, 100);
         assert_eq!(state.usage.output_tokens, 50);
     }
@@ -811,82 +779,6 @@ mod tests {
                 .iter()
                 .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Commands:")))
         );
-    }
-
-    // ── Markdown Rendering Tests ─────────────────────────────────────────────
-
-    #[test]
-    fn test_assistant_line_renders_markdown() {
-        let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("**bold text** and *italic*".into()));
-        let rendered = build_chat_text(&state);
-        assert!(!rendered.lines.is_empty());
-        let all_spans: Vec<&str> = rendered
-            .lines
-            .iter()
-            .flat_map(|line| line.spans.iter())
-            .map(|span| span.content.as_ref())
-            .collect();
-        let combined: String = all_spans.join("");
-        assert!(combined.contains("bold text"));
-    }
-
-    #[test]
-    fn test_assistant_line_renders_code_block() {
-        let mut state = TuiState::new();
-        let code = "Here is some code:\n```rust\nfn main() {\n    println!(\"hello\");\n}\n```";
-        state.chat_lines.push(ChatLine::Assistant(code.into()));
-        let rendered = build_chat_text(&state);
-        assert!(!rendered.lines.is_empty());
-    }
-
-    #[test]
-    fn test_assistant_line_renders_heading() {
-        let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("# Main Heading\n## Sub Heading".into()));
-        let rendered = build_chat_text(&state);
-        assert!(!rendered.lines.is_empty());
-        let all_spans: Vec<&str> = rendered
-            .lines
-            .iter()
-            .flat_map(|line| line.spans.iter())
-            .map(|span| span.content.as_ref())
-            .collect();
-        let combined: String = all_spans.join("");
-        assert!(combined.contains("Main Heading"));
-        assert!(combined.contains("Sub Heading"));
-    }
-
-    #[test]
-    fn test_text_line_remains_plain() {
-        let mut state = TuiState::new();
-        state.chat_lines.push(ChatLine::Text("**not bold**".into()));
-        let rendered = build_chat_text(&state);
-        assert_eq!(rendered.lines.len(), 1);
-        let spans = &rendered.lines[0].spans;
-        assert_eq!(spans.len(), 1);
-        assert_eq!(spans[0].content, "**not bold**");
-    }
-
-    #[test]
-    fn test_finalize_turn_creates_assistant_variant() {
-        let mut state = TuiState::new();
-        state.append_delta("Hello from assistant");
-        state.finalize_turn();
-        assert_eq!(state.chat_lines.len(), 1);
-        match &state.chat_lines[0] {
-            ChatLine::Assistant(text) => {
-                assert_eq!(text, "Hello from assistant");
-            }
-            _ => panic!(
-                "expected ChatLine::Assistant, got {:?}",
-                state.chat_lines[0]
-            ),
-        }
     }
 
     #[test]
