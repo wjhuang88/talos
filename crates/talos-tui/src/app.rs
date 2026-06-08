@@ -71,11 +71,12 @@ impl Tui {
         let viewport_top = position().map(|(_, y)| y).unwrap_or(0);
         let terminal_height = crossterm::terminal::size().map(|(_, h)| h).unwrap_or(24);
         let available_height = terminal_height.saturating_sub(viewport_top);
+        let viewport_height = available_height.min(20).max(5);
         
         let terminal = Terminal::with_options(
             backend,
             TerminalOptions {
-                viewport: Viewport::Inline(available_height),
+                viewport: Viewport::Inline(viewport_height),
             },
         )?;
 
@@ -111,6 +112,9 @@ impl Tui {
             let evo = &self.evolution_panel;
             self.terminal
                 .draw(|frame| render(frame, state, sidebar, evo))?;
+            
+            let mut stdout = io::stdout();
+            let _ = execute!(stdout, crossterm::style::Print("\n"));
 
             tokio::select! {
                 _ = render_interval.tick() => {}
