@@ -5,10 +5,11 @@ append into scrollback as the conversation grows (information-flow driven, line-
 and resume the shell's previous content after the TUI exits — matching the Codex TUI
 experience.
 
-## Status: ACTIVE (2026-06-08)
+## Status: COMPLETE (2026-06-08)
 
 Core architectural flip landed (3 atomic commits: `5ed0e5e`, `684600f`, `8cd0756`).
-Infrastructure work (tui/ subdir, history_cell/ subdir, widget migration) deferred to I023.
+Viewport refactor landed (fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL, diff+force_clear rendering). 127 TUI tests pass; workspace `cargo check/test` clean.
+State model refactor deferred to I023 (TUI-004 backlog item).
 
 ## Decision Gate
 
