@@ -32,8 +32,9 @@ use crate::state::{ApprovalState, ChatMessage, CtrlCState, MessageRole, MessageS
 use crate::widgets::ApprovalOverlay;
 
 struct ViewportLayout {
-    gap_top: Rect,
+    preview: Rect,
     queue_preview: Option<Rect>,
+    gap: Rect,
     tips: Rect,
     input_pad_top: Rect,
     input: Rect,
@@ -55,6 +56,7 @@ impl ViewportLayout {
             constraints.push(Constraint::Length(queue_line_count));
         }
         constraints.push(Constraint::Length(1));
+        constraints.push(Constraint::Length(1));
         constraints.extend_from_slice(&[
             Constraint::Length(1),
             Constraint::Length(1),
@@ -64,7 +66,7 @@ impl ViewportLayout {
         let chunks = Layout::vertical(&constraints).split(area);
 
         let mut idx = 0;
-        let gap_top = chunks[idx];
+        let preview = chunks[idx];
         idx += 1;
 
         let queue_preview = if queue_line_count > 0 {
@@ -75,6 +77,8 @@ impl ViewportLayout {
             None
         };
 
+        let gap = chunks[idx];
+        idx += 1;
         let tips = chunks[idx];
         idx += 1;
         let input_pad_top = chunks[idx];
@@ -86,8 +90,9 @@ impl ViewportLayout {
         let status = chunks[idx];
 
         Self {
-            gap_top,
+            preview,
             queue_preview,
+            gap,
             tips,
             input_pad_top,
             input,
@@ -237,18 +242,18 @@ impl Tui {
         };
 
         self.terminal
-            .draw(ViewportLayout::height(queue_line_count), |frame| {
+            .draw_with_overlap(ViewportLayout::height(queue_line_count), 1, |frame| {
                 let layout = ViewportLayout::split(frame.area(), queue_line_count);
 
                 if !state.current_turn_text.is_empty() {
                     let line = state.current_turn_text.split('\n').last().unwrap_or("");
-                    let display = truncate_end_to_width(line, layout.gap_top.width);
+                    let display = truncate_end_to_width(line, layout.preview.width);
                     frame.render_widget(
                         Paragraph::new(Line::from(Span::styled(
                             display,
                             Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
                         ))),
-                        layout.gap_top,
+                        layout.preview,
                     );
                 }
 

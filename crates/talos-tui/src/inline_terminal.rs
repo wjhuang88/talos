@@ -159,12 +159,34 @@ impl InlineTerminal {
         height: u16,
         draw_fn: impl FnOnce(&mut InlineFrame),
     ) -> io::Result<()> {
+        self.draw_with_overlap(height, 0, draw_fn)
+    }
+
+    /// Draws a frame with the viewport shifted up by `overlap` rows.
+    ///
+    /// The topmost `overlap` rows of the rendered area will occupy the same
+    /// screen position as the last rows of the scrollback buffer, creating a
+    /// visual overlap. After drawing, the internal viewport position is
+    /// restored so that `insert_history` continues to work correctly.
+    pub fn draw_with_overlap(
+        &mut self,
+        height: u16,
+        overlap: u16,
+        draw_fn: impl FnOnce(&mut InlineFrame),
+    ) -> io::Result<()> {
         let screen_size = self.backend.size()?;
         self.screen_size = screen_size;
 
+        let natural_y = self.viewport_area.y;
+        let total_height = (height + overlap).min(screen_size.height);
+
         let mut area = self.viewport_area;
-        area.height = height.min(screen_size.height);
+        area.height = total_height;
         area.width = screen_size.width;
+
+        if area.y >= overlap {
+            area.y -= overlap;
+        }
 
         if area.bottom() > screen_size.height {
             area.y = screen_size.height.saturating_sub(area.height);
@@ -181,7 +203,12 @@ impl InlineTerminal {
             self.needs_clear = false;
         }
 
-        self.draw_inner(draw_fn, force_clear, height)
+        let result = self.draw_inner(draw_fn, force_clear, total_height);
+
+        self.viewport_area.y = natural_y;
+        self.viewport_area.height = height.min(screen_size.height);
+
+        result
     }
 
     fn draw_inner(

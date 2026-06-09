@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-06"
-status_note: "Governance validator drift repaired (2026-06-05): EVOLUTION-FEEDBACK SOP restored, AGENTS.md routes lesson feedback, Agent-authored/Agent-assisted model-tag wording fixed. I013 is complete; I014-I020 are planned follow-up iterations. GOV-001 backlog compaction completed. I021 Evolution MenteDB Realignment complete (2026-06-06): 5 atomic commits #I021-S1..S5 realigned talos-evolution data structure with MenteDB blueprint; 615 tests pass; runtime regression confirmed (no 400 Bad Request on cargo run -- -p '你好'). I014 TUI Completion complete (2026-06-06): 2 atomic commits #I009-S6 and #I010-S9 landed; tool provenance markers + /plugins + /copy last/all + /export with OSC 52 + pbcopy + permission gating; 652 tests pass workspace-wide (was 615; +37 from talos-tui). EVOL-001 (MenteDB cognitive rigor Phase 2) remains P3 in backlog for future I022 selection."
+last_audited_at: "2026-06-09"
+status_note: "Governance drift repair (2026-06-09): CLAUDE.md and GEMINI.md redirect files created; broken relative links in TUI-002-codex-overhaul.md fixed (../decisions/ → ../../decisions/); base_url now honored for both Anthropic and OpenAI providers (build_provider fix + docstring update); config.reference.toml added to docs/reference/; I023 TUI state model in Review (S1-S6 done, 131 tests pass). I015 Provider Schema complete (schema types + opencode import + 9 tests). 5 talos-tools tests fail on Windows (shell metacharacter/timeout/working-directory — environment-dependent, not governance drift)."
 
 entrypoints:
   agent_guide: "AGENTS.md"
