@@ -377,17 +377,10 @@ impl Tui {
     fn extract_new_scrollback_lines(&mut self) -> Vec<String> {
         let mut new_lines = Vec::new();
 
-        let has_new_messages = self.last_pushed_history < self.state.messages.len();
-        let has_streaming = !self.state.current_turn_text.is_empty();
-
-        if has_new_messages && !has_streaming {
-            return new_lines;
-        }
-
         let start = self.last_pushed_history.min(self.state.messages.len());
         for msg in &self.state.messages[start..] {
             new_lines.extend(message_to_text_lines(msg));
-            new_lines.push(" ".to_string());
+            new_lines.push(String::new());
         }
         self.last_pushed_history = self.state.messages.len();
 
@@ -562,6 +555,9 @@ impl Tui {
         self.state.append_user_message(&msg);
         if let Some(ref tx) = self.message_tx {
             let _ = tx.send(msg);
+        }
+        if let Err(e) = self.flush_scrollback() {
+            eprintln!("warning: flush scrollback failed: {e}");
         }
     }
 

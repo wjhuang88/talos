@@ -65,6 +65,7 @@ pub struct InlineTerminal {
     screen_size: Size,
     last_known_cursor_pos: Position,
     needs_clear: bool,
+    max_height: u16,
 }
 
 impl InlineTerminal {
@@ -109,6 +110,7 @@ impl InlineTerminal {
             screen_size,
             last_known_cursor_pos: cursor_pos,
             needs_clear: false,
+            max_height: viewport_height,
         })
     }
 
@@ -276,16 +278,20 @@ impl InlineTerminal {
             should_update_area = true;
             ct
         } else {
-            area.top().saturating_sub(1)
+            // Viewport is at screen bottom. Use max_height to compute a safe
+            // anchor that won't be overwritten when viewport height changes.
+            let anchor = screen_height.saturating_sub(self.max_height);
+            anchor.saturating_sub(1)
         };
 
         // Phase 2: Set scroll region to rows above the viewport and write
         // history lines. Each \r\n inside this region pushes old content
         // into the terminal's native scrollback.
-        if area.top() > 0 {
+        let effective_top = screen_height.saturating_sub(self.max_height);
+        if effective_top > 0 {
             let _ = queue!(
                 self.backend_mut(),
-                crossterm::style::Print(format!("\x1b[1;{}r", area.top()))
+                crossterm::style::Print(format!("\x1b[1;{}r", effective_top))
             );
         }
 
