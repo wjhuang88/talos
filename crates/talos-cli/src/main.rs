@@ -1261,7 +1261,11 @@ pub(crate) fn build_provider(
     }
     match config.provider_protocol() {
         ProviderProtocol::AnthropicMessages => {
-            Arc::new(AnthropicProvider::new(api_key, &config.model))
+            let mut provider = AnthropicProvider::new(api_key, &config.model);
+            if let Some(base_url) = config.base_url() {
+                provider = provider.with_base_url(base_url);
+            }
+            Arc::new(provider)
         }
         ProviderProtocol::OpenAIChat => {
             let mut provider = OpenAIProvider::new(api_key, &config.model);

@@ -1,0 +1,133 @@
+# Talos Configuration Reference
+#
+# Place at ~/.talos/config.toml or copy and edit for your setup.
+# Environment variable substitution is supported: ${ENV_VAR} resolves at load time.
+#
+# Config location: talos-config/src/lib.rs
+
+# ── Required ──────────────────────────────────────────────────────────────────
+# Active provider name. Built-in providers: "anthropic", "openai".
+# Any other name requires a matching [providers.<name>] section.
+provider = "anthropic"
+
+# Model identifier passed to the provider API.
+model = "claude-sonnet-4-20250514"
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+# [log]
+# level = "info"                        # RUST_LOG level when neither RUST_LOG nor filter is set
+# format = "pretty"                     # "pretty" (default) or "compact"
+# filter = "talos_provider=debug"       # Full tracing filter; overrides level when set
+
+# ── Hooks ─────────────────────────────────────────────────────────────────────
+# [hooks]
+# (placeholder for I009-S2 hook system)
+
+# ── MCP Servers ───────────────────────────────────────────────────────────────
+# [[mcp.servers]]
+# name = "my-mcp-server"
+# transport = "stdio"                   # "stdio" or "http"
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+# env = { }                             # extra environment variables
+# cwd = "/optional/working/directory"
+
+# ── JSON-RPC ──────────────────────────────────────────────────────────────────
+# [rpc]
+# methods_allowlist = []                # allowed RPC method names
+# max_concurrent = 1                    # concurrent RPC requests (MVP: serialized)
+
+# ── Provider Definitions ──────────────────────────────────────────────────────
+# Each [providers.<name>] section defines a named provider.
+#
+# Fields:
+#   protocol   "anthropic-messages" | "openai-chat" (default: "openai-chat")
+#   base_url   Full endpoint URL for anthropic-messages; gateway root for openai-chat
+#              (openai-chat auto-appends /chat/completions; anthropic-messages POSTs as-is)
+#   api_key    Inline key (skip_serializing — never echoed back on re-serialize)
+#   api_key_env  Environment variable name to read the key from
+#
+# API key resolution order:
+#   1. Inline api_key from this file
+#   2. Env var named by api_key_env
+#   3. Built-in env var: ANTHROPIC_API_KEY or OPENAI_API_KEY
+#   4. For built-in "openai" provider only: OPENAI_COMPAT_API_KEY
+#
+# Per-model limits go in [providers.<name>.models.<model>]:
+#   context_limit  Max input context tokens
+#   output_limit   Max output tokens
+
+# ── Example: Built-in Anthropic (env-var mode) ────────────────────────────────
+# provider = "anthropic"
+# model = "claude-sonnet-4-20250514"
+# No [providers.anthropic] section needed — built-in defaults apply.
+# Set ANTHROPIC_API_KEY in your environment.
+
+# ── Example: Built-in Anthropic (inline key) ──────────────────────────────────
+# provider = "anthropic"
+# model = "claude-sonnet-4-20250514"
+#
+# [providers.anthropic]
+# api_key = "sk-ant-..."                # chmod 600 ~/.talos/config.toml
+
+# ── Example: Built-in OpenAI ─────────────────────────────────────────────────
+# provider = "openai"
+# model = "gpt-4o"
+# No [providers.openai] section needed — built-in defaults apply.
+# Set OPENAI_API_KEY in your environment.
+
+# ── Example: OpenAI-compatible gateway (DashScope, Bailian, self-hosted, etc.)
+# provider = "my-gateway"
+# model = "your-model"
+#
+# [providers.my-gateway]
+# protocol = "openai-chat"
+# base_url = "https://your-gateway.example.com/v1"
+# api_key_env = "MY_GATEWAY_API_KEY"
+#
+# [providers.my-gateway.models.your-model]
+# context_limit = 202752
+# output_limit = 4096
+
+# ── Example: ZhipuAI (Anthropic Messages protocol) ───────────────────────────
+# provider = "zhipuai"
+# model = "glm-5.1"
+#
+# [providers.zhipuai]
+# protocol = "anthropic-messages"
+# base_url = "https://open.bigmodel.cn/api/anthropic/v1/messages"
+# api_key_env = "ZHIPU_API_KEY"
+#
+# [providers.zhipuai.models.glm-5.1]
+# context_limit = 128000
+# output_limit = 4096
+
+# ── Example: DashScope / Alibaba Cloud ────────────────────────────────────────
+# provider = "dashscope"
+# model = "glm-5"
+#
+# [providers.dashscope]
+# protocol = "openai-chat"
+# base_url = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+# api_key_env = "DASHSCOPE_API_KEY"
+
+# ── Example: Multiple providers with env-var substitution ─────────────────────
+# provider = "anthropic"
+# model = "claude-sonnet-4-20250514"
+#
+# [providers.anthropic]
+# api_key = "${ANTHROPIC_API_KEY}"      # resolved at load time from env
+#
+# [providers.openai]
+# api_key_env = "OPENAI_API_KEY"
+#
+# [providers.my-gateway]
+# protocol = "openai-chat"
+# base_url = "https://gateway.example.com/v1"
+# api_key = "${GATEWAY_SECRET}"
+
+# ── Built-in Model Defaults ───────────────────────────────────────────────────
+# provider = "anthropic"    → claude-sonnet-4-20250514 (200k/4096)
+#                             claude-opus-4-20250514  (200k/4096)
+# provider = "openai"       → gpt-4o      (128k/4096)
+#                             gpt-4o-mini (128k/4096)

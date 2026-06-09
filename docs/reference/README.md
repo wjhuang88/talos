@@ -11,6 +11,7 @@ Stable technical facts about the project. Not procedures or status — those liv
 |----------|---------|
 | `ARCHITECTURE.md` | System design, crate structure, data flow, core traits |
 | `REFERENCE-PROJECTS.md` | Analysis of projects that influenced Talos design |
+| `config.reference.toml` | Full configuration schema with examples for all providers |
 
 ## Rules
 

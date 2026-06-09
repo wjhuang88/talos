@@ -319,7 +319,7 @@ impl Config {
     ///
     /// `None` means "use the provider's hard-coded default endpoint".
     /// `Some(url)` is sent verbatim to the provider's HTTP client via
-    /// `with_base_url()`. Currently honored only for the OpenAI provider.
+    /// `with_base_url()`. Honored for both OpenAI and Anthropic providers.
     pub fn base_url(&self) -> Option<String> {
         self.providers
             .get(&self.provider)
@@ -482,10 +482,18 @@ fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
 
 /// Returns the user's home directory.
 fn home_dir() -> PathBuf {
-    env::var("HOME")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
+    if let Some(home) = env::var("HOME").ok().filter(|h| !h.is_empty()) {
+        return PathBuf::from(home);
+    }
+    if let Some(profile) = env::var("USERPROFILE").ok().filter(|p| !p.is_empty()) {
+        return PathBuf::from(profile);
+    }
+    let drive = env::var("HOMEDRIVE").unwrap_or_default();
+    let path = env::var("HOMEPATH").unwrap_or_default();
+    if !drive.is_empty() && !path.is_empty() {
+        return PathBuf::from(format!("{drive}{path}"));
+    }
+    PathBuf::from(".")
 }
 
 /// Performs `${ENV_VAR}` substitution in a string.

@@ -9,7 +9,7 @@
 | `decisions/` | Architecture Decision Records (ADRs) | `README.md` |
 | `roadmap/` | Phased implementation plan and requirement traceability | `IMPLEMENTATION-ROADMAP.md`, `REQUIREMENT-CONVERGENCE.md` |
 | `proposals/` | Uncommitted ideas for future consideration | `README.md` |
-| `reference/` | Stable facts: architecture, contracts, config | `ARCHITECTURE.md`, `REFERENCE-PROJECTS.md` |
+| `reference/` | Stable facts: architecture, contracts, config | `ARCHITECTURE.md`, `REFERENCE-PROJECTS.md`, `config.reference.toml` |
 | `sop/` | Standard Operating Procedures | See below |
 
 ## Operating View
