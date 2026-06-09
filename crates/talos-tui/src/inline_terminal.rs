@@ -175,7 +175,7 @@ impl InlineTerminal {
         self.screen_size = screen_size;
 
         let mut area = self.viewport_area;
-        area.height = height.min(screen_size.height);
+        area.height = self.max_height.min(screen_size.height);
         area.width = screen_size.width;
 
         if area.bottom() > screen_size.height {
@@ -193,23 +193,30 @@ impl InlineTerminal {
             self.needs_clear = false;
         }
 
-        self.draw_inner(draw_fn, force_clear)
+        self.draw_inner(draw_fn, force_clear, height)
     }
 
     fn draw_inner(
         &mut self,
         draw_fn: impl FnOnce(&mut InlineFrame),
         force_clear: bool,
+        render_height: u16,
     ) -> io::Result<()> {
         let area = self.viewport_area;
         let prev_idx = 1 - self.current;
+
+        let render_area = Rect {
+            y: area.bottom().saturating_sub(render_height),
+            height: render_height.min(area.height),
+            ..area
+        };
 
         {
             let buffer = &mut self.buffers[self.current];
             buffer.reset();
             buffer.resize(area);
 
-            let mut frame = InlineFrame { area, buffer };
+            let mut frame = InlineFrame { area: render_area, buffer };
             draw_fn(&mut frame);
         }
 
@@ -278,20 +285,13 @@ impl InlineTerminal {
             should_update_area = true;
             ct
         } else {
-            // Viewport is at screen bottom. Use max_height to compute a safe
-            // anchor that won't be overwritten when viewport height changes.
-            let anchor = screen_height.saturating_sub(self.max_height);
-            anchor.saturating_sub(1)
+            area.top().saturating_sub(1)
         };
 
-        // Phase 2: Set scroll region to rows above the viewport and write
-        // history lines. Each \r\n inside this region pushes old content
-        // into the terminal's native scrollback.
-        let effective_top = screen_height.saturating_sub(self.max_height);
-        if effective_top > 0 {
+        if area.top() > 0 {
             let _ = queue!(
                 self.backend_mut(),
-                crossterm::style::Print(format!("\x1b[1;{}r", effective_top))
+                crossterm::style::Print(format!("\x1b[1;{}r", area.top()))
             );
         }
 
