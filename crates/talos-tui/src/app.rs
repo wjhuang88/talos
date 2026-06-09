@@ -380,7 +380,7 @@ impl Tui {
         let start = self.last_pushed_history.min(self.state.messages.len());
         for msg in &self.state.messages[start..] {
             new_lines.extend(message_to_text_lines(msg));
-            new_lines.push(String::new());
+            new_lines.push(" ".to_string());
         }
         self.last_pushed_history = self.state.messages.len();
 
@@ -415,7 +415,7 @@ impl Tui {
                 .map(|s| s.to_string())
                 .collect();
             if !tail.is_empty() {
-                tail.push(String::new());
+                tail.push(" ".to_string());
                 self.terminal.insert_history(&tail)?;
             }
         }
