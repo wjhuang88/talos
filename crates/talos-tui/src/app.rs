@@ -242,7 +242,7 @@ impl Tui {
         };
 
         self.terminal
-            .draw_with_overlap(ViewportLayout::height(queue_line_count), 1, |frame| {
+            .draw(ViewportLayout::height(queue_line_count), |frame| {
                 let layout = ViewportLayout::split(frame.area(), queue_line_count);
 
                 if !state.current_turn_text.is_empty() {
