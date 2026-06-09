@@ -65,7 +65,6 @@ pub struct InlineTerminal {
     screen_size: Size,
     last_known_cursor_pos: Position,
     needs_clear: bool,
-    max_height: u16,
 }
 
 impl InlineTerminal {
@@ -77,23 +76,13 @@ impl InlineTerminal {
     /// # Errors
     ///
     /// Returns an error if the terminal size cannot be read or raw mode fails.
-    pub fn new(viewport_height: u16) -> io::Result<Self> {
+    pub fn new() -> io::Result<Self> {
         let stdout = io::stdout();
         let mut backend = CrosstermBackend::new(stdout);
 
         let screen_size = backend.size()?;
         let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
 
-        let needed_bottom = cursor_pos.y.saturating_add(viewport_height);
-        if needed_bottom > screen_size.height {
-            let padding = needed_bottom.saturating_sub(screen_size.height);
-            for _ in 0..padding {
-                let _ = queue!(backend, Print("\n"));
-            }
-            let _ = io::Write::flush(&mut backend);
-        }
-
-        let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
         let _ = execute!(backend, Hide);
         let viewport_area = Rect::new(0, cursor_pos.y, screen_size.width, 0);
 
@@ -110,7 +99,6 @@ impl InlineTerminal {
             screen_size,
             last_known_cursor_pos: cursor_pos,
             needs_clear: false,
-            max_height: viewport_height,
         })
     }
 
@@ -175,7 +163,7 @@ impl InlineTerminal {
         self.screen_size = screen_size;
 
         let mut area = self.viewport_area;
-        area.height = self.max_height.min(screen_size.height);
+        area.height = height.min(screen_size.height);
         area.width = screen_size.width;
 
         if area.bottom() > screen_size.height {

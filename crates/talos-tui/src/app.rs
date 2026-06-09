@@ -32,10 +32,9 @@ use crate::state::{ApprovalState, ChatMessage, CtrlCState, MessageRole, MessageS
 use crate::widgets::ApprovalOverlay;
 
 struct ViewportLayout {
-    streaming: Option<Rect>,
+    gap_top: Rect,
     queue_preview: Option<Rect>,
     tips: Rect,
-    gap_mid: Rect,
     input_pad_top: Rect,
     input: Rect,
     input_pad_bot: Rect,
@@ -43,22 +42,15 @@ struct ViewportLayout {
 }
 
 impl ViewportLayout {
-    const BASE_HEIGHT: u16 = 6;
-    const MAX_QUEUE_PREVIEW: u16 = 3;
+    const BASE_HEIGHT: u16 = 7;
 
-    fn max_height() -> u16 {
-        Self::BASE_HEIGHT + Self::MAX_QUEUE_PREVIEW + 1
+    fn height(queue_line_count: u16) -> u16 {
+        Self::BASE_HEIGHT + queue_line_count
     }
 
-    fn height(queue_line_count: u16, has_streaming: bool) -> u16 {
-        Self::BASE_HEIGHT + queue_line_count + if has_streaming { 1 } else { 0 }
-    }
-
-    fn split(area: Rect, queue_line_count: u16, has_streaming: bool) -> Self {
+    fn split(area: Rect, queue_line_count: u16) -> Self {
         let mut constraints = vec![];
-        if has_streaming {
-            constraints.push(Constraint::Length(1));
-        }
+        constraints.push(Constraint::Length(1));
         if queue_line_count > 0 {
             constraints.push(Constraint::Length(queue_line_count));
         }
@@ -68,18 +60,12 @@ impl ViewportLayout {
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
-            Constraint::Length(1),
         ]);
         let chunks = Layout::vertical(&constraints).split(area);
 
         let mut idx = 0;
-        let streaming = if has_streaming {
-            let r = chunks[idx];
-            idx += 1;
-            Some(r)
-        } else {
-            None
-        };
+        let gap_top = chunks[idx];
+        idx += 1;
 
         let queue_preview = if queue_line_count > 0 {
             let r = chunks[idx];
@@ -91,9 +77,6 @@ impl ViewportLayout {
 
         let tips = chunks[idx];
         idx += 1;
-
-        let gap_mid = chunks[idx];
-        idx += 1;
         let input_pad_top = chunks[idx];
         idx += 1;
         let input = chunks[idx];
@@ -103,10 +86,9 @@ impl ViewportLayout {
         let status = chunks[idx];
 
         Self {
-            streaming,
+            gap_top,
             queue_preview,
             tips,
-            gap_mid,
             input_pad_top,
             input,
             input_pad_bot,
@@ -150,7 +132,7 @@ impl Tui {
 
         enable_raw_mode()?;
 
-        let terminal = InlineTerminal::new(ViewportLayout::max_height())?;
+        let terminal = InlineTerminal::new()?;
 
         Ok(Self {
             state: TuiState::new(),
@@ -254,21 +236,19 @@ impl Tui {
             1 + (queue_count as u16).min(2)
         };
 
-        let has_streaming = !state.current_turn_text.is_empty();
-
         self.terminal
-            .draw(ViewportLayout::height(queue_line_count, has_streaming), |frame| {
-                let layout = ViewportLayout::split(frame.area(), queue_line_count, has_streaming);
+            .draw(ViewportLayout::height(queue_line_count), |frame| {
+                let layout = ViewportLayout::split(frame.area(), queue_line_count);
 
-                if let Some(st_area) = layout.streaming {
+                if !state.current_turn_text.is_empty() {
                     let line = state.current_turn_text.split('\n').last().unwrap_or("");
-                    let display = truncate_end_to_width(line, st_area.width);
+                    let display = truncate_end_to_width(line, layout.gap_top.width);
                     frame.render_widget(
                         Paragraph::new(Line::from(Span::styled(
                             display,
                             Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
                         ))),
-                        st_area,
+                        layout.gap_top,
                     );
                 }
 
@@ -380,7 +360,6 @@ impl Tui {
         let start = self.last_pushed_history.min(self.state.messages.len());
         for msg in &self.state.messages[start..] {
             new_lines.extend(message_to_text_lines(msg));
-            new_lines.push(String::new());
         }
         self.last_pushed_history = self.state.messages.len();
 
@@ -410,12 +389,11 @@ impl Tui {
         let all_lines: Vec<&str> = text.split('\n').collect();
 
         if remaining_start < all_lines.len() {
-            let mut tail: Vec<String> = all_lines[remaining_start..]
+            let tail: Vec<String> = all_lines[remaining_start..]
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
             if !tail.is_empty() {
-                tail.push(" ".to_string());
                 self.terminal.insert_history(&tail)?;
             }
         }
@@ -767,7 +745,7 @@ pub(crate) fn build_status_text(state: &TuiState) -> Text<'static> {
     let sep = Span::styled(" │ ", dim);
     let val = Style::default().fg(Color::Rgb(0x81, 0xA1, 0xC1));
 
-    let mut spans = vec![
+    let spans = vec![
         Span::styled(" ", dim),
         Span::styled(model_name, val),
         sep.clone(),
