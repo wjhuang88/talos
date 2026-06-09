@@ -1,13 +1,14 @@
 #[cfg(test)]
 mod tests {
     use ratatui::style::Modifier;
+    use std::time::{Duration, Instant};
     use talos_core::ApprovalChoice;
     use talos_core::message::{AgentEvent, StopReason, ToolCall, ToolResult, Usage};
     use talos_core::tool::ToolProvenance;
 
     use crate::app::{build_status_text, calculate_cost};
     use crate::sidebar::{SkillInfo, SkillSidebar};
-    use crate::state::{ApprovalState, ChatLine, CtrlCState, TuiState, plugin_observation_key};
+    use crate::state::{ApprovalState, ChatMessage, CtrlCState, MessageRole, MessageStatus, TuiState, Tip, TipKind, plugin_observation_key};
     use crate::theme::nord;
     use crate::widgets::{ToolCallBubble, provenance_marker, render_diff, truncate};
     use crate::{contrast_ratio, rgb_components};
@@ -15,7 +16,7 @@ mod tests {
     #[test]
     fn test_state_new() {
         let state = TuiState::new();
-        assert!(state.chat_lines.is_empty());
+        assert!(state.messages.is_empty());
         assert!(state.input_buffer.is_empty());
         assert_eq!(state.cursor_pos, 0);
         assert!(!state.is_processing);
@@ -37,7 +38,7 @@ mod tests {
         let mut state = TuiState::new();
         state.append_delta("Assistant response");
         state.finalize_turn();
-        assert!(state.chat_lines.is_empty());
+        assert!(state.messages.is_empty());
         assert!(state.current_turn_text.is_empty());
     }
 
@@ -45,34 +46,35 @@ mod tests {
     fn test_finalize_turn_empty() {
         let mut state = TuiState::new();
         state.finalize_turn();
-        assert!(state.chat_lines.is_empty());
+        assert!(state.messages.is_empty());
     }
 
     #[test]
     fn test_append_user_message() {
         let mut state = TuiState::new();
         state.append_user_message("Hello");
-        assert_eq!(state.chat_lines, vec![ChatLine::Text("> Hello".into())]);
+        let msg = &state.messages[0];
+        assert_eq!(msg.role, MessageRole::User);
+        assert_eq!(msg.content, "> Hello");
+        assert!(msg.tool_call.is_none());
     }
 
     #[test]
     fn test_append_error() {
         let mut state = TuiState::new();
         state.append_error("Something failed");
-        assert_eq!(
-            state.chat_lines,
-            vec![ChatLine::Text("[Error] Something failed".into())]
-        );
+        let msg = &state.messages[0];
+        assert_eq!(msg.role, MessageRole::Error);
+        assert!(msg.content.contains("Something failed"));
     }
 
     #[test]
     fn test_append_system() {
         let mut state = TuiState::new();
         state.append_system("Turn cancelled");
-        assert_eq!(
-            state.chat_lines,
-            vec![ChatLine::Text("[System] Turn cancelled".into())]
-        );
+        let msg = &state.messages[0];
+        assert_eq!(msg.role, MessageRole::System);
+        assert!(msg.content.contains("Turn cancelled"));
     }
 
     #[test]
@@ -230,22 +232,14 @@ mod tests {
             call: call.clone(),
             provenance: Default::default(),
         });
-        assert_eq!(state.chat_lines.len(), 1);
-        match &state.chat_lines[0] {
-            ChatLine::ToolCall {
-                tool_name,
-                arguments,
-                provenance,
-                result,
-            } => {
-                assert_eq!(tool_name, "bash");
-                assert!(arguments.contains("command"));
-                assert!(arguments.contains("ls"));
-                assert_eq!(provenance, &ToolProvenance::Native);
-                assert!(result.is_none());
-            }
-            _ => panic!("expected ToolCall variant"),
-        }
+        assert_eq!(state.messages.len(), 1);
+        let msg = &state.messages[0];
+        let tool_call = msg.tool_call.as_ref().expect("expected ToolCall");
+        assert_eq!(tool_call.tool_name, "bash");
+        assert!(tool_call.arguments.contains("command"));
+        assert!(tool_call.arguments.contains("ls"));
+        assert_eq!(tool_call.provenance, ToolProvenance::Native);
+        assert!(tool_call.result.is_none());
     }
 
     #[test]
@@ -264,17 +258,10 @@ mod tests {
             provenance: provenance.clone(),
         });
 
-        match &state.chat_lines[0] {
-            ChatLine::ToolCall {
-                tool_name,
-                provenance: actual,
-                ..
-            } => {
-                assert_eq!(tool_name, "remote_search");
-                assert_eq!(actual, &provenance);
-            }
-            _ => panic!("expected ToolCall variant"),
-        }
+        let msg = &state.messages[0];
+        let tool_call = msg.tool_call.as_ref().expect("expected ToolCall");
+        assert_eq!(tool_call.tool_name, "remote_search");
+        assert_eq!(tool_call.provenance, provenance);
     }
 
     #[test]
@@ -297,16 +284,12 @@ mod tests {
         state.handle_event(&AgentEvent::ToolResult {
             result: result.clone(),
         });
-        assert_eq!(state.chat_lines.len(), 1);
-        match &state.chat_lines[0] {
-            ChatLine::ToolCall {
-                result: Some(r), ..
-            } => {
-                assert_eq!(r.content, "fn main() {}");
-                assert!(!r.is_error);
-            }
-            _ => panic!("expected ToolCall with result"),
-        }
+        assert_eq!(state.messages.len(), 1);
+        let msg = &state.messages[0];
+        let tool_call = msg.tool_call.as_ref().expect("expected ToolCall");
+        let r = tool_call.result.as_ref().expect("expected result");
+        assert_eq!(r.content, "fn main() {}");
+        assert!(!r.is_error);
     }
 
     #[test]
@@ -339,10 +322,9 @@ mod tests {
         });
         assert!(!state.is_processing);
         assert!(state.current_turn_text.is_empty());
-        assert_eq!(
-            state.chat_lines,
-            vec![ChatLine::Text("[Error] API error".into())]
-        );
+        let msg = &state.messages[0];
+        assert_eq!(msg.role, MessageRole::Error);
+        assert!(msg.content.contains("API error"));
     }
 
     #[test]
@@ -691,18 +673,8 @@ mod tests {
     fn test_slash_command_help() {
         let mut state = TuiState::new();
         state.handle_slash_command("/help");
-        assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("/help")))
-        );
-        assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("/quit")))
-        );
+        assert!(state.messages.iter().any(|m| m.content.contains("/help")));
+        assert!(state.messages.iter().any(|m| m.content.contains("/quit")));
     }
 
     #[test]
@@ -724,38 +696,24 @@ mod tests {
         let mut state = TuiState::new();
         state.model_name = "test-model".to_string();
         state.handle_slash_command("/status");
-        assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("test-model")))
-        );
+        assert!(state.messages.iter().any(|m| m.content.contains("test-model")));
     }
 
     #[test]
     fn test_slash_command_new_clears_chat() {
         let mut state = TuiState::new();
         state.append_user_message("hello");
-        assert!(!state.chat_lines.is_empty());
+        assert!(!state.messages.is_empty());
         state.handle_slash_command("/new");
-        assert_eq!(state.chat_lines.len(), 1);
-        if let ChatLine::Text(msg) = &state.chat_lines[0] {
-            assert!(msg.contains("New session started"));
-        } else {
-            panic!("expected system message");
-        }
+        assert_eq!(state.messages.len(), 1);
+        assert!(state.messages[0].content.contains("New session started"));
     }
 
     #[test]
     fn test_slash_command_unknown() {
         let mut state = TuiState::new();
         state.handle_slash_command("/foobar");
-        assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Unknown command")))
-        );
+        assert!(state.messages.iter().any(|m| m.content.contains("Unknown command")));
     }
 
     #[test]
@@ -773,12 +731,7 @@ mod tests {
         state.input_buffer = "/".to_string();
         state.cursor_pos = 1;
         state.complete_slash_command();
-        assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Commands:")))
-        );
+        assert!(state.messages.iter().any(|m| m.content.contains("Commands:")));
     }
 
     #[test]
@@ -944,7 +897,7 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
 
-        assert!(content.contains("Steering: 2"));
+        assert!(content.contains("S:2"));
     }
 
     #[test]
@@ -960,7 +913,7 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
 
-        assert!(content.contains("Follow-up: 1"));
+        assert!(content.contains("F:1"));
     }
 
     #[test]
@@ -974,8 +927,8 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
 
-        assert!(!content.contains("Steering:"));
-        assert!(!content.contains("Follow-up:"));
+        assert!(!content.contains("S:"));
+        assert!(!content.contains("F:"));
     }
 
     #[test]
@@ -993,8 +946,8 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
 
-        assert!(content.contains("Steering: 1"));
-        assert!(content.contains("Follow-up: 2"));
+        assert!(content.contains("S:1"));
+        assert!(content.contains("F:2"));
     }
 
     // ── I009-S6: Plugin provenance observation tests ──────────────────────────
@@ -1119,12 +1072,9 @@ mod tests {
         let mut state = TuiState::new();
         state.handle_slash_command("/plugins");
         assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("No tool provenance observed yet"))),
-            "expected empty-state message; chat_lines = {:?}",
-            state.chat_lines,
+            state.messages.iter().any(|m| m.content.contains("No tool provenance observed yet")),
+            "expected empty-state message; messages = {:?}",
+            state.messages,
         );
     }
 
@@ -1148,14 +1098,7 @@ mod tests {
         });
 
         state.handle_slash_command("/plugins");
-        let lines: Vec<&str> = state
-            .chat_lines
-            .iter()
-            .filter_map(|l| match l {
-                ChatLine::Text(t) => Some(t.as_str()),
-                _ => None,
-            })
-            .collect();
+        let lines: Vec<&str> = state.messages.iter().map(|m| m.content.as_str()).collect();
         assert!(lines.iter().any(|t| t.contains("Observed tool provenance")));
         assert!(lines.iter().any(|t| t.contains("native (1 call)")));
         assert!(lines.iter().any(|t| t.contains("mcp:filesystem (1 call)")));
@@ -1179,14 +1122,7 @@ mod tests {
         });
 
         state.handle_slash_command("/plugins");
-        let lines: Vec<&str> = state
-            .chat_lines
-            .iter()
-            .filter_map(|l| match l {
-                ChatLine::Text(t) => Some(t.as_str()),
-                _ => None,
-            })
-            .collect();
+        let lines: Vec<&str> = state.messages.iter().map(|m| m.content.as_str()).collect();
         assert!(
             lines.iter().any(|t| t.contains("native (2 calls)")),
             "expected plural form; lines = {:?}",
@@ -1225,10 +1161,7 @@ mod tests {
         let mut state = TuiState::new();
         state.handle_slash_command("/help");
         assert!(
-            state.chat_lines.iter().any(|l| matches!(
-                l,
-                ChatLine::Text(t) if t.contains("/plugins")
-            )),
+            state.messages.iter().any(|m| m.content.contains("/plugins")),
             "/help should describe /plugins",
         );
     }
@@ -1244,15 +1177,27 @@ mod tests {
     #[test]
     fn test_last_assistant_text_returns_most_recent() {
         let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("first response".into()));
-        state
-            .chat_lines
-            .push(ChatLine::Text("> user follow-up".into()));
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("second response".into()));
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "first response".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        state.messages.push(ChatMessage {
+            role: MessageRole::User,
+            status: MessageStatus::Completed,
+            content: "> user follow-up".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "second response".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
 
         assert_eq!(state.last_assistant_text().as_deref(), Some("second response"));
     }
@@ -1260,10 +1205,14 @@ mod tests {
     #[test]
     fn test_last_assistant_text_ignores_streaming_text() {
         let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("old response".into()));
-        // Streaming-in-progress text is NOT in chat_lines yet.
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "old response".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        // Streaming-in-progress text is NOT in messages yet.
         state.current_turn_text = "in-flight response".into();
 
         assert_eq!(state.last_assistant_text().as_deref(), Some("old response"));
@@ -1279,9 +1228,13 @@ mod tests {
     fn test_transcript_plain_text_renders_each_line_type() {
         let mut state = TuiState::new();
         state.append_user_message("Hello there");
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("Hi back".into()));
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "Hi back".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
         let call = ToolCall {
             id: "c1".into(),
             name: "bash".into(),
@@ -1311,9 +1264,13 @@ mod tests {
     #[test]
     fn test_transcript_plain_text_excludes_streaming() {
         let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("complete".into()));
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "complete".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
         state.current_turn_text = "streaming in progress".into();
 
         let out = state.transcript_plain_text();
@@ -1345,10 +1302,7 @@ mod tests {
         let mut state = TuiState::new();
         state.handle_slash_command("/copy last");
         assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("No assistant message"))),
+            state.messages.iter().any(|m| m.content.contains("No assistant message")),
             "expected 'no assistant message' error",
         );
     }
@@ -1358,10 +1312,7 @@ mod tests {
         let mut state = TuiState::new();
         state.handle_slash_command("/copy banana");
         assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Unknown /copy target"))),
+            state.messages.iter().any(|m| m.content.contains("Unknown /copy target")),
             "expected 'unknown target' error",
         );
     }
@@ -1371,10 +1322,7 @@ mod tests {
         let mut state = TuiState::new();
         state.handle_slash_command("/export");
         assert!(
-            state
-                .chat_lines
-                .iter()
-                .any(|l| matches!(l, ChatLine::Text(t) if t.contains("Usage: /export"))),
+            state.messages.iter().any(|m| m.content.contains("Usage: /export")),
             "expected 'Usage: /export' error",
         );
     }
@@ -1387,23 +1335,20 @@ mod tests {
         let path = dir.path().join("secrets/transcript.md");
 
         let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("leakable content".into()));
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "leakable content".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
         // The TUI constructs an in-handler PermissionEngine, so we cannot
         // inject a deny rule from the test. The default engine has no
         // explicit write rule; its default for 'write' is Ask, which our
         // wrapper maps to PermissionDenied.
         state.handle_slash_command(&format!("/export {}", path.display()));
 
-        let messages: Vec<&str> = state
-            .chat_lines
-            .iter()
-            .filter_map(|l| match l {
-                ChatLine::Text(t) => Some(t.as_str()),
-                _ => None,
-            })
-            .collect();
+        let messages: Vec<&str> = state.messages.iter().map(|m| m.content.as_str()).collect();
         assert!(
             messages.iter().any(|t| t.contains("Export failed")),
             "expected export-failed message; got: {:?}",
@@ -1422,14 +1367,7 @@ mod tests {
     fn test_slash_command_help_lists_copy_and_export() {
         let mut state = TuiState::new();
         state.handle_slash_command("/help");
-        let messages: Vec<&str> = state
-            .chat_lines
-            .iter()
-            .filter_map(|l| match l {
-                ChatLine::Text(t) => Some(t.as_str()),
-                _ => None,
-            })
-            .collect();
+        let messages: Vec<&str> = state.messages.iter().map(|m| m.content.as_str()).collect();
         assert!(messages.iter().any(|t| t.contains("/copy last")));
         assert!(messages.iter().any(|t| t.contains("/copy all")));
         assert!(messages.iter().any(|t| t.contains("/export <p>")));
@@ -1443,22 +1381,23 @@ mod tests {
         // a system message reporting a copy (or a clipboard failure, both
         // of which prove the command ran).
         let mut state = TuiState::new();
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("first answer".into()));
-        state
-            .chat_lines
-            .push(ChatLine::Assistant("second answer".into()));
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "first answer".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        state.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: "second answer".into(),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
 
         state.handle_slash_command("/copy last");
-        let messages: Vec<&str> = state
-            .chat_lines
-            .iter()
-            .filter_map(|l| match l {
-                ChatLine::Text(t) => Some(t.as_str()),
-                _ => None,
-            })
-            .collect();
+        let messages: Vec<&str> = state.messages.iter().map(|m| m.content.as_str()).collect();
         let copy_outcome = messages
             .iter()
             .find(|t| t.contains("Copied") || t.contains("Clipboard write failed"))
@@ -1468,5 +1407,53 @@ mod tests {
             copy_outcome.contains("character"),
             "expected char-count in copy outcome: {copy_outcome}",
         );
+    }
+
+    // ── Tip and TuiStateEvent tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_tip_auto_expires() {
+        let mut state = TuiState::new();
+        state.tip = Some(Tip {
+            kind: TipKind::ExitHint,
+            text: "test".into(),
+            ttl: Duration::from_millis(1),
+            created_at: Instant::now() - Duration::from_secs(1),
+        });
+        state.expire_tip();
+        assert!(state.tip.is_none());
+    }
+
+    #[test]
+    fn test_tip_does_not_expire_before_ttl() {
+        let mut state = TuiState::new();
+        state.tip = Some(Tip {
+            kind: TipKind::ExitHint,
+            text: "test".into(),
+            ttl: Duration::from_secs(10),
+            created_at: Instant::now(),
+        });
+        state.expire_tip();
+        assert!(state.tip.is_some());
+    }
+
+    #[test]
+    fn test_emit_event_no_tx_is_noop() {
+        let mut state = TuiState::new();
+        // No event_tx set — should not panic
+        state.append_user_message("hello");
+    }
+
+    #[test]
+    fn test_message_roles_are_correct() {
+        let mut state = TuiState::new();
+        state.append_user_message("hello");
+        assert_eq!(state.messages[0].role, MessageRole::User);
+
+        state.append_error("oops");
+        assert_eq!(state.messages[1].role, MessageRole::Error);
+
+        state.append_system("info");
+        assert_eq!(state.messages[2].role, MessageRole::System);
     }
 }

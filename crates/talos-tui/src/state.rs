@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use talos_core::ApprovalChoice;
 use talos_core::message::{AgentEvent, ToolCall, ToolResult, Usage};
 use talos_core::tool::ToolProvenance;
+use tokio::sync::mpsc;
 
 /// Plugin/tool provenance observation summary.
 ///
@@ -60,17 +61,64 @@ pub(crate) enum CtrlCState {
     Waiting(Instant),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ChatLine {
-    Text(String),
-    Assistant(String),
-    ToolCall {
-        tool_name: String,
-        arguments: String,
-        provenance: ToolProvenance,
-        result: Option<ToolResult>,
-    },
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum MessageRole {
+    User,
+    Assistant,
+    System,
+    Error,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum MessageStatus {
+    Pending,
+    Accepted,
+    Streaming,
+    Completed,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ChatMessage {
+    pub role: MessageRole,
+    pub status: MessageStatus,
+    pub content: String,
+    pub tool_call: Option<ToolCallInfo>,
+    pub created_at: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ToolCallInfo {
+    pub tool_name: String,
+    pub arguments: String,
+    pub provenance: ToolProvenance,
+    pub result: Option<ToolResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TipKind {
+    ExitHint,
+    QueueHint,
+    ApprovalResult,
+    LagWarning,
+    Info,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Tip {
+    pub kind: TipKind,
+    pub text: String,
+    pub ttl: Duration,
+    pub created_at: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TuiStateEvent {
+    MessageAdded { index: usize, role: MessageRole },
+    MessageStatusChanged { index: usize, from: MessageStatus, to: MessageStatus },
+    TipShown { kind: TipKind },
+    SplashComplete,
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct ScrollbackState {
@@ -79,7 +127,7 @@ pub(crate) struct ScrollbackState {
 
 #[derive(Debug, Default)]
 pub(crate) struct TuiState {
-    pub(crate) chat_lines: Vec<ChatLine>,
+    pub(crate) messages: Vec<ChatMessage>,
     pub(crate) input_buffer: String,
     pub(crate) cursor_pos: usize,
     pub(crate) is_processing: bool,
@@ -95,7 +143,8 @@ pub(crate) struct TuiState {
     pub(crate) followup_queue: Vec<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
     pub(crate) scrollback: ScrollbackState,
-    pub(crate) status_message: Option<(String, Instant)>,
+    pub(crate) tip: Option<Tip>,
+    pub(crate) event_tx: Option<mpsc::UnboundedSender<TuiStateEvent>>,
 }
 
 impl TuiState {
@@ -115,29 +164,65 @@ impl TuiState {
         }
     }
 
+    fn emit_event(&mut self, event: TuiStateEvent) {
+        if let Some(ref tx) = self.event_tx {
+            let _ = tx.send(event);
+        }
+    }
+
     pub(crate) fn append_user_message(&mut self, content: &str) {
-        self.chat_lines.push(ChatLine::Text(format!("> {content}")));
+        let index = self.messages.len();
+        self.messages.push(ChatMessage {
+            role: MessageRole::User,
+            status: MessageStatus::Completed,
+            content: format!("> {content}"),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        self.emit_event(TuiStateEvent::MessageAdded { index, role: MessageRole::User });
     }
 
     pub(crate) fn append_error(&mut self, message: &str) {
-        self.chat_lines
-            .push(ChatLine::Text(format!("[Error] {message}")));
+        let index = self.messages.len();
+        self.messages.push(ChatMessage {
+            role: MessageRole::Error,
+            status: MessageStatus::Completed,
+            content: format!("[Error] {message}"),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        self.emit_event(TuiStateEvent::MessageAdded { index, role: MessageRole::Error });
     }
 
     pub(crate) fn append_system(&mut self, message: &str) {
-        self.chat_lines
-            .push(ChatLine::Text(format!("[System] {message}")));
+        let index = self.messages.len();
+        self.messages.push(ChatMessage {
+            role: MessageRole::System,
+            status: MessageStatus::Completed,
+            content: format!("[System] {message}"),
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+        self.emit_event(TuiStateEvent::MessageAdded { index, role: MessageRole::System });
     }
 
     pub(crate) fn append_tool_call(&mut self, call: &ToolCall, provenance: &ToolProvenance) {
         self.record_provenance(provenance);
-        self.chat_lines.push(ChatLine::ToolCall {
-            tool_name: call.name.clone(),
-            arguments: serde_json::to_string_pretty(&call.input)
-                .unwrap_or_else(|_| call.input.to_string()),
-            provenance: provenance.clone(),
-            result: None,
+        let index = self.messages.len();
+        self.messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            status: MessageStatus::Completed,
+            content: String::new(),
+            tool_call: Some(ToolCallInfo {
+                tool_name: call.name.clone(),
+                arguments: serde_json::to_string_pretty(&call.input)
+                    .unwrap_or_else(|_| call.input.to_string()),
+                provenance: provenance.clone(),
+                result: None,
+            }),
+            created_at: Instant::now(),
         });
+        self.emit_event(TuiStateEvent::MessageAdded { index, role: MessageRole::Assistant });
     }
 
     fn record_provenance(&mut self, provenance: &ToolProvenance) {
@@ -154,16 +239,10 @@ impl TuiState {
     }
 
     pub(crate) fn set_tool_result(&mut self, result: &ToolResult) {
-        for line in self.chat_lines.iter_mut().rev() {
-            if let ChatLine::ToolCall {
-                tool_name: _,
-                arguments: _,
-                provenance: _,
-                result: slot,
-            } = line
-            {
-                if slot.is_none() {
-                    *slot = Some(result.clone());
+        for msg in self.messages.iter_mut().rev() {
+            if let Some(ref mut tool_call) = msg.tool_call {
+                if tool_call.result.is_none() {
+                    tool_call.result = Some(result.clone());
                     break;
                 }
             }
@@ -256,11 +335,18 @@ impl TuiState {
         let now = Instant::now();
         match &self.ctrl_c_state {
             CtrlCState::Idle => {
-                if self.is_processing {
-                    self.status_message = Some(("Turn cancelled. Press Ctrl+C again to exit.".into(), now));
+                let text = if self.is_processing {
+                    "Turn cancelled. Press Ctrl+C again to exit.".to_string()
                 } else {
-                    self.status_message = Some(("Press Ctrl+C again within 2 seconds to exit.".into(), now));
-                }
+                    "Press Ctrl+C again within 2 seconds to exit.".to_string()
+                };
+                self.tip = Some(Tip {
+                    kind: TipKind::ExitHint,
+                    text,
+                    ttl: Duration::from_secs(2),
+                    created_at: now,
+                });
+                self.emit_event(TuiStateEvent::TipShown { kind: TipKind::ExitHint });
                 self.ctrl_c_state = CtrlCState::Waiting(now);
                 false
             }
@@ -269,7 +355,13 @@ impl TuiState {
                     self.should_exit = true;
                     true
                 } else {
-                    self.status_message = Some(("Press Ctrl+C again within 2 seconds to exit.".into(), now));
+                    self.tip = Some(Tip {
+                        kind: TipKind::ExitHint,
+                        text: "Press Ctrl+C again within 2 seconds to exit.".to_string(),
+                        ttl: Duration::from_secs(2),
+                        created_at: now,
+                    });
+                    self.emit_event(TuiStateEvent::TipShown { kind: TipKind::ExitHint });
                     self.ctrl_c_state = CtrlCState::Waiting(now);
                     false
                 }
@@ -277,11 +369,10 @@ impl TuiState {
         }
     }
 
-    pub(crate) fn expire_status_message(&mut self) {
-        const STATUS_TTL: Duration = Duration::from_secs(2);
-        if let Some((_, set_at)) = &self.status_message {
-            if Instant::now().duration_since(*set_at) >= STATUS_TTL {
-                self.status_message = None;
+    pub(crate) fn expire_tip(&mut self) {
+        if let Some(ref tip) = self.tip {
+            if Instant::now().duration_since(tip.created_at) >= tip.ttl {
+                self.tip = None;
             }
         }
     }
@@ -291,7 +382,7 @@ impl TuiState {
             AgentEvent::TurnStart => {
                 self.is_processing = true;
                 self.current_turn_text.clear();
-                self.status_message = None;
+                self.tip = None;
             }
             AgentEvent::TextDelta { delta } => {
                 self.append_delta(delta);
@@ -305,7 +396,7 @@ impl TuiState {
             AgentEvent::TurnEnd { usage, .. } => {
                 self.is_processing = false;
                 self.finalize_turn();
-                self.status_message = None;
+                self.tip = None;
                 self.usage = usage.clone();
             }
             AgentEvent::Error { message } => {
@@ -356,7 +447,7 @@ impl TuiState {
                 ));
             }
             "/new" => {
-                self.chat_lines.clear();
+                self.messages.clear();
                 self.current_turn_text.clear();
                 self.usage = Usage::default();
                 self.branch_id = None;
@@ -470,12 +561,15 @@ impl TuiState {
         }
     }
 
-    /// Returns the source text of the most recent [`ChatLine::Assistant`],
+    /// Returns the source text of the most recent assistant message (text-only, no tool call),
     /// if any. Streaming-in-progress text (`current_turn_text`) is excluded.
     pub(crate) fn last_assistant_text(&self) -> Option<String> {
-        self.chat_lines.iter().rev().find_map(|line| match line {
-            ChatLine::Assistant(text) => Some(text.clone()),
-            _ => None,
+        self.messages.iter().rev().find_map(|msg| {
+            if msg.role == MessageRole::Assistant && msg.tool_call.is_none() && !msg.content.is_empty() {
+                Some(msg.content.clone())
+            } else {
+                None
+            }
         })
     }
 
@@ -486,8 +580,8 @@ impl TuiState {
     /// in-flight streaming turns do not produce half-copied output.
     pub(crate) fn transcript_plain_text(&self) -> String {
         let mut out = String::new();
-        for line in &self.chat_lines {
-            Self::append_line_plain(&mut out, line);
+        for msg in &self.messages {
+            Self::append_message_plain(&mut out, msg);
         }
         out
     }
@@ -499,71 +593,50 @@ impl TuiState {
     /// processors.
     pub(crate) fn transcript_markdown(&self) -> String {
         let mut out = String::new();
-        for line in &self.chat_lines {
-            Self::append_line_markdown(&mut out, line);
+        for msg in &self.messages {
+            Self::append_message_markdown(&mut out, msg);
         }
         out
     }
 
-    pub(crate) fn append_line_plain(out: &mut String, line: &ChatLine) {
-        match line {
-            ChatLine::Text(text) => {
-                out.push_str(text);
+
+    pub(crate) fn append_message_plain(out: &mut String, msg: &ChatMessage) {
+        if !msg.content.is_empty() {
+            out.push_str(&msg.content);
+            if !msg.content.ends_with('\n') {
                 out.push('\n');
             }
-            ChatLine::Assistant(text) => {
-                out.push_str(text);
-                if !text.ends_with('\n') {
-                    out.push('\n');
-                }
-            }
-            ChatLine::ToolCall {
-                tool_name,
-                arguments,
-                provenance,
-                result,
-            } => {
-                let marker = plugin_observation_key(provenance);
-                out.push_str(&format!("▸ {tool_name} [{marker}]\n"));
-                out.push_str(&format!("  {arguments}\n"));
-                if let Some(result) = result {
-                    let icon = if result.is_error { "✗" } else { "✓" };
-                    out.push_str(&format!("  {icon} {}\n", result.content));
-                }
+        }
+        if let Some(ref tool_call) = msg.tool_call {
+            let marker = plugin_observation_key(&tool_call.provenance);
+            out.push_str(&format!("▸ {} [{marker}]\n", tool_call.tool_name));
+            out.push_str(&format!("  {}\n", tool_call.arguments));
+            if let Some(ref result) = tool_call.result {
+                let icon = if result.is_error { "✗" } else { "✓" };
+                out.push_str(&format!("  {icon} {}\n", result.content));
             }
         }
     }
 
-    fn append_line_markdown(out: &mut String, line: &ChatLine) {
-        match line {
-            ChatLine::Text(text) => {
-                out.push_str(text);
+    fn append_message_markdown(out: &mut String, msg: &ChatMessage) {
+        if !msg.content.is_empty() {
+            out.push_str(&msg.content);
+            if !msg.content.ends_with('\n') {
                 out.push('\n');
             }
-            ChatLine::Assistant(text) => {
-                out.push_str(text);
-                if !text.ends_with('\n') {
-                    out.push('\n');
-                }
-            }
-            ChatLine::ToolCall {
-                tool_name,
-                arguments,
-                provenance,
-                result,
-            } => {
-                let marker = plugin_observation_key(provenance);
-                out.push_str(&format!("### `▸ {tool_name} [{marker}]`\n\n"));
-                out.push_str("```json\n");
-                out.push_str(arguments);
+        }
+        if let Some(ref tool_call) = msg.tool_call {
+            let marker = plugin_observation_key(&tool_call.provenance);
+            out.push_str(&format!("### `▸ {} [{marker}]`\n\n", tool_call.tool_name));
+            out.push_str("```json\n");
+            out.push_str(&tool_call.arguments);
+            out.push_str("\n```\n");
+            if let Some(ref result) = tool_call.result {
+                let label = if result.is_error { "Error" } else { "Result" };
+                out.push_str(&format!("\n**{label}:**\n\n"));
+                out.push_str("```\n");
+                out.push_str(&result.content);
                 out.push_str("\n```\n");
-                if let Some(result) = result {
-                    let label = if result.is_error { "Error" } else { "Result" };
-                    out.push_str(&format!("\n**{label}:**\n\n"));
-                    out.push_str("```\n");
-                    out.push_str(&result.content);
-                    out.push_str("\n```\n");
-                }
             }
         }
     }

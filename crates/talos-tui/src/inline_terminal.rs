@@ -10,7 +10,7 @@
 use std::io::{self, Stdout};
 
 use crossterm::{
-    cursor::{MoveTo, SetCursorStyle, Show},
+    cursor::{Hide, MoveTo, SetCursorStyle, Show},
     execute, queue,
     style::Print,
     terminal::{self, Clear, ClearType, EnableLineWrap},
@@ -76,14 +76,13 @@ impl InlineTerminal {
     /// # Errors
     ///
     /// Returns an error if the terminal size cannot be read or raw mode fails.
-    pub fn new() -> io::Result<Self> {
+    pub fn new(viewport_height: u16) -> io::Result<Self> {
         let stdout = io::stdout();
         let mut backend = CrosstermBackend::new(stdout);
 
         let screen_size = backend.size()?;
         let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
 
-        let viewport_height = 4u16;
         let needed_bottom = cursor_pos.y.saturating_add(viewport_height);
         if needed_bottom > screen_size.height {
             let padding = needed_bottom.saturating_sub(screen_size.height);
@@ -94,6 +93,7 @@ impl InlineTerminal {
         }
 
         let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
+        let _ = execute!(backend, Hide);
         let viewport_area = Rect::new(0, cursor_pos.y, screen_size.width, 0);
 
         let buffers = [

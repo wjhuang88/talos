@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I023 TUI State Model | Planned | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Start as next iteration (user-prioritized); depends on I022 (Complete); [TUI-004](backlog/active/TUI-004-state-model.md) backlog spec |
+| I023 TUI State Model | Review | [I023 TUI State Model](iterations/I023-tui-state-model.md) | S1-S6 implemented; 131 TUI tests pass; `ViewportLayout` struct; `ChatLine` removed; awaiting runtime verification of cursor fix |
 
 ## Review
 

@@ -11,7 +11,7 @@ English | **[中文](README.zh-CN.md)**
 
 | Area | State | Notes |
 |------|-------|-------|
-| Runtime | Active | 661 tests passing across 14 crates. Codex-style inline-by-default TUI with fixed 4-line viewport, real-time scrollback flush, status bar tips. Next: I023 unified state model refactor. |
+| Runtime | Active | 131 TUI tests passing. Codex-style inline-by-default TUI with `ViewportLayout` (6-row viewport: tips/gap/input-pad/input/input-pad/status), `ChatMessage`/`Tip`/`TuiStateEvent` unified state model, bg-color input area with `❯` prompt, `TipKind`-colored tips, Nord-styled status bar. Next: TUI-005 logo/splash. |
 | R1 Review Closure | Complete | I008/I009 closed. I009 TUI consumer work deferred to #I009-S6. I010 R3 product polish complete. |
 | I008 Learning Agent | Complete | `EvolutionHookHandler` wired into all run paths; runtime evidence recorded. |
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers shipped in I014. |
@@ -22,8 +22,8 @@ English | **[中文](README.zh-CN.md)**
 | I015-I017 Follow-up Plan | Planned | Provider schema, portable file/search tools, and embedded Git tools. |
 | I018-I020 Architecture Plan | Planned | Bounded logs, embedded prompt assets, layered memory, and local research library. |
 | I021 Evolution Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits realigned `talos-evolution` with the MenteDB blueprint; 7470ac5 byte-cap stays as defense-in-depth. |
-| I022 TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
-| I023 TUI State Model | Planned (next) | Unified `ChatMessage`/`Tip`/`TuiStateEvent` model; event-bus hook. Depends on I022 (Complete). |
+| I022 TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
+| I023 TUI State Model | Review (S1-S6 done) | Unified `ChatMessage`/`Tip`/`TuiStateEvent` model; `ViewportLayout` struct; event-bus hook; `ChatLine` removed; 131 TUI tests pass. Awaiting final runtime verification. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.

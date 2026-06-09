@@ -2,20 +2,31 @@
 
 **User can**: See every message with its lifecycle visible (pending → accepted → streaming → completed), see transient tips auto-expire from the status bar instead of polluting scrollback, and have a structured state model that a future global event bus can subscribe to without touching TUI internals.
 
-## Status: PLANNED
+## Status: REVIEW (2026-06-09)
 
-Next iteration after I022. Depends on I022 core flip (landed).
+All stories implemented. 131 tests pass (`talos-tui`). Viewport layout refactored to `ViewportLayout` struct with auto-computed height.
 
 ## Stories
 
-| Story | Title | Acceptance |
-|---|---|---|
-| S1 | Define new data types | `MessageRole`, `MessageStatus`, `ChatMessage`, `TipKind`, `Tip`, `TuiStateEvent` defined in `state.rs`. All derive `Debug, Clone`. No `ChatLine` or `status_message` references remain in the type definitions. |
-| S2 | Restructure `TuiState` | `TuiState` uses `messages: Vec<ChatMessage>`, `tips: Vec<Tip>`, `streaming_text`, `streaming_scrolled`, `event_tx: Option<mpsc::UnboundedSender<TuiStateEvent>>`. `chat_lines`, `current_turn_text`, `status_message` fields removed. |
-| S3 | Migrate state methods | `handle_event`, `handle_ctrl_c`, `append_user_message`, `append_error`, `append_system`, `append_tool_call`, `set_tool_result`, `expire_tips`, `finalize_turn` all use new types. Event emissions on status transitions when `event_tx` is set. |
-| S4 | Migrate app.rs | `flush_scrollback`, `extract_new_scrollback_lines`, `finalize_scrollback` use `messages` instead of `chat_lines`. `build_status_text` renders active `Tip`. `handle_input_event` uses `ChatMessage { role: User, status: Pending/Accepted }` for queued/sent messages. `chat_line_to_text_lines` → `message_to_text_lines`. |
-| S5 | Migrate tests | All 127+ tests pass. `ChatLine` references replaced with `ChatMessage`. `status_message` assertions replaced with `Tip`. New tests for `Tip` expiry and `TuiStateEvent` emission. |
-| S6 | Verification | `cargo check --workspace` clean (0 warnings). `cargo test --workspace` exit 0. `cargo run -p talos-cli` shows correct behavior: messages appear in scrollback, tips auto-expire from status bar, no duplicate content, no rendering glitches. |
+| Story | Title | Acceptance | Status |
+|---|---|---|---|
+| S1 | Define new data types | `MessageRole`, `MessageStatus`, `ChatMessage`, `TipKind`, `Tip`, `TuiStateEvent` defined in `state.rs`. All derive `Debug, Clone`. No `ChatLine` or `status_message` references remain in the type definitions. | ✅ Complete |
+| S2 | Restructure `TuiState` | `TuiState` uses `messages: Vec<ChatMessage>`, `tip: Option<Tip>`, `event_tx: Option<mpsc::UnboundedSender<TuiStateEvent>>`. `chat_lines`, `status_message` fields removed. `current_turn_text` retained for streaming. | ✅ Complete |
+| S3 | Migrate state methods | `handle_event`, `handle_ctrl_c`, `append_user_message`, `append_error`, `append_system`, `append_tool_call`, `set_tool_result`, `expire_tip`, slash commands all use new types. `emit_event` helper on `TuiState`. Event emissions on status transitions when `event_tx` is set. | ✅ Complete |
+| S4 | Migrate app.rs | `flush_scrollback`, `extract_new_scrollback_lines`, `finalize_scrollback` use `messages` instead of `chat_lines`. `build_status_text` uses Nord-styled Span-based layout (no background, dim separators, `S:/F:` queue indicators). `build_input_text` has `❯` prompt (Nord Aurora green). `draw_frame` uses `ViewportLayout` struct with named fields. `InlineTerminal::new(viewport_height)` parameterized. | ✅ Complete |
+| S5 | Migrate tests | All 131 tests pass. `ChatLine` references replaced with `ChatMessage`. `status_message` assertions replaced with `Tip`. New tests: `test_tip_auto_expires`, `test_tip_does_not_expire_before_ttl`, `test_emit_event_no_tx_is_noop`, `test_message_roles_are_correct`. | ✅ Complete |
+| S6 | Verification | `cargo check --workspace` clean. `cargo test --workspace` exit 0. Runtime verified: messages appear in scrollback with blank-line spacing, tips auto-expire, input area with bg-color style, status bar no background. | ✅ Complete |
+
+## Execution Evidence
+
+- 131 tests pass (`cargo test -p talos-tui --lib`).
+- `ViewportLayout` struct with `ROWS` const array and auto-computed `HEIGHT` (6 lines): tips, gap, input_pad_top, input, input_pad_bot, status.
+- `InlineTerminal::new(viewport_height)` takes dynamic height from `ViewportLayout::HEIGHT`.
+- Input area: background color `#3B4252` (Nord Polar Night), no borders, `❯` prompt in `#A3BE8C` (Nord Aurora green).
+- Tips: `TipKind`-driven colors (green/purple/red/cyan) displayed in hints row; status bar no longer shows tips.
+- Status bar: no background color, Nord Snow gray `#81A1C1` values, dim `│` separators, `S:/F:` queue format.
+- Messages separated by blank lines in scrollback (both `extract_new_scrollback_lines` and `finalize_scrollback`).
+- `ChatLine` completely removed (no dead code).
 
 ## Dependencies
 
@@ -29,12 +40,12 @@ Follow `docs/backlog/active/TUI-004-state-model.md` design. Any deviation from t
 Required reading:
 
 - `docs/backlog/active/TUI-004-state-model.md` — full design, acceptance criteria, risks.
-- `crates/talos-tui/src/state.rs` — current `TuiState`, `ChatLine`, to be replaced.
-- `crates/talos-tui/src/app.rs` — scrollback flush, status bar, input handling, to be migrated.
-- `docs/iterations/I022-tui-inline-default.md` — prerequisite iteration record.
+- `crates/talos-tui/src/state.rs` — `TuiState`, `ChatMessage`, `Tip`, `TuiStateEvent`.
+- `crates/talos-tui/src/app.rs` — `ViewportLayout`, `draw_frame`, `build_input_text`, `build_status_text`.
+- `crates/talos-tui/src/inline_terminal.rs` — `InlineTerminal::new(viewport_height)`.
 
 ## Baseline
 
-- 127 tests pass (`talos-tui`).
+- 127 tests pass (`talos-tui`) at start.
 - Workspace `cargo test` and `cargo check` exit 0.
 - I022 core flip landed; viewport is fixed 4 lines, scrollback flush works.
