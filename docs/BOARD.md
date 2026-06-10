@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I023 TUI State Model | Review | [I023 TUI State Model](iterations/I023-tui-state-model.md) | S1-S6 implemented; 131 TUI tests pass; `ViewportLayout` struct; `ChatLine` removed; awaiting runtime verification of cursor fix |
+| I023 TUI State Model | Review | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Event-driven architecture: `talos-conversation` + `talos-tui` separation; Codex-style `insert_history`; stream-based content delivery; 93 tests pass (43 TUI + 50 conversation); awaiting runtime verification of insert_history rendering |
 
 ## Review
 

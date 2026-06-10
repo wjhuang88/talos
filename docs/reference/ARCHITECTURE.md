@@ -43,6 +43,7 @@ Talos crates are introduced progressively across iterations (see Implementation 
 | `talos-plugin` | I009 | Plugin runtime for third-party extensions (hook-based first, WASM as option). |
 | `talos-mcp` | I009 | Model Context Protocol implementation for external tool and resource access. |
 | `talos-rpc` | I009 | API layer for remote interaction and frontend integration. |
+| `talos-conversation` | I023 | Business logic layer between agent and TUI: owns conversation state, emits typed `UiOutput` events via async channels. |
 
 ## Dependency Graph
 
@@ -59,9 +60,14 @@ The architecture follows a strict hierarchy to prevent circular dependencies.
    \      |      /           |           |      /     /
     \     v     /            v           v     /     /
      [ talos-core ] <-------------------------------'
+
+Information flow for TUI:
+  Agent → ConversationEngine → (mpsc::UiOutput) → Tui
+                                      ↑
+                              UserInput (mpsc)
 ```
 
-Every crate depends on `talos-core`. Intermediate crates like `talos-agent` aggregate functionality from specialized modules.
+Every crate depends on `talos-core`. Intermediate crates like `talos-agent` aggregate functionality from specialized modules. `talos-conversation` bridges the agent and TUI layers, owning conversation state and emitting typed events via async channels.
 
 ## Core Data Flow
 
@@ -91,6 +97,52 @@ Talos uses traits to decouple logic and allow for alternative implementations.
 *   `PermissionEngine`: Logic for checking tool calls against active policies.
 *   `SkillProvider`: Interface for loading and injecting domain-specific knowledge.
 *   `PluginHost`: Manages the lifecycle and hooks for WASM-based extensions.
+
+## TUI Event-Driven Architecture (I023)
+
+The TUI follows a single-directional information flow: Agent → ConversationEngine → UI.
+
+### ConversationEngine (`talos-conversation`)
+
+Owns all business state (messages, turn lifecycle, model info). The TUI does not hold business state — only pure UI state (input buffer, cursor, tips, approval).
+
+```text
+┌─────────────────────┐     UiOutput (mpsc)     ┌──────────────┐
+│  ConversationEngine │ ──────────────────────> │     Tui      │
+│  (business state)   │                         │  (UI state)  │
+│                     │ <────────────────────── │              │
+└─────────────────────┘     UserInput (mpsc)    └──────────────┘
+```
+
+### UiOutput Event Types
+
+| Variant | Purpose |
+|---------|---------|
+| `Stream { stream, source }` | New content stream (user message or AI response). UI consumes via `Stream::next()` in `select!` loop. |
+| `Status { snapshot }` | Status update (model name, token usage, processing state). |
+| `Tip { text, kind }` | Transient tip message with TTL auto-expiry. |
+| `Exit` | Signal to terminate the UI loop. |
+
+### Stream Consumption
+
+Content flows as character/chunk streams, not pre-split lines:
+
+1. `select!` loop has a `next_stream_chunk` branch that reads the active stream directly — no spawn task.
+2. `consume_stream_chunk` splits on `\n`, pushes complete lines to `pending_scrollback`, updates `streaming_preview` from `stream_buffer`.
+3. `flush_pending_scrollback` calls `insert_history` (one line at a time, Codex-style terminal ops) to write to scrollback above the viewport.
+4. `handle_ui_output(Stream)` finalizes active stream, pushes non-empty preview to scrollback, then sets new active stream.
+
+### Inline Terminal Rendering
+
+The inline-by-default TUI (I022) uses a fixed viewport within the terminal. History content is written above the viewport using `insert_history`:
+
+- **Non-bottom**: `\x1bM` pushes viewport down one row, history line written at the vacated position.
+- **Bottom**: Scroll region `[1, viewport_top]` + `\r\n` scrolls history up, history line written at the bottom of the history area.
+- Both branches set `needs_clear = true` so the next `draw_frame` performs a force-clear + full diff redraw of the viewport.
+
+### Preview Component
+
+Always occupies exactly 1 row in the viewport. Shows `streaming_preview` content (partial stream content not yet terminated by `\n`). User messages have no trailing `\n` so they stay in preview until the AI stream arrives.
 
 ## Async Pattern (SQ/EQ)
 

@@ -37,7 +37,7 @@ impl ViewportComponent for PreviewComponent<'_> {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 display,
-                Style::default().fg(Color::Rgb(0xBF, 0x61, 0x6C)).bg(Color::Rgb(0x3B, 0x17, 0x1B)),
+                Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
             ))),
             area,
         );
@@ -188,7 +188,17 @@ pub struct Tui {
 
 impl Tui {
     pub fn new() -> Result<Self> {
-        print_banner();
+        let _splash_lines = print_splash_scrollback();
+
+        let (_, cursor_y) = crossterm::cursor::position().map_err(|e| anyhow::anyhow!("{e}"))?;
+        let (_, screen_h) = crossterm::terminal::size().map_err(|e| anyhow::anyhow!("{e}"))?;
+        let viewport_height: u16 = 7;
+        if cursor_y.saturating_add(viewport_height) > screen_h {
+            for _ in 0..viewport_height.saturating_sub(1) {
+                println!();
+            }
+        }
+
         enable_raw_mode()?;
         let terminal = InlineTerminal::new()?;
 
@@ -511,14 +521,6 @@ impl Drop for Tui {
     }
 }
 
-fn print_banner() {
-    let version = env!("CARGO_PKG_VERSION");
-    println!();
-    println!("  \u{1f6e0} Talos v{version}");
-    println!("  Safety-first agent runtime");
-    println!();
-}
-
 pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
     let buffer = &state.input_buffer;
     let char_count = buffer.chars().count();
@@ -621,6 +623,15 @@ fn truncate_end_to_width(s: &str, max_width: u16) -> String {
         start = i;
     }
     chars[start..].iter().collect()
+}
+
+fn print_splash_scrollback() -> u16 {
+    let version = env!("CARGO_PKG_VERSION");
+    println!();
+    println!("  \u{1f6e0} Talos v{version}");
+    println!("  Safety-first agent runtime");
+    println!();
+    4
 }
 
 #[cfg(test)]

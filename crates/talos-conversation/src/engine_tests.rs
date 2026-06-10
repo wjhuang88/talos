@@ -360,7 +360,7 @@ async fn handle_user_message_creates_stream_with_prefix() {
     assert_eq!(outputs.len(), 1);
     let (source, text) = collect_stream(outputs).await.unwrap();
     assert_eq!(source, MessageSource::User);
-    assert_eq!(text, "> hello world\n");
+    assert_eq!(text, "> hello world");
 }
 
 #[tokio::test]
@@ -373,7 +373,7 @@ async fn handle_user_message_multiline_single_stream() {
     assert_eq!(engine.messages[0].content, "> line1\nline2\n");
 
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert_eq!(text, "> line1\nline2\n");
+    assert_eq!(text, "> line1\nline2");
 }
 
 // ---------------------------------------------------------------------------
@@ -884,7 +884,7 @@ async fn full_turn_lifecycle() {
 
     let outputs = engine.handle_user_message("What is 2+2?");
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert_eq!(text, "> What is 2+2?\n");
+    assert_eq!(text, "> What is 2+2?");
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
     let assistant_stream = outputs.into_iter().find_map(|o| match o {

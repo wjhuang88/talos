@@ -2,9 +2,9 @@
 
 **User can**: See every message with its lifecycle visible (pending → accepted → streaming → completed), see transient tips auto-expire from the status bar instead of polluting scrollback, and have a structured state model that a future global event bus can subscribe to without touching TUI internals.
 
-## Status: REVIEW (2026-06-09)
+## Status: REVIEW (2026-06-10)
 
-All stories implemented. 131 tests pass (`talos-tui`). Viewport layout refactored to `ViewportLayout` struct with auto-computed height.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery. 93 tests pass (43 TUI + 50 conversation). Awaiting runtime verification of insert_history rendering.
 
 ## Stories
 
@@ -16,17 +16,22 @@ All stories implemented. 131 tests pass (`talos-tui`). Viewport layout refactore
 | S4 | Migrate app.rs | `flush_scrollback`, `extract_new_scrollback_lines`, `finalize_scrollback` use `messages` instead of `chat_lines`. `build_status_text` uses Nord-styled Span-based layout (no background, dim separators, `S:/F:` queue indicators). `build_input_text` has `❯` prompt (Nord Aurora green). `draw_frame` uses `ViewportLayout` struct with named fields. `InlineTerminal::new(viewport_height)` parameterized. | ✅ Complete |
 | S5 | Migrate tests | All 131 tests pass. `ChatLine` references replaced with `ChatMessage`. `status_message` assertions replaced with `Tip`. New tests: `test_tip_auto_expires`, `test_tip_does_not_expire_before_ttl`, `test_emit_event_no_tx_is_noop`, `test_message_roles_are_correct`. | ✅ Complete |
 | S6 | Verification | `cargo check --workspace` clean. `cargo test --workspace` exit 0. Runtime verified: messages appear in scrollback with blank-line spacing, tips auto-expire, input area with bg-color style, status bar no background. | ✅ Complete |
+| S7 | Event-driven architecture | `talos-conversation` crate: `ConversationEngine` owns business state, emits `UiOutput` via async channels. `talos-tui` owns pure UI state. Single-directional flow: Agent → Engine → UI. Stream-based content delivery (`StreamMessage`). `select!` loop consumes streams directly (no spawn task). | ✅ Complete |
+| S8 | Codex-style insert_history | Two-branch `insert_history`: non-bottom (`\x1bM` push viewport) and bottom (scroll region + `\r\n`). Single-line operation. `needs_clear` after each insert for clean viewport redraw. `streaming_preview` unconditionally synced with `stream_buffer`. | ✅ Complete |
 
 ## Execution Evidence
 
-- 131 tests pass (`cargo test -p talos-tui --lib`).
-- `ViewportLayout` struct with `ROWS` const array and auto-computed `HEIGHT` (6 lines): tips, gap, input_pad_top, input, input_pad_bot, status.
-- `InlineTerminal::new(viewport_height)` takes dynamic height from `ViewportLayout::HEIGHT`.
-- Input area: background color `#3B4252` (Nord Polar Night), no borders, `❯` prompt in `#A3BE8C` (Nord Aurora green).
-- Tips: `TipKind`-driven colors (green/purple/red/cyan) displayed in hints row; status bar no longer shows tips.
-- Status bar: no background color, Nord Snow gray `#81A1C1` values, dim `│` separators, `S:/F:` queue format.
-- Messages separated by blank lines in scrollback (both `extract_new_scrollback_lines` and `finalize_scrollback`).
-- `ChatLine` completely removed (no dead code).
+- 93 tests pass (43 TUI + 50 conversation).
+- `talos-conversation` crate: `ConversationEngine` owns all business state, 50 tests.
+- `talos-tui` crate: event-driven UI with pure state, 43 tests.
+- Single-directional information flow: Agent → ConversationEngine → UI via typed async channels (`mpsc::UiOutput`).
+- Stream-based content delivery: UI consumes active stream via `next_stream_chunk` in `select!` loop (no spawn task).
+- `insert_history` rewritten Codex-style: two branches (non-bottom: `\x1bM` push viewport; bottom: scroll region + `\r\n`), single-line operation, `needs_clear` for clean redraw.
+- `streaming_preview` unconditionally synced with `stream_buffer` — no stale preview after `\n` split.
+- `finalize_active_stream` clears `stream_buffer` only; preview push happens in `handle_ui_output` with correct ordering (finalize → push preview → set new stream).
+- User messages have no trailing `\n` in stream (stay in preview until AI stream arrives).
+- Preview component always 1 row height_hint.
+- Commits: `5c90874` (event-driven architecture), `a669a3e` (insert_history rewrite + preview sync fix).
 
 ## Dependencies
 
@@ -40,9 +45,11 @@ Follow `docs/backlog/active/TUI-004-state-model.md` design. Any deviation from t
 Required reading:
 
 - `docs/backlog/active/TUI-004-state-model.md` — full design, acceptance criteria, risks.
-- `crates/talos-tui/src/state.rs` — `TuiState`, `ChatMessage`, `Tip`, `TuiStateEvent`.
-- `crates/talos-tui/src/app.rs` — `ViewportLayout`, `draw_frame`, `build_input_text`, `build_status_text`.
-- `crates/talos-tui/src/inline_terminal.rs` — `InlineTerminal::new(viewport_height)`.
+- `crates/talos-conversation/src/engine.rs` — ConversationEngine, handle_agent_event, handle_user_message.
+- `crates/talos-conversation/src/types.rs` — StatusSnapshot, StreamMessage, UiOutput, MessageSource.
+- `crates/talos-tui/src/app.rs` — Tui struct, select! loop, consume_stream_chunk, handle_ui_output, PreviewComponent.
+- `crates/talos-tui/src/inline_terminal.rs` — InlineTerminal, insert_history (Codex-style), set_viewport_area, draw/draw_inner.
+- `crates/talos-tui/src/state.rs` — TuiState (pure UI state).
 
 ## Baseline
 

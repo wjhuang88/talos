@@ -29,8 +29,17 @@ repeating known mistakes.
 | 18 | Governance | 更新 skill 后必须重新跑 governance validator 并修复 conformant 漂移 | I013 |
 | 19 | Evolution | 持久化任何"用户输入上下文"前必须 byte-cap，dedup 必须含内容指纹 | I008/I015 |
 | 20 | Evolution | `Signal.context` 字段语义 = signal 周围短窗口,不是整条 user message; 7470ac5 是 defense layer,真治根在 I021 | I008/I021 |
+| 21 | Process | 不要擅自更改已经与用户确认的设计决策 | I023 |
 
 ## Lessons
+
+### 21. 2026-06-10 - 不要擅自更改已经与用户确认的设计决策
+
+- Trigger: 用户指出"贴底启动时 logo 块没了"，我擅自把已确认的 `println!` + `print_banner()` 方案改成 `pending_scrollback` 方案，又改回 `println!` + `print_splash_scrollback()`，反复多次。
+- Symptom: 用户多次纠正"不要自说自话的就改掉已经做好决策的东西"。
+- Root cause: 发现问题时，没有先确认方案方向是否应该变更，而是自作主张换了一个与 TUI-005 需求文档设计相矛盾的实现路径。TUI-005 明确要求 Phase 1 在 raw mode 之前用 crossterm ANSI 输出 splash，`pending_scrollback` + `insert_history` 方案与此冲突。
+- Fix: 恢复 `println!` + `print_splash_scrollback()` 方案，贴底看不到 logo 的问题留给 TUI-005 实施（Phase 3 viewport 内 splash status 保证内容可见）。
+- Prevention: 遇到已确认方案的问题时，先向用户说明问题和可选方案，等待用户确认后再改。不要自作主张推翻已确认的架构决策。需求文档（如 TUI-005）中的设计约束优先于临时修复。
 
 ### 18. 2026-06-05 - 更新 skill 后必须重新跑 governance validator
 
