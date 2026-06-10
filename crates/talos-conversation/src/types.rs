@@ -55,6 +55,7 @@ pub enum TipKind {
     ApprovalResult,
     LagWarning,
     Info,
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

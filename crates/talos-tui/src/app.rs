@@ -13,7 +13,7 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Padding, Paragraph},
 };
-use talos_conversation::{StatusSnapshot, TipKind, UiOutput, UserInput};
+use talos_conversation::{MessageSource, StatusSnapshot, TipKind, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use tokio::sync::mpsc;
@@ -25,6 +25,7 @@ use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
 use crate::widgets::ApprovalOverlay;
 
 struct PreviewComponent<'a> {
+    padding: &'a str,
     text: &'a str,
 }
 
@@ -33,7 +34,8 @@ impl ViewportComponent for PreviewComponent<'_> {
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let line = self.text.split('\n').last().unwrap_or("");
-        let display = truncate_end_to_width(line, area.width);
+        let full = format!("{}{}", self.padding, line);
+        let display = truncate_end_to_width(&full, area.width);
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 display,
@@ -85,16 +87,8 @@ impl ViewportComponent for QueuePreviewComponent {
     }
 }
 
-struct GapComponent;
-
-impl ViewportComponent for GapComponent {
-    fn height_hint(&self, _w: u16) -> u16 { 1 }
-    fn render(&self, _frame: &mut InlineFrame, _area: Rect) {}
-}
-
 struct TipsComponent<'a> {
     tip: Option<&'a Tip>,
-    is_processing: bool,
 }
 
 impl ViewportComponent for TipsComponent<'_> {
@@ -105,15 +99,10 @@ impl ViewportComponent for TipsComponent<'_> {
             let color = match tip.kind {
                 TipKind::ExitHint | TipKind::QueueHint => Color::Rgb(0xA3, 0xBE, 0x8C),
                 TipKind::ApprovalResult => Color::Rgb(0xB4, 0x8E, 0xAD),
-                TipKind::LagWarning => Color::Rgb(0xBF, 0x61, 0x6C),
+                TipKind::LagWarning | TipKind::Error => Color::Rgb(0xBF, 0x61, 0x6C),
                 TipKind::Info => Color::Rgb(0x88, 0xC0, 0xD0),
             };
             Text::from(Line::from(Span::styled(format!(" {}", tip.text), Style::default().fg(color))))
-        } else if self.is_processing {
-            Text::from(Line::from(Span::styled(
-                " Processing… Esc to clear, Ctrl+C to cancel",
-                Style::default().fg(Color::Rgb(0xD0, 0x87, 0x70)),
-            )))
         } else {
             Text::from(Line::from(Span::styled(
                 " Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution",
@@ -182,6 +171,8 @@ pub struct Tui {
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
     pending_scrollback: Vec<String>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
+    stream_source: Option<MessageSource>,
+    stream_line_count: usize,
     stream_buffer: String,
     streaming_preview: String,
 }
@@ -192,7 +183,7 @@ impl Tui {
 
         let (_, cursor_y) = crossterm::cursor::position().map_err(|e| anyhow::anyhow!("{e}"))?;
         let (_, screen_h) = crossterm::terminal::size().map_err(|e| anyhow::anyhow!("{e}"))?;
-        let viewport_height: u16 = 7;
+        let viewport_height: u16 = 6;
         if cursor_y.saturating_add(viewport_height) > screen_h {
             for _ in 0..viewport_height.saturating_sub(1) {
                 println!();
@@ -211,6 +202,8 @@ impl Tui {
             user_input_tx: None,
             pending_scrollback: Vec::new(),
             active_stream: None,
+            stream_source: None,
+            stream_line_count: 0,
             stream_buffer: String::new(),
             streaming_preview: String::new(),
         })
@@ -342,8 +335,27 @@ impl Tui {
     }
 
     fn finalize_active_stream(&mut self) {
+        if !self.streaming_preview.is_empty() {
+            let padding = self.stream_padding(self.stream_line_count).to_string();
+            self.pending_scrollback.push(format!("{padding}{}", std::mem::take(&mut self.streaming_preview)));
+            self.stream_line_count += 1;
+        }
         self.stream_buffer.clear();
         self.active_stream = None;
+        self.stream_source = None;
+        self.stream_line_count = 0;
+    }
+
+    fn stream_padding(&self, line_index: usize) -> &str {
+        match self.stream_source {
+            Some(MessageSource::User) => "> ",
+            Some(MessageSource::Assistant) if line_index == 0 => "~ ",
+            Some(MessageSource::Assistant) => "  ",
+            Some(MessageSource::System) => "# ",
+            Some(MessageSource::Error) => "! ",
+            Some(MessageSource::Tool { .. }) => "~ ",
+            None => "  ",
+        }
     }
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
@@ -351,7 +363,9 @@ impl Tui {
         while let Some(pos) = self.stream_buffer.find('\n') {
             let line = self.stream_buffer[..pos].to_string();
             self.stream_buffer = self.stream_buffer[pos + 1..].to_string();
-            self.pending_scrollback.push(line);
+            let padding = self.stream_padding(self.stream_line_count).to_string();
+            self.pending_scrollback.push(format!("{padding}{line}"));
+            self.stream_line_count += 1;
         }
         self.streaming_preview = self.stream_buffer.clone();
     }
@@ -362,9 +376,8 @@ impl Tui {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
-                if !self.streaming_preview.is_empty() {
-                    self.pending_scrollback.push(std::mem::take(&mut self.streaming_preview));
-                }
+                self.stream_source = Some(msg.source.clone());
+                self.stream_line_count = 0;
                 self.active_stream = Some(msg.stream);
                 self.stream_buffer.clear();
             }
@@ -402,21 +415,26 @@ impl Tui {
         let state = &self.state;
         let status = &state.status;
 
-        let preview = PreviewComponent { text: &self.streaming_preview };
+        let preview_padding = if status.is_processing {
+            "* "
+        } else {
+            "  "
+        };
+        let preview_text = self.streaming_preview.clone();
+        let preview = PreviewComponent { padding: preview_padding, text: &preview_text };
         let queue = QueuePreviewComponent {
             count: status.steering_count + status.followup_count,
             steering: status.steering_count,
             followup: status.followup_count,
         };
-        let gap = GapComponent;
-        let tips = TipsComponent { tip: state.tip.as_ref(), is_processing: status.is_processing };
+        let tips = TipsComponent { tip: state.tip.as_ref() };
         let input_pad_top = InputPadComponent;
         let input = InputComponent { state, approval: &state.approval_state };
         let input_pad_bot = InputPadComponent;
         let status_comp = StatusComponent { status };
 
         let stack = ComponentStack::new(vec![
-            &preview, &queue, &gap, &tips, &input_pad_top, &input, &input_pad_bot, &status_comp,
+            &preview, &queue, &tips, &input_pad_top, &input, &input_pad_bot, &status_comp,
         ]);
 
         let total_height = stack.total_height(self.terminal.screen_size().width);

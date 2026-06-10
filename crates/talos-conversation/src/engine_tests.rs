@@ -3,7 +3,7 @@ use talos_core::message::{AgentEvent, StopReason, ToolCall, ToolResult, Usage};
 use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
-use crate::types::{ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, UiOutput};
+use crate::types::{ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, TipKind, UiOutput};
 
 fn new_engine() -> ConversationEngine {
     ConversationEngine::new("claude-sonnet-4".to_string())
@@ -332,12 +332,17 @@ async fn error_clears_turn_and_produces_stream_and_status() {
     assert_eq!(engine.messages[0].role, MessageRole::Error);
     assert_eq!(engine.messages[0].content, "[Error] rate limited");
 
-    assert_eq!(outputs.len(), 2);
+    assert_eq!(outputs.len(), 3);
+    let tip = outputs.iter().find_map(|o| match o {
+        UiOutput::Tip { kind, text } => Some((kind.clone(), text.clone())),
+        _ => None,
+    });
+    assert_eq!(tip, Some((TipKind::Error, "rate limited".to_string())));
     let snapshot = find_status(&outputs).unwrap();
     assert!(!snapshot.is_processing);
     let (source, text) = collect_stream(outputs).await.unwrap();
     assert_eq!(source, MessageSource::Error);
-    assert_eq!(text, "[Error] rate limited\n");
+    assert_eq!(text, "[Error] rate limited");
 }
 
 // ---------------------------------------------------------------------------
@@ -354,13 +359,13 @@ async fn handle_user_message_creates_stream_with_prefix() {
     let msg = &engine.messages[0];
     assert_eq!(msg.role, MessageRole::User);
     assert_eq!(msg.status, MessageStatus::Completed);
-    assert_eq!(msg.content, "> hello world\n");
+    assert_eq!(msg.content, "hello world\n");
     assert!(msg.tool_call.is_none());
 
     assert_eq!(outputs.len(), 1);
     let (source, text) = collect_stream(outputs).await.unwrap();
     assert_eq!(source, MessageSource::User);
-    assert_eq!(text, "> hello world");
+    assert_eq!(text, "hello world");
 }
 
 #[tokio::test]
@@ -370,10 +375,10 @@ async fn handle_user_message_multiline_single_stream() {
     let outputs = engine.handle_user_message("line1\nline2");
 
     assert_eq!(engine.messages.len(), 1);
-    assert_eq!(engine.messages[0].content, "> line1\nline2\n");
+    assert_eq!(engine.messages[0].content, "line1\nline2\n");
 
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert_eq!(text, "> line1\nline2");
+    assert_eq!(text, "line1\nline2");
 }
 
 // ---------------------------------------------------------------------------
@@ -752,7 +757,7 @@ fn transcript_plain_text_concatenates_messages() {
     });
 
     let plain = engine.transcript_plain_text();
-    assert!(plain.contains("> hello"));
+    assert!(plain.contains("hello"));
     assert!(plain.contains("Hi there!"));
 }
 
@@ -769,7 +774,7 @@ fn transcript_markdown_concatenates_messages() {
     });
 
     let md = engine.transcript_markdown();
-    assert!(md.contains("> hello"));
+    assert!(md.contains("hello"));
     assert!(md.contains("Hi there!"));
 }
 
@@ -884,7 +889,7 @@ async fn full_turn_lifecycle() {
 
     let outputs = engine.handle_user_message("What is 2+2?");
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert_eq!(text, "> What is 2+2?");
+    assert_eq!(text, "What is 2+2?");
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
     let assistant_stream = outputs.into_iter().find_map(|o| match o {

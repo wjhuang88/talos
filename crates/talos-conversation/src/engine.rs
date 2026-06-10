@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, ScrollbackState,
-    StatusSnapshot, StreamMessage, ToolCallInfo, UiOutput,
+    StatusSnapshot, StreamMessage, TipKind, ToolCallInfo, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -145,8 +145,13 @@ impl ConversationEngine {
                 self.is_processing = false;
                 self.current_turn_text.clear();
 
+                outputs.push(UiOutput::Tip {
+                    text: message.clone(),
+                    kind: TipKind::Error,
+                });
+
                 let (tx, rx) = mpsc::unbounded_channel::<String>();
-                let text = format!("[Error] {message}\n");
+                let text = format!("[Error] {message}");
                 let _ = tx.send(text);
                 drop(tx);
                 outputs.push(UiOutput::Stream(StreamMessage {
@@ -172,11 +177,11 @@ impl ConversationEngine {
     }
 
     pub fn handle_user_message(&mut self, msg: &str) -> Vec<UiOutput> {
-        let text = format!("> {msg}");
+        let msg_owned = msg.to_string();
         self.messages.push(ChatMessage {
             role: MessageRole::User,
             status: MessageStatus::Completed,
-            content: format!("{}\n", text),
+            content: format!("{msg_owned}\n"),
             tool_call: None,
             created_at: Instant::now(),
         });
@@ -184,7 +189,7 @@ impl ConversationEngine {
 
         vec![UiOutput::Stream(StreamMessage {
             source: MessageSource::User,
-            stream: Box::pin(stream::once(async move { text })),
+            stream: Box::pin(stream::once(async move { msg_owned })),
         })]
     }
 
@@ -418,10 +423,10 @@ fn format_tool_call_text(call: &talos_core::message::ToolCall, provenance: &Tool
     let marker = plugin_observation_key(provenance);
     let args = serde_json::to_string_pretty(&call.input)
         .unwrap_or_else(|_| call.input.to_string());
-    format!("▸ {} [{}]\n  {}\n", call.name, marker, args)
+    format!("▸ {} [{}]\n  {}", call.name, marker, args)
 }
 
 fn format_tool_result_text(result: &ToolResult) -> String {
     let icon = if result.is_error { "✗" } else { "✓" };
-    format!("  {icon} {}\n", result.content)
+    format!("  {icon} {}", result.content)
 }
