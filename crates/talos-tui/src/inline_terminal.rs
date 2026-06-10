@@ -235,68 +235,37 @@ impl InlineTerminal {
         Ok(())
     }
 
-    pub fn insert_history(&mut self, lines: &[String]) -> io::Result<()> {
-        if lines.is_empty() {
-            return Ok(());
-        }
-
+    pub fn insert_history(&mut self, line: &str) -> io::Result<()> {
         let screen_height = self.screen_size.height;
         let mut area = self.viewport_area;
-        let last_cursor_pos = self.last_known_cursor_pos;
-        let n = lines.len() as u16;
+        let writer = self.backend_mut();
 
-        let write_top = if area.bottom() < screen_height {
-            let scroll_amount = n.min(screen_height - area.bottom());
-            if scroll_amount > 0 {
-                let top_1based = area.top() + 1;
-                let bottom_1based = screen_height;
-                if top_1based < bottom_1based {
-                    let _ = queue!(
-                        self.backend_mut(),
-                        crossterm::style::Print(format!("\x1b[{};{}r", top_1based, bottom_1based))
-                    );
-                }
-                let _ = queue!(self.backend_mut(), MoveTo(0, area.top()));
-                for _ in 0..scroll_amount {
-                    let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1bM"));
-                }
-                let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1b[r"));
-            }
-            area.y += scroll_amount;
-            self.viewport_area = area;
-            self.buffers = [Buffer::empty(area), Buffer::empty(area)];
-            self.needs_clear = true;
-            area.top().saturating_sub(n)
-        } else {
-            let top_1based = area.top().saturating_sub(n) + 1;
-            let bottom_1based = screen_height;
-            if top_1based < bottom_1based && top_1based > 0 {
-                let _ = queue!(
-                    self.backend_mut(),
-                    crossterm::style::Print(format!("\x1b[{};{}r", top_1based, bottom_1based))
-                );
-                let _ = queue!(self.backend_mut(), MoveTo(0, top_1based - 1));
-                for _ in 0..n {
-                    let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1bM"));
-                }
-                let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1b[r"));
-            }
-            area.y += n;
-            self.viewport_area = area;
-            self.buffers = [Buffer::empty(area), Buffer::empty(area)];
-            self.needs_clear = true;
-            area.top().saturating_sub(n)
-        };
-
-        for (i, line) in lines.iter().enumerate() {
-            let row = write_top + i as u16;
-            let _ = queue!(self.backend_mut(), MoveTo(0, row));
-            let _ = queue!(self.backend_mut(), Clear(ClearType::UntilNewLine));
-            let _ = queue!(self.backend_mut(), Print(line.as_str()));
+        if area.bottom() < screen_height {
+            let top_1based = area.top() + 1;
+            let _ = queue!(writer, crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height)));
+            let _ = queue!(writer, MoveTo(0, area.top()));
+            let _ = queue!(writer, crossterm::style::Print("\x1bM"));
+            let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
+            area.y += 1;
+            let _ = queue!(writer, MoveTo(0, area.top() - 1));
+            let _ = queue!(writer, Clear(ClearType::UntilNewLine));
+            let _ = queue!(writer, Print(line));
+        } else if area.top() > 1 {
+            let _ = queue!(writer, crossterm::style::Print(format!("\x1b[1;{}r", area.top())));
+            let _ = queue!(writer, MoveTo(0, area.top() - 1));
+            let _ = queue!(writer, crossterm::style::Print("\r\n"));
+            let _ = queue!(writer, Clear(ClearType::UntilNewLine));
+            let _ = queue!(writer, Print(line));
+            let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
         }
 
-        let _ = queue!(self.backend_mut(), MoveTo(last_cursor_pos.x, last_cursor_pos.y));
-        let _ = std::io::Write::flush(self.backend_mut());
+        let _ = std::io::Write::flush(writer);
+
+        let area_changed = area != self.viewport_area;
+        if area_changed {
+            self.set_viewport_area(area);
+        }
+        self.needs_clear = true;
 
         Ok(())
     }

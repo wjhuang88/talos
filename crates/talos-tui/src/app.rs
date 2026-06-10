@@ -29,9 +29,7 @@ struct PreviewComponent<'a> {
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 {
-        if self.text.is_empty() { 0 } else { 1 }
-    }
+    fn height_hint(&self, _w: u16) -> u16 { 1 }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let line = self.text.split('\n').last().unwrap_or("");
@@ -39,7 +37,7 @@ impl ViewportComponent for PreviewComponent<'_> {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 display,
-                Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
+                Style::default().fg(Color::Rgb(0xBF, 0x61, 0x6C)).bg(Color::Rgb(0x3B, 0x17, 0x1B)),
             ))),
             area,
         );
@@ -334,10 +332,7 @@ impl Tui {
     }
 
     fn finalize_active_stream(&mut self) {
-        if !self.stream_buffer.is_empty() {
-            self.pending_scrollback.push(std::mem::take(&mut self.stream_buffer));
-        }
-        self.streaming_preview.clear();
+        self.stream_buffer.clear();
         self.active_stream = None;
     }
 
@@ -354,9 +349,14 @@ impl Tui {
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {
         match output {
             UiOutput::Stream(msg) => {
+                if self.active_stream.is_some() {
+                    self.finalize_active_stream();
+                }
+                if !self.streaming_preview.is_empty() {
+                    self.pending_scrollback.push(std::mem::take(&mut self.streaming_preview));
+                }
                 self.active_stream = Some(msg.stream);
                 self.stream_buffer.clear();
-                self.streaming_preview.clear();
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
@@ -382,7 +382,9 @@ impl Tui {
             return Ok(());
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
-        self.terminal.insert_history(&lines)?;
+        for line in &lines {
+            self.terminal.insert_history(line)?;
+        }
         Ok(())
     }
 

@@ -172,11 +172,11 @@ impl ConversationEngine {
     }
 
     pub fn handle_user_message(&mut self, msg: &str) -> Vec<UiOutput> {
-        let text = format!("> {msg}\n");
+        let text = format!("> {msg}");
         self.messages.push(ChatMessage {
             role: MessageRole::User,
             status: MessageStatus::Completed,
-            content: text.clone(),
+            content: format!("{}\n", text),
             tool_call: None,
             created_at: Instant::now(),
         });
