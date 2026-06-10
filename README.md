@@ -11,7 +11,7 @@ English | **[中文](README.zh-CN.md)**
 
 | Area | State | Notes |
 |------|-------|-------|
-| Runtime | Active | 131 TUI tests passing. Codex-style inline-by-default TUI with `ViewportLayout` (6-row viewport: tips/gap/input-pad/input/input-pad/status), `ChatMessage`/`Tip`/`TuiStateEvent` unified state model, bg-color input area with `❯` prompt, `TipKind`-colored tips, Nord-styled status bar. Next: TUI-005 logo/splash. |
+| Runtime | Active | Event-driven TUI: `talos-conversation` crate separates business logic from UI rendering. Two-loop design (Agent → ConversationEngine → UI) via typed async channels. 91 TUI+conversation tests pass (43 TUI + 48 conversation). |
 | R1 Review Closure | Complete | I008/I009 closed. I009 TUI consumer work deferred to #I009-S6. I010 R3 product polish complete. |
 | I008 Learning Agent | Complete | `EvolutionHookHandler` wired into all run paths; runtime evidence recorded. |
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers shipped in I014. |
@@ -23,7 +23,7 @@ English | **[中文](README.zh-CN.md)**
 | I018-I020 Architecture Plan | Planned | Bounded logs, embedded prompt assets, layered memory, and local research library. |
 | I021 Evolution Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits realigned `talos-evolution` with the MenteDB blueprint; 7470ac5 byte-cap stays as defense-in-depth. |
 | I022 TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
-| I023 TUI State Model | Review (S1-S6 done) | Unified `ChatMessage`/`Tip`/`TuiStateEvent` model; `ViewportLayout` struct; event-bus hook; `ChatLine` removed; 131 TUI tests pass. Awaiting final runtime verification. |
+| I023 TUI State Model | Complete | Event-driven architecture: `talos-conversation` crate owns business logic, `talos-tui` owns pure UI state. Two-loop design with typed async channels. 91 tests pass. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.
@@ -128,7 +128,7 @@ testable `talos` binary. Requirement closure is tracked in
 Talos follows a simple core, flexible extensions design:
 
 - **Core crates**: config, provider, agent, CLI, and shared protocol/types.
-- **Extension crates**: tools, session, sandbox, permissions, TUI, skills,
+- **Extension crates**: tools, session, sandbox, permissions, conversation, TUI, skills,
   evolution, plugins, MCP, and RPC.
 
 ```text

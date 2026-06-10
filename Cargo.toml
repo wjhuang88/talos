@@ -17,6 +17,7 @@ members = [
     "crates/talos-tools",
     "crates/talos-sandbox",
     "crates/talos-permission",
+    "crates/talos-conversation",
     "crates/talos-tui",
     "crates/talos-skill",
     "crates/talos-evolution",

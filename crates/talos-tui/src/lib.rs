@@ -1,8 +1,3 @@
-//! Talos TUI - terminal user interface for the Talos agent.
-//!
-//! Provides a chat-based interface with streaming output, tool call rendering,
-//! permission approval overlays, slash commands, and status panels.
-
 mod app;
 mod clipboard;
 pub mod evolution;

@@ -1,12 +1,3 @@
-//! Custom terminal wrapper that enables dynamic viewport height.
-//!
-//! Inspired by Codex's `custom_terminal.rs`, this wrapper replaces ratatui's
-//! `Terminal<Viewport::Inline(N)>` with a terminal that:
-//! - Initializes with viewport height = 0 (no blank lines)
-//! - Accepts a dynamic height parameter on each `draw()` call
-//! - Pushes finalized content to scrollback via ANSI escape sequences
-//! - Never queries cursor position after initialization
-
 use std::io::{self, Stdout};
 
 use crossterm::{
@@ -22,24 +13,20 @@ use ratatui::{
     widgets::{StatefulWidget, Widget},
 };
 
-/// A frame for rendering within the inline terminal.
 pub struct InlineFrame<'a> {
     area: Rect,
     buffer: &'a mut Buffer,
 }
 
 impl<'a> InlineFrame<'a> {
-    /// Returns the area of the current frame.
     pub const fn area(&self) -> Rect {
         self.area
     }
 
-    /// Render a widget to the current buffer.
     pub fn render_widget<W: Widget>(&mut self, widget: W, area: Rect) {
         widget.render(area, self.buffer);
     }
 
-    /// Render a stateful widget to the current buffer.
     #[allow(dead_code)]
     pub fn render_stateful_widget<W: StatefulWidget>(
         &mut self,
@@ -51,12 +38,45 @@ impl<'a> InlineFrame<'a> {
     }
 }
 
-/// A custom terminal that supports dynamic viewport height.
-///
-/// Unlike ratatui's `Terminal<Viewport::Inline(N)>`, this terminal:
-/// - Starts with viewport height = 0 (no blank lines on init)
-/// - Adjusts viewport height on each `draw()` call
-/// - Pushes content to scrollback without querying cursor position
+pub trait ViewportComponent {
+    fn height_hint(&self, available_width: u16) -> u16;
+    fn render(&self, frame: &mut InlineFrame, area: Rect);
+}
+
+pub struct ComponentStack<'a> {
+    components: Vec<&'a dyn ViewportComponent>,
+}
+
+impl<'a> ComponentStack<'a> {
+    pub fn new(components: Vec<&'a dyn ViewportComponent>) -> Self {
+        Self { components }
+    }
+
+    pub fn total_height(&self, available_width: u16) -> u16 {
+        self.components
+            .iter()
+            .map(|c| c.height_hint(available_width))
+            .sum()
+    }
+
+    pub fn layout(&self, area: Rect, available_width: u16) -> Vec<(&'a dyn ViewportComponent, Rect)> {
+        let mut result = Vec::new();
+        let mut y = area.y;
+
+        for component in &self.components {
+            let h = component.height_hint(available_width);
+            if h == 0 {
+                continue;
+            }
+            let rect = Rect { x: area.x, y, width: area.width, height: h };
+            result.push((*component, rect));
+            y = y.saturating_add(h);
+        }
+
+        result
+    }
+}
+
 pub struct InlineTerminal {
     backend: CrosstermBackend<Stdout>,
     buffers: [Buffer; 2],
@@ -68,14 +88,6 @@ pub struct InlineTerminal {
 }
 
 impl InlineTerminal {
-    /// Creates a new inline terminal.
-    ///
-    /// The viewport is anchored at the current cursor position with height = 0,
-    /// so no blank lines are produced on initialization.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the terminal size cannot be read or raw mode fails.
     pub fn new() -> io::Result<Self> {
         let stdout = io::stdout();
         let mut backend = CrosstermBackend::new(stdout);
@@ -102,27 +114,20 @@ impl InlineTerminal {
         })
     }
 
-    /// Returns a reference to the backend.
     #[allow(dead_code)]
     pub const fn backend(&self) -> &CrosstermBackend<Stdout> {
         &self.backend
     }
 
-    /// Returns a mutable reference to the backend.
     pub fn backend_mut(&mut self) -> &mut CrosstermBackend<Stdout> {
         &mut self.backend
     }
 
-    /// Returns the current viewport area.
     #[allow(dead_code)]
     pub const fn viewport_area(&self) -> Rect {
         self.viewport_area
     }
 
-    /// Sets the viewport area, resizing buffers accordingly.
-    ///
-    /// This does NOT query the cursor position — it directly updates the
-    /// internal state and reallocates buffers.
     pub fn set_viewport_area(&mut self, area: Rect) {
         if area == self.viewport_area {
             return;
@@ -140,20 +145,11 @@ impl InlineTerminal {
         self.buffers[self.current] = Buffer::empty(area);
     }
 
-    /// Returns the current screen size.
     #[allow(dead_code)]
     pub const fn screen_size(&self) -> Size {
         self.screen_size
     }
 
-    /// Draws a frame with the given viewport height.
-    ///
-    /// The viewport height is adjusted before rendering. The draw function
-    /// receives a `Frame` that covers the adjusted viewport area.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the terminal size cannot be read or output fails.
     pub fn draw(
         &mut self,
         height: u16,
@@ -171,9 +167,12 @@ impl InlineTerminal {
         }
 
         let area_changed = area != self.viewport_area;
+        let shrinking = area.height < self.viewport_area.height;
         if area_changed {
             self.set_viewport_area(area);
-            self.needs_clear = true;
+            if shrinking {
+                self.needs_clear = true;
+            }
         }
 
         let force_clear = self.needs_clear;
@@ -244,22 +243,17 @@ impl InlineTerminal {
         let screen_height = self.screen_size.height;
         let mut area = self.viewport_area;
         let last_cursor_pos = self.last_known_cursor_pos;
-        let mut should_update_area = false;
+        let n = lines.len() as u16;
 
-        // Phase 1: If viewport is not at screen bottom, scroll it down
-        // using Reverse Index so it reaches the bottom.
-        let cursor_top = if area.bottom() < screen_height {
-            let scroll_amount = (lines.len() as u16).min(screen_height - area.bottom());
+        let write_top = if area.bottom() < screen_height {
+            let scroll_amount = n.min(screen_height - area.bottom());
             if scroll_amount > 0 {
                 let top_1based = area.top() + 1;
                 let bottom_1based = screen_height;
                 if top_1based < bottom_1based {
                     let _ = queue!(
                         self.backend_mut(),
-                        crossterm::style::Print(format!(
-                            "\x1b[{};{}r",
-                            top_1based, bottom_1based
-                        ))
+                        crossterm::style::Print(format!("\x1b[{};{}r", top_1based, bottom_1based))
                     );
                 }
                 let _ = queue!(self.backend_mut(), MoveTo(0, area.top()));
@@ -268,52 +262,45 @@ impl InlineTerminal {
                 }
                 let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1b[r"));
             }
-            let ct = area.top().saturating_sub(1);
             area.y += scroll_amount;
-            should_update_area = true;
-            ct
+            self.viewport_area = area;
+            self.buffers = [Buffer::empty(area), Buffer::empty(area)];
+            self.needs_clear = true;
+            area.top().saturating_sub(n)
         } else {
-            area.top().saturating_sub(1)
+            let top_1based = area.top().saturating_sub(n) + 1;
+            let bottom_1based = screen_height;
+            if top_1based < bottom_1based && top_1based > 0 {
+                let _ = queue!(
+                    self.backend_mut(),
+                    crossterm::style::Print(format!("\x1b[{};{}r", top_1based, bottom_1based))
+                );
+                let _ = queue!(self.backend_mut(), MoveTo(0, top_1based - 1));
+                for _ in 0..n {
+                    let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1bM"));
+                }
+                let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1b[r"));
+            }
+            area.y += n;
+            self.viewport_area = area;
+            self.buffers = [Buffer::empty(area), Buffer::empty(area)];
+            self.needs_clear = true;
+            area.top().saturating_sub(n)
         };
 
-        if area.top() > 0 {
-            let _ = queue!(
-                self.backend_mut(),
-                crossterm::style::Print(format!("\x1b[1;{}r", area.top()))
-            );
+        for (i, line) in lines.iter().enumerate() {
+            let row = write_top + i as u16;
+            let _ = queue!(self.backend_mut(), MoveTo(0, row));
+            let _ = queue!(self.backend_mut(), Clear(ClearType::UntilNewLine));
+            let _ = queue!(self.backend_mut(), Print(line.as_str()));
         }
 
-        let _ = queue!(self.backend_mut(), MoveTo(0, cursor_top));
-        for line in lines {
-            let _ = queue!(self.backend_mut(), Print("\r\n"));
-            let _ = queue!(self.backend_mut(), Print(line));
-        }
-
-        let _ = queue!(self.backend_mut(), crossterm::style::Print("\x1b[r"));
-
-        // Phase 3: Update viewport position only when it was scrolled.
-        if should_update_area {
-            self.viewport_area = area;
-            self.buffers = [
-                Buffer::empty(self.viewport_area),
-                Buffer::empty(self.viewport_area),
-            ];
-            self.needs_clear = true;
-        }
-
-        let _ = queue!(
-            self.backend_mut(),
-            MoveTo(last_cursor_pos.x, last_cursor_pos.y)
-        );
-
+        let _ = queue!(self.backend_mut(), MoveTo(last_cursor_pos.x, last_cursor_pos.y));
         let _ = std::io::Write::flush(self.backend_mut());
 
         Ok(())
     }
 
-    /// Restores the terminal to its original state.
-    ///
-    /// Disables raw mode, shows the cursor, and resets cursor style.
     pub fn restore(&self) {
         let _ = terminal::disable_raw_mode();
         let _ = execute!(
@@ -324,7 +311,6 @@ impl InlineTerminal {
         );
     }
 
-    /// Returns the area of the last completed frame.
     #[allow(dead_code)]
     pub fn get_frame_area(&self) -> Rect {
         self.viewport_area

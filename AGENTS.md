@@ -9,7 +9,7 @@ the optimization depth of Claude Code, the openness of OpenCode, and the self-ev
 Starting as a pure CLI tool, evolving into a full agent runtime platform.
 
 **Language**: Rust (stable, edition 2024)
-**Workspace**: Cargo workspace with 12 crates under `crates/`
+**Workspace**: Cargo workspace with 16 crates under `crates/`
 **Architecture**: See `docs/reference/ARCHITECTURE.md`
 
 ## Hard Constraints

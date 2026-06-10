@@ -57,6 +57,7 @@ use talos_agent::session::AppServerSession;
 #[cfg(debug_assertions)]
 use talos_config::McpServerConfig;
 use talos_config::{Config, ProviderProtocol};
+use talos_conversation::{ConversationEngine, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::AgentEvent;
@@ -661,6 +662,89 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     bail!("session event channel closed unexpectedly");
 }
 
+async fn run_conversation_loop(
+    mut engine: ConversationEngine,
+    mut agent_rx: tokio::sync::broadcast::Receiver<AgentEvent>,
+    mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
+    ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    session_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+) {
+    loop {
+        tokio::select! {
+            event = agent_rx.recv() => {
+                match event {
+                    Ok(agent_event) => {
+                        let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
+                        let outputs = engine.handle_agent_event(&agent_event);
+                        for output in outputs {
+                            let _ = ui_tx.send(output);
+                        }
+                        if is_turn_end {
+                            if let Some(msg) = engine.drain_steering_queue() {
+                                let _ = session_tx
+                                    .send(talos_core::session::SessionOp::Submit { message: msg })
+                                    .await;
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        let _ = ui_tx.send(UiOutput::Tip {
+                            text: format!("Warning: dropped {n} event(s)"),
+                            kind: talos_conversation::TipKind::LagWarning,
+                        });
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
+                }
+            }
+            Some(input) = user_rx.recv() => {
+                match input {
+                    UserInput::Message(msg) => {
+                        if msg.starts_with('/') {
+                            let outputs = engine.handle_slash_command(&msg);
+                            for output in outputs {
+                                match output {
+                                    UiOutput::Exit => {
+                                        let _ = ui_tx.send(UiOutput::Exit);
+                                        return;
+                                    }
+                                    other => { let _ = ui_tx.send(other); }
+                                }
+                            }
+                        } else if engine.is_processing {
+                            engine.steering_queue.push(msg);
+                            let _ = ui_tx.send(UiOutput::Tip {
+                                text: "Message queued (steering). Press Esc to cancel.".into(),
+                                kind: talos_conversation::TipKind::QueueHint,
+                            });
+                            let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                        } else {
+                            engine.is_processing = true;
+                            let outputs = engine.handle_user_message(&msg);
+                            for output in outputs {
+                                let _ = ui_tx.send(output);
+                            }
+                            let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                            let _ = session_tx
+                                .send(talos_core::session::SessionOp::Submit { message: msg })
+                                .await;
+                        }
+                    }
+                    UserInput::Cancel => {
+                        engine.is_processing = false;
+                        let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                    }
+                    UserInput::Exit => {
+                        let _ = ui_tx.send(UiOutput::Exit);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 async fn run_tui_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -720,7 +804,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
 
-    // Bridge: SessionEvent EQ → broadcast<AgentEvent> for TUI
+    // Bridge: SessionEvent → broadcast<AgentEvent>
     let (bridge_tx, bridge_rx) = broadcast::channel::<AgentEvent>(32);
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
@@ -746,19 +830,22 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let mut tui = Tui::new().context("failed to initialize TUI")?;
 
-    let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
-    tui.set_message_tx(user_msg_tx);
+    // Channels between conversation engine and UI
+    let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
+    let (user_input_tx, user_input_rx) = mpsc::unbounded_channel::<UserInput>();
+
+    tui.set_ui_output_rx(ui_output_rx);
+    tui.set_user_input_tx(user_input_tx);
     tui.set_model_name(config.model.clone());
 
+    // Conversation engine task: sits between agent loop and UI loop
     let sq_tx = handle.sq_tx.clone();
+    let engine = ConversationEngine::new(config.model.clone());
     tokio::spawn(async move {
-        while let Some(input) = user_msg_rx.recv().await {
-            let _ = sq_tx.send(SessionOp::Submit { message: input }).await;
-        }
-        let _ = sq_tx.send(SessionOp::Shutdown).await;
+        run_conversation_loop(engine, bridge_rx, user_input_rx, ui_output_tx, sq_tx).await;
     });
 
-    tui.run_with_approval(bridge_rx, approval_rx).await
+    tui.run_with_approval(approval_rx).await
 }
 
 async fn run_inline_mode(cli: Cli) -> Result<()> {
