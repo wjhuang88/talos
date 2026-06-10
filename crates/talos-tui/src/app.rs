@@ -27,6 +27,7 @@ use crate::widgets::ApprovalOverlay;
 struct PreviewComponent<'a> {
     padding: &'a str,
     text: &'a str,
+    spinner_color: Option<Color>,
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
@@ -34,15 +35,31 @@ impl ViewportComponent for PreviewComponent<'_> {
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let line = self.text.split('\n').last().unwrap_or("");
-        let full = format!("{}{}", self.padding, line);
-        let display = truncate_end_to_width(&full, area.width);
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                display,
-                Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
-            ))),
-            area,
-        );
+        if let Some(color) = self.spinner_color {
+            let full = format!("{}{}", self.padding, line);
+            let display = truncate_end_to_width(&full, area.width);
+            let padding_len = self.padding.chars().count();
+            let (pad_part, text_part) = display.split_at(
+                display.char_indices().nth(padding_len).map(|(i, _)| i).unwrap_or(display.len()),
+            );
+            frame.render_widget(
+                Paragraph::new(Line::from(vec![
+                    Span::styled(pad_part.to_string(), Style::default().fg(color)),
+                    Span::styled(text_part.to_string(), Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0))),
+                ])),
+                area,
+            );
+        } else {
+            let full = format!("{}{}", self.padding, line);
+            let display = truncate_end_to_width(&full, area.width);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    display,
+                    Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
+                ))),
+                area,
+            );
+        }
     }
 }
 
@@ -175,6 +192,8 @@ pub struct Tui {
     stream_line_count: usize,
     stream_buffer: String,
     streaming_preview: String,
+    processing_frame: usize,
+    processing_tick: usize,
 }
 
 impl Tui {
@@ -206,6 +225,8 @@ impl Tui {
             stream_line_count: 0,
             stream_buffer: String::new(),
             streaming_preview: String::new(),
+            processing_frame: 0,
+            processing_tick: 0,
         })
     }
 
@@ -415,13 +436,35 @@ impl Tui {
         let state = &self.state;
         let status = &state.status;
 
-        let preview_padding = if status.is_processing {
-            "* "
+        let spinner_frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let spinner_colors = [
+            Color::Rgb(0x88, 0xC0, 0xD0),
+            Color::Rgb(0x81, 0xA1, 0xC1),
+            Color::Rgb(0x5E, 0x81, 0xAC),
+            Color::Rgb(0x81, 0xA1, 0xC1),
+            Color::Rgb(0x88, 0xC0, 0xD0),
+            Color::Rgb(0x8F, 0xBC, 0xBB),
+            Color::Rgb(0xA3, 0xBE, 0x8C),
+            Color::Rgb(0x8F, 0xBC, 0xBB),
+            Color::Rgb(0x88, 0xC0, 0xD0),
+            Color::Rgb(0x81, 0xA1, 0xC1),
+        ];
+        let (preview_padding, spinner_color) = if status.is_processing {
+            self.processing_tick += 1;
+            if self.processing_tick % 3 == 0 {
+                self.processing_frame = self.processing_frame.wrapping_add(1);
+            }
+            let idx = self.processing_frame % spinner_frames.len();
+            let c1 = spinner_frames[idx];
+            let c2 = spinner_frames[(idx + 5) % spinner_frames.len()];
+            (format!("{c1}{c2}"), Some(spinner_colors[idx]))
         } else {
-            "  "
+            self.processing_frame = 0;
+            self.processing_tick = 0;
+            ("  ".to_string(), None)
         };
         let preview_text = self.streaming_preview.clone();
-        let preview = PreviewComponent { padding: preview_padding, text: &preview_text };
+        let preview = PreviewComponent { padding: &preview_padding, text: &preview_text, spinner_color };
         let queue = QueuePreviewComponent {
             count: status.steering_count + status.followup_count,
             steering: status.steering_count,
