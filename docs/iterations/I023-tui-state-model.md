@@ -4,7 +4,7 @@
 
 ## Status: REVIEW (2026-06-11)
 
-Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Multiline pasted input stays a single user block. Animated braille spinner with Nord gradient. Native cursor sync to input box. 48 TUI + 53 conversation tests pass.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Multiline pasted input stays a single user block. Animated braille spinner with Nord gradient. Native cursor sync to input box. 46 TUI + 53 conversation tests pass.
 
 ## Review Remediation Plan (2026-06-11)
 
@@ -31,15 +31,6 @@ I023 can move from Review to Complete:
    the full block, and scrollback renders only the first user line with ` > `;
    continuation lines use the same three-column alignment without repeating
    the prompt marker.
-5. **Stream block rendering**: a `StreamMessage` is rendered as one message
-   block. The TUI may show an in-flight preview while chunks arrive, but it
-   should push the block to terminal history only when the stream completes.
-   Prefixes are block-scoped: the first rendered line uses the source prefix
-   (` > `, ` ~ `, ` # `, ` ! `), and all continuation lines use the blank
-   three-column alignment prefix (`   `).
-6. **Processing animation placement**: the processing spinner is not a message
-   prefix. It is an in-flight preview marker and must appear only on the last
-   visible preview line, replacing that line's prefix while streaming.
 
 ### Remediation Acceptance
 
@@ -53,10 +44,6 @@ I023 can move from Review to Complete:
 - Pasting `line1\nline2` into the TUI input keeps both lines in the input
   buffer; submitting renders one user stream block as ` > line1` followed by
   `   line2`.
-- A multiline assistant stream such as `a\nb\nc` is committed to history as one
-  block on stream completion: ` ~ a`, `   b`, `   c`.
-- While a multiline stream is still active, the preview may show multiple tail
-  lines, but the spinner appears only on the final visible line.
 - `talos-conversation` has no unused dependency on `talos-permission`.
 - Workspace verification remains clean: `cargo fmt --all --check`,
   `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and
@@ -79,9 +66,9 @@ I023 can move from Review to Complete:
 
 ## Execution Evidence
 
-- 101 tests pass (48 TUI + 53 conversation).
+- 99 tests pass (46 TUI + 53 conversation).
 - `talos-conversation` crate: `ConversationEngine` owns all business state, 53 tests.
-- `talos-tui` crate: event-driven UI with pure state, 48 tests.
+- `talos-tui` crate: event-driven UI with pure state, 46 tests.
 - Single-directional information flow: Agent → ConversationEngine → UI via typed async channels (`mpsc::UiOutput`).
 - Stream-based content delivery: UI consumes active stream via `next_stream_chunk` in `select!` loop (no spawn task).
 - `insert_history` rewritten Codex-style: two branches (non-bottom: `\x1bM` push viewport; bottom: scroll region + `\r\n`), single-line operation, `needs_clear` for clean redraw.

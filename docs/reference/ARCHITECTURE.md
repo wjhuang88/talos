@@ -166,13 +166,6 @@ to the input buffer, including newlines; Enter submits the whole buffer. When th
 user block is flushed to scrollback, only the first line receives the ` > `
 prompt marker. Continuation lines retain the three-column alignment with spaces.
 
-The same block rule applies to all stream sources. `StreamMessage` chunks are
-accumulated by the TUI while the stream is active and committed to terminal
-history as one block when the stream completes. The live preview may show the
-tail of the active block, but history insertion remains block-finalized. The
-processing animation is a live preview marker only; it is rendered on the last
-visible preview line and is never persisted into scrollback.
-
 ### Native Cursor Sync
 
 After each `draw_frame` render, the native terminal cursor is repositioned to the input box position using `MoveTo(col, row)` + `Show`. The column is calculated as 3 (prefix width) + Unicode display width of text before the cursor. This ensures IME input, text selection, and other cursor-dependent features work correctly.
@@ -190,13 +183,7 @@ On exit, `restore()` clears the viewport area (`MoveTo` + `Clear(ClearType::From
 
 ### Preview Component
 
-Occupies 1 to 6 rows in the viewport, showing the tail of the active stream
-block. The preview is not persisted to terminal history; it is a live view of
-the current `StreamMessage` until the stream completes and the block is flushed
-to scrollback. The preview uses source prefixes for non-final visible lines.
-When `is_processing` is true, the animated 2-char braille spinner replaces the
-prefix only on the final visible line. When idle, that line uses the normal
-block prefix or 3 spaces.
+Always occupies exactly 1 row in the viewport. Shows `streaming_preview` content (partial stream content not yet terminated by `\n`). User messages have no trailing `\n` so they stay in preview until the AI stream arrives. The preview padding shows an animated 2-char braille spinner with Nord color gradient when `is_processing` is true, or 3 spaces when idle.
 
 ## Async Pattern (SQ/EQ)
 
