@@ -146,6 +146,8 @@ layout stable:
 - 3-char ASCII line padding system: ` > ` (user), ` ~ ` (assistant/tool first), `   ` (continuation), ` # ` (system), ` ! ` (error).
 - Non-first streams are separated by a blank line when the new stream's first
   non-empty chunk arrives.
+- Queued steering input is rendered through `start_user_message` when drained
+  after the active turn, before the bridge submits it to the session actor.
 - Animated 2-char braille spinner with Nord color gradient (10 frames, 150ms/frame) in preview component.
 - Native terminal cursor synced to input box position after each render (`MoveTo` + `Show`).
 - `restore()` clears viewport content (`MoveTo` + `Clear(FromCursorDown)`) before disabling raw mode.

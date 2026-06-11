@@ -82,7 +82,7 @@ impl ConversationEngine {
         self.steering_queue.push(msg);
         vec![
             UiOutput::Tip {
-                text: "Message queued (steering). Press Esc to cancel.".into(),
+                text: "Message queued and will send after current turn.".into(),
                 kind: TipKind::QueueHint,
             },
             UiOutput::Status(self.status_snapshot()),

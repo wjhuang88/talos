@@ -679,6 +679,11 @@ async fn run_conversation_loop(
                         if is_turn_end
                             && let Some(msg) = engine.drain_steering_queue()
                         {
+                            let outputs = engine.start_user_message(&msg);
+                            for output in outputs {
+                                let _ = ui_tx.send(output);
+                            }
+                            let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
                             let _ = session_tx
                                 .send(talos_core::session::SessionOp::Submit { message: msg })
                                 .await;
@@ -1627,6 +1632,62 @@ mod tests {
         }
         assert!(colors::RESET.starts_with("\x1b["));
         assert!(colors::BOLD.starts_with("\x1b["));
+    }
+
+    #[tokio::test]
+    async fn conversation_loop_displays_drained_queued_input() {
+        let engine = ConversationEngine::new("test-model".to_string());
+        let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (session_tx, mut session_rx) = tokio::sync::mpsc::channel(4);
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine, agent_rx, user_rx, ui_tx, session_tx,
+        ));
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        user_tx
+            .send(UserInput::Message("queued follow-up".to_string()))
+            .unwrap();
+        agent_tx
+            .send(AgentEvent::TurnEnd {
+                stop_reason: talos_core::message::StopReason::EndTurn,
+                usage: Default::default(),
+            })
+            .unwrap();
+
+        let mut saw_queued_user_stream = false;
+        let mut saw_queue_drained_status = false;
+        for _ in 0..8 {
+            let Some(output) = ui_rx.recv().await else {
+                break;
+            };
+            match output {
+                UiOutput::Stream(msg) if msg.source == talos_conversation::MessageSource::User => {
+                    saw_queued_user_stream = true;
+                }
+                UiOutput::Status(status) if status.is_processing && status.steering_count == 0 => {
+                    saw_queue_drained_status = true;
+                }
+                _ => {}
+            }
+            if saw_queued_user_stream && saw_queue_drained_status {
+                break;
+            }
+        }
+
+        assert!(saw_queued_user_stream);
+        assert!(saw_queue_drained_status);
+        assert!(matches!(
+            session_rx.try_recv(),
+            Ok(talos_core::session::SessionOp::Submit { message })
+                if message == "queued follow-up"
+        ));
+
+        drop(agent_tx);
+        drop(user_tx);
+        loop_handle.await.unwrap();
     }
 
     // === Error Handling Tests ===

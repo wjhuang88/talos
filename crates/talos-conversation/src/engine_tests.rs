@@ -582,6 +582,11 @@ fn enqueue_steering_records_queue_and_status() {
             ..
         }
     )));
+    assert!(outputs.iter().any(|output| matches!(
+        output,
+        UiOutput::Tip { text, .. } if text.contains("will send after current turn")
+            && !text.contains("Esc")
+    )));
     assert!(outputs.iter().any(|output| {
         matches!(
             output,
