@@ -132,17 +132,42 @@ Content flows as character/chunk streams, not pre-split lines:
 3. `flush_pending_scrollback` calls `insert_history` (one line at a time, Codex-style terminal ops) to write to scrollback above the viewport.
 4. `handle_ui_output(Stream)` finalizes active stream, pushes non-empty preview to scrollback, then sets new active stream.
 
+### Line Padding System
+
+Each scrollback line carries a 3-character ASCII prefix aligned with the input box prefix (` > `):
+
+| Source | First Line | Continuation |
+|--------|-----------|--------------|
+| User | ` > ` | ` > ` |
+| Assistant | ` ~ ` | `   ` |
+| System | ` # ` | `   ` |
+| Error | ` ! ` | `   ` |
+| Tool | ` ~ ` | `   ` |
+
+### Styled Scrollback
+
+`ScrollbackLine` carries `text: String` + `bg: Option<Color>`. User message lines receive the Nord Polar Night background (`#3B4252`) via `crossterm::style::SetBackgroundColor`. Empty padding lines fill the full terminal width with spaces so the background color covers the entire row.
+
+User messages are visually grouped with top/bottom padding rows (same background color), creating a block effect. Each stream (except the first) is preceded by a blank separator line.
+
+### Native Cursor Sync
+
+After each `draw_frame` render, the native terminal cursor is repositioned to the input box position using `MoveTo(col, row)` + `Show`. The column is calculated as 3 (prefix width) + Unicode display width of text before the cursor. This ensures IME input, text selection, and other cursor-dependent features work correctly.
+
 ### Inline Terminal Rendering
 
-The inline-by-default TUI (I022) uses a fixed viewport within the terminal. History content is written above the viewport using `insert_history`:
+The inline-by-default TUI (I022) uses a fixed viewport within the terminal. History content is written above the viewport using `insert_history(line, bg)`:
 
 - **Non-bottom**: `\x1bM` pushes viewport down one row, history line written at the vacated position.
 - **Bottom**: Scroll region `[1, viewport_top]` + `\r\n` scrolls history up, history line written at the bottom of the history area.
+- When `bg` is set, the line is wrapped with `SetBackgroundColor` / `Reset` and padded to full terminal width with trailing spaces so the background color covers the entire row.
 - Both branches set `needs_clear = true` so the next `draw_frame` performs a force-clear + full diff redraw of the viewport.
+
+On exit, `restore()` clears the viewport area (`MoveTo` + `Clear(ClearType::FromCursorDown)`) before disabling raw mode and restoring the cursor.
 
 ### Preview Component
 
-Always occupies exactly 1 row in the viewport. Shows `streaming_preview` content (partial stream content not yet terminated by `\n`). User messages have no trailing `\n` so they stay in preview until the AI stream arrives.
+Always occupies exactly 1 row in the viewport. Shows `streaming_preview` content (partial stream content not yet terminated by `\n`). User messages have no trailing `\n` so they stay in preview until the AI stream arrives. The preview padding shows an animated 2-char braille spinner with Nord color gradient when `is_processing` is true, or 3 spaces when idle.
 
 ## Async Pattern (SQ/EQ)
 

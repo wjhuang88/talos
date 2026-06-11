@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, EventStream, KeyCode, KeyEventKind},
+    style::Color as CColor,
     terminal::enable_raw_mode,
 };
 use futures::{Stream, StreamExt};
@@ -23,6 +24,20 @@ use crate::inline_terminal::{ComponentStack, InlineFrame, InlineTerminal, Viewpo
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
 use crate::widgets::ApprovalOverlay;
+
+const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
+
+fn to_crossterm_color(c: Color) -> Option<CColor> {
+    match c {
+        Color::Rgb(r, g, b) => Some(CColor::Rgb { r, g, b }),
+        _ => None,
+    }
+}
+
+struct ScrollbackLine {
+    text: String,
+    bg: Option<CColor>,
+}
 
 struct PreviewComponent<'a> {
     padding: &'a str,
@@ -137,7 +152,7 @@ impl ViewportComponent for InputPadComponent {
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         frame.render_widget(
-            Paragraph::new("").style(Style::default().bg(Color::Rgb(0x3B, 0x42, 0x52))),
+            Paragraph::new("").style(Style::default().bg(INPUT_BG)),
             area,
         );
     }
@@ -152,11 +167,10 @@ impl ViewportComponent for InputComponent<'_> {
     fn height_hint(&self, _w: u16) -> u16 { 1 }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let input_bg = Color::Rgb(0x3B, 0x42, 0x52);
         let input_text = build_input_text(self.state);
         let input_block = Block::default()
-            .style(Style::default().bg(input_bg))
-            .padding(Padding::new(1, 1, 0, 0));
+            .style(Style::default().bg(INPUT_BG))
+            .padding(Padding::new(0, 1, 0, 0));
         frame.render_widget(Paragraph::new(input_text).block(input_block), area);
 
         if let ApprovalState::Visible { tool_name, arguments, selected } = self.approval {
@@ -186,7 +200,7 @@ pub struct Tui {
     evolution_panel: EvolutionPanel,
     ui_output_rx: Option<mpsc::UnboundedReceiver<UiOutput>>,
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
-    pending_scrollback: Vec<String>,
+    pending_scrollback: Vec<ScrollbackLine>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     stream_source: Option<MessageSource>,
     stream_line_count: usize,
@@ -194,6 +208,7 @@ pub struct Tui {
     streaming_preview: String,
     processing_frame: usize,
     processing_tick: usize,
+    stream_count: usize,
 }
 
 impl Tui {
@@ -227,6 +242,7 @@ impl Tui {
             streaming_preview: String::new(),
             processing_frame: 0,
             processing_tick: 0,
+            stream_count: 0,
         })
     }
 
@@ -358,8 +374,13 @@ impl Tui {
     fn finalize_active_stream(&mut self) {
         if !self.streaming_preview.is_empty() {
             let padding = self.stream_padding(self.stream_line_count).to_string();
-            self.pending_scrollback.push(format!("{padding}{}", std::mem::take(&mut self.streaming_preview)));
+            let text = format!("{padding}{}", std::mem::take(&mut self.streaming_preview));
+            let bg = self.stream_bg();
+            self.pending_scrollback.push(ScrollbackLine { text, bg });
             self.stream_line_count += 1;
+        }
+        if self.stream_bg().is_some() {
+            self.pending_scrollback.push(ScrollbackLine { text: String::new(), bg: self.stream_bg() });
         }
         self.stream_buffer.clear();
         self.active_stream = None;
@@ -367,15 +388,22 @@ impl Tui {
         self.stream_line_count = 0;
     }
 
+    fn stream_bg(&self) -> Option<CColor> {
+        match self.stream_source {
+            Some(MessageSource::User) => to_crossterm_color(INPUT_BG),
+            _ => None,
+        }
+    }
+
     fn stream_padding(&self, line_index: usize) -> &str {
         match self.stream_source {
-            Some(MessageSource::User) => "> ",
-            Some(MessageSource::Assistant) if line_index == 0 => "~ ",
-            Some(MessageSource::Assistant) => "  ",
-            Some(MessageSource::System) => "# ",
-            Some(MessageSource::Error) => "! ",
-            Some(MessageSource::Tool { .. }) => "~ ",
-            None => "  ",
+            Some(MessageSource::User) => " > ",
+            Some(MessageSource::Assistant) if line_index == 0 => " ~ ",
+            Some(MessageSource::Assistant) => "   ",
+            Some(MessageSource::System) => " # ",
+            Some(MessageSource::Error) => " ! ",
+            Some(MessageSource::Tool { .. }) => " ~ ",
+            None => "   ",
         }
     }
 
@@ -385,7 +413,9 @@ impl Tui {
             let line = self.stream_buffer[..pos].to_string();
             self.stream_buffer = self.stream_buffer[pos + 1..].to_string();
             let padding = self.stream_padding(self.stream_line_count).to_string();
-            self.pending_scrollback.push(format!("{padding}{line}"));
+            let text = format!("{padding}{line}");
+            let bg = self.stream_bg();
+            self.pending_scrollback.push(ScrollbackLine { text, bg });
             self.stream_line_count += 1;
         }
         self.streaming_preview = self.stream_buffer.clone();
@@ -397,10 +427,17 @@ impl Tui {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
+                if self.stream_count > 0 {
+                    self.pending_scrollback.push(ScrollbackLine { text: String::new(), bg: None });
+                }
                 self.stream_source = Some(msg.source.clone());
                 self.stream_line_count = 0;
+                if self.stream_bg().is_some() {
+                    self.pending_scrollback.push(ScrollbackLine { text: String::new(), bg: self.stream_bg() });
+                }
                 self.active_stream = Some(msg.stream);
                 self.stream_buffer.clear();
+                self.stream_count += 1;
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
@@ -427,7 +464,7 @@ impl Tui {
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
         for line in &lines {
-            self.terminal.insert_history(line)?;
+            self.terminal.insert_history(&line.text, line.bg)?;
         }
         Ok(())
     }
@@ -457,11 +494,11 @@ impl Tui {
             let idx = self.processing_frame % spinner_frames.len();
             let c1 = spinner_frames[idx];
             let c2 = spinner_frames[(idx + 5) % spinner_frames.len()];
-            (format!("{c1}{c2}"), Some(spinner_colors[idx]))
+            (format!(" {c1}{c2}"), Some(spinner_colors[idx]))
         } else {
             self.processing_frame = 0;
             self.processing_tick = 0;
-            ("  ".to_string(), None)
+            ("   ".to_string(), None)
         };
         let preview_text = self.streaming_preview.clone();
         let preview = PreviewComponent { padding: &preview_padding, text: &preview_text, spinner_color };
@@ -488,6 +525,21 @@ impl Tui {
                 component.render(frame, area);
             }
         })?;
+
+        {
+            let viewport = self.terminal.viewport_area();
+            let screen_w = self.terminal.screen_size().width;
+            let input_y_offset: u16 = preview.height_hint(screen_w)
+                + queue.height_hint(screen_w)
+                + tips.height_hint(screen_w)
+                + input_pad_top.height_hint(screen_w);
+            let input_row = viewport.bottom().saturating_sub(total_height) + input_y_offset;
+            let byte_pos = self.state.cursor_byte_pos();
+            let cursor_col = 3u16 + unicode_width::UnicodeWidthStr::width(
+                &self.state.input_buffer[..byte_pos],
+            ) as u16;
+            self.terminal.set_cursor(cursor_col, input_row)?;
+        }
 
         Ok(())
     }
@@ -596,7 +648,7 @@ pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
 
     let mut spans = Vec::new();
     spans.push(Span::styled(
-        " ❯ ",
+        " > ",
         Style::default().fg(Color::Rgb(0xA3, 0xBE, 0x8C)),
     ));
     spans.push(Span::raw(before));

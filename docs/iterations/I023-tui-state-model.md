@@ -2,9 +2,9 @@
 
 **User can**: See every message with its lifecycle visible (pending → accepted → streaming → completed), see transient tips auto-expire from the status bar instead of polluting scrollback, and have a structured state model that a future global event bus can subscribe to without touching TUI internals.
 
-## Status: REVIEW (2026-06-10)
+## Status: REVIEW (2026-06-11)
 
-Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery. 93 tests pass (43 TUI + 50 conversation). Awaiting runtime verification of insert_history rendering.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Animated braille spinner with Nord gradient. Native cursor sync to input box. 43 TUI + 50 conversation tests pass.
 
 ## Stories
 
@@ -18,6 +18,8 @@ Event-driven architecture with `talos-conversation` crate. Codex-style `insert_h
 | S6 | Verification | `cargo check --workspace` clean. `cargo test --workspace` exit 0. Runtime verified: messages appear in scrollback with blank-line spacing, tips auto-expire, input area with bg-color style, status bar no background. | ✅ Complete |
 | S7 | Event-driven architecture | `talos-conversation` crate: `ConversationEngine` owns business state, emits `UiOutput` via async channels. `talos-tui` owns pure UI state. Single-directional flow: Agent → Engine → UI. Stream-based content delivery (`StreamMessage`). `select!` loop consumes streams directly (no spawn task). | ✅ Complete |
 | S8 | Codex-style insert_history | Two-branch `insert_history`: non-bottom (`\x1bM` push viewport) and bottom (scroll region + `\r\n`). Single-line operation. `needs_clear` after each insert for clean viewport redraw. `streaming_preview` unconditionally synced with `stream_buffer`. | ✅ Complete |
+| S9 | Line padding and styled scrollback | 3-char ASCII padding by message type (` > ` user, ` ~ ` assistant/tool, ` # ` system, ` ! ` error). User messages rendered with Nord Polar Night background (`#3B4252`) and top/bottom padding rows. `ScrollbackLine` carries `text` + optional `bg`. `insert_history` accepts `bg: Option<Color>`, pads lines to full terminal width. Stream separator (blank line) between non-first streams. | ✅ Complete |
+| S10 | Animated spinner and cursor sync | 2-char braille spinner with 10-frame animation and Nord color gradient cycling (150ms/frame). Native terminal cursor synced to input box position after each render via `MoveTo` + `Show`. `set_cursor` method on `InlineTerminal`. `restore()` clears viewport content before exiting. | ✅ Complete |
 
 ## Execution Evidence
 
@@ -27,11 +29,15 @@ Event-driven architecture with `talos-conversation` crate. Codex-style `insert_h
 - Single-directional information flow: Agent → ConversationEngine → UI via typed async channels (`mpsc::UiOutput`).
 - Stream-based content delivery: UI consumes active stream via `next_stream_chunk` in `select!` loop (no spawn task).
 - `insert_history` rewritten Codex-style: two branches (non-bottom: `\x1bM` push viewport; bottom: scroll region + `\r\n`), single-line operation, `needs_clear` for clean redraw.
-- `streaming_preview` unconditionally synced with `stream_buffer` — no stale preview after `\n` split.
-- `finalize_active_stream` clears `stream_buffer` only; preview push happens in `handle_ui_output` with correct ordering (finalize → push preview → set new stream).
-- User messages have no trailing `\n` in stream (stay in preview until AI stream arrives).
-- Preview component always 1 row height_hint.
-- Commits: `5c90874` (event-driven architecture), `a669a3e` (insert_history rewrite + preview sync fix).
+- `insert_history` accepts `bg: Option<Color>` for styled scrollback — lines padded to full terminal width with `SetBackgroundColor`.
+- `ScrollbackLine` struct carries `text: String` + `bg: Option<Color>`, enabling per-line background styling.
+- User messages rendered with Nord Polar Night background (`#3B4252`) and top/bottom padding rows for visual grouping.
+- 3-char ASCII line padding system: ` > ` (user), ` ~ ` (assistant/tool first), `   ` (continuation), ` # ` (system), ` ! ` (error).
+- Non-first streams separated by a blank line.
+- Animated 2-char braille spinner with Nord color gradient (10 frames, 150ms/frame) in preview component.
+- Native terminal cursor synced to input box position after each render (`MoveTo` + `Show`).
+- `restore()` clears viewport content (`MoveTo` + `Clear(FromCursorDown)`) before disabling raw mode.
+- Commits: `5c90874` (event-driven architecture), `a669a3e` (insert_history rewrite + preview sync fix), `988fc82` (line padding + error tips), `fc370ce` (animated spinner).
 
 ## Dependencies
 

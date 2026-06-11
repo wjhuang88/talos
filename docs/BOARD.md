@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I023 TUI State Model | Review | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Event-driven architecture: `talos-conversation` + `talos-tui` separation; Codex-style `insert_history`; stream-based content delivery; 93 tests pass (43 TUI + 50 conversation); awaiting runtime verification of insert_history rendering |
+| I023 TUI State Model | Review | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Event-driven architecture: `talos-conversation` + `talos-tui` separation; Codex-style `insert_history` with styled scrollback; 3-char ASCII line padding; user messages with Nord bg color + top/bottom padding; animated braille spinner; native cursor sync; 93 tests pass (43 TUI + 50 conversation) |
 
 ## Review
 

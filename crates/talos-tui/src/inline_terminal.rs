@@ -3,7 +3,7 @@ use std::io::{self, Stdout};
 use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
     execute, queue,
-    style::Print,
+    style::{Color as CColor, Print, SetBackgroundColor},
     terminal::{self, Clear, ClearType, EnableLineWrap},
 };
 use ratatui::{
@@ -235,31 +235,47 @@ impl InlineTerminal {
         Ok(())
     }
 
-    pub fn insert_history(&mut self, line: &str) -> io::Result<()> {
+    pub fn insert_history(&mut self, line: &str, bg: Option<CColor>) -> io::Result<()> {
         let screen_height = self.screen_size.height;
+        let line_width = self.screen_size.width;
         let mut area = self.viewport_area;
         let writer = self.backend_mut();
 
+        let styled_print = |w: &mut CrosstermBackend<Stdout>, text: &str, bg: Option<CColor>| -> io::Result<()> {
+            if let Some(color) = bg {
+                queue!(w, SetBackgroundColor(color))?;
+                queue!(w, Print(text))?;
+                let text_width = unicode_width::UnicodeWidthStr::width(text) as usize;
+                if text_width < line_width as usize {
+                    queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
+                }
+                queue!(w, SetBackgroundColor(CColor::Reset))?;
+            } else {
+                queue!(w, Print(text))?;
+            }
+            Ok(())
+        };
+
         if area.bottom() < screen_height {
             let top_1based = area.top() + 1;
-            let _ = queue!(writer, crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height)));
-            let _ = queue!(writer, MoveTo(0, area.top()));
-            let _ = queue!(writer, crossterm::style::Print("\x1bM"));
-            let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
+            queue!(writer, crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height)))?;
+            queue!(writer, MoveTo(0, area.top()))?;
+            queue!(writer, crossterm::style::Print("\x1bM"))?;
+            queue!(writer, crossterm::style::Print("\x1b[r"))?;
             area.y += 1;
-            let _ = queue!(writer, MoveTo(0, area.top() - 1));
-            let _ = queue!(writer, Clear(ClearType::UntilNewLine));
-            let _ = queue!(writer, Print(line));
+            queue!(writer, MoveTo(0, area.top() - 1))?;
+            queue!(writer, Clear(ClearType::UntilNewLine))?;
+            styled_print(writer, line, bg)?;
         } else if area.top() > 1 {
-            let _ = queue!(writer, crossterm::style::Print(format!("\x1b[1;{}r", area.top())));
-            let _ = queue!(writer, MoveTo(0, area.top() - 1));
-            let _ = queue!(writer, crossterm::style::Print("\r\n"));
-            let _ = queue!(writer, Clear(ClearType::UntilNewLine));
-            let _ = queue!(writer, Print(line));
-            let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
+            queue!(writer, crossterm::style::Print(format!("\x1b[1;{}r", area.top())))?;
+            queue!(writer, MoveTo(0, area.top() - 1))?;
+            queue!(writer, crossterm::style::Print("\r\n"))?;
+            queue!(writer, Clear(ClearType::UntilNewLine))?;
+            styled_print(writer, line, bg)?;
+            queue!(writer, crossterm::style::Print("\x1b[r"))?;
         }
 
-        let _ = std::io::Write::flush(writer);
+        std::io::Write::flush(writer)?;
 
         let area_changed = area != self.viewport_area;
         if area_changed {
@@ -270,7 +286,20 @@ impl InlineTerminal {
         Ok(())
     }
 
+    pub fn set_cursor(&mut self, col: u16, row: u16) -> io::Result<()> {
+        let writer = self.backend_mut();
+        queue!(writer, MoveTo(col, row))?;
+        queue!(writer, Show)?;
+        io::Write::flush(writer)?;
+        Ok(())
+    }
+
     pub fn restore(&self) {
+        let _ = execute!(
+            io::stdout(),
+            MoveTo(0, self.viewport_area.top()),
+            Clear(ClearType::FromCursorDown),
+        );
         let _ = terminal::disable_raw_mode();
         let _ = execute!(
             io::stdout(),

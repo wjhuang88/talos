@@ -100,6 +100,14 @@ impl TuiState {
         content
     }
 
+    pub(crate) fn cursor_byte_pos(&self) -> usize {
+        self.input_buffer
+            .char_indices()
+            .nth(self.cursor_pos)
+            .map(|(i, _)| i)
+            .unwrap_or(self.input_buffer.len())
+    }
+
     pub(crate) fn handle_ctrl_c(&mut self) -> bool {
         let now = Instant::now();
         match &self.ctrl_c_state {
