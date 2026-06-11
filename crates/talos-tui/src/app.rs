@@ -39,6 +39,64 @@ pub(crate) struct ScrollbackLine {
     bg: Option<CColor>,
 }
 
+#[derive(Default)]
+struct StreamRenderState {
+    source: Option<MessageSource>,
+    line_count: usize,
+    buffer: String,
+    preview: String,
+}
+
+impl StreamRenderState {
+    fn start(&mut self, source: MessageSource) {
+        self.source = Some(source);
+        self.line_count = 0;
+        self.buffer.clear();
+        self.preview.clear();
+    }
+
+    fn source(&self) -> Option<&MessageSource> {
+        self.source.as_ref()
+    }
+
+    fn preview(&self) -> &str {
+        &self.preview
+    }
+
+    fn push_chunk(&mut self, chunk: &str) -> Vec<(usize, String)> {
+        self.buffer.push_str(chunk);
+        let mut lines = Vec::new();
+
+        while let Some(pos) = self.buffer.find('\n') {
+            let line = self.buffer[..pos].to_string();
+            self.buffer = self.buffer[pos + 1..].to_string();
+            lines.push((self.line_count, line));
+            self.line_count += 1;
+        }
+
+        self.preview = self.buffer.clone();
+        lines
+    }
+
+    fn take_preview_line(&mut self) -> Option<(usize, String)> {
+        if self.preview.is_empty() {
+            return None;
+        }
+
+        self.buffer.clear();
+        let line_index = self.line_count;
+        self.line_count += 1;
+        Some((line_index, std::mem::take(&mut self.preview)))
+    }
+
+    fn reset(&mut self) {
+        self.source = None;
+        self.line_count = 0;
+        self.buffer.clear();
+        self.preview.clear();
+    }
+}
+
 struct PreviewComponent<'a> {
     padding: &'a str,
     text: &'a str,
@@ -252,10 +310,7 @@ pub struct Tui {
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
     pending_scrollback: Vec<ScrollbackLine>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
-    stream_source: Option<MessageSource>,
-    stream_line_count: usize,
-    stream_buffer: String,
-    streaming_preview: String,
+    stream_render: StreamRenderState,
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
@@ -286,10 +341,7 @@ impl Tui {
             user_input_tx: None,
             pending_scrollback: Vec::new(),
             active_stream: None,
-            stream_source: None,
-            stream_line_count: 0,
-            stream_buffer: String::new(),
-            streaming_preview: String::new(),
+            stream_render: StreamRenderState::default(),
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
@@ -422,12 +474,11 @@ impl Tui {
     }
 
     fn finalize_active_stream(&mut self) {
-        if !self.streaming_preview.is_empty() {
-            let padding = self.stream_padding(self.stream_line_count).to_string();
-            let text = format!("{padding}{}", std::mem::take(&mut self.streaming_preview));
+        if let Some((line_index, preview)) = self.stream_render.take_preview_line() {
+            let padding = self.stream_padding(line_index).to_string();
+            let text = format!("{padding}{preview}");
             let bg = self.stream_bg();
             self.pending_scrollback.push(ScrollbackLine { text, bg });
-            self.stream_line_count += 1;
         }
         if self.stream_bg().is_some() {
             self.pending_scrollback.push(ScrollbackLine {
@@ -435,35 +486,28 @@ impl Tui {
                 bg: self.stream_bg(),
             });
         }
-        self.stream_buffer.clear();
         self.active_stream = None;
-        self.stream_source = None;
-        self.stream_line_count = 0;
+        self.stream_render.reset();
     }
 
     fn stream_bg(&self) -> Option<CColor> {
-        match self.stream_source {
+        match self.stream_render.source() {
             Some(MessageSource::User) => to_crossterm_color(INPUT_BG),
             _ => None,
         }
     }
 
     fn stream_padding(&self, line_index: usize) -> &str {
-        stream_padding_for(self.stream_source.as_ref(), line_index)
+        stream_padding_for(self.stream_render.source(), line_index)
     }
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
-        self.stream_buffer.push_str(chunk);
-        while let Some(pos) = self.stream_buffer.find('\n') {
-            let line = self.stream_buffer[..pos].to_string();
-            self.stream_buffer = self.stream_buffer[pos + 1..].to_string();
-            let padding = self.stream_padding(self.stream_line_count).to_string();
+        for (line_index, line) in self.stream_render.push_chunk(chunk) {
+            let padding = self.stream_padding(line_index).to_string();
             let text = format!("{padding}{line}");
             let bg = self.stream_bg();
             self.pending_scrollback.push(ScrollbackLine { text, bg });
-            self.stream_line_count += 1;
         }
-        self.streaming_preview = self.stream_buffer.clone();
     }
 
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {
@@ -478,8 +522,7 @@ impl Tui {
                         bg: None,
                     });
                 }
-                self.stream_source = Some(msg.source.clone());
-                self.stream_line_count = 0;
+                self.stream_render.start(msg.source.clone());
                 if self.stream_bg().is_some() {
                     self.pending_scrollback.push(ScrollbackLine {
                         text: String::new(),
@@ -487,7 +530,6 @@ impl Tui {
                     });
                 }
                 self.active_stream = Some(msg.stream);
-                self.stream_buffer.clear();
                 self.stream_count += 1;
             }
             UiOutput::Status(snapshot) => {
@@ -551,7 +593,7 @@ impl Tui {
             self.processing_tick = 0;
             ("   ".to_string(), None)
         };
-        let preview_text = self.streaming_preview.clone();
+        let preview_text = self.stream_render.preview().to_string();
         let preview = PreviewComponent {
             padding: &preview_padding,
             text: &preview_text,
@@ -884,5 +926,26 @@ mod tests {
     #[test]
     fn truncate_to_width_short_enough() {
         assert_eq!(truncate_end_to_width("hi", 10), "hi");
+    }
+
+    #[test]
+    fn stream_render_state_tracks_lines_and_preview() {
+        let mut state = StreamRenderState::default();
+        state.start(MessageSource::Assistant);
+
+        assert_eq!(
+            state.push_chunk("first\nsec"),
+            vec![(0, "first".to_string())]
+        );
+        assert_eq!(state.preview(), "sec");
+        assert_eq!(
+            state.push_chunk("ond\nthird"),
+            vec![(1, "second".to_string())]
+        );
+        assert_eq!(state.take_preview_line(), Some((2, "third".to_string())));
+
+        state.reset();
+        assert!(state.source().is_none());
+        assert_eq!(state.preview(), "");
     }
 }

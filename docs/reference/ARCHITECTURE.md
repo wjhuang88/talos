@@ -172,6 +172,12 @@ soon as they arrive. The source prefix is rendered only for stream-local line 0;
 all later lines use the blank three-column prefix. Incomplete trailing text stays
 in the live preview until the next newline or stream completion.
 
+`talos-tui` keeps this state in a private stream-render helper rather than in
+the terminal writer. That helper owns the active source, stream-local line
+counter, incomplete line buffer, and preview text. `InlineTerminal` remains a
+single-line history writer; it does not parse message blocks, markdown, or table
+layout.
+
 ### Native Cursor Sync
 
 After each `draw_frame` render, the native terminal cursor is repositioned to the input box position using `MoveTo(col, row)` + `Show`. The column is calculated as 3 (prefix width) + Unicode display width of text before the cursor. This ensures IME input, text selection, and other cursor-dependent features work correctly.

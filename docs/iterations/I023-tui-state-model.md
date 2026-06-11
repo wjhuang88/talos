@@ -58,6 +58,25 @@ I023 can move from Review to Complete:
   `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and
   `cargo test --workspace`.
 
+## Next Slice: Stream Render State
+
+The next implementation step is a behavior-preserving extraction inside
+`crates/talos-tui/src/app.rs`: collect stream rendering fields into one
+`StreamRenderState` helper that owns the active source, stream-local line count,
+incomplete line buffer, and live preview text.
+
+This is intentionally not markdown rendering and not a dynamic-height streaming
+viewport. The helper keeps the current contract:
+
+- complete `\n`-terminated lines are converted into scrollback lines immediately;
+- incomplete trailing text remains the single-row preview;
+- source prefixes are decided by the stream-local line index;
+- the processing spinner stays preview-only;
+- `InlineTerminal::insert_history` remains a single-line writer.
+
+The purpose is to give future block-aware rendering a local cache boundary
+without weakening the stable scrollback/layout strategy.
+
 ## Stories
 
 | Story | Title | Acceptance | Status |
