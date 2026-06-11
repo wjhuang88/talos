@@ -67,7 +67,9 @@ struct OpencodeModelLimit {
 /// let providers = talos_config::opencode::import_opencode_providers(json).unwrap();
 /// assert!(providers.contains_key("custom"));
 /// ```
-pub fn import_opencode_providers(input: &str) -> Result<HashMap<String, ProviderConfig>, ConfigError> {
+pub fn import_opencode_providers(
+    input: &str,
+) -> Result<HashMap<String, ProviderConfig>, ConfigError> {
     let value: serde_json::Value = serde_json::from_str(input)
         .map_err(|e| ConfigError::ParseError(format!("invalid JSON: {e}")))?;
 

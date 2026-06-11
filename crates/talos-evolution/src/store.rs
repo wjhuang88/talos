@@ -1,9 +1,9 @@
 //! KnowledgeStore — SQLite persistence for observations and patterns.
 
-use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 
+use crate::EvolutionResult as Result;
 use crate::{Observation, Pattern, SignalType};
 
 /// SQLite-backed store for evolution data.
@@ -14,7 +14,7 @@ pub struct KnowledgeStore {
 impl KnowledgeStore {
     /// Open or create a knowledge store at the given path.
     pub fn open(path: &str) -> Result<Self> {
-        let conn = Connection::open(path).context("failed to open knowledge store")?;
+        let conn = Connection::open(path)?;
         let store = Self { conn };
         store.migrate()?;
         Ok(store)
@@ -22,7 +22,7 @@ impl KnowledgeStore {
 
     /// Open an in-memory knowledge store for testing.
     pub fn open_memory() -> Result<Self> {
-        let conn = Connection::open_in_memory().context("failed to open in-memory store")?;
+        let conn = Connection::open_in_memory()?;
         let store = Self { conn };
         store.migrate()?;
         Ok(store)
@@ -89,17 +89,20 @@ impl KnowledgeStore {
         )?;
 
         // I021-S4: Detect v1 schema (missing pattern.key) and hard-reset if needed.
-        let has_key_column: i64 = self.conn.prepare(
-            "SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = 'key'",
-        )?.query_row([], |row| row.get(0))?;
+        let has_key_column: i64 = self
+            .conn
+            .prepare("SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = 'key'")?
+            .query_row([], |row| row.get(0))?;
 
         if has_key_column == 0 {
-            let obs_count: i64 = self.conn.query_row(
-                "SELECT COUNT(*) FROM observations", [], |row| row.get(0),
-            ).unwrap_or(0);
-            let pat_count: i64 = self.conn.query_row(
-                "SELECT COUNT(*) FROM patterns", [], |row| row.get(0),
-            ).unwrap_or(0);
+            let obs_count: i64 = self
+                .conn
+                .query_row("SELECT COUNT(*) FROM observations", [], |row| row.get(0))
+                .unwrap_or(0);
+            let pat_count: i64 = self
+                .conn
+                .query_row("SELECT COUNT(*) FROM patterns", [], |row| row.get(0))
+                .unwrap_or(0);
 
             if obs_count > 0 || pat_count > 0 {
                 let _ = self.conn.execute("DELETE FROM observations", []);
@@ -117,9 +120,12 @@ impl KnowledgeStore {
 
         // Add content_hash column to existing databases (SQLite ALTER doesn't support IF NOT EXISTS).
         // We catch the "duplicate column" error to make this idempotent.
-        let has_column = self.conn.prepare(
-            "SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = 'content_hash'",
-        )?.query_row([], |row| row.get::<_, i64>(0))?;
+        let has_column = self
+            .conn
+            .prepare(
+                "SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = 'content_hash'",
+            )?
+            .query_row([], |row| row.get::<_, i64>(0))?;
         if has_column == 0 {
             let _ = self.conn.execute(
                 "ALTER TABLE patterns ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''",
@@ -135,28 +141,30 @@ impl KnowledgeStore {
             ("last_reinforced", "''"),
             ("source_sessions", "'[]'"),
         ] {
-            let has_col: i64 = self.conn.prepare(
-                &format!("SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = '{col}'"),
-            )?.query_row([], |row| row.get(0))?;
+            let has_col: i64 = self
+                .conn
+                .prepare(&format!(
+                    "SELECT COUNT(*) FROM pragma_table_info('patterns') WHERE name = '{col}'"
+                ))?
+                .query_row([], |row| row.get(0))?;
             if has_col == 0 {
                 let _ = self.conn.execute(
-                    &format!("ALTER TABLE patterns ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}"),
+                    &format!(
+                        "ALTER TABLE patterns ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}"
+                    ),
                     [],
                 );
             }
         }
 
         // Initialize schema_version if empty (new database).
-        let version_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM schema_version",
-            [],
-            |row| row.get(0),
-        )?;
+        let version_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM schema_version", [], |row| row.get(0))?;
         if version_count == 0 {
-            let _ = self.conn.execute(
-                "INSERT INTO schema_version (version) VALUES (2)",
-                [],
-            );
+            let _ = self
+                .conn
+                .execute("INSERT INTO schema_version (version) VALUES (2)", []);
         }
 
         Ok(())
@@ -213,7 +221,7 @@ impl KnowledgeStore {
                     turn_number: row.get(6)?,
                 })
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         Ok(observations)
     }
@@ -221,7 +229,8 @@ impl KnowledgeStore {
     /// Insert a pattern.
     pub fn insert_pattern(&self, pattern: &Pattern) -> Result<()> {
         let value_json = serde_json::to_string(&pattern.value).unwrap_or_else(|_| "null".into());
-        let sessions_json = serde_json::to_string(&pattern.source_sessions).unwrap_or_else(|_| "[]".into());
+        let sessions_json =
+            serde_json::to_string(&pattern.source_sessions).unwrap_or_else(|_| "[]".into());
         self.conn.execute(
             "INSERT INTO patterns (id, description, instruction, confidence, evidence_count, first_observed, last_updated, category, active, content_hash, key, value, contradicting_count, last_reinforced, source_sessions)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
@@ -270,8 +279,7 @@ impl KnowledgeStore {
                 let value: serde_json::Value =
                     serde_json::from_str(&value_str).unwrap_or(serde_json::Value::Null);
                 let contradicting_raw: String = row.get(12)?;
-                let contradicting_count: u32 =
-                    contradicting_raw.parse().unwrap_or(0);
+                let contradicting_count: u32 = contradicting_raw.parse().unwrap_or(0);
 
                 let last_reinforced_str: String = row.get(13)?;
                 let last_reinforced = if last_reinforced_str.is_empty() {
@@ -304,7 +312,7 @@ impl KnowledgeStore {
                     source_sessions,
                 })
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         Ok(patterns)
     }
@@ -366,8 +374,7 @@ impl KnowledgeStore {
                 let value: serde_json::Value =
                     serde_json::from_str(&value_str).unwrap_or(serde_json::Value::Null);
                 let contradicting_raw: String = row.get(12)?;
-                let contradicting_count: u32 =
-                    contradicting_raw.parse().unwrap_or(0);
+                let contradicting_count: u32 = contradicting_raw.parse().unwrap_or(0);
 
                 let last_reinforced_str: String = row.get(13)?;
                 let last_reinforced = if last_reinforced_str.is_empty() {
@@ -400,7 +407,7 @@ impl KnowledgeStore {
                     source_sessions,
                 })
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         Ok(patterns)
     }

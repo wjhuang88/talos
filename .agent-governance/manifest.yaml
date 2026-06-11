@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-09"
-status_note: "Governance drift repair (2026-06-09): CLAUDE.md and GEMINI.md redirect files created; broken relative links in TUI-002-codex-overhaul.md fixed (../decisions/ → ../../decisions/); base_url now honored for both Anthropic and OpenAI providers (build_provider fix + docstring update); config.reference.toml added to docs/reference/; I023 TUI state model in Review (S1-S6 done, 131 tests pass). I015 Provider Schema complete (schema types + opencode import + 9 tests). 5 talos-tools tests fail on Windows (shell metacharacter/timeout/working-directory — environment-dependent, not governance drift)."
+last_audited_at: "2026-06-11"
+status_note: "Governance audit repair (2026-06-11): README/iteration status synchronized with I023 Review; library crates no longer use anyhow; cargo check --workspace and cargo clippy --workspace -- -D warnings pass; CI workflow added for check, test, and strict clippy. Future TUI /copy and /export helpers are intentionally retained with local dead_code allows until slash-command rewire."
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -51,18 +51,6 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "I013 complete: boundary ADRs and logging R1 landed; I014-I020 are planned follow-up iterations"
-    - "I014 TUI Completion complete (2026-06-06): provenance markers + /plugins + /copy + /export landed via 2 atomic commits; 652 tests pass"
+    - "Complete I023 runtime verification before marking the iteration Complete"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
-    - "Resolved: GOV-001 compacted PRODUCT-BACKLOG.md into a routing surface with active item files and archive index"
-    - "Implement #I009-S6 TUI provenance markers and /plugins command in I010 R2/R3 or a dedicated follow-up"
-    - "Resolved: ADR-006 draws the event-architecture boundary (adopt single-consumer loop + AppServerSession seam; reject global pub/sub bus) — guardrail for implementers"
-    - "Resolved: ADR-007 records & justifies the four talos-sandbox process-hardening unsafe sites (satisfies Hard Constraint #2)"
-    - "Resolved: ADR-005 fixes the canonical TUI event architecture (two-layer: L1 mpsc AppEvent bus + L2 AppServerSession SQ/EQ seam); ADR-004 amended"
-    - "Resolved: R0 remediation closed ARCH-S1..S7, including process hardening runtime wiring, Agent::new deprecation, ApprovalChoice unification, session index refresh, fork identity/path repair, and search highlight cleanup"
-    - "Resolved: R1 Review Closure completed I008/I009; I009 TUI consumer work in #I009-S6"
-    - "Resolved: #I010-S7 AppServerSession convergence landed in I010 R2"
-    - "Resolved: ADR-004 dead event-loop variants were removed during I010 convergence"
-    - "Resolved: I021 Evolution MenteDB Realignment complete (2026-06-06) — 5 atomic commits #I021-S1..S5 realigned talos-evolution data structure with MenteDB blueprint; defense layer (commit 7470ac5) preserved; 615 tests pass; runtime regression confirmed"
     - "Select EVOL-001 sub-stories (MenteDB cognitive rigor Phase 2) into I022 or successor iteration when I021 is stable in production"
-    - "Add CI pipeline (cargo test + clippy on push)"

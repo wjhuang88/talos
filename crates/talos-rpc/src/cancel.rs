@@ -28,11 +28,11 @@ impl CancelRegistry {
     /// Cancels a token by `turn_id` and removes it.
     #[must_use]
     pub fn cancel(&self, turn_id: &str) -> bool {
-        if let Ok(mut guard) = self.inner.lock() {
-            if let Some(token) = guard.remove(turn_id) {
-                token.cancel();
-                return true;
-            }
+        if let Ok(mut guard) = self.inner.lock()
+            && let Some(token) = guard.remove(turn_id)
+        {
+            token.cancel();
+            return true;
         }
         false
     }

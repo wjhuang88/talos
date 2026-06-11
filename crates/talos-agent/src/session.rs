@@ -15,7 +15,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, warn};
 
 use talos_core::message::AgentEvent;
-use talos_core::session::{SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnCompletionStatus};
+use talos_core::session::{
+    SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnCompletionStatus,
+};
 
 use crate::Agent;
 
@@ -343,7 +345,9 @@ mod tests {
         let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
         assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
             "Should have TurnStarted"
         );
         assert!(
@@ -351,7 +355,13 @@ mod tests {
             "Should have TextDelta with 'hello'"
         );
         assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::TurnCompleted { status: TurnCompletionStatus::Success, .. })),
+            events.iter().any(|e| matches!(
+                e,
+                SessionEvent::TurnCompleted {
+                    status: TurnCompletionStatus::Success,
+                    ..
+                }
+            )),
             "Should have TurnCompleted(Success)"
         );
     }
@@ -400,9 +410,20 @@ mod tests {
 
         let success_count = events
             .iter()
-            .filter(|e| matches!(e, SessionEvent::TurnCompleted { status: TurnCompletionStatus::Success, .. }))
+            .filter(|e| {
+                matches!(
+                    e,
+                    SessionEvent::TurnCompleted {
+                        status: TurnCompletionStatus::Success,
+                        ..
+                    }
+                )
+            })
             .count();
-        assert!(success_count >= 1, "Should have at least 1 TurnCompleted(Success)");
+        assert!(
+            success_count >= 1,
+            "Should have at least 1 TurnCompleted(Success)"
+        );
     }
 
     #[tokio::test]
@@ -447,11 +468,19 @@ mod tests {
         let events = collect_events(eq_rx, Duration::from_secs(3)).await;
 
         assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
             "Should have TurnStarted"
         );
         assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::TurnCompleted { status: TurnCompletionStatus::Cancelled, .. })),
+            events.iter().any(|e| matches!(
+                e,
+                SessionEvent::TurnCompleted {
+                    status: TurnCompletionStatus::Cancelled,
+                    ..
+                }
+            )),
             "Should have TurnCompleted(Cancelled)"
         );
     }
@@ -499,7 +528,10 @@ mod tests {
         sq_tx.send(SessionOp::Shutdown).await.unwrap();
 
         let result = tokio::time::timeout(Duration::from_secs(2), actor_task).await;
-        assert!(result.is_ok(), "Actor should handle EQ disconnect gracefully");
+        assert!(
+            result.is_ok(),
+            "Actor should handle EQ disconnect gracefully"
+        );
     }
 
     #[tokio::test]
@@ -529,7 +561,10 @@ mod tests {
             "try_send should fail when SQ is at capacity"
         );
         assert!(
-            matches!(result.unwrap_err(), tokio::sync::mpsc::error::TrySendError::Full(_)),
+            matches!(
+                result.unwrap_err(),
+                tokio::sync::mpsc::error::TrySendError::Full(_)
+            ),
             "Error should be Full, not Closed"
         );
     }
@@ -643,12 +678,20 @@ mod tests {
         let events = collect_events(eq_rx, Duration::from_secs(3)).await;
 
         assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
+            events
+                .iter()
+                .any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
             "Should have TurnStarted"
         );
 
         assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::TurnCompleted { status: TurnCompletionStatus::Cancelled, .. })),
+            events.iter().any(|e| matches!(
+                e,
+                SessionEvent::TurnCompleted {
+                    status: TurnCompletionStatus::Cancelled,
+                    ..
+                }
+            )),
             "First turn should be Cancelled"
         );
     }

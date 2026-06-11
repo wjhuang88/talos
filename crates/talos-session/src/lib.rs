@@ -348,39 +348,35 @@ impl Session {
             }
 
             // Try old format: {"type": "message", "data": <Message>}
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) {
-                if value.get("type").and_then(|t| t.as_str()) == Some("message") {
-                    if let Some(data) = value.get("data") {
-                        if let Ok(msg) = serde_json::from_value::<Message>(data.clone()) {
-                            let (role, content) = match &msg {
-                                Message::User { content } => ("user".to_string(), content.clone()),
-                                Message::Assistant { content, .. } => {
-                                    ("assistant".to_string(), content.clone())
-                                }
-                                Message::Tool { result } => {
-                                    ("system".to_string(), result.content.clone())
-                                }
-                            };
-
-                            let id = format!("synthetic-{synthetic_counter}");
-                            let parent_id = if synthetic_counter > 0 {
-                                Some(format!("synthetic-{}", synthetic_counter - 1))
-                            } else {
-                                None
-                            };
-
-                            entries.push(SessionEntry {
-                                id,
-                                parent_id,
-                                timestamp: Utc::now(),
-                                role,
-                                content,
-                                metadata: SessionMetadata::default(),
-                            });
-                            synthetic_counter += 1;
-                        }
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line)
+                && value.get("type").and_then(|t| t.as_str()) == Some("message")
+                && let Some(data) = value.get("data")
+                && let Ok(msg) = serde_json::from_value::<Message>(data.clone())
+            {
+                let (role, content) = match &msg {
+                    Message::User { content } => ("user".to_string(), content.clone()),
+                    Message::Assistant { content, .. } => {
+                        ("assistant".to_string(), content.clone())
                     }
-                }
+                    Message::Tool { result } => ("system".to_string(), result.content.clone()),
+                };
+
+                let id = format!("synthetic-{synthetic_counter}");
+                let parent_id = if synthetic_counter > 0 {
+                    Some(format!("synthetic-{}", synthetic_counter - 1))
+                } else {
+                    None
+                };
+
+                entries.push(SessionEntry {
+                    id,
+                    parent_id,
+                    timestamp: Utc::now(),
+                    role,
+                    content,
+                    metadata: SessionMetadata::default(),
+                });
+                synthetic_counter += 1;
             }
             // Invalid lines are silently skipped (crash-safety guarantee)
         }
@@ -439,10 +435,10 @@ impl Session {
         let mut events = Vec::new();
 
         for entry in entries {
-            if entry.role == "system" {
-                if let Ok(event) = serde_json::from_str::<AgentEvent>(&entry.content) {
-                    events.push(event);
-                }
+            if entry.role == "system"
+                && let Ok(event) = serde_json::from_str::<AgentEvent>(&entry.content)
+            {
+                events.push(event);
             }
         }
 
@@ -650,24 +646,24 @@ impl SessionManager {
             }
 
             // Try old format: {"type": "message", "data": <Message>}
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) {
-                if value.get("type").and_then(|t| t.as_str()) == Some("message") {
-                    count += 1;
-                    if let Some(data) = value.get("data") {
-                        if let Ok(msg) = serde_json::from_value::<Message>(data.clone()) {
-                            let content = match &msg {
-                                Message::User { content } => content.clone(),
-                                Message::Assistant { content, .. } => content.clone(),
-                                Message::Tool { result } => result.content.clone(),
-                            };
-                            let preview = if content.len() > 100 {
-                                format!("{}...", &content[..100])
-                            } else {
-                                content
-                            };
-                            last_preview = preview;
-                        }
-                    }
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line)
+                && value.get("type").and_then(|t| t.as_str()) == Some("message")
+            {
+                count += 1;
+                if let Some(data) = value.get("data")
+                    && let Ok(msg) = serde_json::from_value::<Message>(data.clone())
+                {
+                    let content = match &msg {
+                        Message::User { content } => content.clone(),
+                        Message::Assistant { content, .. } => content.clone(),
+                        Message::Tool { result } => result.content.clone(),
+                    };
+                    let preview = if content.len() > 100 {
+                        format!("{}...", &content[..100])
+                    } else {
+                        content
+                    };
+                    last_preview = preview;
                 }
             }
         }

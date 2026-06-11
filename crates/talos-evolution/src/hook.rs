@@ -30,11 +30,11 @@ use talos_core::message::Message;
 use talos_plugin::event::{HookEvent, HookEventKind};
 use talos_plugin::handler::{HookContext, HookHandler, HookResult};
 
-use crate::EvolutionConfig;
 use crate::adapter::BehaviorAdapter;
 use crate::extractor::PatternExtractor;
 use crate::observer::TurnObserver;
 use crate::store::KnowledgeStore;
+use crate::{EvolutionConfig, EvolutionResult};
 
 const ERROR_INTENSITY: f64 = 1.0;
 const CORRECTION_INTENSITY: f64 = 0.8;
@@ -88,22 +88,21 @@ impl EvolutionHookHandler {
     pub fn open_default(
         config: EvolutionConfig,
         session_id: Option<String>,
-    ) -> anyhow::Result<Option<Self>> {
-        use anyhow::Context;
+    ) -> EvolutionResult<Option<Self>> {
         let Some(home) = dirs::home_dir() else {
             return Ok(None);
         };
         let dir = home.join(".talos").join("evolution");
-        std::fs::create_dir_all(&dir).context("failed to create .talos/evolution directory")?;
+        std::fs::create_dir_all(&dir)?;
         let db_path = dir.join("knowledge.db");
-        let store = KnowledgeStore::open(db_path.to_str().unwrap_or_default())
-            .context("failed to open knowledge store")?;
+        let store = KnowledgeStore::open(db_path.to_str().unwrap_or_default())?;
 
-        let purged = store
-            .delete_oversized_patterns(config.max_output_bytes)
-            .context("failed to purge oversized patterns")?;
+        let purged = store.delete_oversized_patterns(config.max_output_bytes)?;
         if purged > 0 {
-            tracing::info!(count = purged, "evolution: purged oversized patterns on open");
+            tracing::info!(
+                count = purged,
+                "evolution: purged oversized patterns on open"
+            );
         }
 
         Ok(Some(Self::new(store, config, session_id)))
@@ -206,9 +205,9 @@ impl HookHandler for EvolutionHookHandler {
                 if let Some(text) = messages.iter().find_map(|m| match m {
                     Message::User { content } => Some(content.as_str()),
                     _ => None,
-                }) && let Some((intensity, _marker)) = detect_correction_with_marker(text) {
-                    let mut observer =
-                        self.observer.lock().expect("evolution observer poisoned");
+                }) && let Some((intensity, _marker)) = detect_correction_with_marker(text)
+                {
+                    let mut observer = self.observer.lock().expect("evolution observer poisoned");
                     let context = if let Some(marker_pos) =
                         TurnObserver::find_marker(text, CORRECTION_MARKERS)
                     {
@@ -232,10 +231,8 @@ impl HookHandler for EvolutionHookHandler {
                 let message = format!("{error:?}");
                 let mut observer = self.observer.lock().expect("evolution observer poisoned");
                 #[allow(deprecated)]
-                let truncated = TurnObserver::truncate_context(
-                    message,
-                    self.config.max_context_bytes,
-                );
+                let truncated =
+                    TurnObserver::truncate_context(message, self.config.max_context_bytes);
                 observer.record_error(truncated, ERROR_INTENSITY);
                 HookResult::Continue
             }
@@ -618,11 +615,7 @@ mod tests {
 
         let store = KnowledgeStore::open(db_path.to_str().unwrap()).expect("open store");
 
-        let mut pattern = Pattern::new(
-            "Big".to_string(),
-            "x".repeat(10_000),
-            "test".to_string(),
-        );
+        let mut pattern = Pattern::new("Big".to_string(), "x".repeat(10_000), "test".to_string());
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
         store.insert_pattern(&pattern).unwrap();

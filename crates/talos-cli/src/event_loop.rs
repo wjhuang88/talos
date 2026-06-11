@@ -93,10 +93,14 @@ impl EventLoop {
                     }) => {
                         let _ = event_tx_forward.send(AgentToolResult(result.is_error));
                     }
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::TurnEnd { .. }) => {
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::TurnEnd {
+                        ..
+                    }) => {
                         let _ = event_tx_forward.send(AgentCompleted);
                     }
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::Error { message }) => {
+                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::Error {
+                        message,
+                    }) => {
                         let _ = event_tx_forward.send(AgentError(message));
                     }
                     SessionEvent::TurnCompleted { status, .. } => match status {
@@ -220,12 +224,12 @@ impl EventLoop {
                 print!("\r");
                 io::stdout().flush().ok();
                 let now = Instant::now();
-                if let Some(prev) = self.first_ctrl_c_time {
-                    if now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW {
-                        eprintln!("Exiting.");
-                        self.state = AppState::ShuttingDown;
-                        return;
-                    }
+                if let Some(prev) = self.first_ctrl_c_time
+                    && now.duration_since(prev) < DOUBLE_CTRL_C_WINDOW
+                {
+                    eprintln!("Exiting.");
+                    self.state = AppState::ShuttingDown;
+                    return;
                 }
                 self.first_ctrl_c_time = Some(now);
                 eprintln!("Press Ctrl+C again within 2 seconds to exit.");

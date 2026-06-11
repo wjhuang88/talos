@@ -274,10 +274,10 @@ fn extract_event_type(event_text: &str) -> Option<String> {
 fn extract_event_data(event_text: &str) -> Value {
     for line in event_text.lines() {
         let line = line.trim();
-        if let Some(rest) = line.strip_prefix("data:") {
-            if let Ok(value) = serde_json::from_str::<Value>(rest.trim()) {
-                return value;
-            }
+        if let Some(rest) = line.strip_prefix("data:")
+            && let Ok(value) = serde_json::from_str::<Value>(rest.trim())
+        {
+            return value;
         }
     }
     Value::Null

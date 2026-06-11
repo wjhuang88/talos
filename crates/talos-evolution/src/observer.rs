@@ -178,8 +178,6 @@ impl TurnObserver {
 mod tests {
     use super::*;
 
-    const MARKERS: &[&str] = &["don't", "do not", "instead", "actually", "不要用 sed", "不对"];
-
     #[test]
     fn test_turn_observer_new() {
         let observer = TurnObserver::new(Some("session-1".to_string()));
@@ -296,7 +294,11 @@ mod tests {
         let pos = text.find("marker").unwrap();
         let window = TurnObserver::capture_window(text, pos, 20);
 
-        assert!(window.contains("marker"), "window={window:?} len={}", window.len());
+        assert!(
+            window.contains("marker"),
+            "window={window:?} len={}",
+            window.len()
+        );
     }
 
     #[test]

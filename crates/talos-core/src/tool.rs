@@ -166,18 +166,17 @@ impl ToolRegistry {
         }
 
         // Check required fields if the schema specifies them
-        if let Some(schema_obj) = params.as_object() {
-            if let Some(Value::Array(required)) = schema_obj.get("required") {
-                if let Some(input_obj) = input.as_object() {
-                    for req in required {
-                        if let Some(req_key) = req.as_str() {
-                            if !input_obj.contains_key(req_key) {
-                                return Err(ToolError::InvalidInput(format!(
-                                    "missing required field '{req_key}' for tool '{name}'"
-                                )));
-                            }
-                        }
-                    }
+        if let Some(schema_obj) = params.as_object()
+            && let Some(Value::Array(required)) = schema_obj.get("required")
+            && let Some(input_obj) = input.as_object()
+        {
+            for req in required {
+                if let Some(req_key) = req.as_str()
+                    && !input_obj.contains_key(req_key)
+                {
+                    return Err(ToolError::InvalidInput(format!(
+                        "missing required field '{req_key}' for tool '{name}'"
+                    )));
                 }
             }
         }

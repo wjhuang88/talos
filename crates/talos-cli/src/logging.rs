@@ -28,12 +28,11 @@ fn env_filter(config: Option<&LogConfig>) -> EnvFilter {
         return filter;
     }
 
-    if let Some(filter) = config.and_then(|config| config.filter.as_deref()) {
-        if !filter.trim().is_empty()
-            && let Ok(filter) = EnvFilter::try_new(filter)
-        {
-            return filter;
-        }
+    if let Some(filter) = config.and_then(|config| config.filter.as_deref())
+        && !filter.trim().is_empty()
+        && let Ok(filter) = EnvFilter::try_new(filter)
+    {
+        return filter;
     }
 
     let level = config

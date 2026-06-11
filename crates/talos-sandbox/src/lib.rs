@@ -263,10 +263,10 @@ mod macos {
             profile.push_str("(allow file-read-metadata (subpath \"/Library\"))\n");
 
             for path in &config.extra_read_paths {
-                if let Ok(canonical) = path.canonicalize() {
-                    if let Some(path_str) = canonical.to_str() {
-                        profile.push_str(&format!("(allow file-read* (subpath \"{path_str}\"))\n"));
-                    }
+                if let Ok(canonical) = path.canonicalize()
+                    && let Some(path_str) = canonical.to_str()
+                {
+                    profile.push_str(&format!("(allow file-read* (subpath \"{path_str}\"))\n"));
                 }
             }
 

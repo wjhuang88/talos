@@ -359,14 +359,14 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             let choice = &chunk.choices[0];
 
             // Extract text delta
-            if let Some(ref text) = choice.delta.content {
-                if !text.is_empty() {
-                    let _ = tx
-                        .send(AgentEvent::TextDelta {
-                            delta: text.clone(),
-                        })
-                        .await;
-                }
+            if let Some(ref text) = choice.delta.content
+                && !text.is_empty()
+            {
+                let _ = tx
+                    .send(AgentEvent::TextDelta {
+                        delta: text.clone(),
+                    })
+                    .await;
             }
 
             // Extract tool calls

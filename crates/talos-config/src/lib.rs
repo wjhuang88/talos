@@ -272,10 +272,10 @@ impl Config {
     pub fn api_key(&self) -> Result<String, ConfigError> {
         let provider = self.active_provider_config();
 
-        if let Some(key) = provider.api_key.as_deref() {
-            if !key.is_empty() {
-                return Ok(key.to_string());
-            }
+        if let Some(key) = provider.api_key.as_deref()
+            && !key.is_empty()
+        {
+            return Ok(key.to_string());
         }
 
         let primary = provider
@@ -287,20 +287,18 @@ impl Config {
                 _ => "",
             });
 
-        if !primary.is_empty() {
-            if let Ok(key) = env::var(primary) {
-                if !key.is_empty() {
-                    return Ok(key);
-                }
-            }
+        if !primary.is_empty()
+            && let Ok(key) = env::var(primary)
+            && !key.is_empty()
+        {
+            return Ok(key);
         }
 
-        if self.provider == "openai" {
-            if let Ok(key) = env::var("OPENAI_COMPAT_API_KEY") {
-                if !key.is_empty() {
-                    return Ok(key);
-                }
-            }
+        if self.provider == "openai"
+            && let Ok(key) = env::var("OPENAI_COMPAT_API_KEY")
+            && !key.is_empty()
+        {
+            return Ok(key);
         }
 
         Err(ConfigError::MissingApiKey(

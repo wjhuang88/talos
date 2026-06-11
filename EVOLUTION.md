@@ -30,6 +30,9 @@ repeating known mistakes.
 | 19 | Evolution | 持久化任何"用户输入上下文"前必须 byte-cap，dedup 必须含内容指纹 | I008/I015 |
 | 20 | Evolution | `Signal.context` 字段语义 = signal 周围短窗口,不是整条 user message; 7470ac5 是 defense layer,真治根在 I021 | I008/I021 |
 | 21 | Process | 不要擅自更改已经与用户确认的设计决策 | I023 |
+| 22 | Code Quality | 库 crate 必须用 thiserror 而非 anyhow；clippy -D warnings 必须通过 | I023 |
+| 23 | Code Style | Rust 2024 let-chains (`if let X && let Y`) 替代嵌套 if-let 金字塔 | I023 |
+| 24 | TUI | 流内容应按完整 block 渲染（积累 buffer → finalize 时一次性输出），不要逐行分割 | I023 |
 
 ## Lessons
 
@@ -40,6 +43,30 @@ repeating known mistakes.
 - Root cause: 发现问题时，没有先确认方案方向是否应该变更，而是自作主张换了一个与 TUI-005 需求文档设计相矛盾的实现路径。TUI-005 明确要求 Phase 1 在 raw mode 之前用 crossterm ANSI 输出 splash，`pending_scrollback` + `insert_history` 方案与此冲突。
 - Fix: 恢复 `println!` + `print_splash_scrollback()` 方案，贴底看不到 logo 的问题留给 TUI-005 实施（Phase 3 viewport 内 splash status 保证内容可见）。
 - Prevention: 遇到已确认方案的问题时，先向用户说明问题和可选方案，等待用户确认后再改。不要自作主张推翻已确认的架构决策。需求文档（如 TUI-005）中的设计约束优先于临时修复。
+
+### 22. 2026-06-11 - 库 crate 必须用 thiserror 而非 anyhow
+
+- Trigger: `cargo clippy --workspace -- -D warnings` 在 CI 中失败。
+- Symptom: `talos-evolution` 使用 `anyhow` 作为错误类型，违反了 AGENTS.md 的 "Use `thiserror` for library crates, `anyhow` for binary crates only" 规则。
+- Root cause: I021 在 `talos-evolution` 中引入 `anyhow` 时没有遵守已有的错误处理策略。
+- Fix: 将 `talos-evolution` 从 `anyhow` 迁移到 `thiserror`：定义 `EvolutionError` 枚举（`Io` + `Store` 变体），创建 `EvolutionResult<T>` 类型别名，移除 `Cargo.toml` 中的 `anyhow` 依赖。
+- Prevention: 引入新依赖前检查 AGENTS.md 的 crate 约束。CI `clippy -D warnings` 会阻止违规。
+
+### 23. 2026-06-11 - Rust 2024 let-chains 替代嵌套 if-let
+
+- Trigger: Clippy 和代码审查发现多层嵌套 `if let` / `if condition` 金字塔。
+- Symptom: 代码缩进到 5-6 层深，如 `session.rs` 的旧消息格式解析。
+- Root cause: 使用 Rust 2021 风格的嵌套 guard，没有利用 edition 2024 的 `let-chains` 特性。
+- Fix: 将 `if let X { if let Y { ... } }` 模式统一替换为 `if let X && let Y { ... }`。跨多个 crate 应用：`talos-config`、`talos-agent`、`talos-session`、`talos-sandbox`、`talos-provider`、`talos-rpc`、`talos-cli`。
+- Prevention: 使用 edition 2024 时优先使用 let-chains 减少嵌套。CI clippy 会标记不必要的复杂度。
+
+### 24. 2026-06-11 - TUI 流内容应按完整 block 渲染
+
+- Trigger: 我最初实现的 `consume_stream_chunk` 逐行分割流内容并逐行推入 scrollback，导致多行消息行间间距不一致。
+- Symptom: 用户消息中如果包含换行，每行单独处理会导致 padding、背景色、行间距不一致。
+- Root cause: 流式内容到达时逐 `\n` 分割并逐行 flush，无法对整个消息块做统一的渲染处理（如上下 padding、背景色）。
+- Fix: 外部修改重构为 block-based 渲染：`consume_stream_chunk` 只积累 buffer，`finalize_active_stream` 一次性用 `render_stream_block_lines` 渲染整个 block，统一添加 top/bottom padding 和背景色。
+- Prevention: 对于需要统一格式化（padding、背景色、分组）的内容，积累后批量渲染优于逐条流式渲染。预览组件仍然实时显示 streaming 内容（最多 6 行），但 scrollback 应在 block 完成后一次性写入。
 
 ### 18. 2026-06-05 - 更新 skill 后必须重新跑 governance validator
 

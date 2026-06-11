@@ -26,7 +26,11 @@ impl<'a> BehaviorAdapter<'a> {
             .iter()
             .filter(|p| p.evidence_count >= self.config.min_evidence)
             .collect();
-        filtered.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        filtered.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if filtered.is_empty() {
             return String::new();
@@ -129,11 +133,7 @@ mod tests {
         let mut config = EvolutionConfig::default();
         config.max_output_bytes = 200;
 
-        let mut pattern = Pattern::new(
-            "Test".to_string(),
-            "x".repeat(150),
-            "test".to_string(),
-        );
+        let mut pattern = Pattern::new("Test".to_string(), "x".repeat(150), "test".to_string());
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
         store.insert_pattern(&pattern).unwrap();
@@ -154,11 +154,7 @@ mod tests {
         let mut config = EvolutionConfig::default();
         config.max_output_bytes = 100;
 
-        let mut pattern = Pattern::new(
-            "Big".to_string(),
-            "x".repeat(5000),
-            "test".to_string(),
-        );
+        let mut pattern = Pattern::new("Big".to_string(), "x".repeat(5000), "test".to_string());
         pattern.confidence = 0.9;
         pattern.evidence_count = 5;
         store.insert_pattern(&pattern).unwrap();
@@ -171,7 +167,10 @@ mod tests {
             "output {} exceeds max_output_bytes 100",
             context.len()
         );
-        assert!(!context.contains("xxxxx"), "oversized pattern should be dropped");
+        assert!(
+            !context.contains("xxxxx"),
+            "oversized pattern should be dropped"
+        );
     }
 
     #[test]
@@ -198,7 +197,10 @@ mod tests {
         let high_pos = context.find("[high]").unwrap();
         let mid_pos = context.find("[mid]").unwrap();
         let low_pos = context.find("[low]").unwrap();
-        assert!(high_pos < mid_pos, "high confidence should appear before mid");
+        assert!(
+            high_pos < mid_pos,
+            "high confidence should appear before mid"
+        );
         assert!(mid_pos < low_pos, "mid confidence should appear before low");
     }
 }

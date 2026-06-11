@@ -89,7 +89,9 @@ mod tests {
     #[test]
     fn session_op_serde_roundtrip() {
         let ops = vec![
-            SessionOp::Submit { message: "hello".into() },
+            SessionOp::Submit {
+                message: "hello".into(),
+            },
             SessionOp::Interrupt,
             SessionOp::Shutdown,
         ];
@@ -114,7 +116,9 @@ mod tests {
                 arguments: "{}".into(),
                 call_id: "call_1".into(),
             },
-            SessionEvent::TurnStarted { turn_id: "1".into() },
+            SessionEvent::TurnStarted {
+                turn_id: "1".into(),
+            },
             SessionEvent::TurnCompleted {
                 turn_id: "1".into(),
                 status: TurnCompletionStatus::Success,
@@ -129,7 +133,9 @@ mod tests {
                     message: "boom".into(),
                 },
             },
-            SessionEvent::Error { message: "fail".into() },
+            SessionEvent::Error {
+                message: "fail".into(),
+            },
         ];
         for event in &events {
             let json = serde_json::to_string(event).unwrap();

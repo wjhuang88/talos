@@ -2383,6 +2383,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // Agent::new is correct for prompt-builder unit tests.
     fn test_clear_append_prompt() {
         let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
         let tools = ToolRegistry::new();
@@ -2408,6 +2409,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // Agent::new is correct for prompt-builder unit tests.
     fn test_set_append_prompt_opt_none() {
         let provider: Arc<dyn LanguageModel> = Arc::new(MockModel::new(vec![]));
         let tools = ToolRegistry::new();

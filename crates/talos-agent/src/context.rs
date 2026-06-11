@@ -110,12 +110,12 @@ impl ContextLoader {
         let mut parts: Vec<String> = Vec::new();
 
         // 1. Load global AGENTS.md
-        if let Some(global_path) = self.global_agents_path() {
-            if global_path.exists() {
-                let content = fs::read_to_string(&global_path).map_err(ContextError::IoError)?;
-                if !content.trim().is_empty() {
-                    parts.push(self.format_section(&global_path, &content));
-                }
+        if let Some(global_path) = self.global_agents_path()
+            && global_path.exists()
+        {
+            let content = fs::read_to_string(&global_path).map_err(ContextError::IoError)?;
+            if !content.trim().is_empty() {
+                parts.push(self.format_section(&global_path, &content));
             }
         }
 

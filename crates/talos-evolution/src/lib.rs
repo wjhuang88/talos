@@ -16,6 +16,21 @@ pub use hook::EvolutionHookHandler;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Error type for the evolution crate.
+#[derive(Debug, Error)]
+pub enum EvolutionError {
+    /// Filesystem operation failed.
+    #[error("filesystem operation failed: {0}")]
+    Io(#[from] std::io::Error),
+    /// SQLite persistence operation failed.
+    #[error("knowledge store operation failed: {0}")]
+    Store(#[from] rusqlite::Error),
+}
+
+/// Result type for evolution operations.
+pub type EvolutionResult<T> = std::result::Result<T, EvolutionError>;
 
 // ─── MenteDB-aligned types (I021-S1) ────────────────────────────────────────
 

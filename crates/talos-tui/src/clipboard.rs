@@ -9,6 +9,8 @@
 //! OSC 52 spec: <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>.
 //! Format: `ESC ] 52 ; c ; <base64> BEL`.
 
+#![allow(dead_code)] // Preserved for the planned TUI slash-command rewire of `/copy`.
+
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
