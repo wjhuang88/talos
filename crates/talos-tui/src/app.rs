@@ -46,15 +46,27 @@ struct StreamRenderState {
     line_count: usize,
     buffer: String,
     preview: String,
+    hold_complete_lines: bool,
+    held_lines: Vec<(usize, String)>,
 }
 
 impl StreamRenderState {
     fn start(&mut self, source: MessageSource) -> Vec<ScrollbackLine> {
+        self.start_with_hold(source, false)
+    }
+
+    fn start_with_hold(
+        &mut self,
+        source: MessageSource,
+        hold_complete_lines: bool,
+    ) -> Vec<ScrollbackLine> {
         let bg = stream_bg_for(Some(&source));
         self.source = Some(source);
         self.line_count = 0;
         self.buffer.clear();
         self.preview.clear();
+        self.hold_complete_lines = hold_complete_lines;
+        self.held_lines.clear();
 
         if bg.is_some() {
             vec![ScrollbackLine {
@@ -81,7 +93,11 @@ impl StreamRenderState {
         while let Some(pos) = self.buffer.find('\n') {
             let line = self.buffer[..pos].to_string();
             self.buffer = self.buffer[pos + 1..].to_string();
-            lines.push(self.render_line(self.line_count, &line));
+            if self.hold_complete_lines {
+                self.held_lines.push((self.line_count, line));
+            } else {
+                lines.push(self.render_line(self.line_count, &line));
+            }
             self.line_count += 1;
         }
 
@@ -91,6 +107,13 @@ impl StreamRenderState {
 
     fn finish(&mut self) -> Vec<ScrollbackLine> {
         let mut lines = Vec::new();
+
+        let held_lines = std::mem::take(&mut self.held_lines);
+        lines.extend(
+            held_lines
+                .into_iter()
+                .map(|(line_index, line)| self.render_line(line_index, &line)),
+        );
 
         if !self.preview.is_empty() {
             let preview = std::mem::take(&mut self.preview);
@@ -126,6 +149,8 @@ impl StreamRenderState {
         self.line_count = 0;
         self.buffer.clear();
         self.preview.clear();
+        self.hold_complete_lines = false;
+        self.held_lines.clear();
     }
 }
 
@@ -987,6 +1012,41 @@ mod tests {
         );
 
         state.reset();
+        assert!(state.source().is_none());
+        assert_eq!(state.preview(), "");
+    }
+
+    #[test]
+    fn stream_render_state_can_hold_complete_lines_until_finish() {
+        let mut state = StreamRenderState::default();
+        assert!(
+            state
+                .start_with_hold(MessageSource::Assistant, true)
+                .is_empty()
+        );
+
+        assert!(state.push_chunk("first\nsecond\nthi").is_empty());
+        assert_eq!(state.preview(), "thi");
+        assert!(state.push_chunk("rd").is_empty());
+        assert_eq!(state.preview(), "third");
+
+        assert_eq!(
+            state.finish(),
+            vec![
+                ScrollbackLine {
+                    text: " ~ first".to_string(),
+                    bg: None
+                },
+                ScrollbackLine {
+                    text: "   second".to_string(),
+                    bg: None
+                },
+                ScrollbackLine {
+                    text: "   third".to_string(),
+                    bg: None
+                }
+            ]
+        );
         assert!(state.source().is_none());
         assert_eq!(state.preview(), "");
     }

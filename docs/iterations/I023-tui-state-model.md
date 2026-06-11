@@ -97,6 +97,26 @@ Acceptance:
 - `Tui` keeps `insert_history` as the only terminal history writer and still
   writes one line at a time.
 
+## Next Slice: Stream Hold Buffer
+
+Add an internal hold-buffer mode to `StreamRenderState` without enabling it for
+normal streams yet. The default runtime behavior remains immediate line
+emission: complete `\n`-terminated lines are written to pending scrollback as
+soon as they arrive, and only the incomplete trailing text remains in preview.
+
+The hold-buffer path exists for future markdown/table rendering, where a logical
+block may need complete block text before it can decide how many terminal rows
+to emit. This slice only proves the buffer boundary and keeps the terminal
+layout stable:
+
+- default stream start uses immediate mode and preserves current behavior;
+- hold mode accumulates complete lines internally instead of emitting them from
+  `push_chunk`;
+- `finish` emits held lines in order, then the remaining preview line, then any
+  source-specific closing rows;
+- line prefixes are still based on stream-local line indexes;
+- `InlineTerminal::insert_history` remains a single-line writer.
+
 ## Stories
 
 | Story | Title | Acceptance | Status |

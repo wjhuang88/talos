@@ -179,6 +179,11 @@ source-specific scrollback rows such as the user block background padding.
 `InlineTerminal` remains a single-line history writer; it does not parse message
 blocks, markdown, or table layout.
 
+The stream-render helper may hold complete stream-local lines internally for
+future block renderers, but the default runtime mode is immediate line emission.
+Hold mode is a private preparation boundary: it changes when `ScrollbackLine`s
+are emitted from the helper, not how terminal history is written.
+
 ### Native Cursor Sync
 
 After each `draw_frame` render, the native terminal cursor is repositioned to the input box position using `MoveTo(col, row)` + `Show`. The column is calculated as 3 (prefix width) + Unicode display width of text before the cursor. This ensures IME input, text selection, and other cursor-dependent features work correctly.
