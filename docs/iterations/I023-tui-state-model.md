@@ -31,6 +31,12 @@ I023 can move from Review to Complete:
    the full block, and scrollback renders only the first user line with ` > `;
    continuation lines use the same three-column alignment without repeating
    the prompt marker.
+5. **Block-aware line streaming**: `StreamMessage` is a logical message block,
+   but terminal history is still flushed line-by-line as complete `\n` lines
+   arrive. Prefixes are keyed by the stream-local line index: line 0 uses the
+   source prefix (` > `, ` ~ `, ` # `, ` ! `), and all continuation lines use
+   the blank alignment prefix (`   `). The live processing spinner remains a
+   preview-only marker and is never written to history.
 
 ### Remediation Acceptance
 
@@ -44,6 +50,9 @@ I023 can move from Review to Complete:
 - Pasting `line1\nline2` into the TUI input keeps both lines in the input
   buffer; submitting renders one user stream block as ` > line1` followed by
   `   line2`.
+- Multiline assistant/system/error/tool streams flush complete lines in real
+  time, with only the first line carrying the source prefix and all continuation
+  lines aligned with `   `.
 - `talos-conversation` has no unused dependency on `talos-permission`.
 - Workspace verification remains clean: `cargo fmt --all --check`,
   `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and

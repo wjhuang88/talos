@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_user_stream_padding_only_marks_first_line() {
+    fn test_stream_padding_only_marks_first_line() {
         assert_eq!(stream_padding_for(Some(&MessageSource::User), 0), " > ");
         assert_eq!(stream_padding_for(Some(&MessageSource::User), 1), "   ");
         assert_eq!(
@@ -334,6 +334,28 @@ mod tests {
         );
         assert_eq!(
             stream_padding_for(Some(&MessageSource::Assistant), 1),
+            "   "
+        );
+        assert_eq!(stream_padding_for(Some(&MessageSource::System), 0), " # ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::System), 1), "   ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::Error), 0), " ! ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::Error), 1), "   ");
+        assert_eq!(
+            stream_padding_for(
+                Some(&MessageSource::Tool {
+                    name: "bash".to_string()
+                }),
+                0
+            ),
+            " ~ "
+        );
+        assert_eq!(
+            stream_padding_for(
+                Some(&MessageSource::Tool {
+                    name: "bash".to_string()
+                }),
+                1
+            ),
             "   "
         );
     }

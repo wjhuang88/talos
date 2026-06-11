@@ -760,11 +760,13 @@ pub(crate) fn stream_padding_for(
     source: Option<&MessageSource>,
     line_index: usize,
 ) -> &'static str {
+    if line_index > 0 {
+        return "   ";
+    }
+
     match source {
-        Some(MessageSource::User) if line_index == 0 => " > ",
-        Some(MessageSource::User) => "   ",
-        Some(MessageSource::Assistant) if line_index == 0 => " ~ ",
-        Some(MessageSource::Assistant) => "   ",
+        Some(MessageSource::User) => " > ",
+        Some(MessageSource::Assistant) => " ~ ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
         Some(MessageSource::Tool { .. }) => " ~ ",

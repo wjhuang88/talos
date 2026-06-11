@@ -166,6 +166,12 @@ to the input buffer, including newlines; Enter submits the whole buffer. When th
 user block is flushed to scrollback, only the first line receives the ` > `
 prompt marker. Continuation lines retain the three-column alignment with spaces.
 
+The same prefix rule applies to every `StreamMessage` source. Streams are
+logical message blocks, but the TUI writes complete lines to terminal history as
+soon as they arrive. The source prefix is rendered only for stream-local line 0;
+all later lines use the blank three-column prefix. Incomplete trailing text stays
+in the live preview until the next newline or stream completion.
+
 ### Native Cursor Sync
 
 After each `draw_frame` render, the native terminal cursor is repositioned to the input box position using `MoveTo(col, row)` + `Show`. The column is calculated as 3 (prefix width) + Unicode display width of text before the cursor. This ensures IME input, text selection, and other cursor-dependent features work correctly.
