@@ -3,13 +3,15 @@ use talos_core::message::{AgentEvent, StopReason, ToolCall, ToolResult, Usage};
 use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
-use crate::types::{ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, TipKind, UiOutput};
+use crate::types::{
+    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, TipKind, UiOutput,
+};
 
 fn new_engine() -> ConversationEngine {
     ConversationEngine::new("claude-sonnet-4".to_string())
 }
 
-fn make_tool_call(name: &str, provenance: ToolProvenance) -> ToolCall {
+fn make_tool_call(name: &str, _provenance: ToolProvenance) -> ToolCall {
     ToolCall {
         id: "tc-1".to_string(),
         name: name.to_string(),
@@ -108,10 +110,13 @@ async fn text_delta_sends_chunks_to_stream() {
 async fn text_delta_accumulates_multiline() {
     let mut engine = new_engine();
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-    let stream_msg = outputs.into_iter().find_map(|o| match o {
-        UiOutput::Stream(m) => Some(m),
-        _ => None,
-    }).unwrap();
+    let stream_msg = outputs
+        .into_iter()
+        .find_map(|o| match o {
+            UiOutput::Stream(m) => Some(m),
+            _ => None,
+        })
+        .unwrap();
 
     engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "line1\nline2\n".to_string(),
@@ -181,10 +186,13 @@ async fn tool_call_closes_previous_stream() {
     let mut engine = new_engine();
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-    let stream_msg = outputs.into_iter().find_map(|o| match o {
-        UiOutput::Stream(m) => Some(m),
-        _ => None,
-    }).unwrap();
+    let stream_msg = outputs
+        .into_iter()
+        .find_map(|o| match o {
+            UiOutput::Stream(m) => Some(m),
+            _ => None,
+        })
+        .unwrap();
 
     engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "partial".to_string(),
@@ -547,6 +555,61 @@ async fn unknown_command_returns_error_stream() {
 // drain_steering_queue
 // ---------------------------------------------------------------------------
 
+#[tokio::test]
+async fn start_user_message_marks_processing_and_streams_user_input() {
+    let mut engine = new_engine();
+
+    let outputs = engine.start_user_message("hello");
+    let (source, text) = collect_stream(outputs).await.unwrap();
+
+    assert_eq!(source, MessageSource::User);
+    assert_eq!(text, "hello");
+    assert!(engine.is_processing());
+    assert!(engine.status_snapshot().is_processing);
+}
+
+#[test]
+fn enqueue_steering_records_queue_and_status() {
+    let mut engine = new_engine();
+
+    let outputs = engine.enqueue_steering("queued".to_string());
+
+    assert_eq!(engine.drain_steering_queue(), Some("queued".to_string()));
+    assert!(outputs.iter().any(|output| matches!(
+        output,
+        UiOutput::Tip {
+            kind: TipKind::QueueHint,
+            ..
+        }
+    )));
+    assert!(outputs.iter().any(|output| {
+        matches!(
+            output,
+            UiOutput::Status(status) if status.steering_count == 1
+        )
+    }));
+}
+
+#[test]
+fn cancel_turn_clears_processing_state() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: "partial".to_string(),
+    });
+
+    let outputs = engine.cancel_turn();
+
+    assert!(!engine.is_processing());
+    assert!(engine.current_turn_text.is_empty());
+    assert!(outputs.iter().any(|output| {
+        matches!(
+            output,
+            UiOutput::Status(status) if !status.is_processing
+        )
+    }));
+}
+
 #[test]
 fn drain_steering_queue_fifo_order() {
     let mut engine = new_engine();
@@ -592,9 +655,12 @@ fn provenance_mcp_remote_key() {
     let mut engine = new_engine();
 
     engine.handle_agent_event(&AgentEvent::ToolCall {
-        call: make_tool_call("search", ToolProvenance::McpRemote {
-            server: "github".to_string(),
-        }),
+        call: make_tool_call(
+            "search",
+            ToolProvenance::McpRemote {
+                server: "github".to_string(),
+            },
+        ),
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
@@ -611,9 +677,12 @@ fn provenance_truncates_long_server_names() {
     let long_name = "a".repeat(30); // 30 chars, > 24
 
     engine.handle_agent_event(&AgentEvent::ToolCall {
-        call: make_tool_call("tool", ToolProvenance::McpRemote {
-            server: long_name.clone(),
-        }),
+        call: make_tool_call(
+            "tool",
+            ToolProvenance::McpRemote {
+                server: long_name.clone(),
+            },
+        ),
         provenance: ToolProvenance::McpRemote {
             server: long_name.clone(),
         },
@@ -653,33 +722,50 @@ fn provenance_groups_mcp_servers() {
     let mut engine = new_engine();
 
     engine.handle_agent_event(&AgentEvent::ToolCall {
-        call: make_tool_call("search", ToolProvenance::McpRemote {
-            server: "github".to_string(),
-        }),
+        call: make_tool_call(
+            "search",
+            ToolProvenance::McpRemote {
+                server: "github".to_string(),
+            },
+        ),
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
     });
     engine.handle_agent_event(&AgentEvent::ToolCall {
-        call: make_tool_call("list", ToolProvenance::McpRemote {
-            server: "filesystem".to_string(),
-        }),
+        call: make_tool_call(
+            "list",
+            ToolProvenance::McpRemote {
+                server: "filesystem".to_string(),
+            },
+        ),
         provenance: ToolProvenance::McpRemote {
             server: "filesystem".to_string(),
         },
     });
     engine.handle_agent_event(&AgentEvent::ToolCall {
-        call: make_tool_call("search2", ToolProvenance::McpRemote {
-            server: "github".to_string(),
-        }),
+        call: make_tool_call(
+            "search2",
+            ToolProvenance::McpRemote {
+                server: "github".to_string(),
+            },
+        ),
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
     });
 
     assert_eq!(engine.plugin_observations.len(), 2);
-    let github = engine.plugin_observations.iter().find(|e| e.key == "mcp:github").unwrap();
-    let fs = engine.plugin_observations.iter().find(|e| e.key == "mcp:filesystem").unwrap();
+    let github = engine
+        .plugin_observations
+        .iter()
+        .find(|e| e.key == "mcp:github")
+        .unwrap();
+    let fs = engine
+        .plugin_observations
+        .iter()
+        .find(|e| e.key == "mcp:filesystem")
+        .unwrap();
     assert_eq!(github.count, 2);
     assert_eq!(fs.count, 1);
 }
@@ -704,7 +790,10 @@ fn last_assistant_text_returns_latest() {
         tool_call: None,
         created_at: std::time::Instant::now(),
     });
-    assert_eq!(engine.last_assistant_text(), Some("I can help!".to_string()));
+    assert_eq!(
+        engine.last_assistant_text(),
+        Some("I can help!".to_string())
+    );
 
     engine.messages.push(ChatMessage {
         role: MessageRole::Assistant,
@@ -713,7 +802,10 @@ fn last_assistant_text_returns_latest() {
         tool_call: None,
         created_at: std::time::Instant::now(),
     });
-    assert_eq!(engine.last_assistant_text(), Some("Updated answer.".to_string()));
+    assert_eq!(
+        engine.last_assistant_text(),
+        Some("Updated answer.".to_string())
+    );
 }
 
 #[test]
@@ -741,7 +833,10 @@ fn last_assistant_text_skips_tool_calls() {
         tool_call: None,
         created_at: std::time::Instant::now(),
     });
-    assert_eq!(engine.last_assistant_text(), Some("Here's the result.".to_string()));
+    assert_eq!(
+        engine.last_assistant_text(),
+        Some("Here's the result.".to_string())
+    );
 }
 
 #[test]
@@ -877,8 +972,6 @@ fn status_snapshot_reflects_current_state() {
     assert_eq!(snapshot.branch_id, Some("b-123".to_string()));
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Full turn integration
 // ---------------------------------------------------------------------------
@@ -892,10 +985,13 @@ async fn full_turn_lifecycle() {
     assert_eq!(text, "What is 2+2?");
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-    let assistant_stream = outputs.into_iter().find_map(|o| match o {
-        UiOutput::Stream(m) => Some(m),
-        _ => None,
-    }).unwrap();
+    let assistant_stream = outputs
+        .into_iter()
+        .find_map(|o| match o {
+            UiOutput::Stream(m) => Some(m),
+            _ => None,
+        })
+        .unwrap();
 
     engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "2+2 equals 4.\n".to_string(),
@@ -960,9 +1056,12 @@ fn tool_call_records_provenance() {
     let mut engine = new_engine();
 
     engine.handle_agent_event(&AgentEvent::ToolCall {
-        call: make_tool_call("search", ToolProvenance::McpRemote {
-            server: "github".to_string(),
-        }),
+        call: make_tool_call(
+            "search",
+            ToolProvenance::McpRemote {
+                server: "github".to_string(),
+            },
+        ),
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },

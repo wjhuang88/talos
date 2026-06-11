@@ -1,15 +1,17 @@
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant};
-    use talos_conversation::{StatusSnapshot, TipKind};
+    use talos_conversation::{MessageSource, StatusSnapshot, TipKind};
     use talos_core::ApprovalChoice;
     use talos_core::message::Usage;
 
-    use crate::app::{build_status_text, calculate_cost};
+    use crate::app::{
+        build_input_text, build_status_text, calculate_cost, cursor_line_col, input_line_count,
+        stream_padding_for,
+    };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
     use crate::{contrast_ratio, rgb_components};
-    use crate::theme::nord;
 
     // ── TuiState (pure UI) ─────────────────────────────────────────────
 
@@ -301,5 +303,38 @@ mod tests {
         let text = build_status_text(&status);
         let content = format!("{:?}", text);
         assert!(content.contains("S:3"));
+    }
+
+    #[test]
+    fn test_multiline_input_uses_prompt_only_on_first_line() {
+        let mut state = TuiState::new();
+        state.input_append_str("first\nsecond");
+
+        let text = build_input_text(&state);
+
+        assert_eq!(text.lines.len(), 2);
+        assert_eq!(text.lines[0].to_string(), " > first");
+        assert_eq!(text.lines[1].to_string(), "   second ");
+        assert_eq!(input_line_count(&state.input_buffer), 2);
+    }
+
+    #[test]
+    fn test_cursor_line_col_tracks_multiline_buffer() {
+        assert_eq!(cursor_line_col("abc"), (0, 3));
+        assert_eq!(cursor_line_col("abc\nde"), (1, 2));
+    }
+
+    #[test]
+    fn test_user_stream_padding_only_marks_first_line() {
+        assert_eq!(stream_padding_for(Some(&MessageSource::User), 0), " > ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::User), 1), "   ");
+        assert_eq!(
+            stream_padding_for(Some(&MessageSource::Assistant), 0),
+            " ~ "
+        );
+        assert_eq!(
+            stream_padding_for(Some(&MessageSource::Assistant), 1),
+            "   "
+        );
     }
 }

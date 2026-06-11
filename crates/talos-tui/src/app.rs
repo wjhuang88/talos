@@ -1,7 +1,7 @@
+use std::io;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
 use crossterm::{
     event::{self, Event, EventStream, KeyCode, KeyEventKind},
     style::Color as CColor,
@@ -34,8 +34,8 @@ fn to_crossterm_color(c: Color) -> Option<CColor> {
     }
 }
 
-struct ScrollbackLine {
-    text: String,
+pub(crate) struct ScrollbackLine {
+    pub(crate) text: String,
     bg: Option<CColor>,
 }
 
@@ -46,21 +46,30 @@ struct PreviewComponent<'a> {
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 { 1 }
+    fn height_hint(&self, _w: u16) -> u16 {
+        1
+    }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let line = self.text.split('\n').last().unwrap_or("");
+        let line = self.text.split('\n').next_back().unwrap_or("");
         if let Some(color) = self.spinner_color {
             let full = format!("{}{}", self.padding, line);
             let display = truncate_end_to_width(&full, area.width);
             let padding_len = self.padding.chars().count();
             let (pad_part, text_part) = display.split_at(
-                display.char_indices().nth(padding_len).map(|(i, _)| i).unwrap_or(display.len()),
+                display
+                    .char_indices()
+                    .nth(padding_len)
+                    .map(|(i, _)| i)
+                    .unwrap_or(display.len()),
             );
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled(pad_part.to_string(), Style::default().fg(color)),
-                    Span::styled(text_part.to_string(), Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0))),
+                    Span::styled(
+                        text_part.to_string(),
+                        Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
+                    ),
                 ])),
                 area,
             );
@@ -86,7 +95,11 @@ struct QueuePreviewComponent {
 
 impl ViewportComponent for QueuePreviewComponent {
     fn height_hint(&self, _w: u16) -> u16 {
-        if self.count == 0 { 0 } else { 1 + (self.count as u16).min(2) }
+        if self.count == 0 {
+            0
+        } else {
+            1 + (self.count as u16).min(2)
+        }
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
@@ -95,7 +108,11 @@ impl ViewportComponent for QueuePreviewComponent {
         lines.push(Line::from(vec![
             Span::styled(" ", dim),
             Span::styled(
-                format!("{} queued input{}", self.count, if self.count == 1 { "" } else { "s" }),
+                format!(
+                    "{} queued input{}",
+                    self.count,
+                    if self.count == 1 { "" } else { "s" }
+                ),
                 dim,
             ),
             Span::styled(" (will send after current turn)", dim),
@@ -115,6 +132,23 @@ impl ViewportComponent for QueuePreviewComponent {
                 Span::styled(text, dim),
             ]));
         }
+        if self.followup > 0 && lines.len() < 3 {
+            let label = if self.followup == 1 {
+                "followup".to_string()
+            } else {
+                format!("followup x{}", self.followup)
+            };
+            let text = if label.len() > max_width {
+                format!("{}…", &label[..max_width - 1])
+            } else {
+                label
+            };
+            lines.push(Line::from(vec![
+                Span::styled("  ", dim),
+                Span::styled("↳ ", dim.add_modifier(Modifier::DIM)),
+                Span::styled(text, dim),
+            ]));
+        }
         frame.render_widget(Paragraph::new(lines), area);
     }
 }
@@ -124,7 +158,9 @@ struct TipsComponent<'a> {
 }
 
 impl ViewportComponent for TipsComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 { 1 }
+    fn height_hint(&self, _w: u16) -> u16 {
+        1
+    }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let text = if let Some(tip) = self.tip {
@@ -134,7 +170,10 @@ impl ViewportComponent for TipsComponent<'_> {
                 TipKind::LagWarning | TipKind::Error => Color::Rgb(0xBF, 0x61, 0x6C),
                 TipKind::Info => Color::Rgb(0x88, 0xC0, 0xD0),
             };
-            Text::from(Line::from(Span::styled(format!(" {}", tip.text), Style::default().fg(color))))
+            Text::from(Line::from(Span::styled(
+                format!(" {}", tip.text),
+                Style::default().fg(color),
+            )))
         } else {
             Text::from(Line::from(Span::styled(
                 " Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution",
@@ -148,7 +187,9 @@ impl ViewportComponent for TipsComponent<'_> {
 struct InputPadComponent;
 
 impl ViewportComponent for InputPadComponent {
-    fn height_hint(&self, _w: u16) -> u16 { 1 }
+    fn height_hint(&self, _w: u16) -> u16 {
+        1
+    }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         frame.render_widget(
@@ -164,7 +205,9 @@ struct InputComponent<'a> {
 }
 
 impl ViewportComponent for InputComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 { 1 }
+    fn height_hint(&self, _w: u16) -> u16 {
+        input_line_count(&self.state.input_buffer)
+    }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let input_text = build_input_text(self.state);
@@ -173,7 +216,12 @@ impl ViewportComponent for InputComponent<'_> {
             .padding(Padding::new(0, 1, 0, 0));
         frame.render_widget(Paragraph::new(input_text).block(input_block), area);
 
-        if let ApprovalState::Visible { tool_name, arguments, selected } = self.approval {
+        if let ApprovalState::Visible {
+            tool_name,
+            arguments,
+            selected,
+        } = self.approval
+        {
             let overlay = ApprovalOverlay::new(tool_name, arguments, selected);
             frame.render_widget(overlay, area);
         }
@@ -185,7 +233,9 @@ struct StatusComponent<'a> {
 }
 
 impl ViewportComponent for StatusComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 { 1 }
+    fn height_hint(&self, _w: u16) -> u16 {
+        1
+    }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let text = build_status_text(self.status);
@@ -212,11 +262,11 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> io::Result<Self> {
         let _splash_lines = print_splash_scrollback();
 
-        let (_, cursor_y) = crossterm::cursor::position().map_err(|e| anyhow::anyhow!("{e}"))?;
-        let (_, screen_h) = crossterm::terminal::size().map_err(|e| anyhow::anyhow!("{e}"))?;
+        let (_, cursor_y) = crossterm::cursor::position()?;
+        let (_, screen_h) = crossterm::terminal::size()?;
         let viewport_height: u16 = 6;
         if cursor_y.saturating_add(viewport_height) > screen_h {
             for _ in 0..viewport_height.saturating_sub(1) {
@@ -318,7 +368,7 @@ impl Tui {
     pub async fn run_with_approval(
         &mut self,
         mut approval_rx: mpsc::UnboundedReceiver<TuiApprovalRequest>,
-    ) -> Result<()> {
+    ) -> io::Result<()> {
         let mut event_stream = EventStream::new();
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
@@ -380,7 +430,10 @@ impl Tui {
             self.stream_line_count += 1;
         }
         if self.stream_bg().is_some() {
-            self.pending_scrollback.push(ScrollbackLine { text: String::new(), bg: self.stream_bg() });
+            self.pending_scrollback.push(ScrollbackLine {
+                text: String::new(),
+                bg: self.stream_bg(),
+            });
         }
         self.stream_buffer.clear();
         self.active_stream = None;
@@ -396,15 +449,7 @@ impl Tui {
     }
 
     fn stream_padding(&self, line_index: usize) -> &str {
-        match self.stream_source {
-            Some(MessageSource::User) => " > ",
-            Some(MessageSource::Assistant) if line_index == 0 => " ~ ",
-            Some(MessageSource::Assistant) => "   ",
-            Some(MessageSource::System) => " # ",
-            Some(MessageSource::Error) => " ! ",
-            Some(MessageSource::Tool { .. }) => " ~ ",
-            None => "   ",
-        }
+        stream_padding_for(self.stream_source.as_ref(), line_index)
     }
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
@@ -428,12 +473,18 @@ impl Tui {
                     self.finalize_active_stream();
                 }
                 if self.stream_count > 0 {
-                    self.pending_scrollback.push(ScrollbackLine { text: String::new(), bg: None });
+                    self.pending_scrollback.push(ScrollbackLine {
+                        text: String::new(),
+                        bg: None,
+                    });
                 }
                 self.stream_source = Some(msg.source.clone());
                 self.stream_line_count = 0;
                 if self.stream_bg().is_some() {
-                    self.pending_scrollback.push(ScrollbackLine { text: String::new(), bg: self.stream_bg() });
+                    self.pending_scrollback.push(ScrollbackLine {
+                        text: String::new(),
+                        bg: self.stream_bg(),
+                    });
                 }
                 self.active_stream = Some(msg.stream);
                 self.stream_buffer.clear();
@@ -458,7 +509,7 @@ impl Tui {
         false
     }
 
-    fn flush_pending_scrollback(&mut self) -> Result<()> {
+    fn flush_pending_scrollback(&mut self) -> io::Result<()> {
         if self.pending_scrollback.is_empty() {
             return Ok(());
         }
@@ -469,7 +520,7 @@ impl Tui {
         Ok(())
     }
 
-    fn draw_frame(&mut self) -> Result<()> {
+    fn draw_frame(&mut self) -> io::Result<()> {
         let state = &self.state;
         let status = &state.status;
 
@@ -488,7 +539,7 @@ impl Tui {
         ];
         let (preview_padding, spinner_color) = if status.is_processing {
             self.processing_tick += 1;
-            if self.processing_tick % 3 == 0 {
+            if self.processing_tick.is_multiple_of(3) {
                 self.processing_frame = self.processing_frame.wrapping_add(1);
             }
             let idx = self.processing_frame % spinner_frames.len();
@@ -501,20 +552,35 @@ impl Tui {
             ("   ".to_string(), None)
         };
         let preview_text = self.streaming_preview.clone();
-        let preview = PreviewComponent { padding: &preview_padding, text: &preview_text, spinner_color };
+        let preview = PreviewComponent {
+            padding: &preview_padding,
+            text: &preview_text,
+            spinner_color,
+        };
         let queue = QueuePreviewComponent {
             count: status.steering_count + status.followup_count,
             steering: status.steering_count,
             followup: status.followup_count,
         };
-        let tips = TipsComponent { tip: state.tip.as_ref() };
+        let tips = TipsComponent {
+            tip: state.tip.as_ref(),
+        };
         let input_pad_top = InputPadComponent;
-        let input = InputComponent { state, approval: &state.approval_state };
+        let input = InputComponent {
+            state,
+            approval: &state.approval_state,
+        };
         let input_pad_bot = InputPadComponent;
         let status_comp = StatusComponent { status };
 
         let stack = ComponentStack::new(vec![
-            &preview, &queue, &tips, &input_pad_top, &input, &input_pad_bot, &status_comp,
+            &preview,
+            &queue,
+            &tips,
+            &input_pad_top,
+            &input,
+            &input_pad_bot,
+            &status_comp,
         ]);
 
         let total_height = stack.total_height(self.terminal.screen_size().width);
@@ -533,11 +599,12 @@ impl Tui {
                 + queue.height_hint(screen_w)
                 + tips.height_hint(screen_w)
                 + input_pad_top.height_hint(screen_w);
-            let input_row = viewport.bottom().saturating_sub(total_height) + input_y_offset;
+            let input_top = viewport.bottom().saturating_sub(total_height) + input_y_offset;
             let byte_pos = self.state.cursor_byte_pos();
-            let cursor_col = 3u16 + unicode_width::UnicodeWidthStr::width(
-                &self.state.input_buffer[..byte_pos],
-            ) as u16;
+            let (cursor_row_offset, cursor_col_offset) =
+                cursor_line_col(&self.state.input_buffer[..byte_pos]);
+            let input_row = input_top.saturating_add(cursor_row_offset);
+            let cursor_col = 3u16 + cursor_col_offset;
             self.terminal.set_cursor(cursor_col, input_row)?;
         }
 
@@ -552,7 +619,12 @@ impl Tui {
                 }
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        return self.state.handle_ctrl_c();
+                        let was_processing = self.state.status.is_processing;
+                        let should_exit = self.state.handle_ctrl_c();
+                        if was_processing && let Some(ref tx) = self.user_input_tx {
+                            let _ = tx.send(UserInput::Cancel);
+                        }
+                        return should_exit;
                     }
                     KeyCode::Char('k') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
@@ -604,10 +676,10 @@ impl Tui {
                     KeyCode::Enter => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         let input = self.state.input_submit();
-                        if !input.is_empty() {
-                            if let Some(ref tx) = self.user_input_tx {
-                                let _ = tx.send(UserInput::Message(input));
-                            }
+                        if !input.is_empty()
+                            && let Some(ref tx) = self.user_input_tx
+                        {
+                            let _ = tx.send(UserInput::Message(input));
                         }
                     }
                     KeyCode::Esc => {
@@ -616,6 +688,10 @@ impl Tui {
                     }
                     _ => {}
                 }
+            }
+            Event::Paste(text) => {
+                self.state.ctrl_c_state = CtrlCState::Idle;
+                self.state.input_append_str(text);
             }
             Event::Resize(_, _) => {}
             _ => {}
@@ -638,34 +714,76 @@ pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
     let buffer = &state.input_buffer;
     let char_count = buffer.chars().count();
     let cursor_pos = state.cursor_pos.min(char_count);
-
-    let before: String = buffer.chars().take(cursor_pos).collect();
-    let after: String = buffer.chars().skip(cursor_pos).collect();
-
     let cursor_style = Style::default()
         .fg(Color::Rgb(0x2E, 0x34, 0x40))
         .bg(Color::Rgb(0x88, 0xC0, 0xD0));
 
-    let mut spans = Vec::new();
-    spans.push(Span::styled(
-        " > ",
-        Style::default().fg(Color::Rgb(0xA3, 0xBE, 0x8C)),
-    ));
-    spans.push(Span::raw(before));
-    if after.is_empty() {
-        spans.push(Span::styled(" ", cursor_style));
-    } else {
-        let mut chars = after.chars();
-        if let Some(first) = chars.next() {
-            let rest: String = chars.collect();
-            spans.push(Span::styled(first.to_string(), cursor_style));
-            spans.push(Span::raw(rest));
+    let prompt_style = Style::default().fg(Color::Rgb(0xA3, 0xBE, 0x8C));
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut line_index = 0usize;
+    let mut spans = vec![Span::styled(" > ", prompt_style)];
+    let mut cursor_rendered = false;
+
+    for (idx, ch) in buffer.chars().enumerate() {
+        if idx == cursor_pos {
+            cursor_rendered = true;
+            if ch == '\n' {
+                spans.push(Span::styled(" ", cursor_style));
+            } else {
+                spans.push(Span::styled(ch.to_string(), cursor_style));
+                continue;
+            }
+        }
+
+        if ch == '\n' {
+            lines.push(Line::from(spans));
+            line_index += 1;
+            spans = vec![Span::raw(input_prefix_for_line(line_index))];
         } else {
-            spans.push(Span::styled(" ", cursor_style));
+            spans.push(Span::raw(ch.to_string()));
         }
     }
 
-    Text::from(Line::from(spans))
+    if !cursor_rendered {
+        spans.push(Span::styled(" ", cursor_style));
+    }
+    lines.push(Line::from(spans));
+
+    Text::from(lines)
+}
+
+pub(crate) fn input_prefix_for_line(line_index: usize) -> &'static str {
+    if line_index == 0 { " > " } else { "   " }
+}
+
+pub(crate) fn stream_padding_for(
+    source: Option<&MessageSource>,
+    line_index: usize,
+) -> &'static str {
+    match source {
+        Some(MessageSource::User) if line_index == 0 => " > ",
+        Some(MessageSource::User) => "   ",
+        Some(MessageSource::Assistant) if line_index == 0 => " ~ ",
+        Some(MessageSource::Assistant) => "   ",
+        Some(MessageSource::System) => " # ",
+        Some(MessageSource::Error) => " ! ",
+        Some(MessageSource::Tool { .. }) => " ~ ",
+        None => "   ",
+    }
+}
+
+pub(crate) fn input_line_count(buffer: &str) -> u16 {
+    buffer.split('\n').count().max(1) as u16
+}
+
+pub(crate) fn cursor_line_col(buffer_before_cursor: &str) -> (u16, u16) {
+    let row = buffer_before_cursor.matches('\n').count() as u16;
+    let col = buffer_before_cursor
+        .rsplit('\n')
+        .next()
+        .map(unicode_width::UnicodeWidthStr::width)
+        .unwrap_or(0) as u16;
+    (row, col)
 }
 
 pub(crate) fn build_status_text(status: &StatusSnapshot) -> Text<'static> {

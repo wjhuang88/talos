@@ -11,7 +11,7 @@ English | **[中文](README.zh-CN.md)**
 
 | Area | State | Notes |
 |------|-------|-------|
-| Runtime | Active | Event-driven TUI: `talos-conversation` crate separates business logic from UI rendering. Two-loop design (Agent → ConversationEngine → UI) via typed async channels. Codex-style `insert_history`, stream-based content delivery, single-directional flow. Styled scrollback with Nord bg for user messages, 3-char ASCII line padding, animated braille spinner, native cursor sync. 93 TUI+conversation tests pass (43 TUI + 50 conversation). |
+| Runtime | Active | Event-driven TUI: `talos-conversation` crate separates business logic from UI rendering. Two-loop design (Agent → ConversationEngine → UI) via typed async channels. Codex-style `insert_history`, stream-based content delivery, single-directional flow. Styled scrollback with Nord bg for user messages, 3-char ASCII line padding, multiline paste blocks, animated braille spinner, native cursor sync. 99 TUI+conversation tests pass (46 TUI + 53 conversation). |
 | R1 Review Closure | Complete | I008/I009 closed. I009 TUI consumer work deferred to #I009-S6. I010 R3 product polish complete. |
 | I008 Learning Agent | Complete | `EvolutionHookHandler` wired into all run paths; runtime evidence recorded. |
 | I009 Extensible Agent | Complete | Hooks, MCP client/server, JSON-RPC, and `ToolProvenance` producers shipped. TUI markers shipped in I014. |
@@ -23,7 +23,7 @@ English | **[中文](README.zh-CN.md)**
 | I018-I020 Architecture Plan | Planned | Bounded logs, embedded prompt assets, layered memory, and local research library. |
 | I021 Evolution Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits realigned `talos-evolution` with the MenteDB blueprint; 7470ac5 byte-cap stays as defense-in-depth. |
 | I022 TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
-| I023 TUI State Model | Complete | Event-driven architecture: `talos-conversation` crate owns business logic, `talos-tui` owns pure UI state. Two-loop design with typed async channels. Codex-style `insert_history` with styled scrollback, 3-char ASCII line padding, Nord-themed user messages with top/bottom padding, animated braille spinner, native cursor sync. 93 tests pass. |
+| I023 TUI State Model | Review | Event-driven architecture: `talos-conversation` crate owns business logic, `talos-tui` owns pure UI state. Two-loop design with typed async channels. Codex-style `insert_history` with styled scrollback, 3-char ASCII line padding, Nord-themed multiline user message blocks with top/bottom padding, animated braille spinner, native cursor sync. 99 TUI+conversation tests pass; final runtime verification remains the review gate. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.
@@ -117,7 +117,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I018-I020 | Memory/Research Plan | Planned | Log retention, prompt assets, layered memory foundation, exploration library. |
 | I021 | Evolution MenteDB Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat / `400 Bad Request` loop. Realigns `Signal.context` semantics, `TurnObservation` schema, and `Pattern` provenance per the MenteDB blueprint; defense layer from `7470ac5` stays as belt-and-suspenders. |
 | I022 | TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
-| I023 | TUI State Model | Planned (next) | Unified `ChatMessage`/`Tip`/`TuiStateEvent` model; event-bus hook. Depends on I022 (Complete). |
+| I023 | TUI State Model | Review | Event-driven `talos-conversation` + `talos-tui` state model, styled multiline scrollback, spinner, and cursor sync. Final runtime verification remains before Complete. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in

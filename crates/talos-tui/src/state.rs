@@ -64,6 +64,12 @@ impl TuiState {
         self.cursor_pos += 1;
     }
 
+    pub(crate) fn input_append_str(&mut self, text: &str) {
+        for ch in text.chars() {
+            self.input_append_char(ch);
+        }
+    }
+
     pub(crate) fn input_backspace(&mut self) {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
@@ -145,10 +151,10 @@ impl TuiState {
     }
 
     pub(crate) fn expire_tip(&mut self) {
-        if let Some(ref tip) = self.tip {
-            if Instant::now().duration_since(tip.created_at) >= tip.ttl {
-                self.tip = None;
-            }
+        if let Some(ref tip) = self.tip
+            && Instant::now().duration_since(tip.created_at) >= tip.ttl
+        {
+            self.tip = None;
         }
     }
 }

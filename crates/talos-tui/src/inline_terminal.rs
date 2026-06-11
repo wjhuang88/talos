@@ -2,6 +2,7 @@ use std::io::{self, Stdout};
 
 use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
+    event::{DisableBracketedPaste, EnableBracketedPaste},
     execute, queue,
     style::{Color as CColor, Print, SetBackgroundColor},
     terminal::{self, Clear, ClearType, EnableLineWrap},
@@ -59,7 +60,11 @@ impl<'a> ComponentStack<'a> {
             .sum()
     }
 
-    pub fn layout(&self, area: Rect, available_width: u16) -> Vec<(&'a dyn ViewportComponent, Rect)> {
+    pub fn layout(
+        &self,
+        area: Rect,
+        available_width: u16,
+    ) -> Vec<(&'a dyn ViewportComponent, Rect)> {
         let mut result = Vec::new();
         let mut y = area.y;
 
@@ -68,7 +73,12 @@ impl<'a> ComponentStack<'a> {
             if h == 0 {
                 continue;
             }
-            let rect = Rect { x: area.x, y, width: area.width, height: h };
+            let rect = Rect {
+                x: area.x,
+                y,
+                width: area.width,
+                height: h,
+            };
             result.push((*component, rect));
             y = y.saturating_add(h);
         }
@@ -95,13 +105,10 @@ impl InlineTerminal {
         let screen_size = backend.size()?;
         let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
 
-        let _ = execute!(backend, Hide);
+        let _ = execute!(backend, Hide, EnableBracketedPaste);
         let viewport_area = Rect::new(0, cursor_pos.y, screen_size.width, 0);
 
-        let buffers = [
-            Buffer::empty(viewport_area),
-            Buffer::empty(viewport_area),
-        ];
+        let buffers = [Buffer::empty(viewport_area), Buffer::empty(viewport_area)];
 
         Ok(Self {
             backend,
@@ -150,11 +157,7 @@ impl InlineTerminal {
         self.screen_size
     }
 
-    pub fn draw(
-        &mut self,
-        height: u16,
-        draw_fn: impl FnOnce(&mut InlineFrame),
-    ) -> io::Result<()> {
+    pub fn draw(&mut self, height: u16, draw_fn: impl FnOnce(&mut InlineFrame)) -> io::Result<()> {
         let screen_size = self.backend.size()?;
         self.screen_size = screen_size;
 
@@ -203,7 +206,10 @@ impl InlineTerminal {
             buffer.reset();
             buffer.resize(area);
 
-            let mut frame = InlineFrame { area: render_area, buffer };
+            let mut frame = InlineFrame {
+                area: render_area,
+                buffer,
+            };
             draw_fn(&mut frame);
         }
 
@@ -241,24 +247,28 @@ impl InlineTerminal {
         let mut area = self.viewport_area;
         let writer = self.backend_mut();
 
-        let styled_print = |w: &mut CrosstermBackend<Stdout>, text: &str, bg: Option<CColor>| -> io::Result<()> {
-            if let Some(color) = bg {
-                queue!(w, SetBackgroundColor(color))?;
-                queue!(w, Print(text))?;
-                let text_width = unicode_width::UnicodeWidthStr::width(text) as usize;
-                if text_width < line_width as usize {
-                    queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
+        let styled_print =
+            |w: &mut CrosstermBackend<Stdout>, text: &str, bg: Option<CColor>| -> io::Result<()> {
+                if let Some(color) = bg {
+                    queue!(w, SetBackgroundColor(color))?;
+                    queue!(w, Print(text))?;
+                    let text_width = unicode_width::UnicodeWidthStr::width(text);
+                    if text_width < line_width as usize {
+                        queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
+                    }
+                    queue!(w, SetBackgroundColor(CColor::Reset))?;
+                } else {
+                    queue!(w, Print(text))?;
                 }
-                queue!(w, SetBackgroundColor(CColor::Reset))?;
-            } else {
-                queue!(w, Print(text))?;
-            }
-            Ok(())
-        };
+                Ok(())
+            };
 
         if area.bottom() < screen_height {
             let top_1based = area.top() + 1;
-            queue!(writer, crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height)))?;
+            queue!(
+                writer,
+                crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height))
+            )?;
             queue!(writer, MoveTo(0, area.top()))?;
             queue!(writer, crossterm::style::Print("\x1bM"))?;
             queue!(writer, crossterm::style::Print("\x1b[r"))?;
@@ -267,7 +277,10 @@ impl InlineTerminal {
             queue!(writer, Clear(ClearType::UntilNewLine))?;
             styled_print(writer, line, bg)?;
         } else if area.top() > 1 {
-            queue!(writer, crossterm::style::Print(format!("\x1b[1;{}r", area.top())))?;
+            queue!(
+                writer,
+                crossterm::style::Print(format!("\x1b[1;{}r", area.top()))
+            )?;
             queue!(writer, MoveTo(0, area.top() - 1))?;
             queue!(writer, crossterm::style::Print("\r\n"))?;
             queue!(writer, Clear(ClearType::UntilNewLine))?;
@@ -287,6 +300,7 @@ impl InlineTerminal {
     }
 
     pub fn set_cursor(&mut self, col: u16, row: u16) -> io::Result<()> {
+        self.last_known_cursor_pos = Position::new(col, row);
         let writer = self.backend_mut();
         queue!(writer, MoveTo(col, row))?;
         queue!(writer, Show)?;
@@ -303,6 +317,7 @@ impl InlineTerminal {
         let _ = terminal::disable_raw_mode();
         let _ = execute!(
             io::stdout(),
+            DisableBracketedPaste,
             EnableLineWrap,
             SetCursorStyle::DefaultUserShape,
             Show

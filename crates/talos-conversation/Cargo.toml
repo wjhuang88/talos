@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { path = "../talos-core" }
-talos-permission = { path = "../talos-permission" }
 tokio = { version = "1", features = ["sync", "macros", "time", "rt", "io-util"] }
 tokio-stream = "0.1"
 futures = "0.3"

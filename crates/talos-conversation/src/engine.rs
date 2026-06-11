@@ -26,16 +26,16 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
 }
 
 pub struct ConversationEngine {
-    pub messages: Vec<ChatMessage>,
-    pub current_turn_text: String,
-    pub steering_queue: Vec<String>,
-    pub followup_queue: Vec<String>,
-    pub usage: Usage,
-    pub model_name: String,
-    pub branch_id: Option<String>,
-    pub plugin_observations: Vec<PluginObservation>,
-    pub scrollback: ScrollbackState,
-    pub is_processing: bool,
+    pub(crate) messages: Vec<ChatMessage>,
+    pub(crate) current_turn_text: String,
+    pub(crate) steering_queue: Vec<String>,
+    pub(crate) followup_queue: Vec<String>,
+    pub(crate) usage: Usage,
+    pub(crate) model_name: String,
+    pub(crate) branch_id: Option<String>,
+    pub(crate) plugin_observations: Vec<PluginObservation>,
+    pub(crate) scrollback: ScrollbackState,
+    pub(crate) is_processing: bool,
     last_flushed_message: usize,
     stream_tx: Option<mpsc::UnboundedSender<String>>,
 }
@@ -67,6 +67,39 @@ impl ConversationEngine {
             followup_count: self.followup_queue.len(),
             is_processing: self.is_processing,
         }
+    }
+
+    pub fn is_processing(&self) -> bool {
+        self.is_processing
+    }
+
+    pub fn start_user_message(&mut self, msg: &str) -> Vec<UiOutput> {
+        self.is_processing = true;
+        self.handle_user_message(msg)
+    }
+
+    pub fn enqueue_steering(&mut self, msg: String) -> Vec<UiOutput> {
+        self.steering_queue.push(msg);
+        vec![
+            UiOutput::Tip {
+                text: "Message queued (steering). Press Esc to cancel.".into(),
+                kind: TipKind::QueueHint,
+            },
+            UiOutput::Status(self.status_snapshot()),
+        ]
+    }
+
+    pub fn cancel_turn(&mut self) -> Vec<UiOutput> {
+        self.close_stream();
+        self.is_processing = false;
+        self.current_turn_text.clear();
+        vec![
+            UiOutput::Tip {
+                text: "Turn cancellation requested.".into(),
+                kind: TipKind::ExitHint,
+            },
+            UiOutput::Status(self.status_snapshot()),
+        ]
     }
 
     pub fn handle_agent_event(&mut self, event: &AgentEvent) -> Vec<UiOutput> {
@@ -113,7 +146,9 @@ impl ConversationEngine {
                 let (tx, rx) = mpsc::unbounded_channel::<String>();
                 let _ = tx.send(tool_text);
                 outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Tool { name: call.name.clone() },
+                    source: MessageSource::Tool {
+                        name: call.name.clone(),
+                    },
                     stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
                 }));
                 drop(tx);
@@ -126,7 +161,9 @@ impl ConversationEngine {
                 let (tx, rx) = mpsc::unbounded_channel::<String>();
                 let _ = tx.send(result_text);
                 outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Tool { name: String::new() },
+                    source: MessageSource::Tool {
+                        name: String::new(),
+                    },
                     stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
                 }));
                 drop(tx);
@@ -253,7 +290,8 @@ impl ConversationEngine {
                 outputs.extend(self.handle_plugins_command());
             }
             _ => {
-                let text = format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
+                let text =
+                    format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
                 outputs.push(UiOutput::Stream(StreamMessage {
                     source: MessageSource::Error,
                     stream: Box::pin(stream::once(async move { text })),
@@ -310,7 +348,10 @@ impl ConversationEngine {
 
     pub fn last_assistant_text(&self) -> Option<String> {
         self.messages.iter().rev().find_map(|msg| {
-            if msg.role == MessageRole::Assistant && msg.tool_call.is_none() && !msg.content.is_empty() {
+            if msg.role == MessageRole::Assistant
+                && msg.tool_call.is_none()
+                && !msg.content.is_empty()
+            {
                 Some(msg.content.clone())
             } else {
                 None
@@ -396,33 +437,32 @@ impl ConversationEngine {
 
     fn set_tool_result(&mut self, result: &ToolResult) {
         for msg in self.messages.iter_mut().rev() {
-            if let Some(ref mut tool_call) = msg.tool_call {
-                if tool_call.result.is_none() {
-                    tool_call.result = Some(result.clone());
-                    break;
-                }
+            if let Some(ref mut tool_call) = msg.tool_call
+                && tool_call.result.is_none()
+            {
+                tool_call.result = Some(result.clone());
+                break;
             }
         }
     }
 
     fn record_provenance(&mut self, provenance: &ToolProvenance) {
         let key = plugin_observation_key(provenance);
-        if let Some(entry) = self
-            .plugin_observations
-            .iter_mut()
-            .find(|e| e.key == key)
-        {
+        if let Some(entry) = self.plugin_observations.iter_mut().find(|e| e.key == key) {
             entry.count += 1;
         } else {
-            self.plugin_observations.push(PluginObservation { key, count: 1 });
+            self.plugin_observations
+                .push(PluginObservation { key, count: 1 });
         }
     }
 }
 
-fn format_tool_call_text(call: &talos_core::message::ToolCall, provenance: &ToolProvenance) -> String {
+fn format_tool_call_text(
+    call: &talos_core::message::ToolCall,
+    provenance: &ToolProvenance,
+) -> String {
     let marker = plugin_observation_key(provenance);
-    let args = serde_json::to_string_pretty(&call.input)
-        .unwrap_or_else(|_| call.input.to_string());
+    let args = serde_json::to_string_pretty(&call.input).unwrap_or_else(|_| call.input.to_string());
     format!("▸ {} [{}]\n  {}", call.name, marker, args)
 }
 

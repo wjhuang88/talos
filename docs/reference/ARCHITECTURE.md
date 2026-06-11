@@ -114,6 +114,17 @@ Owns all business state (messages, turn lifecycle, model info). The TUI does not
 └─────────────────────┘     UserInput (mpsc)    └──────────────┘
 ```
 
+State-critical session events must be delivered to `ConversationEngine` through
+a non-lossy queue. The TUI bridge may use bounded/lossy fan-out only for passive
+observers; it must not drop turn lifecycle events that drive `is_processing`,
+stream closure, queue draining, or error display.
+
+Cancellation is part of the same contract. When TUI input produces
+`UserInput::Cancel`, the integration layer must send `SessionOp::Interrupt` to
+the session actor and let `ConversationEngine` update its own processing state
+through an explicit cancellation method. UI-only cancellation hints are not a
+valid backend interrupt.
+
 ### UiOutput Event Types
 
 | Variant | Purpose |
@@ -138,7 +149,7 @@ Each scrollback line carries a 3-character ASCII prefix aligned with the input b
 
 | Source | First Line | Continuation |
 |--------|-----------|--------------|
-| User | ` > ` | ` > ` |
+| User | ` > ` | `   ` |
 | Assistant | ` ~ ` | `   ` |
 | System | ` # ` | `   ` |
 | Error | ` ! ` | `   ` |
@@ -149,6 +160,11 @@ Each scrollback line carries a 3-character ASCII prefix aligned with the input b
 `ScrollbackLine` carries `text: String` + `bg: Option<Color>`. User message lines receive the Nord Polar Night background (`#3B4252`) via `crossterm::style::SetBackgroundColor`. Empty padding lines fill the full terminal width with spaces so the background color covers the entire row.
 
 User messages are visually grouped with top/bottom padding rows (same background color), creating a block effect. Each stream (except the first) is preceded by a blank separator line.
+
+Multiline user input is one stream block. Bracketed paste appends the pasted text
+to the input buffer, including newlines; Enter submits the whole buffer. When the
+user block is flushed to scrollback, only the first line receives the ` > `
+prompt marker. Continuation lines retain the three-column alignment with spaces.
 
 ### Native Cursor Sync
 

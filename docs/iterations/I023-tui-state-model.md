@@ -4,7 +4,50 @@
 
 ## Status: REVIEW (2026-06-11)
 
-Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Animated braille spinner with Nord gradient. Native cursor sync to input box. 43 TUI + 50 conversation tests pass.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Multiline pasted input stays a single user block. Animated braille spinner with Nord gradient. Native cursor sync to input box. 46 TUI + 53 conversation tests pass.
+
+## Review Remediation Plan (2026-06-11)
+
+Architecture review found that the state model separation is directionally correct,
+but the TUI integration still has three boundary issues that must close before
+I023 can move from Review to Complete:
+
+1. **Real cancellation**: Ctrl+C in TUI must emit `UserInput::Cancel`, and the
+   conversation bridge must translate it into `SessionOp::Interrupt`. Updating
+   only UI state is not sufficient because tools or provider work may continue
+   after the user sees a cancellation hint.
+2. **Reliable state-critical events**: the TUI bridge must not use lossy
+   `broadcast` delivery for turn lifecycle events. `TurnStart`, deltas, tool
+   events, errors, and completion-derived errors must reach `ConversationEngine`
+   through a non-dropping queue; lossy fan-out is allowed only for observers that
+   do not own state.
+3. **Engine-owned mutation**: external integration code must stop mutating
+   `ConversationEngine` fields directly for processing state and queues. The
+   engine should expose methods such as `start_user_message`, `enqueue_steering`,
+   `cancel_turn`, and `drain_steering_queue` so the ownership boundary matches
+   the architecture document.
+4. **Multiline input blocks**: pasted multiline input must remain one user
+   message block. The input box may grow to multiple rows, submission streams
+   the full block, and scrollback renders only the first user line with ` > `;
+   continuation lines use the same three-column alignment without repeating
+   the prompt marker.
+
+### Remediation Acceptance
+
+- Pressing Ctrl+C during an active TUI turn sends `SessionOp::Interrupt` to the
+  session actor and updates `StatusSnapshot.is_processing` to `false`.
+- The TUI bridge from `SessionEvent` to `ConversationEngine` uses a non-lossy
+  channel for state-critical events; no `Lagged` recovery path is required in
+  the TUI bridge.
+- `talos-cli` no longer writes `engine.is_processing` or
+  `engine.steering_queue` directly.
+- Pasting `line1\nline2` into the TUI input keeps both lines in the input
+  buffer; submitting renders one user stream block as ` > line1` followed by
+  `   line2`.
+- `talos-conversation` has no unused dependency on `talos-permission`.
+- Workspace verification remains clean: `cargo fmt --all --check`,
+  `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and
+  `cargo test --workspace`.
 
 ## Stories
 
@@ -23,9 +66,9 @@ Event-driven architecture with `talos-conversation` crate. Codex-style `insert_h
 
 ## Execution Evidence
 
-- 93 tests pass (43 TUI + 50 conversation).
-- `talos-conversation` crate: `ConversationEngine` owns all business state, 50 tests.
-- `talos-tui` crate: event-driven UI with pure state, 43 tests.
+- 99 tests pass (46 TUI + 53 conversation).
+- `talos-conversation` crate: `ConversationEngine` owns all business state, 53 tests.
+- `talos-tui` crate: event-driven UI with pure state, 46 tests.
 - Single-directional information flow: Agent → ConversationEngine → UI via typed async channels (`mpsc::UiOutput`).
 - Stream-based content delivery: UI consumes active stream via `next_stream_chunk` in `select!` loop (no spawn task).
 - `insert_history` rewritten Codex-style: two branches (non-bottom: `\x1bM` push viewport; bottom: scroll region + `\r\n`), single-line operation, `needs_clear` for clean redraw.

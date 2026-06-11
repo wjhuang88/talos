@@ -75,7 +75,6 @@ use talos_rpc::RpcServer;
 use talos_session::{IndexError, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
-use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -363,8 +362,6 @@ struct Cli {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-
-
 
     if matches!(cli.mode, Some(Mode::McpServer)) {
         return run_mcp_server().await;
@@ -664,7 +661,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
 
 async fn run_conversation_loop(
     mut engine: ConversationEngine,
-    mut agent_rx: tokio::sync::broadcast::Receiver<AgentEvent>,
+    mut agent_rx: tokio::sync::mpsc::UnboundedReceiver<AgentEvent>,
     mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
     ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
     session_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
@@ -673,29 +670,21 @@ async fn run_conversation_loop(
         tokio::select! {
             event = agent_rx.recv() => {
                 match event {
-                    Ok(agent_event) => {
+                    Some(agent_event) => {
                         let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
                         let outputs = engine.handle_agent_event(&agent_event);
                         for output in outputs {
                             let _ = ui_tx.send(output);
                         }
-                        if is_turn_end {
-                            if let Some(msg) = engine.drain_steering_queue() {
-                                let _ = session_tx
-                                    .send(talos_core::session::SessionOp::Submit { message: msg })
-                                    .await;
-                            }
+                        if is_turn_end
+                            && let Some(msg) = engine.drain_steering_queue()
+                        {
+                            let _ = session_tx
+                                .send(talos_core::session::SessionOp::Submit { message: msg })
+                                .await;
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        let _ = ui_tx.send(UiOutput::Tip {
-                            text: format!("Warning: dropped {n} event(s)"),
-                            kind: talos_conversation::TipKind::LagWarning,
-                        });
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        break;
-                    }
+                    None => break,
                 }
             }
             Some(input) = user_rx.recv() => {
@@ -712,16 +701,12 @@ async fn run_conversation_loop(
                                     other => { let _ = ui_tx.send(other); }
                                 }
                             }
-                        } else if engine.is_processing {
-                            engine.steering_queue.push(msg);
-                            let _ = ui_tx.send(UiOutput::Tip {
-                                text: "Message queued (steering). Press Esc to cancel.".into(),
-                                kind: talos_conversation::TipKind::QueueHint,
-                            });
-                            let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                        } else if engine.is_processing() {
+                            for output in engine.enqueue_steering(msg) {
+                                let _ = ui_tx.send(output);
+                            }
                         } else {
-                            engine.is_processing = true;
-                            let outputs = engine.handle_user_message(&msg);
+                            let outputs = engine.start_user_message(&msg);
                             for output in outputs {
                                 let _ = ui_tx.send(output);
                             }
@@ -732,8 +717,12 @@ async fn run_conversation_loop(
                         }
                     }
                     UserInput::Cancel => {
-                        engine.is_processing = false;
-                        let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                        let _ = session_tx
+                            .send(talos_core::session::SessionOp::Interrupt)
+                            .await;
+                        for output in engine.cancel_turn() {
+                            let _ = ui_tx.send(output);
+                        }
                     }
                     UserInput::Exit => {
                         let _ = ui_tx.send(UiOutput::Exit);
@@ -804,8 +793,10 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
 
-    // Bridge: SessionEvent → broadcast<AgentEvent>
-    let (bridge_tx, bridge_rx) = broadcast::channel::<AgentEvent>(32);
+    // Bridge: SessionEvent → ConversationEngine. State-critical events use
+    // an unbounded mpsc so the TUI state machine does not miss turn lifecycle
+    // transitions.
+    let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
         while let Some(session_event) = bridge_forwarder.recv().await {
@@ -845,7 +836,8 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         run_conversation_loop(engine, bridge_rx, user_input_rx, ui_output_tx, sq_tx).await;
     });
 
-    tui.run_with_approval(approval_rx).await
+    tui.run_with_approval(approval_rx).await?;
+    Ok(())
 }
 
 async fn run_inline_mode(cli: Cli) -> Result<()> {
