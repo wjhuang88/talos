@@ -287,6 +287,7 @@ pub struct Tui {
     stream_source: Option<MessageSource>,
     stream_buffer: String,
     streaming_preview: String,
+    flushed_line_count: usize,
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
@@ -320,6 +321,7 @@ impl Tui {
             stream_source: None,
             stream_buffer: String::new(),
             streaming_preview: String::new(),
+            flushed_line_count: 0,
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
@@ -453,24 +455,32 @@ impl Tui {
 
     fn finalize_active_stream(&mut self) {
         if !self.stream_buffer.is_empty() {
-            if self.stream_count > 0 {
-                self.pending_scrollback.push(ScrollbackLine {
-                    text: String::new(),
-                    bg: None,
-                });
-            }
-
             let bg = self.stream_bg();
-            if bg.is_some() {
-                self.pending_scrollback.push(ScrollbackLine {
-                    text: String::new(),
-                    bg,
-                });
+
+            if self.flushed_line_count == 0 {
+                if self.stream_count > 0 {
+                    self.pending_scrollback.push(ScrollbackLine {
+                        text: String::new(),
+                        bg: None,
+                    });
+                }
+                if bg.is_some() {
+                    self.pending_scrollback.push(ScrollbackLine {
+                        text: String::new(),
+                        bg,
+                    });
+                }
             }
 
-            let lines = render_stream_block_lines(self.stream_source.as_ref(), &self.stream_buffer);
+            let remaining = stream_block_lines(&self.stream_buffer);
+            let flushed = self.flushed_line_count;
+            let padded = remaining.into_iter().enumerate().map(|(i, line)| {
+                let line_index = flushed + i;
+                let padding = stream_padding_for(self.stream_source.as_ref(), line_index);
+                format!("{padding}{line}")
+            });
             self.pending_scrollback
-                .extend(lines.into_iter().map(|text| ScrollbackLine { text, bg }));
+                .extend(padded.map(|text| ScrollbackLine { text, bg }));
 
             if bg.is_some() {
                 self.pending_scrollback.push(ScrollbackLine {
@@ -485,6 +495,7 @@ impl Tui {
         self.streaming_preview.clear();
         self.active_stream = None;
         self.stream_source = None;
+        self.flushed_line_count = 0;
     }
 
     fn stream_bg(&self) -> Option<CColor> {
@@ -496,6 +507,48 @@ impl Tui {
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
         self.stream_buffer.push_str(chunk);
+        self.streaming_preview = self.stream_buffer.clone();
+
+        let lines = stream_block_lines(&self.stream_buffer);
+        if lines.len() <= MAX_PREVIEW_LINES {
+            return;
+        }
+
+        let overflow = lines.len() - MAX_PREVIEW_LINES;
+        let bg = self.stream_bg();
+
+        if self.flushed_line_count == 0 {
+            if self.stream_count > 0 {
+                self.pending_scrollback.push(ScrollbackLine {
+                    text: String::new(),
+                    bg: None,
+                });
+            }
+            if bg.is_some() {
+                self.pending_scrollback.push(ScrollbackLine {
+                    text: String::new(),
+                    bg,
+                });
+            }
+        }
+
+        for (i, line) in lines.iter().enumerate().take(overflow) {
+            let line_index = self.flushed_line_count + i;
+            let padding = stream_padding_for(self.stream_source.as_ref(), line_index);
+            self.pending_scrollback.push(ScrollbackLine {
+                text: format!("{padding}{line}"),
+                bg,
+            });
+        }
+        self.flushed_line_count += overflow;
+
+        let cut_byte = self
+            .stream_buffer
+            .match_indices('\n')
+            .nth(overflow - 1)
+            .map(|(i, _)| i + 1)
+            .unwrap_or(self.stream_buffer.len());
+        self.stream_buffer = self.stream_buffer[cut_byte..].to_string();
         self.streaming_preview = self.stream_buffer.clone();
     }
 
@@ -509,6 +562,7 @@ impl Tui {
                 self.active_stream = Some(msg.stream);
                 self.stream_buffer.clear();
                 self.streaming_preview.clear();
+                self.flushed_line_count = 0;
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
