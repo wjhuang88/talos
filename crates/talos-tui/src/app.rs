@@ -26,6 +26,7 @@ use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
 use crate::widgets::ApprovalOverlay;
 
 const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
+const MAX_PREVIEW_LINES: usize = 6;
 
 fn to_crossterm_color(c: Color) -> Option<CColor> {
     match c {
@@ -42,48 +43,79 @@ pub(crate) struct ScrollbackLine {
 struct PreviewComponent<'a> {
     padding: &'a str,
     text: &'a str,
+    source: Option<&'a MessageSource>,
     spinner_color: Option<Color>,
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
     fn height_hint(&self, _w: u16) -> u16 {
-        1
+        preview_line_count(self.text, MAX_PREVIEW_LINES)
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let line = self.text.split('\n').next_back().unwrap_or("");
-        if let Some(color) = self.spinner_color {
-            let full = format!("{}{}", self.padding, line);
-            let display = truncate_end_to_width(&full, area.width);
-            let padding_len = self.padding.chars().count();
-            let (pad_part, text_part) = display.split_at(
-                display
-                    .char_indices()
-                    .nth(padding_len)
-                    .map(|(i, _)| i)
-                    .unwrap_or(display.len()),
-            );
-            frame.render_widget(
-                Paragraph::new(Line::from(vec![
-                    Span::styled(pad_part.to_string(), Style::default().fg(color)),
-                    Span::styled(
-                        text_part.to_string(),
-                        Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
-                    ),
-                ])),
-                area,
-            );
+        let preview_lines = preview_block_lines(self.text, MAX_PREVIEW_LINES);
+        let mut rendered = Vec::new();
+
+        if preview_lines.is_empty() {
+            rendered.push(render_preview_line(
+                self.padding,
+                "",
+                area.width,
+                self.spinner_color,
+            ));
         } else {
-            let full = format!("{}{}", self.padding, line);
-            let display = truncate_end_to_width(&full, area.width);
-            frame.render_widget(
-                Paragraph::new(Line::from(Span::styled(
-                    display,
-                    Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
-                ))),
-                area,
-            );
+            let last_visible = preview_lines.len().saturating_sub(1);
+            for (visible_index, (line_index, line)) in preview_lines.into_iter().enumerate() {
+                let is_last = visible_index == last_visible;
+                let padding = if is_last && self.spinner_color.is_some() {
+                    self.padding
+                } else {
+                    stream_padding_for(self.source, line_index)
+                };
+                rendered.push(render_preview_line(
+                    padding,
+                    line,
+                    area.width,
+                    if is_last { self.spinner_color } else { None },
+                ));
+            }
         }
+
+        frame.render_widget(Paragraph::new(rendered), area);
+    }
+}
+
+fn render_preview_line(
+    padding: &str,
+    line: &str,
+    width: u16,
+    spinner_color: Option<Color>,
+) -> Line<'static> {
+    if let Some(color) = spinner_color {
+        let full = format!("{padding}{line}");
+        let display = truncate_end_to_width(&full, width);
+        let padding_len = padding.chars().count();
+        let (pad_part, text_part) = display.split_at(
+            display
+                .char_indices()
+                .nth(padding_len)
+                .map(|(i, _)| i)
+                .unwrap_or(display.len()),
+        );
+        Line::from(vec![
+            Span::styled(pad_part.to_string(), Style::default().fg(color)),
+            Span::styled(
+                text_part.to_string(),
+                Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
+            ),
+        ])
+    } else {
+        let full = format!("{padding}{line}");
+        let display = truncate_end_to_width(&full, width);
+        Line::from(Span::styled(
+            display,
+            Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
+        ))
     }
 }
 
@@ -253,7 +285,6 @@ pub struct Tui {
     pending_scrollback: Vec<ScrollbackLine>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     stream_source: Option<MessageSource>,
-    stream_line_count: usize,
     stream_buffer: String,
     streaming_preview: String,
     processing_frame: usize,
@@ -287,7 +318,6 @@ impl Tui {
             pending_scrollback: Vec::new(),
             active_stream: None,
             stream_source: None,
-            stream_line_count: 0,
             stream_buffer: String::new(),
             streaming_preview: String::new(),
             processing_frame: 0,
@@ -422,23 +452,39 @@ impl Tui {
     }
 
     fn finalize_active_stream(&mut self) {
-        if !self.streaming_preview.is_empty() {
-            let padding = self.stream_padding(self.stream_line_count).to_string();
-            let text = format!("{padding}{}", std::mem::take(&mut self.streaming_preview));
+        if !self.stream_buffer.is_empty() {
+            if self.stream_count > 0 {
+                self.pending_scrollback.push(ScrollbackLine {
+                    text: String::new(),
+                    bg: None,
+                });
+            }
+
             let bg = self.stream_bg();
-            self.pending_scrollback.push(ScrollbackLine { text, bg });
-            self.stream_line_count += 1;
-        }
-        if self.stream_bg().is_some() {
-            self.pending_scrollback.push(ScrollbackLine {
-                text: String::new(),
-                bg: self.stream_bg(),
-            });
+            if bg.is_some() {
+                self.pending_scrollback.push(ScrollbackLine {
+                    text: String::new(),
+                    bg,
+                });
+            }
+
+            let lines = render_stream_block_lines(self.stream_source.as_ref(), &self.stream_buffer);
+            self.pending_scrollback
+                .extend(lines.into_iter().map(|text| ScrollbackLine { text, bg }));
+
+            if bg.is_some() {
+                self.pending_scrollback.push(ScrollbackLine {
+                    text: String::new(),
+                    bg,
+                });
+            }
+
+            self.stream_count += 1;
         }
         self.stream_buffer.clear();
+        self.streaming_preview.clear();
         self.active_stream = None;
         self.stream_source = None;
-        self.stream_line_count = 0;
     }
 
     fn stream_bg(&self) -> Option<CColor> {
@@ -448,21 +494,8 @@ impl Tui {
         }
     }
 
-    fn stream_padding(&self, line_index: usize) -> &str {
-        stream_padding_for(self.stream_source.as_ref(), line_index)
-    }
-
     fn consume_stream_chunk(&mut self, chunk: &str) {
         self.stream_buffer.push_str(chunk);
-        while let Some(pos) = self.stream_buffer.find('\n') {
-            let line = self.stream_buffer[..pos].to_string();
-            self.stream_buffer = self.stream_buffer[pos + 1..].to_string();
-            let padding = self.stream_padding(self.stream_line_count).to_string();
-            let text = format!("{padding}{line}");
-            let bg = self.stream_bg();
-            self.pending_scrollback.push(ScrollbackLine { text, bg });
-            self.stream_line_count += 1;
-        }
         self.streaming_preview = self.stream_buffer.clone();
     }
 
@@ -472,23 +505,10 @@ impl Tui {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
-                if self.stream_count > 0 {
-                    self.pending_scrollback.push(ScrollbackLine {
-                        text: String::new(),
-                        bg: None,
-                    });
-                }
                 self.stream_source = Some(msg.source.clone());
-                self.stream_line_count = 0;
-                if self.stream_bg().is_some() {
-                    self.pending_scrollback.push(ScrollbackLine {
-                        text: String::new(),
-                        bg: self.stream_bg(),
-                    });
-                }
                 self.active_stream = Some(msg.stream);
                 self.stream_buffer.clear();
-                self.stream_count += 1;
+                self.streaming_preview.clear();
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
@@ -555,6 +575,7 @@ impl Tui {
         let preview = PreviewComponent {
             padding: &preview_padding,
             text: &preview_text,
+            source: self.stream_source.as_ref(),
             spinner_color,
         };
         let queue = QueuePreviewComponent {
@@ -760,16 +781,56 @@ pub(crate) fn stream_padding_for(
     source: Option<&MessageSource>,
     line_index: usize,
 ) -> &'static str {
+    if line_index > 0 {
+        return "   ";
+    }
+
     match source {
-        Some(MessageSource::User) if line_index == 0 => " > ",
-        Some(MessageSource::User) => "   ",
-        Some(MessageSource::Assistant) if line_index == 0 => " ~ ",
-        Some(MessageSource::Assistant) => "   ",
+        Some(MessageSource::User) => " > ",
+        Some(MessageSource::Assistant) => " ~ ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
         Some(MessageSource::Tool { .. }) => " ~ ",
         None => "   ",
     }
+}
+
+pub(crate) fn stream_block_lines(raw: &str) -> Vec<&str> {
+    if raw.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines: Vec<&str> = raw.split('\n').collect();
+    if lines.last().is_some_and(|line| line.is_empty()) {
+        lines.pop();
+    }
+    lines
+}
+
+pub(crate) fn render_stream_block_lines(source: Option<&MessageSource>, raw: &str) -> Vec<String> {
+    stream_block_lines(raw)
+        .into_iter()
+        .enumerate()
+        .map(|(line_index, line)| format!("{}{}", stream_padding_for(source, line_index), line))
+        .collect()
+}
+
+pub(crate) fn preview_block_lines(raw: &str, max_lines: usize) -> Vec<(usize, &str)> {
+    let lines = stream_block_lines(raw);
+    if lines.is_empty() || max_lines == 0 {
+        return Vec::new();
+    }
+
+    let start = lines.len().saturating_sub(max_lines);
+    lines
+        .into_iter()
+        .enumerate()
+        .skip(start)
+        .collect::<Vec<_>>()
+}
+
+pub(crate) fn preview_line_count(raw: &str, max_lines: usize) -> u16 {
+    preview_block_lines(raw, max_lines).len().max(1) as u16
 }
 
 pub(crate) fn input_line_count(buffer: &str) -> u16 {

@@ -7,7 +7,7 @@ mod tests {
 
     use crate::app::{
         build_input_text, build_status_text, calculate_cost, cursor_line_col, input_line_count,
-        stream_padding_for,
+        preview_block_lines, preview_line_count, render_stream_block_lines, stream_padding_for,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_user_stream_padding_only_marks_first_line() {
+    fn test_stream_padding_only_marks_first_line() {
         assert_eq!(stream_padding_for(Some(&MessageSource::User), 0), " > ");
         assert_eq!(stream_padding_for(Some(&MessageSource::User), 1), "   ");
         assert_eq!(
@@ -336,5 +336,44 @@ mod tests {
             stream_padding_for(Some(&MessageSource::Assistant), 1),
             "   "
         );
+        assert_eq!(stream_padding_for(Some(&MessageSource::System), 0), " # ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::System), 1), "   ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::Error), 0), " ! ");
+        assert_eq!(stream_padding_for(Some(&MessageSource::Error), 1), "   ");
+        assert_eq!(
+            stream_padding_for(
+                Some(&MessageSource::Tool {
+                    name: "bash".to_string()
+                }),
+                0
+            ),
+            " ~ "
+        );
+        assert_eq!(
+            stream_padding_for(
+                Some(&MessageSource::Tool {
+                    name: "bash".to_string()
+                }),
+                1
+            ),
+            "   "
+        );
+    }
+
+    #[test]
+    fn test_render_stream_block_lines_uses_block_prefixes() {
+        let rendered =
+            render_stream_block_lines(Some(&MessageSource::Assistant), "first\nsecond\nthird\n");
+
+        assert_eq!(rendered, vec![" ~ first", "   second", "   third"]);
+    }
+
+    #[test]
+    fn test_preview_block_lines_keeps_tail_with_original_indexes() {
+        let preview = preview_block_lines("a\nb\nc\nd", 2);
+
+        assert_eq!(preview, vec![(2, "c"), (3, "d")]);
+        assert_eq!(preview_line_count("a\nb\nc\nd", 2), 2);
+        assert_eq!(preview_line_count("", 2), 1);
     }
 }
