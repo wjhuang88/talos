@@ -77,6 +77,26 @@ viewport. The helper keeps the current contract:
 The purpose is to give future block-aware rendering a local cache boundary
 without weakening the stable scrollback/layout strategy.
 
+## Next Slice: Stream Line Emission Boundary
+
+After `StreamRenderState` exists, move the conversion from stream-local lines to
+`ScrollbackLine` into that helper. `Tui` should no longer assemble prefixes or
+user-message background rows directly; it should only start streams, pass chunks
+to the render state, append returned scrollback lines, and flush them through
+`InlineTerminal::insert_history`.
+
+Acceptance:
+
+- `StreamRenderState::start` returns any stream-opening scrollback rows needed
+  for the source, including the user block top padding row.
+- `StreamRenderState::push_chunk` returns prefixed scrollback lines for complete
+  `\n`-terminated content only.
+- `StreamRenderState::finish` returns the remaining preview line, any
+  stream-closing rows such as the user block bottom padding row, and resets the
+  helper.
+- `Tui` keeps `insert_history` as the only terminal history writer and still
+  writes one line at a time.
+
 ## Stories
 
 | Story | Title | Acceptance | Status |

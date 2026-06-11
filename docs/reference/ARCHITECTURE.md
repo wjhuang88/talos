@@ -174,9 +174,10 @@ in the live preview until the next newline or stream completion.
 
 `talos-tui` keeps this state in a private stream-render helper rather than in
 the terminal writer. That helper owns the active source, stream-local line
-counter, incomplete line buffer, and preview text. `InlineTerminal` remains a
-single-line history writer; it does not parse message blocks, markdown, or table
-layout.
+counter, incomplete line buffer, preview text, source prefix rendering, and
+source-specific scrollback rows such as the user block background padding.
+`InlineTerminal` remains a single-line history writer; it does not parse message
+blocks, markdown, or table layout.
 
 ### Native Cursor Sync
 

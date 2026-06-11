@@ -34,6 +34,7 @@ fn to_crossterm_color(c: Color) -> Option<CColor> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ScrollbackLine {
     pub(crate) text: String,
     bg: Option<CColor>,
@@ -48,11 +49,21 @@ struct StreamRenderState {
 }
 
 impl StreamRenderState {
-    fn start(&mut self, source: MessageSource) {
+    fn start(&mut self, source: MessageSource) -> Vec<ScrollbackLine> {
+        let bg = stream_bg_for(Some(&source));
         self.source = Some(source);
         self.line_count = 0;
         self.buffer.clear();
         self.preview.clear();
+
+        if bg.is_some() {
+            vec![ScrollbackLine {
+                text: String::new(),
+                bg,
+            }]
+        } else {
+            Vec::new()
+        }
     }
 
     fn source(&self) -> Option<&MessageSource> {
@@ -63,14 +74,14 @@ impl StreamRenderState {
         &self.preview
     }
 
-    fn push_chunk(&mut self, chunk: &str) -> Vec<(usize, String)> {
+    fn push_chunk(&mut self, chunk: &str) -> Vec<ScrollbackLine> {
         self.buffer.push_str(chunk);
         let mut lines = Vec::new();
 
         while let Some(pos) = self.buffer.find('\n') {
             let line = self.buffer[..pos].to_string();
             self.buffer = self.buffer[pos + 1..].to_string();
-            lines.push((self.line_count, line));
+            lines.push(self.render_line(self.line_count, &line));
             self.line_count += 1;
         }
 
@@ -78,15 +89,36 @@ impl StreamRenderState {
         lines
     }
 
-    fn take_preview_line(&mut self) -> Option<(usize, String)> {
-        if self.preview.is_empty() {
-            return None;
+    fn finish(&mut self) -> Vec<ScrollbackLine> {
+        let mut lines = Vec::new();
+
+        if !self.preview.is_empty() {
+            let preview = std::mem::take(&mut self.preview);
+            lines.push(self.render_line(self.line_count, &preview));
+            self.line_count += 1;
         }
 
-        self.buffer.clear();
-        let line_index = self.line_count;
-        self.line_count += 1;
-        Some((line_index, std::mem::take(&mut self.preview)))
+        if self.bg().is_some() {
+            lines.push(ScrollbackLine {
+                text: String::new(),
+                bg: self.bg(),
+            });
+        }
+
+        self.reset();
+        lines
+    }
+
+    fn render_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
+        let padding = stream_padding_for(self.source(), line_index);
+        ScrollbackLine {
+            text: format!("{padding}{line}"),
+            bg: self.bg(),
+        }
+    }
+
+    fn bg(&self) -> Option<CColor> {
+        stream_bg_for(self.source())
     }
 
     fn reset(&mut self) {
@@ -474,40 +506,13 @@ impl Tui {
     }
 
     fn finalize_active_stream(&mut self) {
-        if let Some((line_index, preview)) = self.stream_render.take_preview_line() {
-            let padding = self.stream_padding(line_index).to_string();
-            let text = format!("{padding}{preview}");
-            let bg = self.stream_bg();
-            self.pending_scrollback.push(ScrollbackLine { text, bg });
-        }
-        if self.stream_bg().is_some() {
-            self.pending_scrollback.push(ScrollbackLine {
-                text: String::new(),
-                bg: self.stream_bg(),
-            });
-        }
+        self.pending_scrollback.extend(self.stream_render.finish());
         self.active_stream = None;
-        self.stream_render.reset();
-    }
-
-    fn stream_bg(&self) -> Option<CColor> {
-        match self.stream_render.source() {
-            Some(MessageSource::User) => to_crossterm_color(INPUT_BG),
-            _ => None,
-        }
-    }
-
-    fn stream_padding(&self, line_index: usize) -> &str {
-        stream_padding_for(self.stream_render.source(), line_index)
     }
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
-        for (line_index, line) in self.stream_render.push_chunk(chunk) {
-            let padding = self.stream_padding(line_index).to_string();
-            let text = format!("{padding}{line}");
-            let bg = self.stream_bg();
-            self.pending_scrollback.push(ScrollbackLine { text, bg });
-        }
+        self.pending_scrollback
+            .extend(self.stream_render.push_chunk(chunk));
     }
 
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {
@@ -522,13 +527,8 @@ impl Tui {
                         bg: None,
                     });
                 }
-                self.stream_render.start(msg.source.clone());
-                if self.stream_bg().is_some() {
-                    self.pending_scrollback.push(ScrollbackLine {
-                        text: String::new(),
-                        bg: self.stream_bg(),
-                    });
-                }
+                self.pending_scrollback
+                    .extend(self.stream_render.start(msg.source.clone()));
                 self.active_stream = Some(msg.stream);
                 self.stream_count += 1;
             }
@@ -816,6 +816,13 @@ pub(crate) fn stream_padding_for(
     }
 }
 
+fn stream_bg_for(source: Option<&MessageSource>) -> Option<CColor> {
+    match source {
+        Some(MessageSource::User) => to_crossterm_color(INPUT_BG),
+        _ => None,
+    }
+}
+
 pub(crate) fn input_line_count(buffer: &str) -> u16 {
     buffer.split('\n').count().max(1) as u16
 }
@@ -931,18 +938,53 @@ mod tests {
     #[test]
     fn stream_render_state_tracks_lines_and_preview() {
         let mut state = StreamRenderState::default();
-        state.start(MessageSource::Assistant);
+        assert!(state.start(MessageSource::Assistant).is_empty());
 
         assert_eq!(
             state.push_chunk("first\nsec"),
-            vec![(0, "first".to_string())]
+            vec![ScrollbackLine {
+                text: " ~ first".to_string(),
+                bg: None
+            }]
         );
         assert_eq!(state.preview(), "sec");
         assert_eq!(
             state.push_chunk("ond\nthird"),
-            vec![(1, "second".to_string())]
+            vec![ScrollbackLine {
+                text: "   second".to_string(),
+                bg: None
+            }]
         );
-        assert_eq!(state.take_preview_line(), Some((2, "third".to_string())));
+        assert_eq!(
+            state.finish(),
+            vec![ScrollbackLine {
+                text: "   third".to_string(),
+                bg: None
+            }]
+        );
+        assert!(state.source().is_none());
+        assert_eq!(state.preview(), "");
+    }
+
+    #[test]
+    fn stream_render_state_wraps_user_blocks_with_background_rows() {
+        let mut state = StreamRenderState::default();
+        let bg = stream_bg_for(Some(&MessageSource::User));
+
+        assert_eq!(
+            state.start(MessageSource::User),
+            vec![ScrollbackLine {
+                text: String::new(),
+                bg
+            }]
+        );
+        assert_eq!(
+            state.finish(),
+            vec![ScrollbackLine {
+                text: String::new(),
+                bg
+            }]
+        );
 
         state.reset();
         assert!(state.source().is_none());
