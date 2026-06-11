@@ -159,7 +159,9 @@ Each scrollback line carries a 3-character ASCII prefix aligned with the input b
 
 `ScrollbackLine` carries `text: String` + `bg: Option<Color>`. User message lines receive the Nord Polar Night background (`#3B4252`) via `crossterm::style::SetBackgroundColor`. Empty padding lines fill the full terminal width with spaces so the background color covers the entire row.
 
-User messages are visually grouped with top/bottom padding rows (same background color), creating a block effect. Each stream (except the first) is preceded by a blank separator line.
+User messages are visually grouped with top/bottom padding rows (same background
+color), creating a block effect. Each stream after the first is preceded by a
+blank separator line when that stream's first non-empty chunk arrives.
 
 Multiline user input is one stream block. Bracketed paste appends the pasted text
 to the input buffer, including newlines; Enter submits the whole buffer. When the

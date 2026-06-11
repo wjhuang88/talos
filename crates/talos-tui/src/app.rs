@@ -34,7 +34,7 @@ fn to_crossterm_color(c: Color) -> Option<CColor> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ScrollbackLine {
     pub(crate) text: String,
     bg: Option<CColor>,
@@ -368,6 +368,8 @@ pub struct Tui {
     pending_scrollback: Vec<ScrollbackLine>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     stream_render: StreamRenderState,
+    stream_opening_pending: bool,
+    pending_stream_opening: Vec<ScrollbackLine>,
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
@@ -399,6 +401,8 @@ impl Tui {
             pending_scrollback: Vec::new(),
             active_stream: None,
             stream_render: StreamRenderState::default(),
+            stream_opening_pending: false,
+            pending_stream_opening: Vec::new(),
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
@@ -531,11 +535,25 @@ impl Tui {
     }
 
     fn finalize_active_stream(&mut self) {
-        self.pending_scrollback.extend(self.stream_render.finish());
+        let lines = self.stream_render.finish();
+        if self.stream_opening_pending {
+            self.stream_opening_pending = false;
+            self.pending_stream_opening.clear();
+        } else {
+            self.pending_scrollback.extend(lines);
+        }
         self.active_stream = None;
     }
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
+        if self.stream_opening_pending && !chunk.is_empty() {
+            self.pending_scrollback.extend(stream_opening_lines(
+                self.stream_count,
+                std::mem::take(&mut self.pending_stream_opening),
+            ));
+            self.stream_opening_pending = false;
+            self.stream_count += 1;
+        }
         self.pending_scrollback
             .extend(self.stream_render.push_chunk(chunk));
     }
@@ -546,16 +564,9 @@ impl Tui {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
-                if self.stream_count > 0 {
-                    self.pending_scrollback.push(ScrollbackLine {
-                        text: String::new(),
-                        bg: None,
-                    });
-                }
-                self.pending_scrollback
-                    .extend(self.stream_render.start(msg.source.clone()));
+                self.pending_stream_opening = self.stream_render.start(msg.source.clone());
+                self.stream_opening_pending = true;
                 self.active_stream = Some(msg.stream);
-                self.stream_count += 1;
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
@@ -848,6 +859,18 @@ fn stream_bg_for(source: Option<&MessageSource>) -> Option<CColor> {
     }
 }
 
+fn stream_opening_lines(stream_count: usize, opening: Vec<ScrollbackLine>) -> Vec<ScrollbackLine> {
+    let mut lines = Vec::new();
+    if stream_count > 0 {
+        lines.push(ScrollbackLine {
+            text: String::new(),
+            bg: None,
+        });
+    }
+    lines.extend(opening);
+    lines
+}
+
 pub(crate) fn input_line_count(buffer: &str) -> u16 {
     buffer.split('\n').count().max(1) as u16
 }
@@ -1049,5 +1072,29 @@ mod tests {
         );
         assert!(state.source().is_none());
         assert_eq!(state.preview(), "");
+    }
+
+    #[test]
+    fn stream_opening_lines_adds_separator_only_after_first_stream() {
+        let bg = stream_bg_for(Some(&MessageSource::User));
+        let opening = vec![ScrollbackLine {
+            text: String::new(),
+            bg,
+        }];
+
+        assert_eq!(stream_opening_lines(0, opening.clone()), opening);
+        assert_eq!(
+            stream_opening_lines(1, opening.clone()),
+            vec![
+                ScrollbackLine {
+                    text: String::new(),
+                    bg: None
+                },
+                ScrollbackLine {
+                    text: String::new(),
+                    bg
+                }
+            ]
+        );
     }
 }

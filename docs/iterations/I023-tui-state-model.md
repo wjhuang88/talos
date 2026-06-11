@@ -144,7 +144,8 @@ layout stable:
 - `ScrollbackLine` struct carries `text: String` + `bg: Option<Color>`, enabling per-line background styling.
 - User messages rendered with Nord Polar Night background (`#3B4252`) and top/bottom padding rows for visual grouping.
 - 3-char ASCII line padding system: ` > ` (user), ` ~ ` (assistant/tool first), `   ` (continuation), ` # ` (system), ` ! ` (error).
-- Non-first streams separated by a blank line.
+- Non-first streams are separated by a blank line when the new stream's first
+  non-empty chunk arrives.
 - Animated 2-char braille spinner with Nord color gradient (10 frames, 150ms/frame) in preview component.
 - Native terminal cursor synced to input box position after each render (`MoveTo` + `Show`).
 - `restore()` clears viewport content (`MoveTo` + `Clear(FromCursorDown)`) before disabling raw mode.
