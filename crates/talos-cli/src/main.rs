@@ -13,32 +13,9 @@
 //! - `--session <id>`: Resume a specific session by UUID
 
 mod approval;
+mod colors;
 mod event_loop;
 mod logging;
-
-/// Nord theme ANSI color constants for terminal output.
-///
-/// Reference: https://www.nordtheme.com/docs/colors-and-palettes
-mod colors {
-    /// Reset all formatting.
-    pub const RESET: &str = "\x1b[0m";
-    /// Bold text.
-    pub const BOLD: &str = "\x1b[1m";
-
-    // Polar Night
-    /// nord3 — comments, timestamps (RGB: 76, 86, 106).
-    pub const NORD3: &str = "\x1b[38;2;76;86;106m";
-
-    // Frost
-    /// nord8 — primary accent, session IDs (RGB: 136, 192, 208).
-    pub const NORD8: &str = "\x1b[38;2;136;192;208m";
-
-    // Aurora
-    /// nord13 — warning, snippet highlights (RGB: 235, 203, 139).
-    pub const NORD13: &str = "\x1b[38;2;235;203;139m";
-    /// nord14 — success, project names (RGB: 163, 190, 140).
-    pub const NORD14: &str = "\x1b[38;2;163;190;140m";
-}
 
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;

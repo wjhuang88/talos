@@ -26,18 +26,10 @@ use crate::inline_terminal::{
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
 use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
+use crate::theme::{semantic, to_crossterm_color};
 use crate::widgets::ApprovalOverlay;
 
-const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
-const PREVIEW_FG: Color = Color::Rgb(0xE5, 0xE9, 0xF0);
 const SPINNER_FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-
-fn to_crossterm_color(c: Color) -> Option<CColor> {
-    match c {
-        Color::Rgb(r, g, b) => Some(CColor::Rgb { r, g, b }),
-        _ => None,
-    }
-}
 
 #[derive(Clone, Debug, Eq)]
 pub(crate) struct ScrollbackLine {
@@ -360,7 +352,7 @@ impl ViewportComponent for PreviewComponent<'_> {
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let line = self.text.split('\n').next_back().unwrap_or("");
-        let text_color = self.text_color.unwrap_or(PREVIEW_FG);
+        let text_color = self.text_color.unwrap_or(semantic::PREVIEW_FG);
         if let Some(color) = self.spinner_color {
             let full = format!("{}{}", self.padding, line);
             let display = truncate_end_to_width(&full, area.width);
@@ -405,8 +397,7 @@ fn animated_hold_preview_text(status: &HoldStatus, frame: usize) -> String {
 }
 
 fn hold_preview_color(frame: usize) -> Color {
-    const COLORS: [Color; 2] = [Color::Rgb(0x88, 0xC0, 0xD0), Color::Rgb(0x8F, 0xBC, 0xBB)];
-    COLORS[(frame / 2) % COLORS.len()]
+    semantic::HOLD_PREVIEW[(frame / 2) % semantic::HOLD_PREVIEW.len()]
 }
 
 fn preview_spinner_padding(processing_frame: usize, processing_tick: usize) -> (String, usize) {
@@ -434,7 +425,7 @@ impl ViewportComponent for QueuePreviewComponent {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let dim = Style::default().fg(Color::Rgb(0x4C, 0x56, 0x6A));
+        let dim = Style::default().fg(semantic::DIM_TEXT);
         let mut lines = Vec::new();
         lines.push(Line::from(vec![
             Span::styled(" ", dim),
@@ -496,10 +487,10 @@ impl ViewportComponent for TipsComponent<'_> {
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let text = if let Some(tip) = self.tip {
             let color = match tip.kind {
-                TipKind::ExitHint | TipKind::QueueHint => Color::Rgb(0xA3, 0xBE, 0x8C),
-                TipKind::ApprovalResult => Color::Rgb(0xB4, 0x8E, 0xAD),
-                TipKind::LagWarning | TipKind::Error => Color::Rgb(0xBF, 0x61, 0x6C),
-                TipKind::Info => Color::Rgb(0x88, 0xC0, 0xD0),
+                TipKind::ExitHint | TipKind::QueueHint => semantic::TIP_SUCCESS,
+                TipKind::ApprovalResult => semantic::TIP_RESULT,
+                TipKind::LagWarning | TipKind::Error => semantic::TIP_ERROR,
+                TipKind::Info => semantic::TIP_INFO,
             };
             Text::from(Line::from(Span::styled(
                 format!(" {}", tip.text),
@@ -508,7 +499,7 @@ impl ViewportComponent for TipsComponent<'_> {
         } else {
             Text::from(Line::from(Span::styled(
                 " Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution",
-                Style::default().fg(Color::Rgb(0x4C, 0x56, 0x6A)),
+                Style::default().fg(semantic::DIM_TEXT),
             )))
         };
         frame.render_widget(Paragraph::new(text), area);
@@ -524,7 +515,7 @@ impl ViewportComponent for InputPadComponent {
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         frame.render_widget(
-            Paragraph::new("").style(Style::default().bg(INPUT_BG)),
+            Paragraph::new("").style(Style::default().bg(semantic::INPUT_BG)),
             area,
         );
     }
@@ -543,7 +534,7 @@ impl ViewportComponent for InputComponent<'_> {
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let input_text = build_input_text(self.state);
         let input_block = Block::default()
-            .style(Style::default().bg(INPUT_BG))
+            .style(Style::default().bg(semantic::INPUT_BG))
             .padding(Padding::new(0, 1, 0, 0));
         frame.render_widget(Paragraph::new(input_text).block(input_block), area);
 
@@ -823,18 +814,6 @@ impl Tui {
         let state = &self.state;
         let status = &state.status;
 
-        let spinner_colors = [
-            Color::Rgb(0x88, 0xC0, 0xD0),
-            Color::Rgb(0x81, 0xA1, 0xC1),
-            Color::Rgb(0x5E, 0x81, 0xAC),
-            Color::Rgb(0x81, 0xA1, 0xC1),
-            Color::Rgb(0x88, 0xC0, 0xD0),
-            Color::Rgb(0x8F, 0xBC, 0xBB),
-            Color::Rgb(0xA3, 0xBE, 0x8C),
-            Color::Rgb(0x8F, 0xBC, 0xBB),
-            Color::Rgb(0x88, 0xC0, 0xD0),
-            Color::Rgb(0x81, 0xA1, 0xC1),
-        ];
         let (preview_padding, spinner_color) = if status.is_processing {
             self.processing_tick += 1;
             if self.processing_tick.is_multiple_of(3) {
@@ -842,7 +821,7 @@ impl Tui {
             }
             let (padding, color_idx) =
                 preview_spinner_padding(self.processing_frame, self.processing_tick);
-            (padding, Some(spinner_colors[color_idx]))
+            (padding, Some(semantic::PROCESSING_SPINNER[color_idx]))
         } else {
             self.processing_frame = 0;
             self.processing_tick = 0;
@@ -1020,10 +999,10 @@ pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
     let char_count = buffer.chars().count();
     let cursor_pos = state.cursor_pos.min(char_count);
     let cursor_style = Style::default()
-        .fg(Color::Rgb(0x2E, 0x34, 0x40))
-        .bg(Color::Rgb(0x88, 0xC0, 0xD0));
+        .fg(semantic::APPROVAL_BUTTON)
+        .bg(semantic::APPROVAL_BUTTON_BG);
 
-    let prompt_style = Style::default().fg(Color::Rgb(0xA3, 0xBE, 0x8C));
+    let prompt_style = Style::default().fg(semantic::APPROVAL_PROMPT);
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut line_index = 0usize;
     let mut spans = vec![Span::styled(" > ", prompt_style)];
@@ -1081,7 +1060,7 @@ pub(crate) fn stream_padding_for(
 
 fn stream_bg_for(source: Option<&MessageSource>) -> Option<CColor> {
     match source {
-        Some(MessageSource::User) => to_crossterm_color(INPUT_BG),
+        Some(MessageSource::User) => to_crossterm_color(semantic::INPUT_BG),
         _ => None,
     }
 }
@@ -1092,26 +1071,12 @@ fn prefix_color_for(source: Option<&MessageSource>, line_index: usize) -> Option
     }
 
     match source {
-        Some(MessageSource::User) => Some(CColor::Rgb {
-            r: 0xA3,
-            g: 0xBE,
-            b: 0x8C,
-        }),
-        Some(MessageSource::Assistant) | Some(MessageSource::Tool { .. }) => Some(CColor::Rgb {
-            r: 0x88,
-            g: 0xC0,
-            b: 0xD0,
-        }),
-        Some(MessageSource::System) => Some(CColor::Rgb {
-            r: 0xB4,
-            g: 0x8E,
-            b: 0xAD,
-        }),
-        Some(MessageSource::Error) => Some(CColor::Rgb {
-            r: 0xBF,
-            g: 0x61,
-            b: 0x6C,
-        }),
+        Some(MessageSource::User) => to_crossterm_color(semantic::PREFIX_USER),
+        Some(MessageSource::Assistant) | Some(MessageSource::Tool { .. }) => {
+            to_crossterm_color(semantic::PREFIX_ASSISTANT)
+        }
+        Some(MessageSource::System) => to_crossterm_color(semantic::PREFIX_SYSTEM),
+        Some(MessageSource::Error) => to_crossterm_color(semantic::PREFIX_ERROR),
         None => None,
     }
 }
@@ -1150,11 +1115,7 @@ fn render_code_block_line(line: &str) -> Vec<HistorySegment> {
     };
     vec![HistorySegment::styled(
         line,
-        Some(CColor::Rgb {
-            r: 0xE5,
-            g: 0xC0,
-            b: 0x7B,
-        }),
+        to_crossterm_color(semantic::MARKDOWN_CODE),
         attrs,
     )]
 }
@@ -1187,11 +1148,7 @@ fn render_table_history_line(line: &str, row_index: usize) -> Vec<HistorySegment
             for segment in &mut cell_segments {
                 segment.attrs.bold = true;
                 if segment.fg.is_none() {
-                    segment.fg = Some(CColor::Rgb {
-                        r: 0xD8,
-                        g: 0xDE,
-                        b: 0xE9,
-                    });
+                    segment.fg = to_crossterm_color(semantic::MARKDOWN_TABLE_HEADER);
                 }
             }
         }
@@ -1292,11 +1249,7 @@ fn emphasize_table_header(segments: &mut [HistorySegment]) {
     for segment in segments {
         segment.attrs.bold = true;
         if segment.fg.is_none() {
-            segment.fg = Some(CColor::Rgb {
-                r: 0xD8,
-                g: 0xDE,
-                b: 0xE9,
-            });
+            segment.fg = to_crossterm_color(semantic::MARKDOWN_TABLE_HEADER);
         }
     }
 }
@@ -1326,11 +1279,7 @@ fn render_list_line(line: &str) -> Vec<HistorySegment> {
     };
     let mut segments = vec![HistorySegment::styled(
         prefix,
-        Some(CColor::Rgb {
-            r: 0xA3,
-            g: 0xBE,
-            b: 0x8C,
-        }),
+        to_crossterm_color(semantic::MARKDOWN_LIST_MARKER),
         HistoryAttrs {
             bold: true,
             ..HistoryAttrs::default()
@@ -1351,11 +1300,7 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
     }
     segments.push(HistorySegment::styled(
         "> ",
-        Some(CColor::Rgb {
-            r: 0x88,
-            g: 0xC0,
-            b: 0xD0,
-        }),
+        to_crossterm_color(semantic::MARKDOWN_QUOTE_MARKER),
         HistoryAttrs {
             bold: true,
             ..HistoryAttrs::default()
@@ -1364,11 +1309,7 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
     for mut segment in render_inline_markdown(rest) {
         segment.attrs.dim = true;
         if segment.fg.is_none() {
-            segment.fg = Some(CColor::Rgb {
-                r: 0xD8,
-                g: 0xDE,
-                b: 0xE9,
-            });
+            segment.fg = to_crossterm_color(semantic::MARKDOWN_QUOTE_TEXT);
         }
         segments.push(segment);
     }
@@ -1391,11 +1332,7 @@ fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
             for mut segment in parse_inline_delimiters(heading) {
                 segment.attrs.bold = true;
                 if segment.fg.is_none() {
-                    segment.fg = Some(CColor::Rgb {
-                        r: 0x88,
-                        g: 0xC0,
-                        b: 0xD0,
-                    });
+                    segment.fg = to_crossterm_color(semantic::MARKDOWN_HEADING);
                 }
                 segments.push(segment);
             }
@@ -1445,11 +1382,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
             let (code, after) = after_tick.split_at(end);
             segments.push(HistorySegment::styled(
                 code,
-                Some(CColor::Rgb {
-                    r: 0xE5,
-                    g: 0xC0,
-                    b: 0x7B,
-                }),
+                to_crossterm_color(semantic::MARKDOWN_CODE),
                 HistoryAttrs::default(),
             ));
             rest = &after[1..];
@@ -1463,11 +1396,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
             let (strong, after) = after_marker.split_at(end);
             segments.push(HistorySegment::styled(
                 strong,
-                Some(CColor::Rgb {
-                    r: 0xE5,
-                    g: 0xE9,
-                    b: 0xF0,
-                }),
+                to_crossterm_color(semantic::MARKDOWN_TEXT_STRONG),
                 HistoryAttrs {
                     bold: true,
                     ..HistoryAttrs::default()
@@ -1484,11 +1413,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
             let (strong, after) = after_marker.split_at(end);
             segments.push(HistorySegment::styled(
                 strong,
-                Some(CColor::Rgb {
-                    r: 0xE5,
-                    g: 0xE9,
-                    b: 0xF0,
-                }),
+                to_crossterm_color(semantic::MARKDOWN_TEXT_STRONG),
                 HistoryAttrs {
                     bold: true,
                     ..HistoryAttrs::default()
@@ -1508,11 +1433,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
                 let (url, after_url) = after_url_start.split_at(url_end);
                 segments.push(HistorySegment::styled(
                     label,
-                    Some(CColor::Rgb {
-                        r: 0x88,
-                        g: 0xC0,
-                        b: 0xD0,
-                    }),
+                    to_crossterm_color(semantic::MARKDOWN_LINK),
                     HistoryAttrs {
                         underlined: true,
                         ..HistoryAttrs::default()
@@ -1521,11 +1442,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
                 if !url.is_empty() {
                     segments.push(HistorySegment::styled(
                         format!(" ({url})"),
-                        Some(CColor::Rgb {
-                            r: 0x4C,
-                            g: 0x56,
-                            b: 0x6A,
-                        }),
+                        to_crossterm_color(semantic::MARKDOWN_LINK_URL),
                         HistoryAttrs {
                             dim: true,
                             ..HistoryAttrs::default()
@@ -1545,11 +1462,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
             let (emphasis, after) = after_marker.split_at(end);
             segments.push(HistorySegment::styled(
                 emphasis,
-                Some(CColor::Rgb {
-                    r: 0xD8,
-                    g: 0xDE,
-                    b: 0xE9,
-                }),
+                to_crossterm_color(semantic::MARKDOWN_TEXT_EMPHASIS),
                 HistoryAttrs {
                     italic: true,
                     ..HistoryAttrs::default()
@@ -1567,11 +1480,7 @@ fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
             let (emphasis, after) = after_marker.split_at(end);
             segments.push(HistorySegment::styled(
                 emphasis,
-                Some(CColor::Rgb {
-                    r: 0xD8,
-                    g: 0xDE,
-                    b: 0xE9,
-                }),
+                to_crossterm_color(semantic::MARKDOWN_TEXT_EMPHASIS),
                 HistoryAttrs {
                     italic: true,
                     ..HistoryAttrs::default()
@@ -1667,9 +1576,9 @@ pub(crate) fn build_status_text(status: &StatusSnapshot) -> Text<'static> {
         String::new()
     };
 
-    let dim = Style::default().fg(Color::Rgb(0x4C, 0x56, 0x6A));
+    let dim = Style::default().fg(semantic::DIM_TEXT);
     let sep = Span::styled(" │ ", dim);
-    let val = Style::default().fg(Color::Rgb(0x81, 0xA1, 0xC1));
+    let val = Style::default().fg(semantic::STATUS_VALUE);
 
     let spans = vec![
         Span::styled(" ", dim),
@@ -1840,12 +1749,7 @@ mod tests {
                 .segments
                 .iter()
                 .any(|segment| segment.text == "code"
-                    && segment.fg
-                        == Some(CColor::Rgb {
-                            r: 0xE5,
-                            g: 0xC0,
-                            b: 0x7B,
-                        }))
+                    && segment.fg == to_crossterm_color(semantic::MARKDOWN_CODE))
         );
         assert_eq!(state.preview(), "");
     }
@@ -1910,12 +1814,7 @@ mod tests {
                 .segments
                 .iter()
                 .any(|segment| segment.text == "code"
-                    && segment.fg
-                        == Some(CColor::Rgb {
-                            r: 0xE5,
-                            g: 0xC0,
-                            b: 0x7B,
-                        }))
+                    && segment.fg == to_crossterm_color(semantic::MARKDOWN_CODE))
         );
     }
 
