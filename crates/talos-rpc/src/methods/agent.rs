@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 use talos_core::message::AgentEvent;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::RpcError;
@@ -92,7 +92,7 @@ pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodRes
     let mut notifications = Vec::new();
 
     let output = if params.stream {
-        let (event_tx, mut event_rx) = broadcast::channel(32);
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
         let prompt = params.prompt;
         let agent = ctx.agent.clone();
         let mut run_task = tokio::spawn(async move { agent.run_streaming(prompt, event_tx).await });
@@ -104,9 +104,9 @@ pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodRes
                     ctx.cancel_registry.remove(&turn_id);
                     return Err(RpcError::Internal("turn cancelled".to_string()));
                 }
-                recv_result = event_rx.recv() => {
-                    match recv_result {
-                        Ok(AgentEvent::TextDelta { delta }) => {
+                event = event_rx.recv() => {
+                    match event {
+                        Some(AgentEvent::TextDelta { delta }) => {
                             let notification = JsonRpcNotification {
                                 jsonrpc: JSON_RPC_VERSION.to_string(),
                                 method: "agent.run.delta".to_string(),
@@ -117,11 +117,11 @@ pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodRes
                             };
                             notifications.push(notification);
                         }
-                        Ok(AgentEvent::TurnEnd { .. }) => break,
-                        Ok(AgentEvent::Error { message }) => return Err(RpcError::Internal(message)),
-                        Ok(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
-                        Ok(_) => {}
-                        Err(_) => break,
+                        Some(AgentEvent::TurnEnd { .. }) => break,
+                        Some(AgentEvent::Error { message }) => return Err(RpcError::Internal(message)),
+                        Some(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
+                        Some(_) => {}
+                        None => break,
                     }
                 }
             }

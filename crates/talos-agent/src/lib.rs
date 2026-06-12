@@ -42,7 +42,7 @@ use talos_sandbox::{SandboxConfig, SandboxError, SandboxProvider, SandboxResult}
 use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::Semaphore;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 pub use prompt::{ContextFile, SystemPromptBuilder, ToolDescription};
@@ -335,7 +335,7 @@ impl Agent {
     }
 
     /// Runs a single turn with streaming events forwarded to the given
-    /// broadcast channel.
+    /// unbounded mpsc channel.
     ///
     /// This method behaves like [`Agent::run`] but also sends every
     /// [`AgentEvent`] to `event_tx`, allowing external consumers to receive
@@ -347,7 +347,7 @@ impl Agent {
     pub async fn run_streaming(
         &self,
         user_message: String,
-        event_tx: broadcast::Sender<AgentEvent>,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> AgentResult<String> {
         self.run_inner(user_message, Some(event_tx)).await
     }
@@ -359,7 +359,7 @@ impl Agent {
     async fn run_inner(
         &self,
         user_message: String,
-        event_tx: Option<broadcast::Sender<AgentEvent>>,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     ) -> AgentResult<String> {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
@@ -1236,7 +1236,7 @@ mod tests {
             Arc::new(MockModel::new(vec![events.clone()])),
             ToolRegistry::new(),
         );
-        let (tx, mut rx) = broadcast::channel::<AgentEvent>(32);
+        let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
         let response = agent.run_streaming("Hi".into(), tx).await.unwrap();
         assert_eq!(response, "Streaming");
@@ -1917,7 +1917,7 @@ mod tests {
         }));
 
         let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
-        let (tx, mut rx) = broadcast::channel::<AgentEvent>(32);
+        let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
         let _response = agent.run_streaming("Echo test".into(), tx).await.unwrap();
 

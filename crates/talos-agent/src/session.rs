@@ -9,10 +9,10 @@ use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
 use futures_util::FutureExt;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, warn};
+use tracing::error;
 
 use talos_core::message::AgentEvent;
 use talos_core::session::{
@@ -59,7 +59,7 @@ impl AppServerSession {
     ///
     /// For each [`SessionOp::Submit`], spawns a turn task that:
     /// 1. Emits [`SessionEvent::TurnStarted`]
-    /// 2. Calls `agent.run_streaming()` with an internal broadcast channel
+    /// 2. Calls `agent.run_streaming()` with an internal mpsc channel
     /// 3. Forwards `AgentEvent`s as `SessionEvent::AgentEvent` on the EQ
     /// 4. Emits [`SessionEvent::TurnCompleted`] on finish
     ///
@@ -100,13 +100,13 @@ impl AppServerSession {
                     let token_clone = token.clone();
 
                     let handle = tokio::spawn(async move {
-                        let (broadcast_tx, broadcast_rx) = broadcast::channel::<AgentEvent>(32);
+                        let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
 
                         let _ = AssertUnwindSafe(run_turn_with_forwarding(
                             agent,
                             message,
-                            broadcast_tx,
-                            broadcast_rx,
+                            event_tx,
+                            event_rx,
                             eq_tx,
                             token_clone,
                             turn_id_clone,
@@ -139,9 +139,9 @@ impl AppServerSession {
 async fn run_turn_with_forwarding(
     agent: Arc<Agent>,
     message: String,
-    broadcast_tx: broadcast::Sender<AgentEvent>,
-    mut broadcast_rx: broadcast::Receiver<AgentEvent>,
-    eq_tx: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
+    event_tx: mpsc::UnboundedSender<AgentEvent>,
+    mut event_rx: mpsc::UnboundedReceiver<AgentEvent>,
+    eq_tx: mpsc::UnboundedSender<SessionEvent>,
     cancel_token: CancellationToken,
     turn_id: String,
 ) {
@@ -152,36 +152,34 @@ async fn run_turn_with_forwarding(
         loop {
             tokio::select! {
                 _ = cancel_clone.cancelled() => break,
-                result = broadcast_rx.recv() => {
-                    match result {
-                        Ok(event) => {
+                event = event_rx.recv() => {
+                    match event {
+                        Some(event) => {
                             let _ = eq_tx.send(SessionEvent::AgentEvent(event));
                         }
-                        Err(broadcast::error::RecvError::Closed) => break,
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("broadcast lagged, dropped {n} events");
-                        }
+                        None => break, // Channel closed (agent done)
                     }
                 }
             }
         }
     });
 
-    tokio::task::yield_now().await;
+    let mut agent_task = tokio::spawn(async move { agent.run_streaming(message, event_tx).await });
 
-    let agent_result = AssertUnwindSafe(agent.run_streaming(message, broadcast_tx))
-        .catch_unwind()
-        .await;
+    let agent_result = tokio::select! {
+        result = &mut agent_task => result,
+        _ = cancel_token.cancelled() => {
+            agent_task.abort();
+            let _ = forwarder.await;
+            let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
+                turn_id,
+                status: TurnCompletionStatus::Cancelled,
+            });
+            return;
+        }
+    };
 
     let _ = forwarder.await;
-
-    if cancel_token.is_cancelled() {
-        let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
-            turn_id,
-            status: TurnCompletionStatus::Cancelled,
-        });
-        return;
-    }
 
     match agent_result {
         Ok(Ok(_final_text)) => {
@@ -198,7 +196,7 @@ async fn run_turn_with_forwarding(
                 },
             });
         }
-        Err(_panic) => {
+        Err(_join_error) => {
             error!("agent panicked during turn");
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
                 turn_id,

@@ -798,6 +798,14 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
 
+    let sq_tx_signal = handle.sq_tx.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::signal::ctrl_c().await.ok();
+            let _ = sq_tx_signal.try_send(SessionOp::Interrupt);
+        }
+    });
+
     // Bridge: SessionEvent → ConversationEngine. State-critical events use
     // an unbounded mpsc so the TUI state machine does not miss turn lifecycle
     // transitions.
