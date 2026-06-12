@@ -6,8 +6,8 @@
 | Title | TUI Logo & Splash Screen |
 | Priority | P2 |
 | Status | Planned |
-| Depends on | I023 (TUI state model — `ChatMessage`/`Tip`/`TuiStateEvent` replaces flat fields; logo widget should emit `TuiStateEvent::SplashComplete`) |
-| Blocks | TUI-001 (completion — logo is a visual identity element) |
+| Depends on | I023 (TUI state model — Complete), I022 (inline-by-default — Complete) |
+| Blocks | None (TUI-001 completion was delivered via I014) |
 | Owner | `crates/talos-tui/src/` |
 
 ## Outcome

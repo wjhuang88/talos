@@ -7,7 +7,7 @@ content.
 
 ## Status
 
-Planned. Selected into I014.
+Complete. Delivered via I014 (2026-06-06). Provenance markers, `/plugins`, `/copy`, and `/export` all landed.
 
 ## Priority
 
