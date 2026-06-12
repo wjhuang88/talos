@@ -95,7 +95,7 @@ pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodRes
         let (event_tx, mut event_rx) = mpsc::unbounded_channel::<AgentEvent>();
         let prompt = params.prompt;
         let agent = ctx.agent.clone();
-        let mut run_task = tokio::spawn(async move { agent.run_streaming(prompt, event_tx).await });
+        let mut run_task = tokio::spawn(async move { agent.run_streaming(prompt, vec![], event_tx).await });
 
         loop {
             tokio::select! {

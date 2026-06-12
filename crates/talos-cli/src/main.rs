@@ -610,6 +610,8 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     let session_config = SessionConfig {
         print_mode: true,
         workspace_root: std::env::current_dir().context("failed to determine working directory")?,
+        initial_history: vec![],
+        model_context_limit: 128_000,
     };
     let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -636,7 +638,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
                 std::process::exit(1);
             }
             SessionEvent::TurnCompleted { status, .. } => match status {
-                talos_core::session::TurnCompletionStatus::Success => {
+                talos_core::session::TurnCompletionStatus::Success { .. } => {
                     println!();
                     return Ok(());
                 }
@@ -664,7 +666,8 @@ async fn run_conversation_loop(
     mut agent_rx: tokio::sync::mpsc::UnboundedReceiver<AgentEvent>,
     mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
     ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
-    session_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
+    interrupt_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
 ) {
     loop {
         tokio::select! {
@@ -684,9 +687,7 @@ async fn run_conversation_loop(
                                 let _ = ui_tx.send(output);
                             }
                             let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            let _ = session_tx
-                                .send(talos_core::session::SessionOp::Submit { message: msg })
-                                .await;
+                            let _ = submit_tx.send(msg);
                         }
                     }
                     None => break,
@@ -716,15 +717,11 @@ async fn run_conversation_loop(
                                 let _ = ui_tx.send(output);
                             }
                             let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            let _ = session_tx
-                                .send(talos_core::session::SessionOp::Submit { message: msg })
-                                .await;
+                            let _ = submit_tx.send(msg);
                         }
                     }
                     UserInput::Cancel => {
-                        let _ = session_tx
-                            .send(talos_core::session::SessionOp::Interrupt)
-                            .await;
+                        let _ = interrupt_tx.send(talos_core::session::SessionOp::Interrupt).await;
                         for output in engine.cancel_turn() {
                             let _ = ui_tx.send(output);
                         }
@@ -791,9 +788,64 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     }
 
+    // Session management: create or resume session for history persistence.
+    let session_manager = SessionManager::new().context("failed to initialize session manager")?;
+    let project_name = workspace_root
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("default");
+
+    let session = if let Some(ref session_id) = cli.session {
+        session_manager
+            .resume_session(session_id)
+            .with_context(|| format!("failed to resume session {session_id}"))?
+    } else if cli.r#continue {
+        let sessions = session_manager
+            .list_sessions()
+            .context("failed to list sessions")?;
+        if sessions.is_empty() {
+            session_manager
+                .create_session(project_name)
+                .context("failed to create session")?
+        } else {
+            let most_recent = sessions
+                .iter()
+                .max_by_key(|s| s.timestamp)
+                .context("no sessions found")?;
+            session_manager
+                .get_session(&most_recent.id)
+                .with_context(|| format!("failed to resume session {}", most_recent.id))?
+        }
+    } else if cli.resume {
+        let sessions = session_manager
+            .list_sessions()
+            .context("failed to list sessions")?;
+        if sessions.is_empty() {
+            session_manager
+                .create_session(project_name)
+                .context("failed to create session")?
+        } else {
+            let most_recent = sessions
+                .iter()
+                .max_by_key(|s| s.timestamp)
+                .context("no sessions found")?;
+            session_manager
+                .get_session(&most_recent.id)
+                .with_context(|| format!("failed to resume session {}", most_recent.id))?
+        }
+    } else {
+        session_manager
+            .create_session(project_name)
+            .context("failed to create session")?
+    };
+
+    let initial_history = session.read_messages().unwrap_or_default();
+
     let session_config = SessionConfig {
         print_mode: false,
-        workspace_root,
+        workspace_root: workspace_root.clone(),
+        initial_history,
+        model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -806,10 +858,10 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     });
 
-    // Bridge: SessionEvent → ConversationEngine. State-critical events use
-    // an unbounded mpsc so the TUI state machine does not miss turn lifecycle
-    // transitions.
+    // Bridge: SessionEvent → ConversationEngine + JSONL persistence.
     let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
+    let session_for_persist = session.clone();
+    let session_manager_for_persist = session_manager.clone();
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
         while let Some(session_event) = bridge_forwarder.recv().await {
@@ -818,17 +870,56 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
                     let _ = bridge_tx.send(agent_event);
                 }
                 SessionEvent::TurnCompleted {
+                    status: talos_core::session::TurnCompletionStatus::Success { final_text },
+                    ..
+                } => {
+                    if !final_text.is_empty() {
+                        let assistant_msg = talos_core::message::Message::Assistant {
+                            content: final_text,
+                            tool_calls: vec![],
+                        };
+                        if let Err(e) = session_for_persist.append(&assistant_msg) {
+                            eprintln!("Warning: failed to persist assistant message: {e}");
+                        }
+                        if let Err(e) =
+                            session_manager_for_persist.update_index(&session_for_persist)
+                        {
+                            eprintln!("Warning: failed to update session index: {e}");
+                        }
+                    }
+                }
+                SessionEvent::TurnCompleted {
                     status: talos_core::session::TurnCompletionStatus::Error { message },
                     ..
                 } => {
                     let _ = bridge_tx.send(AgentEvent::Error { message });
                 }
-                SessionEvent::TurnCompleted { .. } => {}
                 SessionEvent::Error { message } => {
                     let _ = bridge_tx.send(AgentEvent::Error { message });
                 }
                 _ => {}
             }
+        }
+    });
+
+    // Wrap sq_tx to persist user messages before forwarding.
+    let session_for_user_persist = session.clone();
+    let session_manager_for_user_persist = session_manager.clone();
+    let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
+    let sq_tx_inner = handle.sq_tx.clone();
+    tokio::spawn(async move {
+        while let Some(msg) = user_msg_rx.recv().await {
+            let user_msg = talos_core::message::Message::User { content: msg.clone() };
+            if let Err(e) = session_for_user_persist.append(&user_msg) {
+                eprintln!("Warning: failed to persist user message: {e}");
+            }
+            if let Err(e) = session_manager_for_user_persist.update_index(&session_for_user_persist)
+            {
+                eprintln!("Warning: failed to update session index: {e}");
+            }
+            let _ = sq_tx_inner
+                .send(SessionOp::Submit { message: msg })
+                .await;
         }
     });
 
@@ -843,10 +934,10 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_model_name(config.model.clone());
 
     // Conversation engine task: sits between agent loop and UI loop
-    let sq_tx = handle.sq_tx.clone();
     let engine = ConversationEngine::new(config.model.clone());
+    let interrupt_tx = handle.sq_tx.clone();
     tokio::spawn(async move {
-        run_conversation_loop(engine, bridge_rx, user_input_rx, ui_output_tx, sq_tx).await;
+        run_conversation_loop(engine, bridge_rx, user_input_rx, ui_output_tx, user_msg_tx, interrupt_tx).await;
     });
 
     tui.run_with_approval(approval_rx).await?;
@@ -907,9 +998,46 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
         agent.set_append_prompt(append.clone());
     }
 
+    let session_manager = SessionManager::new().context("failed to initialize session manager")?;
+    let project_name = workspace_root
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("default");
+
+    let session = if let Some(ref session_id) = cli.session {
+        session_manager
+            .resume_session(session_id)
+            .with_context(|| format!("failed to resume session {session_id}"))?
+    } else if cli.r#continue {
+        let sessions = session_manager
+            .list_sessions()
+            .context("failed to list sessions")?;
+        if sessions.is_empty() {
+            session_manager
+                .create_session(project_name)
+                .context("failed to create session")?
+        } else {
+            let most_recent = sessions
+                .iter()
+                .max_by_key(|s| s.timestamp)
+                .context("no sessions found")?;
+            session_manager
+                .get_session(&most_recent.id)
+                .with_context(|| format!("failed to resume session {}", most_recent.id))?
+        }
+    } else {
+        session_manager
+            .create_session(project_name)
+            .context("failed to create session")?
+    };
+
+    let initial_history = session.read_messages().unwrap_or_default();
+
     let session_config = SessionConfig {
         print_mode: true,
-        workspace_root,
+        workspace_root: workspace_root.clone(),
+        initial_history,
+        model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -955,6 +1083,14 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
             })
             .await;
 
+        // Persist user message to JSONL.
+        let user_msg = talos_core::message::Message::User {
+            content: input.to_string(),
+        };
+        if let Err(e) = session.append(&user_msg) {
+            eprintln!("Warning: failed to persist user message: {e}");
+        }
+
         let mut turn_done = false;
         while let Some(event) = eq_rx.recv().await {
             match event {
@@ -977,7 +1113,20 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
                 },
                 SessionEvent::TurnCompleted { status, .. } => {
                     match status {
-                        talos_core::session::TurnCompletionStatus::Success => {}
+                        talos_core::session::TurnCompletionStatus::Success { final_text } => {
+                            if !final_text.is_empty() {
+                                let assistant_msg = talos_core::message::Message::Assistant {
+                                    content: final_text,
+                                    tool_calls: vec![],
+                                };
+                                if let Err(e) = session.append(&assistant_msg) {
+                                    eprintln!("Warning: failed to persist assistant message: {e}");
+                                }
+                                if let Err(e) = session_manager.update_index(&session) {
+                                    eprintln!("Warning: failed to update session index: {e}");
+                                }
+                            }
+                        }
                         talos_core::session::TurnCompletionStatus::Cancelled => {
                             println!("\n(turn cancelled)");
                         }
@@ -1172,9 +1321,13 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         agent.set_append_prompt(append_prompt.clone());
     }
 
+    let initial_history = session.read_messages().unwrap_or_default();
+
     let session_config = SessionConfig {
         print_mode: false,
         workspace_root: workspace_root.clone(),
+        initial_history,
+        model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -1648,10 +1801,11 @@ mod tests {
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (session_tx, mut session_rx) = tokio::sync::mpsc::channel(4);
+        let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);
 
         let loop_handle = tokio::spawn(run_conversation_loop(
-            engine, agent_rx, user_rx, ui_tx, session_tx,
+            engine, agent_rx, user_rx, ui_tx, submit_tx, interrupt_tx,
         ));
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
@@ -1688,9 +1842,8 @@ mod tests {
         assert!(saw_queued_user_stream);
         assert!(saw_queue_drained_status);
         assert!(matches!(
-            session_rx.try_recv(),
-            Ok(talos_core::session::SessionOp::Submit { message })
-                if message == "queued follow-up"
+            submit_rx.try_recv(),
+            Ok(message) if message == "queued follow-up"
         ));
 
         drop(agent_tx);

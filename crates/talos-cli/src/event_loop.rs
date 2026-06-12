@@ -104,7 +104,7 @@ impl EventLoop {
                         let _ = event_tx_forward.send(AgentError(message));
                     }
                     SessionEvent::TurnCompleted { status, .. } => match status {
-                        TurnCompletionStatus::Success => {
+                        TurnCompletionStatus::Success { .. } => {
                             let _ = event_tx_forward.send(AgentCompleted);
                         }
                         TurnCompletionStatus::Cancelled => {
