@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::message::AgentEvent;
+use crate::message::Message;
 
 /// Commands sent to the session actor via the bounded SQ.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +52,11 @@ pub enum SessionEvent {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum TurnCompletionStatus {
     /// Turn completed normally.
-    Success,
+    Success {
+        /// The final assistant response text.
+        #[serde(default)]
+        final_text: String,
+    },
     /// Turn was cancelled by user interrupt.
     Cancelled,
     /// Turn ended with an error.
@@ -80,6 +85,16 @@ pub struct SessionConfig {
     pub print_mode: bool,
     /// Workspace root path for file operations.
     pub workspace_root: PathBuf,
+    /// Prior conversation messages to include in the first turn.
+    #[serde(default)]
+    pub initial_history: Vec<Message>,
+    /// Model context token limit for compaction triggering.
+    #[serde(default = "default_model_context_limit")]
+    pub model_context_limit: u32,
+}
+
+fn default_model_context_limit() -> u32 {
+    128_000
 }
 
 #[cfg(test)]
@@ -121,7 +136,9 @@ mod tests {
             },
             SessionEvent::TurnCompleted {
                 turn_id: "1".into(),
-                status: TurnCompletionStatus::Success,
+                status: TurnCompletionStatus::Success {
+                    final_text: String::new(),
+                },
             },
             SessionEvent::TurnCompleted {
                 turn_id: "2".into(),
@@ -152,10 +169,14 @@ mod tests {
         let config = SessionConfig {
             print_mode: true,
             workspace_root: PathBuf::from("/tmp/test"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
         };
         let json = serde_json::to_string(&config).unwrap();
         let back: SessionConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(config.print_mode, back.print_mode);
         assert_eq!(config.workspace_root, back.workspace_root);
+        assert_eq!(config.initial_history, back.initial_history);
+        assert_eq!(config.model_context_limit, back.model_context_limit);
     }
 }

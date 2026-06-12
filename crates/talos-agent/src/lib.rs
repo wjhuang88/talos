@@ -331,7 +331,7 @@ impl Agent {
     /// [`AgentError::TurnBudgetExceeded`] if the tool call budget is exceeded,
     /// or [`AgentError::DoomLoopDetected`] if a doom loop is detected.
     pub async fn run(&self, user_message: String) -> AgentResult<String> {
-        self.run_inner(user_message, None).await
+        self.run_inner(user_message, vec![], None).await
     }
 
     /// Runs a single turn with streaming events forwarded to the given
@@ -341,15 +341,22 @@ impl Agent {
     /// [`AgentEvent`] to `event_tx`, allowing external consumers to receive
     /// real-time updates (e.g., for UI streaming).
     ///
+    /// # Arguments
+    ///
+    /// * `user_message` — The current user message for this turn.
+    /// * `history` — Prior conversation messages to include before the user message.
+    /// * `event_tx` — Channel for streaming agent events.
+    ///
     /// # Errors
     ///
     /// Returns the same errors as [`Agent::run`].
     pub async fn run_streaming(
         &self,
         user_message: String,
+        history: Vec<Message>,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> AgentResult<String> {
-        self.run_inner(user_message, Some(event_tx)).await
+        self.run_inner(user_message, history, Some(event_tx)).await
     }
 
     /// Internal implementation shared by [`run`] and [`run_streaming`].
@@ -359,6 +366,7 @@ impl Agent {
     async fn run_inner(
         &self,
         user_message: String,
+        history: Vec<Message>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
     ) -> AgentResult<String> {
         let turn_id = TurnId::new();
@@ -383,9 +391,10 @@ impl Agent {
             format!("{system_prompt}\n\n{user_message}")
         };
 
-        let mut messages = vec![Message::User {
+        let mut messages = history;
+        messages.push(Message::User {
             content: full_message,
-        }];
+        });
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
 
@@ -1238,7 +1247,7 @@ mod tests {
         );
         let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
-        let response = agent.run_streaming("Hi".into(), tx).await.unwrap();
+        let response = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
         assert_eq!(response, "Streaming");
 
         let mut received = Vec::new();
@@ -1919,7 +1928,7 @@ mod tests {
         let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
         let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
-        let _response = agent.run_streaming("Echo test".into(), tx).await.unwrap();
+        let _response = agent.run_streaming("Echo test".into(), vec![], tx).await.unwrap();
 
         let mut events = Vec::new();
         while let Ok(event) = rx.try_recv() {
