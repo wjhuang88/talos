@@ -2,9 +2,9 @@
 
 **User can**: See every message with its lifecycle visible (pending → accepted → streaming → completed), see transient tips auto-expire from the status bar instead of polluting scrollback, and have a structured state model that a future global event bus can subscribe to without touching TUI internals.
 
-## Status: REVIEW (2026-06-11)
+## Status: COMPLETE (2026-06-12)
 
-Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-column line padding system. Multiline pasted input stays a single user block. Single-row preview stays stable while the TUI holds Markdown tables/code fences/lists/quotes through a stream block classifier. Conservative Markdown rendering now supports styled inline rows and styled block rows while keeping user-authored streams literal. Animated braille spinner with Nord gradient. Native cursor sync to input box. 60 TUI + 53 conversation tests pass.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-column line padding system. Multiline pasted input stays a single user block. Single-row preview stays stable while the TUI holds Markdown tables/code fences/lists/quotes through a stream block classifier. Conservative Markdown rendering now supports styled inline rows and styled block rows while keeping user-authored streams literal. Animated braille spinner with Nord gradient. Native cursor sync to input box. 60 TUI + 53 conversation tests pass. Review remediation closed: real cancellation via abort-on-cancel, non-lossy mpsc delivery, engine-owned mutation enforced by `pub(crate)`, SIGINT fallback handler.
 
 ## Review Remediation Plan (2026-06-11)
 
@@ -57,6 +57,22 @@ I023 can move from Review to Complete:
 - Workspace verification remains clean: `cargo fmt --all --check`,
   `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and
   `cargo test --workspace`.
+
+### Remediation Evidence (2026-06-12)
+
+All five review remediation slices closed:
+
+1. **D1 Cancellation path**: Ctrl+C in TUI sends `UserInput::Cancel` → conversation bridge sends `SessionOp::Interrupt` → session actor cancels `CancellationToken` → `run_turn_with_forwarding` uses `tokio::select!` to abort the agent task on cancellation. SIGINT fallback handler added for TUI mode (defense-in-depth matching inline mode). `test_interrupt` and `test_concurrent_submit_and_interrupt` verify cancellation behavior.
+
+2. **D2 Non-lossy state-critical delivery**: Replaced `broadcast::channel::<AgentEvent>(32)` with `mpsc::unbounded_channel::<AgentEvent>()` in `session.rs::run_turn_with_forwarding`. Updated `Agent::run_streaming()` signature from `broadcast::Sender` to `mpsc::UnboundedSender`. Updated RPC path. Removed all `Lagged` error handling. Zero `broadcast` usage remains in `talos-agent`, `talos-rpc`, `talos-cli`.
+
+3. **D3 Engine-owned mutation**: Verified at compile time — all `ConversationEngine` fields are `pub(crate)`. External crates (talos-cli, talos-tui) can only access engine state through public methods (`is_processing()`, `status_snapshot()`, `handle_agent_event()`, `cancel_turn()`, etc.). Zero direct field mutations from external code.
+
+4. **D4 Runtime verification**: `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace` all clean.
+
+5. **D5 Closeout**: Iteration doc updated, BOARD.md updated, status moved to Complete.
+
+Files changed: `crates/talos-agent/src/lib.rs` (API signature), `crates/talos-agent/src/session.rs` (broadcast→mpsc, cancellation abort), `crates/talos-rpc/src/methods/agent.rs` (broadcast→mpsc), `crates/talos-cli/src/main.rs` (SIGINT handler).
 
 ## Next Slice: Stream Render State
 
@@ -253,6 +269,7 @@ for D4, which should be confirmed against the current CLI mode before execution.
 - Native terminal cursor synced to input box position after each render (`MoveTo` + `Show`).
 - `restore()` clears viewport content (`MoveTo` + `Clear(FromCursorDown)`) before disabling raw mode.
 - Commits: `5c90874` (event-driven architecture), `a669a3e` (insert_history rewrite + preview sync fix), `988fc82` (line padding + error tips), `fc370ce` (animated spinner), classifier/markdown renderer commits pending this closeout.
+- Review remediation (2026-06-12): `broadcast::channel(32)` replaced with `mpsc::unbounded_channel` in session actor and agent API. Agent task abort on cancellation via `tokio::select!` + `CancellationToken`. SIGINT fallback handler added for TUI mode. Engine-owned mutation verified (all fields `pub(crate)`). `cargo fmt/check/clippy/test --workspace` clean.
 
 ## Dependencies
 

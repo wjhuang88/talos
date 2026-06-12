@@ -23,7 +23,7 @@ English | **[中文](README.zh-CN.md)**
 | I018-I020 Architecture Plan | Planned | Bounded logs, embedded prompt assets, layered memory, and local research library. |
 | I021 Evolution Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits realigned `talos-evolution` with the MenteDB blueprint; 7470ac5 byte-cap stays as defense-in-depth. |
 | I022 TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
-| I023 TUI State Model | Review | Event-driven architecture: `talos-conversation` crate owns business logic, `talos-tui` owns pure UI state. Two-loop design with typed async channels. Codex-style single-row history insertion with styled scrollback, 3-column line padding, Nord-themed multiline user message blocks with top/bottom padding, single-row preview with Markdown block classification and conservative styled Markdown rendering, animated braille spinner, native cursor sync. 113 focused TUI+conversation tests pass; cancellation/non-lossy/engine-owned/runtime closure remains the review gate. |
+| I023 TUI State Model | Complete | Event-driven architecture: `talos-conversation` crate owns business logic, `talos-tui` owns pure UI state. Two-loop design with typed async channels. Codex-style single-row history insertion with styled scrollback, 3-column line padding, Nord-themed multiline user message blocks with top/bottom padding, single-row preview with Markdown block classification and conservative styled Markdown rendering, animated braille spinner, native cursor sync. Non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback. 113 focused TUI+conversation tests pass. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.
@@ -117,7 +117,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I018-I020 | Memory/Research Plan | Planned | Log retention, prompt assets, layered memory foundation, exploration library. |
 | I021 | Evolution MenteDB Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat / `400 Bad Request` loop. Realigns `Signal.context` semantics, `TurnObservation` schema, and `Pattern` provenance per the MenteDB blueprint; defense layer from `7470ac5` stays as belt-and-suspenders. |
 | I022 | TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
-| I023 | TUI State Model | Review | Event-driven `talos-conversation` + `talos-tui` state model, styled multiline scrollback, Markdown block classification and conservative styled rendering, spinner, and cursor sync. Cancellation/non-lossy/engine-owned/runtime closure remains before Complete. |
+| I023 | TUI State Model | Complete | Event-driven `talos-conversation` + `talos-tui` state model, styled multiline scrollback, Markdown block classification and conservative styled rendering, spinner, cursor sync. Non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in
