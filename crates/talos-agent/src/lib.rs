@@ -1928,7 +1928,10 @@ mod tests {
         let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
         let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
-        let _response = agent.run_streaming("Echo test".into(), vec![], tx).await.unwrap();
+        let _response = agent
+            .run_streaming("Echo test".into(), vec![], tx)
+            .await
+            .unwrap();
 
         let mut events = Vec::new();
         while let Ok(event) = rx.try_recv() {

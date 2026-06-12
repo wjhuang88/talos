@@ -872,21 +872,23 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
                 SessionEvent::TurnCompleted {
                     status: talos_core::session::TurnCompletionStatus::Success { final_text },
                     ..
-                } => {
-                    if !final_text.is_empty() {
-                        let assistant_msg = talos_core::message::Message::Assistant {
-                            content: final_text,
-                            tool_calls: vec![],
-                        };
-                        if let Err(e) = session_for_persist.append(&assistant_msg) {
-                            eprintln!("Warning: failed to persist assistant message: {e}");
-                        }
-                        if let Err(e) =
-                            session_manager_for_persist.update_index(&session_for_persist)
-                        {
-                            eprintln!("Warning: failed to update session index: {e}");
-                        }
+                } if !final_text.is_empty() => {
+                    let assistant_msg = talos_core::message::Message::Assistant {
+                        content: final_text,
+                        tool_calls: vec![],
+                    };
+                    if let Err(e) = session_for_persist.append(&assistant_msg) {
+                        eprintln!("Warning: failed to persist assistant message: {e}");
                     }
+                    if let Err(e) = session_manager_for_persist.update_index(&session_for_persist) {
+                        eprintln!("Warning: failed to update session index: {e}");
+                    }
+                }
+                SessionEvent::TurnCompleted {
+                    status: talos_core::session::TurnCompletionStatus::Success { .. },
+                    ..
+                } => {
+                    // Empty assistant turns have no durable transcript entry.
                 }
                 SessionEvent::TurnCompleted {
                     status: talos_core::session::TurnCompletionStatus::Error { message },
@@ -909,7 +911,9 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_inner = handle.sq_tx.clone();
     tokio::spawn(async move {
         while let Some(msg) = user_msg_rx.recv().await {
-            let user_msg = talos_core::message::Message::User { content: msg.clone() };
+            let user_msg = talos_core::message::Message::User {
+                content: msg.clone(),
+            };
             if let Err(e) = session_for_user_persist.append(&user_msg) {
                 eprintln!("Warning: failed to persist user message: {e}");
             }
@@ -917,9 +921,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
             {
                 eprintln!("Warning: failed to update session index: {e}");
             }
-            let _ = sq_tx_inner
-                .send(SessionOp::Submit { message: msg })
-                .await;
+            let _ = sq_tx_inner.send(SessionOp::Submit { message: msg }).await;
         }
     });
 
@@ -937,7 +939,15 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let engine = ConversationEngine::new(config.model.clone());
     let interrupt_tx = handle.sq_tx.clone();
     tokio::spawn(async move {
-        run_conversation_loop(engine, bridge_rx, user_input_rx, ui_output_tx, user_msg_tx, interrupt_tx).await;
+        run_conversation_loop(
+            engine,
+            bridge_rx,
+            user_input_rx,
+            ui_output_tx,
+            user_msg_tx,
+            interrupt_tx,
+        )
+        .await;
     });
 
     tui.run_with_approval(approval_rx).await?;
@@ -1802,10 +1812,15 @@ mod tests {
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
         let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
 
         let loop_handle = tokio::spawn(run_conversation_loop(
-            engine, agent_rx, user_rx, ui_tx, submit_tx, interrupt_tx,
+            engine,
+            agent_rx,
+            user_rx,
+            ui_tx,
+            submit_tx,
+            interrupt_tx,
         ));
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();

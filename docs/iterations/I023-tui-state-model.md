@@ -62,17 +62,17 @@ I023 can move from Review to Complete:
 
 All five review remediation slices closed:
 
-1. **D1 Cancellation path**: Ctrl+C in TUI sends `UserInput::Cancel` → conversation bridge sends `SessionOp::Interrupt` → session actor cancels `CancellationToken` → `run_turn_with_forwarding` uses `tokio::select!` to abort the agent task on cancellation. SIGINT fallback handler added for TUI mode (defense-in-depth matching inline mode). `test_interrupt` and `test_concurrent_submit_and_interrupt` verify cancellation behavior.
+1. **D1 Cancellation path**: Ctrl+C in TUI sends `UserInput::Cancel` → conversation bridge sends `SessionOp::Interrupt` → session actor cancels `CancellationToken` → `run_turn_with_forwarding` uses `tokio::select!` to abort the agent task on cancellation. SIGINT fallback handler added for TUI mode (defense-in-depth matching inline mode). Follow-up correction: session actor now commits a successfully completed turn when `Interrupt` or `Shutdown` races after completion, preserving I024 conversation history. `test_interrupt`, `test_concurrent_submit_and_interrupt`, and `test_interrupt_after_success_preserves_history` verify cancellation/history behavior.
 
 2. **D2 Non-lossy state-critical delivery**: Replaced `broadcast::channel::<AgentEvent>(32)` with `mpsc::unbounded_channel::<AgentEvent>()` in `session.rs::run_turn_with_forwarding`. Updated `Agent::run_streaming()` signature from `broadcast::Sender` to `mpsc::UnboundedSender`. Updated RPC path. Removed all `Lagged` error handling. Zero `broadcast` usage remains in `talos-agent`, `talos-rpc`, `talos-cli`.
 
 3. **D3 Engine-owned mutation**: Verified at compile time — all `ConversationEngine` fields are `pub(crate)`. External crates (talos-cli, talos-tui) can only access engine state through public methods (`is_processing()`, `status_snapshot()`, `handle_agent_event()`, `cancel_turn()`, etc.). Zero direct field mutations from external code.
 
-4. **D4 Runtime verification**: `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace` all clean.
+4. **D4 Runtime verification**: Follow-up audit found stale formatting/clippy claims. Corrected code and re-ran `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace`; all pass on 2026-06-12.
 
-5. **D5 Closeout**: Iteration doc updated, BOARD.md updated, status moved to Complete.
+5. **D5 Closeout**: Iteration doc updated, PRODUCT-BACKLOG.md updated, BOARD.md updated, status remains Complete with current verification evidence.
 
-Files changed: `crates/talos-agent/src/lib.rs` (API signature), `crates/talos-agent/src/session.rs` (broadcast→mpsc, cancellation abort), `crates/talos-rpc/src/methods/agent.rs` (broadcast→mpsc), `crates/talos-cli/src/main.rs` (SIGINT handler).
+Files changed: `crates/talos-agent/src/lib.rs` (API signature), `crates/talos-agent/src/session.rs` (broadcast→mpsc, cancellation abort, completed-turn history commit), `crates/talos-rpc/src/methods/agent.rs` (broadcast→mpsc), `crates/talos-cli/src/main.rs` (SIGINT handler, persistence cleanup).
 
 ## Next Slice: Stream Render State
 

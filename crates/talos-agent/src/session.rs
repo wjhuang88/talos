@@ -86,15 +86,7 @@ impl AppServerSession {
                         token.cancel();
                     }
                     if let Some(handle) = current_turn.take() {
-                        if let Some(final_text) = handle.await.ok().flatten() {
-                            if let Some(user_msg) = self.pending_user_message.take() {
-                                self.history.push(Message::User { content: user_msg });
-                            }
-                            self.history.push(Message::Assistant {
-                                content: final_text,
-                                tool_calls: vec![],
-                            });
-                        }
+                        self.commit_finished_turn(handle).await;
                     }
 
                     turn_counter += 1;
@@ -130,17 +122,17 @@ impl AppServerSession {
                         let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
                         let (result_tx, result_rx) = tokio::sync::oneshot::channel::<String>();
 
-                        let _ = AssertUnwindSafe(run_turn_with_forwarding(
+                        let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                             agent,
                             message,
                             history,
                             event_tx,
                             event_rx,
                             eq_tx,
-                            token_clone,
-                            turn_id_clone,
+                            cancel_token: token_clone,
+                            turn_id: turn_id_clone,
                             result_tx,
-                        ))
+                        }))
                         .catch_unwind()
                         .await;
 
@@ -154,31 +146,59 @@ impl AppServerSession {
                         token.cancel();
                     }
                     if let Some(handle) = current_turn.take() {
-                        let _ = handle.await;
+                        self.commit_finished_turn(handle).await;
                     }
                 }
                 SessionOp::Shutdown => {
                     if let Some(handle) = current_turn.take() {
-                        let _ = handle.await;
+                        self.commit_finished_turn(handle).await;
                     }
                     break;
                 }
             }
         }
     }
+
+    async fn commit_finished_turn(&mut self, handle: JoinHandle<Option<String>>) {
+        let Some(final_text) = handle.await.ok().flatten() else {
+            return;
+        };
+
+        if let Some(user_msg) = self.pending_user_message.take() {
+            self.history.push(Message::User { content: user_msg });
+        }
+        self.history.push(Message::Assistant {
+            content: final_text,
+            tool_calls: vec![],
+        });
+    }
 }
 
-async fn run_turn_with_forwarding(
+struct TurnForwarding {
     agent: Arc<Agent>,
     message: String,
     history: Vec<talos_core::message::Message>,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
-    mut event_rx: mpsc::UnboundedReceiver<AgentEvent>,
+    event_rx: mpsc::UnboundedReceiver<AgentEvent>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     cancel_token: CancellationToken,
     turn_id: String,
     result_tx: tokio::sync::oneshot::Sender<String>,
-) {
+}
+
+async fn run_turn_with_forwarding(turn: TurnForwarding) {
+    let TurnForwarding {
+        agent,
+        message,
+        history,
+        event_tx,
+        mut event_rx,
+        eq_tx,
+        cancel_token,
+        turn_id,
+        result_tx,
+    } = turn;
+
     let eq_tx_clone = eq_tx.clone();
     let cancel_clone = cancel_token.clone();
 
@@ -198,7 +218,8 @@ async fn run_turn_with_forwarding(
         }
     });
 
-    let mut agent_task = tokio::spawn(async move { agent.run_streaming(message, history, event_tx).await });
+    let mut agent_task =
+        tokio::spawn(async move { agent.run_streaming(message, history, event_tx).await });
 
     let agent_result = tokio::select! {
         result = &mut agent_task => result,
@@ -250,7 +271,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use std::collections::VecDeque;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use talos_core::message::{Message, StopReason};
     use talos_core::provider::{LanguageModel, ProviderResult};
@@ -357,11 +378,11 @@ mod tests {
     async fn test_submit_and_receive() {
         let agent = make_agent(MockModel::new(vec![success_events("hello")]));
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -410,11 +431,11 @@ mod tests {
             success_events("second"),
         ]));
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -482,11 +503,11 @@ mod tests {
             events: slow_events,
         });
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -530,11 +551,11 @@ mod tests {
     async fn test_shutdown() {
         let agent = make_agent(MockModel::new(vec![]));
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let sq_tx = handle.sq_tx;
@@ -551,11 +572,11 @@ mod tests {
     async fn test_eq_consumer_disconnect() {
         let agent = make_agent(MockModel::new(vec![success_events("hello")]));
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let sq_tx = handle.sq_tx;
@@ -583,11 +604,11 @@ mod tests {
     async fn test_sq_backpressure() {
         let agent = make_agent(MockModel::new(vec![success_events("hello")]));
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, _actor) = AppServerSession::new(agent, config);
 
         let sq_tx = handle.sq_tx;
@@ -620,11 +641,11 @@ mod tests {
     async fn test_panic_recovery() {
         let agent = make_agent(PanicModel);
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -693,11 +714,11 @@ mod tests {
             events: slow_events,
         });
         let config = SessionConfig {
-                    print_mode: false,
-                    workspace_root: "/tmp".into(),
-                    initial_history: vec![],
-                    model_context_limit: 128_000,
-                };
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -749,7 +770,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_turn_with_history() {
-        use std::sync::Arc;
         use talos_core::message::Message;
 
         let captured_messages = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
@@ -858,6 +878,93 @@ mod tests {
             user_messages.len() >= 3,
             "Third turn should have at least 3 user messages (turns 1, 2, 3), got {}",
             user_messages.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_interrupt_after_success_preserves_history() {
+        use talos_core::message::Message;
+
+        let captured_messages = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
+        let responses = Arc::new(Mutex::new(VecDeque::from(vec![
+            success_events("first response"),
+            success_events("second response"),
+        ])));
+
+        struct CapturingModel {
+            responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+            captured: Arc<Mutex<Vec<Vec<Message>>>>,
+        }
+
+        #[async_trait]
+        impl LanguageModel for CapturingModel {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                self.captured.lock().unwrap().push(messages.to_vec());
+                let (tx, rx) = mpsc::channel(64);
+                let events = {
+                    let mut responses = self.responses.lock().unwrap();
+                    responses.pop_front().unwrap_or_default()
+                };
+                tokio::spawn(async move {
+                    for event in events {
+                        let _ = tx.send(event).await;
+                    }
+                });
+                Ok(rx)
+            }
+        }
+
+        let agent = make_agent(CapturingModel {
+            responses,
+            captured: captured_messages.clone(),
+        });
+        let config = SessionConfig {
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+
+        let sq_tx = handle.sq_tx;
+        let actor_task = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "turn 1".into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        sq_tx.send(SessionOp::Interrupt).await.unwrap();
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "turn 2".into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        sq_tx.send(SessionOp::Shutdown).await.unwrap();
+        let _ = actor_task.await;
+
+        let captured = captured_messages.lock().unwrap();
+        assert!(captured.len() >= 2, "Should have captured 2 calls");
+
+        let second_call_messages = &captured[1];
+        assert!(
+            second_call_messages
+                .iter()
+                .any(|m| matches!(m, Message::User { content } if content == "turn 1")),
+            "Second turn should retain first user message after interrupt"
+        );
+        assert!(
+            second_call_messages.iter().any(
+                |m| matches!(m, Message::Assistant { content, .. } if content == "first response")
+            ),
+            "Second turn should retain first assistant response after interrupt"
         );
     }
 }
