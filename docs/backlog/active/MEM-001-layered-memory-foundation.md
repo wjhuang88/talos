@@ -7,11 +7,12 @@ consolidation and provenance.
 
 ## Status
 
-Planned. Selected into I019.
+Planned. Selected into I019. **I024 (Working Memory + Episodic Memory wiring) is a prerequisite** —
+Semantic Memory consolidation builds on top of persisted episode history.
 
 ## Priority
 
-P2.
+P2. I024 (MEM-002) is P0 and must land first.
 
 ## Required Reads
 

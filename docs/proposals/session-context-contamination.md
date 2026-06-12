@@ -1,11 +1,28 @@
 # Session Context Contamination (P0)
 
-**Status**: Proposal — P0 (blocking daily use)  
-**Priority**: 🔴 **CRITICAL** — blocks daily use, requires immediate attention  
-**Created**: 2026-06-02  
-**Reporter**: User  
-**Estimated effort**: 4.5-5.5 days  
+**Status**: Promoted to I024 (Working Memory + Episodic Memory slice, split from I019)
+**Priority**: 🔴 **CRITICAL** — blocks daily use, requires immediate attention
+**Created**: 2026-06-02
+**Updated**: 2026-06-12 — Decision: split from I019 layered memory as standalone P0 iteration
+**Reporter**: User
 **Recommended start**: ASAP
+
+## Decision Record (2026-06-12)
+
+ADR-016 defines four memory layers (Working, Episodic, Semantic, Procedural). The conversation
+context gap is a Working Memory + Episodic Memory problem — session history exists in JSONL but is
+never loaded into the agent turn loop. The original proposal recommended a 4-phase fix embedded in
+I019, but the user decided to **split the approach**:
+
+- **I024** (this iteration): Working Memory + Episodic Memory wiring — load session history into
+  agent turn loop, apply existing compaction, persist new turns back to JSONL. Solves the P0
+  "agent has no memory" problem. Reuses existing `Session::read_messages()` and
+  `Compactor` infrastructure.
+- **I019** (future): Semantic Memory consolidation + retrieval — builds on top of I024's episodic
+  foundation. Adds fact extraction, contradiction metadata, and bounded semantic retrieval.
+
+Rationale: Working/Episodic is a **prerequisite** for Semantic (no episodes to consolidate without
+persistence). The P0 context gap makes TUI mode unreliable for any multi-turn conversation.
 
 ## Problem
 
