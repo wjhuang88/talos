@@ -636,12 +636,7 @@ impl SessionManager {
             // Try new format: SessionEntry
             if let Ok(entry) = serde_json::from_str::<SessionEntry>(&line) {
                 count += 1;
-                let preview = if entry.content.len() > 100 {
-                    format!("{}...", &entry.content[..100])
-                } else {
-                    entry.content.clone()
-                };
-                last_preview = preview;
+                last_preview = Self::preview_text(&entry.content);
                 continue;
             }
 
@@ -658,17 +653,23 @@ impl SessionManager {
                         Message::Assistant { content, .. } => content.clone(),
                         Message::Tool { result } => result.content.clone(),
                     };
-                    let preview = if content.len() > 100 {
-                        format!("{}...", &content[..100])
-                    } else {
-                        content
-                    };
-                    last_preview = preview;
+                    last_preview = Self::preview_text(&content);
                 }
             }
         }
 
         Ok((count, last_preview))
+    }
+
+    fn preview_text(content: &str) -> String {
+        const MAX_PREVIEW_CHARS: usize = 100;
+        let mut chars = content.chars();
+        let preview: String = chars.by_ref().take(MAX_PREVIEW_CHARS).collect();
+        if chars.next().is_some() {
+            format!("{preview}...")
+        } else {
+            preview
+        }
     }
 
     fn get_or_create_index(
@@ -1101,6 +1102,57 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].content, "Hello");
         assert_eq!(entries[1].content, "Hi there");
+    }
+
+    #[test]
+    fn list_sessions_preview_handles_utf8_char_boundary() {
+        let manager = test_manager();
+        let session = manager.create_session("test-project").unwrap();
+        let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
+
+        session.append(&Message::User { content }).unwrap();
+
+        let sessions = manager.list_sessions().unwrap();
+        let info = sessions
+            .iter()
+            .find(|info| info.id == session.id)
+            .expect("session should be listed");
+        assert!(info.last_message_preview.ends_with("..."));
+        assert!(
+            info.last_message_preview
+                .is_char_boundary(info.last_message_preview.len())
+        );
+    }
+
+    #[test]
+    fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
+        let manager = test_manager();
+        let session = manager.create_session("test-project").unwrap();
+        let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
+
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(&session.file_path)
+            .unwrap();
+        let old_entry = serde_json::json!({
+            "type": "message",
+            "data": {
+                "role": "user",
+                "content": content
+            }
+        });
+        writeln!(file, "{old_entry}").unwrap();
+
+        let sessions = manager.list_sessions().unwrap();
+        let info = sessions
+            .iter()
+            .find(|info| info.id == session.id)
+            .expect("session should be listed");
+        assert!(info.last_message_preview.ends_with("..."));
+        assert!(
+            info.last_message_preview
+                .is_char_boundary(info.last_message_preview.len())
+        );
     }
 
     #[test]
