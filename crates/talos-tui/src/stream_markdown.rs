@@ -56,10 +56,12 @@ pub(crate) enum BlockDecision {
     },
     FinishHold {
         status: HoldStatus,
+        kind: MarkdownBlockKind,
         lines: Vec<String>,
     },
     FallbackImmediate {
         status: HoldStatus,
+        kind: MarkdownBlockKind,
         reason: FallbackReason,
         lines: Vec<String>,
     },
@@ -131,6 +133,7 @@ impl StreamBlockClassifier {
                             self.state = ClassifierState::Plain;
                             decisions.push(BlockDecision::FinishHold {
                                 status,
+                                kind: MarkdownBlockKind::CodeFence,
                                 lines: rendered,
                             });
                         } else if held_block_too_large(&lines) {
@@ -142,6 +145,7 @@ impl StreamBlockClassifier {
                             self.state = ClassifierState::Plain;
                             decisions.push(BlockDecision::FallbackImmediate {
                                 status,
+                                kind: MarkdownBlockKind::CodeFence,
                                 reason: FallbackReason::HeldBlockTooLarge,
                                 lines,
                             });
@@ -171,6 +175,7 @@ impl StreamBlockClassifier {
                                 self.state = ClassifierState::Plain;
                                 decisions.push(BlockDecision::FallbackImmediate {
                                     status,
+                                    kind: MarkdownBlockKind::Table,
                                     reason: FallbackReason::HeldBlockTooLarge,
                                     lines,
                                 });
@@ -197,6 +202,7 @@ impl StreamBlockClassifier {
                             self.state = ClassifierState::Plain;
                             decisions.push(BlockDecision::FinishHold {
                                 status,
+                                kind: MarkdownBlockKind::Table,
                                 lines: rendered,
                             });
                             next = Some(line);
@@ -226,6 +232,7 @@ impl StreamBlockClassifier {
                             self.state = ClassifierState::Plain;
                             decisions.push(BlockDecision::FinishHold {
                                 status,
+                                kind: MarkdownBlockKind::List,
                                 lines: rendered,
                             });
                             next = Some(line);
@@ -255,6 +262,7 @@ impl StreamBlockClassifier {
                             self.state = ClassifierState::Plain;
                             decisions.push(BlockDecision::FinishHold {
                                 status,
+                                kind: MarkdownBlockKind::Quote,
                                 lines: rendered,
                             });
                             next = Some(line);
@@ -284,12 +292,14 @@ impl StreamBlockClassifier {
                 if kind == MarkdownBlockKind::CodeFence {
                     vec![BlockDecision::FallbackImmediate {
                         status,
+                        kind: MarkdownBlockKind::CodeFence,
                         reason: FallbackReason::UnterminatedCodeFence,
                         lines,
                     }]
                 } else {
                     vec![BlockDecision::FinishHold {
                         status,
+                        kind: kind.clone(),
                         lines: render_block(&kind, &lines),
                     }]
                 }

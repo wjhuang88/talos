@@ -34,8 +34,13 @@ This story makes the state machine explicit, auditable, and bus-ready.
 
 ## Status
 
-Planned. Depends on TUI-002 sub-slice A (I022, landed) for the inline-by-default
+Review. Depends on TUI-002 sub-slice A (I022, landed) for the inline-by-default
 viewport model. Independent of TUI-002 sub-slices B-E (bottom_pane, etc.).
+I023 has landed the event-driven `talos-conversation` boundary, Codex-style
+single-row history insertion, multiline user blocks, one-row streaming preview,
+Markdown block classification, and conservative styled Markdown rendering for
+assistant/tool/system/error streams. Remaining closure work is tracked in the
+I023 one-week handoff plan.
 
 ## Priority
 
@@ -224,7 +229,7 @@ yet — the channel is the interface contract.
 - `ChatLine` enum is removed; all references use `ChatMessage`.
 - `status_message` field is removed; all references use `Tip`.
 - `chat_lines` field is removed; all references use `messages`.
-- All 127+ existing tests pass after migration.
+- All focused TUI/conversation tests pass after migration.
 - `cargo check --workspace` and `cargo test --workspace` exit 0.
 
 ## Dependencies

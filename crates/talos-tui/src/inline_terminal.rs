@@ -4,7 +4,9 @@ use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
     event::{DisableBracketedPaste, EnableBracketedPaste},
     execute, queue,
-    style::{Color as CColor, Print, SetBackgroundColor, SetForegroundColor},
+    style::{
+        Attribute, Color as CColor, Print, SetAttribute, SetBackgroundColor, SetForegroundColor,
+    },
     terminal::{self, Clear, ClearType, EnableLineWrap},
 };
 use ratatui::{
@@ -42,6 +44,39 @@ impl<'a> InlineFrame<'a> {
 pub trait ViewportComponent {
     fn height_hint(&self, available_width: u16) -> u16;
     fn render(&self, frame: &mut InlineFrame, area: Rect);
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct HistoryAttrs {
+    pub(crate) bold: bool,
+    pub(crate) italic: bool,
+    pub(crate) underlined: bool,
+    pub(crate) dim: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HistorySegment {
+    pub(crate) text: String,
+    pub(crate) fg: Option<CColor>,
+    pub(crate) attrs: HistoryAttrs,
+}
+
+impl HistorySegment {
+    pub(crate) fn raw(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            fg: None,
+            attrs: HistoryAttrs::default(),
+        }
+    }
+
+    pub(crate) fn styled(text: impl Into<String>, fg: Option<CColor>, attrs: HistoryAttrs) -> Self {
+        Self {
+            text: text.into(),
+            fg,
+            attrs,
+        }
+    }
 }
 
 pub struct ComponentStack<'a> {
@@ -242,27 +277,37 @@ impl InlineTerminal {
     }
 
     pub fn insert_history(&mut self, line: &str, bg: Option<CColor>) -> io::Result<()> {
+        self.insert_styled_history(&[HistorySegment::raw(line)], bg)
+    }
+
+    pub(crate) fn insert_styled_history(
+        &mut self,
+        segments: &[HistorySegment],
+        bg: Option<CColor>,
+    ) -> io::Result<()> {
         let screen_height = self.screen_size.height;
         let line_width = self.screen_size.width;
         let mut area = self.viewport_area;
         let writer = self.backend_mut();
 
-        let styled_print =
-            |w: &mut CrosstermBackend<Stdout>, text: &str, bg: Option<CColor>| -> io::Result<()> {
-                if let Some(color) = bg {
-                    queue!(w, SetBackgroundColor(color))?;
-                    print_line_with_prefix_color(w, text)?;
-                    let text_width = unicode_width::UnicodeWidthStr::width(text);
-                    if text_width < line_width as usize {
-                        queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
-                    }
-                    queue!(w, SetForegroundColor(CColor::Reset))?;
-                    queue!(w, SetBackgroundColor(CColor::Reset))?;
-                } else {
-                    print_line_with_prefix_color(w, text)?;
+        let styled_print = |w: &mut CrosstermBackend<Stdout>,
+                            segments: &[HistorySegment],
+                            bg: Option<CColor>|
+         -> io::Result<()> {
+            if let Some(color) = bg {
+                queue!(w, SetBackgroundColor(color))?;
+                print_segments(w, segments)?;
+                let text_width = segments_width(segments);
+                if text_width < line_width as usize {
+                    queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
                 }
-                Ok(())
-            };
+                queue!(w, SetForegroundColor(CColor::Reset))?;
+                queue!(w, SetBackgroundColor(CColor::Reset))?;
+            } else {
+                print_segments(w, segments)?;
+            }
+            Ok(())
+        };
 
         if area.bottom() < screen_height {
             let top_1based = area.top() + 1;
@@ -276,7 +321,7 @@ impl InlineTerminal {
             area.y += 1;
             queue!(writer, MoveTo(0, area.top() - 1))?;
             queue!(writer, Clear(ClearType::UntilNewLine))?;
-            styled_print(writer, line, bg)?;
+            styled_print(writer, segments, bg)?;
         } else if area.top() > 1 {
             queue!(
                 writer,
@@ -285,7 +330,7 @@ impl InlineTerminal {
             queue!(writer, MoveTo(0, area.top() - 1))?;
             queue!(writer, crossterm::style::Print("\r\n"))?;
             queue!(writer, Clear(ClearType::UntilNewLine))?;
-            styled_print(writer, line, bg)?;
+            styled_print(writer, segments, bg)?;
             queue!(writer, crossterm::style::Print("\x1b[r"))?;
         }
 
@@ -331,38 +376,50 @@ impl InlineTerminal {
     }
 }
 
-fn print_line_with_prefix_color(
+fn print_segments(
     writer: &mut CrosstermBackend<Stdout>,
-    text: &str,
+    segments: &[HistorySegment],
 ) -> io::Result<()> {
-    if let Some(rest) = text.strip_prefix(" > ") {
-        queue!(
-            writer,
-            SetForegroundColor(CColor::Rgb {
-                r: 0xA3,
-                g: 0xBE,
-                b: 0x8C,
-            })
-        )?;
-        queue!(writer, Print(" > "))?;
+    for segment in segments {
+        if let Some(fg) = segment.fg {
+            queue!(writer, SetForegroundColor(fg))?;
+        }
+        set_attrs(writer, segment.attrs)?;
+        queue!(writer, Print(&segment.text))?;
+        clear_attrs(writer)?;
         queue!(writer, SetForegroundColor(CColor::Reset))?;
-        queue!(writer, Print(rest))?;
-    } else if let Some(rest) = text.strip_prefix(" ◆ ") {
-        queue!(
-            writer,
-            SetForegroundColor(CColor::Rgb {
-                r: 0x88,
-                g: 0xC0,
-                b: 0xD0,
-            })
-        )?;
-        queue!(writer, Print(" ◆ "))?;
-        queue!(writer, SetForegroundColor(CColor::Reset))?;
-        queue!(writer, Print(rest))?;
-    } else {
-        queue!(writer, Print(text))?;
     }
     Ok(())
+}
+
+fn set_attrs(writer: &mut CrosstermBackend<Stdout>, attrs: HistoryAttrs) -> io::Result<()> {
+    if attrs.bold {
+        queue!(writer, SetAttribute(Attribute::Bold))?;
+    }
+    if attrs.italic {
+        queue!(writer, SetAttribute(Attribute::Italic))?;
+    }
+    if attrs.underlined {
+        queue!(writer, SetAttribute(Attribute::Underlined))?;
+    }
+    if attrs.dim {
+        queue!(writer, SetAttribute(Attribute::Dim))?;
+    }
+    Ok(())
+}
+
+fn clear_attrs(writer: &mut CrosstermBackend<Stdout>) -> io::Result<()> {
+    queue!(writer, SetAttribute(Attribute::NormalIntensity))?;
+    queue!(writer, SetAttribute(Attribute::NoItalic))?;
+    queue!(writer, SetAttribute(Attribute::NoUnderline))?;
+    Ok(())
+}
+
+fn segments_width(segments: &[HistorySegment]) -> usize {
+    segments
+        .iter()
+        .map(|segment| unicode_width::UnicodeWidthStr::width(segment.text.as_str()))
+        .sum()
 }
 
 impl Drop for InlineTerminal {

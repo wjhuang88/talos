@@ -3,9 +3,10 @@
 ## Status
 
 Proposal and implementation guide for the TUI stream renderer. The first
-classifier slice landed during I023: block detection, hold status, plain-text
-fallbacks, and table alignment are implemented in `talos-tui`. Rich styled spans
-and full CommonMark support remain future work.
+classifier and renderer slices landed during I023: block detection, hold
+status, plain-text fallbacks, table alignment, styled history spans, prefix
+colors, and conservative inline Markdown rendering are implemented in
+`talos-tui`. Full CommonMark support remains future work.
 
 ## Goals
 
@@ -33,7 +34,7 @@ StreamMessage { source, stream }
   -> StreamBlockClassifier
   -> MarkdownLineRenderer / MarkdownBlockRenderer
   -> Vec<ScrollbackLine>
-  -> InlineTerminal::insert_history(line, bg)
+  -> InlineTerminal::insert_history / insert_styled_history
 ```
 
 `talos-conversation` emits semantic streams only. `talos-tui` owns display
@@ -105,17 +106,19 @@ Initial supported inline forms:
 | Markdown form | Recognition | Rendering |
 |---|---|---|
 | Plain text | Default | Unstyled text |
-| Inline code | Balanced backticks on one line, e.g. `` `cmd` `` | Code span style when history styling supports spans; plain text fallback keeps backticks or uses local convention |
-| Strong | Balanced `**text**` or `__text__` on one line | Bold style when supported; plain text fallback preserves original markers |
-| Emphasis | Balanced `*text*` or `_text_` on one line | Italic/dim style when supported; plain text fallback preserves original markers |
-| Link | `[label](url)` on one line | Render label and URL in a stable terminal form; do not split URL tokens during wrapping |
-| Heading | `# ` through `###### ` on one line | Emphasized heading row; no extra vertical spacing in the first slice |
+| Inline code | Balanced backticks on one line, e.g. `` `cmd` `` | Strip delimiters and render code span with code color |
+| Strong | Balanced `**text**` or `__text__` on one line | Strip delimiters and render bold |
+| Emphasis | Balanced `*text*` or `_text_` on one line | Strip delimiters and render italic/dim |
+| Link | `[label](url)` on one line | Render label as underlined link text and append dim ` (url)` |
+| Heading | `# ` through `###### ` on one line | Strip heading marker, render emphasized heading row, no extra vertical spacing |
 
 Recognition is conservative. If delimiters are unbalanced or the line is
 ambiguous, render it as plain text rather than entering a hold state.
 
 Inline detection never delays a completed line. If a line cannot be rendered
 confidently as inline Markdown, it is emitted as plain text immediately.
+User-authored streams are rendered literal: pasted input keeps Markdown markers
+visible and never enters the Markdown block classifier.
 
 ## Block Markdown
 
@@ -127,10 +130,10 @@ Initial supported block forms:
 
 | Block kind | Start condition | End condition | Preview status | First-slice rendering |
 |---|---|---|---|---|
-| Fenced code block | Line starts with triple backticks or tildes | Matching closing fence line, or stream finish fallback | `receiving code block...` | Preserve lines with code styling when available; plain text fallback keeps fences |
-| Markdown table | Header row with pipes followed by separator row | Blank line, non-table line, or stream finish | `rendering table...` | Align columns by display width; fallback to original rows if alignment fails |
-| List block | Consecutive `- `, `* `, `+ `, or ordered `1. ` lines | Blank line or non-list line | `formatting list...` | Preserve marker and continuation indentation |
-| Block quote | Consecutive `> ` lines | Blank line or non-quote line | `formatting quote...` | Preserve quote marker with dim style when available |
+| Fenced code block | Line starts with triple backticks or tildes | Matching closing fence line, or stream finish fallback | `receiving code block...` | Preserve fences, style fence rows dim and code rows with code color |
+| Markdown table | Header row with pipes followed by separator row | Blank line, non-table line, or stream finish | `rendering table...` | Align columns by display width, bold header, dim separator; fallback to original rows if alignment fails |
+| List block | Consecutive `- `, `* `, `+ `, or ordered `1. ` lines | Blank line or non-list line | `formatting list...` | Preserve marker and indentation, style marker, render inline Markdown in item body |
+| Block quote | Consecutive `> ` lines | Blank line or non-quote line | `formatting quote...` | Preserve quote marker, style marker, render quote body dim |
 
 Fenced code blocks suppress other block recognizers until the closing fence is
 seen. For example, a pipe-delimited line inside a code fence must not start a
@@ -248,32 +251,33 @@ No fallback path may drop buffered text.
    preservation. Every renderer keeps a plain fallback.
 5. Add richer styled row support only after the plain row path is stable.
 
+I023 implementation status:
+
+- Slices 1-5 have landed for the conservative first renderer.
+- `ScrollbackLine` now carries visible `text`, styled `HistorySegment`s, and
+  optional background color.
+- `InlineTerminal` remains a single-row writer; styled rows use
+  `insert_styled_history`, while plain rows can still use `insert_history`.
+- User streams intentionally bypass Markdown parsing and stay literal.
+
 ## History Rendering Contract
 
 `InlineTerminal` receives already-rendered rows and remains ignorant of
-Markdown. A future richer history row may carry spans, but the terminal writer
-still inserts finalized rows above the viewport.
-
-First slice:
+Markdown. A history row carries both its visible fallback text and the styled
+segments used for terminal output. The terminal writer still inserts finalized
+rows above the viewport one line at a time.
 
 ```rust
 struct ScrollbackLine {
     text: String,
+    segments: Vec<HistorySegment>,
     bg: Option<CColor>,
 }
 ```
 
-Future slice:
-
-```rust
-struct RenderedHistoryRow {
-    cells: Vec<StyledSegment>,
-    bg: Option<CColor>,
-}
-```
-
-Until the future slice lands, Markdown renderers must have a plain-text fallback
-that preserves content.
+Markdown renderers must keep `text` as a stable visible fallback so tests,
+copy/export paths, and terminal-width padding are not coupled to specific ANSI
+style decisions.
 
 ## Test Matrix
 
@@ -310,7 +314,7 @@ Integration tests:
   flushes aligned rows to history.
 - Text before and after a held block remains visible in order.
 - Pasted multiline user input remains one user block and does not run Markdown
-  block detection unless user-message Markdown rendering is explicitly enabled.
+  block detection.
 
 ## Alternatives Considered
 
@@ -323,10 +327,6 @@ Integration tests:
 
 ## Open Questions
 
-- Whether user messages should opt into Markdown rendering or stay literal by
-  default.
-- Whether first-slice inline styling should preserve Markdown markers in
-  history or strip them when styled spans become available.
 - Exact byte/line thresholds for held blocks before fallback.
 - Whether table alignment should consider East Asian wide characters from the
   start or initially reuse the existing display-width utilities only.

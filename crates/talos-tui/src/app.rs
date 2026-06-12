@@ -20,10 +20,12 @@ use talos_core::TuiApprovalRequest;
 use tokio::sync::mpsc;
 
 use crate::evolution::{self, EvolutionPanel};
-use crate::inline_terminal::{ComponentStack, InlineFrame, InlineTerminal, ViewportComponent};
+use crate::inline_terminal::{
+    ComponentStack, HistoryAttrs, HistorySegment, InlineFrame, InlineTerminal, ViewportComponent,
+};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
-use crate::stream_markdown::{BlockDecision, HoldStatus, StreamBlockClassifier};
+use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
 use crate::widgets::ApprovalOverlay;
 
 const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
@@ -35,10 +37,42 @@ fn to_crossterm_color(c: Color) -> Option<CColor> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub(crate) struct ScrollbackLine {
     pub(crate) text: String,
+    segments: Vec<HistorySegment>,
     bg: Option<CColor>,
+}
+
+impl PartialEq for ScrollbackLine {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text && self.bg == other.bg
+    }
+}
+
+impl ScrollbackLine {
+    fn plain(text: impl Into<String>, bg: Option<CColor>) -> Self {
+        let text = text.into();
+        Self {
+            segments: vec![HistorySegment::raw(text.clone())],
+            text,
+            bg,
+        }
+    }
+
+    fn styled(segments: Vec<HistorySegment>, bg: Option<CColor>) -> Self {
+        let text = segments
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect::<String>();
+        Self { text, segments, bg }
+    }
+
+    fn has_plain_segments_only(&self) -> bool {
+        self.segments
+            .iter()
+            .all(|segment| segment.fg.is_none() && segment.attrs == HistoryAttrs::default())
+    }
 }
 
 #[derive(Default)]
@@ -74,10 +108,7 @@ impl StreamRenderState {
         self.hold_status = None;
 
         if bg.is_some() {
-            vec![ScrollbackLine {
-                text: String::new(),
-                bg,
-            }]
+            vec![ScrollbackLine::plain(String::new(), bg)]
         } else {
             Vec::new()
         }
@@ -128,33 +159,91 @@ impl StreamRenderState {
         }
 
         if self.bg().is_some() {
-            lines.push(ScrollbackLine {
-                text: String::new(),
-                bg: self.bg(),
-            });
+            lines.push(ScrollbackLine::plain(String::new(), self.bg()));
         }
 
         self.reset();
         lines
     }
 
-    fn render_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
+    fn render_line(
+        &self,
+        line_index: usize,
+        line: &str,
+        block: Option<(&MarkdownBlockKind, usize)>,
+    ) -> ScrollbackLine {
         let padding = stream_padding_for(self.source(), line_index);
-        ScrollbackLine {
-            text: format!("{padding}{line}"),
-            bg: self.bg(),
-        }
+        let mut segments = vec![HistorySegment::styled(
+            padding,
+            prefix_color_for(self.source(), line_index),
+            HistoryAttrs {
+                bold: line_index == 0 && self.source().is_some(),
+                ..HistoryAttrs::default()
+            },
+        )];
+        segments.extend(render_markdown_segments(line, block));
+        ScrollbackLine::styled(segments, self.bg())
     }
 
-    fn render_next_line(&mut self, line: &str) -> ScrollbackLine {
-        let rendered = self.render_line(self.line_count, line);
+    fn render_plain_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
+        let padding = stream_padding_for(self.source(), line_index);
+        let segments = vec![
+            HistorySegment::styled(
+                padding,
+                prefix_color_for(self.source(), line_index),
+                HistoryAttrs {
+                    bold: line_index == 0 && self.source().is_some(),
+                    ..HistoryAttrs::default()
+                },
+            ),
+            HistorySegment::raw(line),
+        ];
+        ScrollbackLine::styled(segments, self.bg())
+    }
+
+    fn render_block_line(
+        &mut self,
+        line: &str,
+        kind: &MarkdownBlockKind,
+        block_line_index: usize,
+    ) -> ScrollbackLine {
+        let rendered = self.render_line(self.line_count, line, Some((kind, block_line_index)));
         self.line_count += 1;
         rendered
     }
 
+    fn render_next_line(&mut self, line: &str) -> ScrollbackLine {
+        let rendered = if self.markdown_enabled() {
+            self.render_line(self.line_count, line, None)
+        } else {
+            self.render_plain_line(self.line_count, line)
+        };
+        self.line_count += 1;
+        rendered
+    }
+
+    fn render_block_lines(
+        &mut self,
+        kind: &MarkdownBlockKind,
+        block_lines: Vec<String>,
+    ) -> Vec<ScrollbackLine> {
+        let mut rendered = Vec::with_capacity(block_lines.len());
+        for (block_line_index, line) in block_lines.into_iter().enumerate() {
+            rendered.push(self.render_block_line(&line, kind, block_line_index));
+        }
+        rendered
+    }
+
     fn push_complete_line(&mut self, line: String) -> Vec<ScrollbackLine> {
+        if !self.markdown_enabled() {
+            return vec![self.render_next_line(&line)];
+        }
         let decisions = self.block_classifier.push_line(line);
         self.apply_block_decisions(decisions)
+    }
+
+    fn markdown_enabled(&self) -> bool {
+        !matches!(self.source(), Some(MessageSource::User))
     }
 
     fn apply_block_decisions(&mut self, decisions: Vec<BlockDecision>) -> Vec<ScrollbackLine> {
@@ -174,24 +263,22 @@ impl StreamRenderState {
                 }
                 BlockDecision::FinishHold {
                     status: _,
+                    kind,
                     lines: rendered,
                 } => {
                     self.hold_status = None;
                     self.preview = self.buffer.clone();
-                    for line in rendered {
-                        lines.push(self.render_next_line(&line));
-                    }
+                    lines.extend(self.render_block_lines(&kind, rendered));
                 }
                 BlockDecision::FallbackImmediate {
                     status: _,
+                    kind,
                     reason: _,
                     lines: rendered,
                 } => {
                     self.hold_status = None;
                     self.preview = self.buffer.clone();
-                    for line in rendered {
-                        lines.push(self.render_next_line(&line));
-                    }
+                    lines.extend(self.render_block_lines(&kind, rendered));
                 }
             }
         }
@@ -653,7 +740,12 @@ impl Tui {
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
         for line in &lines {
-            self.terminal.insert_history(&line.text, line.bg)?;
+            if line.has_plain_segments_only() {
+                self.terminal.insert_history(&line.text, line.bg)?;
+            } else {
+                self.terminal
+                    .insert_styled_history(&line.segments, line.bg)?;
+            }
         }
         Ok(())
     }
@@ -919,16 +1011,385 @@ fn stream_bg_for(source: Option<&MessageSource>) -> Option<CColor> {
     }
 }
 
+fn prefix_color_for(source: Option<&MessageSource>, line_index: usize) -> Option<CColor> {
+    if line_index > 0 {
+        return None;
+    }
+
+    match source {
+        Some(MessageSource::User) => Some(CColor::Rgb {
+            r: 0xA3,
+            g: 0xBE,
+            b: 0x8C,
+        }),
+        Some(MessageSource::Assistant) | Some(MessageSource::Tool { .. }) => Some(CColor::Rgb {
+            r: 0x88,
+            g: 0xC0,
+            b: 0xD0,
+        }),
+        Some(MessageSource::System) => Some(CColor::Rgb {
+            r: 0xB4,
+            g: 0x8E,
+            b: 0xAD,
+        }),
+        Some(MessageSource::Error) => Some(CColor::Rgb {
+            r: 0xBF,
+            g: 0x61,
+            b: 0x6C,
+        }),
+        None => None,
+    }
+}
+
 fn stream_opening_lines(stream_count: usize, opening: Vec<ScrollbackLine>) -> Vec<ScrollbackLine> {
     let mut lines = Vec::new();
     if stream_count > 0 {
-        lines.push(ScrollbackLine {
-            text: String::new(),
-            bg: None,
-        });
+        lines.push(ScrollbackLine::plain(String::new(), None));
     }
     lines.extend(opening);
     lines
+}
+
+fn render_markdown_segments(
+    line: &str,
+    block: Option<(&MarkdownBlockKind, usize)>,
+) -> Vec<HistorySegment> {
+    match block {
+        Some((MarkdownBlockKind::CodeFence, _)) => render_code_block_line(line),
+        Some((MarkdownBlockKind::Table, row_index)) => render_table_history_line(line, row_index),
+        Some((MarkdownBlockKind::List, _)) => render_list_line(line),
+        Some((MarkdownBlockKind::Quote, _)) => render_quote_line(line),
+        None => render_inline_markdown(line),
+    }
+}
+
+fn render_code_block_line(line: &str) -> Vec<HistorySegment> {
+    let trimmed = line.trim_start();
+    let attrs = if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+        HistoryAttrs {
+            dim: true,
+            ..HistoryAttrs::default()
+        }
+    } else {
+        HistoryAttrs::default()
+    };
+    vec![HistorySegment::styled(
+        line,
+        Some(CColor::Rgb {
+            r: 0xE5,
+            g: 0xC0,
+            b: 0x7B,
+        }),
+        attrs,
+    )]
+}
+
+fn render_table_history_line(line: &str, row_index: usize) -> Vec<HistorySegment> {
+    let attrs = HistoryAttrs {
+        bold: row_index == 0,
+        dim: row_index == 1,
+        ..HistoryAttrs::default()
+    };
+    vec![HistorySegment::styled(
+        line,
+        Some(if row_index == 1 {
+            CColor::Rgb {
+                r: 0x4C,
+                g: 0x56,
+                b: 0x6A,
+            }
+        } else {
+            CColor::Rgb {
+                r: 0xD8,
+                g: 0xDE,
+                b: 0xE9,
+            }
+        }),
+        attrs,
+    )]
+}
+
+fn render_list_line(line: &str) -> Vec<HistorySegment> {
+    let Some((prefix, body)) = split_list_marker(line) else {
+        return render_inline_markdown(line);
+    };
+    let mut segments = vec![HistorySegment::styled(
+        prefix,
+        Some(CColor::Rgb {
+            r: 0xA3,
+            g: 0xBE,
+            b: 0x8C,
+        }),
+        HistoryAttrs {
+            bold: true,
+            ..HistoryAttrs::default()
+        },
+    )];
+    segments.extend(render_inline_markdown(body));
+    segments
+}
+
+fn render_quote_line(line: &str) -> Vec<HistorySegment> {
+    let indent_len = line.len() - line.trim_start().len();
+    let (indent, rest) = line.split_at(indent_len);
+    let rest = rest.strip_prefix('>').unwrap_or(rest);
+    let rest = rest.strip_prefix(' ').unwrap_or(rest);
+    let mut segments = Vec::new();
+    if !indent.is_empty() {
+        segments.push(HistorySegment::raw(indent));
+    }
+    segments.push(HistorySegment::styled(
+        "> ",
+        Some(CColor::Rgb {
+            r: 0x88,
+            g: 0xC0,
+            b: 0xD0,
+        }),
+        HistoryAttrs {
+            bold: true,
+            ..HistoryAttrs::default()
+        },
+    ));
+    for mut segment in render_inline_markdown(rest) {
+        segment.attrs.dim = true;
+        if segment.fg.is_none() {
+            segment.fg = Some(CColor::Rgb {
+                r: 0xD8,
+                g: 0xDE,
+                b: 0xE9,
+            });
+        }
+        segments.push(segment);
+    }
+    segments
+}
+
+fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
+    if let Some((indent, marker, heading)) = split_heading(line) {
+        let mut segments = Vec::new();
+        if !indent.is_empty() {
+            segments.push(HistorySegment::raw(indent));
+        }
+        if heading.is_empty() {
+            segments.push(HistorySegment::raw(marker));
+        } else {
+            for mut segment in parse_inline_delimiters(heading) {
+                segment.attrs.bold = true;
+                if segment.fg.is_none() {
+                    segment.fg = Some(CColor::Rgb {
+                        r: 0x88,
+                        g: 0xC0,
+                        b: 0xD0,
+                    });
+                }
+                segments.push(segment);
+            }
+        }
+        return segments;
+    }
+
+    parse_inline_delimiters(line)
+}
+
+fn split_heading(line: &str) -> Option<(&str, &str, &str)> {
+    let indent_len = line.len() - line.trim_start().len();
+    let (indent, rest) = line.split_at(indent_len);
+    let marker_len = rest.chars().take_while(|ch| *ch == '#').count();
+    if marker_len == 0 || marker_len > 6 {
+        return None;
+    }
+    let marker_end = marker_len;
+    let after_marker = rest.get(marker_end..)?;
+    if !after_marker.starts_with(' ') {
+        return None;
+    }
+    Some((indent, &rest[..=marker_end], after_marker.trim_start()))
+}
+
+fn parse_inline_delimiters(line: &str) -> Vec<HistorySegment> {
+    let mut segments = Vec::new();
+    let mut plain = String::new();
+    let mut rest = line;
+
+    while !rest.is_empty() {
+        if let Some(after_tick) = rest.strip_prefix('`')
+            && let Some(end) = after_tick.find('`')
+        {
+            push_plain_segment(&mut segments, &mut plain);
+            let (code, after) = after_tick.split_at(end);
+            segments.push(HistorySegment::styled(
+                code,
+                Some(CColor::Rgb {
+                    r: 0xE5,
+                    g: 0xC0,
+                    b: 0x7B,
+                }),
+                HistoryAttrs::default(),
+            ));
+            rest = &after[1..];
+            continue;
+        }
+
+        if let Some(after_marker) = rest.strip_prefix("**")
+            && let Some(end) = after_marker.find("**")
+        {
+            push_plain_segment(&mut segments, &mut plain);
+            let (strong, after) = after_marker.split_at(end);
+            segments.push(HistorySegment::styled(
+                strong,
+                Some(CColor::Rgb {
+                    r: 0xE5,
+                    g: 0xE9,
+                    b: 0xF0,
+                }),
+                HistoryAttrs {
+                    bold: true,
+                    ..HistoryAttrs::default()
+                },
+            ));
+            rest = &after[2..];
+            continue;
+        }
+
+        if let Some(after_marker) = rest.strip_prefix("__")
+            && let Some(end) = after_marker.find("__")
+        {
+            push_plain_segment(&mut segments, &mut plain);
+            let (strong, after) = after_marker.split_at(end);
+            segments.push(HistorySegment::styled(
+                strong,
+                Some(CColor::Rgb {
+                    r: 0xE5,
+                    g: 0xE9,
+                    b: 0xF0,
+                }),
+                HistoryAttrs {
+                    bold: true,
+                    ..HistoryAttrs::default()
+                },
+            ));
+            rest = &after[2..];
+            continue;
+        }
+
+        if let Some(after_bracket) = rest.strip_prefix('[')
+            && let Some(label_end) = after_bracket.find("](")
+        {
+            let (label, after_label) = after_bracket.split_at(label_end);
+            let after_url_start = &after_label[2..];
+            if let Some(url_end) = after_url_start.find(')') {
+                push_plain_segment(&mut segments, &mut plain);
+                let (url, after_url) = after_url_start.split_at(url_end);
+                segments.push(HistorySegment::styled(
+                    label,
+                    Some(CColor::Rgb {
+                        r: 0x88,
+                        g: 0xC0,
+                        b: 0xD0,
+                    }),
+                    HistoryAttrs {
+                        underlined: true,
+                        ..HistoryAttrs::default()
+                    },
+                ));
+                if !url.is_empty() {
+                    segments.push(HistorySegment::styled(
+                        format!(" ({url})"),
+                        Some(CColor::Rgb {
+                            r: 0x4C,
+                            g: 0x56,
+                            b: 0x6A,
+                        }),
+                        HistoryAttrs {
+                            dim: true,
+                            ..HistoryAttrs::default()
+                        },
+                    ));
+                }
+                rest = &after_url[1..];
+                continue;
+            }
+        }
+
+        if let Some(after_marker) = rest.strip_prefix('*')
+            && !after_marker.starts_with('*')
+            && let Some(end) = after_marker.find('*')
+        {
+            push_plain_segment(&mut segments, &mut plain);
+            let (emphasis, after) = after_marker.split_at(end);
+            segments.push(HistorySegment::styled(
+                emphasis,
+                Some(CColor::Rgb {
+                    r: 0xD8,
+                    g: 0xDE,
+                    b: 0xE9,
+                }),
+                HistoryAttrs {
+                    italic: true,
+                    ..HistoryAttrs::default()
+                },
+            ));
+            rest = &after[1..];
+            continue;
+        }
+
+        if let Some(after_marker) = rest.strip_prefix('_')
+            && !after_marker.starts_with('_')
+            && let Some(end) = after_marker.find('_')
+        {
+            push_plain_segment(&mut segments, &mut plain);
+            let (emphasis, after) = after_marker.split_at(end);
+            segments.push(HistorySegment::styled(
+                emphasis,
+                Some(CColor::Rgb {
+                    r: 0xD8,
+                    g: 0xDE,
+                    b: 0xE9,
+                }),
+                HistoryAttrs {
+                    italic: true,
+                    ..HistoryAttrs::default()
+                },
+            ));
+            rest = &after[1..];
+            continue;
+        }
+
+        let ch = rest.chars().next().expect("rest is not empty");
+        plain.push(ch);
+        rest = &rest[ch.len_utf8()..];
+    }
+
+    push_plain_segment(&mut segments, &mut plain);
+    if segments.is_empty() {
+        vec![HistorySegment::raw("")]
+    } else {
+        segments
+    }
+}
+
+fn push_plain_segment(segments: &mut Vec<HistorySegment>, plain: &mut String) {
+    if !plain.is_empty() {
+        segments.push(HistorySegment::raw(std::mem::take(plain)));
+    }
+}
+
+fn split_list_marker(line: &str) -> Option<(&str, &str)> {
+    let trimmed_start = line.len() - line.trim_start().len();
+    let rest = &line[trimmed_start..];
+    for marker in ["- ", "* ", "+ "] {
+        if let Some(body) = rest.strip_prefix(marker) {
+            return Some((&line[..trimmed_start + marker.len()], body));
+        }
+    }
+    let dot = rest.find('.')?;
+    if dot == 0 || !rest[..dot].chars().all(|ch| ch.is_ascii_digit()) {
+        return None;
+    }
+    rest.get(dot + 1..)
+        .and_then(|after| after.starts_with(' ').then_some(()))?;
+    let marker_len = dot + 2;
+    Some((&line[..trimmed_start + marker_len], &rest[marker_len..]))
 }
 
 pub(crate) fn input_line_count(buffer: &str) -> u16 {
@@ -1048,28 +1509,13 @@ mod tests {
         let mut state = StreamRenderState::default();
         assert!(state.start(MessageSource::Assistant).is_empty());
 
-        assert_eq!(
-            state.push_chunk("first\nsec"),
-            vec![ScrollbackLine {
-                text: " ◆ first".to_string(),
-                bg: None
-            }]
-        );
+        assert_eq!(state.push_chunk("first\nsec"), vec![state_line(" ◆ first")]);
         assert_eq!(state.preview(), "sec");
         assert_eq!(
             state.push_chunk("ond\nthird"),
-            vec![ScrollbackLine {
-                text: "   second".to_string(),
-                bg: None
-            }]
+            vec![state_line("   second")]
         );
-        assert_eq!(
-            state.finish(),
-            vec![ScrollbackLine {
-                text: "   third".to_string(),
-                bg: None
-            }]
-        );
+        assert_eq!(state.finish(), vec![state_line("   third")]);
         assert!(state.source().is_none());
         assert_eq!(state.preview(), "");
     }
@@ -1081,17 +1527,11 @@ mod tests {
 
         assert_eq!(
             state.start(MessageSource::User),
-            vec![ScrollbackLine {
-                text: String::new(),
-                bg
-            }]
+            vec![ScrollbackLine::plain(String::new(), bg)]
         );
         assert_eq!(
             state.finish(),
-            vec![ScrollbackLine {
-                text: String::new(),
-                bg
-            }]
+            vec![ScrollbackLine::plain(String::new(), bg)]
         );
 
         state.reset();
@@ -1116,18 +1556,9 @@ mod tests {
         assert_eq!(
             state.finish(),
             vec![
-                ScrollbackLine {
-                    text: " ◆ first".to_string(),
-                    bg: None
-                },
-                ScrollbackLine {
-                    text: "   second".to_string(),
-                    bg: None
-                },
-                ScrollbackLine {
-                    text: "   third".to_string(),
-                    bg: None
-                }
+                state_line(" ◆ first"),
+                state_line("   second"),
+                state_line("   third")
             ]
         );
         assert!(state.source().is_none());
@@ -1148,18 +1579,9 @@ mod tests {
         assert_eq!(
             state.finish(),
             vec![
-                ScrollbackLine {
-                    text: " ◆ | A | Longer |".to_string(),
-                    bg: None
-                },
-                ScrollbackLine {
-                    text: "   | --- | ------ |".to_string(),
-                    bg: None
-                },
-                ScrollbackLine {
-                    text: "   | x | yy     |".to_string(),
-                    bg: None
-                },
+                state_line(" ◆ | A | Longer |"),
+                state_line("   | --- | ------ |"),
+                state_line("   | x | yy     |"),
             ]
         );
         assert_eq!(state.preview(), "");
@@ -1175,41 +1597,92 @@ mod tests {
 
         assert_eq!(
             state.finish(),
-            vec![
-                ScrollbackLine {
-                    text: " ◆ ```rust".to_string(),
-                    bg: None
-                },
-                ScrollbackLine {
-                    text: "   fn main() {}".to_string(),
-                    bg: None
-                },
-            ]
+            vec![state_line(" ◆ ```rust"), state_line("   fn main() {}"),]
         );
         assert_eq!(state.preview(), "");
     }
 
     #[test]
+    fn stream_render_state_renders_inline_markdown_segments() {
+        let mut state = StreamRenderState::default();
+        assert!(state.start(MessageSource::Assistant).is_empty());
+
+        let lines = state.push_chunk("# Title with **strong** and `code`\n");
+
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, " ◆ Title with strong and code");
+        assert!(lines[0].segments.iter().any(|segment| segment.attrs.bold));
+        assert!(
+            lines[0]
+                .segments
+                .iter()
+                .any(|segment| segment.text == "code"
+                    && segment.fg
+                        == Some(CColor::Rgb {
+                            r: 0xE5,
+                            g: 0xC0,
+                            b: 0x7B,
+                        }))
+        );
+    }
+
+    #[test]
+    fn stream_render_state_styles_block_markdown_rows() {
+        let mut state = StreamRenderState::default();
+        assert!(state.start(MessageSource::Assistant).is_empty());
+
+        assert!(state.push_chunk("- **first**\n").is_empty());
+        assert!(state.push_chunk("- second\n").is_empty());
+        let lines = state.finish();
+
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].text, " ◆ - first");
+        assert_eq!(lines[1].text, "   - second");
+        assert!(
+            lines[0]
+                .segments
+                .iter()
+                .any(|segment| segment.text == "- " && segment.attrs.bold)
+        );
+    }
+
+    #[test]
+    fn stream_render_state_keeps_user_markdown_literal() {
+        let mut state = StreamRenderState::default();
+        let bg = stream_bg_for(Some(&MessageSource::User));
+        assert_eq!(
+            state.start(MessageSource::User),
+            vec![ScrollbackLine::plain(String::new(), bg)]
+        );
+
+        let lines = state.push_chunk("# literal **user** `input`\n");
+
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, " > # literal **user** `input`");
+        assert!(
+            lines[0]
+                .segments
+                .iter()
+                .all(|segment| !segment.attrs.italic)
+        );
+    }
+
+    #[test]
     fn stream_opening_lines_adds_separator_only_after_first_stream() {
         let bg = stream_bg_for(Some(&MessageSource::User));
-        let opening = vec![ScrollbackLine {
-            text: String::new(),
-            bg,
-        }];
+        let opening = vec![ScrollbackLine::plain(String::new(), bg)];
 
         assert_eq!(stream_opening_lines(0, opening.clone()), opening);
         assert_eq!(
             stream_opening_lines(1, opening.clone()),
             vec![
-                ScrollbackLine {
-                    text: String::new(),
-                    bg: None
-                },
-                ScrollbackLine {
-                    text: String::new(),
-                    bg
-                }
+                ScrollbackLine::plain(String::new(), None),
+                ScrollbackLine::plain(String::new(), bg)
             ]
         );
+    }
+
+    fn state_line(text: &str) -> ScrollbackLine {
+        ScrollbackLine::plain(text, None)
     }
 }
