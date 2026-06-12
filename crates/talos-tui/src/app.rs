@@ -904,10 +904,10 @@ pub(crate) fn stream_padding_for(
 
     match source {
         Some(MessageSource::User) => " > ",
-        Some(MessageSource::Assistant) => " ~ ",
+        Some(MessageSource::Assistant) => " ◆ ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
-        Some(MessageSource::Tool { .. }) => " ~ ",
+        Some(MessageSource::Tool { .. }) => " ◆ ",
         None => "   ",
     }
 }
@@ -1051,7 +1051,7 @@ mod tests {
         assert_eq!(
             state.push_chunk("first\nsec"),
             vec![ScrollbackLine {
-                text: " ~ first".to_string(),
+                text: " ◆ first".to_string(),
                 bg: None
             }]
         );
@@ -1117,7 +1117,7 @@ mod tests {
             state.finish(),
             vec![
                 ScrollbackLine {
-                    text: " ~ first".to_string(),
+                    text: " ◆ first".to_string(),
                     bg: None
                 },
                 ScrollbackLine {
@@ -1149,7 +1149,7 @@ mod tests {
             state.finish(),
             vec![
                 ScrollbackLine {
-                    text: " ~ | A | Longer |".to_string(),
+                    text: " ◆ | A | Longer |".to_string(),
                     bg: None
                 },
                 ScrollbackLine {
@@ -1177,7 +1177,7 @@ mod tests {
             state.finish(),
             vec![
                 ScrollbackLine {
-                    text: " ~ ```rust".to_string(),
+                    text: " ◆ ```rust".to_string(),
                     bg: None
                 },
                 ScrollbackLine {

@@ -4,7 +4,7 @@ use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
     event::{DisableBracketedPaste, EnableBracketedPaste},
     execute, queue,
-    style::{Color as CColor, Print, SetBackgroundColor},
+    style::{Color as CColor, Print, SetBackgroundColor, SetForegroundColor},
     terminal::{self, Clear, ClearType, EnableLineWrap},
 };
 use ratatui::{
@@ -251,14 +251,15 @@ impl InlineTerminal {
             |w: &mut CrosstermBackend<Stdout>, text: &str, bg: Option<CColor>| -> io::Result<()> {
                 if let Some(color) = bg {
                     queue!(w, SetBackgroundColor(color))?;
-                    queue!(w, Print(text))?;
+                    print_line_with_prefix_color(w, text)?;
                     let text_width = unicode_width::UnicodeWidthStr::width(text);
                     if text_width < line_width as usize {
                         queue!(w, Print(" ".repeat(line_width as usize - text_width)))?;
                     }
+                    queue!(w, SetForegroundColor(CColor::Reset))?;
                     queue!(w, SetBackgroundColor(CColor::Reset))?;
                 } else {
-                    queue!(w, Print(text))?;
+                    print_line_with_prefix_color(w, text)?;
                 }
                 Ok(())
             };
@@ -328,6 +329,40 @@ impl InlineTerminal {
     pub fn get_frame_area(&self) -> Rect {
         self.viewport_area
     }
+}
+
+fn print_line_with_prefix_color(
+    writer: &mut CrosstermBackend<Stdout>,
+    text: &str,
+) -> io::Result<()> {
+    if let Some(rest) = text.strip_prefix(" > ") {
+        queue!(
+            writer,
+            SetForegroundColor(CColor::Rgb {
+                r: 0xA3,
+                g: 0xBE,
+                b: 0x8C,
+            })
+        )?;
+        queue!(writer, Print(" > "))?;
+        queue!(writer, SetForegroundColor(CColor::Reset))?;
+        queue!(writer, Print(rest))?;
+    } else if let Some(rest) = text.strip_prefix(" ◆ ") {
+        queue!(
+            writer,
+            SetForegroundColor(CColor::Rgb {
+                r: 0x88,
+                g: 0xC0,
+                b: 0xD0,
+            })
+        )?;
+        queue!(writer, Print(" ◆ "))?;
+        queue!(writer, SetForegroundColor(CColor::Reset))?;
+        queue!(writer, Print(rest))?;
+    } else {
+        queue!(writer, Print(text))?;
+    }
+    Ok(())
 }
 
 impl Drop for InlineTerminal {

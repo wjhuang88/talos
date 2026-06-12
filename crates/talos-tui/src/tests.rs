@@ -330,7 +330,7 @@ mod tests {
         assert_eq!(stream_padding_for(Some(&MessageSource::User), 1), "   ");
         assert_eq!(
             stream_padding_for(Some(&MessageSource::Assistant), 0),
-            " ~ "
+            " ◆ "
         );
         assert_eq!(
             stream_padding_for(Some(&MessageSource::Assistant), 1),
@@ -347,7 +347,7 @@ mod tests {
                 }),
                 0
             ),
-            " ~ "
+            " ◆ "
         );
         assert_eq!(
             stream_padding_for(

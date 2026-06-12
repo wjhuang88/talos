@@ -145,15 +145,15 @@ Content flows as character/chunk streams, not pre-split lines:
 
 ### Line Padding System
 
-Each scrollback line carries a 3-character ASCII prefix aligned with the input box prefix (` > `):
+Each scrollback line carries a three-column prefix aligned with the input box prefix (` > `):
 
 | Source | First Line | Continuation |
 |--------|-----------|--------------|
 | User | ` > ` | `   ` |
-| Assistant | ` ~ ` | `   ` |
+| Assistant | ` ◆ ` | `   ` |
 | System | ` # ` | `   ` |
 | Error | ` ! ` | `   ` |
-| Tool | ` ~ ` | `   ` |
+| Tool | ` ◆ ` | `   ` |
 
 ### Styled Scrollback
 
