@@ -332,6 +332,108 @@ Integration tests:
 - Whether table alignment should consider East Asian wide characters from the
   start or initially reuse the existing display-width utilities only.
 
+## Future Work: Code Block Rendering Overhaul
+
+### Problem
+
+Current code fence rendering preserves the Markdown fence markers (``` / ~~~) as
+visible rows styled dim. This works for basic visibility but has two drawbacks:
+
+1. **Fence markers are visual noise** — the user did not write ``` to see ``` on
+   screen; they wrote it to mark a code block. The rendered output should convey
+   "this is a code block" through framing, not through raw Markdown syntax.
+2. **No syntax highlighting** — all code content renders in a single flat color
+   (`#E5C07B` warm amber). For longer code blocks this is hard to scan.
+
+### Proposed Approach
+
+1. **Hide fence markers, add rounded border.** Strip the opening and closing
+   fence lines from rendered output. Replace them with Unicode rounded box
+   drawing characters (`╭`, `╮`, `╰`, `╯`, `│`) that visually frame the code
+   block. The language tag (e.g. `rust` from ` ```rust `) can appear as a dim
+   label in the top-right of the top border row.
+
+2. **Syntax-based coloring via tree-sitter (or equivalent).** Integrate a
+   syntax highlighting backend — tree-sitter is the leading candidate because
+   it is a Rust-native library with broad language support and is already used
+   by terminal editors (Helix, Zed). The integration can be phased:
+
+   - **Phase A (standalone):** Use `tree-sitter` + `tree-sitter-highlight` to
+     tokenize code content and apply Nord-themed highlight queries. No other
+   crate changes needed.
+   - **Phase B (after tree-sitter integration for tooling):** If Talos later
+   adds tree-sitter for code analysis tools (AST-aware search, refactoring),
+   the highlighting path reuses the same infrastructure.
+
+   Alternative: `syntect` (TextMate grammar-based) is simpler to integrate but
+   adds a Sublime-syntax dependency and does not align with a future
+   tree-sitter tooling path.
+
+3. **Nord-themed highlight palette.** Map tree-sitter highlight categories to
+   Nord colors. Example mapping:
+
+   | Category | Nord Color | Hex |
+   |---|---|---|
+   | Keyword | NORD9 (Frost blue) | `#81A1C1` |
+   | Function / Method | NORD8 (Frost cyan) | `#88C0D0` |
+   | String | NORD14 (Aurora green) | `#A3BE8C` |
+   | Comment | NORD3 (Polar Night muted) | `#4C566A` |
+   | Type / Constructor | NORD15 (Aurora purple) | `#B48EAD` |
+   | Number / Constant | NORD13 (Aurora yellow) | `#EBCB8B` |
+   | Operator / Punctuation | NORD4 (Snow Storm primary) | `#D8DEE9` |
+   | Variable | NORD5 (Snow Storm bright) | `#E5E9F0` |
+
+### Rendering Sketch
+
+Current output:
+```
+ ● ```rust
+ ● fn main() {
+ ●     println!("hello");
+ ● }
+ ● ```
+```
+
+Proposed output:
+```
+ ● ╭─rust─────────────────────────────╮
+ ● │ fn main() {                      │
+ ● │     println!("hello");           │
+ ● │ }                                │
+ ● ╰──────────────────────────────────╯
+```
+
+Fully enclosed rounded box with language tag embedded in the top border.
+Content lines have `│` on both sides, right-aligned to max content width.
+With syntax coloring applied to the code lines inside the border.
+
+### Alternatives Considered
+
+| Alternative | Reason deferred |
+|---|---|
+| Keep fence markers, only add syntax highlighting | Improves readability but still shows raw Markdown syntax to the user |
+| Use `syntect` for highlighting | Simpler initial integration, but does not align with potential future tree-sitter tooling integration |
+| Bat-style rendering (line numbers, Git gutter) | Too complex for first slice; line numbers and git diff markers can be added incrementally later |
+| Custom regex-based highlighting | Fragile, incomplete, and duplicates what tree-sitter already does well |
+
+### Open Questions
+
+- Whether `tree-sitter` crate size and build time impact are acceptable for the
+  CLI binary. If too heavy, `syntect` may be a lighter first step.
+- Whether to bundle highlight query files or embed them at compile time.
+- Exact border character choice for narrow terminals (fallback to plain `│`?).
+- Whether the language label should appear in the top border or as a separate
+  dim line above the block.
+
+### Dependencies
+
+- Current code fence rendering in `talos-tui` (stable, shipped in I023).
+- ADR for adding `tree-sitter` or `syntect` as a dependency (project rule:
+  non-trivial deps need a decision record).
+- If deferring syntax highlighting: tree-sitter can land when the project
+  integrates it for code analysis tooling — the border-only improvement is
+  independent and can ship first.
+
 ## Dependencies
 
 - I023 stream render state extraction and hold-buffer boundary.

@@ -16,13 +16,13 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I024 Conversation Context | Active | [I024 Conversation Context](iterations/I024-conversation-context.md) | Follow [Two-Week Handoff Plan](roadmap/TWO-WEEK-HANDOFF-PLAN.md); audit landed implementation, verify resume/runtime behavior, prove compaction, then move I024 to Review |
+| (no active iterations) | — | — | — |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I023 TUI State Model | Complete | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Review remediation closed: broadcast→mpsc non-lossy delivery, agent abort-on-cancel, completed-turn history preserved across late interrupt/shutdown, SIGINT fallback, engine-owned mutation verified (pub(crate)), workspace verification clean |
+| I024 Conversation Context | **Review** | [I024 Conversation Context](iterations/I024-conversation-context.md) | All 5 stories done: S1-S3 verified, S4 layers 1-3 wired (4-5 deferred to MEM-003), S5 658 tests pass + clippy clean. Fixed interactive mode duplicate JSONL persist bug. Resume-from-JSONL integration test added. |
 | I022 TUI Inline-by-Default | Complete | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Core flip + viewport refactor + scrollback flush + status bar tips landed; 127 TUI tests pass; state model refactor deferred to I023 |
 | I014 TUI Completion | Complete | [I014 TUI Completion](iterations/I014-tui-completion.md) | Both stories landed (2 atomic commits: 7f783fa #I009-S6, 3b526c8 #I010-S9); 652 tests pass workspace-wide (was 615; +37 from talos-tui); runtime evidence recorded |
 | I021 Evolution MenteDB Realignment | Complete | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | All 5 stories landed; 615 tests pass; runtime regression confirmed (model responds to `cargo run -p talos-cli -- -p "你好"`); 5 atomic commits #I021-S1..S5; defense layer (commit `7470ac5`) preserved |
