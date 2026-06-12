@@ -111,6 +111,7 @@ These are immutable facts that every change must respect:
 | "Where is `unsafe` allowed and why?" | `docs/decisions/007-process-hardening-unsafe.md` |
 | "Why is bundled SQLite allowed?" | `docs/decisions/008-sqlite-bundled-storage.md` |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
+| "Governance drift, repair, or skill upgrade" | `docs/sop/DOC-CHECK.md` → refresh audit against current `agent-project-governance` skill, then run `scripts/validate_project_governance.sh .` and `scripts/assess_project_scale.sh .` |
 | "A session exposed a reusable lesson, failed validation, or user correction" | `docs/sop/EVOLUTION-FEEDBACK.md` → `EVOLUTION.md` |
 | "I have an idea for later" | `docs/proposals/` |
 | "What's the implementation plan?" | `docs/roadmap/IMPLEMENTATION-ROADMAP.md` |
@@ -130,6 +131,7 @@ Before ending a session, verify:
 7. **No orphaned changes**: All modified files trace to a requirement.
 8. **README sync**: Update `README.md` to reflect any new features, usage changes, or architecture updates from this session. README is a living document, not a one-time setup.
 9. **Board sync**: If active/review/paused/next work changed, update `docs/BOARD.md` after the owner docs. The board is a derived view, not a source of truth.
+10. **Governance harness**: If governance files changed, run `scripts/validate_project_governance.sh .`; when profile, branch mode, worktree mode, or governance depth is affected, also run `scripts/assess_project_scale.sh .`.
 
 ## Current Known Traps
 

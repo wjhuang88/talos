@@ -3,12 +3,18 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-11"
-status_note: "Governance audit repair (2026-06-11): README/iteration status synchronized with I023 Review; library crates no longer use anyhow; cargo check --workspace and cargo clippy --workspace -- -D warnings pass; CI workflow added for check, test, and strict clippy. Future TUI /copy and /export helpers are intentionally retained with local dead_code allows until slash-command rewire."
+last_audited_at: "2026-06-12"
+status_note: "Governance refresh (2026-06-12): local manifest now records the governing skill version; project-local governance validator and scale harness scripts are available under scripts/. Scale evidence recommends high-risk profile, simple branch mode, and on-demand worktree mode. Prior I023 audit notes remain valid: README/iteration status synchronized with I023 Review; library crates no longer use anyhow; cargo check --workspace and cargo clippy --workspace -- -D warnings pass; CI workflow added for check, test, and strict clippy. Future TUI /copy and /export helpers are intentionally retained with local dead_code allows until slash-command rewire."
+
+governance:
+  skill_name: "agent-project-governance"
+  skill_version: "2.0.0"
+  last_refresh: "2026-06-12"
 
 entrypoints:
   agent_guide: "AGENTS.md"
   evolution: "EVOLUTION.md"
+  evolution_feedback: "docs/sop/EVOLUTION-FEEDBACK.md"
   document_map: "docs/README.md"
   board: "docs/BOARD.md"
   backlog: "docs/backlog/PRODUCT-BACKLOG.md"
@@ -18,6 +24,10 @@ entrypoints:
   proposals: "docs/proposals/"
   reference: "docs/reference/"
   sop: "docs/sop/"
+  governance_validator: "scripts/validate_project_governance.sh"
+  governance_validator_ps: "scripts/validate_project_governance.ps1"
+  scale_harness: "scripts/assess_project_scale.sh"
+  scale_harness_ps: "scripts/assess_project_scale.ps1"
 
 capabilities:
   task_router: "conformant"

@@ -79,6 +79,16 @@ cargo test --workspace -- --nocapture
 cargo test --workspace -- --ignored
 ```
 
+## Governance Checks
+
+Run these when governance documents, status owners, profile, branch mode, worktree mode, or
+process rules change:
+
+```bash
+scripts/validate_project_governance.sh .
+scripts/assess_project_scale.sh .
+```
+
 ## Rules
 
 - `cargo test --workspace` must exit 0 before any merge.
