@@ -405,20 +405,13 @@ fn animated_hold_preview_text(status: &HoldStatus, frame: usize) -> String {
 }
 
 fn hold_preview_color(frame: usize) -> Color {
-    const COLORS: [Color; 6] = [
-        Color::Rgb(0x88, 0xC0, 0xD0),
-        Color::Rgb(0x8F, 0xBC, 0xBB),
-        Color::Rgb(0xA3, 0xBE, 0x8C),
-        Color::Rgb(0xE5, 0xC0, 0x7B),
-        Color::Rgb(0xB4, 0x8E, 0xAD),
-        Color::Rgb(0x81, 0xA1, 0xC1),
-    ];
-    COLORS[frame % COLORS.len()]
+    const COLORS: [Color; 2] = [Color::Rgb(0x88, 0xC0, 0xD0), Color::Rgb(0x8F, 0xBC, 0xBB)];
+    COLORS[(frame / 2) % COLORS.len()]
 }
 
 fn preview_spinner_padding(processing_frame: usize, processing_tick: usize) -> (String, usize) {
-    let lead_idx = processing_frame % SPINNER_FRAMES.len();
-    let chase_idx = ((processing_tick / 5) + SPINNER_FRAMES.len() - 2) % SPINNER_FRAMES.len();
+    let lead_idx = ((processing_tick / 5) + SPINNER_FRAMES.len() - 2) % SPINNER_FRAMES.len();
+    let chase_idx = processing_frame % SPINNER_FRAMES.len();
     (
         format!(" {}{}", SPINNER_FRAMES[lead_idx], SPINNER_FRAMES[chase_idx]),
         lead_idx,
@@ -1881,7 +1874,8 @@ mod tests {
         assert_eq!(animated_hold_preview_text(&status, 2), "rendering table.");
         assert_eq!(animated_hold_preview_text(&status, 4), "rendering table..");
         assert_eq!(animated_hold_preview_text(&status, 6), "rendering table...");
-        assert_ne!(hold_preview_color(0), hold_preview_color(1));
+        assert_eq!(hold_preview_color(0), hold_preview_color(1));
+        assert_ne!(hold_preview_color(0), hold_preview_color(2));
     }
 
     #[test]
@@ -1890,11 +1884,11 @@ mod tests {
         let (second_padding, second_color_idx) = preview_spinner_padding(1, 3);
         let (third_padding, third_color_idx) = preview_spinner_padding(1, 5);
 
-        assert_eq!(first_padding, " ⠋⠇");
-        assert_eq!(second_padding, " ⠙⠇");
-        assert_eq!(third_padding, " ⠙⠏");
-        assert_ne!(first_color_idx, second_color_idx);
-        assert_eq!(second_color_idx, third_color_idx);
+        assert_eq!(first_padding, " ⠇⠋");
+        assert_eq!(second_padding, " ⠇⠙");
+        assert_eq!(third_padding, " ⠏⠙");
+        assert_eq!(first_color_idx, second_color_idx);
+        assert_ne!(second_color_idx, third_color_idx);
     }
 
     #[test]
