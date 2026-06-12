@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I024 Conversation Context | Active | [I024 Conversation Context](iterations/I024-conversation-context.md) | P0: wire session JSONL history + compaction into agent turn loop; all modes receive conversation history; multi-turn conversations verified |
+| I024 Conversation Context | Active | [I024 Conversation Context](iterations/I024-conversation-context.md) | Follow [Two-Week Handoff Plan](roadmap/TWO-WEEK-HANDOFF-PLAN.md); audit landed implementation, verify resume/runtime behavior, prove compaction, then move I024 to Review |
 
 ## Review
 
@@ -41,6 +41,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| TUI-005 Logo & Splash Screen | Planned | [TUI-005 Logo & Splash Screen](backlog/active/TUI-005-logo-splash.md) | Start only after I024 is in Review; preserve inline-by-default behavior and `○`/`◉` symbols for future todo list |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 

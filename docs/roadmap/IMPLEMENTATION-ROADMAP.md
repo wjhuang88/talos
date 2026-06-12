@@ -53,6 +53,7 @@ block or duplicate each other.
 | R13 | TUI inline-by-default | I022 TUI Inline-by-Default | Done (2026-06-08). Codex-style inline TUI; 127 TUI tests pass |
 | R14 | TUI state model | I023 TUI State Model | Done (2026-06-12). Event-driven architecture, non-lossy delivery, abort-on-cancel; 113 focused tests |
 | R15 | Conversation context continuity | I024 Conversation Context Continuity | Agent receives session history in every turn; compaction bounds context; JSONL persists episodes; multi-turn conversations verified |
+| R16 | Two-week handoff polish gate | I024 closeout then TUI-005 Logo & Splash | Follow `docs/roadmap/TWO-WEEK-HANDOFF-PLAN.md`: do not start TUI-005 until I024 is in Review with verification evidence |
 
 Ordering rules:
 - R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.

@@ -7,7 +7,8 @@ from the current session so it can reason about what was previously discussed.
 
 ## Status
 
-Ready. Selected into I024.
+Active. Selected into I024; implementation has partially landed and needs evidence audit
+before completion.
 
 ## Priority
 

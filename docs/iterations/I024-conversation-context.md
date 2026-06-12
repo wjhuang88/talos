@@ -3,7 +3,13 @@
 **User can**: Have a multi-turn conversation where the agent remembers all previous messages
 in the session, correctly references prior context, and does not hallucinate false memories.
 
-## Status: Planned
+## Status: Active
+
+## Activation Note (2026-06-12)
+
+I024 is active because recent work has already landed parts of S1-S4. The next implementer
+must start with a state audit before claiming completion: compare current code and tests
+against each story below, then update this document with per-story evidence.
 
 ## Scope
 
@@ -24,11 +30,11 @@ unreliable for multi-turn conversations.
 
 ## Selected Stories
 
-- [ ] #I024-S1: Agent API accepts conversation history
-- [ ] #I024-S2: AppServerSession loads and passes history
-- [ ] #I024-S3: CLI modes integrate SessionManager and JSONL persistence
-- [ ] #I024-S4: Compaction wired into turn loop
-- [ ] #I024-S5: Tests and runtime verification
+- [ ] #I024-S1: Agent API accepts conversation history (implementation landed; evidence audit pending)
+- [ ] #I024-S2: AppServerSession loads and passes history (implementation landed; evidence audit pending)
+- [ ] #I024-S3: CLI modes integrate SessionManager and JSONL persistence (implementation landed; resume/runtime audit pending)
+- [ ] #I024-S4: Compaction wired into turn loop (implementation landed; long-session audit pending)
+- [ ] #I024-S5: Tests and runtime verification (not complete)
 
 ## Stories Detail
 
