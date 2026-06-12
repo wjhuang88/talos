@@ -967,4 +967,95 @@ mod tests {
             "Second turn should retain first assistant response after interrupt"
         );
     }
+
+    #[tokio::test]
+    async fn test_initial_history_from_jsonl_resume() {
+        use talos_core::message::Message;
+
+        let prior_history = vec![
+            Message::User {
+                content: "prior question".into(),
+            },
+            Message::Assistant {
+                content: "prior answer".into(),
+                tool_calls: vec![],
+            },
+        ];
+
+        let captured_messages = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
+        let responses = Arc::new(Mutex::new(VecDeque::from(vec![success_events(
+            "new response",
+        )])));
+
+        struct CapturingModel {
+            responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+            captured: Arc<Mutex<Vec<Vec<Message>>>>,
+        }
+
+        #[async_trait]
+        impl LanguageModel for CapturingModel {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                self.captured.lock().unwrap().push(messages.to_vec());
+                let (tx, rx) = mpsc::channel(64);
+                let events = {
+                    let mut responses = self.responses.lock().unwrap();
+                    responses.pop_front().unwrap_or_default()
+                };
+                tokio::spawn(async move {
+                    for event in events {
+                        let _ = tx.send(event).await;
+                    }
+                });
+                Ok(rx)
+            }
+        }
+
+        let agent = make_agent(CapturingModel {
+            responses,
+            captured: captured_messages.clone(),
+        });
+        let config = SessionConfig {
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: prior_history,
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+        let sq_tx = handle.sq_tx;
+        let actor_task = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "new question".into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        sq_tx.send(SessionOp::Shutdown).await.unwrap();
+        let _ = actor_task.await;
+
+        let captured = captured_messages.lock().unwrap();
+        assert_eq!(captured.len(), 1, "Should have captured exactly 1 call");
+
+        let messages = &captured[0];
+        assert!(
+            messages
+                .iter()
+                .any(|m| matches!(m, Message::User { content } if content == "prior question")),
+            "Resumed session should include prior user message"
+        );
+        assert!(
+            messages.iter().any(
+                |m| matches!(m, Message::Assistant { content, .. } if content == "prior answer")
+            ),
+            "Resumed session should include prior assistant response"
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|m| matches!(m, Message::User { content } if content.contains("new question"))),
+            "Resumed session should include new user message"
+        );
+    }
 }
