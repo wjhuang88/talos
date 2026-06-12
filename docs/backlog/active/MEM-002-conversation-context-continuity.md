@@ -7,8 +7,9 @@ from the current session so it can reason about what was previously discussed.
 
 ## Status
 
-Active. Selected into I024; implementation has partially landed and needs evidence audit
-before completion.
+Review. Selected into I024; history wiring, JSONL-backed resume, and layers 1-3 compaction
+evidence are recorded in the iteration. Complete requires final runtime evidence or explicit
+closeout note.
 
 ## Priority
 

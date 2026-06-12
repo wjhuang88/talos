@@ -53,4 +53,6 @@ docs/proposals/
   investigation and mitigation direction.
 - [TUI Stream Markdown Rendering](tui-stream-markdown-rendering.md) — single-line and block
   Markdown recognition/rendering direction for the inline TUI stream renderer.
+- [Tree-sitter Code Analysis](tree-sitter-code-analysis.md) — research proposal for adding
+  parser-backed code analysis after dependency and ADR review.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.

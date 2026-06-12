@@ -971,16 +971,25 @@ mod tests {
     #[tokio::test]
     async fn test_initial_history_from_jsonl_resume() {
         use talos_core::message::Message;
+        use talos_session::SessionManager;
 
-        let prior_history = vec![
-            Message::User {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
+        let session = manager.create_session("resume-test").unwrap();
+        let session_id = session.id.to_string();
+        session
+            .append(&Message::User {
                 content: "prior question".into(),
-            },
-            Message::Assistant {
+            })
+            .unwrap();
+        session
+            .append(&Message::Assistant {
                 content: "prior answer".into(),
                 tool_calls: vec![],
-            },
-        ];
+            })
+            .unwrap();
+        let resumed = manager.resume_session(&session_id).unwrap();
+        let prior_history = resumed.read_messages().unwrap();
 
         let captured_messages = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
         let responses = Arc::new(Mutex::new(VecDeque::from(vec![success_events(
@@ -1052,9 +1061,9 @@ mod tests {
             "Resumed session should include prior assistant response"
         );
         assert!(
-            messages
-                .iter()
-                .any(|m| matches!(m, Message::User { content } if content.contains("new question"))),
+            messages.iter().any(
+                |m| matches!(m, Message::User { content } if content.contains("new question"))
+            ),
             "Resumed session should include new user message"
         );
     }

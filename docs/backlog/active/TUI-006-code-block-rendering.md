@@ -6,7 +6,7 @@
 | Title | Code Block Rendering — Rounded Border & Syntax Highlighting |
 | Priority | P2 |
 | Status | Planned |
-| Depends on | I023 (TUI state model — stable code fence hold/render pipeline) |
+| Depends on | I023 (TUI state model — stable code fence hold/render pipeline); CODE-001 for syntax highlighting |
 | Blocks | None |
 | Owner | `crates/talos-tui/src/` |
 
@@ -68,10 +68,11 @@ Implementation touches `render_code_block_line()` and adds a new
 `render_code_block()` function in `app.rs`, following the same pattern as
 `render_table_block()`.
 
-### Sub-slice B: Syntax Highlighting (blocked on tree-sitter ADR)
+### Sub-slice B: Syntax Highlighting (blocked on CODE-001 + tree-sitter ADR decision)
 
 Integrate a syntax highlighting backend to colorize code content inside the
-rounded border. Tree-sitter is the leading candidate:
+rounded border. Tree-sitter is the leading candidate, but it must go through
+CODE-001 research before any dependency lands:
 
 - **Phase A (standalone):** `tree-sitter` + `tree-sitter-highlight` tokenize
   code content and apply Nord-themed highlight queries. No other crate changes.

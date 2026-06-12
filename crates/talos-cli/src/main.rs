@@ -518,7 +518,10 @@ fn resolve_workspace_root(cli: &Cli) -> Result<PathBuf> {
                     .join(path)
             };
             if !abs.is_dir() {
-                bail!("workspace path does not exist or is not a directory: {}", abs.display());
+                bail!(
+                    "workspace path does not exist or is not a directory: {}",
+                    abs.display()
+                );
             }
             Ok(abs)
         }

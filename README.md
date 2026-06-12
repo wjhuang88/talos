@@ -69,6 +69,12 @@ Use print mode for shell-style output:
 cargo run -p talos-cli -- -p "summarize the project status"
 ```
 
+Set an explicit workspace root when launching Talos from another directory:
+
+```bash
+cargo run -p talos-cli -- --workspace /path/to/project "inspect this repository"
+```
+
 Use an OpenAI-compatible gateway:
 
 ```toml

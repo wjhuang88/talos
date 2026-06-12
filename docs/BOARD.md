@@ -22,7 +22,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I024 Conversation Context | **Review** | [I024 Conversation Context](iterations/I024-conversation-context.md) | All 5 stories done: S1-S3 verified, S4 layers 1-3 wired (4-5 deferred to MEM-003), S5 658 tests pass + clippy clean. Fixed interactive mode duplicate JSONL persist bug. Resume-from-JSONL integration test added. |
+| I024 Conversation Context | **Review** | [I024 Conversation Context](iterations/I024-conversation-context.md) | S1-S3 verified; S4 layers 1-3 wired and layers 4-5 deferred to MEM-003; S5 workspace tests and clippy clean. Fixed interactive mode duplicate JSONL persist bug. JSONL-backed resume test added. Complete requires final runtime evidence or explicit closeout note. |
 | I022 TUI Inline-by-Default | Complete | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Core flip + viewport refactor + scrollback flush + status bar tips landed; 127 TUI tests pass; state model refactor deferred to I023 |
 | I014 TUI Completion | Complete | [I014 TUI Completion](iterations/I014-tui-completion.md) | Both stories landed (2 atomic commits: 7f783fa #I009-S6, 3b526c8 #I010-S9); 652 tests pass workspace-wide (was 615; +37 from talos-tui); runtime evidence recorded |
 | I021 Evolution MenteDB Realignment | Complete | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | All 5 stories landed; 615 tests pass; runtime regression confirmed (model responds to `cargo run -p talos-cli -- -p "你好"`); 5 atomic commits #I021-S1..S5; defense layer (commit `7470ac5`) preserved |
@@ -42,6 +42,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | TUI-005 Logo & Splash Screen | Planned | [TUI-005 Logo & Splash Screen](backlog/active/TUI-005-logo-splash.md) | Start only after I024 is in Review; preserve inline-by-default behavior and `○`/`◉` symbols for future todo list |
+| CODE-001 Tree-sitter Code Analysis Research | Research | [CODE-001 Tree-sitter Code Analysis Research](backlog/active/CODE-001-tree-sitter-code-analysis-research.md) | Research dependency/ADR fit before adding any tree-sitter crates; choose one bounded first implementation slice |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 

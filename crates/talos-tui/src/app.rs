@@ -1262,15 +1262,7 @@ fn table_border_line(
         text.push_str(&"─".repeat(width + 2));
     }
     text.push(right);
-    vec![HistorySegment::styled(
-        text,
-        Some(CColor::Rgb {
-            r: 0x5E,
-            g: 0x81,
-            b: 0xAC,
-        }),
-        HistoryAttrs::default(),
-    )]
+    vec![HistorySegment::raw(text)]
 }
 
 fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<HistorySegment> {
@@ -1293,15 +1285,7 @@ fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<Hist
 }
 
 fn table_border_segment(text: impl Into<String>) -> HistorySegment {
-    HistorySegment::styled(
-        text,
-        Some(CColor::Rgb {
-            r: 0x5E,
-            g: 0x81,
-            b: 0xAC,
-        }),
-        HistoryAttrs::default(),
-    )
+    HistorySegment::raw(text)
 }
 
 fn emphasize_table_header(segments: &mut [HistorySegment]) {
@@ -1393,15 +1377,7 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
 
 fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
     if is_horizontal_rule(line) {
-        return vec![HistorySegment::styled(
-            "────────",
-            Some(CColor::Rgb {
-                r: 0x5E,
-                g: 0x81,
-                b: 0xAC,
-            }),
-            HistoryAttrs::default(),
-        )];
+        return vec![HistorySegment::raw("────────")];
     }
 
     if let Some((indent, marker, heading)) = split_heading(line) {
@@ -1850,7 +1826,7 @@ mod tests {
                 .segments
                 .iter()
                 .any(|segment| segment.text == "┌─────┬─────────────┐"
-                    && segment.fg == Some(CColor::Rgb { r: 0x5E, g: 0x81, b: 0xAC })
+                    && segment.fg.is_none()
                     && segment.attrs == HistoryAttrs::default())
         );
         assert!(
@@ -1957,7 +1933,7 @@ mod tests {
                 .segments
                 .iter()
                 .any(|segment| segment.text == "────────"
-                    && segment.fg == Some(CColor::Rgb { r: 0x5E, g: 0x81, b: 0xAC })
+                    && segment.fg.is_none()
                     && !segment.attrs.dim)
         );
     }

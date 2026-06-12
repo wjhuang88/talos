@@ -3,7 +3,7 @@
 **User can**: Have a multi-turn conversation where the agent remembers all previous messages
 in the session, correctly references prior context, and does not hallucinate false memories.
 
-## Status: Active
+## Status: Review
 
 ## Activation Note (2026-06-12)
 
@@ -47,9 +47,9 @@ unreliable for multi-turn conversations.
 | `run_inner()` has a `history: Vec<Message>` parameter | ✅ | `lib.rs:367-370` — `run_inner(user_message, history, event_tx)` |
 | History messages appear before the current user message in the provider call | ✅ | `lib.rs:394-397` — `let mut messages = history; messages.push(Message::User { content: full_message });` |
 | All existing tests continue to pass | ✅ | `lib.rs:334` — `run()` passes `vec![]` as default |
-| New unit test: agent with 3-message history | ❌ Missing | No test verifies multi-message history reaching provider. `run_streaming` test on L1250 passes `vec![]`. |
+| New unit test: agent with 3-message history | ✅ | `session.rs` — `test_initial_history_from_jsonl_resume` creates a JSONL-backed session, resumes it through `SessionManager`, and verifies prior user+assistant messages reach the provider before the new user message. |
 
-**Gap**: No unit test confirms that a non-empty `history` actually reaches the provider call. The session-level test (`test_multi_turn_with_history`) covers this indirectly but is in S2's domain.
+**Gap**: No remaining S1 gap after the JSONL-backed resume test; direct `Agent::run_streaming` tests still use empty history, but the provider-facing path is covered through `AppServerSession`.
 
 ### S2: AppServerSession loads and passes history — **Done**
 
@@ -66,7 +66,7 @@ unreliable for multi-turn conversations.
 
 **Gap**: `commit_finished_turn` only saves `user_msg` + `assistant(content, tool_calls: vec![])`. Tool call messages (`Message::Tool { result }`) are NOT committed to in-memory history. This means tool-heavy sessions have incomplete history for subsequent turns. This is a known fidelity gap documented in I024 Non-Goals: "No `read_messages()` fidelity improvement (tool_calls serialization)".
 
-### S3: CLI modes integrate SessionManager and JSONL persistence — **Partially done**
+### S3: CLI modes integrate SessionManager and JSONL persistence — **Done**
 
 **Evidence** (2026-06-12 audit):
 
@@ -81,9 +81,9 @@ unreliable for multi-turn conversations.
 
 **Gaps**:
 1. **Print mode JSONL persistence**: Print mode creates a session but never persists the user message or assistant response to JSONL. This is acceptable per I024 ("Print mode remains single-turn") but means print-mode turns are invisible to future `-c` resumes.
-2. **Interactive mode event_loop persistence**: Not fully audited in this session. The `event_loop.rs` module handles JSONL writes — needs verification.
+2. **Interactive mode event_loop persistence**: Verified and fixed during Day 3; `assistant_persisted` prevents double writes when both `TurnEnd` and `TurnCompleted::Success` arrive.
 
-### S4: Compaction wired into turn loop — **Partially done**
+### S4: Compaction wired into turn loop — **Review with deferred residual**
 
 **Evidence** (2026-06-12 audit):
 
@@ -91,22 +91,22 @@ unreliable for multi-turn conversations.
 |---|---|---|
 | `Compactor::should_compact()` called before provider call | ✅ | `session.rs:107` — `if self.compactor.should_compact(&self.history)` |
 | `Compactor::compact()` applied when history exceeds 80% of model limit | ⚠️ Partially | `session.rs:108-111` — applies layers 1-3 (budget, trim, microcompact). Layers 4-5 (collapse, autocompact) are NOT called — they require a provider reference which the session actor doesn't pass. |
-| Long sessions (>20 turns) do not exceed token budget | ⚠️ Untested | Layers 1-3 handle most cases (budget caps tool results, trim removes old tool results, microcompact deduplicates). Layers 4-5 (LLM summarization) are not wired. |
-| Unit test: 50-turn session compacts correctly | ❌ Missing | No 50-turn compaction integration test exists. |
+| Long sessions (>20 turns) do not exceed token budget | ⏭️ Deferred | Layers 1-3 are wired; 50-turn heavy-tool validation depends on layers 4-5 and is tracked by MEM-003. |
+| Unit test: 50-turn session compacts correctly | ⏭️ Deferred | Tracked by MEM-003 acceptance criteria. |
 
 **Gaps**:
 1. **Layers 4-5 not wired**: The `session.rs` compaction code only calls `apply_budget`, `apply_trim`, `apply_microcompact`. Layers 4-5 (`apply_collapse`, `apply_autocompact`) require an `&dyn LanguageModel` provider reference that isn't available in the current architecture (the session actor holds an `Arc<Agent>`, not a provider reference).
 2. **No 50-turn integration test**: Need a test proving compaction keeps context bounded over many turns.
 
-### S5: Tests and runtime verification — **Not complete**
+### S5: Tests and runtime verification — **Review**
 
 | Acceptance Criterion | Status |
 |---|---|
 | Test: 3-turn conversation — agent references messages from turns 1-2 | ✅ `session.rs:772-882` |
-| Test: resume session — agent has full history | ❌ No test for JSONL resume loading into initial_history and verifying provider receives it |
-| Test: long session triggers compaction without errors | ❌ No long-session compaction test |
-| Runtime: TUI mode multi-turn conversation verified | ❌ Not verified in this audit |
-| `cargo test --workspace` passes | ⏳ Need to run |
+| Test: resume session — agent has full history | ✅ `session.rs::test_initial_history_from_jsonl_resume` |
+| Test: long session triggers compaction without errors | ⏭️ Deferred to MEM-003 |
+| Runtime: TUI mode multi-turn conversation verified | ⚠️ Not manually re-run in this correction; covered by session/CLI wiring tests and remains Review evidence to collect before Complete |
+| `cargo test --workspace` passes | ✅ 658 tests, 0 failures |
 
 ## Day 1 Audit Summary (2026-06-12)
 
@@ -140,11 +140,11 @@ unreliable for multi-turn conversations.
 - **TUI mode**: Bridge forwarder persists assistant on `TurnCompleted::Success` (main.rs:872-886). User msg wrapper persists before forwarding (main.rs:907-926). No duplicate writes.
 - **Inline mode**: User msg persisted after submit (main.rs:1096-1102). Assistant persisted on `TurnCompleted::Success` (main.rs:1126-1137). No duplicate writes.
 - **Interactive mode** (`event_loop.rs`): **Found and fixed duplicate persist bug**. Both `AgentEvent::TurnEnd` and `SessionEvent::TurnCompleted::Success` fire `AgentCompleted`, causing double JSONL writes. Fixed with `assistant_persisted` boolean guard.
-- **Resume-from-JSONL test added**: `test_initial_history_from_jsonl_resume` in session.rs verifies that `initial_history` from `read_messages()` reaches the provider with prior user+assistant messages.
+- **Resume-from-JSONL test added**: `test_initial_history_from_jsonl_resume` in session.rs creates a JSONL-backed session, resumes it through `SessionManager`, loads `read_messages()`, and verifies prior user+assistant messages reach the provider.
 - All 140 talos-agent tests pass + 13 doctests. All talos-cli tests pass.
 
 ### Day 4: Compaction — Deferred to MEM-003
-- Layers 1-3 (budget, trim, microcompact) are wired and sufficient for sessions up to ~40-50 turns
+- Layers 1-3 (budget, trim, microcompact) are wired and sufficient for short-to-medium sessions under typical message sizes; 40-50 turn heavy-tool claims remain unproven until MEM-003
 - Layers 4-5 (collapse, autocompact) require `&dyn LanguageModel` provider reference through the session actor
 - Architecture options documented in `docs/backlog/active/MEM-003-llm-compaction.md`
 - No 50-turn integration test added (layers 4-5 are the ones that matter for that scale)
@@ -167,7 +167,7 @@ unreliable for multi-turn conversations.
 - [x] Compaction triggered when history exceeds token budget (S4 ✅ — layers 1-3; layers 4-5 deferred to MEM-003)
 - [x] New turns persisted to session JSONL (S3 ✅ — all modes)
 - [x] All modes (TUI, inline, interactive) wired (S3 ✅)
-- [x] Resume loads full conversation context (S5 ✅ — `test_initial_history_from_jsonl_resume`)
+- [x] Resume loads full conversation context (S5 ✅ — `test_initial_history_from_jsonl_resume`, JSONL-backed)
 - [x] `cargo test --workspace` passes (Day 5 — 658 tests, 0 failures)
 - [x] `cargo check --workspace` clean (Day 5)
 - [x] `cargo clippy --workspace -- -D warnings` clean (Day 5)

@@ -5,7 +5,7 @@
 | Story ID | MEM-003 |
 | Priority | P3 |
 | Status | Planned |
-| Depends On | MEM-002 (closed) |
+| Depends On | MEM-002/I024 in Review; close or explicitly accept residuals before activation |
 | Blocks | None |
 | Origin | I024 Day 4 audit gap |
 
@@ -13,7 +13,7 @@
 
 The `Compactor` implements 5 progressive compaction layers, but only layers 1-3 (budget, trim, microcompact) are wired into the session actor's turn loop. Layers 4-5 (collapse, autocompact) require calling the LLM provider to summarize conversation history, but the session actor does not have access to the provider reference.
 
-Layers 1-3 are sufficient for sessions up to ~40-50 turns. Layers 4-5 are needed for extreme long sessions (>50 turns with heavy tool use) where the accumulated context exceeds the model limit even after budget/trim/microcompact.
+Layers 1-3 are sufficient for short-to-medium sessions under typical message sizes. The previously cited 40-50 turn boundary is an assumption, not verified evidence. Layers 4-5 are needed for extreme long sessions (>50 turns with heavy tool use) where the accumulated context exceeds the model limit even after budget/trim/microcompact.
 
 ## Approach
 
