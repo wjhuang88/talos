@@ -16,12 +16,13 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I023 TUI State Model | Review | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Event-driven architecture: `talos-conversation` + `talos-tui` separation; Codex-style single-row history insertion with styled scrollback; 3-column line padding; user messages with Nord bg color + top/bottom padding; single-row preview with Markdown block classifier and conservative styled Markdown rendering; one-week closure plan ready for cancellation/non-lossy/engine-owned/runtime gates; 113 focused tests pass (60 TUI + 53 conversation) |
+| I024 Conversation Context | Active | [I024 Conversation Context](iterations/I024-conversation-context.md) | P0: wire session JSONL history + compaction into agent turn loop; all modes receive conversation history; multi-turn conversations verified |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I023 TUI State Model | Complete | [I023 TUI State Model](iterations/I023-tui-state-model.md) | Review remediation closed: broadcast→mpsc non-lossy delivery, agent abort-on-cancel, SIGINT fallback, engine-owned mutation verified (pub(crate)), workspace verification clean |
 | I022 TUI Inline-by-Default | Complete | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Core flip + viewport refactor + scrollback flush + status bar tips landed; 127 TUI tests pass; state model refactor deferred to I023 |
 | I014 TUI Completion | Complete | [I014 TUI Completion](iterations/I014-tui-completion.md) | Both stories landed (2 atomic commits: 7f783fa #I009-S6, 3b526c8 #I010-S9); 652 tests pass workspace-wide (was 615; +37 from talos-tui); runtime evidence recorded |
 | I021 Evolution MenteDB Realignment | Complete | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | All 5 stories landed; 615 tests pass; runtime regression confirmed (model responds to `cargo run -p talos-cli -- -p "你好"`); 5 atomic commits #I021-S1..S5; defense layer (commit `7470ac5`) preserved |

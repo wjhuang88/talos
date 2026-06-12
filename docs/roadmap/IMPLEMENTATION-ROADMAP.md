@@ -49,6 +49,10 @@ block or duplicate each other.
 | R9 | Observability/prompt asset slice | I018 Observability and Prompt Assets | File logs are bounded under ADR-014; built-in prompts are embedded assets under ADR-015 |
 | R10 | Memory foundation slice | I019 Layered Memory Foundation | Working/episodic/semantic/procedural memory foundation lands under ADR-016 |
 | R11 | Exploration library slice | I020 Exploration Library | Research artifacts persist locally under ADR-017; vector/graph stores remain Spike-gated |
+| R12 | Evolution MenteDB realignment | I021 Evolution MenteDB Realignment | Done (2026-06-06). `talos-evolution` data structure aligned with MenteDB blueprint; 615 tests pass |
+| R13 | TUI inline-by-default | I022 TUI Inline-by-Default | Done (2026-06-08). Codex-style inline TUI; 127 TUI tests pass |
+| R14 | TUI state model | I023 TUI State Model | Done (2026-06-12). Event-driven architecture, non-lossy delivery, abort-on-cancel; 113 focused tests |
+| R15 | Conversation context continuity | I024 Conversation Context Continuity | Agent receives session history in every turn; compaction bounds context; JSONL persists episodes; multi-turn conversations verified |
 
 Ordering rules:
 - R0 is closed; do not reopen its ARCH stories unless a new regression is recorded with fresh evidence.
