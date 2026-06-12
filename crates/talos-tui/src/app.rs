@@ -29,6 +29,7 @@ use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, Strea
 use crate::widgets::ApprovalOverlay;
 
 const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
+const PREVIEW_FG: Color = Color::Rgb(0xE5, 0xE9, 0xF0);
 
 fn to_crossterm_color(c: Color) -> Option<CColor> {
     match c {
@@ -120,6 +121,10 @@ impl StreamRenderState {
 
     fn preview(&self) -> &str {
         &self.preview
+    }
+
+    fn hold_status(&self) -> Option<&HoldStatus> {
+        self.hold_status.as_ref()
     }
 
     fn push_chunk(&mut self, chunk: &str) -> Vec<ScrollbackLine> {
@@ -344,6 +349,7 @@ struct PreviewComponent<'a> {
     padding: &'a str,
     text: &'a str,
     spinner_color: Option<Color>,
+    text_color: Option<Color>,
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
@@ -353,6 +359,7 @@ impl ViewportComponent for PreviewComponent<'_> {
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
         let line = self.text.split('\n').next_back().unwrap_or("");
+        let text_color = self.text_color.unwrap_or(PREVIEW_FG);
         if let Some(color) = self.spinner_color {
             let full = format!("{}{}", self.padding, line);
             let display = truncate_end_to_width(&full, area.width);
@@ -367,10 +374,7 @@ impl ViewportComponent for PreviewComponent<'_> {
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled(pad_part.to_string(), Style::default().fg(color)),
-                    Span::styled(
-                        text_part.to_string(),
-                        Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
-                    ),
+                    Span::styled(text_part.to_string(), Style::default().fg(text_color)),
                 ])),
                 area,
             );
@@ -380,12 +384,35 @@ impl ViewportComponent for PreviewComponent<'_> {
             frame.render_widget(
                 Paragraph::new(Line::from(Span::styled(
                     display,
-                    Style::default().fg(Color::Rgb(0xE5, 0xE9, 0xF0)),
+                    Style::default().fg(text_color),
                 ))),
                 area,
             );
         }
     }
+}
+
+fn animated_hold_preview_text(status: &HoldStatus, frame: usize) -> String {
+    let base = status.preview_text().trim_end_matches('.');
+    let dots = match (frame / 2) % 4 {
+        0 => "",
+        1 => ".",
+        2 => "..",
+        _ => "...",
+    };
+    format!("{base}{dots}")
+}
+
+fn hold_preview_color(frame: usize) -> Color {
+    const COLORS: [Color; 6] = [
+        Color::Rgb(0x88, 0xC0, 0xD0),
+        Color::Rgb(0x8F, 0xBC, 0xBB),
+        Color::Rgb(0xA3, 0xBE, 0x8C),
+        Color::Rgb(0xE5, 0xC0, 0x7B),
+        Color::Rgb(0xB4, 0x8E, 0xAD),
+        Color::Rgb(0x81, 0xA1, 0xC1),
+    ];
+    COLORS[frame % COLORS.len()]
 }
 
 struct QueuePreviewComponent {
@@ -820,11 +847,19 @@ impl Tui {
             self.processing_tick = 0;
             ("   ".to_string(), None)
         };
-        let preview_text = self.stream_render.preview().to_string();
+        let hold_status = self.stream_render.hold_status().cloned();
+        let preview_text = hold_status
+            .as_ref()
+            .map(|status| animated_hold_preview_text(status, self.processing_frame))
+            .unwrap_or_else(|| self.stream_render.preview().to_string());
+        let preview_text_color = hold_status
+            .as_ref()
+            .map(|_| hold_preview_color(self.processing_frame));
         let preview = PreviewComponent {
             padding: &preview_padding,
             text: &preview_text,
             spinner_color,
+            text_color: preview_text_color,
         };
         let queue = QueuePreviewComponent {
             count: status.steering_count + status.followup_count,
@@ -1823,6 +1858,22 @@ mod tests {
                         }))
         );
         assert_eq!(state.preview(), "");
+    }
+
+    #[test]
+    fn markdown_hold_preview_animates_text_and_color() {
+        let status = HoldStatus {
+            kind: MarkdownBlockKind::Table,
+            lines: 2,
+            bytes: 24,
+            boundary_hint: crate::stream_markdown::BoundaryHint::TableEnd,
+        };
+
+        assert_eq!(animated_hold_preview_text(&status, 0), "rendering table");
+        assert_eq!(animated_hold_preview_text(&status, 2), "rendering table.");
+        assert_eq!(animated_hold_preview_text(&status, 4), "rendering table..");
+        assert_eq!(animated_hold_preview_text(&status, 6), "rendering table...");
+        assert_ne!(hold_preview_color(0), hold_preview_color(1));
     }
 
     #[test]
