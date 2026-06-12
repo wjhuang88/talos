@@ -58,6 +58,10 @@ pub struct EventLoop {
     sq_tx: mpsc::Sender<SessionOp>,
     /// Accumulates assistant text deltas per turn for session logging.
     assistant_text: String,
+    /// Tracks whether the current turn's assistant message has already been
+    /// persisted to JSONL. Prevents double-writes when both `AgentEvent::TurnEnd`
+    /// and `SessionEvent::TurnCompleted::Success` arrive for the same turn.
+    assistant_persisted: bool,
 }
 
 impl EventLoop {
@@ -134,6 +138,7 @@ impl EventLoop {
             session_manager,
             sq_tx,
             assistant_text: String::new(),
+            assistant_persisted: false,
         }
     }
 
@@ -277,18 +282,20 @@ impl EventLoop {
 
             (AppState::AgentRunning { .. }, AgentCompleted) => {
                 println!();
-                // Write accumulated assistant text to session.
-                if !self.assistant_text.is_empty() {
-                    let assistant_msg = Message::Assistant {
-                        content: std::mem::take(&mut self.assistant_text),
-                        tool_calls: vec![],
-                    };
-                    if let Err(e) = self.session.append(&assistant_msg) {
-                        eprintln!("Warning: failed to log assistant message: {e}");
+                if !self.assistant_persisted {
+                    if !self.assistant_text.is_empty() {
+                        let assistant_msg = Message::Assistant {
+                            content: std::mem::take(&mut self.assistant_text),
+                            tool_calls: vec![],
+                        };
+                        if let Err(e) = self.session.append(&assistant_msg) {
+                            eprintln!("Warning: failed to log assistant message: {e}");
+                        }
                     }
-                }
-                if let Err(e) = self.session_manager.update_index(&self.session) {
-                    eprintln!("Warning: failed to refresh session index: {e}");
+                    if let Err(e) = self.session_manager.update_index(&self.session) {
+                        eprintln!("Warning: failed to refresh session index: {e}");
+                    }
+                    self.assistant_persisted = true;
                 }
                 self.state = AppState::WaitingForInput;
             }
@@ -344,6 +351,7 @@ impl EventLoop {
     fn start_agent_turn(&mut self, input: String) {
         let cancel_token = CancellationToken::new();
         self.assistant_text.clear();
+        self.assistant_persisted = false;
 
         // Log user message to session.
         let user_msg = Message::User {
