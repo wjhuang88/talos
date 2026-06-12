@@ -337,6 +337,14 @@ struct Cli {
     append_system_prompt: Option<String>,
 
     #[arg(
+        short = 'w',
+        long,
+        value_name = "PATH",
+        help = "Set the workspace root directory (default: current working directory)."
+    )]
+    workspace: Option<String>,
+
+    #[arg(
         long,
         help = "Use mock LLM provider for testing (no API key required)."
     )]
@@ -499,6 +507,25 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
     // I009-S5 end
 }
 
+fn resolve_workspace_root(cli: &Cli) -> Result<PathBuf> {
+    match &cli.workspace {
+        Some(path) => {
+            let abs = if PathBuf::from(path).is_absolute() {
+                PathBuf::from(path)
+            } else {
+                std::env::current_dir()
+                    .context("failed to determine working directory")?
+                    .join(path)
+            };
+            if !abs.is_dir() {
+                bail!("workspace path does not exist or is not a directory: {}", abs.display());
+            }
+            Ok(abs)
+        }
+        None => std::env::current_dir().context("failed to determine working directory"),
+    }
+}
+
 async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -519,6 +546,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
+    let workspace_root = resolve_workspace_root(&cli)?;
     let prompt = resolve_prompt(cli.prompt)?;
 
     let hooks = build_hook_registry(true);
@@ -581,14 +609,12 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         registry,
         Some(Arc::new(permission_engine)),
         None,
-        PathBuf::from("."),
+        workspace_root.clone(),
         hooks,
     );
 
     if !cli.no_context {
-        let workspace_root =
-            std::env::current_dir().context("failed to determine working directory")?;
-        let context = ContextLoader::new(workspace_root)
+        let context = ContextLoader::new(workspace_root.clone())
             .load()
             .map_err(|e| anyhow!("{e}"))?;
         if !context.is_empty() {
@@ -609,7 +635,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let session_config = SessionConfig {
         print_mode: true,
-        workspace_root: std::env::current_dir().context("failed to determine working directory")?,
+        workspace_root: workspace_root.clone(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -756,8 +782,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let workspace_root =
-        std::env::current_dir().context("failed to determine working directory")?;
+    let workspace_root = resolve_workspace_root(&cli)?;
 
     // TUI approval channel: tools send requests here, TUI handles them
     let (approval_tx, approval_rx) = mpsc::unbounded_channel::<TuiApprovalRequest>();
@@ -974,8 +999,7 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let workspace_root =
-        std::env::current_dir().context("failed to determine working directory")?;
+    let workspace_root = resolve_workspace_root(&cli)?;
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);
     let registry = build_print_tool_registry();
@@ -1166,8 +1190,7 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
 }
 
 async fn run_interactive_mode(cli: Cli) -> Result<()> {
-    let workspace_root =
-        std::env::current_dir().context("failed to determine working directory")?;
+    let workspace_root = resolve_workspace_root(&cli)?;
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
 
