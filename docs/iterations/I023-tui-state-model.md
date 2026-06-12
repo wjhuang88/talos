@@ -4,7 +4,7 @@
 
 ## Status: COMPLETE (2026-06-12)
 
-Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-column line padding system. Multiline pasted input stays a single user block. Single-row preview stays stable while the TUI holds Markdown tables/code fences/lists/quotes through a stream block classifier. Conservative Markdown rendering now supports styled inline rows and styled block rows while keeping user-authored streams literal. Animated braille spinner with Nord gradient. Native cursor sync to input box. 60 TUI + 53 conversation tests pass. Review remediation closed: real cancellation via abort-on-cancel, non-lossy mpsc delivery, engine-owned mutation enforced by `pub(crate)`, SIGINT fallback handler.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-column line padding system. Multiline pasted input stays a single user block. Single-row preview stays stable while the TUI holds Markdown tables/code fences/lists/quotes through a stream block classifier. Conservative Markdown rendering now supports styled inline rows and styled block rows while keeping user-authored streams literal. Animated braille spinner with Nord gradient. Native cursor sync to input box. 61 TUI + 53 conversation tests pass. Review remediation closed: real cancellation via abort-on-cancel, non-lossy mpsc delivery, engine-owned mutation enforced by `pub(crate)`, SIGINT fallback handler.
 
 ## Review Remediation Plan (2026-06-11)
 
@@ -174,9 +174,9 @@ Implementation evidence (2026-06-12):
   rows through the existing `ScrollbackLine` path.
 - `ScrollbackLine` carries visible text plus styled history segments. Assistant,
   tool, system, and error streams render conservative inline Markdown
-  immediately; held tables, code fences, lists, and quotes render styled rows
-  after the block boundary. User streams stay literal so pasted input is not
-  transformed.
+  immediately; held tables render box-drawing borders with inline Markdown
+  inside cells, and code fences, lists, and quotes render styled rows after the
+  block boundary. User streams stay literal so pasted input is not transformed.
 
 ## One-Week Handoff Plan: I023 Closure
 
@@ -242,12 +242,12 @@ for D4, which should be confirmed against the current CLI mode before execution.
 
 ## Execution Evidence
 
-- 113 tests pass in the focused TUI/conversation slice (60 TUI + 53 conversation).
+- 114 tests pass in the focused TUI/conversation slice (61 TUI + 53 conversation).
 - Verification on 2026-06-12 passed: `cargo fmt --all --check`,
   `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`,
   `cargo test --workspace`, and `scripts/validate_project_governance.sh .`.
 - `talos-conversation` crate: `ConversationEngine` owns all business state, 53 tests.
-- `talos-tui` crate: event-driven UI with pure state, 60 tests.
+- `talos-tui` crate: event-driven UI with pure state, 61 tests.
 - Single-directional information flow: Agent → ConversationEngine → UI via typed async channels (`mpsc::UiOutput`).
 - Stream-based content delivery: UI consumes active stream via `next_stream_chunk` in `select!` loop (no spawn task).
 - `insert_history` rewritten Codex-style: two branches (non-bottom: `\x1bM` push viewport; bottom: scroll region + `\r\n`), single-line operation, `needs_clear` for clean redraw.
@@ -291,6 +291,6 @@ Required reading:
 
 ## Baseline
 
-- 127 tests passed (`talos-tui`) at the I022 baseline; I023 focused TUI suite now has 60 tests.
+- 127 tests passed (`talos-tui`) at the I022 baseline; I023 focused TUI suite now has 61 tests.
 - Workspace `cargo test` and `cargo check` exit 0.
 - I022 core flip landed; viewport is fixed 4 lines, scrollback flush works.

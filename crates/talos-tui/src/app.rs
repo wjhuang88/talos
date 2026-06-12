@@ -185,6 +185,24 @@ impl StreamRenderState {
         ScrollbackLine::styled(segments, self.bg())
     }
 
+    fn render_segments_line(
+        &self,
+        line_index: usize,
+        content_segments: Vec<HistorySegment>,
+    ) -> ScrollbackLine {
+        let padding = stream_padding_for(self.source(), line_index);
+        let mut segments = vec![HistorySegment::styled(
+            padding,
+            prefix_color_for(self.source(), line_index),
+            HistoryAttrs {
+                bold: line_index == 0 && self.source().is_some(),
+                ..HistoryAttrs::default()
+            },
+        )];
+        segments.extend(content_segments);
+        ScrollbackLine::styled(segments, self.bg())
+    }
+
     fn render_plain_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
         let padding = stream_padding_for(self.source(), line_index);
         let segments = vec![
@@ -227,9 +245,30 @@ impl StreamRenderState {
         kind: &MarkdownBlockKind,
         block_lines: Vec<String>,
     ) -> Vec<ScrollbackLine> {
+        if kind == &MarkdownBlockKind::Table {
+            return self.render_table_lines(block_lines);
+        }
+
         let mut rendered = Vec::with_capacity(block_lines.len());
         for (block_line_index, line) in block_lines.into_iter().enumerate() {
             rendered.push(self.render_block_line(&line, kind, block_line_index));
+        }
+        rendered
+    }
+
+    fn render_table_lines(&mut self, block_lines: Vec<String>) -> Vec<ScrollbackLine> {
+        let table_lines = render_table_block(&block_lines).unwrap_or_else(|| {
+            block_lines
+                .into_iter()
+                .enumerate()
+                .map(|(row_index, line)| render_table_history_line(&line, row_index))
+                .collect()
+        });
+        let mut rendered = Vec::with_capacity(table_lines.len());
+        for content_segments in table_lines {
+            let line = self.render_segments_line(self.line_count, content_segments);
+            self.line_count += 1;
+            rendered.push(line);
         }
         rendered
     }
@@ -1085,28 +1124,193 @@ fn render_code_block_line(line: &str) -> Vec<HistorySegment> {
 }
 
 fn render_table_history_line(line: &str, row_index: usize) -> Vec<HistorySegment> {
-    let attrs = HistoryAttrs {
-        bold: row_index == 0,
-        dim: row_index == 1,
-        ..HistoryAttrs::default()
-    };
-    vec![HistorySegment::styled(
-        line,
-        Some(if row_index == 1 {
-            CColor::Rgb {
+    let cells = split_table_cells(line);
+    if cells.is_empty() {
+        return render_inline_markdown(line);
+    }
+
+    if row_index == 1 {
+        return vec![HistorySegment::styled(
+            cells
+                .iter()
+                .map(|cell| "-".repeat(cell.len().max(3)))
+                .collect::<Vec<_>>()
+                .join("\t"),
+            Some(CColor::Rgb {
                 r: 0x4C,
                 g: 0x56,
                 b: 0x6A,
+            }),
+            HistoryAttrs {
+                dim: true,
+                ..HistoryAttrs::default()
+            },
+        )];
+    }
+
+    let mut segments = Vec::new();
+    for (i, cell) in cells.iter().enumerate() {
+        if i > 0 {
+            segments.push(HistorySegment::raw("\t"));
+        }
+        let mut cell_segments = render_inline_markdown(cell);
+        if row_index == 0 {
+            for segment in &mut cell_segments {
+                segment.attrs.bold = true;
+                if segment.fg.is_none() {
+                    segment.fg = Some(CColor::Rgb {
+                        r: 0xD8,
+                        g: 0xDE,
+                        b: 0xE9,
+                    });
+                }
             }
-        } else {
-            CColor::Rgb {
+        }
+        segments.extend(cell_segments);
+    }
+    segments
+}
+
+fn render_table_block(lines: &[String]) -> Option<Vec<Vec<HistorySegment>>> {
+    if lines.len() < 2 || !is_table_separator_line(&lines[1]) {
+        return None;
+    }
+
+    let body_rows: Vec<Vec<Vec<HistorySegment>>> = lines
+        .iter()
+        .enumerate()
+        .filter(|(row_index, _)| *row_index != 1)
+        .map(|(row_index, line)| {
+            split_table_cells(line)
+                .into_iter()
+                .map(|cell| {
+                    let mut segments = render_inline_markdown(&cell);
+                    if row_index == 0 {
+                        emphasize_table_header(&mut segments);
+                    }
+                    segments
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    let column_count = body_rows.iter().map(Vec::len).max().unwrap_or(0);
+    if column_count < 2 {
+        return None;
+    }
+
+    let mut widths = vec![3usize; column_count];
+    for row in &body_rows {
+        for (i, cell) in row.iter().enumerate() {
+            widths[i] = widths[i].max(history_segments_width(cell));
+        }
+    }
+
+    let mut rendered = Vec::new();
+    rendered.push(table_border_line('┌', '┬', '┐', &widths));
+    for (row_index, row) in body_rows.iter().enumerate() {
+        if row_index == 1 {
+            rendered.push(table_border_line('├', '┼', '┤', &widths));
+        }
+        rendered.push(table_content_line(row, &widths));
+    }
+    rendered.push(table_border_line('└', '┴', '┘', &widths));
+    Some(rendered)
+}
+
+fn table_border_line(
+    left: char,
+    separator: char,
+    right: char,
+    widths: &[usize],
+) -> Vec<HistorySegment> {
+    let mut text = String::new();
+    text.push(left);
+    for (i, width) in widths.iter().enumerate() {
+        if i > 0 {
+            text.push(separator);
+        }
+        text.push_str(&"─".repeat(width + 2));
+    }
+    text.push(right);
+    vec![HistorySegment::styled(
+        text,
+        Some(CColor::Rgb {
+            r: 0x4C,
+            g: 0x56,
+            b: 0x6A,
+        }),
+        HistoryAttrs {
+            dim: true,
+            ..HistoryAttrs::default()
+        },
+    )]
+}
+
+fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<HistorySegment> {
+    let mut segments = vec![table_border_segment("│")];
+    for (i, width) in widths.iter().enumerate() {
+        if i > 0 {
+            segments.push(table_border_segment("│"));
+        }
+        segments.push(HistorySegment::raw(" "));
+        let cell_segments = row.get(i).cloned().unwrap_or_default();
+        let cell_width = history_segments_width(&cell_segments);
+        segments.extend(cell_segments);
+        if *width > cell_width {
+            segments.push(HistorySegment::raw(" ".repeat(width - cell_width)));
+        }
+        segments.push(HistorySegment::raw(" "));
+    }
+    segments.push(table_border_segment("│"));
+    segments
+}
+
+fn table_border_segment(text: impl Into<String>) -> HistorySegment {
+    HistorySegment::styled(
+        text,
+        Some(CColor::Rgb {
+            r: 0x4C,
+            g: 0x56,
+            b: 0x6A,
+        }),
+        HistoryAttrs {
+            dim: true,
+            ..HistoryAttrs::default()
+        },
+    )
+}
+
+fn emphasize_table_header(segments: &mut [HistorySegment]) {
+    for segment in segments {
+        segment.attrs.bold = true;
+        if segment.fg.is_none() {
+            segment.fg = Some(CColor::Rgb {
                 r: 0xD8,
                 g: 0xDE,
                 b: 0xE9,
-            }
-        }),
-        attrs,
-    )]
+            });
+        }
+    }
+}
+
+fn history_segments_width(segments: &[HistorySegment]) -> usize {
+    segments
+        .iter()
+        .map(|segment| unicode_width::UnicodeWidthStr::width(segment.text.as_str()))
+        .sum()
+}
+
+fn is_table_separator_line(line: &str) -> bool {
+    let trimmed = line.trim().trim_matches('|').trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    trimmed.split('|').all(|cell| {
+        let cell = cell.trim();
+        let cell = cell.trim_start_matches(':').trim_end_matches(':');
+        cell.len() >= 3 && cell.chars().all(|ch| ch == '-')
+    })
 }
 
 fn render_list_line(line: &str) -> Vec<HistorySegment> {
@@ -1165,6 +1369,21 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
 }
 
 fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
+    if is_horizontal_rule(line) {
+        return vec![HistorySegment::styled(
+            "────────",
+            Some(CColor::Rgb {
+                r: 0x4C,
+                g: 0x56,
+                b: 0x6A,
+            }),
+            HistoryAttrs {
+                dim: true,
+                ..HistoryAttrs::default()
+            },
+        )];
+    }
+
     if let Some((indent, marker, heading)) = split_heading(line) {
         let mut segments = Vec::new();
         if !indent.is_empty() {
@@ -1189,6 +1408,17 @@ fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
     }
 
     parse_inline_delimiters(line)
+}
+
+fn is_horizontal_rule(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.len() < 3 {
+        return false;
+    }
+    let Some(marker) = trimmed.chars().next() else {
+        return false;
+    };
+    matches!(marker, '-' | '*' | '_') && trimmed.chars().all(|ch| ch == marker)
 }
 
 fn split_heading(line: &str) -> Option<(&str, &str, &str)> {
@@ -1392,6 +1622,14 @@ fn split_list_marker(line: &str) -> Option<(&str, &str)> {
     Some((&line[..trimmed_start + marker_len], &rest[marker_len..]))
 }
 
+fn split_table_cells(line: &str) -> Vec<String> {
+    line.trim()
+        .trim_matches('|')
+        .split('|')
+        .map(|cell| cell.trim().to_string())
+        .collect()
+}
+
 pub(crate) fn input_line_count(buffer: &str) -> u16 {
     buffer.split('\n').count().max(1) as u16
 }
@@ -1570,19 +1808,40 @@ mod tests {
         let mut state = StreamRenderState::default();
         assert!(state.start(MessageSource::Assistant).is_empty());
 
-        assert!(state.push_chunk("| A | Longer |\n").is_empty());
+        assert!(state.push_chunk("| **A** | Longer `code` |\n").is_empty());
         assert_eq!(state.preview(), "rendering table...");
         assert!(state.push_chunk("| --- | --- |\n").is_empty());
         assert_eq!(state.preview(), "rendering table...");
         assert!(state.push_chunk("| x | yy |\n").is_empty());
 
+        let lines = state.finish();
         assert_eq!(
-            state.finish(),
+            lines,
             vec![
-                state_line(" ◆ | A | Longer |"),
-                state_line("   | --- | ------ |"),
-                state_line("   | x | yy     |"),
+                state_line(" ◆ ┌─────┬─────────────┐"),
+                state_line("   │ A   │ Longer code │"),
+                state_line("   ├─────┼─────────────┤"),
+                state_line("   │ x   │ yy          │"),
+                state_line("   └─────┴─────────────┘"),
             ]
+        );
+        assert!(
+            lines[1]
+                .segments
+                .iter()
+                .any(|segment| segment.text == "A" && segment.attrs.bold)
+        );
+        assert!(
+            lines[1]
+                .segments
+                .iter()
+                .any(|segment| segment.text == "code"
+                    && segment.fg
+                        == Some(CColor::Rgb {
+                            r: 0xE5,
+                            g: 0xC0,
+                            b: 0x7B,
+                        }))
         );
         assert_eq!(state.preview(), "");
     }
@@ -1623,6 +1882,23 @@ mod tests {
                             g: 0xC0,
                             b: 0x7B,
                         }))
+        );
+    }
+
+    #[test]
+    fn stream_render_state_renders_horizontal_rule() {
+        let mut state = StreamRenderState::default();
+        assert!(state.start(MessageSource::Assistant).is_empty());
+
+        let lines = state.push_chunk("---\n");
+
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, " ◆ ────────");
+        assert!(
+            lines[0]
+                .segments
+                .iter()
+                .any(|segment| segment.text == "────────" && segment.attrs.dim)
         );
     }
 

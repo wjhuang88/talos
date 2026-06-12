@@ -1,5 +1,3 @@
-use unicode_width::UnicodeWidthStr;
-
 const MAX_HELD_LINES: usize = 200;
 const MAX_HELD_BYTES: usize = 16 * 1024;
 
@@ -382,10 +380,10 @@ fn held_block_too_large(lines: &[String]) -> bool {
 
 fn render_block(kind: &MarkdownBlockKind, lines: &[String]) -> Vec<String> {
     match kind {
-        MarkdownBlockKind::Table => render_table(lines).unwrap_or_else(|| lines.to_vec()),
-        MarkdownBlockKind::CodeFence | MarkdownBlockKind::List | MarkdownBlockKind::Quote => {
-            lines.to_vec()
-        }
+        MarkdownBlockKind::Table
+        | MarkdownBlockKind::CodeFence
+        | MarkdownBlockKind::List
+        | MarkdownBlockKind::Quote => lines.to_vec(),
     }
 }
 
@@ -453,58 +451,6 @@ fn is_quote_line(line: &str) -> bool {
     line.trim_start().starts_with("> ")
 }
 
-fn render_table(lines: &[String]) -> Option<Vec<String>> {
-    if lines.len() < 2 || !is_table_separator(&lines[1]) {
-        return None;
-    }
-
-    let rows: Vec<Vec<String>> = lines.iter().map(|line| split_table_cells(line)).collect();
-    let column_count = rows.iter().map(Vec::len).max().unwrap_or(0);
-    if column_count < 2 {
-        return None;
-    }
-
-    let mut widths = vec![0usize; column_count];
-    for (row_index, row) in rows.iter().enumerate() {
-        if row_index == 1 {
-            continue;
-        }
-        for (i, cell) in row.iter().enumerate() {
-            widths[i] = widths[i].max(UnicodeWidthStr::width(cell.as_str()));
-        }
-    }
-
-    let mut rendered = Vec::with_capacity(rows.len());
-    for (row_index, row) in rows.iter().enumerate() {
-        if row_index == 1 {
-            let cells: Vec<String> = widths
-                .iter()
-                .map(|width| "-".repeat((*width).max(3)))
-                .collect();
-            rendered.push(format!("| {} |", cells.join(" | ")));
-        } else {
-            let cells: Vec<String> = (0..column_count)
-                .map(|i| {
-                    let cell = row.get(i).cloned().unwrap_or_default();
-                    let pad = widths[i].saturating_sub(UnicodeWidthStr::width(cell.as_str()));
-                    format!("{cell}{}", " ".repeat(pad))
-                })
-                .collect();
-            rendered.push(format!("| {} |", cells.join(" | ")));
-        }
-    }
-
-    Some(rendered)
-}
-
-fn split_table_cells(line: &str) -> Vec<String> {
-    line.trim()
-        .trim_matches('|')
-        .split('|')
-        .map(|cell| cell.trim().to_string())
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -555,8 +501,8 @@ mod tests {
             lines_from_finish(decisions),
             vec![
                 "| A | Longer |".to_string(),
-                "| --- | ------ |".to_string(),
-                "| x | yy     |".to_string(),
+                "| --- | --- |".to_string(),
+                "| x | yy |".to_string(),
                 "after".to_string(),
             ]
         );

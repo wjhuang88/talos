@@ -4,9 +4,10 @@
 
 Proposal and implementation guide for the TUI stream renderer. The first
 classifier and renderer slices landed during I023: block detection, hold
-status, plain-text fallbacks, table alignment, styled history spans, prefix
-colors, and conservative inline Markdown rendering are implemented in
-`talos-tui`. Full CommonMark support remains future work.
+status, plain-text fallbacks, box-drawing table rendering, styled history
+spans, prefix colors, horizontal rules, and conservative inline Markdown
+rendering are implemented in `talos-tui`. Full CommonMark support remains
+future work.
 
 ## Goals
 
@@ -131,7 +132,7 @@ Initial supported block forms:
 | Block kind | Start condition | End condition | Preview status | First-slice rendering |
 |---|---|---|---|---|
 | Fenced code block | Line starts with triple backticks or tildes | Matching closing fence line, or stream finish fallback | `receiving code block...` | Preserve fences, style fence rows dim and code rows with code color |
-| Markdown table | Header row with pipes followed by separator row | Blank line, non-table line, or stream finish | `rendering table...` | Align columns by display width, bold header, dim separator; fallback to original rows if alignment fails |
+| Markdown table | Header row with pipes followed by separator row | Blank line, non-table line, or stream finish | `rendering table...` | Render a box-drawing table with display-width alignment; render inline Markdown inside cells; fallback to visible rows if structured rendering fails |
 | List block | Consecutive `- `, `* `, `+ `, or ordered `1. ` lines | Blank line or non-list line | `formatting list...` | Preserve marker and indentation, style marker, render inline Markdown in item body |
 | Block quote | Consecutive `> ` lines | Blank line or non-quote line | `formatting quote...` | Preserve quote marker, style marker, render quote body dim |
 
@@ -235,7 +236,7 @@ The renderer must prefer visible output over perfect formatting.
   `FallbackImmediate` and flush the raw held lines as plain rows.
 - If stream finish occurs while a code fence is still open, flush the held block
   as plain rows or as an unterminated code block with no data loss.
-- If table alignment fails because of malformed rows, flush original rows.
+- If table rendering fails because of malformed rows, flush original rows.
 - If inline Markdown is ambiguous, render the original line immediately.
 
 No fallback path may drop buffered text.
@@ -247,7 +248,7 @@ No fallback path may drop buffered text.
 2. Wire classifier decisions into `StreamRenderState` while preserving the
    current immediate-line default for plain text.
 3. Add preview status mapping from `HoldStatus` to one-row animation text.
-4. Add first-slice block renderers: table column alignment and code-fence
+4. Add first-slice block renderers: box-drawing table rendering and code-fence
    preservation. Every renderer keeps a plain fallback.
 5. Add richer styled row support only after the plain row path is stable.
 
