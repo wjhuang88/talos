@@ -1262,7 +1262,15 @@ fn table_border_line(
         text.push_str(&"─".repeat(width + 2));
     }
     text.push(right);
-    vec![HistorySegment::raw(text)]
+    vec![HistorySegment::styled(
+        text,
+        Some(CColor::Rgb {
+            r: 0x5E,
+            g: 0x81,
+            b: 0xAC,
+        }),
+        HistoryAttrs::default(),
+    )]
 }
 
 fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<HistorySegment> {
@@ -1285,7 +1293,15 @@ fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<Hist
 }
 
 fn table_border_segment(text: impl Into<String>) -> HistorySegment {
-    HistorySegment::raw(text)
+    HistorySegment::styled(
+        text,
+        Some(CColor::Rgb {
+            r: 0x5E,
+            g: 0x81,
+            b: 0xAC,
+        }),
+        HistoryAttrs::default(),
+    )
 }
 
 fn emphasize_table_header(segments: &mut [HistorySegment]) {
@@ -1380,14 +1396,11 @@ fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
         return vec![HistorySegment::styled(
             "────────",
             Some(CColor::Rgb {
-                r: 0x4C,
-                g: 0x56,
-                b: 0x6A,
+                r: 0x5E,
+                g: 0x81,
+                b: 0xAC,
             }),
-            HistoryAttrs {
-                dim: true,
-                ..HistoryAttrs::default()
-            },
+            HistoryAttrs::default(),
         )];
     }
 
@@ -1837,7 +1850,7 @@ mod tests {
                 .segments
                 .iter()
                 .any(|segment| segment.text == "┌─────┬─────────────┐"
-                    && segment.fg.is_none()
+                    && segment.fg == Some(CColor::Rgb { r: 0x5E, g: 0x81, b: 0xAC })
                     && segment.attrs == HistoryAttrs::default())
         );
         assert!(
@@ -1943,7 +1956,9 @@ mod tests {
             lines[0]
                 .segments
                 .iter()
-                .any(|segment| segment.text == "────────" && segment.attrs.dim)
+                .any(|segment| segment.text == "────────"
+                    && segment.fg == Some(CColor::Rgb { r: 0x5E, g: 0x81, b: 0xAC })
+                    && !segment.attrs.dim)
         );
     }
 
