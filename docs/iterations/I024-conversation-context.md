@@ -5,6 +5,25 @@ in the session, correctly references prior context, and does not hallucinate fal
 
 ## Status: Review
 
+## Review Gap: Visible History Hydration (2026-06-12)
+
+The `-c`/`--continue` path already restored JSONL messages into `SessionConfig.initial_history`,
+so the next provider call received prior conversation context. The missing piece was visible TUI
+history: the TUI history area started empty because `Tui::new()` did not hydrate scrollback from
+the same restored messages.
+
+This is a UX gap in I024 rather than a new memory feature: users can continue a session, but the
+screen looks like a fresh conversation. Closeout requires the TUI to render restored user,
+assistant, and tool-result messages into scrollback without re-submitting them to the agent and
+without appending duplicate JSONL entries.
+
+**Resolution**: Implemented TUI visible-history hydration from the same `initial_history` loaded
+from JSONL. Restored messages render as completed scrollback blocks, reuse the existing stream
+prefix and Markdown/table rendering path, and do not enter the agent SQ or append duplicate JSONL
+records. Verification: `cargo test -p talos-tui`, `cargo check --workspace`,
+`cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, and
+`scripts/validate_project_governance.sh .` all pass on 2026-06-12.
+
 ## Activation Note (2026-06-12)
 
 I024 is active because recent work has already landed parts of S1-S4. The next implementer
@@ -105,8 +124,8 @@ unreliable for multi-turn conversations.
 | Test: 3-turn conversation — agent references messages from turns 1-2 | ✅ `session.rs:772-882` |
 | Test: resume session — agent has full history | ✅ `session.rs::test_initial_history_from_jsonl_resume` |
 | Test: long session triggers compaction without errors | ⏭️ Deferred to MEM-003 |
-| Runtime: TUI mode multi-turn conversation verified | ⚠️ Not manually re-run in this correction; covered by session/CLI wiring tests and remains Review evidence to collect before Complete |
-| `cargo test --workspace` passes | ✅ 658 tests, 0 failures |
+| Runtime: TUI mode multi-turn conversation verified | ⚠️ Not manually re-run in this correction; covered by session/CLI wiring tests, TUI visible-history hydration tests, and remains Review evidence to collect before Complete |
+| `cargo test --workspace` passes | ✅ Passes on 2026-06-12 |
 
 ## Day 1 Audit Summary (2026-06-12)
 

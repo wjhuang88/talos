@@ -845,6 +845,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     };
 
     let initial_history = session.read_messages().unwrap_or_default();
+    let visible_history = initial_history.clone();
 
     let session_config = SessionConfig {
         print_mode: false,
@@ -931,6 +932,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     });
 
     let mut tui = Tui::new().context("failed to initialize TUI")?;
+    tui.hydrate_history(&visible_history);
 
     // Channels between conversation engine and UI
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();

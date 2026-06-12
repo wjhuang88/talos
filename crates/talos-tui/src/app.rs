@@ -17,6 +17,7 @@ use ratatui::{
 use talos_conversation::{MessageSource, StatusSnapshot, TipKind, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
+use talos_core::message::Message;
 use tokio::sync::mpsc;
 
 use crate::evolution::{self, EvolutionPanel};
@@ -628,6 +629,11 @@ impl Tui {
         self.state.status.model_name = name;
     }
 
+    pub fn hydrate_history(&mut self, history: &[Message]) {
+        self.pending_scrollback
+            .extend(render_history_messages(&mut self.stream_count, history));
+    }
+
     pub fn toggle_skill_sidebar(&mut self) {
         self.skill_sidebar.toggle();
     }
@@ -1088,6 +1094,50 @@ fn stream_opening_lines(stream_count: usize, opening: Vec<ScrollbackLine>) -> Ve
     }
     lines.extend(opening);
     lines
+}
+
+fn render_history_message(
+    stream_count: &mut usize,
+    source: MessageSource,
+    content: &str,
+) -> Vec<ScrollbackLine> {
+    let mut renderer = StreamRenderState::default();
+    let mut lines = stream_opening_lines(*stream_count, renderer.start(source));
+    lines.extend(renderer.push_chunk(content));
+    if !content.ends_with('\n') {
+        lines.extend(renderer.push_chunk("\n"));
+    }
+    lines.extend(renderer.finish());
+    *stream_count += 1;
+    lines
+}
+
+fn render_history_messages(stream_count: &mut usize, history: &[Message]) -> Vec<ScrollbackLine> {
+    let mut lines = Vec::new();
+    for message in history {
+        let Some((source, content)) = history_message_parts(message) else {
+            continue;
+        };
+        if content.is_empty() {
+            continue;
+        }
+
+        lines.extend(render_history_message(stream_count, source, content));
+    }
+    lines
+}
+
+fn history_message_parts(message: &Message) -> Option<(MessageSource, &str)> {
+    match message {
+        Message::User { content } => Some((MessageSource::User, content.as_str())),
+        Message::Assistant { content, .. } => Some((MessageSource::Assistant, content.as_str())),
+        Message::Tool { result } => Some((
+            MessageSource::Tool {
+                name: result.tool_use_id.clone(),
+            },
+            result.content.as_str(),
+        )),
+    }
 }
 
 fn render_markdown_segments(
@@ -1891,6 +1941,48 @@ mod tests {
                 ScrollbackLine::plain(String::new(), bg)
             ]
         );
+    }
+
+    #[test]
+    fn render_history_message_reuses_completed_stream_rendering() {
+        let mut stream_count = 0;
+        let lines = render_history_message(
+            &mut stream_count,
+            MessageSource::Assistant,
+            "hello\n| A | B |\n| --- | --- |\n| x | y |",
+        );
+
+        assert_eq!(stream_count, 1);
+        assert_eq!(lines[0].text, " ● hello");
+        assert!(lines.iter().any(|line| line.text.contains("┌")));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.text.contains("│ x") && line.text.contains("│ y"))
+        );
+    }
+
+    #[test]
+    fn hydrate_history_preserves_prefixes_and_stream_count() {
+        let mut stream_count = 0;
+        let lines = render_history_messages(
+            &mut stream_count,
+            &[
+                Message::User {
+                    content: "first\nsecond".to_string(),
+                },
+                Message::Assistant {
+                    content: "reply".to_string(),
+                    tool_calls: vec![],
+                },
+            ],
+        );
+
+        let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
+        assert!(texts.contains(&" > first"));
+        assert!(texts.contains(&"   second"));
+        assert!(texts.contains(&" ● reply"));
+        assert_eq!(stream_count, 2);
     }
 
     fn state_line(text: &str) -> ScrollbackLine {

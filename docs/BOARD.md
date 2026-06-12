@@ -22,7 +22,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I024 Conversation Context | **Review** | [I024 Conversation Context](iterations/I024-conversation-context.md) | S1-S3 verified; S4 layers 1-3 wired and layers 4-5 deferred to MEM-003; S5 workspace tests and clippy clean. Fixed interactive mode duplicate JSONL persist bug. JSONL-backed resume test added. Complete requires final runtime evidence or explicit closeout note. |
+| I024 Conversation Context | **Review** | [I024 Conversation Context](iterations/I024-conversation-context.md) | S1-S3 verified; S4 layers 1-3 wired and layers 4-5 deferred to MEM-003; S5 workspace tests and clippy clean. Fixed interactive duplicate persist, UTF-8 preview panic, and TUI visible history hydration. Complete requires final TUI runtime evidence or explicit closeout note. |
 | I022 TUI Inline-by-Default | Complete | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Core flip + viewport refactor + scrollback flush + status bar tips landed; 127 TUI tests pass; state model refactor deferred to I023 |
 | I014 TUI Completion | Complete | [I014 TUI Completion](iterations/I014-tui-completion.md) | Both stories landed (2 atomic commits: 7f783fa #I009-S6, 3b526c8 #I010-S9); 652 tests pass workspace-wide (was 615; +37 from talos-tui); runtime evidence recorded |
 | I021 Evolution MenteDB Realignment | Complete | [I021 Evolution MenteDB Realignment](iterations/I021-evolution-mentedb-realignment.md) | All 5 stories landed; 615 tests pass; runtime regression confirmed (model responds to `cargo run -p talos-cli -- -p "你好"`); 5 atomic commits #I021-S1..S5; defense layer (commit `7470ac5`) preserved |
