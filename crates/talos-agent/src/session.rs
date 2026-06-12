@@ -15,11 +15,14 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use talos_core::message::AgentEvent;
+use talos_core::message::Message;
 use talos_core::session::{
     SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnCompletionStatus,
 };
 
 use crate::Agent;
+use crate::compaction::Compactor;
+use crate::token::TokenEstimator;
 
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
 ///
@@ -29,7 +32,9 @@ pub struct AppServerSession {
     agent: Arc<Agent>,
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
     eq_tx: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
-    _config: SessionConfig,
+    history: Vec<Message>,
+    compactor: Compactor,
+    pending_user_message: Option<String>,
 }
 
 impl AppServerSession {
@@ -45,11 +50,15 @@ impl AppServerSession {
 
         let handle = SessionHandle { sq_tx, eq_rx };
 
+        let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
+
         let actor = Self {
             agent: Arc::new(agent),
             sq_rx,
             eq_tx,
-            _config: config,
+            history: config.initial_history,
+            compactor,
+            pending_user_message: None,
         };
 
         (handle, actor)
@@ -67,7 +76,7 @@ impl AppServerSession {
     /// [`SessionOp::Shutdown`] exits the loop.
     pub async fn run(&mut self) {
         let mut turn_counter: u64 = 0;
-        let mut current_turn: Option<JoinHandle<()>> = None;
+        let mut current_turn: Option<JoinHandle<Option<String>>> = None;
         let mut cancel_token: Option<CancellationToken> = None;
 
         while let Some(op) = self.sq_rx.recv().await {
@@ -77,7 +86,15 @@ impl AppServerSession {
                         token.cancel();
                     }
                     if let Some(handle) = current_turn.take() {
-                        let _ = handle.await;
+                        if let Some(final_text) = handle.await.ok().flatten() {
+                            if let Some(user_msg) = self.pending_user_message.take() {
+                                self.history.push(Message::User { content: user_msg });
+                            }
+                            self.history.push(Message::Assistant {
+                                content: final_text,
+                                tool_calls: vec![],
+                            });
+                        }
                     }
 
                     turn_counter += 1;
@@ -94,25 +111,40 @@ impl AppServerSession {
                         agent_mut.set_append_prompt_opt(None);
                     }
 
+                    // Apply compaction layers 1-3 before the turn if needed.
+                    if self.compactor.should_compact(&self.history) {
+                        let compacted = self.compactor.apply_budget(self.history.clone());
+                        let compacted = self.compactor.apply_trim(compacted);
+                        let compacted = self.compactor.apply_microcompact(compacted);
+                        self.history = compacted;
+                    }
+
                     let agent = self.agent.clone();
                     let eq_tx = self.eq_tx.clone();
                     let turn_id_clone = turn_id.clone();
                     let token_clone = token.clone();
+                    let history = self.history.clone();
+                    self.pending_user_message = Some(message.clone());
 
                     let handle = tokio::spawn(async move {
                         let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
+                        let (result_tx, result_rx) = tokio::sync::oneshot::channel::<String>();
 
                         let _ = AssertUnwindSafe(run_turn_with_forwarding(
                             agent,
                             message,
+                            history,
                             event_tx,
                             event_rx,
                             eq_tx,
                             token_clone,
                             turn_id_clone,
+                            result_tx,
                         ))
                         .catch_unwind()
                         .await;
+
+                        result_rx.await.ok()
                     });
 
                     current_turn = Some(handle);
@@ -139,11 +171,13 @@ impl AppServerSession {
 async fn run_turn_with_forwarding(
     agent: Arc<Agent>,
     message: String,
+    history: Vec<talos_core::message::Message>,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
     mut event_rx: mpsc::UnboundedReceiver<AgentEvent>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     cancel_token: CancellationToken,
     turn_id: String,
+    result_tx: tokio::sync::oneshot::Sender<String>,
 ) {
     let eq_tx_clone = eq_tx.clone();
     let cancel_clone = cancel_token.clone();
@@ -164,7 +198,7 @@ async fn run_turn_with_forwarding(
         }
     });
 
-    let mut agent_task = tokio::spawn(async move { agent.run_streaming(message, event_tx).await });
+    let mut agent_task = tokio::spawn(async move { agent.run_streaming(message, history, event_tx).await });
 
     let agent_result = tokio::select! {
         result = &mut agent_task => result,
@@ -182,11 +216,14 @@ async fn run_turn_with_forwarding(
     let _ = forwarder.await;
 
     match agent_result {
-        Ok(Ok(_final_text)) => {
+        Ok(Ok(final_text)) => {
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
                 turn_id,
-                status: TurnCompletionStatus::Success,
+                status: TurnCompletionStatus::Success {
+                    final_text: final_text.clone(),
+                },
             });
+            let _ = result_tx.send(final_text);
         }
         Ok(Err(e)) => {
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
@@ -320,9 +357,11 @@ mod tests {
     async fn test_submit_and_receive() {
         let agent = make_agent(MockModel::new(vec![success_events("hello")]));
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -356,7 +395,7 @@ mod tests {
             events.iter().any(|e| matches!(
                 e,
                 SessionEvent::TurnCompleted {
-                    status: TurnCompletionStatus::Success,
+                    status: TurnCompletionStatus::Success { .. },
                     ..
                 }
             )),
@@ -371,9 +410,11 @@ mod tests {
             success_events("second"),
         ]));
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -412,7 +453,7 @@ mod tests {
                 matches!(
                     e,
                     SessionEvent::TurnCompleted {
-                        status: TurnCompletionStatus::Success,
+                        status: TurnCompletionStatus::Success { .. },
                         ..
                     }
                 )
@@ -441,9 +482,11 @@ mod tests {
             events: slow_events,
         });
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -487,9 +530,11 @@ mod tests {
     async fn test_shutdown() {
         let agent = make_agent(MockModel::new(vec![]));
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let sq_tx = handle.sq_tx;
@@ -506,9 +551,11 @@ mod tests {
     async fn test_eq_consumer_disconnect() {
         let agent = make_agent(MockModel::new(vec![success_events("hello")]));
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let sq_tx = handle.sq_tx;
@@ -536,9 +583,11 @@ mod tests {
     async fn test_sq_backpressure() {
         let agent = make_agent(MockModel::new(vec![success_events("hello")]));
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, _actor) = AppServerSession::new(agent, config);
 
         let sq_tx = handle.sq_tx;
@@ -571,9 +620,11 @@ mod tests {
     async fn test_panic_recovery() {
         let agent = make_agent(PanicModel);
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -642,9 +693,11 @@ mod tests {
             events: slow_events,
         });
         let config = SessionConfig {
-            print_mode: false,
-            workspace_root: "/tmp".into(),
-        };
+                    print_mode: false,
+                    workspace_root: "/tmp".into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                };
         let (handle, mut actor) = AppServerSession::new(agent, config);
 
         let eq_rx = handle.eq_rx;
@@ -691,6 +744,120 @@ mod tests {
                 }
             )),
             "First turn should be Cancelled"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_multi_turn_with_history() {
+        use std::sync::Arc;
+        use talos_core::message::Message;
+
+        let captured_messages = Arc::new(Mutex::new(Vec::<Vec<Message>>::new()));
+        let responses = Arc::new(Mutex::new(VecDeque::from(vec![
+            success_events("first response"),
+            success_events("second response"),
+            success_events("third response"),
+        ])));
+        let _captured = captured_messages.clone();
+
+        struct CapturingModel {
+            responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+            captured: Arc<Mutex<Vec<Vec<Message>>>>,
+        }
+
+        #[async_trait]
+        impl LanguageModel for CapturingModel {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                self.captured.lock().unwrap().push(messages.to_vec());
+                let (tx, rx) = mpsc::channel(64);
+                let events = {
+                    let mut responses = self.responses.lock().unwrap();
+                    responses.pop_front().unwrap_or_default()
+                };
+                tokio::spawn(async move {
+                    for event in events {
+                        let _ = tx.send(event).await;
+                    }
+                });
+                Ok(rx)
+            }
+        }
+
+        let agent = make_agent(CapturingModel {
+            responses,
+            captured: captured_messages.clone(),
+        });
+        let config = SessionConfig {
+            print_mode: false,
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+
+        let eq_rx = handle.eq_rx;
+        let sq_tx = handle.sq_tx;
+
+        let actor_task = tokio::spawn(async move { actor.run().await });
+
+        // Submit 3 turns
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "turn 1".into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "turn 2".into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "turn 3".into(),
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        sq_tx.send(SessionOp::Shutdown).await.unwrap();
+        let _ = actor_task.await;
+
+        let events = collect_events(eq_rx, Duration::from_secs(2)).await;
+        let success_count = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    SessionEvent::TurnCompleted {
+                        status: TurnCompletionStatus::Success { .. },
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert!(success_count >= 1, "Should have at least 1 Success");
+
+        // Verify the 3rd turn received history from turns 1 and 2
+        let captured = captured_messages.lock().unwrap();
+        assert!(captured.len() >= 3, "Should have captured at least 3 calls");
+
+        // 3rd call should have messages from turns 1 and 2
+        let third_call_messages = &captured[2];
+        // Should have: User(turn 1), Assistant(first response), User(turn 2), Assistant(second response), User(turn 3 with system prompt)
+        let user_messages: Vec<_> = third_call_messages
+            .iter()
+            .filter(|m| matches!(m, Message::User { .. }))
+            .collect();
+        assert!(
+            user_messages.len() >= 3,
+            "Third turn should have at least 3 user messages (turns 1, 2, 3), got {}",
+            user_messages.len()
         );
     }
 }
