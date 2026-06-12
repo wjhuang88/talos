@@ -30,6 +30,7 @@ use crate::widgets::ApprovalOverlay;
 
 const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
 const PREVIEW_FG: Color = Color::Rgb(0xE5, 0xE9, 0xF0);
+const SPINNER_FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 fn to_crossterm_color(c: Color) -> Option<CColor> {
     match c {
@@ -413,6 +414,15 @@ fn hold_preview_color(frame: usize) -> Color {
         Color::Rgb(0x81, 0xA1, 0xC1),
     ];
     COLORS[frame % COLORS.len()]
+}
+
+fn preview_spinner_padding(processing_frame: usize, processing_tick: usize) -> (String, usize) {
+    let lead_idx = processing_frame % SPINNER_FRAMES.len();
+    let chase_idx = ((processing_tick / 5) + SPINNER_FRAMES.len() - 2) % SPINNER_FRAMES.len();
+    (
+        format!(" {}{}", SPINNER_FRAMES[lead_idx], SPINNER_FRAMES[chase_idx]),
+        lead_idx,
+    )
 }
 
 struct QueuePreviewComponent {
@@ -820,7 +830,6 @@ impl Tui {
         let state = &self.state;
         let status = &state.status;
 
-        let spinner_frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let spinner_colors = [
             Color::Rgb(0x88, 0xC0, 0xD0),
             Color::Rgb(0x81, 0xA1, 0xC1),
@@ -838,10 +847,9 @@ impl Tui {
             if self.processing_tick.is_multiple_of(3) {
                 self.processing_frame = self.processing_frame.wrapping_add(1);
             }
-            let idx = self.processing_frame % spinner_frames.len();
-            let c1 = spinner_frames[idx];
-            let c2 = spinner_frames[(idx + 5) % spinner_frames.len()];
-            (format!(" {c1}{c2}"), Some(spinner_colors[idx]))
+            let (padding, color_idx) =
+                preview_spinner_padding(self.processing_frame, self.processing_tick);
+            (padding, Some(spinner_colors[color_idx]))
         } else {
             self.processing_frame = 0;
             self.processing_tick = 0;
@@ -1874,6 +1882,19 @@ mod tests {
         assert_eq!(animated_hold_preview_text(&status, 4), "rendering table..");
         assert_eq!(animated_hold_preview_text(&status, 6), "rendering table...");
         assert_ne!(hold_preview_color(0), hold_preview_color(1));
+    }
+
+    #[test]
+    fn preview_spinner_uses_canon_rhythm() {
+        let (first_padding, first_color_idx) = preview_spinner_padding(0, 0);
+        let (second_padding, second_color_idx) = preview_spinner_padding(1, 3);
+        let (third_padding, third_color_idx) = preview_spinner_padding(1, 5);
+
+        assert_eq!(first_padding, " ⠋⠇");
+        assert_eq!(second_padding, " ⠙⠇");
+        assert_eq!(third_padding, " ⠙⠏");
+        assert_ne!(first_color_idx, second_color_idx);
+        assert_eq!(second_color_idx, third_color_idx);
     }
 
     #[test]
