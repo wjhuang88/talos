@@ -71,10 +71,10 @@ Examples:
 
 | Classifier state | Preview text |
 |---|---|
-| Plain text incomplete line | ` ◆ generating answer` |
-| Holding table block | ` ◆ rendering table...` |
-| Holding code fence | ` ◆ receiving code block...` |
-| Holding unknown structured block | ` ◆ formatting block...` |
+| Plain text incomplete line | ` ● generating answer` |
+| Holding table block | ` ● rendering table...` |
+| Holding code fence | ` ● receiving code block...` |
+| Holding unknown structured block | ` ● formatting block...` |
 
 The spinner or processing marker is preview-only. It is displayed on the single
 preview row and is never inserted into history.
@@ -86,8 +86,8 @@ Every logical stream block uses the existing three-column prefix policy:
 | Source | First rendered row | Continuation rows |
 |---|---|---|
 | User | ` > ` | `   ` |
-| Assistant | ` ◆ ` | `   ` |
-| Tool | ` ◆ ` | `   ` |
+| Assistant | ` ● ` | `   ` |
+| Tool | ` ● ` | `   ` |
 | System | ` # ` | `   ` |
 | Error | ` ! ` | `   ` |
 

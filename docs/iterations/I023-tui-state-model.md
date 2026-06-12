@@ -34,7 +34,7 @@ I023 can move from Review to Complete:
 5. **Block-aware line streaming**: `StreamMessage` is a logical message block,
    but terminal history is still flushed line-by-line as complete `\n` lines
    arrive. Prefixes are keyed by the stream-local line index: line 0 uses the
-   source prefix (` > `, ` ◆ `, ` # `, ` ! `), and all continuation lines use
+   source prefix (` > `, ` ● `, ` # `, ` ! `), and all continuation lines use
    the blank alignment prefix (`   `). The live processing spinner remains a
    preview-only marker and is never written to history.
 
@@ -237,7 +237,7 @@ for D4, which should be confirmed against the current CLI mode before execution.
 | S6 | Verification | `cargo check --workspace` clean. `cargo test --workspace` exit 0. Runtime verified: messages appear in scrollback with blank-line spacing, tips auto-expire, input area with bg-color style, status bar no background. | ✅ Complete |
 | S7 | Event-driven architecture | `talos-conversation` crate: `ConversationEngine` owns business state, emits `UiOutput` via async channels. `talos-tui` owns pure UI state. Single-directional flow: Agent → Engine → UI. Stream-based content delivery (`StreamMessage`). `select!` loop consumes streams directly (no spawn task). | ✅ Complete |
 | S8 | Codex-style insert_history | Two-branch `insert_history`: non-bottom (`\x1bM` push viewport) and bottom (scroll region + `\r\n`). Single-line operation. `needs_clear` after each insert for clean viewport redraw. `streaming_preview` unconditionally synced with `stream_buffer`. | ✅ Complete |
-| S9 | Line padding and styled scrollback | 3-column padding by message type (` > ` user, ` ◆ ` assistant/tool, ` # ` system, ` ! ` error). User messages rendered with Nord Polar Night background (`#3B4252`) and top/bottom padding rows. `ScrollbackLine` carries visible `text`, styled history segments, and optional `bg`. `insert_history` / `insert_styled_history` pad lines to full terminal width. Stream separator (blank line) between non-first streams. | ✅ Complete |
+| S9 | Line padding and styled scrollback | 3-column padding by message type (` > ` user, ` ● ` assistant/tool, ` # ` system, ` ! ` error). User messages rendered with Nord Polar Night background (`#3B4252`) and top/bottom padding rows. `ScrollbackLine` carries visible `text`, styled history segments, and optional `bg`. `insert_history` / `insert_styled_history` pad lines to full terminal width. Stream separator (blank line) between non-first streams. | ✅ Complete |
 | S10 | Animated spinner and cursor sync | 2-char braille spinner with 10-frame animation and Nord color gradient cycling (150ms/frame). Native terminal cursor synced to input box position after each render via `MoveTo` + `Show`. `set_cursor` method on `InlineTerminal`. `restore()` clears viewport content before exiting. | ✅ Complete |
 
 ## Execution Evidence
@@ -254,7 +254,7 @@ for D4, which should be confirmed against the current CLI mode before execution.
 - `insert_history` accepts `bg: Option<Color>` for plain scrollback and `insert_styled_history` accepts rendered segments; both keep one-row terminal insertion and full-width background padding.
 - `ScrollbackLine` struct carries visible `text`, styled history segments, and `bg: Option<Color>`, enabling per-line background styling and conservative Markdown styles without terminal history rewrite.
 - User messages rendered with Nord Polar Night background (`#3B4252`) and top/bottom padding rows for visual grouping.
-- 3-column line padding system: ` > ` (user), ` ◆ ` (assistant/tool first), `   ` (continuation), ` # ` (system), ` ! ` (error).
+- 3-column line padding system: ` > ` (user), ` ● ` (assistant/tool first), `   ` (continuation), ` # ` (system), ` ! ` (error).
 - Non-first streams are separated by a blank line when the new stream's first
   non-empty chunk arrives.
 - Queued steering input is rendered through `start_user_message` when drained

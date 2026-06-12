@@ -150,10 +150,10 @@ Each scrollback line carries a three-column prefix aligned with the input box pr
 | Source | First Line | Continuation |
 |--------|-----------|--------------|
 | User | ` > ` | `   ` |
-| Assistant | ` ◆ ` | `   ` |
+| Assistant | ` ● ` | `   ` |
 | System | ` # ` | `   ` |
 | Error | ` ! ` | `   ` |
-| Tool | ` ◆ ` | `   ` |
+| Tool | ` ● ` | `   ` |
 
 ### Styled Scrollback
 

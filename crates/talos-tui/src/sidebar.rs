@@ -71,7 +71,7 @@ impl SkillSidebar {
     /// When visible and not collapsed, shows a bordered panel with:
     /// - Title "Skills"
     /// - List of skills with name (nord8), description (nord4), and status indicator
-    ///   (● active in nord14, ○ inactive in nord3)
+    ///   (◆ active in nord14, ◇ inactive in nord3)
     ///
     /// When collapsed, shows only a skill count icon.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -94,7 +94,7 @@ impl SkillSidebar {
             lines.push(Line::from(Span::styled("No skills loaded", empty_style)));
         } else {
             for skill in &self.skills {
-                let status_icon = if skill.active { "●" } else { "○" };
+                let status_icon = if skill.active { "◆" } else { "◇" };
                 let status_style = if skill.active {
                     Style::default().fg(nord::NORD14)
                 } else {

@@ -1071,10 +1071,10 @@ pub(crate) fn stream_padding_for(
 
     match source {
         Some(MessageSource::User) => " > ",
-        Some(MessageSource::Assistant) => " ◆ ",
+        Some(MessageSource::Assistant) => " ● ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
-        Some(MessageSource::Tool { .. }) => " ◆ ",
+        Some(MessageSource::Tool { .. }) => " ● ",
         None => "   ",
     }
 }
@@ -1754,7 +1754,7 @@ mod tests {
         let mut state = StreamRenderState::default();
         assert!(state.start(MessageSource::Assistant).is_empty());
 
-        assert_eq!(state.push_chunk("first\nsec"), vec![state_line(" ◆ first")]);
+        assert_eq!(state.push_chunk("first\nsec"), vec![state_line(" ● first")]);
         assert_eq!(state.preview(), "sec");
         assert_eq!(
             state.push_chunk("ond\nthird"),
@@ -1801,7 +1801,7 @@ mod tests {
         assert_eq!(
             state.finish(),
             vec![
-                state_line(" ◆ first"),
+                state_line(" ● first"),
                 state_line("   second"),
                 state_line("   third")
             ]
@@ -1825,7 +1825,7 @@ mod tests {
         assert_eq!(
             lines,
             vec![
-                state_line(" ◆ ┌─────┬─────────────┐"),
+                state_line(" ● ┌─────┬─────────────┐"),
                 state_line("   │ A   │ Longer code │"),
                 state_line("   ├─────┼─────────────┤"),
                 state_line("   │ x   │ yy          │"),
@@ -1901,7 +1901,7 @@ mod tests {
 
         assert_eq!(
             state.finish(),
-            vec![state_line(" ◆ ```rust"), state_line("   fn main() {}"),]
+            vec![state_line(" ● ```rust"), state_line("   fn main() {}"),]
         );
         assert_eq!(state.preview(), "");
     }
@@ -1914,7 +1914,7 @@ mod tests {
         let lines = state.push_chunk("# Title with **strong** and `code`\n");
 
         assert_eq!(lines.len(), 1);
-        assert_eq!(lines[0].text, " ◆ Title with strong and code");
+        assert_eq!(lines[0].text, " ● Title with strong and code");
         assert!(lines[0].segments.iter().any(|segment| segment.attrs.bold));
         assert!(
             lines[0]
@@ -1938,7 +1938,7 @@ mod tests {
         let lines = state.push_chunk("---\n");
 
         assert_eq!(lines.len(), 1);
-        assert_eq!(lines[0].text, " ◆ ────────");
+        assert_eq!(lines[0].text, " ● ────────");
         assert!(
             lines[0]
                 .segments
@@ -1957,7 +1957,7 @@ mod tests {
         let lines = state.finish();
 
         assert_eq!(lines.len(), 2);
-        assert_eq!(lines[0].text, " ◆ - first");
+        assert_eq!(lines[0].text, " ● - first");
         assert_eq!(lines[1].text, "   - second");
         assert!(
             lines[0]
