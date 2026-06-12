@@ -23,6 +23,7 @@ use crate::evolution::{self, EvolutionPanel};
 use crate::inline_terminal::{ComponentStack, InlineFrame, InlineTerminal, ViewportComponent};
 use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
+use crate::stream_markdown::{BlockDecision, HoldStatus, StreamBlockClassifier};
 use crate::widgets::ApprovalOverlay;
 
 const INPUT_BG: Color = Color::Rgb(0x3B, 0x42, 0x52);
@@ -48,6 +49,8 @@ struct StreamRenderState {
     preview: String,
     hold_complete_lines: bool,
     held_lines: Vec<(usize, String)>,
+    block_classifier: StreamBlockClassifier,
+    hold_status: Option<HoldStatus>,
 }
 
 impl StreamRenderState {
@@ -67,6 +70,8 @@ impl StreamRenderState {
         self.preview.clear();
         self.hold_complete_lines = hold_complete_lines;
         self.held_lines.clear();
+        self.block_classifier.reset();
+        self.hold_status = None;
 
         if bg.is_some() {
             vec![ScrollbackLine {
@@ -96,12 +101,13 @@ impl StreamRenderState {
             if self.hold_complete_lines {
                 self.held_lines.push((self.line_count, line));
             } else {
-                lines.push(self.render_line(self.line_count, &line));
+                lines.extend(self.push_complete_line(line));
             }
-            self.line_count += 1;
         }
 
-        self.preview = self.buffer.clone();
+        if self.hold_status.is_none() {
+            self.preview = self.buffer.clone();
+        }
         lines
     }
 
@@ -109,16 +115,16 @@ impl StreamRenderState {
         let mut lines = Vec::new();
 
         let held_lines = std::mem::take(&mut self.held_lines);
-        lines.extend(
-            held_lines
-                .into_iter()
-                .map(|(line_index, line)| self.render_line(line_index, &line)),
-        );
+        for (_, line) in held_lines {
+            lines.push(self.render_next_line(&line));
+        }
+
+        let decisions = self.block_classifier.finish();
+        lines.extend(self.apply_block_decisions(decisions));
 
         if !self.preview.is_empty() {
             let preview = std::mem::take(&mut self.preview);
-            lines.push(self.render_line(self.line_count, &preview));
-            self.line_count += 1;
+            lines.push(self.render_next_line(&preview));
         }
 
         if self.bg().is_some() {
@@ -140,6 +146,58 @@ impl StreamRenderState {
         }
     }
 
+    fn render_next_line(&mut self, line: &str) -> ScrollbackLine {
+        let rendered = self.render_line(self.line_count, line);
+        self.line_count += 1;
+        rendered
+    }
+
+    fn push_complete_line(&mut self, line: String) -> Vec<ScrollbackLine> {
+        let decisions = self.block_classifier.push_line(line);
+        self.apply_block_decisions(decisions)
+    }
+
+    fn apply_block_decisions(&mut self, decisions: Vec<BlockDecision>) -> Vec<ScrollbackLine> {
+        let mut lines = Vec::new();
+        for decision in decisions {
+            match decision {
+                BlockDecision::ImmediateLine(line) => {
+                    self.hold_status = None;
+                    if self.buffer.is_empty() {
+                        self.preview.clear();
+                    }
+                    lines.push(self.render_next_line(&line));
+                }
+                BlockDecision::StartHold { status } | BlockDecision::ContinueHold { status } => {
+                    self.preview = status.preview_text().to_string();
+                    self.hold_status = Some(status);
+                }
+                BlockDecision::FinishHold {
+                    status: _,
+                    lines: rendered,
+                } => {
+                    self.hold_status = None;
+                    self.preview = self.buffer.clone();
+                    for line in rendered {
+                        lines.push(self.render_next_line(&line));
+                    }
+                }
+                BlockDecision::FallbackImmediate {
+                    status: _,
+                    reason: _,
+                    lines: rendered,
+                } => {
+                    self.hold_status = None;
+                    self.preview = self.buffer.clone();
+                    for line in rendered {
+                        lines.push(self.render_next_line(&line));
+                    }
+                }
+            }
+        }
+        lines
+    }
+
     fn bg(&self) -> Option<CColor> {
         stream_bg_for(self.source())
     }
@@ -151,6 +209,8 @@ impl StreamRenderState {
         self.preview.clear();
         self.hold_complete_lines = false;
         self.held_lines.clear();
+        self.block_classifier.reset();
+        self.hold_status = None;
     }
 }
 
@@ -1071,6 +1131,61 @@ mod tests {
             ]
         );
         assert!(state.source().is_none());
+        assert_eq!(state.preview(), "");
+    }
+
+    #[test]
+    fn stream_render_state_holds_table_and_flushes_aligned_rows() {
+        let mut state = StreamRenderState::default();
+        assert!(state.start(MessageSource::Assistant).is_empty());
+
+        assert!(state.push_chunk("| A | Longer |\n").is_empty());
+        assert_eq!(state.preview(), "rendering table...");
+        assert!(state.push_chunk("| --- | --- |\n").is_empty());
+        assert_eq!(state.preview(), "rendering table...");
+        assert!(state.push_chunk("| x | yy |\n").is_empty());
+
+        assert_eq!(
+            state.finish(),
+            vec![
+                ScrollbackLine {
+                    text: " ~ | A | Longer |".to_string(),
+                    bg: None
+                },
+                ScrollbackLine {
+                    text: "   | --- | ------ |".to_string(),
+                    bg: None
+                },
+                ScrollbackLine {
+                    text: "   | x | yy     |".to_string(),
+                    bg: None
+                },
+            ]
+        );
+        assert_eq!(state.preview(), "");
+    }
+
+    #[test]
+    fn stream_render_state_keeps_code_fence_visible_on_finish() {
+        let mut state = StreamRenderState::default();
+        assert!(state.start(MessageSource::Assistant).is_empty());
+
+        assert!(state.push_chunk("```rust\nfn main() {}\n").is_empty());
+        assert_eq!(state.preview(), "receiving code block...");
+
+        assert_eq!(
+            state.finish(),
+            vec![
+                ScrollbackLine {
+                    text: " ~ ```rust".to_string(),
+                    bg: None
+                },
+                ScrollbackLine {
+                    text: "   fn main() {}".to_string(),
+                    bg: None
+                },
+            ]
+        );
         assert_eq!(state.preview(), "");
     }
 

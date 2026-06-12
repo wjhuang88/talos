@@ -4,7 +4,7 @@
 
 ## Status: REVIEW (2026-06-11)
 
-Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Multiline pasted input stays a single user block. Animated braille spinner with Nord gradient. Native cursor sync to input box. 46 TUI + 53 conversation tests pass.
+Event-driven architecture with `talos-conversation` crate. Codex-style `insert_history` rewrite. Stream-based content delivery with styled scrollback (user messages have Nord bg color with top/bottom padding). 3-char ASCII line padding system. Multiline pasted input stays a single user block. Single-row preview stays stable while the TUI holds Markdown tables/code fences/lists/quotes through a stream block classifier. Animated braille spinner with Nord gradient. Native cursor sync to input box. 57 TUI + 53 conversation tests pass.
 
 ## Review Remediation Plan (2026-06-11)
 
@@ -147,6 +147,18 @@ Acceptance:
 - Tests cover chunk boundaries split across newline, pipe, backtick, and inline
   delimiter tokens.
 
+Implementation evidence (2026-06-12):
+
+- `crates/talos-tui/src/stream_markdown.rs` adds a deterministic stream block
+  classifier with hold status, boundary hints, fallback reasons, table
+  alignment, and tests for plain text, tables, code fences, table lookahead, and
+  unterminated fences.
+- `StreamRenderState` consumes classifier decisions, keeps preview one row,
+  shows block status text while holding structured content, and flushes rendered
+  rows through the existing `ScrollbackLine` path.
+- The first implementation keeps inline Markdown as conservative immediate
+  plain text. Rich styled spans remain future work.
+
 ## Stories
 
 | Story | Title | Acceptance | Status |
@@ -164,9 +176,9 @@ Acceptance:
 
 ## Execution Evidence
 
-- 99 tests pass (46 TUI + 53 conversation).
+- 110 tests pass (57 TUI + 53 conversation).
 - `talos-conversation` crate: `ConversationEngine` owns all business state, 53 tests.
-- `talos-tui` crate: event-driven UI with pure state, 46 tests.
+- `talos-tui` crate: event-driven UI with pure state, 57 tests.
 - Single-directional information flow: Agent → ConversationEngine → UI via typed async channels (`mpsc::UiOutput`).
 - Stream-based content delivery: UI consumes active stream via `next_stream_chunk` in `select!` loop (no spawn task).
 - `insert_history` rewritten Codex-style: two branches (non-bottom: `\x1bM` push viewport; bottom: scroll region + `\r\n`), single-line operation, `needs_clear` for clean redraw.
@@ -178,10 +190,13 @@ Acceptance:
   non-empty chunk arrives.
 - Queued steering input is rendered through `start_user_message` when drained
   after the active turn, before the bridge submits it to the session actor.
+- Markdown tables, fenced code blocks, lists, and quotes are detected by a
+  TUI-side classifier. Structured blocks are held with one-row preview status
+  text, then flushed as visible history rows with no terminal history rewrite.
 - Animated 2-char braille spinner with Nord color gradient (10 frames, 150ms/frame) in preview component.
 - Native terminal cursor synced to input box position after each render (`MoveTo` + `Show`).
 - `restore()` clears viewport content (`MoveTo` + `Clear(FromCursorDown)`) before disabling raw mode.
-- Commits: `5c90874` (event-driven architecture), `a669a3e` (insert_history rewrite + preview sync fix), `988fc82` (line padding + error tips), `fc370ce` (animated spinner).
+- Commits: `5c90874` (event-driven architecture), `a669a3e` (insert_history rewrite + preview sync fix), `988fc82` (line padding + error tips), `fc370ce` (animated spinner), pending classifier implementation commit.
 
 ## Dependencies
 

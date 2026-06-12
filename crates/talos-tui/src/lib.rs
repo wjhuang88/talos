@@ -5,6 +5,7 @@ mod export;
 mod inline_terminal;
 mod sidebar;
 mod state;
+mod stream_markdown;
 mod theme;
 mod widgets;
 

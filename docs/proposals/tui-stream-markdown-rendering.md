@@ -2,10 +2,10 @@
 
 ## Status
 
-Proposal for the post-I023 TUI stream renderer. This document describes how
-Talos should identify and render simple Markdown while preserving the current
-inline-terminal stability guarantees. It is not an implementation task until it
-is accepted through requirement intake and linked from a backlog story.
+Proposal and implementation guide for the TUI stream renderer. The first
+classifier slice landed during I023: block detection, hold status, plain-text
+fallbacks, and table alignment are implemented in `talos-tui`. Rich styled spans
+and full CommonMark support remain future work.
 
 ## Goals
 
@@ -205,13 +205,11 @@ struct HoldStatus {
 }
 
 enum BoundaryHint {
-    WaitingForCodeFenceClose,
-    WaitingForTableSeparator,
-    WaitingForTableEnd,
-    WaitingForBlankLine,
-    WaitingForNonListLine,
-    WaitingForNonQuoteLine,
-    WaitingForStreamFinish,
+    CodeFenceClose,
+    TableSeparator,
+    TableEnd,
+    NonListLine,
+    NonQuoteLine,
 }
 ```
 
@@ -221,6 +219,10 @@ boundary rules. The UI preview derives its animation text from `HoldStatus`.
 The classifier must expose `HoldStatus` on start, continuation, finish, and
 fallback decisions so the preview can update animation text as the block grows
 instead of showing a generic spinner forever.
+
+Future classifiers may add more boundary hints, but the first implementation
+keeps the public state small: code fence close, table separator/end, non-list
+line, and non-quote line.
 
 ## Fallback Rules
 
