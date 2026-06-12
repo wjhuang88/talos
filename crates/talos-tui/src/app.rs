@@ -1136,15 +1136,8 @@ fn render_table_history_line(line: &str, row_index: usize) -> Vec<HistorySegment
                 .map(|cell| "-".repeat(cell.len().max(3)))
                 .collect::<Vec<_>>()
                 .join("\t"),
-            Some(CColor::Rgb {
-                r: 0x4C,
-                g: 0x56,
-                b: 0x6A,
-            }),
-            HistoryAttrs {
-                dim: true,
-                ..HistoryAttrs::default()
-            },
+            None,
+            HistoryAttrs::default(),
         )];
     }
 
@@ -1233,18 +1226,7 @@ fn table_border_line(
         text.push_str(&"─".repeat(width + 2));
     }
     text.push(right);
-    vec![HistorySegment::styled(
-        text,
-        Some(CColor::Rgb {
-            r: 0x4C,
-            g: 0x56,
-            b: 0x6A,
-        }),
-        HistoryAttrs {
-            dim: true,
-            ..HistoryAttrs::default()
-        },
-    )]
+    vec![HistorySegment::raw(text)]
 }
 
 fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<HistorySegment> {
@@ -1267,18 +1249,7 @@ fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<Hist
 }
 
 fn table_border_segment(text: impl Into<String>) -> HistorySegment {
-    HistorySegment::styled(
-        text,
-        Some(CColor::Rgb {
-            r: 0x4C,
-            g: 0x56,
-            b: 0x6A,
-        }),
-        HistoryAttrs {
-            dim: true,
-            ..HistoryAttrs::default()
-        },
-    )
+    HistorySegment::raw(text)
 }
 
 fn emphasize_table_header(segments: &mut [HistorySegment]) {
@@ -1824,6 +1795,14 @@ mod tests {
                 state_line("   │ x   │ yy          │"),
                 state_line("   └─────┴─────────────┘"),
             ]
+        );
+        assert!(
+            lines[0]
+                .segments
+                .iter()
+                .any(|segment| segment.text == "┌─────┬─────────────┐"
+                    && segment.fg.is_none()
+                    && segment.attrs == HistoryAttrs::default())
         );
         assert!(
             lines[1]
