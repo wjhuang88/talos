@@ -51,4 +51,6 @@ docs/proposals/
   handling.
 - [Session Context Contamination](session-context-contamination.md) — context contamination
   investigation and mitigation direction.
+- [TUI Stream Markdown Rendering](tui-stream-markdown-rendering.md) — single-line and block
+  Markdown recognition/rendering direction for the inline TUI stream renderer.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.

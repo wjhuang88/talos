@@ -186,6 +186,28 @@ future block renderers, but the default runtime mode is immediate line emission.
 Hold mode is a private preparation boundary: it changes when `ScrollbackLine`s
 are emitted from the helper, not how terminal history is written.
 
+### Markdown And Block Rendering Direction
+
+Markdown rendering must preserve the inline-terminal stability contract. The
+live preview remains exactly one row. Markdown that can be represented as a
+single streaming line may render in preview and flush complete lines to history
+immediately. Markdown that requires block context, such as tables or fenced code
+blocks, is held locally by the stream-render helper; while held, preview shows a
+single-row animation/status such as `rendering table...` or `receiving code
+block...`. When the block boundary is reached, the helper renders the block to
+history rows and `InlineTerminal::insert_history` writes those rows one at a
+time.
+
+Block detection belongs to a deterministic TUI-side classifier, not to
+`InlineTerminal` and not to `talos-conversation`. The classifier must expose
+the block kind, held line/byte counts, and boundary hint so preview status can
+explain why raw content is hidden. It must also have visible fallback behavior:
+malformed, oversized, or unterminated blocks are flushed as plain rows rather
+than dropped.
+
+The detailed target design and test matrix are tracked as a proposal in
+[`docs/proposals/tui-stream-markdown-rendering.md`](../proposals/tui-stream-markdown-rendering.md).
+
 ### Native Cursor Sync
 
 After each `draw_frame` render, the native terminal cursor is repositioned to the input box position using `MoveTo(col, row)` + `Show`. The column is calculated as 3 (prefix width) + Unicode display width of text before the cursor. This ensures IME input, text selection, and other cursor-dependent features work correctly.

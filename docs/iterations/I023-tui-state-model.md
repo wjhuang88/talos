@@ -117,6 +117,36 @@ layout stable:
 - line prefixes are still based on stream-local line indexes;
 - `InlineTerminal::insert_history` remains a single-line writer.
 
+## Next Slice: Markdown Block Classifier Design
+
+Before implementing Markdown rendering, add a TUI-side classifier boundary as
+described in
+[`docs/proposals/tui-stream-markdown-rendering.md`](../proposals/tui-stream-markdown-rendering.md).
+The classifier decides whether incoming stream content can be rendered as an
+immediate single-line Markdown row or must be held as a structured block.
+
+The preview remains a one-row component. Immediate lines may show their latest
+incomplete text in preview. Held blocks hide raw content in preview and instead
+show status derived from classifier metadata, such as `rendering table...` or
+`receiving code block...`. Finished blocks are rendered into scrollback rows and
+inserted through the existing single-line `InlineTerminal::insert_history`
+path.
+
+Acceptance:
+
+- Plain text and conservative single-line Markdown render in immediate mode and
+  continue flushing complete lines to history as they arrive.
+- Tables, fenced code blocks, list blocks, and quote blocks have deterministic
+  start/end conditions and expose hold status for preview animation text.
+- Code fences suppress table/list/quote recognition until the matching closing
+  fence is seen.
+- Malformed, oversized, or unterminated blocks fall back to visible plain rows;
+  no buffered text is dropped.
+- Prefixes remain stream-local: only rendered row 0 gets the source prefix, and
+  all continuation rows get the blank three-column prefix.
+- Tests cover chunk boundaries split across newline, pipe, backtick, and inline
+  delimiter tokens.
+
 ## Stories
 
 | Story | Title | Acceptance | Status |

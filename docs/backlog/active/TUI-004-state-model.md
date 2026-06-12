@@ -242,6 +242,7 @@ yet — the channel is the interface contract.
 | `Tip` expiry timing differs from current `status_message` TTL | TTL values match current behavior (2s for Ctrl+C, 3s for approval); no user-visible change |
 | `event_tx` channel adds latency to state mutations | Channel is optional; when `None`, no overhead. Send is non-blocking (`UnboundedSender`) |
 | Steering queue + Pending message duplication | Queue holds raw text; `ChatMessage` holds formatted display content. Both reference the same input but serve different purposes (dispatch vs. display) |
+| Future Markdown block rendering hides streaming content while waiting for a block boundary | Keep preview one row, hold only the active structured block, expose classifier status in the preview animation, and fall back to visible plain rows for malformed, oversized, or unterminated blocks. See `docs/proposals/tui-stream-markdown-rendering.md` |
 
 ## Required Reads
 
@@ -249,4 +250,5 @@ yet — the channel is the interface contract.
 - `crates/talos-tui/src/app.rs` — `flush_scrollback`, `finalize_scrollback`, `build_status_text`, `handle_agent_event`, `handle_input_event`
 - `docs/backlog/active/TUI-002-codex-overhaul.md` — inline-by-default architecture (prerequisite)
 - `docs/iterations/I022-tui-inline-default.md` — I022 iteration record (prerequisite, landed)
+- `docs/proposals/tui-stream-markdown-rendering.md` — future single-line and block Markdown recognition/rendering design
 - `docs/proposals/reasoning-thinking-field.md` — future `ReasoningDelta` event will need `TuiStateEvent` hook
