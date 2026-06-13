@@ -610,6 +610,59 @@ impl SessionManager {
         Ok(sessions)
     }
 
+    /// List sessions for one workspace directory.
+    pub fn list_workspace_sessions(
+        &self,
+        workspace: &str,
+    ) -> Result<Vec<SessionInfo>, SessionError> {
+        let workspace_dir = self.sessions_dir.join(workspace);
+        if !workspace_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        Self::scan_workspace_sessions(workspace, &workspace_dir)
+    }
+
+    fn scan_workspace_sessions(
+        workspace_name: &str,
+        workspace_dir: &Path,
+    ) -> Result<Vec<SessionInfo>, SessionError> {
+        let mut sessions = Vec::new();
+        for file_entry in fs::read_dir(workspace_dir)? {
+            let file_entry = file_entry?;
+            let path = file_entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                continue;
+            }
+
+            let file_stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+
+            if let Some(id) = file_stem {
+                let metadata = fs::metadata(&path)?;
+                let timestamp = metadata
+                    .modified()
+                    .ok()
+                    .map(DateTime::<Utc>::from)
+                    .unwrap_or_else(Utc::now);
+
+                let (message_count, last_preview) = Self::scan_file(&path)?;
+
+                sessions.push(SessionInfo {
+                    id,
+                    project: workspace_name.to_string(),
+                    last_message_preview: last_preview,
+                    timestamp,
+                    message_count,
+                });
+            }
+        }
+
+        Ok(sessions)
+    }
+
     /// Resume a session by ID, loading all entries from the JSONL file.
     ///
     /// This is equivalent to [`SessionManager::get_session`] but with a clearer
@@ -851,6 +904,31 @@ mod tests {
 
         let s2_info = sessions.iter().find(|s| s.id == s2.id).unwrap();
         assert_eq!(s2_info.message_count, 0);
+    }
+
+    #[test]
+    fn list_workspace_sessions_filters_by_workspace() {
+        let manager = test_manager();
+        let playit = manager.create_session("playit").unwrap();
+        let talos = manager.create_session("talos").unwrap();
+
+        playit
+            .append(&Message::User {
+                content: "playit message".into(),
+            })
+            .unwrap();
+        talos
+            .append(&Message::User {
+                content: "talos message".into(),
+            })
+            .unwrap();
+
+        let sessions = manager.list_workspace_sessions("playit").unwrap();
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, playit.id);
+        assert_eq!(sessions[0].project, "playit");
+        assert_eq!(sessions[0].last_message_preview, "playit message");
     }
 
     #[test]

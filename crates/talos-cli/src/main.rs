@@ -795,7 +795,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     // Session management: create or resume session for history persistence.
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let project_name = workspace_root
+    let workspace_name = workspace_root
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("default");
@@ -806,11 +806,11 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
             .with_context(|| format!("failed to resume session {session_id}"))?
     } else if cli.r#continue {
         let sessions = session_manager
-            .list_sessions()
+            .list_workspace_sessions(workspace_name)
             .context("failed to list sessions")?;
         if sessions.is_empty() {
             session_manager
-                .create_session(project_name)
+                .create_session(workspace_name)
                 .context("failed to create session")?
         } else {
             let most_recent = sessions
@@ -823,11 +823,11 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     } else if cli.resume {
         let sessions = session_manager
-            .list_sessions()
+            .list_workspace_sessions(workspace_name)
             .context("failed to list sessions")?;
         if sessions.is_empty() {
             session_manager
-                .create_session(project_name)
+                .create_session(workspace_name)
                 .context("failed to create session")?
         } else {
             let most_recent = sessions
@@ -840,7 +840,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     } else {
         session_manager
-            .create_session(project_name)
+            .create_session(workspace_name)
             .context("failed to create session")?
     };
 
@@ -1015,7 +1015,7 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
     }
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let project_name = workspace_root
+    let workspace_name = workspace_root
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("default");
@@ -1026,11 +1026,11 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
             .with_context(|| format!("failed to resume session {session_id}"))?
     } else if cli.r#continue {
         let sessions = session_manager
-            .list_sessions()
+            .list_workspace_sessions(workspace_name)
             .context("failed to list sessions")?;
         if sessions.is_empty() {
             session_manager
-                .create_session(project_name)
+                .create_session(workspace_name)
                 .context("failed to create session")?
         } else {
             let most_recent = sessions
@@ -1043,7 +1043,7 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
         }
     } else {
         session_manager
-            .create_session(project_name)
+            .create_session(workspace_name)
             .context("failed to create session")?
     };
 
@@ -1175,6 +1175,10 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let workspace_root = resolve_workspace_root(&cli)?;
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
+    let workspace_name = workspace_root
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("default");
 
     let session = if let Some(ref source_session_id) = cli.fork {
         fork_session(&session_manager, source_session_id)?
@@ -1184,15 +1188,11 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
             .with_context(|| format!("failed to resume session {session_id}"))?
     } else if cli.r#continue {
         let sessions = session_manager
-            .list_sessions()
+            .list_workspace_sessions(workspace_name)
             .context("failed to list sessions")?;
         if sessions.is_empty() {
-            let project_name = workspace_root
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("default");
             session_manager
-                .create_session(project_name)
+                .create_session(workspace_name)
                 .context("failed to create session")?
         } else {
             let most_recent = sessions
@@ -1205,16 +1205,12 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         }
     } else if cli.resume {
         let sessions = session_manager
-            .list_sessions()
+            .list_workspace_sessions(workspace_name)
             .context("failed to list sessions")?;
         if sessions.is_empty() {
             println!("No existing sessions. Creating a new one.");
-            let project_name = workspace_root
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("default");
             session_manager
-                .create_session(project_name)
+                .create_session(workspace_name)
                 .context("failed to create session")?
         } else {
             println!("{}Available sessions:{}\n", colors::BOLD, colors::RESET);
@@ -1251,12 +1247,8 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
                 .with_context(|| format!("failed to resume session {}", selected.id))?
         }
     } else {
-        let project_name = workspace_root
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("default");
         session_manager
-            .create_session(project_name)
+            .create_session(workspace_name)
             .context("failed to create session")?
     };
 

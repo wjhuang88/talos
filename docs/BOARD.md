@@ -43,6 +43,7 @@ acceptance criteria, verification evidence, or iteration state.
 |---|---|---|---|
 | TUI-005 Logo & Splash Screen | Planned | [TUI-005 Logo & Splash Screen](backlog/active/TUI-005-logo-splash.md) | Start only after I024 is in Review; preserve inline-by-default behavior and `○`/`◉` symbols for future todo list |
 | CODE-001 Tree-sitter Code Analysis Research | Research | [CODE-001 Tree-sitter Code Analysis Research](backlog/active/CODE-001-tree-sitter-code-analysis-research.md) | Research dependency/ADR fit before adding any tree-sitter crates; choose one bounded first implementation slice |
+| MEM-004 Workspace-Scoped Session Topology | Planned | [MEM-004 Workspace-Scoped Session Topology](backlog/active/MEM-004-workspace-session-topology.md) | Start after I024 closeout; define stable workspace identity before same-workspace multi-session recall |
 | TUI-007 Theme System | Planned | [TUI-007 Theme System](backlog/active/TUI-007-theme-system.md) | Start after color constants stay centralized; define semantic theme roles before user config or runtime switching |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |

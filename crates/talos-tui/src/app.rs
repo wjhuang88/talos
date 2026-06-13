@@ -699,6 +699,11 @@ impl Tui {
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
 
+        // Establish the viewport before flushing restored history. Otherwise the
+        // first scrollback lines can be written into the future input area and
+        // then erased by the first frame draw.
+        self.draw_frame()?;
+
         loop {
             self.state.expire_tip();
             self.flush_pending_scrollback()?;

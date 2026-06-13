@@ -24,6 +24,19 @@ records. Verification: `cargo test -p talos-tui`, `cargo check --workspace`,
 `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, and
 `scripts/validate_project_governance.sh .` all pass on 2026-06-12.
 
+**Correction**: Follow-up testing showed two issues in the first hydration slice. First,
+`--continue`/`--resume` chose the newest session globally instead of the newest session for the
+active workspace. Second, restored history could be flushed before the first TUI frame had
+established a viewport, allowing the newest restored lines to be written into the future input
+area and then cleared by the first draw; this also caused excessive-looking space under the logo.
+Both are corrected: session candidates are workspace-scoped for implicit continue/resume, and the
+TUI establishes its first frame before flushing restored scrollback.
+
+**Residual design**: The current correction is a compatibility stopgap over the existing
+directory-name storage convention. A first-class `Workspace -> Session[]` data model, stable
+workspace identity, index filtering, and same-workspace multi-session awareness are tracked by
+`docs/backlog/active/MEM-004-workspace-session-topology.md`.
+
 ## Activation Note (2026-06-12)
 
 I024 is active because recent work has already landed parts of S1-S4. The next implementer
@@ -197,6 +210,7 @@ unreliable for multi-turn conversations.
 - No Procedural Memory (I019)
 - No vector/graph retrieval (I019/I020)
 - No cross-session memory
+- No first-class workspace/session topology migration (tracked by MEM-004)
 - No fork identity fix (#ARCH-S6)
 - No `read_messages()` fidelity improvement (tool_calls serialization)
 

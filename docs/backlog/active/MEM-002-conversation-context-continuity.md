@@ -91,4 +91,5 @@ consolidation remains in I019.
 ## Residual Work Destination
 
 Semantic consolidation, cross-session memory, and improved SessionEntry fidelity remain
-in MEM-001 / I019.
+in MEM-001 / I019. First-class workspace/session topology, stable workspace identity, and
+same-workspace multi-session awareness are tracked by MEM-004.
