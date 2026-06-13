@@ -5,14 +5,18 @@
 | ID | TUI-005 |
 | Title | TUI Logo & Splash Screen |
 | Priority | P2 |
-| Status | Planned |
+| Status | Complete (in-scope splash); overlay permanently deferred per [ADR-019](../../decisions/019-tui-splash-scrollback-boundary.md) |
 | Depends on | I023 (TUI state model — Complete), I022 (inline-by-default — Complete) |
 | Blocks | None (TUI-001 completion was delivered via I014) |
 | Owner | `crates/talos-tui/src/` |
 
 ## Outcome
 
-User sees a branded, product-quality splash screen on startup: a geometric guardian helmet rendered via ratatui Canvas, large `TALOS` typography in Nord frost colors, and runtime subsystem status indicators. The splash auto-dismisses after 2 seconds (or on first user input), seamlessly transitioning into the inline-by-default conversation view. The logo widget is independently reusable for future alt-screen sub-views (help panel, plugin dashboard).
+User sees a branded, product-quality splash on startup: a scrollback-only `TALOS`
+block wordmark in Nord Frost colors, a short tagline, capability badges, version text,
+a narrow-terminal fallback, and stable startup line boundaries. The splash is printed
+before raw mode, remains in native terminal scrollback, preserves the blank line before
+the logo, and never renders as a viewport overlay.
 
 ## Motivation
 
@@ -22,7 +26,13 @@ Current `print_banner()` is a 3-line plain-text print (`🛡 Talos v0.x` + sloga
 - Overlaps with viewport if cursor is near screen bottom (I022 padding logic compensates but banner itself is unstyled)
 - No visual hierarchy — looks like a debug print, not a product
 
-## Design
+## Historical Design (Superseded)
+
+The original design below proposed a ratatui Canvas helmet, viewport overlay,
+auto-dismiss lifecycle, and reusable `LogoWidget`. That plan is superseded by the
+scrollback-only boundary in [ADR-019](../../decisions/019-tui-splash-scrollback-boundary.md).
+Do not implement the overlay path unless a future ADR reopens it with a real runtime
+readiness data source and concrete viewport consumer.
 
 ### Architecture Constraint: Inline-by-Default Model
 
@@ -283,4 +293,79 @@ fn build_splash_status(state: &TuiState) -> Paragraph<'static>;
 - Agent count indicator (future enhancement)
 - Alt-screen views (separate backlog item)
 - Splash duration configuration in config.toml (future enhancement)
-- Startup subsystem check animation (requires state model to have actual subsystem readiness; defer until I023 + runtime integration)
+- Startup subsystem check animation (requires state model to have actual subsystem readiness; defer until I023 + runtime integration) — **permanently deferred per [ADR-019](../../decisions/019-tui-splash-scrollback-boundary.md)** (scrollback-only splash; no viewport overlay)
+
+## Sub-slice A: Styled Scrollback Splash Foundation — Landed (2026-06-13)
+
+Implemented the Phase 1 styled ANSI scrollback output:
+
+- **`crates/talos-tui/src/splash.rs`** — new module:
+  - `LogoRenderMode` enum (Canvas / UnicodeBlock) with `select_render_mode(width)` threshold logic (≥80 → Canvas, <80 → UnicodeBlock)
+  - `print_splash_scrollback()` — Phase 1 styled ANSI output to stdout before raw mode
+
+### Logo redesign (2026-06-13)
+
+The first cut used a crude `/\|`-drawn helmet plus spaced `T A L O S` letters, which
+read as a debug print. It was replaced with a product-quality block wordmark:
+
+- Wide (≥80 cols): 6-row ANSI Shadow `TALOS` block wordmark (42 cols, byte-aligned),
+  painted with a vertical Nord Frost gradient (NORD10 → NORD9 → NORD8 → NORD7).
+- Narrow (<80 cols): 4-row compact block `TALOS` fallback (~26 cols).
+- Subtitle `⬡ The watchman never sleeps` (bronze italic) — a myth wink (Talos'
+  tireless patrol) that stays language-agnostic to match the general-purpose
+  agent-runtime positioning. Badges `Precision · Safety · Reliability` with dimmed
+  `·` separators, and a brighter Frost-Blue (NORD9) version line `v0.1.0`.
+- Whole splash is left-aligned with a fixed 2-space indent.
+- Render-mode selection, gradient, wordmark alignment (42-col invariant), fallback
+  width, badge separators, reserved-symbol exclusion, and CRLF line-boundary behavior
+  are covered by tests.
+
+- **`crates/talos-tui/src/lib.rs`** — added `mod splash;`
+- **`crates/talos-tui/src/app.rs`** — removed old plain-text `print_splash_scrollback()`, now delegates to `crate::splash::print_splash_scrollback()`
+
+Verification: `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `scripts/validate_project_governance.sh .` all pass.
+
+Correction (2026-06-14): a runtime check showed the first wordmark row could inherit the
+previous command's terminal column when launched through `cargo run`, causing the first
+row to appear far to the right of the rest of the splash. The fix makes splash output
+start with an explicit CRLF, preserves the intended blank line before the logo, and routes
+rendering through a testable writer function.
+
+## Closeout (2026-06-13)
+
+The in-scope deliverable — a branded, inline-safe startup splash printed to terminal
+scrollback — is delivered and verified. The Phase 3-4 viewport overlay (subsystem
+readiness badges + 2s auto-dismiss) is **permanently deferred per
+[ADR-019](../../decisions/019-tui-splash-scrollback-boundary.md)** (scrollback-only
+splash; no viewport overlay). It is the only remaining TUI-005 item and is recorded
+here rather than implemented in this slice.
+
+Acceptance status for the delivered scrollback-splash scope:
+- AC-1 (styled splash in scrollback): met — wordmark, gradient, subtitle, badges, version.
+- AC-3 (helmet at normal width): superseded — the crude Canvas helmet was replaced by
+  the `TALOS` block wordmark, which carries the brand identity more cleanly.
+- AC-4 (narrow-width fallback): met — compact block wordmark under 80 columns.
+- AC-5 (no alt-screen violation): met — scrollback-only, inline-by-default preserved.
+- AC-7 (widget reusability): not applicable to the accepted scrollback-only scope; do
+  not claim `LogoWidget` exists unless a future ADR/backlog item reopens viewport logo
+  rendering.
+- AC-2 / AC-6 (overlay auto-dismiss / no input delay): not applicable to the
+  scrollback-only path; they re-open only if the deferred Phase 3-4 overlay is built.
+
+Runtime evidence: the user ran the real `talos` binary on 2026-06-14 and found a
+first-row column drift bug when launched through `cargo run`. The corrected implementation
+now starts splash output on a fresh CRLF boundary before any styled content.
+
+Verification re-run in the current tree on 2026-06-13: `cargo fmt --all --check`,
+`cargo check --workspace`, `cargo clippy --workspace -- -D warnings`,
+`cargo test --workspace`, and
+`scripts/validate_project_governance.sh .` (0 warnings) all pass.
+
+Correction verification re-run in the current tree on 2026-06-14: `cargo fmt --all --check`,
+`cargo check --workspace`, `cargo clippy --workspace -- -D warnings`,
+`cargo test -p talos-tui` (82 tests passed), `cargo test --workspace`,
+`git diff --check`, and `scripts/validate_project_governance.sh .` (0 warnings) all pass.
+
+README updated to document the new startup splash behavior.
+
+Status: in-scope work Complete; viewport-overlay enhancement deferred per Scope Boundary.

@@ -585,7 +585,7 @@ pub struct Tui {
 
 impl Tui {
     pub fn new() -> io::Result<Self> {
-        let _splash_lines = print_splash_scrollback();
+        crate::splash::print_splash_scrollback();
 
         let (_, cursor_y) = crossterm::cursor::position()?;
         let (_, screen_h) = crossterm::terminal::size()?;
@@ -1672,15 +1672,6 @@ fn truncate_end_to_width(s: &str, max_width: u16) -> String {
         start = i;
     }
     chars[start..].iter().collect()
-}
-
-fn print_splash_scrollback() -> u16 {
-    let version = env!("CARGO_PKG_VERSION");
-    println!();
-    println!("  \u{1f6e0} Talos v{version}");
-    println!("  Safety-first agent runtime");
-    println!();
-    4
 }
 
 #[cfg(test)]

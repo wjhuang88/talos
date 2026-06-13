@@ -4,6 +4,7 @@ pub mod evolution;
 mod export;
 mod inline_terminal;
 mod sidebar;
+mod splash;
 mod state;
 mod stream_markdown;
 mod theme;

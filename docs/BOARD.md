@@ -40,7 +40,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| TUI-005 Logo & Splash Screen | Planned | [TUI-005 Logo & Splash Screen](backlog/active/TUI-005-logo-splash.md) | I024 is Complete; next implementer may start after reading the handoff correction checklist. Preserve inline-by-default behavior and `○`/`◉` symbols for future todo list. |
 | CODE-001 Tree-sitter Code Analysis Research | Research | [CODE-001 Tree-sitter Code Analysis Research](backlog/active/CODE-001-tree-sitter-code-analysis-research.md) | Research dependency/ADR fit before adding any tree-sitter crates; choose one bounded first implementation slice |
 | MEM-004 Workspace-Scoped Session Topology | Planned | [MEM-004 Workspace-Scoped Session Topology](backlog/active/MEM-004-workspace-session-topology.md) | Start after I024 closeout; define stable workspace identity before same-workspace multi-session recall |
 | TUI-007 Theme System | Planned | [TUI-007 Theme System](backlog/active/TUI-007-theme-system.md) | Start after color constants stay centralized; define semantic theme roles before user config or runtime switching |
@@ -51,6 +50,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| TUI-005 Logo & Splash Screen | Complete (in-scope); overlay deferred | [TUI-005 Logo & Splash Screen](backlog/active/TUI-005-logo-splash.md) | Branded inline `TALOS` block wordmark (Nord Frost gradient), `⬡ The watchman never sleeps` tagline, narrow-width fallback; scrollback-only, no alt-screen. 2026-06-14 correction fixed first-row column drift and preserved the intended blank line before the logo; README synced, 82 TUI tests and workspace verification pass. Phase 3-4 viewport overlay (subsystem badges + auto-dismiss) deferred per Scope Boundary. |
 | I024 Conversation Context | Complete | [I024 Conversation Context](iterations/I024-conversation-context.md) | Closed 2026-06-13: session history reaches provider calls, JSONL resume and visible TUI history hydration work, implicit resume is workspace-scoped, and residual long-session compaction/topology work is registered in MEM-003/MEM-004. |
 
 ## Later

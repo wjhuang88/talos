@@ -108,6 +108,7 @@ These are immutable facts that every change must respect:
 | "I have a technical tradeoff to decide" | `docs/decisions/README.md` (then create a new ADR) |
 | "I need to fix an architecture/design/security review finding" | `docs/backlog/PRODUCT-BACKLOG.md` → "ARCH: Architecture Review Remediation" (`#ARCH-S1..S4`) |
 | "Should we add a global message bus / unified event bus / pub-sub?" | `docs/decisions/006-event-architecture-boundary.md` (decided: no global pub/sub) |
+| "Should the splash/logo render inside the viewport / as an overlay?" | `docs/decisions/019-tui-splash-scrollback-boundary.md` (decided: scrollback-only, no viewport overlay) |
 | "Where is `unsafe` allowed and why?" | `docs/decisions/007-process-hardening-unsafe.md` |
 | "Why is bundled SQLite allowed?" | `docs/decisions/008-sqlite-bundled-storage.md` |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |

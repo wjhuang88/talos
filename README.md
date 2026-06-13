@@ -63,6 +63,12 @@ Run the default TUI:
 cargo run -p talos-cli -- "help me inspect this repository"
 ```
 
+On startup Talos prints a branded splash to the terminal scrollback: a block-letter
+`TALOS` wordmark with a Nord Frost gradient, the `⬡ The watchman never sleeps`
+tagline, capability badges, and the version line. It stays inline (no alt-screen),
+so the splash remains in your scrollback as the conversation begins. Narrow
+terminals (< 80 columns) automatically fall back to a compact wordmark.
+
 Use print mode for shell-style output:
 
 ```bash
