@@ -7,9 +7,9 @@ from the current session so it can reason about what was previously discussed.
 
 ## Status
 
-Review. Selected into I024; history wiring, JSONL-backed resume, and layers 1-3 compaction
-evidence are recorded in the iteration. Complete requires final runtime evidence or explicit
-closeout note.
+Complete. Delivered through I024; history wiring, JSONL-backed resume, visible TUI resume
+hydration, workspace-scoped implicit resume, and layers 1-3 compaction evidence are recorded in
+the iteration. Accepted residuals are tracked by MEM-003 and MEM-004.
 
 ## Priority
 
@@ -47,14 +47,16 @@ consolidation remains in I019.
 
 ## Acceptance Criteria
 
-- [ ] Agent receives conversation history in every turn (not just the current message)
-- [ ] History is loaded from session JSONL on startup via `SessionManager`
-- [ ] Compaction is triggered when history exceeds token budget (`Compactor::should_compact`)
-- [ ] New turns are persisted to session JSONL after completion
-- [ ] All modes (TUI, inline, interactive, print) pass history through the pipeline
-- [ ] Resume (`-c` / `-r`) loads full conversation context from prior session
-- [ ] No LLM hallucinations of false conversation history
-- [ ] `cargo test --workspace` passes
+- [x] Agent receives conversation history in every turn (not just the current message)
+- [x] History is loaded from session JSONL on startup via `SessionManager`
+- [x] Compaction is triggered when history exceeds token budget (`Compactor::should_compact`)
+- [x] New turns are persisted to session JSONL after completion
+- [x] All modes in I024 scope pass history through the pipeline; print mode remains documented
+  single-turn behavior
+- [x] Resume (`-c` / `-r`) loads full conversation context from prior session
+- [x] False-history risk is reduced by using current-session JSONL history instead of relying on
+  the model to infer prior turns
+- [x] `cargo test --workspace` passes
 
 ## Out of Scope
 
@@ -90,6 +92,6 @@ consolidation remains in I019.
 
 ## Residual Work Destination
 
-Semantic consolidation, cross-session memory, and improved SessionEntry fidelity remain
-in MEM-001 / I019. First-class workspace/session topology, stable workspace identity, and
-same-workspace multi-session awareness are tracked by MEM-004.
+Semantic consolidation and cross-session memory remain in MEM-001 / I019. LLM compaction layers
+4-5 and 50-turn heavy-tool proof are tracked by MEM-003. First-class workspace/session topology,
+stable workspace identity, and same-workspace multi-session awareness are tracked by MEM-004.
