@@ -69,6 +69,16 @@ Use print mode for shell-style output:
 cargo run -p talos-cli -- -p "summarize the project status"
 ```
 
+Use mock mode for local request inspection without making a provider call:
+
+```bash
+cargo run -p talos-cli -- -p --mock "/mock-request summarize this repository"
+```
+
+This prints the provider request snapshot Talos would send, including method,
+URL, headers, and JSON body. The `/mock-request` wrapper is stripped from the
+snapshot body, and credential headers are redacted in the output.
+
 Set an explicit workspace root when launching Talos from another directory:
 
 ```bash

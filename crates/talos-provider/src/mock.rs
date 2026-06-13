@@ -28,6 +28,14 @@ use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderResult};
 use tokio::sync::mpsc;
 
+/// User prompt that makes the mock provider print the would-be model request.
+pub const REQUEST_DEBUG_COMMAND: &str = "/mock-request";
+
+const DEFAULT_MOCK_RESPONSE: &str =
+    "I'm a mock LLM. I can help with testing and development without making real API calls.";
+
+type RequestDebugBuilder = Arc<dyn Fn(&[Message]) -> String + Send + Sync>;
+
 /// A queued event template that the mock provider will emit.
 #[derive(Debug, Clone)]
 enum QueuedEvent {
@@ -68,9 +76,10 @@ struct MockState {
 ///
 /// `MockProvider` is `Send + Sync` and can be shared across async tasks.
 /// Each call to [`stream`] consumes one item from the queue.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MockProvider {
     state: Arc<Mutex<MockState>>,
+    request_debug_builder: Option<RequestDebugBuilder>,
 }
 
 impl MockProvider {
@@ -83,7 +92,18 @@ impl MockProvider {
             state: Arc::new(Mutex::new(MockState {
                 queue: VecDeque::new(),
             })),
+            request_debug_builder: None,
         }
+    }
+
+    /// Attach a renderer for provider-specific request diagnostics.
+    #[must_use]
+    pub fn with_request_debug_builder(
+        mut self,
+        builder: impl Fn(&[Message]) -> String + Send + Sync + 'static,
+    ) -> Self {
+        self.request_debug_builder = Some(Arc::new(builder));
+        self
     }
 
     /// Queue a text response.
@@ -177,29 +197,41 @@ impl Default for MockProvider {
 
 #[async_trait::async_trait]
 impl LanguageModel for MockProvider {
-    async fn stream(&self, _messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(32);
 
         let event = {
             let mut state = self.state.lock().expect("mock state lock poisoned");
             state.queue.pop_front()
         };
+        let debug_messages = request_debug_messages(messages);
+        let request_debug = if event.is_none() {
+            self.request_debug_builder
+                .as_ref()
+                .and_then(|builder| debug_messages.as_ref().map(|messages| builder(messages)))
+                .or_else(|| debug_messages.map(|_| "request diagnostics are not configured".into()))
+        } else {
+            None
+        };
 
         tokio::spawn(async move {
-            match event {
-                Some(QueuedEvent::Text(text)) => {
+            match (event, request_debug) {
+                (Some(QueuedEvent::Text(text)), _) => {
                     emit_text_response(&tx, &text).await;
                 }
-                Some(QueuedEvent::ToolCall { name, input }) => {
+                (Some(QueuedEvent::ToolCall { name, input }), _) => {
                     emit_tool_call_response(&tx, &name, input).await;
                 }
-                Some(QueuedEvent::Error(message)) => {
+                (Some(QueuedEvent::Error(message)), _) => {
                     emit_error_response(&tx, &message).await;
                 }
-                Some(QueuedEvent::Streaming(chunks)) => {
+                (Some(QueuedEvent::Streaming(chunks)), _) => {
                     emit_streaming_response(&tx, &chunks).await;
                 }
-                None => {
+                (None, Some(debug_text)) => {
+                    emit_text_response(&tx, &debug_text).await;
+                }
+                (None, None) => {
                     emit_default_response(&tx).await;
                 }
             }
@@ -207,6 +239,36 @@ impl LanguageModel for MockProvider {
 
         Ok(rx)
     }
+}
+
+fn request_debug_messages(messages: &[Message]) -> Option<Vec<Message>> {
+    let mut debug_messages = messages.to_vec();
+    let Message::User { content } = debug_messages.last_mut()? else {
+        return None;
+    };
+
+    let stripped_content = strip_request_debug_command(content)?;
+    *content = stripped_content;
+
+    Some(debug_messages)
+}
+
+fn strip_request_debug_command(content: &str) -> Option<String> {
+    let mut lines: Vec<&str> = content.lines().collect();
+    let command_line_index = lines
+        .iter()
+        .rposition(|line| line.trim_start().starts_with(REQUEST_DEBUG_COMMAND))?;
+    let command_line = lines[command_line_index];
+    let command_offset = command_line.find(REQUEST_DEBUG_COMMAND)?;
+    let after_command = command_line[command_offset + REQUEST_DEBUG_COMMAND.len()..].trim_start();
+
+    if after_command.is_empty() {
+        lines.remove(command_line_index);
+    } else {
+        lines[command_line_index] = after_command;
+    }
+
+    Some(lines.join("\n").trim_end().to_string())
 }
 
 async fn emit_text_response(tx: &mpsc::Sender<AgentEvent>, text: &str) {
@@ -284,7 +346,7 @@ async fn emit_default_response(tx: &mpsc::Sender<AgentEvent>) {
     let _ = tx.send(AgentEvent::TurnStart).await;
     let _ = tx
         .send(AgentEvent::TextDelta {
-            delta: "I'm a mock LLM".into(),
+            delta: DEFAULT_MOCK_RESPONSE.into(),
         })
         .await;
     let _ = tx
@@ -453,9 +515,76 @@ mod tests {
         assert!(matches!(events[0], AgentEvent::TurnStart));
         assert!(matches!(
             &events[1],
-            AgentEvent::TextDelta { delta } if delta == "I'm a mock LLM"
+            AgentEvent::TextDelta { delta } if delta == DEFAULT_MOCK_RESPONSE
         ));
         assert!(matches!(events[2], AgentEvent::TurnEnd { .. }));
+    }
+
+    #[tokio::test]
+    async fn request_debug_command_uses_configured_builder() {
+        let provider =
+            MockProvider::new().with_request_debug_builder(|messages| match messages.last() {
+                Some(Message::User { content }) => content.clone(),
+                other => format!("unexpected: {other:?}"),
+            });
+        let messages = vec![Message::User {
+            content: format!("system prompt\n\n{REQUEST_DEBUG_COMMAND} explain this code"),
+        }];
+
+        let rx = provider
+            .stream(&messages)
+            .await
+            .expect("stream should succeed");
+        let events = collect_events(rx).await;
+
+        assert!(matches!(
+            &events[1],
+            AgentEvent::TextDelta { delta } if delta == "system prompt\n\nexplain this code"
+        ));
+    }
+
+    #[tokio::test]
+    async fn request_debug_command_strips_multiline_wrapper() {
+        let provider =
+            MockProvider::new().with_request_debug_builder(|messages| match messages.last() {
+                Some(Message::User { content }) => content.clone(),
+                other => format!("unexpected: {other:?}"),
+            });
+        let messages = vec![Message::User {
+            content: format!("system prompt\n\n{REQUEST_DEBUG_COMMAND}\nexplain this code"),
+        }];
+
+        let rx = provider
+            .stream(&messages)
+            .await
+            .expect("stream should succeed");
+        let events = collect_events(rx).await;
+
+        assert!(matches!(
+            &events[1],
+            AgentEvent::TextDelta { delta } if delta == "system prompt\n\nexplain this code"
+        ));
+    }
+
+    #[tokio::test]
+    async fn request_debug_command_does_not_override_queued_events() {
+        let provider = MockProvider::new()
+            .with_response("queued")
+            .with_request_debug_builder(|_| "debug".into());
+        let messages = vec![Message::User {
+            content: REQUEST_DEBUG_COMMAND.into(),
+        }];
+
+        let rx = provider
+            .stream(&messages)
+            .await
+            .expect("stream should succeed");
+        let events = collect_events(rx).await;
+
+        assert!(matches!(
+            &events[1],
+            AgentEvent::TextDelta { delta } if delta == "queued"
+        ));
     }
 
     #[tokio::test]

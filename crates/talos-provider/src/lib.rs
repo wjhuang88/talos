@@ -119,6 +119,25 @@ impl LanguageModel for AnthropicProvider {
     }
 }
 
+/// Build a redacted Anthropic Messages API request snapshot for mock diagnostics.
+pub fn anthropic_request_debug_snapshot(
+    api_key: &str,
+    model: &str,
+    base_url: Option<&str>,
+    messages: &[Message],
+) -> Value {
+    json!({
+        "method": "POST",
+        "url": base_url.unwrap_or(ANTHROPIC_API_URL),
+        "headers": {
+            "x-api-key": redact_secret(api_key),
+            "anthropic-version": ANTHROPIC_VERSION,
+            "content-type": "application/json",
+        },
+        "body": build_request_body(model, messages),
+    })
+}
+
 fn build_request_body(model: &str, messages: &[Message]) -> Value {
     let anthropic_messages: Vec<Value> = messages
         .iter()
@@ -168,6 +187,24 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
         "max_tokens": 4096,
         "stream": true,
     })
+}
+
+fn redact_secret(secret: &str) -> String {
+    let trimmed = secret.trim();
+    if trimmed.is_empty() {
+        return "<empty>".into();
+    }
+
+    let prefix: String = trimmed.chars().take(4).collect();
+    let suffix: String = trimmed
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{prefix}...{suffix}")
 }
 
 async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEvent>) {

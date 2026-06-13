@@ -464,7 +464,7 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
     }
 
     let api_key = if cli.mock {
-        String::new()
+        config.api_key().unwrap_or_default()
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
@@ -647,7 +647,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     }
 
     let api_key = if cli.mock {
-        String::new()
+        config.api_key().unwrap_or_default()
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
@@ -883,7 +883,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     let api_key = if cli.mock {
-        String::new()
+        config.api_key().unwrap_or_default()
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
@@ -1062,7 +1062,7 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
     }
 
     let api_key = if cli.mock {
-        String::new()
+        config.api_key().unwrap_or_default()
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
@@ -1261,7 +1261,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }
 
     let api_key = if cli.mock {
-        String::new()
+        config.api_key().unwrap_or_default()
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
@@ -1503,8 +1503,31 @@ pub(crate) fn build_provider(
 ) -> Arc<dyn talos_core::provider::LanguageModel> {
     if mock {
         use talos_provider::mock::MockProvider;
-        return Arc::new(MockProvider::new()
-            .with_response("I'm a mock LLM. I can help with testing and development without making real API calls."));
+        let api_key = api_key.to_string();
+        let model = config.model.clone();
+        let base_url = config.base_url();
+        let provider_protocol = config.provider_protocol();
+        return Arc::new(MockProvider::new().with_request_debug_builder(move |messages| {
+            let snapshot = match &provider_protocol {
+                ProviderProtocol::AnthropicMessages => talos_provider::anthropic_request_debug_snapshot(
+                    &api_key,
+                    &model,
+                    base_url.as_deref(),
+                    messages,
+                ),
+                ProviderProtocol::OpenAIChat => talos_provider::openai::openai_request_debug_snapshot(
+                    &api_key,
+                    &model,
+                    base_url.as_deref(),
+                    messages,
+                ),
+            };
+            format!(
+                "I'm a mock LLM. I did not make a real API call.\n\nCommand: {}\n\nWould send this request:\n{}",
+                talos_provider::mock::REQUEST_DEBUG_COMMAND,
+                serde_json::to_string_pretty(&snapshot).unwrap_or_else(|_| snapshot.to_string())
+            )
+        }));
     }
     match config.provider_protocol() {
         ProviderProtocol::AnthropicMessages => {

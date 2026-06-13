@@ -148,6 +148,29 @@ impl LanguageModel for OpenAIProvider {
     }
 }
 
+/// Build a redacted OpenAI-compatible chat completions request snapshot for mock diagnostics.
+pub fn openai_request_debug_snapshot(
+    api_key: &str,
+    model: &str,
+    base_url: Option<&str>,
+    messages: &[Message],
+) -> Value {
+    let endpoint_url = match base_url {
+        Some(url) => format!("{}{}", url.trim_end_matches('/'), CHAT_COMPLETIONS_PATH),
+        None => format!("{OPENAI_API_URL}{CHAT_COMPLETIONS_PATH}"),
+    };
+
+    json!({
+        "method": "POST",
+        "url": endpoint_url,
+        "headers": {
+            "Authorization": format!("Bearer {}", redact_secret(api_key)),
+            "Content-Type": "application/json",
+        },
+        "body": build_request_body(model, messages),
+    })
+}
+
 /// OpenAI chat message for request serialization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OpenAIMessage {
@@ -287,6 +310,24 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
         "messages": openai_messages,
         "stream": true,
     })
+}
+
+fn redact_secret(secret: &str) -> String {
+    let trimmed = secret.trim();
+    if trimmed.is_empty() {
+        return "<empty>".into();
+    }
+
+    let prefix: String = trimmed.chars().take(4).collect();
+    let suffix: String = trimmed
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{prefix}...{suffix}")
 }
 
 fn non_empty_content(content: &str, fallback: &str) -> String {
