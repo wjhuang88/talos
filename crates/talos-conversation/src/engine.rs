@@ -25,6 +25,8 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
     }
 }
 
+const MOCK_REQUEST_COMMAND: &str = "/mock-request";
+
 pub struct ConversationEngine {
     pub(crate) messages: Vec<ChatMessage>,
     pub(crate) current_turn_text: String,
@@ -253,7 +255,8 @@ impl ConversationEngine {
 [System]   /plugins    — List observed tool provenance\n\
 [System]   /copy last  — Copy last assistant message\n\
 [System]   /copy all   — Copy full transcript\n\
-[System]   /export <p> — Export transcript to path\n";
+[System]   /export <p> — Export transcript to path\n\
+[System]   /mock-request <prompt> — Show mock provider request diagnostics\n";
                 outputs.push(UiOutput::Stream(StreamMessage {
                     source: MessageSource::System,
                     stream: Box::pin(stream::once(async move { text.to_string() })),
@@ -334,9 +337,34 @@ impl ConversationEngine {
     }
 
     pub const SLASH_COMMANDS: &[&str] = &[
-        "/help", "/quit", "/exit", "/status", "/new", "/compact", "/diff", "/model", "/resume",
-        "/fork", "/vim", "/plugins", "/copy", "/export",
+        "/help",
+        "/quit",
+        "/exit",
+        "/status",
+        "/new",
+        "/compact",
+        "/diff",
+        "/model",
+        "/resume",
+        "/fork",
+        "/vim",
+        "/plugins",
+        "/copy",
+        "/export",
+        MOCK_REQUEST_COMMAND,
     ];
+
+    pub fn is_model_passthrough_slash_command(input: &str) -> bool {
+        let trimmed = input.trim_start();
+        if trimmed == MOCK_REQUEST_COMMAND {
+            return true;
+        }
+
+        trimmed
+            .strip_prefix(MOCK_REQUEST_COMMAND)
+            .and_then(|rest| rest.chars().next())
+            .is_some_and(char::is_whitespace)
+    }
 
     pub fn complete_slash_command(&self, input: &str) -> Vec<&str> {
         Self::SLASH_COMMANDS

@@ -408,6 +408,7 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/plugins"));
     assert!(text.contains("/copy"));
     assert!(text.contains("/export"));
+    assert!(text.contains("/mock-request"));
 }
 
 // ---------------------------------------------------------------------------
@@ -549,6 +550,25 @@ async fn unknown_command_returns_error_stream() {
     assert_eq!(source, MessageSource::Error);
     assert!(text.contains("Unknown command"));
     assert!(text.contains("/foobar"));
+}
+
+#[test]
+fn mock_request_is_model_passthrough_slash_command() {
+    assert!(ConversationEngine::is_model_passthrough_slash_command(
+        "/mock-request explain this code"
+    ));
+    assert!(ConversationEngine::is_model_passthrough_slash_command(
+        "/mock-request\nexplain this code"
+    ));
+    assert!(ConversationEngine::is_model_passthrough_slash_command(
+        "  /mock-request"
+    ));
+    assert!(!ConversationEngine::is_model_passthrough_slash_command(
+        "/mock-requested"
+    ));
+    assert!(!ConversationEngine::is_model_passthrough_slash_command(
+        "/help"
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -953,6 +973,15 @@ fn complete_slash_command_multiple_matches() {
 
     assert!(completions.contains(&"/compact"));
     assert!(completions.contains(&"/copy"));
+}
+
+#[test]
+fn complete_slash_command_includes_mock_request() {
+    let engine = new_engine();
+
+    let completions = engine.complete_slash_command("/mock");
+
+    assert_eq!(completions, vec!["/mock-request"]);
 }
 
 // ---------------------------------------------------------------------------

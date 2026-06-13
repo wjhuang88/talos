@@ -828,7 +828,9 @@ async fn run_conversation_loop(
             Some(input) = user_rx.recv() => {
                 match input {
                     UserInput::Message(msg) => {
-                        if msg.starts_with('/') {
+                        if msg.starts_with('/')
+                            && !ConversationEngine::is_model_passthrough_slash_command(&msg)
+                        {
                             let outputs = engine.handle_slash_command(&msg);
                             for output in outputs {
                                 match output {
