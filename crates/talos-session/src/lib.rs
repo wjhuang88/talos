@@ -623,6 +623,15 @@ impl SessionManager {
         Self::scan_workspace_sessions(workspace, &workspace_dir)
     }
 
+    /// Return the most recently modified session for one workspace directory.
+    pub fn latest_workspace_session(
+        &self,
+        workspace: &str,
+    ) -> Result<Option<SessionInfo>, SessionError> {
+        let sessions = self.list_workspace_sessions(workspace)?;
+        Ok(sessions.into_iter().max_by_key(|s| s.timestamp))
+    }
+
     fn scan_workspace_sessions(
         workspace_name: &str,
         workspace_dir: &Path,
@@ -929,6 +938,42 @@ mod tests {
         assert_eq!(sessions[0].id, playit.id);
         assert_eq!(sessions[0].project, "playit");
         assert_eq!(sessions[0].last_message_preview, "playit message");
+    }
+
+    #[test]
+    fn latest_workspace_session_returns_most_recent_session() {
+        let manager = test_manager();
+        let older = manager.create_session("playit").unwrap();
+        let newer = manager.create_session("playit").unwrap();
+
+        older
+            .append(&Message::User {
+                content: "older".into(),
+            })
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        newer
+            .append(&Message::User {
+                content: "newer".into(),
+            })
+            .unwrap();
+
+        let latest = manager
+            .latest_workspace_session("playit")
+            .unwrap()
+            .expect("expected latest session");
+
+        assert_eq!(latest.id, newer.id);
+        assert_eq!(latest.last_message_preview, "newer");
+    }
+
+    #[test]
+    fn latest_workspace_session_returns_none_for_empty_workspace() {
+        let manager = test_manager();
+
+        let latest = manager.latest_workspace_session("missing").unwrap();
+
+        assert!(latest.is_none());
     }
 
     #[test]

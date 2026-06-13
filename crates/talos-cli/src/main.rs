@@ -18,7 +18,7 @@ mod event_loop;
 mod logging;
 
 use std::io::{self, IsTerminal, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -49,7 +49,7 @@ use talos_plugin::{HookRegistry, LoggingHandler};
 use talos_provider::AnthropicProvider;
 use talos_provider::openai::OpenAIProvider;
 use talos_rpc::RpcServer;
-use talos_session::{IndexError, SessionManager};
+use talos_session::{IndexError, Session, SessionInfo, SessionManager};
 use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::mpsc;
@@ -506,6 +506,132 @@ fn resolve_workspace_root(cli: &Cli) -> Result<PathBuf> {
     }
 }
 
+fn workspace_name_from_root(workspace_root: &Path) -> String {
+    workspace_root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("default")
+        .to_string()
+}
+
+#[derive(Clone, Copy)]
+enum ResumeSelection {
+    Disabled,
+    Latest,
+    Prompt,
+}
+
+fn resolve_session_for_workspace(
+    manager: &SessionManager,
+    workspace_name: &str,
+    cli: &Cli,
+    resume_selection: ResumeSelection,
+    allow_fork: bool,
+) -> Result<Session> {
+    if allow_fork && let Some(ref source_session_id) = cli.fork {
+        return fork_session(manager, source_session_id);
+    }
+
+    if let Some(ref session_id) = cli.session {
+        return manager
+            .resume_session(session_id)
+            .with_context(|| format!("failed to resume session {session_id}"));
+    }
+
+    if cli.r#continue {
+        return resume_latest_workspace_session_or_create(manager, workspace_name);
+    }
+
+    match resume_selection {
+        ResumeSelection::Disabled => {}
+        ResumeSelection::Latest if cli.resume => {
+            return resume_latest_workspace_session_or_create(manager, workspace_name);
+        }
+        ResumeSelection::Prompt if cli.resume => {
+            return prompt_for_workspace_session_or_create(manager, workspace_name);
+        }
+        ResumeSelection::Latest | ResumeSelection::Prompt => {}
+    }
+
+    manager
+        .create_session(workspace_name)
+        .context("failed to create session")
+}
+
+fn resume_latest_workspace_session_or_create(
+    manager: &SessionManager,
+    workspace_name: &str,
+) -> Result<Session> {
+    let Some(most_recent) = manager
+        .latest_workspace_session(workspace_name)
+        .context("failed to list sessions")?
+    else {
+        return manager
+            .create_session(workspace_name)
+            .context("failed to create session");
+    };
+
+    manager
+        .get_session(&most_recent.id)
+        .with_context(|| format!("failed to resume session {}", most_recent.id))
+}
+
+fn prompt_for_workspace_session_or_create(
+    manager: &SessionManager,
+    workspace_name: &str,
+) -> Result<Session> {
+    let sessions = manager
+        .list_workspace_sessions(workspace_name)
+        .context("failed to list sessions")?;
+    if sessions.is_empty() {
+        println!("No existing sessions for this workspace. Creating a new one.");
+        return manager
+            .create_session(workspace_name)
+            .context("failed to create session");
+    }
+
+    println!(
+        "{}Available workspace sessions:{}\n",
+        colors::BOLD,
+        colors::RESET
+    );
+    for (idx, session) in sessions.iter().enumerate() {
+        print_session_selection_row(idx, session);
+    }
+    print!("\nSelect a session (1-{}): ", sessions.len());
+    io::stdout().flush().context("failed to flush stdout")?;
+
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .context("failed to read input")?;
+    let choice: usize = input.trim().parse().context("invalid selection")?;
+    if choice < 1 || choice > sessions.len() {
+        bail!("selection out of range");
+    }
+    let selected = &sessions[choice - 1];
+    manager
+        .get_session(&selected.id)
+        .with_context(|| format!("failed to resume session {}", selected.id))
+}
+
+fn print_session_selection_row(idx: usize, session: &SessionInfo) {
+    let ts = session.timestamp.format("%Y-%m-%d %H:%M");
+    println!(
+        "  {}. {}{}{} ({}{}{}) {}{} messages | {}",
+        idx + 1,
+        colors::NORD8,
+        session.id,
+        colors::RESET,
+        colors::NORD14,
+        session.project,
+        colors::RESET,
+        colors::NORD3,
+        session.message_count,
+        ts,
+    );
+}
+
 async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -795,54 +921,14 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     // Session management: create or resume session for history persistence.
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let workspace_name = workspace_root
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("default");
-
-    let session = if let Some(ref session_id) = cli.session {
-        session_manager
-            .resume_session(session_id)
-            .with_context(|| format!("failed to resume session {session_id}"))?
-    } else if cli.r#continue {
-        let sessions = session_manager
-            .list_workspace_sessions(workspace_name)
-            .context("failed to list sessions")?;
-        if sessions.is_empty() {
-            session_manager
-                .create_session(workspace_name)
-                .context("failed to create session")?
-        } else {
-            let most_recent = sessions
-                .iter()
-                .max_by_key(|s| s.timestamp)
-                .context("no sessions found")?;
-            session_manager
-                .get_session(&most_recent.id)
-                .with_context(|| format!("failed to resume session {}", most_recent.id))?
-        }
-    } else if cli.resume {
-        let sessions = session_manager
-            .list_workspace_sessions(workspace_name)
-            .context("failed to list sessions")?;
-        if sessions.is_empty() {
-            session_manager
-                .create_session(workspace_name)
-                .context("failed to create session")?
-        } else {
-            let most_recent = sessions
-                .iter()
-                .max_by_key(|s| s.timestamp)
-                .context("no sessions found")?;
-            session_manager
-                .get_session(&most_recent.id)
-                .with_context(|| format!("failed to resume session {}", most_recent.id))?
-        }
-    } else {
-        session_manager
-            .create_session(workspace_name)
-            .context("failed to create session")?
-    };
+    let workspace_name = workspace_name_from_root(&workspace_root);
+    let session = resolve_session_for_workspace(
+        &session_manager,
+        &workspace_name,
+        &cli,
+        ResumeSelection::Latest,
+        false,
+    )?;
 
     let initial_history = session.read_messages().unwrap_or_default();
     let visible_history = initial_history.clone();
@@ -1015,37 +1101,14 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
     }
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let workspace_name = workspace_root
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("default");
-
-    let session = if let Some(ref session_id) = cli.session {
-        session_manager
-            .resume_session(session_id)
-            .with_context(|| format!("failed to resume session {session_id}"))?
-    } else if cli.r#continue {
-        let sessions = session_manager
-            .list_workspace_sessions(workspace_name)
-            .context("failed to list sessions")?;
-        if sessions.is_empty() {
-            session_manager
-                .create_session(workspace_name)
-                .context("failed to create session")?
-        } else {
-            let most_recent = sessions
-                .iter()
-                .max_by_key(|s| s.timestamp)
-                .context("no sessions found")?;
-            session_manager
-                .get_session(&most_recent.id)
-                .with_context(|| format!("failed to resume session {}", most_recent.id))?
-        }
-    } else {
-        session_manager
-            .create_session(workspace_name)
-            .context("failed to create session")?
-    };
+    let workspace_name = workspace_name_from_root(&workspace_root);
+    let session = resolve_session_for_workspace(
+        &session_manager,
+        &workspace_name,
+        &cli,
+        ResumeSelection::Disabled,
+        false,
+    )?;
 
     let initial_history = session.read_messages().unwrap_or_default();
 
@@ -1175,82 +1238,14 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let workspace_root = resolve_workspace_root(&cli)?;
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let workspace_name = workspace_root
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("default");
-
-    let session = if let Some(ref source_session_id) = cli.fork {
-        fork_session(&session_manager, source_session_id)?
-    } else if let Some(ref session_id) = cli.session {
-        session_manager
-            .resume_session(session_id)
-            .with_context(|| format!("failed to resume session {session_id}"))?
-    } else if cli.r#continue {
-        let sessions = session_manager
-            .list_workspace_sessions(workspace_name)
-            .context("failed to list sessions")?;
-        if sessions.is_empty() {
-            session_manager
-                .create_session(workspace_name)
-                .context("failed to create session")?
-        } else {
-            let most_recent = sessions
-                .iter()
-                .max_by_key(|s| s.timestamp)
-                .context("no sessions found")?;
-            session_manager
-                .get_session(&most_recent.id)
-                .with_context(|| format!("failed to resume session {}", most_recent.id))?
-        }
-    } else if cli.resume {
-        let sessions = session_manager
-            .list_workspace_sessions(workspace_name)
-            .context("failed to list sessions")?;
-        if sessions.is_empty() {
-            println!("No existing sessions. Creating a new one.");
-            session_manager
-                .create_session(workspace_name)
-                .context("failed to create session")?
-        } else {
-            println!("{}Available sessions:{}\n", colors::BOLD, colors::RESET);
-            for (idx, s) in sessions.iter().enumerate() {
-                let ts = s.timestamp.format("%Y-%m-%d %H:%M");
-                println!(
-                    "  {}. {}{}{} ({}{}{}) {}{} messages | {}",
-                    idx + 1,
-                    colors::NORD8,
-                    s.id,
-                    colors::RESET,
-                    colors::NORD14,
-                    s.project,
-                    colors::RESET,
-                    colors::NORD3,
-                    s.message_count,
-                    ts,
-                );
-            }
-            print!("\nSelect a session (1-{}): ", sessions.len());
-            io::stdout().flush().context("failed to flush stdout")?;
-
-            let mut input = String::new();
-            io::stdin()
-                .read_line(&mut input)
-                .context("failed to read input")?;
-            let choice: usize = input.trim().parse().context("invalid selection")?;
-            if choice < 1 || choice > sessions.len() {
-                bail!("selection out of range");
-            }
-            let selected = &sessions[choice - 1];
-            session_manager
-                .get_session(&selected.id)
-                .with_context(|| format!("failed to resume session {}", selected.id))?
-        }
-    } else {
-        session_manager
-            .create_session(workspace_name)
-            .context("failed to create session")?
-    };
+    let workspace_name = workspace_name_from_root(&workspace_root);
+    let session = resolve_session_for_workspace(
+        &session_manager,
+        &workspace_name,
+        &cli,
+        ResumeSelection::Prompt,
+        true,
+    )?;
 
     let mut config = Config::load().context("failed to load configuration")?;
 
