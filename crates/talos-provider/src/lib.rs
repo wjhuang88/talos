@@ -10,7 +10,7 @@ use reqwest::Client;
 use serde_json::{Value, json};
 use talos_core::message::ToolCall;
 use talos_core::message::{AgentEvent, Message, StopReason, Usage};
-use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
+use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -54,8 +54,20 @@ impl AnthropicProvider {
     }
 
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(&self.model, messages);
+        let body = build_request_body(&self.model, messages, &[]);
+        self.send_request(&body).await
+    }
 
+    async fn make_request_with_tools(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> ProviderResult<reqwest::Response> {
+        let body = build_request_body(&self.model, messages, tools);
+        self.send_request(&body).await
+    }
+
+    async fn send_request(&self, body: &Value) -> ProviderResult<reqwest::Response> {
         let mut attempt = 0;
         loop {
             let response = self
@@ -113,11 +125,19 @@ impl AnthropicProvider {
 impl LanguageModel for AnthropicProvider {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
-
         let (tx, rx) = mpsc::channel(32);
-
         tokio::spawn(parse_sse_stream(response, tx));
+        Ok(rx)
+    }
 
+    async fn stream_with_tools(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        let response = self.make_request_with_tools(messages, tools).await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(parse_sse_stream(response, tx));
         Ok(rx)
     }
 }
@@ -137,11 +157,11 @@ pub fn anthropic_request_debug_snapshot(
             "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         },
-        "body": build_request_body(model, messages),
+        "body": build_request_body(model, messages, &[]),
     })
 }
 
-fn build_request_body(model: &str, messages: &[Message]) -> Value {
+fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition]) -> Value {
     let anthropic_messages: Vec<Value> = messages
         .iter()
         .map(|msg| match msg {
@@ -192,12 +212,28 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
         })
         .collect();
 
-    json!({
+    let mut body = json!({
         "model": model,
         "messages": anthropic_messages,
         "max_tokens": 4096,
         "stream": true,
-    })
+    });
+
+    if !tools.is_empty() {
+        let tools_json: Vec<Value> = tools
+            .iter()
+            .map(|t| {
+                json!({
+                    "name": t.name,
+                    "description": t.description,
+                    "input_schema": t.parameters,
+                })
+            })
+            .collect();
+        body["tools"] = json!(tools_json);
+    }
+
+    body
 }
 
 fn redact_secret(secret: &str) -> String {
@@ -218,6 +254,12 @@ fn redact_secret(secret: &str) -> String {
     format!("{prefix}...{suffix}")
 }
 
+struct ToolUseBlock {
+    id: String,
+    name: String,
+    input_json: String,
+}
+
 async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEvent>) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
@@ -228,6 +270,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut cache_read_tokens: u32 = 0;
     let mut cache_write_tokens: u32 = 0;
     let mut text_accumulator = String::new();
+    let mut tool_use_blocks: std::collections::HashMap<u32, ToolUseBlock> =
+        std::collections::HashMap::new();
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
@@ -259,10 +303,62 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         cache_write_tokens = usage.cache_write_tokens;
                     }
                 }
+                Some("content_block_start") => {
+                    if let Some(block) = data.get("content_block")
+                        && block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
+                    {
+                        let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
+                        let id = block
+                            .get("id")
+                            .and_then(|i| i.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let name = block
+                            .get("name")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        tool_use_blocks.insert(
+                            index,
+                            ToolUseBlock {
+                                id,
+                                name,
+                                input_json: String::new(),
+                            },
+                        );
+                    }
+                }
                 Some("content_block_delta") => {
                     if let Some(text) = extract_text_delta(&data) {
                         text_accumulator.push_str(&text);
                         let _ = tx.send(AgentEvent::TextDelta { delta: text }).await;
+                    }
+                    if let Some(partial) = data.get("delta")
+                        && partial.get("type").and_then(|t| t.as_str()) == Some("input_json_delta")
+                    {
+                        let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
+                        if let Some(json_str) = partial.get("partial_json").and_then(|p| p.as_str())
+                            && let Some(block) = tool_use_blocks.get_mut(&index)
+                        {
+                            block.input_json.push_str(json_str);
+                        }
+                    }
+                }
+                Some("content_block_stop") => {
+                    let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
+                    if let Some(block) = tool_use_blocks.remove(&index) {
+                        let input_json: serde_json::Value = serde_json::from_str(&block.input_json)
+                            .unwrap_or(serde_json::json!({}));
+                        let _ = tx
+                            .send(AgentEvent::ToolCall {
+                                call: ToolCall {
+                                    id: block.id,
+                                    name: block.name,
+                                    input: input_json,
+                                },
+                                provenance: ToolProvenance::Native,
+                            })
+                            .await;
                     }
                 }
                 Some("message_delta") => {

@@ -19,7 +19,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
-use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
+use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
@@ -84,8 +84,20 @@ impl OpenAIProvider {
     }
 
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(&self.model, messages);
+        let body = build_request_body(&self.model, messages, &[]);
+        self.send_request(&body).await
+    }
 
+    async fn make_request_with_tools(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> ProviderResult<reqwest::Response> {
+        let body = build_request_body(&self.model, messages, tools);
+        self.send_request(&body).await
+    }
+
+    async fn send_request(&self, body: &Value) -> ProviderResult<reqwest::Response> {
         let mut attempt = 0;
         loop {
             let response = self
@@ -142,11 +154,19 @@ impl OpenAIProvider {
 impl LanguageModel for OpenAIProvider {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
-
         let (tx, rx) = mpsc::channel(32);
-
         tokio::spawn(parse_sse_stream(response, tx));
+        Ok(rx)
+    }
 
+    async fn stream_with_tools(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        let response = self.make_request_with_tools(messages, tools).await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(parse_sse_stream(response, tx));
         Ok(rx)
     }
 }
@@ -170,7 +190,7 @@ pub fn openai_request_debug_snapshot(
             "Authorization": format!("Bearer {}", redact_secret(api_key)),
             "Content-Type": "application/json",
         },
-        "body": build_request_body(model, messages),
+        "body": build_request_body(model, messages, &[]),
     })
 }
 
@@ -250,7 +270,7 @@ struct OpenAIDeltaFunction {
     arguments: Option<String>,
 }
 
-fn build_request_body(model: &str, messages: &[Message]) -> Value {
+fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition]) -> Value {
     let openai_messages: Vec<OpenAIMessage> = messages
         .iter()
         .map(|msg| match msg {
@@ -320,11 +340,30 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
         })
         .collect();
 
-    json!({
+    let mut body = json!({
         "model": model,
         "messages": openai_messages,
         "stream": true,
-    })
+    });
+
+    if !tools.is_empty() {
+        let tools_json: Vec<Value> = tools
+            .iter()
+            .map(|t| {
+                json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    }
+                })
+            })
+            .collect();
+        body["tools"] = json!(tools_json);
+    }
+
+    body
 }
 
 fn redact_secret(secret: &str) -> String {

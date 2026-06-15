@@ -145,6 +145,8 @@ pub struct Agent {
     hook_registry: Arc<HookRegistry>,
     /// Workspace context (AGENTS.md, history summary) for Context message.
     workspace_context: Option<String>,
+    /// Cached tool definitions for native API calls.
+    tool_definitions: Vec<talos_core::provider::ToolDefinition>,
 }
 
 impl Agent {
@@ -175,6 +177,7 @@ impl Agent {
             prompt_builder: SystemPromptBuilder::new(),
             hook_registry: Arc::new(HookRegistry::new()),
             workspace_context: None,
+            tool_definitions: Vec::new(),
         }
     }
 
@@ -255,10 +258,20 @@ impl Agent {
             .map(|tool| ToolDescription {
                 name: tool.name().to_string(),
                 description: tool.description().to_string(),
+                parameters: tool.parameters(),
             })
             .collect();
 
-        let prompt_builder = SystemPromptBuilder::new().with_tools(descriptions);
+        let prompt_builder = SystemPromptBuilder::new().with_tools(descriptions.clone());
+
+        let tool_definitions: Vec<talos_core::provider::ToolDefinition> = descriptions
+            .into_iter()
+            .map(|d| talos_core::provider::ToolDefinition {
+                name: d.name,
+                description: d.description,
+                parameters: d.parameters,
+            })
+            .collect();
 
         Self {
             provider,
@@ -269,6 +282,7 @@ impl Agent {
             prompt_builder,
             hook_registry,
             workspace_context: None,
+            tool_definitions,
         }
     }
 
@@ -456,7 +470,11 @@ impl Agent {
                 }
             };
 
-            let mut rx = match self.provider.stream(provider_messages).await {
+            let mut rx = match self
+                .provider
+                .stream_with_tools(provider_messages, &self.tool_definitions)
+                .await
+            {
                 Ok(rx) => rx,
                 Err(error) => {
                     let _ = self
@@ -642,8 +660,9 @@ impl Agent {
                 )
                 .await;
 
+            let cleaned_turn_text = talos_core::message::strip_tool_syntax(&turn_text);
             let assistant_msg = Message::Assistant {
-                content: turn_text.clone(),
+                content: cleaned_turn_text,
                 tool_calls: effective_tool_calls.clone(),
             };
             messages.push(assistant_msg);
@@ -706,6 +725,15 @@ impl Agent {
         if calls.is_empty() {
             return Ok(Vec::new());
         }
+
+        let mut seen: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
+        let deduped: Vec<ToolCall> = calls
+            .iter()
+            .filter(|c| seen.insert((c.name.clone(), c.input.to_string())))
+            .cloned()
+            .collect();
+        let calls: &[ToolCall] = &deduped;
 
         let mut results: Vec<Option<ToolExecutionResult>> = vec![None; calls.len()];
 

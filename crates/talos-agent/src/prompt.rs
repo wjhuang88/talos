@@ -65,10 +65,9 @@ pub const TOOL_CALLING_STRICT: &str = include_str!("../../../prompts/tool_callin
 /// JSON Schema parameters. This is sufficient for the system prompt context.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolDescription {
-    /// Unique name of the tool.
     pub name: String,
-    /// Human-readable description of what the tool does.
     pub description: String,
+    pub parameters: serde_json::Value,
 }
 
 /// A context file for inclusion in the system prompt.
@@ -276,7 +275,35 @@ impl SystemPromptBuilder {
         } else {
             let mut tools_section = String::from("# Tools\n");
             for tool in &sorted_tools {
-                tools_section.push_str(&format!("## {}\n{}\n\n", tool.name, tool.description));
+                tools_section.push_str(&format!("## {}\n{}\n", tool.name, tool.description));
+                if let Some(props) = tool.parameters.get("properties")
+                    && let Some(required) = tool.parameters.get("required")
+                {
+                    let req_list: Vec<&str> = required
+                        .as_array()
+                        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+                        .unwrap_or_default();
+                    let mut param_parts = Vec::new();
+                    for (key, val) in props.as_object().unwrap_or(&serde_json::Map::new()) {
+                        let desc = val
+                            .get("description")
+                            .and_then(|d| d.as_str())
+                            .unwrap_or("");
+                        let ptype = val.get("type").and_then(|t| t.as_str()).unwrap_or("any");
+                        let req = if req_list.contains(&key.as_str()) {
+                            "required"
+                        } else {
+                            "optional"
+                        };
+                        param_parts.push(format!("  - {} ({}): {} [{}]", key, ptype, desc, req));
+                    }
+                    if !param_parts.is_empty() {
+                        tools_section.push_str("Parameters:\n");
+                        tools_section.push_str(&param_parts.join("\n"));
+                        tools_section.push_str("\n\n");
+                    }
+                }
+                tools_section.push('\n');
             }
             tools_section.push_str(self.tool_call_format);
             parts.push(tools_section);
@@ -388,14 +415,13 @@ impl SystemPromptBuilder {
         let tools_len = if self.tools.is_empty() {
             tools_header.len() + "No tools available.\n".len()
         } else {
-            let mut len = tools_header.len();
-            let mut sorted_tools: Vec<&ToolDescription> = self.tools.iter().collect();
-            sorted_tools.sort_by(|a, b| a.name.cmp(&b.name));
-            for tool in &sorted_tools {
-                len += format!("## {}\n{}\n\n", tool.name, tool.description).len();
-            }
-            len += self.tool_call_format.len();
-            len
+            let built = self.build();
+            let tools_start = built.find("# Tools\n").unwrap_or(0);
+            let tools_end = built
+                .find("# Skills\n")
+                .or_else(|| built.find("# Context\n"))
+                .unwrap_or(built.len());
+            built[tools_start..tools_end].len()
         };
         markers.push(CacheMarker {
             offset,
