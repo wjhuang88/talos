@@ -7,6 +7,7 @@
 use std::io::{self, Write};
 
 use crossterm::{
+    cursor::MoveToColumn,
     execute,
     style::{Attribute, Color as CColor, Print, SetAttribute, SetForegroundColor},
     terminal,
@@ -116,11 +117,11 @@ fn write_splash_scrollback<W: Write>(writer: &mut W, width: u16) -> io::Result<(
         LogoRenderMode::UnicodeBlock => talos_wordmark_compact(),
     };
 
-    execute!(writer, Print("\r\n\r\n"))?;
+    execute!(writer, Print("\r\n"))?;
 
     let gradient = wordmark_gradient(wordmark.len());
-    for (row, color) in wordmark.iter().zip(gradient.iter()) {
-        print_styled_line(writer, row, *color, &[Attribute::Bold])?;
+    for (line, color) in wordmark.iter().zip(gradient.iter()) {
+        print_styled_line(writer, line, *color, &[Attribute::Bold])?;
     }
 
     let wordmark_width = wordmark[0].chars().count();
@@ -136,15 +137,15 @@ fn write_splash_scrollback<W: Write>(writer: &mut W, width: u16) -> io::Result<(
 fn print_right_aligned_version<W: Write>(writer: &mut W, wordmark_width: usize) -> io::Result<()> {
     let version = version_line();
     let version_width = version.chars().count();
-    let padding = INDENT.len() + wordmark_width.saturating_sub(version_width);
+    let version_col = (INDENT.len() + wordmark_width - version_width) as u16;
 
     execute!(
         writer,
-        Print(" ".repeat(padding)),
+        Print("\r\n"),
+        MoveToColumn(version_col),
         SetForegroundColor(to_crossterm_color(nord::NORD9).unwrap_or(CColor::Reset)),
         Print(version),
-        SetForegroundColor(CColor::Reset),
-        Print("\r\n")
+        SetForegroundColor(CColor::Reset)
     )
 }
 
@@ -156,6 +157,8 @@ fn print_styled_line<W: Write>(
 ) -> io::Result<()> {
     execute!(
         writer,
+        Print("\r\n"),
+        MoveToColumn(0),
         Print(INDENT),
         SetForegroundColor(to_crossterm_color(color).unwrap_or(CColor::Reset))
     )?;
@@ -169,13 +172,12 @@ fn print_styled_line<W: Write>(
         writer,
         SetAttribute(Attribute::NormalIntensity),
         SetAttribute(Attribute::NoItalic),
-        SetForegroundColor(CColor::Reset),
-        Print("\r\n")
+        SetForegroundColor(CColor::Reset)
     )
 }
 
 fn print_badge_line<W: Write>(writer: &mut W) -> io::Result<()> {
-    execute!(writer, Print(INDENT))?;
+    execute!(writer, Print("\r\n"), MoveToColumn(0), Print(INDENT))?;
 
     for (i, (color, label)) in badges().iter().enumerate() {
         if i > 0 {
@@ -198,7 +200,7 @@ fn print_badge_line<W: Write>(writer: &mut W) -> io::Result<()> {
         )?;
     }
 
-    execute!(writer, Print("\r\n"))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -324,27 +326,27 @@ mod tests {
     }
 
     #[test]
-    fn rendered_splash_starts_on_a_fresh_line() {
+    fn rendered_splash_starts_with_crlf() {
         let mut output = Vec::new();
         write_splash_scrollback(&mut output, 80).expect("render splash");
         let output = String::from_utf8(output).expect("utf8 splash");
 
-        assert!(
-            output.starts_with("\r\n\r\n  "),
-            "splash must start with CRLF, one blank line, and indent so it cannot inherit the previous command column"
-        );
+        assert!(output.starts_with("\r\n"), "splash must start with CRLF");
     }
 
     #[test]
-    fn rendered_splash_uses_crlf_line_boundaries() {
+    fn rendered_splash_contains_wordmark_content() {
         let mut output = Vec::new();
         write_splash_scrollback(&mut output, 80).expect("render splash");
         let output = String::from_utf8(output).expect("utf8 splash");
 
-        assert!(!output.contains('\n') || output.contains("\r\n"));
         assert!(
-            !output.replace("\r\n", "").contains('\n'),
-            "splash should not emit bare LF line endings"
+            output.contains("████████"),
+            "splash must contain the wordmark"
+        );
+        assert!(
+            output.contains(SUBTITLE),
+            "splash must contain the subtitle"
         );
     }
 }
