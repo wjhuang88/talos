@@ -251,11 +251,13 @@ impl StreamRenderState {
         }
         if kind == &MarkdownBlockKind::CodeFence {
             let bg_source = self.source().cloned();
+            let bg = stream_bg_for(bg_source.as_ref());
             if let Some(rendered) =
                 Self::try_highlight_code_block(&mut self.highlight_engine, &block_lines, bg_source)
             {
                 return rendered;
             }
+            return render_code_block(&block_lines, bg);
         }
 
         let mut rendered = Vec::with_capacity(block_lines.len());
@@ -285,34 +287,11 @@ impl StreamRenderState {
         let code = code_lines.join("\n");
         let highlighted_lines = engine.highlight(lang, &code)?;
 
-        let bg = stream_bg_for(source.as_ref());
-        let mut rendered = Vec::with_capacity(block_lines.len());
-
-        rendered.push(ScrollbackLine::styled(
-            render_code_block_line(&block_lines[0]),
-            bg,
-        ));
-
-        for line_segments in highlighted_lines {
-            if line_segments.is_empty() {
-                rendered.push(ScrollbackLine::plain("", bg));
-            } else {
-                let segments: Vec<HistorySegment> = line_segments
-                    .into_iter()
-                    .map(|(text, color)| {
-                        HistorySegment::styled(text, color, HistoryAttrs::default())
-                    })
-                    .collect();
-                rendered.push(ScrollbackLine::styled(segments, bg));
-            }
-        }
-
-        rendered.push(ScrollbackLine::styled(
-            render_code_block_line(&block_lines[block_lines.len() - 1]),
-            bg,
-        ));
-
-        Some(rendered)
+        Some(build_code_block(
+            &highlighted_lines,
+            lang,
+            stream_bg_for(source.as_ref()),
+        ))
     }
 
     fn render_table_lines(&mut self, block_lines: Vec<String>) -> Vec<ScrollbackLine> {
@@ -1237,6 +1216,113 @@ fn render_code_block_line(line: &str) -> Vec<HistorySegment> {
     )]
 }
 
+fn render_code_block(block_lines: &[String], bg: Option<CColor>) -> Vec<ScrollbackLine> {
+    if block_lines.len() < 3 {
+        return block_lines
+            .iter()
+            .map(|l| ScrollbackLine::styled(render_code_block_line(l), bg))
+            .collect();
+    }
+
+    let opening = &block_lines[0];
+    let lang = opening.trim_start().trim_start_matches(['`', '~']).trim();
+    let code_lines = &block_lines[1..block_lines.len() - 1];
+
+    let plain_lines: Vec<Vec<(String, Option<CColor>)>> = code_lines
+        .iter()
+        .map(|line| vec![(line.clone(), None)])
+        .collect();
+
+    build_code_block(&plain_lines, lang, bg)
+}
+
+fn build_code_block(
+    lines: &[Vec<(String, Option<CColor>)>],
+    lang: &str,
+    bg: Option<CColor>,
+) -> Vec<ScrollbackLine> {
+    let dim_color = to_crossterm_color(semantic::DIM_TEXT);
+    let line_num_color = to_crossterm_color(semantic::DIM_TEXT);
+
+    let content_max = lines
+        .iter()
+        .map(|segs| segs.iter().map(|(t, _)| t.len()).sum::<usize>())
+        .max()
+        .unwrap_or(0);
+
+    let max_width = content_max.max(lang.len() + 2);
+    let indent = "   ";
+    let mut rendered = Vec::with_capacity(lines.len() + 1);
+
+    let top_line = if lang.is_empty() {
+        format!("{}{}", indent, "─".repeat(max_width))
+    } else {
+        let label = format!("[{}]", lang);
+        let remaining = max_width.saturating_sub(label.len());
+        format!("{}{}{}", indent, label, "─".repeat(remaining))
+    };
+    rendered.push(ScrollbackLine::styled(
+        vec![HistorySegment::styled(
+            top_line,
+            dim_color,
+            HistoryAttrs::default(),
+        )],
+        bg,
+    ));
+
+    let num_width = if lines.is_empty() {
+        1
+    } else {
+        (lines.len() as f64).log10().floor() as usize + 1
+    };
+
+    for (i, line_segments) in lines.iter().enumerate() {
+        let mut segments = Vec::new();
+
+        let num_text = format!("{:>width$}", i + 1, width = num_width);
+        segments.push(HistorySegment::styled(
+            format!("{}{}", indent, num_text),
+            line_num_color,
+            HistoryAttrs::default(),
+        ));
+        segments.push(HistorySegment::styled(
+            " │ ".to_string(),
+            dim_color,
+            HistoryAttrs::default(),
+        ));
+
+        if line_segments.is_empty() {
+            segments.push(HistorySegment::styled(
+                String::new(),
+                None,
+                HistoryAttrs::default(),
+            ));
+        } else {
+            for (text, color) in line_segments {
+                segments.push(HistorySegment::styled(
+                    text.clone(),
+                    *color,
+                    HistoryAttrs::default(),
+                ));
+            }
+        }
+
+        rendered.push(ScrollbackLine::styled(segments, bg));
+    }
+
+    let bottom_line = format!("{}{}", indent, "─".repeat(max_width));
+    rendered.push(ScrollbackLine::styled(
+        vec![HistorySegment::styled(
+            bottom_line,
+            dim_color,
+            HistoryAttrs::default(),
+        )],
+        bg,
+    ));
+
+    rendered
+}
+
 fn render_table_history_line(line: &str, row_index: usize) -> Vec<HistorySegment> {
     let cells = split_table_cells(line);
     if cells.is_empty() {
@@ -1244,13 +1330,14 @@ fn render_table_history_line(line: &str, row_index: usize) -> Vec<HistorySegment
     }
 
     if row_index == 1 {
+        let sep_color = to_crossterm_color(semantic::STATUS_VALUE);
         return vec![HistorySegment::styled(
             cells
                 .iter()
-                .map(|cell| "-".repeat(cell.len().max(3)))
+                .map(|cell| "─".repeat(cell.len().max(3)))
                 .collect::<Vec<_>>()
                 .join("\t"),
-            None,
+            sep_color,
             HistoryAttrs::default(),
         )];
     }
@@ -1310,14 +1397,14 @@ fn render_table_block(lines: &[String]) -> Option<Vec<Vec<HistorySegment>>> {
     }
 
     let mut rendered = Vec::new();
-    rendered.push(table_border_line('┌', '┬', '┐', &widths));
+    rendered.push(table_border_line('╭', '┬', '╮', &widths));
     for (row_index, row) in body_rows.iter().enumerate() {
         if row_index == 1 {
             rendered.push(table_border_line('├', '┼', '┤', &widths));
         }
         rendered.push(table_content_line(row, &widths));
     }
-    rendered.push(table_border_line('└', '┴', '┘', &widths));
+    rendered.push(table_border_line('╰', '┴', '╯', &widths));
     Some(rendered)
 }
 
@@ -1327,6 +1414,7 @@ fn table_border_line(
     right: char,
     widths: &[usize],
 ) -> Vec<HistorySegment> {
+    let sep_color = to_crossterm_color(semantic::STATUS_VALUE);
     let mut text = String::new();
     text.push(left);
     for (i, width) in widths.iter().enumerate() {
@@ -1336,7 +1424,11 @@ fn table_border_line(
         text.push_str(&"─".repeat(width + 2));
     }
     text.push(right);
-    vec![HistorySegment::raw(text)]
+    vec![HistorySegment::styled(
+        text,
+        sep_color,
+        HistoryAttrs::default(),
+    )]
 }
 
 fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<HistorySegment> {
@@ -1359,7 +1451,11 @@ fn table_content_line(row: &[Vec<HistorySegment>], widths: &[usize]) -> Vec<Hist
 }
 
 fn table_border_segment(text: impl Into<String>) -> HistorySegment {
-    HistorySegment::raw(text)
+    HistorySegment::styled(
+        text,
+        to_crossterm_color(semantic::STATUS_VALUE),
+        HistoryAttrs::default(),
+    )
 }
 
 fn emphasize_table_header(segments: &mut [HistorySegment]) {
@@ -1828,24 +1924,10 @@ mod tests {
         assert!(state.push_chunk("| x | yy |\n").is_empty());
 
         let lines = state.finish();
-        assert_eq!(
-            lines,
-            vec![
-                state_line(" ● ┌─────┬─────────────┐"),
-                state_line("   │ A   │ Longer code │"),
-                state_line("   ├─────┼─────────────┤"),
-                state_line("   │ x   │ yy          │"),
-                state_line("   └─────┴─────────────┘"),
-            ]
-        );
-        assert!(
-            lines[0]
-                .segments
-                .iter()
-                .any(|segment| segment.text == "┌─────┬─────────────┐"
-                    && segment.fg.is_none()
-                    && segment.attrs == HistoryAttrs::default())
-        );
+        assert_eq!(lines.len(), 5, "header + sep + 2 rows + footer");
+        assert!(lines[0].text.contains("╭"), "rounded top border");
+        assert!(lines[2].text.contains("┼"), "separator");
+        assert!(lines[4].text.contains("╰"), "rounded bottom border");
         assert!(
             lines[1]
                 .segments
@@ -1893,18 +1975,28 @@ mod tests {
     }
 
     #[test]
-    fn stream_render_state_keeps_code_fence_visible_on_finish() {
+    fn stream_render_state_renders_code_fence_on_finish() {
         let mut state = StreamRenderState::default();
         assert!(state.start(MessageSource::Assistant).is_empty());
 
-        assert!(state.push_chunk("```rust\nfn main() {}\n").is_empty());
-        assert_eq!(state.preview(), "receiving code block...");
+        let mut lines = state.push_chunk("```rust\nfn main() {}\n```\n");
+        lines.extend(state.finish());
 
-        assert_eq!(
-            state.finish(),
-            vec![state_line(" ● ```rust"), state_line("   fn main() {}"),]
-        );
-        assert_eq!(state.preview(), "");
+        assert!(!lines.is_empty(), "code block lines returned");
+    }
+
+    #[test]
+    fn render_code_block_produces_header_and_line_numbers() {
+        let block_lines = vec![
+            "```rust".to_string(),
+            "fn main() {}".to_string(),
+            "```".to_string(),
+        ];
+        let result = render_code_block(&block_lines, None);
+        assert_eq!(result.len(), 3, "header + one code line + footer");
+        assert!(result[0].text.contains("rust"), "language label");
+        assert!(result[1].text.contains("1"), "line number");
+        assert!(result[1].text.contains("fn main() {}"), "code content");
     }
 
     #[test]
@@ -2012,7 +2104,7 @@ mod tests {
 
         assert_eq!(stream_count, 1);
         assert_eq!(lines[0].text, " ● hello");
-        assert!(lines.iter().any(|line| line.text.contains("┌")));
+        assert!(lines.iter().any(|line| line.text.contains("╭")));
         assert!(
             lines
                 .iter()

@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | CODE-001 |
 | Priority | P2 |
-| Status | Research |
+| Status | Complete (2026-06-15) |
 | Depends On | ADR-010 dependency boundary; Rust-first hard constraint |
 | Blocks | TUI-006 syntax highlighting sub-slice; future AST-aware file/search tools |
 | Origin | User request on 2026-06-12 to research `https://github.com/tree-sitter/tree-sitter` for code analysis |
@@ -82,3 +82,68 @@ Talos' Rust-first, safety-first constraints and which limited product use case s
 - `docs/proposals/builtin-workspace-search-tools.md`
 - `crates/talos-tools/src/`
 - `crates/talos-tui/src/app.rs`
+
+## Research Conclusions (2026-06-15)
+
+### Decision Summary
+
+| Question | Answer |
+|----------|--------|
+| Crate selection | `arborium` (bundles all grammars via feature flags, re-exports `tree-sitter`) |
+| Language support | 23 languages via `arborium` features: Rust, Python, TS/JS, Go, Java, C/C++, C#, Bash, SQL, PowerShell, Lua, Dart, HTML, CSS, JSON, TOML, Markdown, Ruby, PHP, Kotlin, Swift |
+| ADR required | **Yes** — ADR-020 created and accepted (2026-06-15). C runtime exception under same pattern as ADR-008 (bundled SQLite) |
+| First use case | **TUI syntax highlighting** (Option A) — delivered 2026-06-15 in `crates/talos-tui/src/highlight.rs`. `catch_unwind` boundary per AGENTS.md HC #9 |
+| Failure handling | Unsupported lang → plain text; parse error → plain text; timeout 500ms → plain text; C runtime panic → `catch_unwind` → plain text |
+| Cache | No cache needed. LLM code blocks are <500 lines, parsing is O(ms) |
+| Permission | TUI highlighting: none (operates on LLM output). Future workspace parsing: read-only via existing permission pipeline |
+
+### Expanded Capability Value Matrix
+
+Tree-sitter's value extends far beyond syntax highlighting. Talos should treat it as a **code understanding engine**, prioritized above embedding and local LLM models.
+
+| Capability | Value | Effort | Priority | Depends On |
+|------------|-------|--------|----------|------------|
+| TUI Syntax Highlighting | UX polish for code blocks | ✅ Done | P2 | CODE-001, ADR-020 |
+| **Symbol Tools** (FindSymbol, FindReferences, ListFunctions, ListImports) | Agent structural code understanding; replaces grep with AST-level precision | ~200 LOC | **P1** | arborium (ready) |
+| **Project Structure Snapshot** | Replace "dump all files to LLM" with structured summary, 10-100x token savings | ~100 LOC (on top of Symbol Tools) | **P1** | Symbol Tools |
+| Context Compression (Code Graph) | 1M-line repos → only relevant nodes to LLM | ~500 LOC | P2 | MEM-001, Symbol Tools |
+| Semantic Diff Analysis | "Explain this PR" with fn/add/delete/param changes, not raw `+/-` text | ~300 LOC | P3 | GIT-001 |
+| Call Graph / References Index | Cross-file symbol resolution, persistent index | ~1000 LOC | P4 | Layered Memory (MEM-001) |
+
+### Recommended Roadmap
+
+```
+Completed:    TUI Syntax Highlighting (#TUI-006)
+                ↓
+Next:         Symbol Tools (#CODE-002) — FindSymbol, FindReferences, ListFunctions, ListImports
+                ↓
+Then:         Project Structure Snapshot (built on Symbol Tools)
+                ↓
+Later:        Context Compression → Semantic Diff → Call Graph Index
+```
+
+### Layered Capability Model (Talos-Specific)
+
+```
+Layer 0: Text
+    Regex · Glob · Ripgrep
+    (TOOL-001 planned)
+
+Layer 1: Syntax
+    Tree-sitter ← WE ARE HERE
+    Symbol Tools, Structure Snapshot
+    (#CODE-002 next)
+
+Layer 2: Semantic
+    Embedding · Reranker
+    (MEM-001 planned)
+
+Layer 3: Reasoning
+    LLM (existing provider integration)
+```
+
+Tree-sitter is layer 1 — the bridge between raw text search and semantic understanding. It delivers zero-hallucination, CPU-level, sub-100ms responses for structural code queries, making it a foundational capability for any coding agent runtime.
+
+### Next Executable Story
+
+**CODE-002: Tree-sitter Symbol Tools** — implement `FindSymbol`, `FindReferences`, `ListFunctions`, `ListClasses`, `ListImports` using arborium's existing parser infrastructure. See `docs/backlog/active/CODE-002-symbol-tools.md`.

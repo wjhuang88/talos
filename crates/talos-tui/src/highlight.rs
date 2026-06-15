@@ -140,7 +140,7 @@ fn capture_color(capture: &str) -> Option<CColor> {
         n if n.starts_with("function") || n.starts_with("method") => crate::theme::nord::NORD8,
         n if n.starts_with("string") => crate::theme::nord::NORD14,
         n if n.starts_with("number") || n.starts_with("constant") => crate::theme::nord::NORD15,
-        n if n.starts_with("comment") => crate::theme::nord::NORD3,
+        n if n.starts_with("comment") => crate::theme::nord::NORD4,
         n if n.starts_with("operator") || n.starts_with("punctuation") => crate::theme::nord::NORD4,
         n if n.starts_with("variable") => crate::theme::nord::NORD5,
         n if n.starts_with("property") || n.starts_with("field") => crate::theme::nord::NORD7,
