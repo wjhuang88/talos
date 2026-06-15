@@ -320,19 +320,16 @@ fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
         let inner_start = start + "<tool_call>".len();
         let inner = &remaining[inner_start..];
 
-        let end = inner
-            .find("</tool_call>")
-            .or_else(|| inner.find("</argvalue>"))
-            .unwrap_or(inner.len());
+        let end = inner.find("</tool_call>").unwrap_or(inner.len());
         let content = inner[..end].trim();
 
-        if let Some(call) = parse_single_tool_call(content) {
+        if let Some(call) = parse_json_tool_call(content) {
             calls.push(call);
         }
 
         remaining = &inner[end..];
-        let close_len = remaining.find('>').map(|p| p + 1).unwrap_or(0);
-        if close_len < remaining.len() {
+        let close_len = "</tool_call>".len();
+        if end + close_len < remaining.len() {
             remaining = &remaining[close_len..];
         } else {
             break;
@@ -342,112 +339,18 @@ fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
     calls
 }
 
-fn parse_single_tool_call(content: &str) -> Option<ToolCall> {
-    let trimmed = content.trim();
-    let name_end = trimmed
-        .find(|c: char| c.is_whitespace() || c == ':')
-        .unwrap_or(trimmed.len());
+fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
+    let json_str = content.trim().trim_matches('`');
 
-    let name = trimmed[..name_end].trim().to_string();
-    if name.is_empty() {
-        return None;
-    }
-
-    let args = parse_tool_args_flexible(&trimmed[name_end..]);
-
-    let mut input = serde_json::Map::new();
-    for (key, value) in args {
-        let normalized = normalize_tool_arg(&key, &value);
-        input.insert(key, serde_json::Value::String(normalized));
-    }
+    let obj: serde_json::Value = serde_json::from_str(json_str).ok()?;
+    let name = obj.get("name")?.as_str()?.to_string();
+    let args = obj.get("args")?.clone();
 
     Some(ToolCall {
         id: Uuid::new_v4().to_string(),
         name,
-        input: serde_json::Value::Object(input),
+        input: args,
     })
-}
-
-fn parse_tool_args_flexible(args_str: &str) -> Vec<(String, String)> {
-    let mut args = Vec::new();
-    let lines: Vec<&str> = args_str.lines().collect();
-
-    let mut current_key = String::new();
-    let mut current_value = String::new();
-
-    for line in &lines {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        if let Some(colon_pos) = trimmed.find(':') {
-            if !current_key.is_empty() {
-                args.push((
-                    std::mem::take(&mut current_key),
-                    current_value.trim().to_string(),
-                ));
-                current_value.clear();
-            }
-            current_key = trimmed[..colon_pos].trim().to_string();
-            let after_colon = trimmed[colon_pos + 1..].trim();
-            if !after_colon.is_empty() {
-                current_value.push_str(after_colon);
-            }
-        } else if trimmed.contains('=') {
-            if !current_key.is_empty() {
-                args.push((
-                    std::mem::take(&mut current_key),
-                    current_value.trim().to_string(),
-                ));
-                current_value.clear();
-            }
-            let mut parts = trimmed.splitn(2, '=');
-            current_key = parts.next().unwrap_or("").trim().to_string();
-            if let Some(val) = parts.next() {
-                let val = val.trim().trim_matches('"').trim();
-                if !val.is_empty() {
-                    current_value.push_str(val);
-                }
-            }
-        } else if !current_key.is_empty() {
-            if !current_value.is_empty() {
-                current_value.push('\n');
-            }
-            current_value.push_str(line);
-        }
-    }
-
-    if !current_key.is_empty() {
-        args.push((current_key, current_value.trim().to_string()));
-    }
-
-    args
-}
-
-fn normalize_tool_arg(key: &str, value: &str) -> String {
-    let trimmed = value.trim();
-
-    if trimmed.is_empty() {
-        return String::new();
-    }
-
-    let no_encoding = trimmed
-        .replace("\\n", "\n")
-        .replace("\\t", "\t")
-        .replace("\\\"", "\"")
-        .replace("\\\\", "\\");
-
-    if key == "path" || key == "file_path" || key == "file" {
-        let cleaned = no_encoding.trim_start_matches(['.', '/', '\\']);
-        if cleaned.contains("..") || cleaned.starts_with('/') {
-            let safe = cleaned.replace("..", "").replace(['/', '\\'], "_");
-            return safe.trim().to_string();
-        }
-        return cleaned.to_string();
-    }
-
-    no_encoding.to_string()
 }
 
 fn extract_event_type(event_text: &str) -> Option<String> {

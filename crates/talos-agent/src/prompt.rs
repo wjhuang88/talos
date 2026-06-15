@@ -57,6 +57,14 @@ use talos_skill::SkillIndex;
 pub const DEFAULT_IDENTITY: &str = "You are Talos, an AI coding assistant. You help users with programming tasks \
      by using tools to read, write, and execute code.";
 
+pub const TOOL_CALLING_FORMAT: &str = "# Tool Calling Format\n\
+When you need to use a tool, output:\n\n\
+<tool_call>\n\
+{\"name\": \"<tool_name>\", \"args\": {<parameters>}}\n\
+</tool_call>\n\n\
+The JSON object must contain exactly \"name\" and \"args\" fields.\n\
+Args must be a JSON object with parameter names and values.\n";
+
 /// A description of a tool for inclusion in the system prompt.
 ///
 /// Contains only the name and human-readable description, without the full
@@ -269,6 +277,7 @@ impl SystemPromptBuilder {
             for tool in &sorted_tools {
                 tools_section.push_str(&format!("## {}\n{}\n\n", tool.name, tool.description));
             }
+            tools_section.push_str(TOOL_CALLING_FORMAT);
             parts.push(tools_section);
         }
 
@@ -384,6 +393,7 @@ impl SystemPromptBuilder {
             for tool in &sorted_tools {
                 len += format!("## {}\n{}\n\n", tool.name, tool.description).len();
             }
+            len += TOOL_CALLING_FORMAT.len();
             len
         };
         markers.push(CacheMarker {
