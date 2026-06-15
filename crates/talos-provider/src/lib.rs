@@ -320,7 +320,10 @@ fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
         let inner_start = start + "<tool_call>".len();
         let inner = &remaining[inner_start..];
 
-        let end = inner.find("</tool_call>").unwrap_or(inner.len());
+        let end = inner
+            .find("</tool_call>")
+            .or_else(|| inner.find("</argvalue>"))
+            .unwrap_or(inner.len());
         let content = inner[..end].trim();
 
         if let Some(call) = parse_single_tool_call(content) {
@@ -328,8 +331,9 @@ fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
         }
 
         remaining = &inner[end..];
-        if end < inner.len() {
-            remaining = &remaining["</tool_call>".len()..];
+        let close_len = remaining.find('>').map(|p| p + 1).unwrap_or(0);
+        if close_len < remaining.len() {
+            remaining = &remaining[close_len..];
         } else {
             break;
         }
@@ -340,12 +344,16 @@ fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
 
 fn parse_single_tool_call(content: &str) -> Option<ToolCall> {
     let trimmed = content.trim();
-    let first_space = trimmed.find(|c: char| c.is_whitespace())?;
+    let name_end = trimmed
+        .find(|c: char| c.is_whitespace() || c == ':')
+        .unwrap_or(trimmed.len());
 
-    let name = trimmed[..first_space].trim().to_string();
-    let args_str = trimmed[first_space..].trim();
+    let name = trimmed[..name_end].trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
 
-    let args = parse_tool_args(args_str);
+    let args = parse_tool_args_flexible(&trimmed[name_end..]);
 
     let mut input = serde_json::Map::new();
     for (key, value) in args {
@@ -360,63 +368,58 @@ fn parse_single_tool_call(content: &str) -> Option<ToolCall> {
     })
 }
 
-fn parse_tool_args(args_str: &str) -> Vec<(String, String)> {
+fn parse_tool_args_flexible(args_str: &str) -> Vec<(String, String)> {
     let mut args = Vec::new();
-    let mut pos = 0usize;
-    let chars: Vec<char> = args_str.chars().collect();
+    let lines: Vec<&str> = args_str.lines().collect();
 
-    while pos < chars.len() {
-        while pos < chars.len() && chars[pos].is_whitespace() {
-            pos += 1;
-        }
-        if pos >= chars.len() {
-            break;
-        }
+    let mut current_key = String::new();
+    let mut current_value = String::new();
 
-        let eq_pos = chars[pos..].iter().position(|&c| c == '=');
-        let Some(eq_offset) = eq_pos else {
-            break;
-        };
-        let eq_idx = pos + eq_offset;
-
-        let key = chars[pos..eq_idx]
-            .iter()
-            .collect::<String>()
-            .trim()
-            .to_string();
-        pos = eq_idx + 1;
-
-        while pos < chars.len() && chars[pos].is_whitespace() {
-            pos += 1;
+    for line in &lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
         }
 
-        if pos >= chars.len() {
-            break;
-        }
-
-        let value = if chars[pos] == '"' {
-            pos += 1;
-            let start = pos;
-            while pos < chars.len() && chars[pos] != '"' {
-                if chars[pos] == '\\' && pos + 1 < chars.len() {
-                    pos += 1;
+        if let Some(colon_pos) = trimmed.find(':') {
+            if !current_key.is_empty() {
+                args.push((
+                    std::mem::take(&mut current_key),
+                    current_value.trim().to_string(),
+                ));
+                current_value.clear();
+            }
+            current_key = trimmed[..colon_pos].trim().to_string();
+            let after_colon = trimmed[colon_pos + 1..].trim();
+            if !after_colon.is_empty() {
+                current_value.push_str(after_colon);
+            }
+        } else if trimmed.contains('=') {
+            if !current_key.is_empty() {
+                args.push((
+                    std::mem::take(&mut current_key),
+                    current_value.trim().to_string(),
+                ));
+                current_value.clear();
+            }
+            let mut parts = trimmed.splitn(2, '=');
+            current_key = parts.next().unwrap_or("").trim().to_string();
+            if let Some(val) = parts.next() {
+                let val = val.trim().trim_matches('"').trim();
+                if !val.is_empty() {
+                    current_value.push_str(val);
                 }
-                pos += 1;
             }
-            let val = chars[start..pos].iter().collect::<String>();
-            if pos < chars.len() {
-                pos += 1;
+        } else if !current_key.is_empty() {
+            if !current_value.is_empty() {
+                current_value.push('\n');
             }
-            val
-        } else {
-            let start = pos;
-            while pos < chars.len() && !chars[pos].is_whitespace() {
-                pos += 1;
-            }
-            chars[start..pos].iter().collect::<String>()
-        };
+            current_value.push_str(line);
+        }
+    }
 
-        args.push((key, value));
+    if !current_key.is_empty() {
+        args.push((current_key, current_value.trim().to_string()));
     }
 
     args
