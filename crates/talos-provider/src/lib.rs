@@ -374,17 +374,49 @@ pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
 }
 
 fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
-    let json_str = content.trim().trim_matches('`');
+    let content = content.trim().trim_matches('`').trim();
 
-    let obj: serde_json::Value = serde_json::from_str(json_str).ok()?;
-    let name = obj.get("name")?.as_str()?.to_string();
-    let args = obj.get("args")?.clone();
+    // Try: entire content is JSON: {"name":"bash","args":{...}}
+    if content.starts_with('{') {
+        let obj: serde_json::Value = serde_json::from_str(content).ok()?;
+        let name = obj.get("name")?.as_str()?.to_string();
+        let args = obj.get("args")?.clone();
+        return Some(ToolCall {
+            id: Uuid::new_v4().to_string(),
+            name,
+            input: args,
+        });
+    }
 
-    Some(ToolCall {
-        id: Uuid::new_v4().to_string(),
-        name,
-        input: args,
-    })
+    // Try: name is first word, JSON follows somewhere in content
+    let first_space = content.find(|c: char| c.is_whitespace())?;
+    let name = content[..first_space].trim().to_string();
+
+    let rest = content[first_space..].trim();
+    if let Some(brace_start) = rest.find('{') {
+        let json_str = &rest[brace_start..];
+        if let Some(brace_end) = json_str.rfind('}') {
+            let json_str = &json_str[..=brace_end];
+            if let Ok(args) = serde_json::from_str::<serde_json::Value>(json_str) {
+                return Some(ToolCall {
+                    id: Uuid::new_v4().to_string(),
+                    name,
+                    input: args,
+                });
+            }
+        }
+    }
+
+    // Try: name is first word, rest is key=value pairs
+    if let Ok(args) = serde_json::from_str::<serde_json::Value>(rest) {
+        return Some(ToolCall {
+            id: Uuid::new_v4().to_string(),
+            name,
+            input: args,
+        });
+    }
+
+    None
 }
 
 fn extract_event_type(event_text: &str) -> Option<String> {

@@ -33,7 +33,7 @@ use talos_core::message::{
     AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult,
 };
 use talos_core::provider::{LanguageModel, ProviderError};
-use talos_core::tool::{ToolRegistry, ToolResult as ToolExecutionResult};
+use talos_core::tool::{ToolProtocol, ToolRegistry, ToolResult as ToolExecutionResult};
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnEndReason,
@@ -278,6 +278,13 @@ impl Agent {
     /// to ensure stable ordering across turns.
     pub fn set_tools(&mut self, tools: Vec<ToolDescription>) {
         self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_tools(tools);
+    }
+
+    pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
+        if protocol == ToolProtocol::TalosStrict {
+            self.prompt_builder =
+                std::mem::take(&mut self.prompt_builder).with_strict_tool_format();
+        }
     }
 
     /// Sets the skill index for the system prompt builder.

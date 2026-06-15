@@ -1,0 +1,15 @@
+# Tool Calling Rules
+
+To call a tool, output exactly one block in this format:
+
+<tool_call>
+{"name": "tool_name", "args": {"key": "value"}}
+</tool_call>
+
+Rules:
+- Output the entire <tool_call> block as a single unit
+- The content inside must be valid JSON with "name" and "args" fields
+- Do NOT use markdown fences (```)
+- Do NOT explain what you are doing before the tool call
+- Output the tool call BEFORE any other text
+- After the </tool_call> tag, you may continue with explanations

@@ -57,6 +57,7 @@ use talos_skill::SkillIndex;
 pub const DEFAULT_IDENTITY: &str = include_str!("../../../prompts/identity.txt");
 
 pub const TOOL_CALLING_FORMAT: &str = include_str!("../../../prompts/tool_calling_format.txt");
+pub const TOOL_CALLING_STRICT: &str = include_str!("../../../prompts/tool_calling_strict.txt");
 
 /// A description of a tool for inclusion in the system prompt.
 ///
@@ -147,6 +148,7 @@ pub struct SystemPromptBuilder {
     custom_prompt: Option<String>,
     /// Appended to the end of the prompt when provided.
     append_prompt: Option<String>,
+    tool_call_format: &'static str,
 }
 
 impl SystemPromptBuilder {
@@ -164,7 +166,13 @@ impl SystemPromptBuilder {
             user_preferences: String::new(),
             custom_prompt: None,
             append_prompt: None,
+            tool_call_format: TOOL_CALLING_FORMAT,
         }
+    }
+
+    pub fn with_strict_tool_format(mut self) -> Self {
+        self.tool_call_format = TOOL_CALLING_STRICT;
+        self
     }
 
     /// Sets the tool descriptions for inclusion in the system prompt.
@@ -270,7 +278,7 @@ impl SystemPromptBuilder {
             for tool in &sorted_tools {
                 tools_section.push_str(&format!("## {}\n{}\n\n", tool.name, tool.description));
             }
-            tools_section.push_str(TOOL_CALLING_FORMAT);
+            tools_section.push_str(self.tool_call_format);
             parts.push(tools_section);
         }
 
@@ -386,7 +394,7 @@ impl SystemPromptBuilder {
             for tool in &sorted_tools {
                 len += format!("## {}\n{}\n\n", tool.name, tool.description).len();
             }
-            len += TOOL_CALLING_FORMAT.len();
+            len += self.tool_call_format.len();
             len
         };
         markers.push(CacheMarker {
