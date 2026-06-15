@@ -167,9 +167,38 @@ impl AppServerSession {
         if let Some(user_msg) = self.pending_user_message.take() {
             self.history.push(Message::User { content: user_msg });
         }
+
+        let tool_calls = talos_core::message::extract_tool_calls_from_text(&final_text);
+        let tool_count = tool_calls.len();
+
+        let cleaned_content = if tool_count > 0 {
+            let cleaned = talos_core::message::strip_tool_syntax(&final_text);
+            if tool_count == 1 {
+                format!(
+                    "🛠 {} {}\n\n{}",
+                    tool_calls[0].name,
+                    tool_calls[0].input,
+                    cleaned.trim()
+                )
+            } else {
+                let summary: Vec<String> = tool_calls
+                    .iter()
+                    .map(|tc| format!("  ▸ {} {}", tc.name, tc.input))
+                    .collect();
+                format!(
+                    "🛠 {} tools\n{}\n\n{}",
+                    tool_count,
+                    summary.join("\n"),
+                    cleaned.trim()
+                )
+            }
+        } else {
+            final_text
+        };
+
         self.history.push(Message::Assistant {
-            content: final_text,
-            tool_calls: vec![],
+            content: cleaned_content,
+            tool_calls,
         });
     }
 }

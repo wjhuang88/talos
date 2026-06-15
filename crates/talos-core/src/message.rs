@@ -210,3 +210,46 @@ mod tests {
         }
     }
 }
+
+pub fn extract_tool_calls_from_text(text: &str) -> Vec<ToolCall> {
+    let mut calls = Vec::new();
+    let mut remaining = text;
+
+    while let Some(start) = remaining.find("```json-tool") {
+        let inner_start = start + "```json-tool".len();
+        let inner = remaining[inner_start..].trim_start();
+        let end = inner.find("```").unwrap_or(inner.len());
+        let content = inner[..end].trim();
+
+        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content)
+            && let (Some(name), Some(args)) = (obj["name"].as_str(), Some(obj["args"].clone()))
+        {
+            calls.push(ToolCall {
+                id: format!("tc_{}", calls.len()),
+                name: name.to_string(),
+                input: args,
+            });
+        }
+
+        remaining = &inner[end..];
+        if end + 3 < remaining.len() {
+            remaining = &remaining[3..];
+        } else {
+            break;
+        }
+    }
+
+    calls
+}
+
+pub fn strip_tool_syntax(text: &str) -> String {
+    let mut result = text.to_string();
+    while let Some(start) = result.find("```json-tool") {
+        let end = result[start..]
+            .find("```")
+            .map(|e| start + "```json-tool".len() + e + 3)
+            .unwrap_or(result.len());
+        result.replace_range(start..end, "");
+    }
+    result.trim().to_string()
+}
