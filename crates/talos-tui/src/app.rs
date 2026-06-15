@@ -1183,6 +1183,8 @@ fn history_message_parts(message: &Message) -> Option<(MessageSource, &str)> {
             },
             result.content.as_str(),
         )),
+        Message::System { content } => Some((MessageSource::System, content.as_str())),
+        Message::Context { content } => Some((MessageSource::System, content.as_str())),
     }
 }
 

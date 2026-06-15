@@ -254,6 +254,18 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
     let openai_messages: Vec<OpenAIMessage> = messages
         .iter()
         .map(|msg| match msg {
+            Message::System { content } => OpenAIMessage {
+                role: "system".into(),
+                content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            Message::Context { content } => OpenAIMessage {
+                role: "user".into(),
+                content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                tool_calls: None,
+                tool_call_id: None,
+            },
             Message::User { content } => OpenAIMessage {
                 role: "user".into(),
                 content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),

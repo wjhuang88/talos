@@ -218,6 +218,8 @@ impl Session {
             Message::User { content } => ("user".to_string(), content.clone()),
             Message::Assistant { content, .. } => ("assistant".to_string(), content.clone()),
             Message::Tool { result } => ("system".to_string(), result.content.clone()),
+            Message::System { content } => ("system".to_string(), content.clone()),
+            Message::Context { content } => ("user".to_string(), content.clone()),
         };
 
         let entries = self.read_entries()?;
@@ -367,6 +369,8 @@ impl Session {
                         ("assistant".to_string(), content.clone())
                     }
                     Message::Tool { result } => ("system".to_string(), result.content.clone()),
+                    Message::System { content } => ("system".to_string(), content.clone()),
+                    Message::Context { content } => ("user".to_string(), content.clone()),
                 };
 
                 let id = format!("synthetic-{synthetic_counter}");
@@ -747,6 +751,8 @@ impl SessionManager {
                         Message::User { content } => content.clone(),
                         Message::Assistant { content, .. } => content.clone(),
                         Message::Tool { result } => result.content.clone(),
+                        Message::System { content } => content.clone(),
+                        Message::Context { content } => content.clone(),
                     };
                     last_preview = Self::preview_text(&content);
                 }

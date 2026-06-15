@@ -145,6 +145,14 @@ fn build_request_body(model: &str, messages: &[Message]) -> Value {
     let anthropic_messages: Vec<Value> = messages
         .iter()
         .map(|msg| match msg {
+            Message::System { content } => json!({
+                "role": "user",
+                "content": content,
+            }),
+            Message::Context { content } => json!({
+                "role": "user",
+                "content": content,
+            }),
             Message::User { content } => json!({
                 "role": "user",
                 "content": content,

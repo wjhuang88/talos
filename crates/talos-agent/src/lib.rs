@@ -143,6 +143,8 @@ pub struct Agent {
     prompt_builder: SystemPromptBuilder,
     /// Per-agent lifecycle hook registry.
     hook_registry: Arc<HookRegistry>,
+    /// Workspace context (AGENTS.md, history summary) for Context message.
+    workspace_context: Option<String>,
 }
 
 impl Agent {
@@ -172,6 +174,7 @@ impl Agent {
             workspace_root: PathBuf::from("."),
             prompt_builder: SystemPromptBuilder::new(),
             hook_registry: Arc::new(HookRegistry::new()),
+            workspace_context: None,
         }
     }
 
@@ -265,6 +268,7 @@ impl Agent {
             workspace_root,
             prompt_builder,
             hook_registry,
+            workspace_context: None,
         }
     }
 
@@ -397,15 +401,23 @@ impl Agent {
             }
         };
 
-        let full_message = if system_prompt.is_empty() {
-            user_message
-        } else {
-            format!("{system_prompt}\n\n{user_message}")
-        };
-
         let mut messages = history;
+
+        if !system_prompt.is_empty() {
+            messages.push(Message::System {
+                content: system_prompt,
+            });
+        }
+
+        if let Some(ref context) = self.workspace_context
+            && !context.is_empty() {
+                messages.push(Message::Context {
+                    content: context.clone(),
+                });
+            }
+
         messages.push(Message::User {
-            content: full_message,
+            content: user_message,
         });
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -2452,13 +2464,12 @@ mod tests {
 fn normalize_tool_input(name: &str, input: Value) -> Value {
     if let Value::Object(mut map) = input {
         if (name == "write" || name == "edit")
-            && let Some(Value::String(path)) = map.get("path") {
-                let cleaned = path
-                    .trim()
-                    .trim_start_matches(['.', '/', '\\']);
-                let safe = cleaned.replace("..", "").replace('\\', "_");
-                map.insert("path".into(), Value::String(safe));
-            }
+            && let Some(Value::String(path)) = map.get("path")
+        {
+            let cleaned = path.trim().trim_start_matches(['.', '/', '\\']);
+            let safe = cleaned.replace("..", "").replace('\\', "_");
+            map.insert("path".into(), Value::String(safe));
+        }
         if let Some(Value::String(content)) = map.get("content") {
             let cleaned = content.trim().to_string();
             map.insert("content".into(), Value::String(cleaned));

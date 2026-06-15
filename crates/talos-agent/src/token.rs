@@ -113,6 +113,8 @@ impl TokenEstimator {
             .iter()
             .map(|msg| match msg {
                 Message::User { content } => Self::estimate_text(content),
+                Message::System { content } => Self::estimate_text(content),
+                Message::Context { content } => Self::estimate_text(content),
                 Message::Assistant {
                     content,
                     tool_calls,

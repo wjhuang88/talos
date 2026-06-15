@@ -30,6 +30,16 @@ pub struct ToolResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "role", rename_all = "snake_case")]
 pub enum Message {
+    /// System-level instruction (identity, rules, tool guide).
+    System {
+        /// System prompt content.
+        content: String,
+    },
+    /// Workspace context (AGENTS.md, history summary, retrieved files).
+    Context {
+        /// Context content.
+        content: String,
+    },
     /// Message from the user.
     User {
         /// The user's message text.
