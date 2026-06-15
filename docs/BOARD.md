@@ -41,6 +41,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | CODE-002 Tree-sitter Symbol Tools | Planned | [CODE-002 Symbol Tools](backlog/active/CODE-002-symbol-tools.md) | Implement FindSymbol, FindReferences, ListFunctions, ListImports using arborium; ~200 LOC, P1 |
+| TOOL-002 Tool Calling Remediation | Planned | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Fix 10 issues: schema in prompt, permission bypass, dual parsing, streaming filter, dedup, validation |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
