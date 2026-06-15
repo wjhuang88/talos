@@ -1401,6 +1401,10 @@ fn build_print_tool_registry() -> ToolRegistry {
         approval,
         print_mode: true,
     }));
+    registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
     registry
 }
 
@@ -1480,6 +1484,10 @@ fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(WriteTool::new(PathBuf::from("."))));
     registry.register(Arc::new(EditTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatusTool));
+    registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
     registry
 }
 
