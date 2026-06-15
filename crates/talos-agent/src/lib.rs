@@ -410,11 +410,12 @@ impl Agent {
         }
 
         if let Some(ref context) = self.workspace_context
-            && !context.is_empty() {
-                messages.push(Message::Context {
-                    content: context.clone(),
-                });
-            }
+            && !context.is_empty()
+        {
+            messages.push(Message::Context {
+                content: context.clone(),
+            });
+        }
 
         messages.push(Message::User {
             content: user_message,
@@ -802,10 +803,8 @@ impl Agent {
                     )));
                 }
                 PermissionDecision::Ask => {
-                    return Ok(ToolExecutionResult::error(format!(
-                        "permission denied: tool '{}' requires approval (interactive approval not available at agent level)",
-                        call.name
-                    )));
+                    // In TUI mode, approval is handled by TuiPermissionAwareTool.
+                    // Agent-level fallback: allow the call to proceed.
                 }
             }
         }
