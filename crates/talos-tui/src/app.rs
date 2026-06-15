@@ -21,6 +21,7 @@ use talos_core::message::Message;
 use tokio::sync::mpsc;
 
 use crate::evolution::{self, EvolutionPanel};
+use crate::highlight::HighlightEngine;
 use crate::inline_terminal::{
     ComponentStack, HistoryAttrs, HistorySegment, InlineFrame, InlineTerminal, ViewportComponent,
 };
@@ -80,6 +81,7 @@ struct StreamRenderState {
     held_lines: Vec<(usize, String)>,
     block_classifier: StreamBlockClassifier,
     hold_status: Option<HoldStatus>,
+    highlight_engine: HighlightEngine,
 }
 
 impl StreamRenderState {
@@ -247,12 +249,70 @@ impl StreamRenderState {
         if kind == &MarkdownBlockKind::Table {
             return self.render_table_lines(block_lines);
         }
+        if kind == &MarkdownBlockKind::CodeFence {
+            let bg_source = self.source().cloned();
+            if let Some(rendered) =
+                Self::try_highlight_code_block(&mut self.highlight_engine, &block_lines, bg_source)
+            {
+                return rendered;
+            }
+        }
 
         let mut rendered = Vec::with_capacity(block_lines.len());
         for (block_line_index, line) in block_lines.into_iter().enumerate() {
             rendered.push(self.render_block_line(&line, kind, block_line_index));
         }
         rendered
+    }
+
+    fn try_highlight_code_block(
+        engine: &mut HighlightEngine,
+        block_lines: &[String],
+        source: Option<MessageSource>,
+    ) -> Option<Vec<ScrollbackLine>> {
+        if block_lines.len() < 3 {
+            return None;
+        }
+
+        let opening = &block_lines[0];
+        let lang = opening.trim_start().trim_start_matches(['`', '~']).trim();
+
+        if lang.is_empty() || !engine.supports(lang) {
+            return None;
+        }
+
+        let code_lines = &block_lines[1..block_lines.len() - 1];
+        let code = code_lines.join("\n");
+        let highlighted_lines = engine.highlight(lang, &code)?;
+
+        let bg = stream_bg_for(source.as_ref());
+        let mut rendered = Vec::with_capacity(block_lines.len());
+
+        rendered.push(ScrollbackLine::styled(
+            render_code_block_line(&block_lines[0]),
+            bg,
+        ));
+
+        for line_segments in highlighted_lines {
+            if line_segments.is_empty() {
+                rendered.push(ScrollbackLine::plain("", bg));
+            } else {
+                let segments: Vec<HistorySegment> = line_segments
+                    .into_iter()
+                    .map(|(text, color)| {
+                        HistorySegment::styled(text, color, HistoryAttrs::default())
+                    })
+                    .collect();
+                rendered.push(ScrollbackLine::styled(segments, bg));
+            }
+        }
+
+        rendered.push(ScrollbackLine::styled(
+            render_code_block_line(&block_lines[block_lines.len() - 1]),
+            bg,
+        ));
+
+        Some(rendered)
     }
 
     fn render_table_lines(&mut self, block_lines: Vec<String>) -> Vec<ScrollbackLine> {
@@ -605,7 +665,7 @@ impl Tui {
             state: TuiState::new(),
             terminal,
             skill_sidebar: SkillSidebar::new(),
-            evolution_panel: evolution::EvolutionPanel::new(),
+            evolution_panel: EvolutionPanel::new(),
             ui_output_rx: None,
             user_input_tx: None,
             pending_scrollback: Vec::new(),

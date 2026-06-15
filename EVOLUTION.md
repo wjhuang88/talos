@@ -33,6 +33,7 @@ repeating known mistakes.
 | 22 | Code Quality | 库 crate 必须用 thiserror 而非 anyhow；clippy -D warnings 必须通过 | I023 |
 | 23 | Code Style | Rust 2024 let-chains (`if let X && let Y`) 替代嵌套 if-let 金字塔 | I023 |
 | 24 | TUI | 流内容应按完整 block 渲染（积累 buffer → finalize 时一次性输出），不要逐行分割 | I023 |
+| 25 | Safety | 外部 C/Native 依赖的 panic 必须 `catch_unwind` 捕获 + 降级，不能静默崩溃 | TUI-006/CODE-001 |
 
 ## Lessons
 
@@ -369,5 +370,18 @@ repeating known mistakes.
 2. **Defense-in-depth 修复必须在文档里标注 "this is not the root cause"**。7470ac5 的 commit message 和 lesson #19 都没清楚区分 "防 storage 暴涨" 和 "治字段语义",导致这次 evidence-driven 复查才发现问题。规则:**defense layer 修复的 commit message 和对应 lesson 必须包含 "real fix is in <future iteration>" 的明确指向**。
 3. **数据结构的"实现 vs 设计"差距应该定期审查**。MenteDB reference 文档(`docs/reference/REFERENCE-PROJECTS.md` §17) 写了 `Signal.context: String` 是短窗口,但实现时把它当成 5MB 容器用 — 这种 reference-vs-impl drift 应该在每次 evolution-engine 相关 PR 时 check 一次。规则:**任何修改 `talos-evolution` 的 PR 必须在 PR 描述里对照 `docs/reference/REFERENCE-PROJECTS.md` §17 列出字段语义是否保持**。
 4. **`EVOLUTION.md` lesson 应该能被指向,而不是只被阅读**。Lesson #19 现在被 I021 README "Required Reads" 引用,以后任何相关 PR 都能找到 — 这条 lesson 之前的预防规则 1 已经被 #20 修正("byte-cap 不是治根"),不要盲信旧规则。
+
+---
+
+### 25. 2026-06-15 - 外部 C/Native 依赖的 panic 必须捕获 + 降级，不能静默崩溃
+
+- **Trigger**: `arborium::Highlighter::highlight_spans()` 调用时进程静默崩溃（无错误信息，直接退出），原因是内部 tree-sitter C 运行时 panic。
+- **Symptom**: TUI 在渲染 `receiving code block...` 预览时立刻退出，终端回退到 shell，无任何 panic 信息或错误输出。用户反馈"直接闪退了"。
+- **Root cause**: `highlight_spans()` 调用的是 C 运行时，`?`/`.ok()` 只能捕获 `Result::Err`，无法捕获 `panic!` 或 C 级别的 abort。Arborium 的 C 语法解析器在某类输入上直接终止了进程。
+- **Fix**: 在 `HighlightEngine::highlight()` 中对外部依赖调用包裹 `std::panic::catch_unwind(AssertUnwindSafe(|| { ... }))`，将 panic 转为 `None` 返回，让上层降级为纯文本渲染。
+- **Prevention**:
+  1. **任何调用外部 C/Native 依赖的边界必须包裹 `catch_unwind`**。包括但不限于：tree-sitter、SQLite、libc、子进程启动。
+  2. **降级路径必须是同功能的无依赖纯 Rust 实现**。语法高亮失败 → 纯色字符渲染；SQLite 崩溃 → JSONL 文件直接读取。
+  3. **此约束已写入 AGENTS.md Hard Constraint #9**。
 
 ---

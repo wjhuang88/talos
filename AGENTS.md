@@ -16,7 +16,7 @@ Starting as a pure CLI tool, evolving into a full agent runtime platform.
 
 These are immutable facts that every change must respect:
 
-1. **Rust first.** No arbitrary C/C++ bindings, Python FFI, or Node.js runtime. Approved exceptions are limited to ADR-recorded system/runtime dependencies: OS ABI access via `libc` (ADR-007) and bundled SQLite for local storage via `rusqlite/bundled` (ADR-008).
+1. **Rust first.** No arbitrary C/C++ bindings, Python FFI, or Node.js runtime. Approved exceptions are limited to ADR-recorded system/runtime dependencies: OS ABI access via `libc` (ADR-007), bundled SQLite for local storage via `rusqlite/bundled` (ADR-008), and tree-sitter for code analysis via `arborium` (ADR-020).
 2. **No `unsafe` without ADR.** Any use of `unsafe` requires a decision record in `docs/decisions/`.
 3. **No secrets in build, source, or distribution.** Hardcoded credentials must never be
    committed, baked into the binary, or shipped in default/sample config files. The user's
@@ -29,6 +29,7 @@ These are immutable facts that every change must respect:
 6. **Crate public APIs are semver-bound.** Breaking changes require a decision record and a migration plan.
 7. **No speculative features.** Only implement what the current iteration scope defines. Record ideas in `docs/proposals/`.
 8. **Tests must pass before merge.** `cargo test --workspace` must exit 0. No `#[ignore]` without a tracking issue.
+9. **External dependencies must not crash the process.** Any call into a dependency that involves native/C code (tree-sitter, SQLite, `libc`, process spawning) or that may panic must be wrapped so failures degrade gracefully to a safe fallback, never a silent process exit. `catch_unwind`, timeout guards, and error propagation are mandatory at the integration boundary.
 
 ## Coding Behavior
 
