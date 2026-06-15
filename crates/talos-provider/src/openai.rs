@@ -20,7 +20,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
+use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
+
+use crate::parse_text_tool_calls;
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1";
 const CHAT_COMPLETIONS_PATH: &str = "/chat/completions";
@@ -346,10 +349,10 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut input_tokens: u32 = 0;
     let mut output_tokens: u32 = 0;
 
-    // Accumulate tool call data across chunks (OpenAI streams tool calls incrementally)
     let mut tool_call_ids: Vec<String> = Vec::new();
     let mut tool_call_names: Vec<String> = Vec::new();
     let mut tool_call_args: Vec<String> = Vec::new();
+    let mut text_accumulator = String::new();
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
@@ -374,6 +377,15 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
 
             // OpenAI sends `data: [DONE]` at the end
             if data.as_str().map(|s| s.trim()) == Some("[DONE]") {
+                let text_calls = parse_text_tool_calls(&text_accumulator);
+                for call in text_calls {
+                    let _ = tx
+                        .send(AgentEvent::ToolCall {
+                            call,
+                            provenance: ToolProvenance::Native,
+                        })
+                        .await;
+                }
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
                         stop_reason: StopReason::EndTurn,
@@ -403,6 +415,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             if let Some(ref text) = choice.delta.content
                 && !text.is_empty()
             {
+                text_accumulator.push_str(text);
                 let _ = tx
                     .send(AgentEvent::TextDelta {
                         delta: text.clone(),

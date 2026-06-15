@@ -312,7 +312,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
         .await;
 }
 
-fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
+pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
     let mut calls = Vec::new();
     let mut remaining = text;
 
