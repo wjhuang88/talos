@@ -28,6 +28,7 @@ pub mod prompt;
 pub mod session;
 
 use futures_util::future::join_all;
+use serde_json::Value;
 use talos_core::message::{
     AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult,
 };
@@ -750,18 +751,6 @@ impl Agent {
             .collect())
     }
 
-    /// Executes a single tool call through the security pipeline.
-    ///
-    /// The pipeline is:
-    /// 1. **Permission check** — if a permission engine is configured, evaluate
-    ///    the call. `Allow` proceeds, `Deny` returns an error result, `Ask`
-    ///    defaults to `Deny`.
-    /// 2. **Sandbox execution** — for bash tools, if a sandbox is available,
-    ///    execute through the sandbox. Falls back to direct execution if the
-    ///    sandbox reports `NotAvailable`.
-    /// 3. **Direct execution** — invoke the tool directly.
-    ///
-    /// Returns an error result if the tool is not found in the registry.
     async fn execute_single_tool(
         &self,
         hook_ctx: &HookContext,
@@ -819,19 +808,21 @@ impl Agent {
             }
         };
 
+        let normalized_input = normalize_tool_input(&call.name, call.input.clone());
+
         let result = if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
-                    self.execute_bash_in_sandbox(hook_ctx, sb, &call.input)
+                    self.execute_bash_in_sandbox(hook_ctx, sb, &normalized_input)
                         .await
                 } else {
-                    tool.execute(call.input.clone()).await
+                    tool.execute(normalized_input).await
                 }
             } else {
-                tool.execute(call.input.clone()).await
+                tool.execute(normalized_input).await
             }
         } else {
-            tool.execute(call.input.clone()).await
+            tool.execute(normalized_input).await
         };
 
         let result = match self
@@ -2455,5 +2446,28 @@ mod tests {
             !prompt.contains("test"),
             "Append prompt should be cleared after set_append_prompt_opt(None)"
         );
+    }
+}
+
+fn normalize_tool_input(name: &str, input: Value) -> Value {
+    if let Value::Object(mut map) = input {
+        if (name == "write" || name == "edit")
+            && let Some(Value::String(path)) = map.get("path") {
+                let cleaned = path
+                    .trim()
+                    .trim_start_matches(['.', '/', '\\']);
+                let safe = cleaned.replace("..", "").replace('\\', "_");
+                map.insert("path".into(), Value::String(safe));
+            }
+        if let Some(Value::String(content)) = map.get("content") {
+            let cleaned = content.trim().to_string();
+            map.insert("content".into(), Value::String(cleaned));
+        }
+        if let Some(Value::String(cmd)) = map.get("command") {
+            map.insert("command".into(), Value::String(cmd.trim().to_string()));
+        }
+        Value::Object(map)
+    } else {
+        input
     }
 }

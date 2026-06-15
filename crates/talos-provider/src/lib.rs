@@ -8,9 +8,12 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
+use talos_core::message::ToolCall;
 use talos_core::message::{AgentEvent, Message, StopReason, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
+use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -216,6 +219,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut output_tokens: u32 = 0;
     let mut cache_read_tokens: u32 = 0;
     let mut cache_write_tokens: u32 = 0;
+    let mut text_accumulator = String::new();
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
@@ -249,6 +253,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 }
                 Some("content_block_delta") => {
                     if let Some(text) = extract_text_delta(&data) {
+                        text_accumulator.push_str(&text);
                         let _ = tx.send(AgentEvent::TextDelta { delta: text }).await;
                     }
                 }
@@ -257,6 +262,15 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         output_tokens = usage.output_tokens;
                     }
                     if let Some(stop_reason) = extract_stop_reason(&data) {
+                        let tool_calls = parse_text_tool_calls(&text_accumulator);
+                        for call in tool_calls {
+                            let _ = tx
+                                .send(AgentEvent::ToolCall {
+                                    call,
+                                    provenance: ToolProvenance::Native,
+                                })
+                                .await;
+                        }
                         let _ = tx
                             .send(AgentEvent::TurnEnd {
                                 stop_reason,
@@ -296,6 +310,141 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             },
         })
         .await;
+}
+
+fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
+    let mut calls = Vec::new();
+    let mut remaining = text;
+
+    while let Some(start) = remaining.find("<tool_call>") {
+        let inner_start = start + "<tool_call>".len();
+        let inner = &remaining[inner_start..];
+
+        let end = inner.find("</tool_call>").unwrap_or(inner.len());
+        let content = inner[..end].trim();
+
+        if let Some(call) = parse_single_tool_call(content) {
+            calls.push(call);
+        }
+
+        remaining = &inner[end..];
+        if end < inner.len() {
+            remaining = &remaining["</tool_call>".len()..];
+        } else {
+            break;
+        }
+    }
+
+    calls
+}
+
+fn parse_single_tool_call(content: &str) -> Option<ToolCall> {
+    let trimmed = content.trim();
+    let first_space = trimmed.find(|c: char| c.is_whitespace())?;
+
+    let name = trimmed[..first_space].trim().to_string();
+    let args_str = trimmed[first_space..].trim();
+
+    let args = parse_tool_args(args_str);
+
+    let mut input = serde_json::Map::new();
+    for (key, value) in args {
+        let normalized = normalize_tool_arg(&key, &value);
+        input.insert(key, serde_json::Value::String(normalized));
+    }
+
+    Some(ToolCall {
+        id: Uuid::new_v4().to_string(),
+        name,
+        input: serde_json::Value::Object(input),
+    })
+}
+
+fn parse_tool_args(args_str: &str) -> Vec<(String, String)> {
+    let mut args = Vec::new();
+    let mut pos = 0usize;
+    let chars: Vec<char> = args_str.chars().collect();
+
+    while pos < chars.len() {
+        while pos < chars.len() && chars[pos].is_whitespace() {
+            pos += 1;
+        }
+        if pos >= chars.len() {
+            break;
+        }
+
+        let eq_pos = chars[pos..].iter().position(|&c| c == '=');
+        let Some(eq_offset) = eq_pos else {
+            break;
+        };
+        let eq_idx = pos + eq_offset;
+
+        let key = chars[pos..eq_idx]
+            .iter()
+            .collect::<String>()
+            .trim()
+            .to_string();
+        pos = eq_idx + 1;
+
+        while pos < chars.len() && chars[pos].is_whitespace() {
+            pos += 1;
+        }
+
+        if pos >= chars.len() {
+            break;
+        }
+
+        let value = if chars[pos] == '"' {
+            pos += 1;
+            let start = pos;
+            while pos < chars.len() && chars[pos] != '"' {
+                if chars[pos] == '\\' && pos + 1 < chars.len() {
+                    pos += 1;
+                }
+                pos += 1;
+            }
+            let val = chars[start..pos].iter().collect::<String>();
+            if pos < chars.len() {
+                pos += 1;
+            }
+            val
+        } else {
+            let start = pos;
+            while pos < chars.len() && !chars[pos].is_whitespace() {
+                pos += 1;
+            }
+            chars[start..pos].iter().collect::<String>()
+        };
+
+        args.push((key, value));
+    }
+
+    args
+}
+
+fn normalize_tool_arg(key: &str, value: &str) -> String {
+    let trimmed = value.trim();
+
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let no_encoding = trimmed
+        .replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\\"", "\"")
+        .replace("\\\\", "\\");
+
+    if key == "path" || key == "file_path" || key == "file" {
+        let cleaned = no_encoding.trim_start_matches(['.', '/', '\\']);
+        if cleaned.contains("..") || cleaned.starts_with('/') {
+            let safe = cleaned.replace("..", "").replace(['/', '\\'], "_");
+            return safe.trim().to_string();
+        }
+        return cleaned.to_string();
+    }
+
+    no_encoding.to_string()
 }
 
 fn extract_event_type(event_text: &str) -> Option<String> {
