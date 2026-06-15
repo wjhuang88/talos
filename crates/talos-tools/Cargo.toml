@@ -15,6 +15,13 @@ serde_json = "1"
 schemars = "1.2.1"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "process", "time"] }
+arborium = { version = "2.16", default-features = false, features = [
+    "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
+    "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",
+    "lang-bash", "lang-sql", "lang-powershell", "lang-lua", "lang-dart",
+    "lang-html", "lang-css", "lang-json", "lang-toml", "lang-markdown",
+    "lang-ruby", "lang-php", "lang-kotlin", "lang-swift"
+] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "1.0.0-alpha.3"

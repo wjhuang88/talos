@@ -1,7 +1,10 @@
 //! Built-in agent tools for Talos.
 //!
 //! This crate provides implementations of the [`AgentTool`] trait for common
-//! agent operations such as shell command execution and file operations.
+//! agent operations such as shell command execution, file operations, and
+//! AST-aware symbol queries.
+
+pub mod symbol;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
