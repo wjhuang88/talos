@@ -54,16 +54,9 @@ use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
 use talos_skill::SkillIndex;
 
 /// Default identity text for the Talos agent.
-pub const DEFAULT_IDENTITY: &str = "You are Talos, an AI coding assistant. You help users with programming tasks \
-     by using tools to read, write, and execute code.";
+pub const DEFAULT_IDENTITY: &str = include_str!("../../../prompts/identity.txt");
 
-pub const TOOL_CALLING_FORMAT: &str = "# Tool Calling Format\n\
-When you need to use a tool, output:\n\n\
-<tool_call>\n\
-{\"name\": \"<tool_name>\", \"args\": {<parameters>}}\n\
-</tool_call>\n\n\
-The JSON object must contain exactly \"name\" and \"args\" fields.\n\
-Args must be a JSON object with parameter names and values.\n";
+pub const TOOL_CALLING_FORMAT: &str = include_str!("../../../prompts/tool_calling_format.txt");
 
 /// A description of a tool for inclusion in the system prompt.
 ///

@@ -1,0 +1,12 @@
+# Tool Calling Format
+To call a tool, output a fenced code block with the language tag `json-tool`:
+
+```json-tool
+{"name": "<tool_name>", "args": {<parameters>}}
+```
+
+Example — to run a command:
+
+```json-tool
+{"name": "bash", "args": {"command": "ls -la"}}
+```

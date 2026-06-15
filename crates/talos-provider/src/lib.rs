@@ -324,6 +324,25 @@ pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
     let mut calls = Vec::new();
     let mut remaining = text;
 
+    while let Some(start) = remaining.find("```json-tool") {
+        let inner_start = start + "```json-tool".len();
+        let inner = remaining[inner_start..].trim_start();
+        let end = inner.find("```").unwrap_or(inner.len());
+        let content = inner[..end].trim();
+
+        if let Some(call) = parse_json_tool_call(content) {
+            calls.push(call);
+        }
+
+        remaining = &inner[end..];
+        if end + 3 < remaining.len() {
+            remaining = &remaining[3..];
+        } else {
+            break;
+        }
+    }
+
+    // Fallback: also check for <tool_call> / <toolcall> XML tags
     while let Some(start) = remaining
         .find("<tool_call>")
         .or_else(|| remaining.find("<toolcall>"))
@@ -335,7 +354,6 @@ pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
         };
         let inner_start = start + tag_len;
         let inner = &remaining[inner_start..];
-
         let end = inner.find("</tool_call>").unwrap_or(inner.len());
         let content = inner[..end].trim();
 
