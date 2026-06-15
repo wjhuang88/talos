@@ -245,13 +245,24 @@ impl Agent {
         workspace_root: PathBuf,
         hook_registry: Arc<HookRegistry>,
     ) -> Self {
+        let descriptions: Vec<ToolDescription> = tools
+            .list()
+            .into_iter()
+            .map(|tool| ToolDescription {
+                name: tool.name().to_string(),
+                description: tool.description().to_string(),
+            })
+            .collect();
+
+        let prompt_builder = SystemPromptBuilder::new().with_tools(descriptions);
+
         Self {
             provider,
             tools,
             permission_engine,
             sandbox: sandbox.map(Arc::from),
             workspace_root,
-            prompt_builder: SystemPromptBuilder::new(),
+            prompt_builder,
             hook_registry,
         }
     }
