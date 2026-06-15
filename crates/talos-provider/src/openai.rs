@@ -488,6 +488,16 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         .unwrap_or(0) as u32;
                 }
 
+                let text_calls = parse_text_tool_calls(&text_accumulator);
+                for call in text_calls {
+                    let _ = tx
+                        .send(AgentEvent::ToolCall {
+                            call,
+                            provenance: ToolProvenance::Native,
+                        })
+                        .await;
+                }
+
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
                         stop_reason,
@@ -505,7 +515,17 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     }
 
     // Stream ended without explicit [DONE] or finish_reason
-    // Emit any accumulated tool calls
+    let text_calls = parse_text_tool_calls(&text_accumulator);
+    for call in text_calls {
+        let _ = tx
+            .send(AgentEvent::ToolCall {
+                call,
+                provenance: ToolProvenance::Native,
+            })
+            .await;
+    }
+
+    // Emit any accumulated native tool calls
     for i in 0..tool_call_ids.len() {
         if !tool_call_ids[i].is_empty() && !tool_call_names[i].is_empty() {
             let args: Value =
