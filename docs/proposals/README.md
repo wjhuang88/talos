@@ -56,3 +56,5 @@ docs/proposals/
 - [Tree-sitter Code Analysis](tree-sitter-code-analysis.md) — research proposal for adding
   parser-backed code analysis after dependency and ADR review.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.
+- [Remote Session Protocol](remote-session-protocol.md) — far-future research proposal for remote
+  session query and command protocol (mobile app, web dashboard, cross-device continuity).
