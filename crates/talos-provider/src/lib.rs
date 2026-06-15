@@ -316,8 +316,16 @@ pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
     let mut calls = Vec::new();
     let mut remaining = text;
 
-    while let Some(start) = remaining.find("<tool_call>") {
-        let inner_start = start + "<tool_call>".len();
+    while let Some(start) = remaining
+        .find("<tool_call>")
+        .or_else(|| remaining.find("<toolcall>"))
+    {
+        let tag_len = if remaining[start..].starts_with("<tool_call>") {
+            "<tool_call>".len()
+        } else {
+            "<toolcall>".len()
+        };
+        let inner_start = start + tag_len;
         let inner = &remaining[inner_start..];
 
         let end = inner.find("</tool_call>").unwrap_or(inner.len());
