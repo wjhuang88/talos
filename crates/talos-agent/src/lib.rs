@@ -2465,8 +2465,8 @@ fn normalize_tool_input(name: &str, input: Value) -> Value {
         if (name == "write" || name == "edit")
             && let Some(Value::String(path)) = map.get("path")
         {
-            let cleaned = path.trim().trim_start_matches(['.', '/', '\\']);
-            let safe = cleaned.replace("..", "").replace('\\', "_");
+            let cleaned = path.trim().to_string();
+            let safe = cleaned.replace("..", "");
             map.insert("path".into(), Value::String(safe));
         }
         if let Some(Value::String(content)) = map.get("content") {

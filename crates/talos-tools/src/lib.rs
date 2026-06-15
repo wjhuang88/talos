@@ -369,7 +369,12 @@ pub enum FileToolError {
 /// that the resulting path stays within the workspace.
 fn resolve_workspace_path(workspace_root: &Path, relative: &str) -> Result<PathBuf, FileToolError> {
     let canon_root = workspace_root.canonicalize()?;
-    let joined = workspace_root.join(relative);
+
+    let joined = if relative.starts_with('/') {
+        PathBuf::from(relative)
+    } else {
+        workspace_root.join(relative)
+    };
 
     let canonical = if joined.exists() {
         joined.canonicalize()?
