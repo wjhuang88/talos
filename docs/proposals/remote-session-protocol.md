@@ -26,14 +26,74 @@ the design space and research questions.
 
 ## Design Space
 
+## Architecture
+
+### Preferred Model: Relay + Peer-to-Peer (WireGuard-inspired)
+
+Talos is open-source and should not require a mandatory central server. A WireGuard-style
+architecture provides peer discovery and NAT traversal via a lightweight relay while session
+data flows directly between peers.
+
+```
+        ┌─────────────────────┐
+        │   Discovery Relay   │  (lightweight, optional)
+        │  - Peer registry    │
+        │  - NAT traversal    │
+        │  - Public key store │
+        └──┬──────────────┬───┘
+           │              │
+     "connect to      "here is
+      desktop"         peer info"
+           │              │
+    ┌──────▼──────┐  ┌───▼──────────┐
+    │ Mobile App  │  │ Desktop Talos │
+    │ (read-only  │◄─┤ (full agent)  │
+    │  client)    │  │               │
+    └─────────────┘  └───────────────┘
+          ▲                  ▲
+          └── P2P encrypted ─┘
+              (after relay handshake)
+```
+
+**How it works:**
+
+1. Both peers register with the relay using public keys
+2. Mobile client queries relay: "find peer with device ID `desktop-xyz`"
+3. Relay facilitates NAT traversal (STUN/TURN-style) and key exchange
+4. After handshake, peers communicate directly via encrypted P2P channel
+5. Relay is not in the data path — session content never passes through it
+
+**Relay is optional:**
+
+```
+Without relay:
+  - Direct IP:port connection (LAN, VPN, known endpoints)
+  - QR code pairing (exchange keys + endpoint out-of-band)
+
+With relay:
+  - Peer discovery across NATs
+  - Fallback relayed transport if direct P2P fails
+```
+
+**Why this fits Talos:**
+
+- Open-source product → no vendor lock-in to a central service
+- Privacy-first → session data never touches a third party
+- Works offline → LAN P2P without internet
+- Scales horizontally → each desktop is its own "server"
+
 ### Transport Options
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **JSON-RPC over WebSocket** | Bidirectional, already in `talos-rpc` patterns | Requires persistent connection, port management |
-| **HTTP REST + SSE** | Simple, firewall-friendly, stateless queries | SSE for push only, no bidirectional commands |
-| **gRPC** | Strong typing, streaming, good tooling | Heavier dependency, protobuf build step |
-| **Unix domain socket + JSON** | Local-first, no network exposure, simple | Remote requires tunneling |
+| Option | Role | Notes |
+|--------|------|-------|
+| **QUIC** | Peer-to-peer transport | Built-in encryption, NAT traversal friendly, multiplexed streams |
+| **Noise Protocol** | Key exchange + encryption | Same framework as WireGuard, well-audited |
+| **WebRTC** | NAT traversal | Mature STUN/TURN support, works in browsers |
+| **mDNS / LAN discovery** | Local peer discovery | Zero-config on same network |
+| **WebSocket** | Relay fallback | Simple, firewall-friendly, well-supported everywhere |
+
+QUIC + Noise handshake is the preferred combination — same cryptographic foundation
+as WireGuard, with QUIC providing the transport layer.
 
 ### Authentication & Security
 
@@ -63,20 +123,23 @@ RemoteCommand
 ### Integration Points
 
 - `talos-session`: query active session state
-- `talos-agent`: dispatch remote commands
-- `talos-rpc`: existing JSON-RPC infrastructure (potential reuse)
-- `talos-cli`: optional server mode (`talos serve`)
+- `talos-agent`: dispatch remote commands via P2P channel
+- `talos-remote` (new crate): peer discovery, NAT traversal, encrypted transport
+- `talos-cli`: `talos remote serve` to start peer listener, `talos remote connect <peer>` to link
 
 ## Open Questions
 
-1. Should Talos run a persistent daemon/server, or only expose sessions on-demand?
-2. Should remote access be a separate crate (`talos-remote`) or integrated into `talos-rpc`?
-3. How does this interact with the permission pipeline? Remote commands must go through
+1. Peer identity: public key fingerprint, device name, or human-readable alias?
+2. Relay: self-hosted reference implementation, optional community relay, or both?
+3. How does a mobile client authenticate to the desktop peer? QR code + key exchange?
+4. Should P2P connections be persistent or on-demand per query?
+5. How does this interact with the permission pipeline? Remote commands must go through
    the same approval flow as local commands.
-4. Should session history be push-synced (server → client) or pull-queried (client → server)?
-5. What is the minimum viable slice: read-only session query, or full bidirectional control?
-6. How does this interact with workspace-scoped session topology (MEM-004)?
-7. Mobile app: native (Swift/Kotlin) vs cross-platform (Flutter/React Native) vs PWA?
+6. QUIC vs WebRTC data channels for the P2P transport layer?
+7. Should session history be push-synced (server → client) or pull-queried (client → server)?
+8. What is the minimum viable slice: LAN-only P2P (mDNS + direct connect), relay-assisted, or full NAT traversal?
+9. Mobile app: native (Swift/Kotlin) vs cross-platform (Flutter/React Native) vs PWA?
+10. Can the same P2P protocol support multi-agent coordination (agent ↔ agent)?
 
 ## Constraints
 
@@ -88,11 +151,12 @@ RemoteCommand
 
 ## Recommended Research Path
 
-1. Prototype a minimal read-only HTTP endpoint (`GET /sessions/:id`) in `talos-rpc`
-2. Evaluate WebSocket vs SSE for push events
-3. Design the authentication model (session tokens)
-4. Decide mobile client technology
-5. Spike a two-way command flow
+1. Spike a local P2P connection between two Talos instances on the same network
+   (mDNS discovery + QUIC transport)
+2. Implement Noise protocol key exchange for peer authentication
+3. Design the session query/command protocol over the P2P channel
+4. Add optional relay support for NAT traversal (reference implementation)
+5. Build a minimal read-only mobile client (Flutter or React Native POC)
 
 ## Non-Goals (First Slice)
 
