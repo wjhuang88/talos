@@ -9,7 +9,7 @@ use ratatui::{
 use talos_core::ApprovalChoice;
 use talos_core::tool::ToolProvenance;
 
-use crate::nord;
+use crate::theme::semantic;
 
 /// Maximum length for tool call arguments before truncation.
 const MAX_ARGS_LENGTH: usize = 80;
@@ -74,13 +74,13 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
         let tool_name_style = Style::default()
-            .fg(nord::NORD8)
+            .fg(semantic::TEXT_ACCENT)
             .add_modifier(Modifier::BOLD);
         let marker = provenance_marker(&self.provenance);
         let marker_style = match &self.provenance {
-            ToolProvenance::Native => Style::default().fg(nord::NORD3),
+            ToolProvenance::Native => Style::default().fg(semantic::DIM_TEXT),
             ToolProvenance::McpRemote { .. } => Style::default()
-                .fg(nord::NORD15)
+                .fg(semantic::TEXT_SPECIAL)
                 .add_modifier(Modifier::BOLD),
         };
         lines.push(Line::from(vec![
@@ -89,7 +89,9 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
             Span::styled(format!("[{marker}]"), marker_style),
         ]));
 
-        let args_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
+        let args_style = Style::default()
+            .fg(semantic::DIM_TEXT)
+            .add_modifier(Modifier::DIM);
         let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
         lines.push(Line::from(Span::styled(
             format!("  {args_display}"),
@@ -98,9 +100,9 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
 
         if let Some(is_error) = self.result_status {
             let (icon, style) = if is_error {
-                ("✗ error", Style::default().fg(nord::NORD11))
+                ("✗ error", Style::default().fg(semantic::TEXT_ERROR))
             } else {
-                ("✓ success", Style::default().fg(nord::NORD14))
+                ("✓ success", Style::default().fg(semantic::TEXT_SUCCESS))
             };
             lines.push(Line::from(Span::styled(format!("  {icon}"), style)));
 
@@ -108,7 +110,7 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
                 if let Some(diff_lines) = render_diff(content) {
                     lines.extend(diff_lines);
                 } else {
-                    let content_style = Style::default().fg(nord::NORD4);
+                    let content_style = Style::default().fg(semantic::TEXT_PRIMARY);
                     let content_display = truncate(content, MAX_RESULT_LENGTH);
                     lines.push(Line::from(Span::styled(
                         format!("  {content_display}"),
@@ -122,7 +124,7 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(nord::NORD2)),
+                    .border_style(Style::default().fg(semantic::BORDER_DEFAULT)),
             )
             .wrap(Wrap { trim: false });
 
@@ -175,7 +177,7 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
         let title_style = Style::default()
-            .fg(nord::NORD9)
+            .fg(semantic::TEXT_SECONDARY_ACCENT)
             .add_modifier(Modifier::BOLD);
         lines.push(Line::from(Span::styled(
             "⚠ Permission Required",
@@ -184,14 +186,16 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         lines.push(Line::from(""));
 
         let tool_style = Style::default()
-            .fg(nord::NORD8)
+            .fg(semantic::TEXT_ACCENT)
             .add_modifier(Modifier::BOLD);
         lines.push(Line::from(Span::styled(
             format!("Tool: {}", self.tool_name),
             tool_style,
         )));
 
-        let args_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
+        let args_style = Style::default()
+            .fg(semantic::DIM_TEXT)
+            .add_modifier(Modifier::DIM);
         let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
         lines.push(Line::from(Span::styled(
             format!("Args: {args_display}"),
@@ -199,7 +203,7 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         )));
         lines.push(Line::from(""));
 
-        let risk_style = Style::default().fg(nord::NORD13);
+        let risk_style = Style::default().fg(semantic::TEXT_WARNING);
         lines.push(Line::from(Span::styled(
             "Risk: Requires user approval",
             risk_style,
@@ -215,10 +219,10 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         for (key, label, choice) in options {
             let style = if *self.selected == choice {
                 Style::default()
-                    .fg(nord::NORD8)
+                    .fg(semantic::TEXT_ACCENT)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(nord::NORD4)
+                Style::default().fg(semantic::TEXT_PRIMARY)
             };
             lines.push(Line::from(Span::styled(format!("[{key}] {label}"), style)));
         }
@@ -226,7 +230,7 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         let paragraph = Paragraph::new(Text::from(lines)).block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(nord::NORD9))
+                .border_style(Style::default().fg(semantic::BORDER_ACCENT))
                 .title(" Approval "),
         );
 
@@ -274,28 +278,30 @@ pub(crate) fn render_diff(content: &str) -> Option<Vec<Line<'static>>> {
             Line::from(Span::styled(
                 line.to_string(),
                 Style::default()
-                    .fg(nord::NORD9)
+                    .fg(semantic::TEXT_SECONDARY_ACCENT)
                     .add_modifier(Modifier::BOLD),
             ))
         } else if line.starts_with("@@") {
             Line::from(Span::styled(
                 line.to_string(),
-                Style::default().fg(nord::NORD8),
+                Style::default().fg(semantic::TEXT_ACCENT),
             ))
         } else if line.starts_with('+') && !line.starts_with("+++") {
             Line::from(Span::styled(
                 line.to_string(),
-                Style::default().fg(nord::NORD14),
+                Style::default().fg(semantic::TEXT_SUCCESS),
             ))
         } else if line.starts_with('-') && !line.starts_with("---") {
             Line::from(Span::styled(
                 line.to_string(),
-                Style::default().fg(nord::NORD11),
+                Style::default().fg(semantic::TEXT_ERROR),
             ))
         } else {
             Line::from(Span::styled(
                 line.to_string(),
-                Style::default().fg(nord::NORD4).add_modifier(Modifier::DIM),
+                Style::default()
+                    .fg(semantic::TEXT_PRIMARY)
+                    .add_modifier(Modifier::DIM),
             ))
         };
         lines.push(styled_line);

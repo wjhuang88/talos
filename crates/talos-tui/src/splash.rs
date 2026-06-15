@@ -14,7 +14,7 @@ use crossterm::{
 };
 use ratatui::style::Color;
 
-use crate::theme::{nord, to_crossterm_color};
+use crate::theme::{semantic, to_crossterm_color};
 
 /// Left margin applied to every splash row for a consistent left-aligned layout.
 const INDENT: &str = "  ";
@@ -63,21 +63,14 @@ fn talos_wordmark_compact() -> &'static [&'static str] {
 
 /// Vertical Frost gradient applied row-by-row to the wordmark.
 fn wordmark_gradient(rows: usize) -> Vec<Color> {
-    const RAMP: [Color; 6] = [
-        nord::NORD10,
-        nord::NORD9,
-        nord::NORD8,
-        nord::NORD7,
-        nord::NORD8,
-        nord::NORD7,
-    ];
+    let ramp = &semantic::LOGO_GRADIENT;
     (0..rows)
         .map(|i| {
             if rows <= 1 {
-                RAMP[1]
+                ramp[1]
             } else {
-                let idx = i * (RAMP.len() - 1) / (rows - 1);
-                RAMP[idx]
+                let idx = i * (ramp.len() - 1) / (rows - 1);
+                ramp[idx]
             }
         })
         .collect()
@@ -92,9 +85,9 @@ fn version_line() -> String {
 /// Badge labels with their accent colors and the separator glyph between them.
 fn badges() -> [(Color, &'static str); 3] {
     [
-        (nord::NORD7, "Precision"),
-        (nord::NORD8, "Safety"),
-        (nord::NORD9, "Reliability"),
+        (semantic::LOGO_BADGE_1, "Precision"),
+        (semantic::LOGO_BADGE_2, "Safety"),
+        (semantic::LOGO_BADGE_3, "Reliability"),
     ]
 }
 
@@ -117,8 +110,6 @@ fn write_splash_scrollback<W: Write>(writer: &mut W, width: u16) -> io::Result<(
         LogoRenderMode::UnicodeBlock => talos_wordmark_compact(),
     };
 
-    execute!(writer, Print("\r\n"))?;
-
     let gradient = wordmark_gradient(wordmark.len());
     for (line, color) in wordmark.iter().zip(gradient.iter()) {
         print_styled_line(writer, line, *color, &[Attribute::Bold])?;
@@ -127,11 +118,16 @@ fn write_splash_scrollback<W: Write>(writer: &mut W, width: u16) -> io::Result<(
     let wordmark_width = wordmark[0].chars().count();
     print_right_aligned_version(writer, wordmark_width)?;
 
-    print_styled_line(writer, SUBTITLE, nord::NORD4, &[Attribute::Italic])?;
+    print_styled_line(
+        writer,
+        SUBTITLE,
+        semantic::LOGO_SUBTITLE,
+        &[Attribute::Italic],
+    )?;
 
     print_badge_line(writer)?;
 
-    execute!(writer, Print("\r\n"))
+    execute!(writer, Print("\r\n\r\n"))
 }
 
 fn print_right_aligned_version<W: Write>(writer: &mut W, wordmark_width: usize) -> io::Result<()> {
@@ -143,7 +139,7 @@ fn print_right_aligned_version<W: Write>(writer: &mut W, wordmark_width: usize) 
         writer,
         Print("\r\n"),
         MoveToColumn(version_col),
-        SetForegroundColor(to_crossterm_color(nord::NORD9).unwrap_or(CColor::Reset)),
+        SetForegroundColor(to_crossterm_color(semantic::LOGO_VERSION).unwrap_or(CColor::Reset)),
         Print(version),
         SetForegroundColor(CColor::Reset)
     )
@@ -183,7 +179,9 @@ fn print_badge_line<W: Write>(writer: &mut W) -> io::Result<()> {
         if i > 0 {
             execute!(
                 writer,
-                SetForegroundColor(to_crossterm_color(nord::NORD3).unwrap_or(CColor::Reset))
+                SetForegroundColor(
+                    to_crossterm_color(semantic::LOGO_SEPARATOR).unwrap_or(CColor::Reset)
+                )
             )?;
             execute!(writer, Print("  ·  "))?;
         }

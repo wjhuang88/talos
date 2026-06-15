@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-use crate::nord;
+use crate::theme::semantic;
 
 /// A learned pattern for display.
 #[derive(Debug, Clone)]
@@ -54,7 +54,7 @@ impl EvolutionPanel {
         if self.patterns.is_empty() {
             lines.push(Line::from(Span::styled(
                 "No patterns learned yet",
-                Style::default().fg(nord::NORD3),
+                Style::default().fg(semantic::DIM_TEXT),
             )));
         } else {
             for (i, pattern) in self.patterns.iter().enumerate() {
@@ -70,7 +70,7 @@ impl EvolutionPanel {
                 lines.push(Line::from(Span::styled(
                     header,
                     Style::default()
-                        .fg(nord::NORD8)
+                        .fg(semantic::TEXT_ACCENT)
                         .add_modifier(Modifier::BOLD),
                 )));
 
@@ -87,7 +87,7 @@ impl EvolutionPanel {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(" Evolution Insights (Ctrl+E to toggle) ")
-                    .style(Style::default().fg(nord::NORD15)),
+                    .style(Style::default().fg(semantic::TEXT_SPECIAL)),
             )
             .wrap(Wrap { trim: false });
 

@@ -585,6 +585,8 @@ pub struct Tui {
 
 impl Tui {
     pub fn new() -> io::Result<Self> {
+        let _ = crossterm::terminal::disable_raw_mode();
+
         crate::splash::print_splash_scrollback();
 
         let (_, cursor_y) = crossterm::cursor::position()?;

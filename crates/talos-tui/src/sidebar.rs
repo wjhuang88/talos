@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-use crate::nord;
+use crate::theme::semantic;
 use crate::widgets::truncate;
 
 /// Information about a loaded skill.
@@ -90,21 +90,25 @@ impl SkillSidebar {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
         if self.skills.is_empty() {
-            let empty_style = Style::default().fg(nord::NORD3).add_modifier(Modifier::DIM);
+            let empty_style = Style::default()
+                .fg(semantic::DIM_TEXT)
+                .add_modifier(Modifier::DIM);
             lines.push(Line::from(Span::styled("No skills loaded", empty_style)));
         } else {
             for skill in &self.skills {
                 let status_icon = if skill.active { "◆" } else { "◇" };
                 let status_style = if skill.active {
-                    Style::default().fg(nord::NORD14)
+                    Style::default().fg(semantic::TEXT_SUCCESS)
                 } else {
-                    Style::default().fg(nord::NORD3)
+                    Style::default().fg(semantic::DIM_TEXT)
                 };
 
                 let name_style = Style::default()
-                    .fg(nord::NORD8)
+                    .fg(semantic::TEXT_ACCENT)
                     .add_modifier(Modifier::BOLD);
-                let desc_style = Style::default().fg(nord::NORD4).add_modifier(Modifier::DIM);
+                let desc_style = Style::default()
+                    .fg(semantic::TEXT_PRIMARY)
+                    .add_modifier(Modifier::DIM);
 
                 lines.push(Line::from(vec![
                     Span::styled(status_icon.to_string(), status_style),
@@ -127,7 +131,7 @@ impl SkillSidebar {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(nord::NORD2))
+                    .border_style(Style::default().fg(semantic::BORDER_DEFAULT))
                     .title(" Skills "),
             )
             .wrap(Wrap { trim: false });
@@ -146,15 +150,15 @@ impl SkillSidebar {
         };
 
         let style = if active_count > 0 {
-            Style::default().fg(nord::NORD14)
+            Style::default().fg(semantic::TEXT_SUCCESS)
         } else {
-            Style::default().fg(nord::NORD3)
+            Style::default().fg(semantic::DIM_TEXT)
         };
 
         let paragraph = Paragraph::new(Text::from(Span::styled(text, style))).block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(nord::NORD2)),
+                .border_style(Style::default().fg(semantic::BORDER_DEFAULT)),
         );
 
         frame.render_widget(paragraph, area);
