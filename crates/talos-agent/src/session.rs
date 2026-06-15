@@ -975,7 +975,7 @@ mod tests {
 
         let temp_dir = tempfile::tempdir().unwrap();
         let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-        let session = manager.create_session("resume-test").unwrap();
+        let session = manager.create_session("resume-test", "").unwrap();
         let session_id = session.id.to_string();
         session
             .append(&Message::User {

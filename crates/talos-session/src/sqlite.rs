@@ -43,6 +43,9 @@ pub struct SearchResult {
     /// The project name associated with the session.
     pub project: String,
 
+    /// The stable workspace identity (canonical absolute path).
+    pub workspace_root: String,
+
     /// A snippet of the matching content with highlighted matches.
     pub snippet: String,
 
@@ -121,6 +124,7 @@ impl SessionIndex {
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
                 project TEXT NOT NULL,
+                workspace_root TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 message_count INTEGER NOT NULL DEFAULT 0
@@ -141,6 +145,13 @@ impl SessionIndex {
             );
             "#,
         )?;
+
+        // Migration: add workspace_root column to existing databases.
+        self.conn
+            .execute_batch(
+                "ALTER TABLE sessions ADD COLUMN workspace_root TEXT NOT NULL DEFAULT '';",
+            )
+            .ok();
 
         Ok(())
     }
@@ -179,16 +190,18 @@ impl SessionIndex {
 
         tx.execute(
             r#"
-            INSERT INTO sessions (id, project, created_at, updated_at, message_count)
-            VALUES (?1, ?2, ?3, ?4, ?5)
+            INSERT INTO sessions (id, project, workspace_root, created_at, updated_at, message_count)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ON CONFLICT(id) DO UPDATE SET
                 project = excluded.project,
+                workspace_root = excluded.workspace_root,
                 updated_at = excluded.updated_at,
                 message_count = excluded.message_count
             "#,
             params![
                 session.id.to_string(),
                 session.project,
+                session.workspace_root,
                 created_at,
                 updated_at,
                 message_count,
@@ -234,6 +247,7 @@ impl SessionIndex {
             SELECT
                 f.session_id,
                 s.project,
+                s.workspace_root,
                 snippet(messages_fts, 2, '<b>', '</b>', '...', 32) AS snippet,
                 f.timestamp,
                 bm25(messages_fts) AS rank
@@ -249,9 +263,10 @@ impl SessionIndex {
             .query_map(params![query, limit as i64], |row| {
                 let session_id: String = row.get(0)?;
                 let project: String = row.get(1).unwrap_or_else(|_| "unknown".to_string());
-                let snippet: String = row.get(2)?;
-                let timestamp_str: String = row.get(3)?;
-                let rank: f64 = row.get(4)?;
+                let workspace_root: String = row.get(2).unwrap_or_else(|_| String::new());
+                let snippet: String = row.get(3)?;
+                let timestamp_str: String = row.get(4)?;
+                let rank: f64 = row.get(5)?;
 
                 let timestamp = DateTime::parse_from_rfc3339(&timestamp_str)
                     .map(|dt| dt.with_timezone(&Utc))
@@ -260,6 +275,7 @@ impl SessionIndex {
                 Ok(SearchResult {
                     session_id,
                     project,
+                    workspace_root,
                     snippet,
                     timestamp,
                     rank,
@@ -284,7 +300,7 @@ impl SessionIndex {
     pub fn list_recent(&self, limit: usize) -> Result<Vec<SessionInfo>, IndexError> {
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT id, project, message_count, updated_at
+            SELECT id, project, workspace_root, message_count, updated_at
             FROM sessions
             ORDER BY updated_at DESC
             LIMIT ?1
@@ -295,8 +311,9 @@ impl SessionIndex {
             .query_map(params![limit as i64], |row| {
                 let id_str: String = row.get(0)?;
                 let project: String = row.get(1)?;
-                let message_count: i64 = row.get(2)?;
-                let updated_at_str: String = row.get(3)?;
+                let workspace_root: String = row.get(2).unwrap_or_default();
+                let message_count: i64 = row.get(3)?;
+                let updated_at_str: String = row.get(4)?;
 
                 let id = Uuid::parse_str(&id_str).map_err(|_e| {
                     rusqlite::Error::InvalidColumnType(
@@ -313,6 +330,7 @@ impl SessionIndex {
                 Ok(SessionInfo {
                     id,
                     project,
+                    workspace_root,
                     last_message_preview: String::new(),
                     timestamp,
                     message_count: message_count as usize,
@@ -337,7 +355,7 @@ impl SessionIndex {
     pub fn get_session_info(&self, session_id: &str) -> Result<Option<SessionInfo>, IndexError> {
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT id, project, message_count, updated_at
+            SELECT id, project, workspace_root, message_count, updated_at
             FROM sessions
             WHERE id = ?1
             "#,
@@ -347,8 +365,9 @@ impl SessionIndex {
             .query_row(params![session_id], |row| {
                 let id_str: String = row.get(0)?;
                 let project: String = row.get(1)?;
-                let message_count: i64 = row.get(2)?;
-                let updated_at_str: String = row.get(3)?;
+                let workspace_root: String = row.get(2).unwrap_or_default();
+                let message_count: i64 = row.get(3)?;
+                let updated_at_str: String = row.get(4)?;
 
                 let id = Uuid::parse_str(&id_str).map_err(|_e| {
                     rusqlite::Error::InvalidColumnType(
@@ -365,6 +384,7 @@ impl SessionIndex {
                 Ok(SessionInfo {
                     id,
                     project,
+                    workspace_root,
                     last_message_preview: String::new(),
                     timestamp,
                     message_count: message_count as usize,
@@ -470,7 +490,7 @@ mod tests {
     }
 
     fn test_session(manager: &SessionManager) -> Session {
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
         session
             .append(&Message::User {
                 content: "Hello, how do I implement full-text search in Rust?".into(),
@@ -623,7 +643,7 @@ mod tests {
     fn test_list_recent_ordering() {
         let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
 
-        let session1 = manager.create_session("project-alpha").unwrap();
+        let session1 = manager.create_session("project-alpha", "").unwrap();
         session1
             .append(&Message::User {
                 content: "First session message".into(),
@@ -632,7 +652,7 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        let session2 = manager.create_session("project-beta").unwrap();
+        let session2 = manager.create_session("project-beta", "").unwrap();
         session2
             .append(&Message::User {
                 content: "Second session message".into(),
@@ -662,7 +682,7 @@ mod tests {
 
         for i in 0..5 {
             let session = manager
-                .create_session(&format!("project-limit-{i}"))
+                .create_session(&format!("project-limit-{i}"), "")
                 .unwrap();
             session
                 .append(&Message::User {
@@ -707,7 +727,7 @@ mod tests {
     #[test]
     fn test_index_session_upsert() {
         let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         session
             .append(&Message::User {

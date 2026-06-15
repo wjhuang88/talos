@@ -38,6 +38,7 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use uuid::Uuid;
 
+use sha2::{Digest, Sha256};
 use talos_core::message::{AgentEvent, Message};
 
 pub mod sqlite;
@@ -143,8 +144,11 @@ pub struct SessionInfo {
     /// Unique session identifier.
     pub id: Uuid,
 
-    /// Project name or working directory path.
+    /// Human-readable project display name (basename).
     pub project: String,
+
+    /// Stable workspace identity (canonical absolute path).
+    pub workspace_root: String,
 
     /// Preview of the last message in the session.
     pub last_message_preview: String,
@@ -165,8 +169,11 @@ pub struct Session {
     /// Unique session identifier.
     pub id: Uuid,
 
-    /// Project name or working directory path.
+    /// Human-readable project display name (basename).
     pub project: String,
+
+    /// Stable workspace identity (canonical absolute path).
+    pub workspace_root: String,
 
     /// When the session was created.
     pub created_at: DateTime<Utc>,
@@ -183,7 +190,7 @@ pub struct Session {
 
 impl Session {
     /// Create a new session with a single empty root branch.
-    pub fn new(id: Uuid, project: String, file_path: PathBuf) -> Self {
+    pub fn new(id: Uuid, project: String, workspace_root: String, file_path: PathBuf) -> Self {
         let root_id = Uuid::new_v4().to_string();
         let mut branches = HashMap::new();
         branches.insert(
@@ -197,6 +204,7 @@ impl Session {
         Self {
             id,
             project,
+            workspace_root,
             created_at: Utc::now(),
             file_path,
             current_branch: root_id,
@@ -458,6 +466,13 @@ impl Session {
     }
 }
 
+/// Compute a filesystem-safe directory name from a workspace root path using SHA-256.
+fn workspace_dir_name(workspace_root: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(workspace_root.as_bytes());
+    hex::encode(&hasher.finalize()[..8])
+}
+
 /// Manages sessions on disk.
 #[derive(Debug, Clone)]
 pub struct SessionManager {
@@ -491,24 +506,34 @@ impl SessionManager {
         &self.sessions_dir
     }
 
-    /// Create a new session for the given project.
+    /// Create a new session for the given project and workspace.
     ///
-    /// The session file is created at `~/.talos/sessions/<project>/<uuid>.jsonl`.
-    pub fn create_session(&self, project: &str) -> Result<Session, SessionError> {
+    /// The session file is created at `~/.talos/sessions/<workspace_dir>/<uuid>.jsonl`,
+    /// where `workspace_dir` is a hash of the workspace root path.
+    pub fn create_session(
+        &self,
+        project: &str,
+        workspace_root: &str,
+    ) -> Result<Session, SessionError> {
         let id = Uuid::new_v4();
-        let project_dir = self.sessions_dir.join(project);
+        let project_dir = self.sessions_dir.join(workspace_dir_name(workspace_root));
         fs::create_dir_all(&project_dir)?;
 
         let file_path = project_dir.join(format!("{id}.jsonl"));
-        // Create the file (empty)
         fs::File::create(&file_path)?;
 
-        Ok(Session::new(id, project.to_string(), file_path))
+        Ok(Session::new(
+            id,
+            project.to_string(),
+            workspace_root.to_string(),
+            file_path,
+        ))
     }
 
     /// Load an existing session by ID.
     ///
-    /// Scans all project directories for a file matching `<id>.jsonl`.
+    /// Scans all workspace directories (both old basename and new hashed layouts)
+    /// for a file matching `<id>.jsonl`.
     pub fn get_session(&self, id: &Uuid) -> Result<Session, SessionError> {
         if !self.sessions_dir.exists() {
             return Err(SessionError::SessionNotFound(*id));
@@ -520,7 +545,7 @@ impl SessionManager {
                 continue;
             }
             let project_dir = entry.path();
-            let project_name = project_dir
+            let dir_name = project_dir
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown")
@@ -535,16 +560,22 @@ impl SessionManager {
                     .map(DateTime::<Utc>::from)
                     .unwrap_or_else(Utc::now);
 
-                let mut session = Session::new(*id, project_name, file_path);
+                let workspace_root =
+                    if dir_name.len() == 16 && dir_name.chars().all(|c| c.is_ascii_hexdigit()) {
+                        dir_name.clone()
+                    } else {
+                        String::new()
+                    };
+
+                let mut session = Session::new(*id, dir_name.clone(), workspace_root, file_path);
                 session.created_at = created_at;
 
                 // Load entries from file
                 let entries = session.read_entries()?;
-                if !entries.is_empty() {
-                    // Populate the root branch with loaded entries
-                    if let Some(branch) = session.branches.get_mut(&session.current_branch) {
-                        branch.entries = entries;
-                    }
+                if !entries.is_empty()
+                    && let Some(branch) = session.branches.get_mut(&session.current_branch)
+                {
+                    branch.entries = entries;
                 }
 
                 return Ok(session);
@@ -554,7 +585,7 @@ impl SessionManager {
         Err(SessionError::SessionNotFound(*id))
     }
 
-    /// List all sessions across all project directories.
+    /// List all sessions across all workspace directories.
     pub fn list_sessions(&self) -> Result<Vec<SessionInfo>, SessionError> {
         let mut sessions = Vec::new();
 
@@ -568,7 +599,7 @@ impl SessionManager {
                 continue;
             }
             let project_dir = entry.path();
-            let project_name = project_dir
+            let dir_name = project_dir
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown")
@@ -598,7 +629,8 @@ impl SessionManager {
 
                     sessions.push(SessionInfo {
                         id,
-                        project: project_name.clone(),
+                        project: dir_name.clone(),
+                        workspace_root: String::new(),
                         last_message_preview: last_preview,
                         timestamp,
                         message_count,
@@ -613,27 +645,27 @@ impl SessionManager {
     /// List sessions for one workspace directory.
     pub fn list_workspace_sessions(
         &self,
-        workspace: &str,
+        workspace_root: &str,
     ) -> Result<Vec<SessionInfo>, SessionError> {
-        let workspace_dir = self.sessions_dir.join(workspace);
+        let workspace_dir = self.sessions_dir.join(workspace_dir_name(workspace_root));
         if !workspace_dir.exists() {
             return Ok(Vec::new());
         }
 
-        Self::scan_workspace_sessions(workspace, &workspace_dir)
+        Self::scan_workspace_sessions(workspace_root, &workspace_dir)
     }
 
     /// Return the most recently modified session for one workspace directory.
     pub fn latest_workspace_session(
         &self,
-        workspace: &str,
+        workspace_root: &str,
     ) -> Result<Option<SessionInfo>, SessionError> {
-        let sessions = self.list_workspace_sessions(workspace)?;
+        let sessions = self.list_workspace_sessions(workspace_root)?;
         Ok(sessions.into_iter().max_by_key(|s| s.timestamp))
     }
 
     fn scan_workspace_sessions(
-        workspace_name: &str,
+        workspace_root: &str,
         workspace_dir: &Path,
     ) -> Result<Vec<SessionInfo>, SessionError> {
         let mut sessions = Vec::new();
@@ -661,7 +693,8 @@ impl SessionManager {
 
                 sessions.push(SessionInfo {
                     id,
-                    project: workspace_name.to_string(),
+                    project: String::new(),
+                    workspace_root: workspace_root.to_string(),
                     last_message_preview: last_preview,
                     timestamp,
                     message_count,
@@ -800,7 +833,7 @@ mod tests {
     #[test]
     fn create_session_creates_file() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         assert!(session.file_path.exists());
         assert_eq!(session.project, "test-project");
@@ -810,7 +843,7 @@ mod tests {
     #[test]
     fn create_session_uses_correct_directory() {
         let manager = test_manager();
-        let session = manager.create_session("my-project").unwrap();
+        let session = manager.create_session("my-project", "").unwrap();
 
         let expected_dir = manager.sessions_dir.join("my-project");
         assert!(session.file_path.starts_with(expected_dir));
@@ -819,7 +852,7 @@ mod tests {
     #[test]
     fn append_and_read_messages() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         let msg1 = Message::User {
             content: "Hello!".into(),
@@ -847,7 +880,7 @@ mod tests {
     #[test]
     fn append_and_read_events() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         let event1 = AgentEvent::TurnStart;
         let event2 = AgentEvent::TextDelta {
@@ -872,7 +905,7 @@ mod tests {
     #[test]
     fn read_messages_skips_events() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         let msg = Message::User {
             content: "test".into(),
@@ -891,8 +924,8 @@ mod tests {
     fn list_sessions() {
         let manager = test_manager();
 
-        let s1 = manager.create_session("project-a").unwrap();
-        let s2 = manager.create_session("project-b").unwrap();
+        let s1 = manager.create_session("project-a", "").unwrap();
+        let s2 = manager.create_session("project-b", "").unwrap();
 
         // Append a message to s1 so it has a count
         s1.append(&Message::User {
@@ -918,8 +951,8 @@ mod tests {
     #[test]
     fn list_workspace_sessions_filters_by_workspace() {
         let manager = test_manager();
-        let playit = manager.create_session("playit").unwrap();
-        let talos = manager.create_session("talos").unwrap();
+        let playit = manager.create_session("playit", "").unwrap();
+        let talos = manager.create_session("talos", "").unwrap();
 
         playit
             .append(&Message::User {
@@ -943,8 +976,8 @@ mod tests {
     #[test]
     fn latest_workspace_session_returns_most_recent_session() {
         let manager = test_manager();
-        let older = manager.create_session("playit").unwrap();
-        let newer = manager.create_session("playit").unwrap();
+        let older = manager.create_session("playit", "").unwrap();
+        let newer = manager.create_session("playit", "").unwrap();
 
         older
             .append(&Message::User {
@@ -979,7 +1012,7 @@ mod tests {
     #[test]
     fn get_session_existing() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
         let id = session.id;
 
         let loaded = manager.get_session(&id).unwrap();
@@ -1003,7 +1036,7 @@ mod tests {
     #[test]
     fn invalid_json_lines_are_skipped() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         // Write a valid message
         session
@@ -1052,7 +1085,7 @@ mod tests {
     #[test]
     fn session_with_tool_calls() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         let msg = Message::Assistant {
             content: "Let me check that file.".into(),
@@ -1080,7 +1113,7 @@ mod tests {
     #[test]
     fn session_with_tool_result() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         let msg = Message::Tool {
             result: ToolResult {
@@ -1112,7 +1145,7 @@ mod tests {
     #[test]
     fn session_entry_with_parent_child_relationship() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         let msg1 = Message::User {
             content: "Hello".into(),
@@ -1137,7 +1170,7 @@ mod tests {
     #[test]
     fn fork_creates_new_branch_with_correct_parent_id() {
         let manager = test_manager();
-        let mut session = manager.create_session("test-project").unwrap();
+        let mut session = manager.create_session("test-project", "").unwrap();
 
         // Add some messages
         session
@@ -1179,7 +1212,7 @@ mod tests {
     #[test]
     fn list_branches_returns_all_branch_ids() {
         let manager = test_manager();
-        let mut session = manager.create_session("test-project").unwrap();
+        let mut session = manager.create_session("test-project", "").unwrap();
 
         // Add a message and fork
         session
@@ -1200,7 +1233,7 @@ mod tests {
         let manager = test_manager();
 
         // Create and populate a session
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
         let session_id = session.id.to_string();
 
         session
@@ -1230,7 +1263,7 @@ mod tests {
     #[test]
     fn list_sessions_preview_handles_utf8_char_boundary() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
         let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
 
         session.append(&Message::User { content }).unwrap();
@@ -1250,7 +1283,7 @@ mod tests {
     #[test]
     fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
         let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
 
         let mut file = OpenOptions::new()
@@ -1281,7 +1314,7 @@ mod tests {
     #[test]
     fn backward_compatibility_with_old_jsonl_format() {
         let manager = test_manager();
-        let session = manager.create_session("test-project").unwrap();
+        let session = manager.create_session("test-project", "").unwrap();
 
         // Manually write old-format JSONL lines
         let mut file = OpenOptions::new()
@@ -1370,7 +1403,12 @@ mod tests {
     #[test]
     fn session_new_has_single_empty_branch() {
         let id = Uuid::new_v4();
-        let session = Session::new(id, "test".into(), PathBuf::from("/tmp/test.jsonl"));
+        let session = Session::new(
+            id,
+            "test".into(),
+            String::new(),
+            PathBuf::from("/tmp/test.jsonl"),
+        );
 
         assert_eq!(session.branches.len(), 1);
         assert_eq!(session.list_branches().len(), 1);
@@ -1382,7 +1420,7 @@ mod tests {
     #[test]
     fn fork_from_nonexistent_entry_returns_error() {
         let manager = test_manager();
-        let mut session = manager.create_session("test-project").unwrap();
+        let mut session = manager.create_session("test-project", "").unwrap();
 
         let result = session.fork("nonexistent-id");
         assert!(result.is_err());
@@ -1397,8 +1435,8 @@ mod tests {
         let manager = test_manager();
 
         // Create sessions in different projects
-        let s1 = manager.create_session("project-alpha").unwrap();
-        let s2 = manager.create_session("project-beta").unwrap();
+        let s1 = manager.create_session("project-alpha", "").unwrap();
+        let s2 = manager.create_session("project-beta", "").unwrap();
 
         s1.append(&Message::User {
             content: "First message in alpha".into(),
@@ -1443,7 +1481,7 @@ mod tests {
     #[test]
     fn fork_from_specific_entry_includes_correct_history() {
         let manager = test_manager();
-        let mut session = manager.create_session("test-project").unwrap();
+        let mut session = manager.create_session("test-project", "").unwrap();
 
         session
             .append(&Message::User {
@@ -1483,7 +1521,7 @@ mod tests {
     #[test]
     fn fork_from_current_position_includes_all_entries() {
         let manager = test_manager();
-        let mut session = manager.create_session("test-project").unwrap();
+        let mut session = manager.create_session("test-project", "").unwrap();
 
         session
             .append(&Message::User {
@@ -1504,7 +1542,7 @@ mod tests {
     #[test]
     fn forked_session_branch_has_correct_root_id() {
         let manager = test_manager();
-        let mut session = manager.create_session("test-project").unwrap();
+        let mut session = manager.create_session("test-project", "").unwrap();
 
         session
             .append(&Message::User {
@@ -1531,7 +1569,7 @@ mod tests {
     fn arch_s5_update_index_reflects_new_session_in_list_recent() {
         let manager = test_manager();
         let session = manager
-            .create_session("arch-s5-list")
+            .create_session("arch-s5-list", "")
             .expect("create_session");
         session
             .append(&Message::User {
@@ -1556,7 +1594,7 @@ mod tests {
     fn arch_s5_update_index_reflects_new_session_in_search() {
         let manager = test_manager();
         let session = manager
-            .create_session("arch-s5-search")
+            .create_session("arch-s5-search", "")
             .expect("create_session");
         session
             .append(&Message::User {
@@ -1610,7 +1648,7 @@ mod tests {
     fn arch_s6_fork_index_uses_new_identity() {
         let dir = tempfile::tempdir().unwrap();
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
-        let mut source = manager.create_session("arch-s6-index").unwrap();
+        let mut source = manager.create_session("arch-s6-index", "").unwrap();
         source
             .append(&Message::User {
                 content: "source entry".into(),
@@ -1646,7 +1684,7 @@ mod tests {
     fn arch_s6_fork_file_receives_subsequent_appends() {
         let dir = tempfile::tempdir().unwrap();
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
-        let mut session = manager.create_session("arch-s6-append").unwrap();
+        let mut session = manager.create_session("arch-s6-append", "").unwrap();
         session
             .append(&Message::User {
                 content: "before fork".into(),
@@ -1682,7 +1720,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
         let session = manager
-            .create_session("arch-s6-identity")
+            .create_session("arch-s6-identity", "")
             .expect("create_session");
         session
             .append(&Message::User {

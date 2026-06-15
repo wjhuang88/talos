@@ -506,11 +506,19 @@ fn resolve_workspace_root(cli: &Cli) -> Result<PathBuf> {
     }
 }
 
-fn workspace_name_from_root(workspace_root: &Path) -> String {
+fn workspace_display_name(workspace_root: &Path) -> String {
     workspace_root
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("default")
+        .to_string()
+}
+
+fn canonical_workspace_root(workspace_root: &Path) -> String {
+    workspace_root
+        .canonicalize()
+        .unwrap_or_else(|_| workspace_root.to_path_buf())
+        .to_string_lossy()
         .to_string()
 }
 
@@ -523,7 +531,8 @@ enum ResumeSelection {
 
 fn resolve_session_for_workspace(
     manager: &SessionManager,
-    workspace_name: &str,
+    workspace_root: &str,
+    display_name: &str,
     cli: &Cli,
     resume_selection: ResumeSelection,
     allow_fork: bool,
@@ -539,35 +548,40 @@ fn resolve_session_for_workspace(
     }
 
     if cli.r#continue {
-        return resume_latest_workspace_session_or_create(manager, workspace_name);
+        return resume_latest_workspace_session_or_create(manager, workspace_root, display_name);
     }
 
     match resume_selection {
         ResumeSelection::Disabled => {}
         ResumeSelection::Latest if cli.resume => {
-            return resume_latest_workspace_session_or_create(manager, workspace_name);
+            return resume_latest_workspace_session_or_create(
+                manager,
+                workspace_root,
+                display_name,
+            );
         }
         ResumeSelection::Prompt if cli.resume => {
-            return prompt_for_workspace_session_or_create(manager, workspace_name);
+            return prompt_for_workspace_session_or_create(manager, workspace_root, display_name);
         }
         ResumeSelection::Latest | ResumeSelection::Prompt => {}
     }
 
     manager
-        .create_session(workspace_name)
+        .create_session(display_name, workspace_root)
         .context("failed to create session")
 }
 
 fn resume_latest_workspace_session_or_create(
     manager: &SessionManager,
-    workspace_name: &str,
+    workspace_root: &str,
+    display_name: &str,
 ) -> Result<Session> {
     let Some(most_recent) = manager
-        .latest_workspace_session(workspace_name)
+        .latest_workspace_session(workspace_root)
         .context("failed to list sessions")?
     else {
         return manager
-            .create_session(workspace_name)
+            .create_session(display_name, workspace_root)
             .context("failed to create session");
     };
 
@@ -578,15 +592,16 @@ fn resume_latest_workspace_session_or_create(
 
 fn prompt_for_workspace_session_or_create(
     manager: &SessionManager,
-    workspace_name: &str,
+    workspace_root: &str,
+    display_name: &str,
 ) -> Result<Session> {
     let sessions = manager
-        .list_workspace_sessions(workspace_name)
+        .list_workspace_sessions(workspace_root)
         .context("failed to list sessions")?;
     if sessions.is_empty() {
         println!("No existing sessions for this workspace. Creating a new one.");
         return manager
-            .create_session(workspace_name)
+            .create_session(display_name, workspace_root)
             .context("failed to create session");
     }
 
@@ -923,10 +938,12 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     // Session management: create or resume session for history persistence.
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let workspace_name = workspace_name_from_root(&workspace_root);
+    let display_name = workspace_display_name(&workspace_root);
+    let workspace_root_str = canonical_workspace_root(&workspace_root);
     let session = resolve_session_for_workspace(
         &session_manager,
-        &workspace_name,
+        &workspace_root_str,
+        &display_name,
         &cli,
         ResumeSelection::Latest,
         false,
@@ -1103,10 +1120,12 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
     }
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let workspace_name = workspace_name_from_root(&workspace_root);
+    let display_name = workspace_display_name(&workspace_root);
+    let workspace_root_str = canonical_workspace_root(&workspace_root);
     let session = resolve_session_for_workspace(
         &session_manager,
-        &workspace_name,
+        &workspace_root_str,
+        &display_name,
         &cli,
         ResumeSelection::Disabled,
         false,
@@ -1240,10 +1259,12 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let workspace_root = resolve_workspace_root(&cli)?;
 
     let session_manager = SessionManager::new().context("failed to initialize session manager")?;
-    let workspace_name = workspace_name_from_root(&workspace_root);
+    let display_name = workspace_display_name(&workspace_root);
+    let workspace_root_str = canonical_workspace_root(&workspace_root);
     let session = resolve_session_for_workspace(
         &session_manager,
-        &workspace_name,
+        &workspace_root_str,
+        &display_name,
         &cli,
         ResumeSelection::Prompt,
         true,
@@ -1691,7 +1712,12 @@ fn fork_session(
 
     let new_file_path = project_path.join(format!("{new_id}.jsonl"));
 
-    let mut new_session = Session::new(new_id, project_dir.clone(), new_file_path.clone());
+    let mut new_session = Session::new(
+        new_id,
+        project_dir.clone(),
+        source.workspace_root.clone(),
+        new_file_path.clone(),
+    );
 
     for entry in &entries {
         let line = serde_json::to_string(entry).map_err(|e| anyhow!("serialize error: {e}"))?;
