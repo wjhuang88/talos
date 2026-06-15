@@ -1531,7 +1531,11 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
 
 fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
     if is_horizontal_rule(line) {
-        return vec![HistorySegment::raw("────────")];
+        return vec![HistorySegment::styled(
+            "────────",
+            to_crossterm_color(semantic::STATUS_VALUE),
+            HistoryAttrs::default(),
+        )];
     }
 
     if let Some((indent, marker, heading)) = split_heading(line) {
@@ -2032,7 +2036,7 @@ mod tests {
                 .segments
                 .iter()
                 .any(|segment| segment.text == "────────"
-                    && segment.fg.is_none()
+                    && segment.fg == to_crossterm_color(semantic::STATUS_VALUE)
                     && !segment.attrs.dim)
         );
     }
