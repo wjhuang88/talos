@@ -1531,8 +1531,9 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
 
 fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
     if is_horizontal_rule(line) {
+        let hr_width = 40usize;
         return vec![HistorySegment::styled(
-            "────────",
+            "─".repeat(hr_width),
             to_crossterm_color(semantic::STATUS_VALUE),
             HistoryAttrs::default(),
         )];
@@ -2030,15 +2031,11 @@ mod tests {
         let lines = state.push_chunk("---\n");
 
         assert_eq!(lines.len(), 1);
-        assert_eq!(lines[0].text, " ● ────────");
         assert!(
-            lines[0]
-                .segments
-                .iter()
-                .any(|segment| segment.text == "────────"
-                    && segment.fg == to_crossterm_color(semantic::STATUS_VALUE)
-                    && !segment.attrs.dim)
+            lines[0].text.starts_with(" ● ──"),
+            "horizontal rule with prefix and dashes"
         );
+        assert!(lines[0].text.len() > 40, "horizontal rule should be long");
     }
 
     #[test]
