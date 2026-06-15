@@ -3,13 +3,13 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-12"
-status_note: "Governance refresh (2026-06-12): local manifest now records the governing skill version; project-local governance validator and scale harness scripts are available under scripts/. Scale evidence recommends high-risk profile, simple branch mode, and on-demand worktree mode. Prior I023 audit notes remain valid: README/iteration status synchronized with I023 Review; library crates no longer use anyhow; cargo check --workspace and cargo clippy --workspace -- -D warnings pass; CI workflow added for check, test, and strict clippy. Future TUI /copy and /export helpers are intentionally retained with local dead_code allows until slash-command rewire."
+last_audited_at: "2026-06-15"
+status_note: "Governance refresh (2026-06-15): major session work — TUI-005 splash fix, TUI-007 theme system (Nord + Solarized Dark), MEM-004 workspace session topology (SHA256 hash dirs), CODE-001 tree-sitter research closed, TUI-006 code block rendering + syntax highlighting (arborium 23 langs), CODE-002 symbol tools, TOOL-002 tool calling remediation tracked (10 issues), ADR-020 (tree-sitter), ADR-021 (tool protocol architecture), AGENTS.md HC #9 (catch_unwind for native deps), EVOLUTION.md lesson #25. All workspace tests pass (47 suites), clippy clean, governance validator 0 warnings."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-06-12"
+  last_refresh: "2026-06-15"
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -61,6 +61,9 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "Complete I023 runtime verification before marking the iteration Complete"
+    - "TOOL-002 P0: add tool parameter schema to system prompt (models currently guessing args)"
+    - "TOOL-002 P0: fix permission bypass for text-parsed tool calls"
+    - "TOOL-002 P1: unify dual parsing paths (provider vs session)"
+    - "TUI-008: approval dialog UX — move from bottom-right to prominent position"
+    - "CODE-002: verify symbol tools work end-to-end with real LLM"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
-    - "Select EVOL-001 sub-stories (MenteDB cognitive rigor Phase 2) into I022 or successor iteration when I021 is stable in production"
