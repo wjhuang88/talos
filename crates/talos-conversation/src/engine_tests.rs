@@ -4,7 +4,8 @@ use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
 use crate::types::{
-    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, TipKind, UiOutput,
+    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, TipKind,
+    ToolCallDisplay, ToolResultDisplay, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -37,6 +38,20 @@ async fn collect_stream(outputs: Vec<UiOutput>) -> Option<(MessageSource, String
         }
     }
     None
+}
+
+fn find_tool_call(outputs: &[UiOutput]) -> Option<&ToolCallDisplay> {
+    outputs.iter().find_map(|o| match o {
+        UiOutput::ToolCall(d) => Some(d),
+        _ => None,
+    })
+}
+
+fn find_tool_result(outputs: &[UiOutput]) -> Option<&ToolResultDisplay> {
+    outputs.iter().find_map(|o| match o {
+        UiOutput::ToolResult(d) => Some(d),
+        _ => None,
+    })
 }
 
 /// Extract the first `UiOutput::Status` from outputs.
@@ -165,10 +180,9 @@ async fn tool_call_produces_stream_and_message() {
     });
 
     assert_eq!(outputs.len(), 1);
-    let (source, text) = collect_stream(outputs).await.unwrap();
-    assert!(matches!(source, MessageSource::Tool { name } if name == "bash"));
-    assert!(text.contains("bash"));
-    assert!(text.contains("[native]"));
+    let display = find_tool_call(&outputs).unwrap();
+    assert_eq!(display.tool_name, "bash");
+    assert_eq!(display.provenance, ToolProvenance::Native);
 
     assert_eq!(engine.messages.len(), 1);
     let msg = &engine.messages[0];
@@ -208,8 +222,8 @@ async fn tool_call_closes_previous_stream() {
     assert_eq!(text, "partial");
 
     assert_eq!(outputs.len(), 1);
-    let (source, _) = collect_stream(outputs).await.unwrap();
-    assert!(matches!(source, MessageSource::Tool { .. }));
+    let display = find_tool_call(&outputs).unwrap();
+    assert!(matches!(display.provenance, ToolProvenance::Native));
 }
 
 // ---------------------------------------------------------------------------
@@ -230,10 +244,9 @@ async fn tool_result_produces_stream_and_updates_message() {
     });
 
     assert_eq!(outputs.len(), 1);
-    let (source, text) = collect_stream(outputs).await.unwrap();
-    assert!(matches!(source, MessageSource::Tool { name } if name.is_empty()));
-    assert!(text.contains("✓"));
-    assert!(text.contains("file contents"));
+    let display = find_tool_result(&outputs).unwrap();
+    assert!(!display.is_error);
+    assert_eq!(display.content, "file contents");
 
     let msg = &engine.messages[0];
     let tc = msg.tool_call.as_ref().unwrap();
@@ -259,9 +272,9 @@ async fn tool_result_error_flag_propagates() {
     let result = tc.result.as_ref().unwrap();
     assert!(result.is_error);
 
-    let (_, text) = collect_stream(outputs).await.unwrap();
-    assert!(text.contains("✗"));
-    assert!(text.contains("command not found"));
+    let display = find_tool_result(&outputs).unwrap();
+    assert!(display.is_error);
+    assert!(display.content.contains("command not found"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1035,14 +1048,14 @@ async fn full_turn_lifecycle() {
         call: make_tool_call("calculator", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
     });
-    let (_, tool_text) = collect_stream(outputs).await.unwrap();
-    assert!(tool_text.contains("calculator"));
+    let display = find_tool_call(&outputs).unwrap();
+    assert_eq!(display.tool_name, "calculator");
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
         result: make_tool_result("4", false),
     });
-    let (_, result_text) = collect_stream(outputs).await.unwrap();
-    assert!(result_text.contains("4"));
+    let result_display = find_tool_result(&outputs).unwrap();
+    assert!(result_display.content.contains("4"));
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnEnd {
         stop_reason: StopReason::EndTurn,

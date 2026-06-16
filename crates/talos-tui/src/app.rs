@@ -839,17 +839,27 @@ impl Tui {
                     ToolProvenance::Native => "native".to_string(),
                     ToolProvenance::McpRemote { server } => format!("mcp:{}", server),
                 };
-                let line_text = format!("▸ {} [{}]\n  {}", display.tool_name, marker, args_summary);
-                let segments = vec![HistorySegment::styled(
-                    line_text,
-                    to_crossterm_color(semantic::TEXT_ACCENT),
-                    HistoryAttrs {
-                        bold: true,
-                        ..HistoryAttrs::default()
-                    },
-                )];
-                self.pending_scrollback
-                    .push(ScrollbackLine::styled(segments, None));
+                let accent = to_crossterm_color(semantic::TEXT_ACCENT);
+                let header = format!("▸ {} [{}]", display.tool_name, marker);
+                self.pending_scrollback.push(ScrollbackLine::styled(
+                    vec![HistorySegment::styled(
+                        header,
+                        accent,
+                        HistoryAttrs {
+                            bold: true,
+                            ..HistoryAttrs::default()
+                        },
+                    )],
+                    None,
+                ));
+                self.pending_scrollback.push(ScrollbackLine::styled(
+                    vec![HistorySegment::styled(
+                        format!("  {}", args_summary),
+                        accent,
+                        HistoryAttrs::default(),
+                    )],
+                    None,
+                ));
             }
             UiOutput::ToolResult(display) => {
                 let icon = if display.is_error { "✗" } else { "✓" };
@@ -858,10 +868,17 @@ impl Tui {
                 } else {
                     to_crossterm_color(semantic::TEXT_SUCCESS)
                 };
-                let content_trunc = if display.content.len() > 200 {
-                    format!("{}...", &display.content[..200])
-                } else {
-                    display.content.clone()
+                let content_trunc = {
+                    let first = display
+                        .content
+                        .lines()
+                        .find(|l| !l.trim().is_empty())
+                        .unwrap_or(&display.content);
+                    if first.len() > 120 {
+                        format!("{}…", &first[..120])
+                    } else {
+                        first.to_string()
+                    }
                 };
                 let line_text = format!("  {} {}", icon, content_trunc);
                 let segments = vec![HistorySegment::styled(
