@@ -1103,6 +1103,91 @@ fn format_entry(path: &Path, root: &Path) -> String {
     format!("{type_char} {size_str}  {display}")
 }
 
+/// Input parameters for the [`DeleteTool`].
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DeleteInput {
+    /// Path to the file or directory to delete.
+    pub path: String,
+}
+
+/// Errors specific to the delete tool.
+#[derive(Debug, Error)]
+pub enum DeleteError {
+    #[error("refusing to delete workspace root")]
+    WorkspaceRoot,
+}
+
+/// A tool that deletes files or directories within the workspace.
+pub struct DeleteTool {
+    workspace_root: PathBuf,
+}
+
+impl DeleteTool {
+    pub fn new(workspace_root: PathBuf) -> Self {
+        Self { workspace_root }
+    }
+}
+
+#[async_trait]
+impl AgentTool for DeleteTool {
+    fn name(&self) -> &str {
+        "delete"
+    }
+
+    fn description(&self) -> &str {
+        "Delete a file or directory (cannot delete workspace root)"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(DeleteInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        match self.execute_inner(input).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+}
+
+impl DeleteTool {
+    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+        let delete_input: DeleteInput = serde_json::from_value(input)
+            .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+
+        let path = resolve_workspace_path(&self.workspace_root, &delete_input.path)?;
+
+        if !path.exists() {
+            return Err(FileToolError::FileNotFound(delete_input.path));
+        }
+
+        let canonical_root = self
+            .workspace_root
+            .canonicalize()
+            .map_err(FileToolError::Io)?;
+
+        if path == canonical_root {
+            return Err(FileToolError::InvalidInput(
+                DeleteError::WorkspaceRoot.to_string(),
+            ));
+        }
+
+        if path.is_dir() {
+            tokio::fs::remove_dir_all(&path).await?;
+        } else {
+            tokio::fs::remove_file(&path).await?;
+        }
+
+        let display = path
+            .strip_prefix(&canonical_root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .to_string();
+
+        Ok(format!("deleted {display}"))
+    }
+}
+
 #[cfg(test)]
 mod file_tool_tests {
     use super::*;
@@ -1814,5 +1899,93 @@ mod ls_tool_tests {
     fn test_ls_tool_is_read_only() {
         let tool = LsTool::new(PathBuf::from("."));
         assert!(tool.is_read_only());
+    }
+}
+
+#[cfg(test)]
+mod delete_tool_tests {
+    use super::*;
+    use serde_json::json;
+    use std::fs;
+
+    #[tokio::test]
+    async fn test_delete_file() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("temp.txt"), "content").unwrap();
+
+        let tool = DeleteTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "temp.txt" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("deleted"));
+        assert!(!dir.path().join("temp.txt").exists());
+    }
+
+    #[tokio::test]
+    async fn test_delete_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("subdir/nested")).unwrap();
+        fs::write(dir.path().join("subdir/nested/file.txt"), "data").unwrap();
+
+        let tool = DeleteTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "subdir" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("deleted"));
+        assert!(!dir.path().join("subdir").exists());
+    }
+
+    #[tokio::test]
+    async fn test_delete_empty_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("empty")).unwrap();
+
+        let tool = DeleteTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "empty" })).await;
+
+        assert!(!result.is_error);
+        assert!(!dir.path().join("empty").exists());
+    }
+
+    #[tokio::test]
+    async fn test_delete_not_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = DeleteTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "nonexistent.txt" })).await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("file not found"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_path_escape() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().parent().unwrap().join("outside_target.txt");
+        fs::write(&outside, "secret").unwrap();
+
+        let tool = DeleteTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "../outside_target.txt" })).await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("path escapes workspace root"));
+        assert!(outside.exists());
+        let _ = fs::remove_file(&outside);
+    }
+
+    #[tokio::test]
+    async fn test_delete_refuses_workspace_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = DeleteTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "." })).await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("workspace root"));
+        assert!(dir.path().exists());
+    }
+
+    #[tokio::test]
+    async fn test_delete_not_read_only() {
+        let tool = DeleteTool::new(PathBuf::from("."));
+        assert!(!tool.is_read_only());
     }
 }
