@@ -765,8 +765,13 @@ impl Tui {
                     }
                 }
                 Some(output) = ui_output_rx.recv() => {
+                    let is_tool = matches!(&output, UiOutput::ToolCall(_));
                     if self.handle_ui_output(output) {
                         break;
+                    }
+                    if is_tool {
+                        self.flush_pending_scrollback()?;
+                        self.draw_frame()?;
                     }
                 }
                 Some(request) = approval_rx.recv() => {

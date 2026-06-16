@@ -34,7 +34,6 @@ use talos_core::message::{
 };
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolProtocol, ToolRegistry, ToolResult as ToolExecutionResult};
-use talos_core::tool_filter::ToolSyntaxFilter;
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnEndReason,
@@ -148,7 +147,6 @@ pub struct Agent {
     workspace_context: Option<String>,
     /// Cached tool definitions for native API calls.
     tool_definitions: Vec<talos_core::provider::ToolDefinition>,
-    text_filter: std::sync::Mutex<ToolSyntaxFilter>,
 }
 
 impl Agent {
@@ -180,7 +178,6 @@ impl Agent {
             hook_registry: Arc::new(HookRegistry::new()),
             workspace_context: None,
             tool_definitions: Vec::new(),
-            text_filter: std::sync::Mutex::new(ToolSyntaxFilter::new()),
         }
     }
 
@@ -286,7 +283,6 @@ impl Agent {
             hook_registry,
             workspace_context: None,
             tool_definitions,
-            text_filter: std::sync::Mutex::new(ToolSyntaxFilter::new()),
         }
     }
 
@@ -534,24 +530,6 @@ impl Agent {
 
                 match event {
                     AgentEvent::TextDelta { delta } => {
-                        let filter_out = self
-                            .text_filter
-                            .lock()
-                            .expect("text_filter poisoned")
-                            .push_chunk(&delta);
-                        if let Some(call) = filter_out
-                            .tool_call_completed
-                            .as_deref()
-                            .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-                        {
-                            let name = call.get("name").and_then(|n| n.as_str()).unwrap_or("tool");
-                            let args = call.get("args").cloned().unwrap_or(serde_json::json!({}));
-                            turn_tool_calls.push(talos_core::message::ToolCall {
-                                id: format!("tc_{}", turn_tool_calls.len()),
-                                name: name.to_string(),
-                                input: args,
-                            });
-                        }
                         match self
                             .run_hook(&hook_ctx, HookEvent::OnTextDelta { text: &delta })
                             .await
