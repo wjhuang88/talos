@@ -78,7 +78,6 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
         ];
         if let ToolProvenance::McpRemote { server } = &self.provenance {
             let server_display = truncate(server, 24);
-            spans.push(Span::raw(" "));
             spans.push(Span::styled(format!("[mcp:{}]", server_display), dim_style));
         }
         spans.push(Span::raw(", "));

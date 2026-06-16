@@ -866,7 +866,6 @@ impl Tui {
                     ),
                 ];
                 if let Some(marker) = provenance_marker {
-                    segments.push(HistorySegment::raw(" "));
                     segments.push(HistorySegment::styled(marker, dim, HistoryAttrs::default()));
                 }
                 segments.push(HistorySegment::raw(", "));
