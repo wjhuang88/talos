@@ -14,7 +14,9 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Padding, Paragraph},
 };
-use talos_conversation::{MessageSource, StatusSnapshot, TipKind, UiOutput, UserInput};
+use talos_conversation::{
+    MessageSource, StatusSnapshot, TipKind, ToolCallDisplay, UiOutput, UserInput,
+};
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::Message;
@@ -618,6 +620,7 @@ pub struct Tui {
     stream_render: StreamRenderState,
     stream_opening_pending: bool,
     pending_stream_opening: Vec<ScrollbackLine>,
+    pending_tool_call: Option<ToolCallDisplay>,
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
@@ -653,6 +656,7 @@ impl Tui {
             stream_render: StreamRenderState::default(),
             stream_opening_pending: false,
             pending_stream_opening: Vec::new(),
+            pending_tool_call: None,
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
@@ -759,13 +763,8 @@ impl Tui {
                     }
                 }
                 Some(output) = ui_output_rx.recv() => {
-                    let is_tool_call = matches!(&output, UiOutput::ToolCall(_));
                     if self.handle_ui_output(output) {
                         break;
-                    }
-                    if is_tool_call {
-                        self.flush_pending_scrollback()?;
-                        self.draw_frame()?;
                     }
                 }
                 Some(request) = approval_rx.recv() => {
@@ -826,6 +825,7 @@ impl Tui {
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {
         match output {
             UiOutput::Stream(msg) => {
+                self.pending_tool_call = None;
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
@@ -837,50 +837,13 @@ impl Tui {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
-                let args_str = serde_json::to_string_pretty(&display.arguments)
-                    .unwrap_or_else(|_| display.arguments.to_string());
-                let args_summary = summarize_tool_args(&display.tool_name, &args_str);
-                let provenance_marker = match &display.provenance {
-                    ToolProvenance::Native => None,
-                    ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", server)),
-                };
-                let accent = to_crossterm_color(semantic::TEXT_ACCENT);
-                let prefix_color = to_crossterm_color(semantic::PREFIX_ASSISTANT);
-                let dim = to_crossterm_color(semantic::DIM_TEXT);
-                let mut segments = vec![
-                    HistorySegment::styled(
-                        " ▸ ",
-                        prefix_color,
-                        HistoryAttrs {
-                            bold: true,
-                            ..HistoryAttrs::default()
-                        },
-                    ),
-                    HistorySegment::styled(
-                        display.tool_name.to_string(),
-                        accent,
-                        HistoryAttrs {
-                            bold: true,
-                            ..HistoryAttrs::default()
-                        },
-                    ),
-                ];
-                if let Some(marker) = provenance_marker {
-                    segments.push(HistorySegment::styled(marker, dim, HistoryAttrs::default()));
-                }
-                segments.push(HistorySegment::raw(", "));
-                segments.push(HistorySegment::styled(
-                    args_summary,
-                    dim,
-                    HistoryAttrs {
-                        bold: false,
-                        ..HistoryAttrs::default()
-                    },
-                ));
-                self.pending_scrollback
-                    .push(ScrollbackLine::styled(segments, None));
+                self.pending_tool_call = Some(display);
             }
             UiOutput::ToolResult(display) => {
+                if let Some(tool_call) = self.pending_tool_call.take() {
+                    let tool_call_line = build_tool_call_scrollback_line(&tool_call);
+                    self.pending_scrollback.push(tool_call_line);
+                }
                 let icon = if display.is_error { "✗" } else { "✓" };
                 let color = if display.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
@@ -964,6 +927,7 @@ impl Tui {
         let preview_text = hold_status
             .as_ref()
             .map(|status| animated_hold_preview_text(status, self.processing_frame))
+            .or_else(|| self.pending_tool_call.as_ref().map(tool_call_preview_line))
             .unwrap_or_else(|| self.stream_render.preview().to_string());
         let preview_text_color = hold_status
             .as_ref()
@@ -1957,6 +1921,62 @@ fn summarize_tool_args(tool_name: &str, args_str: &str) -> String {
             }
         }
         _ => args_str.chars().take(80).collect(),
+    }
+}
+
+fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {
+    let args_str = serde_json::to_string_pretty(&tool_call.arguments)
+        .unwrap_or_else(|_| tool_call.arguments.to_string());
+    let args_summary = summarize_tool_args(&tool_call.tool_name, &args_str);
+    let provenance_marker = match &tool_call.provenance {
+        ToolProvenance::Native => None,
+        ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", server)),
+    };
+    let accent = to_crossterm_color(semantic::TEXT_ACCENT);
+    let prefix_color = to_crossterm_color(semantic::PREFIX_ASSISTANT);
+    let dim = to_crossterm_color(semantic::DIM_TEXT);
+    let mut segments = vec![
+        HistorySegment::styled(
+            " ▸ ",
+            prefix_color,
+            HistoryAttrs {
+                bold: true,
+                ..HistoryAttrs::default()
+            },
+        ),
+        HistorySegment::styled(
+            tool_call.tool_name.to_string(),
+            accent,
+            HistoryAttrs {
+                bold: true,
+                ..HistoryAttrs::default()
+            },
+        ),
+    ];
+    if let Some(marker) = provenance_marker {
+        segments.push(HistorySegment::styled(marker, dim, HistoryAttrs::default()));
+    }
+    segments.push(HistorySegment::raw(", "));
+    segments.push(HistorySegment::styled(
+        args_summary,
+        dim,
+        HistoryAttrs::default(),
+    ));
+    ScrollbackLine::styled(segments, None)
+}
+
+fn tool_call_preview_line(tool_call: &ToolCallDisplay) -> String {
+    let args_str = serde_json::to_string_pretty(&tool_call.arguments)
+        .unwrap_or_else(|_| tool_call.arguments.to_string());
+    let args_summary = summarize_tool_args(&tool_call.tool_name, &args_str);
+    let marker = match &tool_call.provenance {
+        ToolProvenance::Native => String::new(),
+        ToolProvenance::McpRemote { server } => format!("[mcp:{}]", server),
+    };
+    if marker.is_empty() {
+        format!(" ▸ {},   {}", tool_call.tool_name, args_summary)
+    } else {
+        format!(" ▸ {}{},   {}", tool_call.tool_name, marker, args_summary)
     }
 }
 
