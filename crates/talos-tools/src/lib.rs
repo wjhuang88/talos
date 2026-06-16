@@ -948,6 +948,161 @@ impl GlobTool {
     }
 }
 
+/// Input parameters for the [`LsTool`].
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct LsInput {
+    /// Directory to list. Defaults to workspace root.
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Show hidden files (starting with `.`).
+    #[serde(default)]
+    pub all: bool,
+    /// Recursively list subdirectories.
+    #[serde(default)]
+    pub recursive: bool,
+}
+
+/// A tool that lists directory contents with file metadata.
+pub struct LsTool {
+    workspace_root: PathBuf,
+}
+
+impl LsTool {
+    pub fn new(workspace_root: PathBuf) -> Self {
+        Self { workspace_root }
+    }
+}
+
+#[async_trait]
+impl AgentTool for LsTool {
+    fn name(&self) -> &str {
+        "ls"
+    }
+
+    fn description(&self) -> &str {
+        "List directory contents with file type and size"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(LsInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        match self.execute_inner(input).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+}
+
+impl LsTool {
+    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+        let ls_input: LsInput = serde_json::from_value(input)
+            .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+
+        let canonical_root = self
+            .workspace_root
+            .canonicalize()
+            .unwrap_or_else(|_| self.workspace_root.clone());
+
+        let target = match &ls_input.path {
+            Some(p) => resolve_workspace_path(&self.workspace_root, p)?,
+            None => canonical_root.clone(),
+        };
+
+        if !target.exists() {
+            return Err(FileToolError::FileNotFound(
+                ls_input.path.unwrap_or_default(),
+            ));
+        }
+
+        if target.is_file() {
+            return Ok(format_entry(&target, &canonical_root));
+        }
+
+        if ls_input.recursive {
+            let mut output = String::new();
+            for entry in walkdir::WalkDir::new(&target)
+                .into_iter()
+                .filter_entry(|e| {
+                    if e.depth() == 0 {
+                        return true;
+                    }
+                    if !ls_input.all && is_hidden_entry(e.file_name()) {
+                        return false;
+                    }
+                    !(e.file_type().is_dir() && is_skip_dir(&e.file_name().to_string_lossy()))
+                })
+                .filter_map(Result::ok)
+                .filter(|e| e.depth() > 0)
+            {
+                output.push_str(&format_entry(entry.path(), &canonical_root));
+                output.push('\n');
+            }
+            return Ok(output.trim_end().to_string());
+        }
+
+        let mut entries: Vec<_> = std::fs::read_dir(&target)?
+            .filter_map(Result::ok)
+            .filter(|e| ls_input.all || !is_hidden_entry(&e.file_name()))
+            .collect();
+
+        entries.sort_by_key(|e| {
+            let is_dir = e
+                .file_type()
+                .map(|ft| ft.is_dir())
+                .unwrap_or(false);
+            (!is_dir, e.file_name())
+        });
+
+        let mut output = String::new();
+        for entry in &entries {
+            output.push_str(&format_entry(&entry.path(), &canonical_root));
+            output.push('\n');
+        }
+
+        Ok(output.trim_end().to_string())
+    }
+}
+
+fn is_hidden_entry(name: &std::ffi::OsStr) -> bool {
+    name.to_string_lossy().starts_with('.')
+}
+
+fn format_entry(path: &Path, root: &Path) -> String {
+    let display = path
+        .strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .to_string();
+
+    let meta = std::fs::symlink_metadata(path).ok();
+    let (type_char, size) = match &meta {
+        Some(m) => {
+            let ft = m.file_type();
+            if ft.is_dir() {
+                ('d', None)
+            } else if ft.is_symlink() {
+                ('l', Some(m.len()))
+            } else {
+                ('-', Some(m.len()))
+            }
+        }
+        None => ('?', None),
+    };
+
+    let size_str = match size {
+        Some(s) => format!("{s:>8}"),
+        None => format!("{:>8}", "-"),
+    };
+
+    format!("{type_char} {size_str}  {display}")
+}
+
 #[cfg(test)]
 mod file_tool_tests {
     use super::*;
@@ -1529,6 +1684,135 @@ mod glob_tool_tests {
     #[test]
     fn test_glob_tool_is_read_only() {
         let tool = GlobTool::new(PathBuf::from("."));
+        assert!(tool.is_read_only());
+    }
+}
+
+#[cfg(test)]
+mod ls_tool_tests {
+    use super::*;
+    use serde_json::json;
+    use std::fs;
+
+    fn make_workspace() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("main.rs"), "fn main() {}\n").unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "[package]\n").unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n").unwrap();
+        fs::write(dir.path().join(".hidden"), "secret\n").unwrap();
+        dir
+    }
+
+    #[tokio::test]
+    async fn test_ls_flat() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({})).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("main.rs"));
+        assert!(result.content.contains("Cargo.toml"));
+        assert!(result.content.contains("src"));
+        assert!(!result.content.contains(".hidden"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_show_hidden() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "all": true })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains(".hidden"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_recursive() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "recursive": true })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("main.rs"));
+        assert!(result.content.contains("src/mod.rs"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_specific_dir() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "src" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("mod.rs"));
+        assert!(!result.content.contains("main.rs"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_dir_type_indicator() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({})).await;
+
+        assert!(!result.is_error);
+        let src_line = result
+            .content
+            .lines()
+            .find(|l| l.contains("src"))
+            .unwrap();
+        assert!(src_line.starts_with('d'));
+    }
+
+    #[tokio::test]
+    async fn test_ls_file_type_indicator() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({})).await;
+
+        assert!(!result.is_error);
+        let toml_line = result
+            .content
+            .lines()
+            .find(|l| l.contains("Cargo.toml"))
+            .unwrap();
+        assert!(toml_line.starts_with('-'));
+    }
+
+    #[tokio::test]
+    async fn test_ls_file_size() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("test.txt"), "hello world").unwrap();
+
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({})).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("11"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_not_found() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "nonexistent" })).await;
+
+        assert!(result.is_error);
+    }
+
+    #[tokio::test]
+    async fn test_ls_single_file() {
+        let dir = make_workspace();
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "main.rs" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("main.rs"));
+    }
+
+    #[test]
+    fn test_ls_tool_is_read_only() {
+        let tool = LsTool::new(PathBuf::from("."));
         assert!(tool.is_read_only());
     }
 }
