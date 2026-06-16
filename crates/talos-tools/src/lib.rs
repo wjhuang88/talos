@@ -846,6 +846,108 @@ impl GrepTool {
     }
 }
 
+/// Input parameters for the [`GlobTool`].
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct GlobInput {
+    /// Glob pattern (e.g. `**/*.rs`, `src/**/*.ts`, `*.toml`).
+    pub pattern: String,
+    /// Base directory for the search. Defaults to workspace root.
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
+/// A tool that finds files by name pattern using glob matching.
+pub struct GlobTool {
+    workspace_root: PathBuf,
+}
+
+impl GlobTool {
+    pub fn new(workspace_root: PathBuf) -> Self {
+        Self { workspace_root }
+    }
+}
+
+#[async_trait]
+impl AgentTool for GlobTool {
+    fn name(&self) -> &str {
+        "glob"
+    }
+
+    fn description(&self) -> &str {
+        "Find files by glob pattern (e.g. **/*.rs)"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(GlobInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        match self.execute_inner(input).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+}
+
+impl GlobTool {
+    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+        let glob_input: GlobInput = serde_json::from_value(input)
+            .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+
+        let canonical_root = self
+            .workspace_root
+            .canonicalize()
+            .unwrap_or_else(|_| self.workspace_root.clone());
+
+        let base_path = match &glob_input.path {
+            Some(p) => resolve_workspace_path(&self.workspace_root, p)?,
+            None => canonical_root.clone(),
+        };
+
+        let full_pattern = base_path.join(&glob_input.pattern);
+        let pattern_str = full_pattern.to_string_lossy().to_string();
+
+        let opts = glob::MatchOptions {
+            case_sensitive: true,
+            require_literal_separator: false,
+            require_literal_leading_dot: false,
+        };
+
+        let mut paths: Vec<String> = Vec::new();
+        for entry in glob::glob_with(&pattern_str, opts)
+            .map_err(|e| FileToolError::InvalidInput(format!("invalid glob pattern: {e}")))?
+        {
+            let path = entry
+                .map_err(|e| FileToolError::InvalidInput(format!("glob error: {e}")))?;
+            let display_path = path
+                .strip_prefix(&canonical_root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .to_string();
+            paths.push(display_path);
+        }
+
+        if paths.is_empty() {
+            return Ok(format!("no files matched pattern '{}'", glob_input.pattern));
+        }
+
+        paths.sort();
+
+        let mut output = String::new();
+        for p in &paths {
+            output.push_str(p);
+            output.push('\n');
+        }
+        output.push_str(&format!("\n{} file(s) matched", paths.len()));
+
+        Ok(output)
+    }
+}
+
 #[cfg(test)]
 mod file_tool_tests {
     use super::*;
@@ -1321,6 +1423,112 @@ mod grep_tool_tests {
     #[test]
     fn test_grep_tool_is_read_only() {
         let tool = GrepTool::new(PathBuf::from("."));
+        assert!(tool.is_read_only());
+    }
+}
+
+#[cfg(test)]
+mod glob_tool_tests {
+    use super::*;
+    use serde_json::json;
+    use std::fs;
+
+    fn make_workspace() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("main.rs"), "fn main() {}\n").unwrap();
+        fs::write(dir.path().join("lib.rs"), "pub fn lib() {}\n").unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "[package]\n").unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n").unwrap();
+        fs::create_dir_all(dir.path().join("tests")).unwrap();
+        fs::write(dir.path().join("tests/integration.rs"), "#[test]\nfn test() {}\n").unwrap();
+        dir
+    }
+
+    #[tokio::test]
+    async fn test_glob_recursive_rs() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "**/*.rs" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("main.rs"));
+        assert!(result.content.contains("lib.rs"));
+        assert!(result.content.contains("src/mod.rs"));
+        assert!(result.content.contains("tests/integration.rs"));
+        assert!(!result.content.contains("Cargo.toml"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_top_level_pattern() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "*.rs" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("main.rs"));
+        assert!(result.content.contains("lib.rs"));
+        assert!(!result.content.contains("src/mod.rs"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_toml_files() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "*.toml" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("Cargo.toml"));
+        assert!(!result.content.contains(".rs"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_specific_dir() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "src/**/*.rs" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("src/mod.rs"));
+        assert!(!result.content.contains("main.rs"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_no_match() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "**/*.py" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("no files matched"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_with_path_param() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "pattern": "*.rs", "path": "src" }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("mod.rs"));
+        assert!(!result.content.contains("main.rs"));
+    }
+
+    #[tokio::test]
+    async fn test_glob_file_count() {
+        let dir = make_workspace();
+        let tool = GlobTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "**/*.rs" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("4 file(s) matched"));
+    }
+
+    #[test]
+    fn test_glob_tool_is_read_only() {
+        let tool = GlobTool::new(PathBuf::from("."));
         assert!(tool.is_read_only());
     }
 }
