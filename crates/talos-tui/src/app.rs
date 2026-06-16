@@ -445,7 +445,7 @@ fn hold_preview_color(frame: usize) -> Color {
 
 fn preview_spinner_padding(processing_frame: usize, _processing_tick: usize) -> (String, usize) {
     let n = SPINNER_FRAMES.len();
-    let lead_idx = (processing_frame + n - n / 4) % n;
+    let lead_idx = (processing_frame + n / 2) % n;
     let chase_idx = processing_frame % n;
     (
         format!(" {}{}", SPINNER_FRAMES[lead_idx], SPINNER_FRAMES[chase_idx]),
@@ -2113,7 +2113,7 @@ mod tests {
     #[test]
     fn preview_spinner_uses_canon_rhythm() {
         let n = SPINNER_FRAMES.len();
-        let phase = n / 4;
+        let phase = n / 2;
 
         let (p0, _) = preview_spinner_padding(0, 0);
         let (p1, _) = preview_spinner_padding(1, 0);
