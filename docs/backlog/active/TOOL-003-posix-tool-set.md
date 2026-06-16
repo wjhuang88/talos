@@ -248,4 +248,67 @@ Workspace-root auto-approval (from TOOL-002 permission fix) applies to all read-
 3. **P2 slice**: read image enhancement (cross-layer change: tools → core → provider → agent → TUI)
 4. **P3 optional**: tree (nice to have)
 
+## Open Design Discussion: Write/Edit Content Display Block
+
+**Status**: Needs design decision before implementation  
+**Reference**: OpenCode's write/edit tool rendering
+
+### Problem
+
+When the agent uses `write` or `edit`, the current TUI only shows a one-line summary:
+
+```
+ → write, path: poem.txt (921 bytes)
+   ✓ wrote 921 bytes to poem.txt
+```
+
+The user cannot see WHAT was written or WHAT changed without reading the file separately. OpenCode shows a content preview/diff block inline in the conversation — similar to how code blocks are rendered, but specifically for file mutations.
+
+### Desired Behavior
+
+The `write` and `edit` tools should produce a **structured content display** that the TUI renders as a visual block (not just a one-liner). The format and rendering need discussion:
+
+#### Open Questions
+
+1. **Write tool**: Show full file content? Or just first N lines? Or a collapsed/expandable block?
+   - Full content could be very long (1000+ lines)
+   - Need to balance "transparency" with "noise"
+
+2. **Edit tool**: Show unified diff? Or just the changed region with context?
+   - Diff format (unified vs side-by-side) affects rendering complexity
+   - `similar` crate (already proposed for DiffTool) can produce unified diffs
+
+3. **Rendering format**:
+   - Option A: Markdown code block with syntax highlighting (reuse existing TUI-006 code block renderer)
+   - Option B: Custom "file diff" block with green/red coloring for added/removed lines
+   - Option C: Collapsed summary line with "expand" to see full content
+
+4. **Scrollback vs viewport**:
+   - Full content blocks in scrollback could be very tall
+   - Should large content be truncated with a "show more" indicator?
+
+5. **Event protocol**:
+   - Need a new `UiOutput` variant (e.g., `UiOutput::FileChange { tool, path, content/diff }`) or extend `ToolCallDisplay`?
+   - Or should the tool result content carry structured metadata that the TUI interprets?
+
+6. **Permission integration**:
+   - If the user can see the content before approval, they can make better decisions
+   - Should the content block appear in the approval prompt?
+
+### Reference: OpenCode Approach
+
+OpenCode renders write/edit operations as inline content blocks in the conversation:
+- `write`: Shows the full file content in a code block
+- `edit`: Shows a diff-style view with green/red highlighting
+- Both are rendered as first-class visual elements, not plain text
+
+### Proposed Direction (Subject to Discussion)
+
+- Extend `ToolCallDisplay` with optional `content_preview: Option<String>` for write and optional `diff: Option<String>` for edit
+- TUI renders these as styled blocks (code block for write, diff block for edit)
+- Truncate at N lines (configurable, default 50) with "..." indicator
+- Reuse TUI-006 syntax highlighting for content preview
+
+**Decision needed from user before implementation proceeds.**
+
 Each batch is independently shippable.
