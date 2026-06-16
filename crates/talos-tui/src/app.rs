@@ -774,6 +774,7 @@ impl Tui {
                     if needs_render {
                         self.flush_pending_scrollback()?;
                         self.draw_frame()?;
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     }
                 }
                 Some(request) = approval_rx.recv() => {
