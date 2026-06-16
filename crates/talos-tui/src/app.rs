@@ -33,7 +33,6 @@ use crate::sidebar::{SkillInfo, SkillSidebar};
 use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
 use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
 use crate::theme::{semantic, to_crossterm_color};
-use crate::widgets::ApprovalOverlay;
 
 const SPINNER_FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -568,7 +567,6 @@ impl ViewportComponent for InputPadComponent {
 
 struct InputComponent<'a> {
     state: &'a TuiState,
-    approval: &'a ApprovalState,
 }
 
 impl ViewportComponent for InputComponent<'_> {
@@ -582,16 +580,6 @@ impl ViewportComponent for InputComponent<'_> {
             .style(Style::default().bg(semantic::INPUT_BG))
             .padding(Padding::new(0, 1, 0, 0));
         frame.render_widget(Paragraph::new(input_text).block(input_block), area);
-
-        if let ApprovalState::Visible {
-            tool_name,
-            arguments,
-            selected,
-        } = self.approval
-        {
-            let overlay = ApprovalOverlay::new(tool_name, arguments, selected);
-            frame.render_widget(overlay, area);
-        }
     }
 }
 
@@ -734,28 +722,26 @@ impl Tui {
             selected: ApprovalChoice::ApproveOnce,
         };
         let warn = to_crossterm_color(semantic::TEXT_WARNING);
-        let segments = vec![
-            HistorySegment::styled(
-                format!("⚠ Approval required: {}\n", tool_name),
+        let accent = to_crossterm_color(semantic::TEXT_ACCENT);
+        self.pending_scrollback.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("⚠ Approval required: {}", tool_name),
                 warn,
                 HistoryAttrs {
                     bold: true,
                     ..HistoryAttrs::default()
                 },
-            ),
-            HistorySegment::styled(
-                format!("  {}\n", arguments),
-                to_crossterm_color(semantic::DIM_TEXT),
+            )],
+            None,
+        ));
+        self.pending_scrollback.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                "[y] approve once  [a] always  [n] deny",
+                accent,
                 HistoryAttrs::default(),
-            ),
-            HistorySegment::styled(
-                "[y] approve once  [a] always  [n] deny".to_string(),
-                to_crossterm_color(semantic::TEXT_ACCENT),
-                HistoryAttrs::default(),
-            ),
-        ];
-        self.pending_scrollback
-            .push(ScrollbackLine::styled(segments, None));
+            )],
+            None,
+        ));
     }
 
     pub fn hide_approval(&mut self) {
@@ -982,10 +968,7 @@ impl Tui {
             tip: state.tip.as_ref(),
         };
         let input_pad_top = InputPadComponent;
-        let input = InputComponent {
-            state,
-            approval: &state.approval_state,
-        };
+        let input = InputComponent { state };
         let input_pad_bot = InputPadComponent;
         let status_comp = StatusComponent { status };
 
