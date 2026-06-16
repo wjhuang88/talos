@@ -417,6 +417,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut tool_call_names: Vec<String> = Vec::new();
     let mut tool_call_args: Vec<String> = Vec::new();
     let mut text_accumulator = String::new();
+    let mut syntax_filter = talos_core::tool_filter::ToolSyntaxFilter::new();
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
@@ -475,16 +476,14 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
 
             let choice = &chunk.choices[0];
 
-            // Extract text delta
             if let Some(ref text) = choice.delta.content
                 && !text.is_empty()
             {
                 text_accumulator.push_str(text);
-                let _ = tx
-                    .send(AgentEvent::TextDelta {
-                        delta: text.clone(),
-                    })
-                    .await;
+                let clean = syntax_filter.push_chunk(text);
+                if !clean.is_empty() {
+                    let _ = tx.send(AgentEvent::TextDelta { delta: clean }).await;
+                }
             }
 
             // Extract tool calls
@@ -513,8 +512,12 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 }
             }
 
-            // Check for finish_reason
             if let Some(ref finish_reason) = choice.finish_reason {
+                let remaining = syntax_filter.finish();
+                if !remaining.is_empty() {
+                    let _ = tx.send(AgentEvent::TextDelta { delta: remaining }).await;
+                }
+
                 let stop_reason = match finish_reason.as_str() {
                     "stop" => StopReason::EndTurn,
                     "tool_calls" => StopReason::ToolUse,

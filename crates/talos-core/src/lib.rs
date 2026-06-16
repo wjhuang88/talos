@@ -5,5 +5,6 @@ pub mod message;
 pub mod provider;
 pub mod session;
 pub mod tool;
+pub mod tool_filter;
 
 pub use approval::{ApprovalChoice, TuiApprovalRequest};
