@@ -415,12 +415,24 @@ fn is_binary_file(path: &Path) -> Result<bool, FileToolError> {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ReadInput {
     pub path: String,
+    /// Starting line number (1-based). Prefer `offset` for new code.
     #[serde(default)]
     #[schemars(range(min = 1))]
     pub start_line: Option<u32>,
+    /// Ending line number (1-based, inclusive). Prefer `limit` for new code.
     #[serde(default)]
     #[schemars(range(min = 1))]
     pub end_line: Option<u32>,
+    /// 0-based line offset for pagination. `offset=0` starts at line 1.
+    /// Takes precedence over `start_line`/`end_line` when specified.
+    #[serde(default)]
+    #[schemars(range(min = 0))]
+    pub offset: Option<u32>,
+    /// Maximum number of lines to return. Defaults to 2000 when `offset` is set.
+    /// Takes precedence over `start_line`/`end_line` when specified.
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub limit: Option<u32>,
 }
 
 /// A tool that reads file content with optional line range support.
@@ -441,7 +453,7 @@ impl AgentTool for ReadTool {
     }
 
     fn description(&self) -> &str {
-        "Read file content with optional line range"
+        "Read file content with optional line range or offset/limit pagination"
     }
 
     fn parameters(&self) -> Value {
@@ -477,26 +489,45 @@ impl ReadTool {
 
         let content = tokio::fs::read_to_string(&path).await?;
         let lines: Vec<&str> = content.lines().collect();
+        let total_lines = lines.len();
 
-        let start = read_input.start_line.unwrap_or(1).saturating_sub(1) as usize;
-        let end = match read_input.end_line {
-            Some(e) => e as usize,
-            None => lines.len(),
+        let (start, max_lines) = if read_input.offset.is_some() || read_input.limit.is_some() {
+            let offset = read_input.offset.unwrap_or(0) as usize;
+            let limit = read_input.limit.unwrap_or(2000) as usize;
+            (offset, limit)
+        } else if read_input.start_line.is_some() || read_input.end_line.is_some() {
+            let start = read_input.start_line.unwrap_or(1).saturating_sub(1) as usize;
+            let end = match read_input.end_line {
+                Some(e) => e as usize,
+                None => lines.len(),
+            };
+            if start > end {
+                return Err(FileToolError::InvalidLineRange {
+                    start: read_input.start_line.unwrap_or(1),
+                    end: read_input.end_line.unwrap_or(lines.len() as u32),
+                });
+            }
+            (start, end.saturating_sub(start))
+        } else {
+            (0, lines.len())
         };
 
-        if start > end {
-            return Err(FileToolError::InvalidLineRange {
-                start: read_input.start_line.unwrap_or(1),
-                end: read_input.end_line.unwrap_or(lines.len() as u32),
-            });
-        }
-
-        let selected = &lines[start.min(lines.len())..end.min(lines.len())];
+        let start = start.min(total_lines);
+        let end = (start + max_lines).min(total_lines);
+        let selected = &lines[start..end];
 
         let mut output = String::new();
         for (i, line) in selected.iter().enumerate() {
             let line_num = start + i + 1;
             output.push_str(&format!("{line_num}: {line}\n"));
+        }
+
+        let remaining = total_lines.saturating_sub(end);
+        if remaining > 0 {
+            let next_offset = end;
+            output.push_str(&format!(
+                "\n... ({remaining} more lines, use offset={next_offset} to continue)"
+            ));
         }
 
         Ok(output)
@@ -680,6 +711,126 @@ mod file_tool_tests {
         assert!(result.content.contains("3: line3"));
         assert!(!result.content.contains("1: line1"));
         assert!(!result.content.contains("4: line4"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_offset_limit() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let content: String = (1..=5).map(|i| format!("line{i}\n")).collect();
+        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "path": "test.txt", "offset": 1, "limit": 2 }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("2: line2"));
+        assert!(result.content.contains("3: line3"));
+        assert!(!result.content.contains("1: line1"));
+        assert!(!result.content.contains("4: line4"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_offset_zero() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        fs::write(temp_dir.path().join("test.txt"), "a\nb\nc\n").unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "path": "test.txt", "offset": 0, "limit": 1 }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("1: a"));
+        assert!(!result.content.contains("2: b"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_limit_only() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let content: String = (1..=5).map(|i| format!("line{i}\n")).collect();
+        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "path": "test.txt", "limit": 2 }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("1: line1"));
+        assert!(result.content.contains("2: line2"));
+        assert!(result.content.contains("more lines"));
+        assert!(result.content.contains("offset=2"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_pagination_hint() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let content: String = (1..=10).map(|i| format!("line{i}\n")).collect();
+        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "path": "test.txt", "offset": 0, "limit": 3 }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("7 more lines"));
+        assert!(result.content.contains("offset=3"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_no_truncation_no_hint() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        fs::write(temp_dir.path().join("test.txt"), "a\nb\n").unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "path": "test.txt", "offset": 0, "limit": 100 }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(!result.content.contains("more lines"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_offset_takes_precedence() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let content: String = (1..=5).map(|i| format!("line{i}\n")).collect();
+        fs::write(temp_dir.path().join("test.txt"), content).unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({
+                "path": "test.txt",
+                "start_line": 1,
+                "end_line": 2,
+                "offset": 2,
+                "limit": 2
+            }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("3: line3"));
+        assert!(result.content.contains("4: line4"));
+        assert!(!result.content.contains("1: line1"));
+        assert!(!result.content.contains("2: line2"));
+    }
+
+    #[tokio::test]
+    async fn test_read_tool_backward_compat_no_params() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        fs::write(temp_dir.path().join("test.txt"), "a\nb\nc\n").unwrap();
+
+        let tool = ReadTool::new(temp_dir.path().to_path_buf());
+        let result = tool.execute(json!({ "path": "test.txt" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("1: a"));
+        assert!(result.content.contains("2: b"));
+        assert!(result.content.contains("3: c"));
+        assert!(!result.content.contains("more lines"));
     }
 
     #[tokio::test]
