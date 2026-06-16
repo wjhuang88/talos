@@ -17,9 +17,10 @@ fn find_start_marker(text: &str) -> Option<usize> {
     let mut earliest = None;
     for marker in START_MARKERS {
         if let Some(pos) = text.find(marker)
-            && earliest.is_none_or(|e| pos < e) {
-                earliest = Some(pos);
-            }
+            && earliest.is_none_or(|e| pos < e)
+        {
+            earliest = Some(pos);
+        }
     }
     earliest
 }
@@ -46,9 +47,10 @@ impl ToolSyntaxFilter {
                 let mut found_end: Option<(usize, usize)> = None;
                 for marker in END_MARKERS {
                     if let Some(pos) = self.pending.find(marker)
-                        && found_end.is_none_or(|(ep, _)| pos < ep) {
-                            found_end = Some((pos, marker.len()));
-                        }
+                        && found_end.is_none_or(|(ep, _)| pos < ep)
+                    {
+                        found_end = Some((pos, marker.len()));
+                    }
                 }
 
                 if let Some((pos, marker_len)) = found_end {
@@ -102,8 +104,13 @@ impl ToolSyntaxFilter {
                     }
                 } else {
                     let mut hold_back = 0;
-                    for i in (1..=self.pending.len().min(20)).rev() {
-                        let suffix = &self.pending[self.pending.len() - i..];
+                    let len = self.pending.len();
+                    for i in (1..=len.min(20)).rev() {
+                        let split = len - i;
+                        if !self.pending.is_char_boundary(split) {
+                            continue;
+                        }
+                        let suffix = &self.pending[split..];
                         if is_prefix_of_any_marker(suffix) {
                             hold_back = i;
                             break;
@@ -111,9 +118,9 @@ impl ToolSyntaxFilter {
                     }
 
                     if hold_back > 0 {
-                        output.push_str(&self.pending[..self.pending.len() - hold_back]);
-                        let held = self.pending[self.pending.len() - hold_back..].to_string();
-                        self.pending = held;
+                        let split = len - hold_back;
+                        output.push_str(&self.pending[..split]);
+                        self.pending = self.pending[split..].to_string();
                         return output;
                     } else {
                         output.push_str(&self.pending);
