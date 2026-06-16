@@ -30,7 +30,7 @@ pub mod session;
 use futures_util::future::join_all;
 use serde_json::Value;
 use talos_core::message::{
-    AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult,
+    AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult, Usage,
 };
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolProtocol, ToolRegistry, ToolResult as ToolExecutionResult};
@@ -424,6 +424,18 @@ impl Agent {
 
         let mut messages = history;
 
+        const DEBUG_CMD: &str = "/mock-request";
+        let is_debug = user_message.trim_start().starts_with(DEBUG_CMD);
+
+        let actual_user_message = if is_debug {
+            
+            user_message.trim_start()[DEBUG_CMD.len()..]
+                .trim()
+                .to_string()
+        } else {
+            user_message
+        };
+
         if !system_prompt.is_empty() {
             messages.push(Message::System {
                 content: system_prompt,
@@ -439,8 +451,26 @@ impl Agent {
         }
 
         messages.push(Message::User {
-            content: user_message,
+            content: actual_user_message,
         });
+
+        if is_debug
+            && let Some(preview) = self.provider.request_preview(&messages) {
+                let snapshot =
+                    serde_json::to_string_pretty(&preview).unwrap_or_else(|_| preview.to_string());
+                let result = format!("Request preview (no API call made):\n\n{snapshot}");
+                if let Some(ref tx) = event_tx {
+                    let _ = tx.send(AgentEvent::TurnStart);
+                    let _ = tx.send(AgentEvent::TextDelta {
+                        delta: result.clone(),
+                    });
+                    let _ = tx.send(AgentEvent::TurnEnd {
+                        stop_reason: StopReason::EndTurn,
+                        usage: Usage::default(),
+                    });
+                }
+                return Ok(result);
+            }
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
 

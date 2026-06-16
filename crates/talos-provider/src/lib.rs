@@ -140,6 +140,20 @@ impl LanguageModel for AnthropicProvider {
         tokio::spawn(parse_sse_stream(response, tx));
         Ok(rx)
     }
+
+    fn request_preview(&self, messages: &[Message]) -> Option<Value> {
+        let body = build_request_body(&self.model, messages, &[]);
+        Some(json!({
+            "method": "POST",
+            "url": &self.base_url,
+            "headers": {
+                "x-api-key": redact_secret(&self.api_key),
+                "anthropic-version": ANTHROPIC_VERSION,
+                "content-type": "application/json",
+            },
+            "body": body,
+        }))
+    }
 }
 
 /// Build a redacted Anthropic Messages API request snapshot for mock diagnostics.

@@ -24,6 +24,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+use serde_json::Value;
 use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderResult};
 use tokio::sync::mpsc;
@@ -238,6 +239,13 @@ impl LanguageModel for MockProvider {
         });
 
         Ok(rx)
+    }
+
+    fn request_preview(&self, messages: &[Message]) -> Option<Value> {
+        let debug_messages = request_debug_messages(messages)?;
+        self.request_debug_builder.as_ref().map(|builder| {
+            serde_json::from_str::<Value>(&builder(&debug_messages)).unwrap_or(Value::Null)
+        })
     }
 }
 

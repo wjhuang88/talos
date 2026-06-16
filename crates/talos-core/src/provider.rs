@@ -46,4 +46,8 @@ pub trait LanguageModel: Send + Sync {
         let _ = tools;
         self.stream(messages).await
     }
+
+    fn request_preview(&self, _messages: &[Message]) -> Option<Value> {
+        None
+    }
 }

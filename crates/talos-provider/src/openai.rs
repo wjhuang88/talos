@@ -169,6 +169,19 @@ impl LanguageModel for OpenAIProvider {
         tokio::spawn(parse_sse_stream(response, tx));
         Ok(rx)
     }
+
+    fn request_preview(&self, messages: &[Message]) -> Option<Value> {
+        let body = build_request_body(&self.model, messages, &[]);
+        Some(json!({
+            "method": "POST",
+            "url": self.endpoint_url(),
+            "headers": {
+                "Authorization": format!("Bearer {}", redact_secret(&self.api_key)),
+                "Content-Type": "application/json",
+            },
+            "body": body,
+        }))
+    }
 }
 
 /// Build a redacted OpenAI-compatible chat completions request snapshot for mock diagnostics.
