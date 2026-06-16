@@ -443,9 +443,10 @@ fn hold_preview_color(frame: usize) -> Color {
     semantic::HOLD_PREVIEW[(frame / 2) % semantic::HOLD_PREVIEW.len()]
 }
 
-fn preview_spinner_padding(processing_frame: usize, processing_tick: usize) -> (String, usize) {
-    let lead_idx = ((processing_tick / 5) + SPINNER_FRAMES.len() - 2) % SPINNER_FRAMES.len();
-    let chase_idx = processing_frame % SPINNER_FRAMES.len();
+fn preview_spinner_padding(processing_frame: usize, _processing_tick: usize) -> (String, usize) {
+    let n = SPINNER_FRAMES.len();
+    let lead_idx = (processing_frame + n - n / 4) % n;
+    let chase_idx = processing_frame % n;
     (
         format!(" {}{}", SPINNER_FRAMES[lead_idx], SPINNER_FRAMES[chase_idx]),
         lead_idx,
@@ -2111,15 +2112,21 @@ mod tests {
 
     #[test]
     fn preview_spinner_uses_canon_rhythm() {
-        let (first_padding, first_color_idx) = preview_spinner_padding(0, 0);
-        let (second_padding, second_color_idx) = preview_spinner_padding(1, 3);
-        let (third_padding, third_color_idx) = preview_spinner_padding(1, 5);
+        let n = SPINNER_FRAMES.len();
+        let phase = n / 4;
 
-        assert_eq!(first_padding, " ⠇⠋");
-        assert_eq!(second_padding, " ⠇⠙");
-        assert_eq!(third_padding, " ⠏⠙");
-        assert_eq!(first_color_idx, second_color_idx);
-        assert_ne!(second_color_idx, third_color_idx);
+        let (p0, _) = preview_spinner_padding(0, 0);
+        let (p1, _) = preview_spinner_padding(1, 0);
+
+        let lead0 = SPINNER_FRAMES[(n - phase) % n];
+        let chase0 = SPINNER_FRAMES[0];
+        assert_eq!(p0, format!(" {lead0}{chase0}"));
+
+        let lead1 = SPINNER_FRAMES[(1 + n - phase) % n];
+        let chase1 = SPINNER_FRAMES[1];
+        assert_eq!(p1, format!(" {lead1}{chase1}"));
+
+        assert_ne!(lead0, chase0);
     }
 
     #[test]
