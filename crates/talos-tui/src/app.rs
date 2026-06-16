@@ -733,6 +733,29 @@ impl Tui {
             arguments: arguments.to_string(),
             selected: ApprovalChoice::ApproveOnce,
         };
+        let warn = to_crossterm_color(semantic::TEXT_WARNING);
+        let segments = vec![
+            HistorySegment::styled(
+                format!("⚠ Approval required: {}\n", tool_name),
+                warn,
+                HistoryAttrs {
+                    bold: true,
+                    ..HistoryAttrs::default()
+                },
+            ),
+            HistorySegment::styled(
+                format!("  {}\n", arguments),
+                to_crossterm_color(semantic::DIM_TEXT),
+                HistoryAttrs::default(),
+            ),
+            HistorySegment::styled(
+                "[y] approve once  [a] always  [n] deny".to_string(),
+                to_crossterm_color(semantic::TEXT_ACCENT),
+                HistoryAttrs::default(),
+            ),
+        ];
+        self.pending_scrollback
+            .push(ScrollbackLine::styled(segments, None));
     }
 
     pub fn hide_approval(&mut self) {
