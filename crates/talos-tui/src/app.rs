@@ -847,7 +847,11 @@ impl Tui {
                     self.finalize_active_stream();
                 }
                 self.pending_tool_call = Some(ToolCallDisplay {
-                    tool_name: name,
+                    tool_name: if name.is_empty() {
+                        "tool".to_string()
+                    } else {
+                        name
+                    },
                     arguments: serde_json::json!({}),
                     provenance: ToolProvenance::Native,
                 });

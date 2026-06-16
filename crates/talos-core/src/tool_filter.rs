@@ -4,6 +4,12 @@ pub struct ToolSyntaxFilter {
     buffer: String,
     in_tool_block: bool,
     pending: String,
+    just_entered_tool_block: bool,
+}
+
+pub struct ToolFilterOutput {
+    pub text: String,
+    pub tool_call_started: bool,
 }
 
 const START_MARKERS: &[&str] = &["<tool_call>", "<toolcall>", "```json-tool"];
@@ -31,12 +37,19 @@ impl ToolSyntaxFilter {
             buffer: String::new(),
             in_tool_block: false,
             pending: String::new(),
+            just_entered_tool_block: false,
         }
     }
 
-    pub fn push_chunk(&mut self, chunk: &str) -> String {
+    pub fn push_chunk(&mut self, chunk: &str) -> ToolFilterOutput {
         self.pending.push_str(chunk);
-        self.drain_pending()
+        let text = self.drain_pending();
+        let started = self.just_entered_tool_block;
+        self.just_entered_tool_block = false;
+        ToolFilterOutput {
+            text,
+            tool_call_started: started,
+        }
     }
 
     fn drain_pending(&mut self) -> String {
@@ -75,6 +88,7 @@ impl ToolSyntaxFilter {
                         self.buffer.push_str(marker);
                         self.pending = search_text[pos + marker.len()..].to_string();
                         self.in_tool_block = true;
+                        self.just_entered_tool_block = true;
                     } else {
                         let max_partial = START_MARKERS
                             .iter()

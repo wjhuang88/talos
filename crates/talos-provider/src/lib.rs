@@ -348,15 +348,25 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             },
                         );
                         let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
-                        tokio::task::yield_now().await;
                     }
                 }
                 Some("content_block_delta") => {
                     if let Some(text) = extract_text_delta(&data) {
                         text_accumulator.push_str(&text);
-                        let clean = syntax_filter.push_chunk(&text);
-                        if !clean.is_empty() {
-                            let _ = tx.send(AgentEvent::TextDelta { delta: clean }).await;
+                        let filter_out = syntax_filter.push_chunk(&text);
+                        if filter_out.tool_call_started {
+                            let _ = tx
+                                .send(AgentEvent::ToolCallStarted {
+                                    name: String::new(),
+                                })
+                                .await;
+                        }
+                        if !filter_out.text.is_empty() {
+                            let _ = tx
+                                .send(AgentEvent::TextDelta {
+                                    delta: filter_out.text,
+                                })
+                                .await;
                         }
                     }
                     if let Some(partial) = data.get("delta")
