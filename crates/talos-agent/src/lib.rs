@@ -2079,7 +2079,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_permission_check_blocks_denied_tool() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(talos_permission::PermissionRule {
             tool_name: "echo".into(),
             path_pattern: None,
@@ -2138,7 +2141,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_permission_check_allows_permitted_tool() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(talos_permission::PermissionRule {
             tool_name: "echo".into(),
             path_pattern: None,
@@ -2197,7 +2203,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_permission_ask_defaults_to_deny() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(talos_permission::PermissionRule {
             tool_name: "echo".into(),
             path_pattern: None,

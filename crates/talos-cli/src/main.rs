@@ -673,7 +673,8 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let hooks = build_hook_registry(true);
     let mut registry = build_print_tool_registry();
-    let mut permission_engine = talos_permission::PermissionEngine::new();
+    let mut permission_engine =
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone());
     // I009-S3 begin
     #[cfg(debug_assertions)]
     if let Some(path) = cli.mcp_server_fixture.clone() {

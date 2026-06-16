@@ -55,6 +55,7 @@
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Errors that can occur during permission evaluation.
@@ -175,6 +176,9 @@ impl PermissionRule {
 pub struct PermissionEngine {
     /// Ordered list of permission rules.
     pub rules: Vec<PermissionRule>,
+    /// Optional workspace root. When set, file operations (read/write/edit)
+    /// targeting paths within this directory are auto-allowed.
+    pub workspace_root: Option<PathBuf>,
 }
 
 impl PermissionEngine {
@@ -185,9 +189,25 @@ impl PermissionEngine {
     /// - Write tools (name contains "write" or "edit") → [`PermissionDecision::Ask`]
     /// - Bash tool → [`PermissionDecision::Ask`]
     pub fn new() -> Self {
-        let mut engine = Self { rules: Vec::new() };
+        let mut engine = Self {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_default_rules();
         engine
+    }
+
+    /// Creates a new permission engine that auto-allows file operations
+    /// within the given workspace root directory.
+    pub fn with_workspace_root(root: PathBuf) -> Self {
+        let mut engine = Self::new();
+        engine.workspace_root = Some(root);
+        engine
+    }
+
+    /// Sets the workspace root for auto-approval of workspace-relative paths.
+    pub fn set_workspace_root(&mut self, root: PathBuf) {
+        self.workspace_root = Some(root);
     }
 
     /// Adds the default ruleset to the engine.
@@ -244,18 +264,30 @@ impl PermissionEngine {
     /// - Tools with names containing "read" or "list" → [`PermissionDecision::Allow`]
     /// - Tools with names containing "write" or "edit" → [`PermissionDecision::Ask`]
     /// - All other tools → [`PermissionDecision::Ask`]
+    ///
+    /// When a [`workspace_root`](Self::workspace_root) is set, file operations
+    /// (read/write/edit/list) targeting paths within that directory are
+    /// auto-allowed before rule evaluation.
     pub fn evaluate(&self, tool_name: &str, input: &Value) -> PermissionDecision {
+        // Workspace-relative file operations: auto-allow
+        if let Some(ref root) = self.workspace_root
+            && let Some(path) = input.get("path").and_then(Value::as_str)
+            && is_path_in_workspace(path, root)
+            && is_file_tool(tool_name)
+        {
+            return PermissionDecision::Allow;
+        }
+
         let path = input.get("path").and_then(Value::as_str);
 
         for rule in &self.rules {
             match rule.matches(tool_name, path) {
                 Ok(true) => return rule.decision.clone(),
                 Ok(false) => continue,
-                Err(_) => continue, // Skip malformed rules
+                Err(_) => continue,
             }
         }
 
-        // No rule matched — apply default based on tool name
         Self::default_decision(tool_name)
     }
 
@@ -325,6 +357,28 @@ impl PermissionEngine {
     }
 }
 
+/// Returns true if the tool is a file operation that should benefit from
+/// workspace-relative auto-approval.
+fn is_file_tool(tool_name: &str) -> bool {
+    let name_lower = tool_name.to_lowercase();
+    name_lower.contains("read")
+        || name_lower.contains("write")
+        || name_lower.contains("edit")
+        || name_lower.contains("list")
+}
+
+/// Checks whether `path` is within (or relative to) the workspace `root`.
+///
+/// Relative paths are assumed to be workspace-relative. Absolute paths are
+/// checked with `starts_with`.
+fn is_path_in_workspace(path_str: &str, root: &Path) -> bool {
+    let path = Path::new(path_str);
+    if path.is_relative() {
+        return true;
+    }
+    path.starts_with(root)
+}
+
 impl Default for PermissionEngine {
     fn default() -> Self {
         Self::new()
@@ -392,7 +446,10 @@ mod tests {
 
         // Custom rule is appended, so default bash rule still matches first
         // We need to test with a new engine where we control rule order
-        let mut engine2 = PermissionEngine { rules: Vec::new() };
+        let mut engine2 = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine2.add_rule(PermissionRule {
             tool_name: "bash".to_owned(),
             path_pattern: None,
@@ -405,7 +462,10 @@ mod tests {
 
     #[test]
     fn test_custom_rule_deny_write_to_sensitive_path() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
             path_pattern: Some(".env".to_owned()),
@@ -423,7 +483,10 @@ mod tests {
 
     #[test]
     fn test_path_pattern_src_glob_matches() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
@@ -436,7 +499,10 @@ mod tests {
 
     #[test]
     fn test_path_pattern_src_glob_nested() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
@@ -450,7 +516,10 @@ mod tests {
 
     #[test]
     fn test_path_pattern_src_glob_no_match() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
@@ -464,7 +533,10 @@ mod tests {
 
     #[test]
     fn test_path_pattern_deny_outside_src() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
@@ -490,7 +562,10 @@ mod tests {
 
     #[test]
     fn test_first_match_wins() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "bash".to_owned(),
             path_pattern: None,
@@ -508,7 +583,10 @@ mod tests {
 
     #[test]
     fn test_specific_rule_before_general() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
             path_pattern: Some("tmp/**".to_owned()),
@@ -600,7 +678,10 @@ mod tests {
 
     #[test]
     fn test_tool_name_exact_match_in_rules() {
-        let mut engine = PermissionEngine { rules: Vec::new() };
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
             path_pattern: None,
@@ -615,7 +696,10 @@ mod tests {
 
     #[test]
     fn test_empty_rules_falls_to_default() {
-        let engine = PermissionEngine { rules: Vec::new() };
+        let engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
         let decision = engine.evaluate("read", &serde_json::json!({}));
         assert_eq!(decision, PermissionDecision::Allow);
 
