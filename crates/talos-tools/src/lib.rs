@@ -363,6 +363,9 @@ pub enum FileToolError {
 
     #[error("invalid input: {0}")]
     InvalidInput(String),
+
+    #[error("file already exists: {0}. Use the edit tool to modify existing files")]
+    FileExists(String),
 }
 
 /// Resolves a relative path against the workspace root and validates
@@ -507,7 +510,8 @@ pub struct WriteInput {
     pub content: String,
 }
 
-/// A tool that creates or overwrites a file with the given content.
+/// A tool that creates a new file with the given content.
+/// Does not overwrite existing files — use the edit tool for modifications.
 pub struct WriteTool {
     workspace_root: PathBuf,
 }
@@ -525,7 +529,7 @@ impl AgentTool for WriteTool {
     }
 
     fn description(&self) -> &str {
-        "Create or overwrite a file"
+        "Create a new file (does not overwrite existing files — use edit instead)"
     }
 
     fn parameters(&self) -> Value {
@@ -546,6 +550,10 @@ impl WriteTool {
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
         let path = resolve_workspace_path(&self.workspace_root, &write_input.path)?;
+
+        if path.exists() {
+            return Err(FileToolError::FileExists(write_input.path));
+        }
 
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
@@ -726,7 +734,7 @@ mod file_tool_tests {
     }
 
     #[tokio::test]
-    async fn test_write_tool_overwrite() {
+    async fn test_write_tool_refuses_overwrite() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file = temp_dir.path().join("existing.txt");
         fs::write(&file, "old content").unwrap();
@@ -736,9 +744,11 @@ mod file_tool_tests {
             .execute(json!({ "path": "existing.txt", "content": "new content" }))
             .await;
 
-        assert!(!result.is_error);
+        assert!(result.is_error);
+        assert!(result.content.contains("already exists"));
+        assert!(result.content.contains("edit tool"));
         let content = fs::read_to_string(&file).unwrap();
-        assert_eq!(content, "new content");
+        assert_eq!(content, "old content");
     }
 
     #[tokio::test]
