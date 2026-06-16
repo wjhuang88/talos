@@ -212,7 +212,6 @@ impl PermissionEngine {
 
     /// Adds the default ruleset to the engine.
     fn add_default_rules(&mut self) {
-        // Read tools: allow
         self.rules.push(PermissionRule {
             tool_name: "read".to_owned(),
             path_pattern: None,
@@ -223,8 +222,22 @@ impl PermissionEngine {
             path_pattern: None,
             decision: PermissionDecision::Allow,
         });
+        self.rules.push(PermissionRule {
+            tool_name: "grep".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
+            tool_name: "glob".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
+            tool_name: "ls".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
 
-        // Write tools: ask
         self.rules.push(PermissionRule {
             tool_name: "write".to_owned(),
             path_pattern: None,
@@ -235,8 +248,12 @@ impl PermissionEngine {
             path_pattern: None,
             decision: PermissionDecision::Ask,
         });
+        self.rules.push(PermissionRule {
+            tool_name: "delete".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Ask,
+        });
 
-        // Bash: ask
         self.rules.push(PermissionRule {
             tool_name: "bash".to_owned(),
             path_pattern: None,
@@ -344,15 +361,22 @@ impl PermissionEngine {
     fn default_decision(tool_name: &str) -> PermissionDecision {
         let name_lower = tool_name.to_lowercase();
 
-        if name_lower.contains("read") || name_lower.contains("list") {
+        if name_lower.contains("read")
+            || name_lower.contains("list")
+            || name_lower == "grep"
+            || name_lower == "glob"
+            || name_lower == "ls"
+        {
             return PermissionDecision::Allow;
         }
 
-        if name_lower.contains("write") || name_lower.contains("edit") {
+        if name_lower.contains("write")
+            || name_lower.contains("edit")
+            || name_lower == "delete"
+        {
             return PermissionDecision::Ask;
         }
 
-        // Default: ask for anything else
         PermissionDecision::Ask
     }
 }
@@ -365,6 +389,9 @@ fn is_file_tool(tool_name: &str) -> bool {
         || name_lower.contains("write")
         || name_lower.contains("edit")
         || name_lower.contains("list")
+        || name_lower == "grep"
+        || name_lower == "glob"
+        || name_lower == "ls"
 }
 
 /// Checks whether `path` is within (or relative to) the workspace `root`.
@@ -423,6 +450,34 @@ mod tests {
     fn test_default_bash_tool_ask() {
         let engine = PermissionEngine::new();
         let decision = engine.evaluate("bash", &serde_json::json!({"command": "ls"}));
+        assert_eq!(decision, PermissionDecision::Ask);
+    }
+
+    #[test]
+    fn test_default_grep_tool_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("grep", &serde_json::json!({"pattern": "fn"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_default_glob_tool_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("glob", &serde_json::json!({"pattern": "*.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_default_ls_tool_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("ls", &serde_json::json!({}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_default_delete_tool_ask() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("delete", &serde_json::json!({"path": "temp.txt"}));
         assert_eq!(decision, PermissionDecision::Ask);
     }
 

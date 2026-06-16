@@ -51,7 +51,7 @@ use talos_provider::openai::OpenAIProvider;
 use talos_rpc::RpcServer;
 use talos_session::{IndexError, Session, SessionInfo, SessionManager};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
-use talos_tools::{BashTool, EditTool, ReadTool, WriteTool};
+use talos_tools::{BashTool, DeleteTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -1330,6 +1330,26 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(EditTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(GrepTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(GlobTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(LsTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(DeleteTool::new(workspace_root.clone())),
         approval,
         print_mode: false,
     }));
@@ -1416,6 +1436,26 @@ fn build_print_tool_registry() -> ToolRegistry {
     }));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(EditTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(GrepTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(GlobTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(LsTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(DeleteTool::new(PathBuf::from("."))),
         approval,
         print_mode: true,
     }));
@@ -1445,6 +1485,22 @@ fn build_tui_tool_registry(
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(EditTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(GrepTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(GlobTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(LsTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(DeleteTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -1501,6 +1557,10 @@ fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(ReadTool::new(PathBuf::from("."))));
     registry.register(Arc::new(WriteTool::new(PathBuf::from("."))));
     registry.register(Arc::new(EditTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GrepTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GlobTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(LsTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(DeleteTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatusTool));
     registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
     registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));

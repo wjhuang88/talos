@@ -246,15 +246,17 @@ Workspace-root auto-approval (from TOOL-002 permission fix) applies to all read-
 ## Acceptance Criteria
 
 ### P0
-- [ ] `grep` tool searches file contents by regex, returns structured JSON
-- [ ] `glob` tool finds files by pattern, returns path list
-- [ ] `delete` tool removes files/directories with workspace path validation
-- [ ] All tools registered in all 4 registry builders
-- [ ] Permission rules configured (read-only auto-allow, delete requires approval)
-- [ ] Unit tests for each tool
+- [x] `grep` tool searches file contents by regex, returns structured output
+- [x] `glob` tool finds files by pattern, returns path list
+- [x] `delete` tool removes files/directories with workspace path validation
+- [x] ReadTool `offset`/`limit` pagination with hint text
+- [x] `ls` tool lists directory contents with metadata (bonus — pulled forward from P1)
+- [x] All tools registered in all 4 registry builders (print, TUI, MCP, interactive)
+- [x] Permission rules configured (grep/glob/ls auto-allow, delete requires approval)
+- [x] Unit tests for each tool (42 new tests across 5 tools)
+- [x] TUI tool call summaries for all new tools
 
 ### P1
-- [ ] `ls` tool lists directory contents with metadata
 - [ ] `diff` tool compares files using `similar`, outputs unified diff
 - [ ] `stat` tool returns file metadata including MIME type
 

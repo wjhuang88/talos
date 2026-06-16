@@ -1903,42 +1903,72 @@ fn truncate_end_to_width(s: &str, max_width: u16) -> String {
 }
 
 fn summarize_tool_args(tool_name: &str, args_str: &str) -> String {
+    let fallback = || args_str.chars().take(80).collect::<String>();
+    let obj = serde_json::from_str::<serde_json::Value>(args_str).ok();
+
     match tool_name {
         "write" | "edit" => {
-            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(args_str) {
+            if let Some(ref obj) = obj {
                 let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
                 let content_len = obj
                     .get("content")
                     .and_then(|c| c.as_str())
                     .map(|s| s.len())
                     .unwrap_or(0);
-                format!("path: {} ({} bytes)", path, content_len)
+                format!("path: {path} ({content_len} bytes)")
             } else {
-                args_str.chars().take(80).collect()
+                fallback()
             }
         }
-        "read" => {
-            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(args_str) {
+        "read" | "delete" => {
+            if let Some(ref obj) = obj {
                 let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
-                format!("path: {}", path)
+                format!("path: {path}")
             } else {
-                args_str.chars().take(80).collect()
+                fallback()
+            }
+        }
+        "grep" => {
+            if let Some(ref obj) = obj {
+                let pattern = obj.get("pattern").and_then(|p| p.as_str()).unwrap_or("?");
+                format!("pattern: {pattern}")
+            } else {
+                fallback()
+            }
+        }
+        "glob" => {
+            if let Some(ref obj) = obj {
+                let pattern = obj.get("pattern").and_then(|p| p.as_str()).unwrap_or("?");
+                format!("pattern: {pattern}")
+            } else {
+                fallback()
+            }
+        }
+        "ls" => {
+            if let Some(ref obj) = obj {
+                let path = obj
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or(".");
+                format!("path: {path}")
+            } else {
+                fallback()
             }
         }
         "bash" => {
-            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(args_str) {
+            if let Some(ref obj) = obj {
                 let cmd = obj.get("command").and_then(|c| c.as_str()).unwrap_or("?");
                 let display = if cmd.len() > 80 {
                     format!("{}...", &cmd[..80])
                 } else {
                     cmd.to_string()
                 };
-                format!("command: {}", display)
+                format!("command: {display}")
             } else {
-                args_str.chars().take(80).collect()
+                fallback()
             }
         }
-        _ => args_str.chars().take(80).collect(),
+        _ => fallback(),
     }
 }
 
