@@ -348,6 +348,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             },
                         );
                         let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
+                        tokio::task::yield_now().await;
                     }
                 }
                 Some("content_block_delta") => {

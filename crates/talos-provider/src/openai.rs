@@ -511,6 +511,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                 let _ = tx
                                     .send(AgentEvent::ToolCallStarted { name: name.clone() })
                                     .await;
+                                tokio::task::yield_now().await;
                             }
                             tool_call_names[idx] = name.clone();
                         }
