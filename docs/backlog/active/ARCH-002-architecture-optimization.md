@@ -25,48 +25,66 @@ Talos has grown organically across 16 crates and 12+ iterations. Several boundar
 - New features
 - Performance optimization
 
-## Known Issues (Preliminary)
+## Known Issues (from architecture survey)
 
-### 1. Type Leakage
+### P0 — Blocks Clean Architecture
 
-External crate types appearing in internal public APIs:
+#### 1. `talos-mcp` depends on `talos-agent` (dead dependency)
+- **File**: `crates/talos-mcp/Cargo.toml`
+- **Issue**: MCP declares dependency on agent crate but source has zero `use talos_agent` — dead coupling
+- **Fix**: Remove dependency
 
-| External Type | Where It Leaks | Impact |
-|---------------|---------------|--------|
-| `serde_json::Value` | Tool parameters, tool results, provider messages | Every crate depends on serde_json; internal types should wrap or constrain usage |
-| `reqwest::Response` | Provider implementations | HTTP client details leak through provider trait boundaries |
-| Provider-specific SSE types | Agent receives `AgentEvent` which originated as provider SSE parsing | Provider parsing logic mixed with event semantics |
+#### 2. `talos-rpc` coupled to concrete `Agent` (no trait abstraction)
+- **Files**: `talos-rpc/src/methods/mod.rs:27`, `talos-rpc/src/server.rs:24`
+- **Issue**: `MethodContext { agent: Arc<Agent> }` — concrete struct, not trait
+- **Fix**: Define `AgentRuntime` trait in `talos-core`; RPC depends on trait
 
-### 2. Crate Boundary Concerns
+#### 3. Duplicate `ToolResult` types in `talos-core`
+- **Files**: `talos-core/src/tool.rs:45` (no tool_use_id) vs `talos-core/src/message.rs:20` (has tool_use_id)
+- **Issue**: Same name, different semantics, causes confusion
+- **Fix**: Rename `message::ToolResult` → `MessageToolResult`
 
-- `talos-cli/src/main.rs` is ~2000 lines — acts as God module (registry builders, approval handlers, event loops, provider construction, session management all inline)
-- `talos-tui/src/app.rs` is ~2300 lines — owns TUI state, event loop, stream rendering, tool call display, scrollback, approval, debug — too many responsibilities
-- `talos-agent/src/lib.rs` is ~2500 lines — owns turn loop, hooks, permission, tool execution, text filtering, doom detection, session actor
+### P1 — Type Leakage
 
-### 3. Missing Abstractions
+#### 4. `rmcp` types bleed through `talos-mcp` public API
+- **Files**: `error.rs:50`, `client/adapter.rs:21`, `client/dispatcher.rs:29`, `client/facade.rs:12`, `server/handler.rs`, `server/permission.rs`
+- **Issue**: `rmcp::ErrorData`, `rmcp::model::Tool` in public signatures
+- **Fix**: Define wrapper types (`McpToolDescriptor`, `McpTransportError`)
 
-- `ToolCallDisplay` and `ToolResultDisplay` are defined in `talos-conversation` but the TUI reaches into their fields directly — no rendering trait
-- Provider trait returns `mpsc::Receiver<AgentEvent>` — ties the agent to a specific channel implementation
-- `PermissionEngine` is passed as `Arc<PermissionEngine>` concrete type, not `dyn PermissionEngineTrait`
-- `AppServerSession` mixes session state management with turn forwarding logic
+#### 5. `rusqlite::Error` leaks in `talos-evolution` and `talos-session`
+- **Files**: `talos-evolution/src/lib.rs:29`, `talos-session/src/sqlite.rs:26`
+- **Fix**: Define crate-specific store error enums
 
-### 4. Anti-Corruption Opportunities
+#### 6. Duplicate `ToolDefinition` in `talos-agent/caching.rs`
+- **File**: `talos-agent/src/caching.rs:45` (identical to `talos-core/src/provider.rs:31`)
+- **Fix**: Use `talos_core::provider::ToolDefinition`
 
-| Boundary | Current State | ACL Needed? |
-|----------|--------------|-------------|
-| Provider → Agent | AgentEvent directly carries provider-specific fields | Yes — translate provider events to internal domain events |
-| Agent → Conversation Engine | AgentEvent passed through as-is | Mostly clean, but text filter logic split across agent and provider |
-| Conversation Engine → TUI | UiOutput enum is clean | Clean — this is the best boundary |
-| Config → Provider | Config types passed directly to provider constructors | Yes — provider should receive a provider-specific config DTO |
-| Tools → Agent | ToolResult is a plain struct with String content | Needs ImageData support (TOOL-003) — opportunity to add structured result types |
+### P2 — God Module Decomposition
 
-### 5. God Module Decomposition Candidates
+24 files exceed 500 lines. Top candidates:
 
 | File | Lines | Proposed Split |
 |------|-------|---------------|
-| `talos-cli/src/main.rs` | ~2000 | Extract: `registry.rs`, `approval.rs` (exists), `provider_setup.rs`, `event_bridge.rs` |
-| `talos-tui/src/app.rs` | ~2300 | Extract: `tool_display.rs`, `scrollback.rs`, `event_loop.rs` |
-| `talos-agent/src/lib.rs` | ~2500 | Extract: `turn_loop.rs`, `tool_execution.rs`, `text_filter.rs` |
+| `talos-agent/src/lib.rs` | 2,568 | `turn_loop.rs`, `tool_execution.rs`, extract ~1000 lines test code |
+| `talos-tui/src/app.rs` | 2,294 | `tool_display.rs`, `scrollback.rs`, `event_loop.rs` |
+| `talos-cli/src/main.rs` | 2,002 | `registry.rs`, `provider_setup.rs`, `event_bridge.rs`, extract test fixtures |
+| `talos-session/src/lib.rs` | 1,736 | Extract ~800 lines test code to `tests/` |
+| `talos-skill/src/lib.rs` | 1,483 | `parser.rs`, `manager.rs`, `loader.rs`, extract tests |
+| `talos-tools/src/lib.rs` | 863 | `bash.rs`, `read.rs`, `write.rs`, `edit.rs` (one file per tool) |
+
+### P3 — Config Boundary
+
+#### 7. `talos-mcp` imports `talos_config` types directly
+- **File**: `talos-mcp/src/client/manager.rs:5`
+- **Fix**: Define `McpClientConfig` in talos-mcp; convert at CLI composition root
+
+### Positive Findings (what's done right)
+
+- `talos-core` has zero internal dependencies — clean foundation
+- `talos-conversation` / `talos-tui` separation is clean
+- `AgentTool`, `LanguageModel`, `SandboxProvider` traits properly abstracted
+- Error types use `thiserror` consistently
+- `talos-mcp/src/client/facade.rs` shows intentional ACL awareness (incomplete but right direction)
 
 ## Open Questions
 
