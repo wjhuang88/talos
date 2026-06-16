@@ -1972,7 +1972,7 @@ fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLin
     let dim = to_crossterm_color(semantic::DIM_TEXT);
     let mut segments = vec![
         HistorySegment::styled(
-            " ▸ ",
+            " → ",
             prefix_color,
             HistoryAttrs {
                 bold: true,

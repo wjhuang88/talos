@@ -73,7 +73,7 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
         let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
 
         let mut spans = vec![
-            Span::styled(" ▸ ", prefix_style),
+            Span::styled(" → ", prefix_style),
             Span::styled(self.tool_name.to_string(), tool_name_style),
         ];
         if let ToolProvenance::McpRemote { server } = &self.provenance {
