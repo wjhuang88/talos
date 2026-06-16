@@ -622,7 +622,6 @@ pub struct Tui {
     stream_render: StreamRenderState,
     stream_opening_pending: bool,
     pending_stream_opening: Vec<ScrollbackLine>,
-    pending_tool_call: Option<ToolCallDisplay>,
     text_filter: ToolSyntaxFilter,
     processing_frame: usize,
     processing_tick: usize,
@@ -659,7 +658,6 @@ impl Tui {
             stream_render: StreamRenderState::default(),
             stream_opening_pending: false,
             pending_stream_opening: Vec::new(),
-            pending_tool_call: None,
             text_filter: ToolSyntaxFilter::new(),
             processing_frame: 0,
             processing_tick: 0,
@@ -767,17 +765,8 @@ impl Tui {
                     }
                 }
                 Some(output) = ui_output_rx.recv() => {
-                    let needs_render = matches!(
-                        &output,
-                        UiOutput::ToolCall(_) | UiOutput::ToolCallStarted { .. }
-                    );
                     if self.handle_ui_output(output) {
                         break;
-                    }
-                    if needs_render {
-                        self.flush_pending_scrollback()?;
-                        self.draw_frame()?;
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     }
                 }
                 Some(request) = approval_rx.recv() => {
@@ -825,29 +814,8 @@ impl Tui {
     fn consume_stream_chunk(&mut self, chunk: &str) {
         let filter_out = self.text_filter.push_chunk(chunk);
 
-        if filter_out.tool_call_started {
-            if self.active_stream.is_some() {
-                self.finalize_active_stream();
-            }
-            self.pending_tool_call = Some(ToolCallDisplay {
-                tool_name: "tool".to_string(),
-                arguments: serde_json::json!({}),
-                provenance: ToolProvenance::Native,
-            });
-        }
-
-        if let Some(call) = filter_out
-            .tool_call_completed
-            .as_deref()
-            .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-        {
-            let name = call.get("name").and_then(|n| n.as_str()).unwrap_or("tool");
-            let args = call.get("args").cloned().unwrap_or(serde_json::json!({}));
-            self.pending_tool_call = Some(ToolCallDisplay {
-                tool_name: name.to_string(),
-                arguments: args,
-                provenance: ToolProvenance::Native,
-            });
+        if filter_out.tool_call_started && self.active_stream.is_some() {
+            self.finalize_active_stream();
         }
 
         if !filter_out.text.is_empty() {
@@ -867,7 +835,6 @@ impl Tui {
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {
         match output {
             UiOutput::Stream(msg) => {
-                self.pending_tool_call = None;
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
@@ -875,28 +842,16 @@ impl Tui {
                 self.stream_opening_pending = true;
                 self.active_stream = Some(msg.stream);
             }
-            UiOutput::ToolCallStarted { name } => {
+            UiOutput::ToolCallStarted { .. } => {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
-                self.pending_tool_call = Some(ToolCallDisplay {
-                    tool_name: if name.is_empty() {
-                        "tool".to_string()
-                    } else {
-                        name
-                    },
-                    arguments: serde_json::json!({}),
-                    provenance: ToolProvenance::Native,
-                });
             }
             UiOutput::ToolCall(display) => {
-                self.pending_tool_call = Some(display);
+                let line = build_tool_call_scrollback_line(&display);
+                self.pending_scrollback.push(line);
             }
             UiOutput::ToolResult(display) => {
-                if let Some(tool_call) = self.pending_tool_call.take() {
-                    let tool_call_line = build_tool_call_scrollback_line(&tool_call);
-                    self.pending_scrollback.push(tool_call_line);
-                }
                 let icon = if display.is_error { "✗" } else { "✓" };
                 let color = if display.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
@@ -980,7 +935,6 @@ impl Tui {
         let preview_text = hold_status
             .as_ref()
             .map(|status| animated_hold_preview_text(status, self.processing_frame))
-            .or_else(|| self.pending_tool_call.as_ref().map(tool_call_preview_line))
             .unwrap_or_else(|| self.stream_render.preview().to_string());
         let preview_text_color = hold_status
             .as_ref()
@@ -2016,34 +1970,6 @@ fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLin
         HistoryAttrs::default(),
     ));
     ScrollbackLine::styled(segments, None)
-}
-
-fn tool_call_preview_line(tool_call: &ToolCallDisplay) -> String {
-    let args_str = serde_json::to_string_pretty(&tool_call.arguments)
-        .unwrap_or_else(|_| tool_call.arguments.to_string());
-    let args_summary = summarize_tool_args(&tool_call.tool_name, &args_str);
-    let marker = match &tool_call.provenance {
-        ToolProvenance::Native => String::new(),
-        ToolProvenance::McpRemote { server } => format!("[mcp:{}]", server),
-    };
-
-    let args_empty = tool_call
-        .arguments
-        .as_object()
-        .map(|o| o.is_empty())
-        .unwrap_or(true);
-    if args_empty {
-        if marker.is_empty() {
-            return format!(" ▸ {}", tool_call.tool_name);
-        }
-        return format!(" ▸ {}{}", tool_call.tool_name, marker);
-    }
-
-    if marker.is_empty() {
-        format!(" ▸ {},   {}", tool_call.tool_name, args_summary)
-    } else {
-        format!(" ▸ {}{},   {}", tool_call.tool_name, marker, args_summary)
-    }
 }
 
 #[cfg(test)]
