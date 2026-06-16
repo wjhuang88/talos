@@ -875,7 +875,7 @@ impl Tui {
                         first.to_string()
                     }
                 };
-                let line_text = format!("  {} {}", icon, content_trunc);
+                let line_text = format!("   {} {}", icon, content_trunc);
                 let segments = vec![HistorySegment::styled(
                     line_text,
                     color,

@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use futures::stream;
-use talos_core::message::{AgentEvent, ToolResult, Usage};
+use talos_core::message::{AgentEvent, StopReason, ToolResult, Usage};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
@@ -164,9 +164,11 @@ impl ConversationEngine {
                     content: result.content.clone(),
                 }));
             }
-            AgentEvent::TurnEnd { usage, .. } => {
+            AgentEvent::TurnEnd { usage, stop_reason } => {
                 self.close_stream();
-                self.is_processing = false;
+                if matches!(stop_reason, StopReason::EndTurn) {
+                    self.is_processing = false;
+                }
                 self.finalize_turn();
                 self.usage = usage.clone();
                 self.last_flushed_message = self.messages.len();
