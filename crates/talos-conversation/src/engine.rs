@@ -7,7 +7,8 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, ScrollbackState,
-    StatusSnapshot, StreamMessage, TipKind, ToolCallInfo, UiOutput,
+    StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay,
+    UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -130,7 +131,6 @@ impl ConversationEngine {
             AgentEvent::ToolCall { call, provenance } => {
                 self.close_stream();
                 self.record_provenance(provenance);
-                let tool_text = format_tool_call_text(call, provenance);
                 self.messages.push(ChatMessage {
                     role: MessageRole::Assistant,
                     status: MessageStatus::Completed,
@@ -144,31 +144,19 @@ impl ConversationEngine {
                     }),
                     created_at: Instant::now(),
                 });
-
-                let (tx, rx) = mpsc::unbounded_channel::<String>();
-                let _ = tx.send(tool_text);
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Tool {
-                        name: call.name.clone(),
-                    },
-                    stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
+                outputs.push(UiOutput::ToolCall(ToolCallDisplay {
+                    tool_name: call.name.clone(),
+                    arguments: call.input.clone(),
+                    provenance: provenance.clone(),
                 }));
-                drop(tx);
             }
             AgentEvent::ToolResult { result } => {
                 self.close_stream();
                 self.set_tool_result(result);
-                let result_text = format_tool_result_text(result);
-
-                let (tx, rx) = mpsc::unbounded_channel::<String>();
-                let _ = tx.send(result_text);
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Tool {
-                        name: String::new(),
-                    },
-                    stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
+                outputs.push(UiOutput::ToolResult(ToolResultDisplay {
+                    is_error: result.is_error,
+                    content: result.content.clone(),
                 }));
-                drop(tx);
             }
             AgentEvent::TurnEnd { usage, .. } => {
                 self.close_stream();
@@ -483,18 +471,4 @@ impl ConversationEngine {
                 .push(PluginObservation { key, count: 1 });
         }
     }
-}
-
-fn format_tool_call_text(
-    call: &talos_core::message::ToolCall,
-    provenance: &ToolProvenance,
-) -> String {
-    let marker = plugin_observation_key(provenance);
-    let args = serde_json::to_string_pretty(&call.input).unwrap_or_else(|_| call.input.to_string());
-    format!("▸ {} [{}]\n  {}", call.name, marker, args)
-}
-
-fn format_tool_result_text(result: &ToolResult) -> String {
-    let icon = if result.is_error { "✗" } else { "✓" };
-    format!("  {icon} {}", result.content)
 }

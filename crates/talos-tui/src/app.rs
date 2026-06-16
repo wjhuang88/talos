@@ -18,6 +18,7 @@ use talos_conversation::{MessageSource, StatusSnapshot, TipKind, UiOutput, UserI
 use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::Message;
+use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
 use crate::evolution::{self, EvolutionPanel};
@@ -826,6 +827,50 @@ impl Tui {
                 self.pending_stream_opening = self.stream_render.start(msg.source.clone());
                 self.stream_opening_pending = true;
                 self.active_stream = Some(msg.stream);
+            }
+            UiOutput::ToolCall(display) => {
+                if self.active_stream.is_some() {
+                    self.finalize_active_stream();
+                }
+                let args_str = serde_json::to_string_pretty(&display.arguments)
+                    .unwrap_or_else(|_| display.arguments.to_string());
+                let args_summary = summarize_tool_args(&display.tool_name, &args_str);
+                let marker = match &display.provenance {
+                    ToolProvenance::Native => "native".to_string(),
+                    ToolProvenance::McpRemote { server } => format!("mcp:{}", server),
+                };
+                let line_text = format!("▸ {} [{}]\n  {}", display.tool_name, marker, args_summary);
+                let segments = vec![HistorySegment::styled(
+                    line_text,
+                    to_crossterm_color(semantic::TEXT_ACCENT),
+                    HistoryAttrs {
+                        bold: true,
+                        ..HistoryAttrs::default()
+                    },
+                )];
+                self.pending_scrollback
+                    .push(ScrollbackLine::styled(segments, None));
+            }
+            UiOutput::ToolResult(display) => {
+                let icon = if display.is_error { "✗" } else { "✓" };
+                let color = if display.is_error {
+                    to_crossterm_color(semantic::TEXT_ERROR)
+                } else {
+                    to_crossterm_color(semantic::TEXT_SUCCESS)
+                };
+                let content_trunc = if display.content.len() > 200 {
+                    format!("{}...", &display.content[..200])
+                } else {
+                    display.content.clone()
+                };
+                let line_text = format!("  {} {}", icon, content_trunc);
+                let segments = vec![HistorySegment::styled(
+                    line_text,
+                    color,
+                    HistoryAttrs::default(),
+                )];
+                self.pending_scrollback
+                    .push(ScrollbackLine::styled(segments, None));
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
@@ -1837,6 +1882,46 @@ fn truncate_end_to_width(s: &str, max_width: u16) -> String {
         start = i;
     }
     chars[start..].iter().collect()
+}
+
+fn summarize_tool_args(tool_name: &str, args_str: &str) -> String {
+    match tool_name {
+        "write" | "edit" => {
+            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(args_str) {
+                let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
+                let content_len = obj
+                    .get("content")
+                    .and_then(|c| c.as_str())
+                    .map(|s| s.len())
+                    .unwrap_or(0);
+                format!("path: {} ({} bytes)", path, content_len)
+            } else {
+                args_str.chars().take(80).collect()
+            }
+        }
+        "read" => {
+            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(args_str) {
+                let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
+                format!("path: {}", path)
+            } else {
+                args_str.chars().take(80).collect()
+            }
+        }
+        "bash" => {
+            if let Ok(obj) = serde_json::from_str::<serde_json::Value>(args_str) {
+                let cmd = obj.get("command").and_then(|c| c.as_str()).unwrap_or("?");
+                let display = if cmd.len() > 80 {
+                    format!("{}...", &cmd[..80])
+                } else {
+                    cmd.to_string()
+                };
+                format!("command: {}", display)
+            } else {
+                args_str.chars().take(80).collect()
+            }
+        }
+        _ => args_str.chars().take(80).collect(),
+    }
 }
 
 #[cfg(test)]

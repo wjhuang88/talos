@@ -86,7 +86,22 @@ pub enum UiOutput {
     Stream(StreamMessage),
     Status(StatusSnapshot),
     Tip { text: String, kind: TipKind },
+    ToolCall(ToolCallDisplay),
+    ToolResult(ToolResultDisplay),
     Exit,
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolCallDisplay {
+    pub tool_name: String,
+    pub arguments: serde_json::Value,
+    pub provenance: ToolProvenance,
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolResultDisplay {
+    pub is_error: bool,
+    pub content: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
