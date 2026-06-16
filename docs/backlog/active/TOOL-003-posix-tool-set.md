@@ -166,8 +166,47 @@ Visualize directory structure.
 | **License** | MIT |
 | **Rationale** | Quick project overview. `termtree` is maintained by rust-cli org. |
 
-## Crate Dependency Summary
+## ReadTool Enhancement: Offset/Limit Partial Read
 
+**Status**: To implement alongside P0 batch  
+**Current state**: `ReadInput` has `start_line` and `end_line` (line-number based, both optional)
+
+### Problem
+
+Current read tool uses `start_line` / `end_line` which:
+- Requires knowing line numbers in advance
+- Reads the entire file into memory before slicing
+- Doesn't support byte-level offset for binary/large files
+- Doesn't support "read next N lines from where I left off" pagination pattern
+
+### Proposed Change
+
+Add `offset` and `limit` parameters for partial reading:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `offset` | `Option<u32>` | `0` | Starting line number (0-based or 1-based, see decision below) |
+| `limit` | `Option<u32>` | `2000` | Maximum number of lines to return |
+
+Behavior:
+- `offset` + `limit` replaces `start_line` / `end_line` (keep old params for backward compat)
+- If `limit` not specified, default cap at 2000 lines to prevent context blowup
+- Response includes `total_lines` so the LLM knows if there's more to read
+- If file exceeds `limit`, append `\n... ({remaining} more lines, use offset={next_offset} to continue)` hint
+
+### Migration
+
+- `start_line` / `end_line` → deprecated but still functional (translated to offset/limit internally)
+- New `offset` / `limit` preferred in system prompt tool description
+- LLM naturally adopts the pagination pattern from the hint text
+
+### Open Questions
+
+1. **0-based vs 1-based offset**: `offset=0` means first line, or `offset=1` means first line? Recommend 0-based (matches most APIs, simpler math).
+2. **Default limit**: 2000 lines? Or token-based (e.g., 10K tokens)?
+3. **Byte offset mode**: Should there be a `byte_offset` for binary reads? Or keep line-only?
+
+## Crate Dependency Summary
 | Crate | Version | License | Pure Rust | New Dep? | Purpose |
 |-------|---------|---------|-----------|----------|---------|
 | `regex` | 1.x | MIT/Apache-2.0 | Yes | Yes | GrepTool |
