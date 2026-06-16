@@ -456,7 +456,7 @@ impl Agent {
         if is_debug && let Some(preview) = self.provider.request_preview(&messages) {
             let snapshot =
                 serde_json::to_string_pretty(&preview).unwrap_or_else(|_| preview.to_string());
-            let result = format!("Request preview (no API call made):\n\n```\n{snapshot}\n```");
+            let result = format!("Request preview (no API call made):\n\n```json\n{snapshot}\n```");
             if let Some(ref tx) = event_tx {
                 let _ = tx.send(AgentEvent::TurnStart);
                 let _ = tx.send(AgentEvent::TextDelta {
