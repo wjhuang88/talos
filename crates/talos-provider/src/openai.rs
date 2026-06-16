@@ -499,6 +499,18 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         })
                         .await;
                 }
+                if let Some(call) = filter_out
+                    .tool_call_completed
+                    .as_deref()
+                    .and_then(crate::parse_json_tool_call)
+                {
+                    let _ = tx
+                        .send(AgentEvent::ToolCall {
+                            call,
+                            provenance: Default::default(),
+                        })
+                        .await;
+                }
             }
 
             // Extract tool calls

@@ -1,15 +1,24 @@
-//! Streaming filter that suppresses tool call syntax from visible text output.
+//! Streaming tool call detector shared by provider and TUI.
+//!
+//! Processes text chunks and separates normal text from tool call blocks
+//! delimited by `<tool_call>...</tool_call>` (or ```` ```json-tool ``` ````).
 
 pub struct ToolSyntaxFilter {
     buffer: String,
     in_tool_block: bool,
     pending: String,
     just_entered_tool_block: bool,
+    just_closed_tool_block: bool,
+    completed_tool_call: Option<String>,
 }
 
 pub struct ToolFilterOutput {
+    /// Clean text to display (tool call syntax stripped).
     pub text: String,
+    /// `<tool_call>` opening tag detected this chunk.
     pub tool_call_started: bool,
+    /// `</tool_call>` closing tag detected, full JSON content available.
+    pub tool_call_completed: Option<String>,
 }
 
 const START_MARKERS: &[&str] = &["<tool_call>", "<toolcall>", "```json-tool"];
@@ -31,6 +40,22 @@ fn find_start_marker(text: &str) -> Option<usize> {
     earliest
 }
 
+fn strip_markers(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    for m in START_MARKERS {
+        if s.starts_with(m) {
+            s = s[m.len()..].to_string();
+        }
+    }
+    for m in END_MARKERS {
+        if s.ends_with(m) {
+            let end = s.len() - m.len();
+            s.truncate(end);
+        }
+    }
+    s.trim().to_string()
+}
+
 impl ToolSyntaxFilter {
     pub fn new() -> Self {
         Self {
@@ -38,6 +63,8 @@ impl ToolSyntaxFilter {
             in_tool_block: false,
             pending: String::new(),
             just_entered_tool_block: false,
+            just_closed_tool_block: false,
+            completed_tool_call: None,
         }
     }
 
@@ -45,10 +72,13 @@ impl ToolSyntaxFilter {
         self.pending.push_str(chunk);
         let text = self.drain_pending();
         let started = self.just_entered_tool_block;
+        let completed = self.completed_tool_call.take();
         self.just_entered_tool_block = false;
+        self.just_closed_tool_block = false;
         ToolFilterOutput {
             text,
             tool_call_started: started,
+            tool_call_completed: completed,
         }
     }
 
@@ -68,9 +98,11 @@ impl ToolSyntaxFilter {
 
                 if let Some((pos, marker_len)) = found_end {
                     self.buffer.push_str(&self.pending[..pos + marker_len]);
+                    let raw = std::mem::take(&mut self.buffer);
+                    self.completed_tool_call = Some(strip_markers(&raw));
                     self.pending = self.pending[pos + marker_len..].to_string();
                     self.in_tool_block = false;
-                    self.buffer.clear();
+                    self.just_closed_tool_block = true;
                 } else {
                     self.buffer.push_str(&self.pending);
                     self.pending.clear();
@@ -156,10 +188,82 @@ impl ToolSyntaxFilter {
             drained
         }
     }
+
+    pub fn is_in_tool_block(&self) -> bool {
+        self.in_tool_block
+    }
 }
 
 impl Default for ToolSyntaxFilter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normal_text_passes_through() {
+        let mut f = ToolSyntaxFilter::new();
+        let out = f.push_chunk("hello world");
+        assert_eq!(out.text, "hello world");
+        assert!(!out.tool_call_started);
+        assert!(out.tool_call_completed.is_none());
+    }
+
+    #[test]
+    fn detects_tool_call_start() {
+        let mut f = ToolSyntaxFilter::new();
+        let out = f.push_chunk("text before <tool_call>");
+        assert_eq!(out.text, "text before ");
+        assert!(out.tool_call_started);
+        assert!(out.tool_call_completed.is_none());
+    }
+
+    #[test]
+    fn detects_tool_call_complete() {
+        let mut f = ToolSyntaxFilter::new();
+        let out = f.push_chunk("<tool_call>{\"name\":\"write\"}</tool_call>");
+        assert!(out.tool_call_started);
+        let completed = out.tool_call_completed.expect("should complete");
+        assert!(completed.contains("\"write\""));
+    }
+
+    #[test]
+    fn streams_tool_call_across_chunks() {
+        let mut f = ToolSyntaxFilter::new();
+
+        let out = f.push_chunk("<tool_call>");
+        assert!(out.tool_call_started);
+        assert!(out.tool_call_completed.is_none());
+
+        let out = f.push_chunk("{\"name\":\"write\",\"args\":");
+        assert!(out.text.is_empty());
+
+        let out = f.push_chunk("{\"path\":\"a.txt\"}}</tool_call>");
+        let completed = out.tool_call_completed.expect("should complete");
+        assert!(completed.contains("write"));
+        assert!(completed.contains("a.txt"));
+    }
+
+    #[test]
+    fn strips_tool_call_from_visible_text() {
+        let mut f = ToolSyntaxFilter::new();
+        let out = f.push_chunk("hello <tool_call>{}</tool_call> world");
+        assert_eq!(out.text, "hello  world");
+    }
+
+    #[test]
+    fn holds_back_partial_marker() {
+        let mut f = ToolSyntaxFilter::new();
+        let out = f.push_chunk("hello <tool_");
+        assert_eq!(out.text, "hello ");
+        assert!(!out.tool_call_started);
+
+        let out = f.push_chunk("call>{}</tool_call>");
+        assert!(out.tool_call_started);
+        assert!(out.tool_call_completed.is_some());
     }
 }

@@ -368,6 +368,18 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                 })
                                 .await;
                         }
+                        if let Some(call) = filter_out
+                            .tool_call_completed
+                            .as_deref()
+                            .and_then(parse_json_tool_call)
+                        {
+                            let _ = tx
+                                .send(AgentEvent::ToolCall {
+                                    call,
+                                    provenance: ToolProvenance::Native,
+                                })
+                                .await;
+                        }
                     }
                     if let Some(partial) = data.get("delta")
                         && partial.get("type").and_then(|t| t.as_str()) == Some("input_json_delta")
@@ -509,7 +521,7 @@ pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
     calls
 }
 
-fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
+pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
     let content = content.trim().trim_matches('`').trim();
 
     // Try: entire content is JSON: {"name":"bash","args":{...}}
