@@ -341,15 +341,19 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
                     tool_call_id: None,
                 }
             }
-            Message::Tool { result } => OpenAIMessage {
-                role: "tool".into(),
-                content: Some(non_empty_content(
-                    &result.content,
-                    EMPTY_TOOL_RESULT_MESSAGE,
-                )),
-                tool_calls: None,
-                tool_call_id: Some(result.tool_use_id.clone()),
-            },
+            Message::Tool { result } => {
+                let content = if result.is_error {
+                    format!("Error: {}", result.content)
+                } else {
+                    non_empty_content(&result.content, EMPTY_TOOL_RESULT_MESSAGE)
+                };
+                OpenAIMessage {
+                    role: "tool".into(),
+                    content: Some(content),
+                    tool_calls: None,
+                    tool_call_id: Some(result.tool_use_id.clone()),
+                }
+            }
         })
         .collect();
 

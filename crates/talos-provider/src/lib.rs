@@ -215,14 +215,20 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
                     "content": blocks,
                 })
             }
-            Message::Tool { result } => json!({
-                "role": "user",
-                "content": [{
+            Message::Tool { result } => {
+                let mut block = json!({
                     "type": "tool_result",
                     "tool_use_id": result.tool_use_id,
                     "content": result.content,
-                }],
-            }),
+                });
+                if result.is_error {
+                    block["is_error"] = json!(true);
+                }
+                json!({
+                    "role": "user",
+                    "content": [block],
+                })
+            }
         })
         .collect();
 

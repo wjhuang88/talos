@@ -984,10 +984,14 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let session_manager_for_persist = session_manager.clone();
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
+        let mut pending_tool_results: Vec<talos_core::message::ToolResult> = Vec::new();
         while let Some(session_event) = bridge_forwarder.recv().await {
             match session_event {
-                SessionEvent::AgentEvent(agent_event) => {
-                    let _ = bridge_tx.send(agent_event);
+                SessionEvent::AgentEvent(ref agent_event) => {
+                    if let AgentEvent::ToolResult { result } = agent_event {
+                        pending_tool_results.push(result.clone());
+                    }
+                    let _ = bridge_tx.send(agent_event.clone());
                 }
                 SessionEvent::TurnCompleted {
                     status: talos_core::session::TurnCompletionStatus::Success { final_text },
@@ -1000,6 +1004,12 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
                     if let Err(e) = session_for_persist.append(&assistant_msg) {
                         eprintln!("Warning: failed to persist assistant message: {e}");
                     }
+                    for result in pending_tool_results.drain(..) {
+                        let tool_msg = talos_core::message::Message::Tool { result };
+                        if let Err(e) = session_for_persist.append(&tool_msg) {
+                            eprintln!("Warning: failed to persist tool result: {e}");
+                        }
+                    }
                     if let Err(e) = session_manager_for_persist.update_index(&session_for_persist) {
                         eprintln!("Warning: failed to update session index: {e}");
                     }
@@ -1008,7 +1018,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
                     status: talos_core::session::TurnCompletionStatus::Success { .. },
                     ..
                 } => {
-                    // Empty assistant turns have no durable transcript entry.
+                    pending_tool_results.clear();
                 }
                 SessionEvent::TurnCompleted {
                     status: talos_core::session::TurnCompletionStatus::Error { message },

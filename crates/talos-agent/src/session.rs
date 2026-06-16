@@ -16,6 +16,7 @@ use tracing::error;
 
 use talos_core::message::AgentEvent;
 use talos_core::message::Message;
+use talos_core::message::ToolResult as MessageToolResult;
 use talos_core::session::{
     SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnCompletionStatus,
 };
@@ -23,6 +24,11 @@ use talos_core::session::{
 use crate::Agent;
 use crate::compaction::Compactor;
 use crate::token::TokenEstimator;
+
+struct TurnRecord {
+    assistant_text: String,
+    tool_results: Vec<MessageToolResult>,
+}
 
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
 ///
@@ -76,7 +82,7 @@ impl AppServerSession {
     /// [`SessionOp::Shutdown`] exits the loop.
     pub async fn run(&mut self) {
         let mut turn_counter: u64 = 0;
-        let mut current_turn: Option<JoinHandle<Option<String>>> = None;
+        let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
         let mut cancel_token: Option<CancellationToken> = None;
 
         while let Some(op) = self.sq_rx.recv().await {
@@ -120,7 +126,7 @@ impl AppServerSession {
 
                     let handle = tokio::spawn(async move {
                         let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
-                        let (result_tx, result_rx) = tokio::sync::oneshot::channel::<String>();
+                        let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
 
                         let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                             agent,
@@ -159,8 +165,8 @@ impl AppServerSession {
         }
     }
 
-    async fn commit_finished_turn(&mut self, handle: JoinHandle<Option<String>>) {
-        let Some(final_text) = handle.await.ok().flatten() else {
+    async fn commit_finished_turn(&mut self, handle: JoinHandle<Option<TurnRecord>>) {
+        let Some(record) = handle.await.ok().flatten() else {
             return;
         };
 
@@ -168,38 +174,20 @@ impl AppServerSession {
             self.history.push(Message::User { content: user_msg });
         }
 
-        let tool_calls = talos_core::message::extract_tool_calls_from_text(&final_text);
-        let tool_count = tool_calls.len();
-
-        let cleaned_content = if tool_count > 0 {
-            let cleaned = talos_core::message::strip_tool_syntax(&final_text);
-            if tool_count == 1 {
-                format!(
-                    "🛠 {} {}\n\n{}",
-                    tool_calls[0].name,
-                    tool_calls[0].input,
-                    cleaned.trim()
-                )
-            } else {
-                let summary: Vec<String> = tool_calls
-                    .iter()
-                    .map(|tc| format!("  ▸ {} {}", tc.name, tc.input))
-                    .collect();
-                format!(
-                    "🛠 {} tools\n{}\n\n{}",
-                    tool_count,
-                    summary.join("\n"),
-                    cleaned.trim()
-                )
-            }
+        if record.tool_results.is_empty() {
+            self.history.push(Message::Assistant {
+                content: record.assistant_text,
+                tool_calls: vec![],
+            });
         } else {
-            final_text
-        };
-
-        self.history.push(Message::Assistant {
-            content: cleaned_content,
-            tool_calls,
-        });
+            self.history.push(Message::Assistant {
+                content: record.assistant_text,
+                tool_calls: vec![],
+            });
+            for result in record.tool_results {
+                self.history.push(Message::Tool { result });
+            }
+        }
     }
 }
 
@@ -212,7 +200,7 @@ struct TurnForwarding {
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     cancel_token: CancellationToken,
     turn_id: String,
-    result_tx: tokio::sync::oneshot::Sender<String>,
+    result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
 }
 
 async fn run_turn_with_forwarding(turn: TurnForwarding) {
@@ -230,6 +218,8 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     let eq_tx_clone = eq_tx.clone();
     let cancel_clone = cancel_token.clone();
+    let collected_results = Arc::new(std::sync::Mutex::new(Vec::<MessageToolResult>::new()));
+    let collected_clone = collected_results.clone();
 
     let forwarder = tokio::spawn(async move {
         loop {
@@ -238,9 +228,12 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 event = event_rx.recv() => {
                     match event {
                         Some(event) => {
+                            if let AgentEvent::ToolResult { result } = &event {
+                                collected_clone.lock().expect("poisoned").push(result.clone());
+                            }
                             let _ = eq_tx.send(SessionEvent::AgentEvent(event));
                         }
-                        None => break, // Channel closed (agent done)
+                        None => break,
                     }
                 }
             }
@@ -267,13 +260,21 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     match agent_result {
         Ok(Ok(final_text)) => {
+            let tool_results = collected_results
+                .lock()
+                .expect("poisoned")
+                .drain(..)
+                .collect::<Vec<_>>();
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
                 turn_id,
                 status: TurnCompletionStatus::Success {
                     final_text: final_text.clone(),
                 },
             });
-            let _ = result_tx.send(final_text);
+            let _ = result_tx.send(TurnRecord {
+                assistant_text: final_text,
+                tool_results,
+            });
         }
         Ok(Err(e)) => {
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
