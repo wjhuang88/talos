@@ -343,10 +343,11 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             index,
                             ToolUseBlock {
                                 id,
-                                name,
+                                name: name.clone(),
                                 input_json: String::new(),
                             },
                         );
+                        let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
                     }
                 }
                 Some("content_block_delta") => {

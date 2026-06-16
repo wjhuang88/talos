@@ -507,6 +507,11 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                     }
                     if let Some(ref func) = tc.function {
                         if let Some(ref name) = func.name {
+                            if tool_call_names[idx].is_empty() {
+                                let _ = tx
+                                    .send(AgentEvent::ToolCallStarted { name: name.clone() })
+                                    .await;
+                            }
                             tool_call_names[idx] = name.clone();
                         }
                         if let Some(ref args) = func.arguments {

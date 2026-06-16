@@ -128,6 +128,12 @@ impl ConversationEngine {
                 }
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
+            AgentEvent::ToolCallStarted { name } => {
+                self.close_stream();
+                outputs.push(UiOutput::ToolCallStarted {
+                    name: name.to_string(),
+                });
+            }
             AgentEvent::ToolCall { call, provenance } => {
                 self.close_stream();
                 self.record_provenance(provenance);

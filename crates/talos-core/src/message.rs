@@ -99,6 +99,11 @@ pub enum AgentEvent {
         /// The text chunk.
         delta: String,
     },
+    /// Tool call detected: parameters still streaming.
+    ToolCallStarted {
+        /// Name of the tool being called.
+        name: String,
+    },
     /// A tool call was requested.
     ToolCall {
         /// The tool call details.

@@ -764,11 +764,14 @@ impl Tui {
                     }
                 }
                 Some(output) = ui_output_rx.recv() => {
-                    let is_tool_call = matches!(&output, UiOutput::ToolCall(_));
+                    let needs_render = matches!(
+                        &output,
+                        UiOutput::ToolCall(_) | UiOutput::ToolCallStarted { .. }
+                    );
                     if self.handle_ui_output(output) {
                         break;
                     }
-                    if is_tool_call {
+                    if needs_render {
                         self.flush_pending_scrollback()?;
                         self.draw_frame()?;
                     }
@@ -839,10 +842,17 @@ impl Tui {
                 self.stream_opening_pending = true;
                 self.active_stream = Some(msg.stream);
             }
-            UiOutput::ToolCall(display) => {
+            UiOutput::ToolCallStarted { name } => {
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
+                self.pending_tool_call = Some(ToolCallDisplay {
+                    tool_name: name,
+                    arguments: serde_json::json!({}),
+                    provenance: ToolProvenance::Native,
+                });
+            }
+            UiOutput::ToolCall(display) => {
                 self.pending_tool_call = Some(display);
             }
             UiOutput::ToolResult(display) => {
@@ -1979,6 +1989,19 @@ fn tool_call_preview_line(tool_call: &ToolCallDisplay) -> String {
         ToolProvenance::Native => String::new(),
         ToolProvenance::McpRemote { server } => format!("[mcp:{}]", server),
     };
+
+    let args_empty = tool_call
+        .arguments
+        .as_object()
+        .map(|o| o.is_empty())
+        .unwrap_or(true);
+    if args_empty {
+        if marker.is_empty() {
+            return format!(" ▸ {}", tool_call.tool_name);
+        }
+        return format!(" ▸ {}{}", tool_call.tool_name, marker);
+    }
+
     if marker.is_empty() {
         format!(" ▸ {},   {}", tool_call.tool_name, args_summary)
     } else {

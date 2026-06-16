@@ -86,6 +86,7 @@ pub enum UiOutput {
     Stream(StreamMessage),
     Status(StatusSnapshot),
     Tip { text: String, kind: TipKind },
+    ToolCallStarted { name: String },
     ToolCall(ToolCallDisplay),
     ToolResult(ToolResultDisplay),
     Exit,
