@@ -1,0 +1,251 @@
+# TOOL-003: POSIX Tool Set — Embedded Rust Utilities
+
+**Status**: Planned  
+**Priority**: P2  
+**Depends on**: TOOL-001 (portable file/search baseline), TOOL-002 (tool calling remediation)  
+**Related ADRs**: ADR-010 (host dependency discipline), ADR-020 (tree-sitter)
+
+## Problem
+
+Talos currently has 4 file/shell tools (bash, read, write, edit) and 4 AST symbol tools. Agents fall back to `bash` for common operations (grep, find, diff, ls, rm, cp, image read) that could be first-class tools with structured JSON output, permission granularity, and sandbox awareness. Each `bash` invocation is a security surface and permission prompt; dedicated tools reduce that surface.
+
+## Scope
+
+### In Scope
+
+Embed Rust-native implementations of high-value POSIX utilities as built-in tools, reducing host dependency on shell commands. Include multimodal image reading support.
+
+### Out of Scope
+
+- Process management (ps/kill)
+- Network utilities (curl/dig)
+- Text processing pipelines (sed/awk/tr)
+- Archive operations (tar/zip) — deferred to a later slice
+
+## Current Tool Inventory
+
+| Tool | Name | Read-Only | POSIX Equivalent |
+|------|------|-----------|------------------|
+| BashTool | `bash` | No | `sh` (covers everything indirectly) |
+| ReadTool | `read` | Yes | `cat`, `head`, `tail` |
+| WriteTool | `write` | No | `touch`, `echo >` |
+| EditTool | `edit` | No | `sed -i`, `patch` |
+| FindSymbolTool | `find_symbol` | Yes | N/A (AST-level) |
+| FindReferencesTool | `find_references` | Yes | N/A (AST-level) |
+| ListSymbolsTool | `list_symbols` | Yes | N/A (AST-level) |
+| ListImportsTool | `list_imports` | Yes | N/A (AST-level) |
+
+## Proposed New Tools
+
+### P0 — High Agent Utility
+
+#### 1. GrepTool (`grep`)
+
+Search file contents by regex across the workspace.
+
+| | |
+|---|---|
+| **Tool name** | `grep` |
+| **Read-only** | Yes |
+| **Parameters** | `pattern` (string, required), `path` (string, optional, default "."), `include` (glob, optional), `max_results` (int, optional, default 50) |
+| **Output** | JSON array: `[{file, line_number, line, match_start, match_end}]` |
+| **Crate** | `regex` (direct usage, not ripgrep library facade — simpler API, fewer deps) |
+| **Crate version** | `regex` 1.x |
+| **License** | MIT/Apache-2.0 |
+| **Rationale** | Highest-value gap. Agents search codebases constantly. `regex` + `walkdir` (already a dep) covers this without ripgrep's internal crate complexity. |
+
+#### 2. GlobTool (`glob`)
+
+Find files by name pattern.
+
+| | |
+|---|---|
+| **Tool name** | `glob` |
+| **Read-only** | Yes |
+| **Parameters** | `pattern` (string, required, e.g. `**/*.rs`), `path` (string, optional, default ".") |
+| **Output** | JSON array of file paths |
+| **Crate** | `glob` |
+| **Crate version** | 0.3.x |
+| **License** | MIT/Apache-2.0 |
+| **Rationale** | File discovery by pattern is the second most common agent operation. `glob` is zero-dep, battle-tested, 200M+ downloads. |
+
+#### 3. DeleteTool (`delete`)
+
+Delete files or directories.
+
+| | |
+|---|---|
+| **Tool name** | `delete` |
+| **Read-only** | No |
+| **Parameters** | `path` (string, required) |
+| **Output** | `deleted: {path}` |
+| **Crate** | `std::fs` (no external dep) |
+| **Rationale** | No native delete capability exists. Currently requires `bash rm`. WriteTool refuses overwrite but can't remove files. |
+
+### P1 — Medium Agent Utility
+
+#### 4. LsTool (`ls`)
+
+List directory contents with metadata.
+
+| | |
+|---|---|
+| **Tool name** | `ls` |
+| **Read-only** | Yes |
+| **Parameters** | `path` (string, optional, default "."), `all` (bool, optional, show hidden), `recursive` (bool, optional, default false) |
+| **Output** | JSON array: `[{name, type, size, modified}]` |
+| **Crate** | `std::fs` (no external dep) |
+| **Rationale** | Structured directory listing without shell parsing. More reliable than parsing `ls -la` output from bash. |
+
+#### 5. DiffTool (`diff`)
+
+Compare two files or strings, show unified diff.
+
+| | |
+|---|---|
+| **Tool name** | `diff` |
+| **Read-only** | Yes |
+| **Parameters** | `old_path` (string, required), `new_path` (string, required) |
+| **Output** | Unified diff text |
+| **Crate** | `similar` |
+| **Crate version** | 3.x |
+| **License** | Apache-2.0 |
+| **Rationale** | Code review workflows. `similar` is the standard Rust diff library (142M downloads, used by `insta`). |
+
+#### 6. StatTool (`stat`)
+
+Get file metadata.
+
+| | |
+|---|---|
+| **Tool name** | `stat` |
+| **Read-only** | Yes |
+| **Parameters** | `path` (string, required) |
+| **Output** | JSON: `{size, is_file, is_dir, is_symlink, modified, created, permissions, mime_type}` |
+| **Crate** | `std::fs` + `infer` (for MIME detection) |
+| **Crate version** | `infer` 0.19.x |
+| **License** | MIT |
+| **Rationale** | Agents need file metadata for decision-making. MIME detection helps identify binary/image files. |
+
+### P2 — Multimodal Support
+
+#### 7. ReadTool Enhancement: Image Reading
+
+Extend the existing `read` tool to detect and return image data for multimodal LLMs.
+
+| | |
+|---|---|
+| **Tool name** | `read` (enhanced, no new tool) |
+| **Behavior change** | When path points to an image file (png/jpeg/gif/webp), return base64-encoded image data instead of text error |
+| **Output for images** | Text placeholder `[Image: {filename} ({width}x{height} {mime_type})]` + `ImageData` attached to ToolResult |
+| **Image formats** | image/png, image/jpeg, image/gif, image/webp (all Anthropic-supported formats) |
+| **Crates** | `infer` 0.19.x (type detection), `imagesize` 0.14.x (dimensions), `base64` 0.22.x (encoding) |
+| **Licenses** | All MIT |
+
+**Message type changes required**:
+
+- `MessageToolResult` gains optional `images: Vec<ImageData>` field
+- `ImageData` struct: `{ media_type: String, data: String }` (base64, no prefix)
+- Anthropic provider: serialize as `content: [{type: "image", source: {type: "base64", media_type, data}}, {type: "text", text: placeholder}]`
+- OpenAI provider: serialize as `content: [{type: "image_url", image_url: {url: "data:{mime};base64,{data}"}}, {type: "text", text: placeholder}]`
+- TUI: render text placeholder only, never base64 data
+- Agent: propagate `images` from `ToolExecutionResult` to `MessageToolResult`
+
+### P3 — Nice to Have
+
+#### 8. TreeTool (`tree`)
+
+Visualize directory structure.
+
+| | |
+|---|---|
+| **Tool name** | `tree` |
+| **Read-only** | Yes |
+| **Parameters** | `path` (string, optional, default "."), `max_depth` (int, optional, default 3) |
+| **Output** | ASCII tree with box-drawing characters |
+| **Crate** | `termtree` |
+| **Crate version** | 0.5.x |
+| **License** | MIT |
+| **Rationale** | Quick project overview. `termtree` is maintained by rust-cli org. |
+
+## Crate Dependency Summary
+
+| Crate | Version | License | Pure Rust | New Dep? | Purpose |
+|-------|---------|---------|-----------|----------|---------|
+| `regex` | 1.x | MIT/Apache-2.0 | Yes | Yes | GrepTool |
+| `glob` | 0.3.x | MIT/Apache-2.0 | Yes | Yes | GlobTool |
+| `similar` | 3.x | Apache-2.0 | Yes | Yes | DiffTool |
+| `infer` | 0.19.x | MIT | Yes | Yes | StatTool + ReadTool image detection |
+| `imagesize` | 0.14.x | MIT | Yes | Yes | ReadTool image dimensions |
+| `base64` | 0.22.x | MIT/Apache-2.0 | Yes | Yes | ReadTool image encoding |
+| `termtree` | 0.5.x | MIT | Yes | Yes | TreeTool |
+| `std::fs` | stdlib | N/A | Yes | No | DeleteTool, LsTool |
+
+All crates are pure Rust, actively maintained, and widely used. No C dependencies. Compliant with AGENTS.md HC #1 (Rust first).
+
+## Registration
+
+All new tools must be registered in:
+- `build_print_tool_registry()` — print mode
+- `build_tui_tool_registry()` — TUI mode
+- `build_mcp_tool_registry()` — MCP server mode
+- `run_interactive_mode()` — interactive REPL (currently missing symbol tools too)
+
+## Permission Rules
+
+| Tool | Default Permission |
+|------|-------------------|
+| `grep` | Allow (read-only) |
+| `glob` | Allow (read-only) |
+| `ls` | Allow (read-only) |
+| `stat` | Allow (read-only) |
+| `diff` | Allow (read-only) |
+| `tree` | Allow (read-only) |
+| `delete` | Ask (destructive) |
+| `read` (image) | Allow (read-only, already allowed) |
+
+Workspace-root auto-approval (from TOOL-002 permission fix) applies to all read-only tools.
+
+## Acceptance Criteria
+
+### P0
+- [ ] `grep` tool searches file contents by regex, returns structured JSON
+- [ ] `glob` tool finds files by pattern, returns path list
+- [ ] `delete` tool removes files/directories with workspace path validation
+- [ ] All tools registered in all 4 registry builders
+- [ ] Permission rules configured (read-only auto-allow, delete requires approval)
+- [ ] Unit tests for each tool
+
+### P1
+- [ ] `ls` tool lists directory contents with metadata
+- [ ] `diff` tool compares files using `similar`, outputs unified diff
+- [ ] `stat` tool returns file metadata including MIME type
+
+### P2
+- [ ] `read` tool detects image files and returns base64 data
+- [ ] `ImageData` type added to `MessageToolResult`
+- [ ] Anthropic provider serializes image blocks in tool_result
+- [ ] OpenAI provider serializes image_url in tool result
+- [ ] TUI shows text placeholder, never base64
+- [ ] Agent propagates images from tool execution to LLM context
+
+### P3
+- [ ] `tree` tool renders directory structure
+
+## Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| New crate deps increase build time | Low | Low | All are small, pure Rust crates |
+| `regex` crate compilation is slow | Medium | Low | Use `regex-lite` if build time is a concern |
+| Image base64 inflates context tokens | Medium | Medium | Cap image size (e.g., 5MB), warn in tool description |
+| `delete` tool is destructive | Medium | High | Permission Ask + workspace path validation + no recursive without explicit flag |
+
+## Implementation Order
+
+1. **P0 batch**: grep + glob + delete (3 tools, highest value)
+2. **P1 batch**: ls + diff + stat (3 tools, medium value)
+3. **P2 slice**: read image enhancement (cross-layer change: tools → core → provider → agent → TUI)
+4. **P3 optional**: tree (nice to have)
+
+Each batch is independently shippable.
