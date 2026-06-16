@@ -59,16 +59,6 @@ impl<'a> ToolCallBubble<'a> {
     }
 }
 
-pub(crate) fn provenance_marker(provenance: &ToolProvenance) -> String {
-    match provenance {
-        ToolProvenance::Native => "native".to_string(),
-        ToolProvenance::McpRemote { server } => {
-            let server = truncate(server, 24);
-            format!("mcp:{server}")
-        }
-    }
-}
-
 impl ratatui::widgets::Widget for ToolCallBubble<'_> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let mut lines: Vec<Line<'static>> = Vec::new();
@@ -79,28 +69,21 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
         let tool_name_style = Style::default()
             .fg(semantic::TEXT_ACCENT)
             .add_modifier(Modifier::BOLD);
-        let marker = provenance_marker(&self.provenance);
-        let marker_style = match &self.provenance {
-            ToolProvenance::Native => Style::default().fg(semantic::DIM_TEXT),
-            ToolProvenance::McpRemote { .. } => Style::default()
-                .fg(semantic::TEXT_SPECIAL)
-                .add_modifier(Modifier::BOLD),
-        };
-        lines.push(Line::from(vec![
+        let dim_style = Style::default().fg(semantic::DIM_TEXT);
+        let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
+
+        let mut spans = vec![
             Span::styled(" ▸ ", prefix_style),
             Span::styled(self.tool_name.to_string(), tool_name_style),
-            Span::raw(" "),
-            Span::styled(format!("[{marker}]"), marker_style),
-        ]));
-
-        let args_style = Style::default()
-            .fg(semantic::DIM_TEXT)
-            .add_modifier(Modifier::DIM);
-        let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
-        lines.push(Line::from(Span::styled(
-            format!("  {args_display}"),
-            args_style,
-        )));
+        ];
+        if let ToolProvenance::McpRemote { server } = &self.provenance {
+            let server_display = truncate(server, 24);
+            spans.push(Span::raw(" "));
+            spans.push(Span::styled(format!("[mcp:{}]", server_display), dim_style));
+        }
+        spans.push(Span::raw(", "));
+        spans.push(Span::styled(args_display, dim_style));
+        lines.push(Line::from(spans));
 
         if let Some(is_error) = self.result_status {
             let (icon, style) = if is_error {

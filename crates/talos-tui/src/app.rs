@@ -840,41 +840,46 @@ impl Tui {
                 let args_str = serde_json::to_string_pretty(&display.arguments)
                     .unwrap_or_else(|_| display.arguments.to_string());
                 let args_summary = summarize_tool_args(&display.tool_name, &args_str);
-                let marker = match &display.provenance {
-                    ToolProvenance::Native => "native".to_string(),
-                    ToolProvenance::McpRemote { server } => format!("mcp:{}", server),
+                let provenance_marker = match &display.provenance {
+                    ToolProvenance::Native => None,
+                    ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", server)),
                 };
                 let accent = to_crossterm_color(semantic::TEXT_ACCENT);
                 let prefix_color = to_crossterm_color(semantic::PREFIX_ASSISTANT);
-                let header = format!("{} [{}]", display.tool_name, marker);
-                self.pending_scrollback.push(ScrollbackLine::styled(
-                    vec![
-                        HistorySegment::styled(
-                            " ▸ ",
-                            prefix_color,
-                            HistoryAttrs {
-                                bold: true,
-                                ..HistoryAttrs::default()
-                            },
-                        ),
-                        HistorySegment::styled(
-                            header,
-                            accent,
-                            HistoryAttrs {
-                                bold: true,
-                                ..HistoryAttrs::default()
-                            },
-                        ),
-                    ],
-                    None,
+                let dim = to_crossterm_color(semantic::DIM_TEXT);
+                let mut segments = vec![
+                    HistorySegment::styled(
+                        " ▸ ",
+                        prefix_color,
+                        HistoryAttrs {
+                            bold: true,
+                            ..HistoryAttrs::default()
+                        },
+                    ),
+                    HistorySegment::styled(
+                        display.tool_name.to_string(),
+                        accent,
+                        HistoryAttrs {
+                            bold: true,
+                            ..HistoryAttrs::default()
+                        },
+                    ),
+                ];
+                if let Some(marker) = provenance_marker {
+                    segments.push(HistorySegment::raw(" "));
+                    segments.push(HistorySegment::styled(marker, dim, HistoryAttrs::default()));
+                }
+                segments.push(HistorySegment::raw(", "));
+                segments.push(HistorySegment::styled(
+                    args_summary,
+                    dim,
+                    HistoryAttrs {
+                        bold: false,
+                        ..HistoryAttrs::default()
+                    },
                 ));
-                self.pending_scrollback.push(ScrollbackLine::styled(
-                    vec![
-                        HistorySegment::raw("   "),
-                        HistorySegment::styled(args_summary, accent, HistoryAttrs::default()),
-                    ],
-                    None,
-                ));
+                self.pending_scrollback
+                    .push(ScrollbackLine::styled(segments, None));
             }
             UiOutput::ToolResult(display) => {
                 let icon = if display.is_error { "✗" } else { "✓" };
