@@ -21,6 +21,7 @@ use talos_core::ApprovalChoice;
 use talos_core::TuiApprovalRequest;
 use talos_core::message::Message;
 use talos_core::tool::ToolProvenance;
+use talos_core::tool_filter::ToolSyntaxFilter;
 use tokio::sync::mpsc;
 
 use crate::evolution::{self, EvolutionPanel};
@@ -622,6 +623,7 @@ pub struct Tui {
     stream_opening_pending: bool,
     pending_stream_opening: Vec<ScrollbackLine>,
     pending_tool_call: Option<ToolCallDisplay>,
+    text_filter: ToolSyntaxFilter,
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
@@ -658,6 +660,7 @@ impl Tui {
             stream_opening_pending: false,
             pending_stream_opening: Vec::new(),
             pending_tool_call: None,
+            text_filter: ToolSyntaxFilter::new(),
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
@@ -820,16 +823,45 @@ impl Tui {
     }
 
     fn consume_stream_chunk(&mut self, chunk: &str) {
-        if self.stream_opening_pending && !chunk.is_empty() {
-            self.pending_scrollback.extend(stream_opening_lines(
-                self.stream_count,
-                std::mem::take(&mut self.pending_stream_opening),
-            ));
-            self.stream_opening_pending = false;
-            self.stream_count += 1;
+        let filter_out = self.text_filter.push_chunk(chunk);
+
+        if filter_out.tool_call_started {
+            if self.active_stream.is_some() {
+                self.finalize_active_stream();
+            }
+            self.pending_tool_call = Some(ToolCallDisplay {
+                tool_name: "tool".to_string(),
+                arguments: serde_json::json!({}),
+                provenance: ToolProvenance::Native,
+            });
         }
-        self.pending_scrollback
-            .extend(self.stream_render.push_chunk(chunk));
+
+        if let Some(call) = filter_out
+            .tool_call_completed
+            .as_deref()
+            .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
+        {
+            let name = call.get("name").and_then(|n| n.as_str()).unwrap_or("tool");
+            let args = call.get("args").cloned().unwrap_or(serde_json::json!({}));
+            self.pending_tool_call = Some(ToolCallDisplay {
+                tool_name: name.to_string(),
+                arguments: args,
+                provenance: ToolProvenance::Native,
+            });
+        }
+
+        if !filter_out.text.is_empty() {
+            if self.stream_opening_pending {
+                self.pending_scrollback.extend(stream_opening_lines(
+                    self.stream_count,
+                    std::mem::take(&mut self.pending_stream_opening),
+                ));
+                self.stream_opening_pending = false;
+                self.stream_count += 1;
+            }
+            self.pending_scrollback
+                .extend(self.stream_render.push_chunk(&filter_out.text));
+        }
     }
 
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {

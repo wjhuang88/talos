@@ -421,8 +421,6 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut tool_call_names: Vec<String> = Vec::new();
     let mut tool_call_args: Vec<String> = Vec::new();
     let mut text_accumulator = String::new();
-    let mut syntax_filter = talos_core::tool_filter::ToolSyntaxFilter::new();
-
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
             Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
@@ -484,33 +482,11 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 && !text.is_empty()
             {
                 text_accumulator.push_str(text);
-                let filter_out = syntax_filter.push_chunk(text);
-                if filter_out.tool_call_started {
-                    let _ = tx
-                        .send(AgentEvent::ToolCallStarted {
-                            name: String::new(),
-                        })
-                        .await;
-                }
-                if !filter_out.text.is_empty() {
-                    let _ = tx
-                        .send(AgentEvent::TextDelta {
-                            delta: filter_out.text,
-                        })
-                        .await;
-                }
-                if let Some(call) = filter_out
-                    .tool_call_completed
-                    .as_deref()
-                    .and_then(crate::parse_json_tool_call)
-                {
-                    let _ = tx
-                        .send(AgentEvent::ToolCall {
-                            call,
-                            provenance: Default::default(),
-                        })
-                        .await;
-                }
+                let _ = tx
+                    .send(AgentEvent::TextDelta {
+                        delta: text.clone(),
+                    })
+                    .await;
             }
 
             // Extract tool calls
@@ -545,11 +521,6 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             }
 
             if let Some(ref finish_reason) = choice.finish_reason {
-                let remaining = syntax_filter.finish();
-                if !remaining.is_empty() {
-                    let _ = tx.send(AgentEvent::TextDelta { delta: remaining }).await;
-                }
-
                 let stop_reason = match finish_reason.as_str() {
                     "stop" => StopReason::EndTurn,
                     "tool_calls" => StopReason::ToolUse,

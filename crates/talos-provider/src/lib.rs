@@ -290,7 +290,6 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut cache_read_tokens: u32 = 0;
     let mut cache_write_tokens: u32 = 0;
     let mut text_accumulator = String::new();
-    let mut syntax_filter = talos_core::tool_filter::ToolSyntaxFilter::new();
     let mut tool_use_blocks: std::collections::HashMap<u32, ToolUseBlock> =
         std::collections::HashMap::new();
 
@@ -353,33 +352,11 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 Some("content_block_delta") => {
                     if let Some(text) = extract_text_delta(&data) {
                         text_accumulator.push_str(&text);
-                        let filter_out = syntax_filter.push_chunk(&text);
-                        if filter_out.tool_call_started {
-                            let _ = tx
-                                .send(AgentEvent::ToolCallStarted {
-                                    name: String::new(),
-                                })
-                                .await;
-                        }
-                        if !filter_out.text.is_empty() {
-                            let _ = tx
-                                .send(AgentEvent::TextDelta {
-                                    delta: filter_out.text,
-                                })
-                                .await;
-                        }
-                        if let Some(call) = filter_out
-                            .tool_call_completed
-                            .as_deref()
-                            .and_then(parse_json_tool_call)
-                        {
-                            let _ = tx
-                                .send(AgentEvent::ToolCall {
-                                    call,
-                                    provenance: ToolProvenance::Native,
-                                })
-                                .await;
-                        }
+                        let _ = tx
+                            .send(AgentEvent::TextDelta {
+                                delta: text.clone(),
+                            })
+                            .await;
                     }
                     if let Some(partial) = data.get("delta")
                         && partial.get("type").and_then(|t| t.as_str()) == Some("input_json_delta")
@@ -414,10 +391,6 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         output_tokens = usage.output_tokens;
                     }
                     if let Some(stop_reason) = extract_stop_reason(&data) {
-                        let remaining = syntax_filter.finish();
-                        if !remaining.is_empty() {
-                            let _ = tx.send(AgentEvent::TextDelta { delta: remaining }).await;
-                        }
                         let tool_calls = parse_text_tool_calls(&text_accumulator);
                         for call in tool_calls {
                             let _ = tx
