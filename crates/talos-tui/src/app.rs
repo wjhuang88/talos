@@ -840,24 +840,34 @@ impl Tui {
                     ToolProvenance::McpRemote { server } => format!("mcp:{}", server),
                 };
                 let accent = to_crossterm_color(semantic::TEXT_ACCENT);
-                let header = format!("▸ {} [{}]", display.tool_name, marker);
+                let prefix_color = to_crossterm_color(semantic::PREFIX_ASSISTANT);
+                let header = format!("{} [{}]", display.tool_name, marker);
                 self.pending_scrollback.push(ScrollbackLine::styled(
-                    vec![HistorySegment::styled(
-                        header,
-                        accent,
-                        HistoryAttrs {
-                            bold: true,
-                            ..HistoryAttrs::default()
-                        },
-                    )],
+                    vec![
+                        HistorySegment::styled(
+                            " ▸ ",
+                            prefix_color,
+                            HistoryAttrs {
+                                bold: true,
+                                ..HistoryAttrs::default()
+                            },
+                        ),
+                        HistorySegment::styled(
+                            header,
+                            accent,
+                            HistoryAttrs {
+                                bold: true,
+                                ..HistoryAttrs::default()
+                            },
+                        ),
+                    ],
                     None,
                 ));
                 self.pending_scrollback.push(ScrollbackLine::styled(
-                    vec![HistorySegment::styled(
-                        format!("  {}", args_summary),
-                        accent,
-                        HistoryAttrs::default(),
-                    )],
+                    vec![
+                        HistorySegment::raw("   "),
+                        HistorySegment::styled(args_summary, accent, HistoryAttrs::default()),
+                    ],
                     None,
                 ));
             }

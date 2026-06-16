@@ -73,6 +73,9 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
+        let prefix_style = Style::default()
+            .fg(semantic::PREFIX_ASSISTANT)
+            .add_modifier(Modifier::BOLD);
         let tool_name_style = Style::default()
             .fg(semantic::TEXT_ACCENT)
             .add_modifier(Modifier::BOLD);
@@ -84,7 +87,8 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
                 .add_modifier(Modifier::BOLD),
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("▸ {}", self.tool_name), tool_name_style),
+            Span::styled(" ▸ ", prefix_style),
+            Span::styled(self.tool_name.to_string(), tool_name_style),
             Span::raw(" "),
             Span::styled(format!("[{marker}]"), marker_style),
         ]));
