@@ -16,7 +16,6 @@ use tracing::error;
 
 use talos_core::message::AgentEvent;
 use talos_core::message::Message;
-use talos_core::message::ToolResult as MessageToolResult;
 use talos_core::session::{
     SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnCompletionStatus,
 };
@@ -26,8 +25,7 @@ use crate::compaction::Compactor;
 use crate::token::TokenEstimator;
 
 struct TurnRecord {
-    assistant_text: String,
-    tool_results: Vec<MessageToolResult>,
+    new_messages: Vec<Message>,
 }
 
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
@@ -40,7 +38,6 @@ pub struct AppServerSession {
     eq_tx: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
     compactor: Compactor,
-    pending_user_message: Option<String>,
 }
 
 impl AppServerSession {
@@ -64,7 +61,6 @@ impl AppServerSession {
             eq_tx,
             history: config.initial_history,
             compactor,
-            pending_user_message: None,
         };
 
         (handle, actor)
@@ -122,7 +118,6 @@ impl AppServerSession {
                     let turn_id_clone = turn_id.clone();
                     let token_clone = token.clone();
                     let history = self.history.clone();
-                    self.pending_user_message = Some(message.clone());
 
                     let handle = tokio::spawn(async move {
                         let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
@@ -170,23 +165,8 @@ impl AppServerSession {
             return;
         };
 
-        if let Some(user_msg) = self.pending_user_message.take() {
-            self.history.push(Message::User { content: user_msg });
-        }
-
-        if record.tool_results.is_empty() {
-            self.history.push(Message::Assistant {
-                content: record.assistant_text,
-                tool_calls: vec![],
-            });
-        } else {
-            self.history.push(Message::Assistant {
-                content: record.assistant_text,
-                tool_calls: vec![],
-            });
-            for result in record.tool_results {
-                self.history.push(Message::Tool { result });
-            }
+        for msg in record.new_messages {
+            self.history.push(msg);
         }
     }
 }
@@ -218,8 +198,6 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     let eq_tx_clone = eq_tx.clone();
     let cancel_clone = cancel_token.clone();
-    let collected_results = Arc::new(std::sync::Mutex::new(Vec::<MessageToolResult>::new()));
-    let collected_clone = collected_results.clone();
 
     let forwarder = tokio::spawn(async move {
         loop {
@@ -228,9 +206,6 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 event = event_rx.recv() => {
                     match event {
                         Some(event) => {
-                            if let AgentEvent::ToolResult { result } = &event {
-                                collected_clone.lock().expect("poisoned").push(result.clone());
-                            }
                             let _ = eq_tx.send(SessionEvent::AgentEvent(event));
                         }
                         None => break,
@@ -259,22 +234,14 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let _ = forwarder.await;
 
     match agent_result {
-        Ok(Ok(final_text)) => {
-            let tool_results = collected_results
-                .lock()
-                .expect("poisoned")
-                .drain(..)
-                .collect::<Vec<_>>();
+        Ok(Ok((final_text, new_messages))) => {
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
                 turn_id,
                 status: TurnCompletionStatus::Success {
                     final_text: final_text.clone(),
                 },
             });
-            let _ = result_tx.send(TurnRecord {
-                assistant_text: final_text,
-                tool_results,
-            });
+            let _ = result_tx.send(TurnRecord { new_messages });
         }
         Ok(Err(e)) => {
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {

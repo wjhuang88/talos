@@ -368,7 +368,8 @@ impl Agent {
     /// [`AgentError::TurnBudgetExceeded`] if the tool call budget is exceeded,
     /// or [`AgentError::DoomLoopDetected`] if a doom loop is detected.
     pub async fn run(&self, user_message: String) -> AgentResult<String> {
-        self.run_inner(user_message, vec![], None).await
+        let (text, _) = self.run_inner(user_message, vec![], None).await?;
+        Ok(text)
     }
 
     /// Runs a single turn with streaming events forwarded to the given
@@ -392,7 +393,7 @@ impl Agent {
         user_message: String,
         history: Vec<Message>,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
-    ) -> AgentResult<String> {
+    ) -> AgentResult<(String, Vec<Message>)> {
         self.run_inner(user_message, history, Some(event_tx)).await
     }
 
@@ -405,7 +406,7 @@ impl Agent {
         user_message: String,
         history: Vec<Message>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-    ) -> AgentResult<String> {
+    ) -> AgentResult<(String, Vec<Message>)> {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
@@ -449,6 +450,8 @@ impl Agent {
             });
         }
 
+        let persist_start = messages.len();
+
         messages.push(Message::User {
             content: actual_user_message,
         });
@@ -467,7 +470,7 @@ impl Agent {
                     usage: Usage::default(),
                 });
             }
-            return Ok(result);
+            return Ok((result, Vec::new()));
         }
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -610,7 +613,8 @@ impl Agent {
             }
 
             if turn_tool_calls.is_empty() {
-                break (Ok(turn_text), TurnStatus::Success);
+                let persisted = messages[persist_start..].to_vec();
+                break (Ok((turn_text, persisted)), TurnStatus::Success);
             }
 
             let effective_tool_calls = match self
