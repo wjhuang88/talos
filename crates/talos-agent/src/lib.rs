@@ -723,17 +723,26 @@ impl Agent {
                     }
                 };
 
-                let msg_result = MessageToolResult {
+                let ui_result = MessageToolResult {
                     tool_use_id: observed.call.id.clone(),
                     content: observed.result.content.clone(),
                     is_error: observed.result.is_error,
                 };
-                messages.push(Message::Tool {
-                    result: msg_result.clone(),
-                });
+                let llm_result = if observed.result.is_error {
+                    MessageToolResult {
+                        content: format!(
+                            "{}\n\n[Analyze the error above and try a different approach.]",
+                            observed.result.content
+                        ),
+                        ..ui_result.clone()
+                    }
+                } else {
+                    ui_result.clone()
+                };
+                messages.push(Message::Tool { result: llm_result });
 
                 if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentEvent::ToolResult { result: msg_result });
+                    let _ = tx.send(AgentEvent::ToolResult { result: ui_result });
                 }
             }
         };
