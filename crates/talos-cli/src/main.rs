@@ -70,10 +70,15 @@ pub(crate) struct TuiApprovalHandler {
 }
 
 impl TuiApprovalHandler {
-    fn new(approval_tx: mpsc::UnboundedSender<TuiApprovalRequest>) -> Self {
+    fn new(
+        approval_tx: mpsc::UnboundedSender<TuiApprovalRequest>,
+        workspace_root: std::path::PathBuf,
+    ) -> Self {
         Self {
             approval_tx,
-            engine: Mutex::new(talos_permission::PermissionEngine::new()),
+            engine: Mutex::new(talos_permission::PermissionEngine::with_workspace_root(
+                workspace_root,
+            )),
         }
     }
 
@@ -730,7 +735,9 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut agent = Agent::with_security_and_hooks(
         provider,
         registry,
-        Some(Arc::new(permission_engine)),
+        Some(Arc::new(
+            talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+        )),
         None,
         workspace_root.clone(),
         hooks,
@@ -911,7 +918,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     // TUI approval channel: tools send requests here, TUI handles them
     let (approval_tx, approval_rx) = mpsc::unbounded_channel::<TuiApprovalRequest>();
-    let approval_handler = Arc::new(TuiApprovalHandler::new(approval_tx));
+    let approval_handler = Arc::new(TuiApprovalHandler::new(approval_tx, workspace_root.clone()));
 
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);
