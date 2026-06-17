@@ -79,7 +79,7 @@ impl AgentTool for BashTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a shell command"
+        "Execute a shell command (fallback: prefer grep/glob/ls/read/write/edit/delete for file ops)"
     }
 
     fn parameters(&self) -> Value {
@@ -305,7 +305,8 @@ mod tests {
     #[test]
     fn test_bash_tool_description() {
         let tool = BashTool::new(test_dir());
-        assert_eq!(tool.description(), "Execute a shell command");
+        assert!(tool.description().contains("shell command"));
+        assert!(tool.description().contains("fallback"));
     }
 
     #[test]
