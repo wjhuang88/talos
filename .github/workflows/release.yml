@@ -47,6 +47,9 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      - name: Install zig
+        run: brew install zig
+
       - name: Install cargo-zigbuild
         run: pip install cargo-zigbuild
 
