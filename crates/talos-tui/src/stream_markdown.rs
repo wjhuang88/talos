@@ -78,7 +78,7 @@ enum ClassifierState {
     Holding {
         kind: MarkdownBlockKind,
         lines: Vec<String>,
-        fence_marker: Option<String>,
+        fence_marker: Option<(String, usize)>,
     },
 }
 
@@ -118,8 +118,10 @@ impl StreamBlockClassifier {
                         lines.push(line);
                         let is_closed = lines.last().is_some_and(|last| {
                             fence_marker
-                                .as_deref()
-                                .is_some_and(|marker| is_matching_fence_close(last, marker))
+                                .as_ref()
+                                .is_some_and(|(marker, count)| {
+                                    is_matching_fence_close(last, marker, *count)
+                                })
                         });
                         if is_closed {
                             let status = hold_status(
@@ -387,19 +389,27 @@ fn render_block(kind: &MarkdownBlockKind, lines: &[String]) -> Vec<String> {
     }
 }
 
-fn fence_marker(line: &str) -> Option<String> {
+fn fence_marker(line: &str) -> Option<(String, usize)> {
     let trimmed = line.trim_start();
-    if trimmed.starts_with("```") {
-        Some("```".to_string())
-    } else if trimmed.starts_with("~~~") {
-        Some("~~~".to_string())
+    if let Some(rest) = trimmed.strip_prefix("```") {
+        let count = 3 + rest.chars().take_while(|c| *c == '`').count();
+        Some(("```".to_string(), count))
+    } else if let Some(rest) = trimmed.strip_prefix("~~~") {
+        let count = 3 + rest.chars().take_while(|c| *c == '~').count();
+        Some(("~~~".to_string(), count))
     } else {
         None
     }
 }
 
-fn is_matching_fence_close(line: &str, marker: &str) -> bool {
-    line.trim_start().starts_with(marker)
+fn is_matching_fence_close(line: &str, marker: &str, open_count: usize) -> bool {
+    let trimmed = line.trim_start();
+    let marker_char = marker.chars().next().unwrap_or('`');
+    let close_count = trimmed.chars().take_while(|c| *c == marker_char).count();
+    if close_count < open_count {
+        return false;
+    }
+    trimmed[close_count..].trim().is_empty()
 }
 
 fn is_possible_table_header(line: &str) -> bool {
@@ -563,5 +573,50 @@ mod tests {
                 if *reason == FallbackReason::UnterminatedCodeFence
                     && lines.len() == 2
         ));
+    }
+
+    #[test]
+    fn fence_info_string_not_treated_as_close() {
+        let mut classifier = StreamBlockClassifier::default();
+        let _ = classifier.push_line("```text".to_string());
+        let _ = classifier.push_line("some code".to_string());
+
+        let decisions = classifier.push_line("```rust".to_string());
+        assert!(
+            decisions.iter().all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
+            "info-string line ```rust should NOT close the fence"
+        );
+
+        let decisions = classifier.push_line("fn main() {}".to_string());
+        assert!(
+            decisions.iter().all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
+            "content after non-close should still be held"
+        );
+
+        let decisions = classifier.push_line("```".to_string());
+        assert!(
+            decisions.iter().any(|d| matches!(d, BlockDecision::FinishHold { .. })),
+            "bare ``` should close the fence"
+        );
+    }
+
+    #[test]
+    fn fence_nested_backtick_count() {
+        let mut classifier = StreamBlockClassifier::default();
+        let _ = classifier.push_line("````text".to_string());
+        let _ = classifier.push_line("```rust".to_string());
+        let _ = classifier.push_line("fn main() {}".to_string());
+
+        let decisions = classifier.push_line("```".to_string());
+        assert!(
+            decisions.iter().all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
+            "3-backtick line should NOT close 4-backtick fence"
+        );
+
+        let decisions = classifier.push_line("````".to_string());
+        assert!(
+            decisions.iter().any(|d| matches!(d, BlockDecision::FinishHold { .. })),
+            "4-backtick line should close 4-backtick fence"
+        );
     }
 }
