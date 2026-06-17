@@ -192,4 +192,111 @@ Phase 3 (P2):
 - `crates/talos-provider/src/lib.rs` (parse_text_tool_calls)
 - `crates/talos-agent/src/lib.rs` (run_inner, execute_single_tool)
 - `crates/talos-agent/src/session.rs` (commit_finished_turn)
+
+## Streaming Tool Output
+
+**Status**: Planned — Requirement documented, not yet implemented
+**Priority**: P2
+
+### Problem
+
+Tool execution is currently all-or-nothing: `tool.execute(input) -> ToolResult`. The agent
+waits synchronously until the tool finishes, then pushes the complete result to the TUI. For
+fast tools (read, grep, glob, ls) this is fine, but for long-running tools — especially `bash`
+running `cargo build` or `cargo test` — the user sees nothing until the command completes.
+
+### Proposed Direction
+
+Add an **optional streaming callback** to tool execution, without changing the `AgentTool` trait
+signature for all tools:
+
+```rust
+pub struct ToolChunk {
+    pub text: String,
+    pub is_final: bool,
+    pub is_error: bool,
+}
+
+pub trait AgentTool: Send + Sync {
+    // Existing — unchanged
+    async fn execute(&self, input: Value) -> ToolResult;
+
+    // New — optional, default implementation delegates to execute()
+    async fn execute_streaming(
+        &self,
+        input: Value,
+        progress: &dyn Fn(ToolChunk) + Send + Sync,
+    ) -> ToolResult {
+        let result = self.execute(input).await;
+        progress(ToolChunk {
+            text: result.content.clone(),
+            is_final: true,
+            is_error: result.is_error,
+        });
+        result
+    }
+}
+```
+
+Only `BashTool` overrides `execute_streaming` to emit stdout/stderr chunks as they arrive.
+All other tools use the default implementation (which is identical to current behavior).
+
+### Agent Execution Flow
+
+```
+execute_single_tool()
+  ├── permission check (unchanged)
+  ├── schema validation (unchanged)
+  ├── tool.execute_streaming(input, |chunk| {
+  │     tx.send(UiOutput::ToolStreamChunk {
+  │         text: chunk.text,
+  │         is_final: chunk.is_final,
+  │     })
+  │   }).await
+  └── post-hook (unchanged)
+```
+
+### TUI Changes
+
+New `UiOutput` variant:
+
+```rust
+pub enum UiOutput {
+    // ... existing variants ...
+    ToolStreamChunk { text: String, is_final: bool },
+}
+```
+
+TUI handles `ToolStreamChunk` by appending `text` to a pending tool result area. When
+`is_final` is true, finalize the result line with `✓` or `✗` icon.
+
+### Scope
+
+| Phase | Tools | Effort |
+|-------|-------|--------|
+| Phase 1 | `BashTool` only — stream stdout/stderr line by line | ~80 LOC |
+| Phase 2 (optional) | `ReadTool` — stream large files line by line | ~30 LOC |
+| Phase 3 (optional) | `GrepTool` — stream matches as found | ~30 LOC |
+
+### Design Constraints
+
+- **No trait breaking change**: `execute()` stays as-is; `execute_streaming()` has a default
+  impl that delegates. Tools opt in by overriding.
+- **Permission before streaming**: permission check and schema validation happen before any
+  streaming starts. No partial output if denied.
+- **LLM context unchanged**: the final `ToolResult` sent to the LLM is still the complete
+  string. Streaming only affects TUI rendering, not model context.
+- **Error handling**: if the tool errors mid-stream, `is_error: true` on the final chunk.
+  Previously streamed chunks are kept; the result line shows `✗`.
+- **Cancellation**: if the user cancels mid-stream, the tool should stop and return a partial
+  `ToolResult` with what was streamed so far.
+
+### Acceptance Criteria
+
+- [ ] `BashTool::execute_streaming()` emits stdout/stderr line by line
+- [ ] TUI shows real-time output for long-running bash commands
+- [ ] Other tools unaffected (default implementation)
+- [ ] Permission check completes before streaming starts
+- [ ] Cancellation stops streaming and returns partial result
+- [ ] `cargo clippy --workspace -- -D warnings` passes
 - `prompts/tool_calling_strict.txt`
