@@ -37,6 +37,28 @@ Embed Rust-native implementations of high-value POSIX utilities as built-in tool
 
 ## Proposed New Tools
 
+### Design Decision: String Output Format
+
+All tools return `ToolResult { content: String, is_error: bool }`. The `content` field is a
+human-readable, line-delimited string — not JSON. This is a deliberate design choice:
+
+1. **Token efficiency**: Plain text uses 2-5x fewer tokens than equivalent JSON for the same
+   information. Compare `main.rs:42: fn main()` (~10 tokens) vs
+   `{"file":"main.rs","line":42,"content":"fn main()"}` (~50 tokens).
+
+2. **Native LLM comprehension**: LLMs process text natively. A well-formatted string like
+   `src/main.rs:42: fn main() {}` is immediately understandable without JSON parsing overhead.
+
+3. **Uniform interface**: Every tool returns the same type. The agent and provider layers don't
+   need tool-specific deserialization logic. The string flows directly into the `tool_result`
+   message block sent to the LLM.
+
+4. **Flexibility**: Each tool chooses its own optimal text format — grep uses `file:line: content`,
+   glob uses one-path-per-line, ls uses `type size name`. No schema rigidity.
+
+5. **Future multimodal exception**: Image reading (P2) will add an optional `images` field to
+   `ToolResult` for base64 data. The `content` field remains a text placeholder string.
+
 ### P0 — High Agent Utility
 
 #### 1. GrepTool (`grep`)
@@ -48,7 +70,7 @@ Search file contents by regex across the workspace.
 | **Tool name** | `grep` |
 | **Read-only** | Yes |
 | **Parameters** | `pattern` (string, required), `path` (string, optional, default "."), `include` (glob, optional), `max_results` (int, optional, default 50) |
-| **Output** | JSON array: `[{file, line_number, line, match_start, match_end}]` |
+| **Output** | Line-delimited text: `file:line_number: matched_content` (one per line, with truncation hint) |
 | **Crate** | `regex` (direct usage, not ripgrep library facade — simpler API, fewer deps) |
 | **Crate version** | `regex` 1.x |
 | **License** | MIT/Apache-2.0 |
@@ -63,7 +85,7 @@ Find files by name pattern.
 | **Tool name** | `glob` |
 | **Read-only** | Yes |
 | **Parameters** | `pattern` (string, required, e.g. `**/*.rs`), `path` (string, optional, default ".") |
-| **Output** | JSON array of file paths |
+| **Output** | Line-delimited file paths (one per line) + total count |
 | **Crate** | `glob` |
 | **Crate version** | 0.3.x |
 | **License** | MIT/Apache-2.0 |
@@ -93,7 +115,7 @@ List directory contents with metadata.
 | **Tool name** | `ls` |
 | **Read-only** | Yes |
 | **Parameters** | `path` (string, optional, default "."), `all` (bool, optional, show hidden), `recursive` (bool, optional, default false) |
-| **Output** | JSON array: `[{name, type, size, modified}]` |
+| **Output** | Line-delimited text: `type_char name` (one per entry, dirs first) |
 | **Crate** | `std::fs` (no external dep) |
 | **Rationale** | Structured directory listing without shell parsing. More reliable than parsing `ls -la` output from bash. |
 
@@ -121,7 +143,7 @@ Get file metadata.
 | **Tool name** | `stat` |
 | **Read-only** | Yes |
 | **Parameters** | `path` (string, required) |
-| **Output** | JSON: `{size, is_file, is_dir, is_symlink, modified, created, permissions, mime_type}` |
+| **Output** | Line-delimited text: `key: value` format (e.g. `size: 1234\ntype: file\nmime: text/rust`) |
 | **Crate** | `std::fs` + `infer` (for MIME detection) |
 | **Crate version** | `infer` 0.19.x |
 | **License** | MIT |

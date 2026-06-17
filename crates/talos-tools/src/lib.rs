@@ -1085,26 +1085,34 @@ fn format_entry(path: &Path, root: &Path, long: bool) -> String {
     }
 
     let meta = std::fs::symlink_metadata(path).ok();
-    let (type_char, size) = match &meta {
+    let suffix = match &meta {
         Some(m) => {
             let ft = m.file_type();
             if ft.is_dir() {
-                ('d', None)
+                "/"
             } else if ft.is_symlink() {
-                ('l', Some(m.len()))
+                "@"
+            } else if is_executable(m) {
+                "*"
             } else {
-                ('-', Some(m.len()))
+                ""
             }
         }
-        None => ('?', None),
+        None => "",
     };
 
-    let size_str = match size {
-        Some(s) => format!("{s:>8}"),
-        None => format!("{:>8}", "-"),
-    };
+    format!("{display}{suffix}")
+}
 
-    format!("{type_char} {size_str}  {display}")
+#[cfg(unix)]
+fn is_executable(meta: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn is_executable(_meta: &std::fs::Metadata) -> bool {
+    false
 }
 
 #[cfg(unix)]
@@ -1921,7 +1929,7 @@ mod ls_tool_tests {
             .lines()
             .find(|l| l.contains("src"))
             .unwrap();
-        assert!(src_line.starts_with('d'));
+        assert!(src_line.ends_with('/'));
     }
 
     #[tokio::test]
@@ -1936,7 +1944,8 @@ mod ls_tool_tests {
             .lines()
             .find(|l| l.contains("Cargo.toml"))
             .unwrap();
-        assert!(toml_line.starts_with('-'));
+        assert!(!toml_line.ends_with('/'));
+        assert!(!toml_line.ends_with('*'));
     }
 
     #[tokio::test]
@@ -1948,7 +1957,7 @@ mod ls_tool_tests {
         let result = tool.execute(json!({})).await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("11"));
+        assert!(result.content.contains("test.txt"));
     }
 
     #[tokio::test]
