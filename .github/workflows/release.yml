@@ -109,25 +109,26 @@ jobs:
             echo
             echo "| Platform | Architecture | File |"
             echo "|----------|-------------|------|"
-            echo "| Linux | x86_64 | \`talos-x86_64-unknown-linux-gnu\` |"
-            echo "| Linux | ARM64 | \`talos-aarch64-unknown-linux-gnu\` |"
-            echo "| macOS | Apple Silicon | \`talos-aarch64-apple-darwin\` |"
-            echo "| macOS | Intel | \`talos-x86_64-apple-darwin\` |"
-            echo "| Windows | x86_64 | \`talos-x86_64-pc-windows-msvc.exe\` |"
-            echo "| Windows | ARM64 | \`talos-aarch64-pc-windows-msvc.exe\` |"
+            echo "| Linux | x86_64 | \`talos-x86_64-unknown-linux-gnu.tar.gz\` |"
+            echo "| Linux | ARM64 | \`talos-aarch64-unknown-linux-gnu.tar.gz\` |"
+            echo "| macOS | Apple Silicon | \`talos-aarch64-apple-darwin.tar.gz\` |"
+            echo "| macOS | Intel | \`talos-x86_64-apple-darwin.tar.gz\` |"
+            echo "| Windows | x86_64 | \`talos-x86_64-pc-windows-msvc.zip\` |"
+            echo "| Windows | ARM64 | \`talos-aarch64-pc-windows-msvc.zip\` |"
             echo
             echo "Checksums: [\`checksum.sha256\`](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/checksum.sha256)"
             echo
             echo "### Install"
             echo
             echo '```bash'
-            echo "# Linux/macOS"
-            echo "curl -L https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/talos-<target> -o talos"
-            echo "chmod +x talos && sudo mv talos /usr/local/bin/"
+            echo "# macOS / Linux"
+            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/scripts/install.sh | sh"
             echo
-            echo "# Windows"
-            echo "# Download the .exe, add to PATH"
+            echo '# Windows (PowerShell)'
+            echo "irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/scripts/install.ps1 | iex"
             echo '```'
+            echo
+            echo "Each archive contains a single \`talos\` (or \`talos.exe\`) binary."
           } > RELEASE_BODY.md
 
       - name: Create GitHub Release
