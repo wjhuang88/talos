@@ -74,7 +74,7 @@ echo "========================================="
 echo " Build complete. dist/:"
 ls -lh "$DIST_DIR"
 
-CHECKSUM_FILE="$DIST_DIR/dist.sha256"
+CHECKSUM_FILE="$DIST_DIR/checksum.sha256"
 cd "$DIST_DIR"
 if command -v sha256sum >/dev/null 2>&1; then
   sha256sum talos-* > "$CHECKSUM_FILE"

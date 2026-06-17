@@ -107,7 +107,7 @@ jobs:
             echo "| Windows | x86_64 | \`talos-x86_64-pc-windows-msvc.exe\` |"
             echo "| Windows | ARM64 | \`talos-aarch64-pc-windows-msvc.exe\` |"
             echo
-            echo "Checksums: [\`dist.sha256\`](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/dist.sha256)"
+            echo "Checksums: [\`checksum.sha256\`](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/checksum.sha256)"
             echo
             echo "### Install"
             echo
