@@ -52,7 +52,7 @@ use talos_rpc::RpcServer;
 use talos_session::{IndexError, Session, SessionInfo, SessionManager};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::git::{GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool, GitPullTool, GitPushTool, GitShowTool, GitStatusTool};
-use talos_tools::{BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool, WriteTool};
+use talos_tools::{BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool, TreeTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -1373,6 +1373,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
     registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
     registry.register(Arc::new(GitBranchListTool::new(workspace_root.clone())));
+    registry.register(Arc::new(TreeTool::new(workspace_root.clone())));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(GitAddTool::new(workspace_root.clone())),
         approval: approval.clone(),
@@ -1524,6 +1525,7 @@ fn build_print_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(TreeTool::new(PathBuf::from("."))));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(GitAddTool::new(PathBuf::from("."))),
         approval: approval.clone(),
@@ -1618,6 +1620,7 @@ fn build_tui_tool_registry(
     registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
     registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
     registry.register(Arc::new(GitBranchListTool::new(workspace_root.clone())));
+    registry.register(Arc::new(TreeTool::new(workspace_root.clone())));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(GitAddTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
@@ -1697,6 +1700,7 @@ fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(GitPushTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GitPullTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GitCheckoutTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(TreeTool::new(PathBuf::from("."))));
     registry
 }
 

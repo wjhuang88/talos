@@ -6,6 +6,9 @@
 
 pub mod symbol;
 pub mod git;
+pub mod tree;
+
+pub use tree::TreeTool;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
