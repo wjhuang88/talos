@@ -299,4 +299,140 @@ TUI handles `ToolStreamChunk` by appending `text` to a pending tool result area.
 - [ ] Permission check completes before streaming starts
 - [ ] Cancellation stops streaming and returns partial result
 - [ ] `cargo clippy --workspace -- -D warnings` passes
+
+## Bug: Approval-Tool Call Ordering and Visual Association
+
+**Status**: Planned — Bug documented, not yet fixed
+**Priority**: P1
+
+### Problem
+
+When the agent invokes a write/execute tool that requires approval, the TUI event sequence is:
+
+```
+1. UiOutput::ToolCallStarted { name: "write" }
+2. UiOutput::ToolCall(display)          ← "→ write, path: poem.txt" pushed to scrollback
+3. [agent calls TuiPermissionAwareTool::execute()]
+4. TuiApprovalRequest sent to TUI       ← approval prompt appears
+5. [user approves]
+6. UiOutput::ToolResult(display)        ← "✓ wrote 921 bytes"
+```
+
+The approval prompt (step 4) appears **after** the tool call line (step 2) with no visual
+connection. In a multi-tool batch, the user may see:
+
+```
+→ write, path: a.txt
+→ write, path: b.txt
+→ write, path: c.txt
+⚠ Approval required for write: b.txt   ← which tool call is this for?
+  [y] approve  [n] deny  [a] always
+```
+
+The user cannot tell which tool call the approval is for.
+
+### Desired Behavior
+
+**Approval must complete before the tool call output is shown.** The flow should be:
+
+```
+→ write, path: a.txt
+  ⚠ Requires approval
+  [y] approve  [n] deny  [a] always
+  ✓ approved
+→ write, path: b.txt
+  ⚠ Requires approval
+  [y] approve  [n] deny  [a] always
+  ✓ approved
+→ write, path: c.txt
+  ⚠ Requires approval
+  [y] approve  [n] deny  [a] always
+  ✗ denied
+  ✗ permission denied
+```
+
+Each tool call that needs approval shows its own approval block **immediately after** the tool
+call line, before moving to the next tool.
+
+### Root Cause
+
+The approval happens **inside** `TuiPermissionAwareTool::execute()`, which is called by the
+agent's `execute_single_tool()`. But the `UiOutput::ToolCall` event is emitted by the
+conversation engine **before** the agent executes the tool. There is no mechanism to:
+
+1. Pause after showing the tool call line
+2. Show approval inline
+3. Then show the result
+
+The approval is a separate channel (`approval_tx`) that is disconnected from the scrollback
+rendering pipeline.
+
+### Proposed Fix
+
+**Option A: Approval-as-UiOutput (recommended)**
+
+Add approval to the `UiOutput` enum so it flows through the same rendering pipeline as tool
+calls:
+
+```rust
+pub enum UiOutput {
+    // ... existing ...
+    ToolApprovalRequest {
+        tool_name: String,
+        arguments: String,
+    },
+    ToolApprovalResponse {
+        approved: bool,
+    },
+}
+```
+
+Flow becomes:
+```
+UiOutput::ToolCall          → push "→ write, path: poem.txt" to scrollback
+UiOutput::ToolApprovalRequest → push "⚠ Requires approval" + key hints to scrollback
+                              → wait for user keypress
+UiOutput::ToolApprovalResponse → push "✓ approved" or "✗ denied"
+UiOutput::ToolResult        → push "✓ wrote 921 bytes" or "✗ permission denied"
+```
+
+The TuiPermissionAwareTool sends approval requests through the UiOutput channel instead of
+a separate approval_tx channel. This ensures correct ordering and visual association.
+
+**Option B: Inline approval in scrollback (simpler)**
+
+Instead of a separate approval overlay/prompt, push the approval as styled scrollback lines
+directly after the tool call line:
+
+```
+→ write, path: poem.txt
+  ⚠ Requires approval — press y/n/a
+```
+
+The key handling reads y/n/a from the input loop, then pushes the result line:
+
+```
+→ write, path: poem.txt
+  ⚠ Requires approval — press y/n/a
+  ✓ approved
+```
+
+This is simpler but requires the input handler to know about pending approval state.
+
+### Files Affected
+
+| File | Change |
+|------|--------|
+| `crates/talos-conversation/src/types.rs` | New UiOutput variants (Option A) |
+| `crates/talos-cli/src/main.rs` | TuiPermissionAwareTool sends approval via UiOutput channel |
+| `crates/talos-tui/src/app.rs` | Handle approval UiOutput variants in handle_ui_output() |
+| `crates/talos-tui/src/state.rs` | Approval pending state (if Option B) |
+
+### Acceptance Criteria
+
+- [ ] Approval prompt appears immediately after the tool call line
+- [ ] Visual association between tool call and its approval is clear
+- [ ] Multi-tool batches show approval per-tool, not batched at the end
+- [ ] Approved/denied result shown inline before next tool call
+- [ ] No regression for auto-allowed tools (read-only tools skip approval entirely)
 - `prompts/tool_calling_strict.txt`
