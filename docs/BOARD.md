@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| (no active iterations) | — | — | — |
+| I025 Tool Pipeline Completion | Active | [I025 Tool Pipeline Completion](iterations/I025-tool-pipeline-completion.md) | TOOL-002 P1-P2 residual + TOOL-003 P1 + fence fix + Mermaid rendering + ToolNature |
 
 ## Review
 
@@ -40,16 +40,18 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| CODE-002 Tree-sitter Symbol Tools | Planned | [CODE-002 Symbol Tools](backlog/active/CODE-002-symbol-tools.md) | Implement FindSymbol, FindReferences, ListFunctions, ListImports using arborium; ~200 LOC, P1 |
-| TOOL-002 Tool Calling Remediation | Planned | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Fix 10 issues: schema in prompt, permission bypass, dual parsing, streaming filter, dedup, validation |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
-| I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Start when native file/search portability becomes release-critical |
+| ARCH-002 Architecture Optimization | Planned | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Survey complete; 5-phase plan: doc validation → audit → ACL → decomposition → traits |
+| I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 
 ## Done This Cycle
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| TOOL-003 P0 POSIX Tool Set | P0 Complete | [TOOL-003 POSIX Tool Set](backlog/active/TOOL-003-posix-tool-set.md) | grep/glob/ls/delete + read offset/limit + ls long format; 42 new tests; permission rules; TUI summaries; prompt optimization; clippy clean |
+| TOOL-002 P0 Tool Calling Remediation | P0 Complete | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Schema in prompt, permission pipeline, agent message cleanup, streaming filter, format cleanup; P1-P2 residual in I025 |
+| CODE-002 Symbol Tools | Complete | [CODE-002 Symbol Tools](backlog/active/CODE-002-symbol-tools.md) | All 4 tools (find_symbol, find_references, list_symbols, list_imports) implemented in symbol.rs; registered in all 4 builders |
 | CODE-001 Tree-sitter Research | Complete | [CODE-001 Tree-sitter Code Analysis Research](backlog/active/CODE-001-tree-sitter-code-analysis-research.md) | All 7 research questions answered; ADR-020 created; arborium integrated; TUI highlighting delivered; next step CODE-002 Symbol Tools planned |
 | TUI-007 Theme System | Complete | [TUI-007 Theme System](backlog/active/TUI-007-theme-system.md) | Theme struct with 42 semantic roles; Nord + Solarized Dark built-in themes; all rendering files migrated to semantic::; workspace tests pass |
 | MEM-004 Workspace Session Topology | Complete | [MEM-004 Workspace-Scoped Session Topology](backlog/active/MEM-004-workspace-session-topology.md) | SHA256-hashed workspace identity; workspace_root column in SQLite; --continue/--resume filtered by workspace; same-basename collision prevented; old sessions backward-compatible |

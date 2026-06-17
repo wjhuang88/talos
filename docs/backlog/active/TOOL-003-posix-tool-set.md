@@ -1,6 +1,8 @@
-# TOOL-003: POSIX Tool Set — Embedded Rust Utilities**Status**: Planned  
-**Priority**: P2  
-**Depends on**: TOOL-001 (portable file/search baseline), TOOL-002 (tool calling remediation)  
+# TOOL-003: POSIX Tool Set — Embedded Rust Utilities
+
+**Status**: P0 Complete; P1-P3 Planned
+**Priority**: P2
+**Depends on**: TOOL-001 (portable file/search baseline), TOOL-002 (tool calling remediation)
 **Related ADRs**: ADR-010 (host dependency discipline), ADR-020 (tree-sitter)
 
 ## Problem

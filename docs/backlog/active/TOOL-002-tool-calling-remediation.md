@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TOOL-002 |
 | Priority | P0 |
-| Status | Planned |
+| Status | P0 Complete; P1-P2 Partial |
 | Depends On | ADR-021 (Tool Protocol Architecture) |
 | Blocks | Reliable tool execution across all providers |
 | Origin | Architecture review 2026-06-15 |
@@ -161,15 +161,29 @@ Phase 3 (P2):
 
 ## Acceptance Criteria
 
-- [ ] System prompt includes parameter schema for each tool
-- [ ] Text-parsed tool calls go through permission pipeline
-- [ ] Agent messages are cleaned of tool syntax before storage
-- [ ] Single parsing implementation shared across providers
-- [ ] Tool syntax is not visible in TUI during streaming
-- [ ] Tool inputs are validated against schema before execution
-- [ ] Duplicate tool calls within a turn are deduplicated
-- [ ] `cargo test --workspace` passes
-- [ ] `cargo clippy --workspace -- -D warnings` passes
+### P0 — Severe (all complete)
+
+- [x] System prompt includes parameter schema for each tool (#1)
+- [x] Text-parsed tool calls go through permission pipeline (#3)
+- [x] Agent messages are cleaned of tool syntax before storage (#4)
+- [x] Single parsing implementation shared across providers (#2, via ToolSyntaxFilter)
+
+### P1 — Important (partially complete)
+
+- [x] Tool syntax is not visible in TUI during streaming (#5, ToolSyntaxFilter implemented)
+- [ ] Tool inputs are validated against schema before execution (#7)
+- [ ] Duplicate tool calls within a turn are deduplicated (#8)
+- [ ] Provider code dedup: shared ToolCallPipeline (#6)
+
+### P2 — Nice to Have (partially complete)
+
+- [x] Redundant format instructions resolved (#9, Native protocol default, format files cleaned up)
+- [ ] `Message::System`/`Message::Context` fully wired (#10)
+
+### Remaining
+
+- [ ] `cargo test --workspace` passes (excluding pre-existing compilation errors)
+- [x] `cargo clippy --workspace -- -D warnings` passes
 
 ## Required Reads
 
