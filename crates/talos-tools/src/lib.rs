@@ -951,15 +951,14 @@ impl GlobTool {
 /// Input parameters for the [`LsTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct LsInput {
-    /// Directory to list. Defaults to workspace root.
     #[serde(default)]
     pub path: Option<String>,
-    /// Show hidden files (starting with `.`).
     #[serde(default)]
     pub all: bool,
-    /// Recursively list subdirectories.
     #[serde(default)]
     pub recursive: bool,
+    #[serde(default)]
+    pub long: bool,
 }
 
 /// A tool that lists directory contents with file metadata.
@@ -980,7 +979,7 @@ impl AgentTool for LsTool {
     }
 
     fn description(&self) -> &str {
-        "List directory contents with file type and size"
+        "List directory contents (supports long format, hidden files, recursive)"
     }
 
     fn parameters(&self) -> Value {
@@ -1021,7 +1020,7 @@ impl LsTool {
         }
 
         if target.is_file() {
-            return Ok(format_entry(&target, &canonical_root));
+            return Ok(format_entry(&target, &canonical_root, ls_input.long));
         }
 
         if ls_input.recursive {
@@ -1040,7 +1039,7 @@ impl LsTool {
                 .filter_map(Result::ok)
                 .filter(|e| e.depth() > 0)
             {
-                output.push_str(&format_entry(entry.path(), &canonical_root));
+                output.push_str(&format_entry(entry.path(), &canonical_root, ls_input.long));
                 output.push('\n');
             }
             return Ok(output.trim_end().to_string());
@@ -1061,7 +1060,7 @@ impl LsTool {
 
         let mut output = String::new();
         for entry in &entries {
-            output.push_str(&format_entry(&entry.path(), &canonical_root));
+            output.push_str(&format_entry(&entry.path(), &canonical_root, ls_input.long));
             output.push('\n');
         }
 
@@ -1073,12 +1072,16 @@ fn is_hidden_entry(name: &std::ffi::OsStr) -> bool {
     name.to_string_lossy().starts_with('.')
 }
 
-fn format_entry(path: &Path, root: &Path) -> String {
+fn format_entry(path: &Path, root: &Path, long: bool) -> String {
     let display = path
         .strip_prefix(root)
         .unwrap_or(path)
         .to_string_lossy()
         .to_string();
+
+    if long {
+        return format_entry_long(path, &display);
+    }
 
     let meta = std::fs::symlink_metadata(path).ok();
     let (type_char, size) = match &meta {
@@ -1101,6 +1104,77 @@ fn format_entry(path: &Path, root: &Path) -> String {
     };
 
     format!("{type_char} {size_str}  {display}")
+}
+
+#[cfg(unix)]
+fn format_entry_long(path: &Path, display: &str) -> String {
+    use std::os::unix::fs::MetadataExt;
+
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(m) => m,
+        Err(_) => return format!("?---------    -      -      -        -  ????-??-?? ??:??  {display}"),
+    };
+
+    let ft = meta.file_type();
+    let type_char = if ft.is_dir() {
+        'd'
+    } else if ft.is_symlink() {
+        'l'
+    } else {
+        '-'
+    };
+
+    let perms = format_permissions(meta.mode());
+    let nlink = meta.nlink();
+    let uid = meta.uid();
+    let gid = meta.gid();
+    let size = meta.len();
+    let mtime = format_mtime(meta.mtime());
+
+    format!(
+        "{type_char}{perms}  {nlink:>3}  {uid:>5}  {gid:>5}  {size:>8}  {mtime}  {display}"
+    )
+}
+
+#[cfg(not(unix))]
+fn format_entry_long(path: &Path, display: &str) -> String {
+    let meta = std::fs::symlink_metadata(path).ok();
+    let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+    format!("-         {size:>8}  {display}")
+}
+
+#[cfg(unix)]
+fn format_permissions(mode: u32) -> String {
+    let bits: [(u32, char); 9] = [
+        (0o400, 'r'), (0o200, 'w'), (0o100, 'x'),
+        (0o040, 'r'), (0o020, 'w'), (0o010, 'x'),
+        (0o004, 'r'), (0o002, 'w'), (0o001, 'x'),
+    ];
+    bits.iter()
+        .map(|(bit, c)| if mode & bit != 0 { *c } else { '-' })
+        .collect()
+}
+
+#[cfg(unix)]
+fn format_mtime(mtime: i64) -> String {
+    let secs = mtime.max(0) as u64;
+    let days = secs / 86400;
+    let rem = secs % 86400;
+    let hour = rem / 3600;
+    let min = (rem % 3600) / 60;
+
+    let z = days as i64 + 719468;
+    let era = if z >= 0 { z / 146097 } else { (z - 146096) / 146097 };
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if m <= 2 { y + 1 } else { y };
+
+    format!("{year:04}-{m:02}-{d:02} {hour:02}:{min:02}")
 }
 
 /// Input parameters for the [`DeleteTool`].
@@ -1893,6 +1967,57 @@ mod ls_tool_tests {
 
         assert!(!result.is_error);
         assert!(result.content.contains("main.rs"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_long_format() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("test.txt"), "hello world").unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "long": true })).await;
+
+        assert!(!result.is_error);
+        let txt_line = result
+            .content
+            .lines()
+            .find(|l| l.contains("test.txt"))
+            .unwrap_or_else(|| panic!("no test.txt line in: {}", result.content));
+        assert!(txt_line.starts_with('-'));
+        assert!(txt_line.contains("rw"));
+    }
+
+    #[tokio::test]
+    async fn test_ls_long_format_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "long": true })).await;
+
+        assert!(!result.is_error);
+        let src_line = result
+            .content
+            .lines()
+            .find(|l| l.contains("src"))
+            .unwrap_or_else(|| panic!("no src line in: {}", result.content));
+        assert!(src_line.starts_with('d'));
+    }
+
+    #[tokio::test]
+    async fn test_ls_long_shows_permissions() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("test.txt"), "content").unwrap();
+
+        let tool = LsTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "long": true })).await;
+
+        assert!(!result.is_error);
+        let line = result.content.lines().find(|l| l.contains("test.txt")).unwrap();
+        let perms_field = line.split_whitespace().nth(0).unwrap_or("");
+        assert!(perms_field.starts_with('-'));
+        assert!(perms_field.len() == 10);
     }
 
     #[test]
