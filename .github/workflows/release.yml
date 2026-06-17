@@ -1,0 +1,212 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            cross: zigbuild
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            cross: zigbuild
+            archive: tar.gz
+          # macOS
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            cross: native
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            cross: native
+            archive: tar.gz
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            runner: ubuntu-latest
+            cross: xwin
+            archive: zip
+          - target: aarch64-pc-windows-msvc
+            runner: ubuntu-latest
+            cross: xwin
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # ── Linux cross-compile via cargo-zigbuild ──
+      - name: Install cargo-zigbuild
+        if: matrix.cross == 'zigbuild'
+        run: pip install cargo-zigbuild
+
+      - name: Build (Linux zigbuild)
+        if: matrix.cross == 'zigbuild'
+        run: cargo zigbuild --release --target ${{ matrix.target }} -p talos-cli
+
+      # ── Windows cross-compile via cargo-xwin ──
+      - name: Install cargo-xwin
+        if: matrix.cross == 'xwin'
+        run: pip install cargo-xwin
+
+      - name: Build (Windows xwin)
+        if: matrix.cross == 'xwin'
+        run: cargo xwin build --release --target ${{ matrix.target }} -p talos-cli
+
+      # ── macOS native ──
+      - name: Build (macOS native)
+        if: matrix.cross == 'native'
+        run: cargo build --release --target ${{ matrix.target }} -p talos-cli
+
+      # ── Package ──
+      - name: Determine binary name
+        id: binname
+        run: |
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            echo "name=talos.exe" >> $GITHUB_OUTPUT
+          else
+            echo "name=talos" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Locate binary
+        id: binpath
+        run: |
+          TARGET="${{ matrix.target }}"
+          BIN="${{ steps.binname.outputs.name }}"
+          
+          if [[ "${{ matrix.cross }}" == "xwin" ]]; then
+            # cargo-xwin puts output in target/<triple>/release/
+            PATH_FOUND="target/${TARGET}/release/${BIN}"
+          else
+            PATH_FOUND="target/${TARGET}/release/${BIN}"
+          fi
+          
+          if [ ! -f "$PATH_FOUND" ]; then
+            echo "::error::Binary not found at $PATH_FOUND"
+            find target/ -name "$BIN" -type f 2>/dev/null || true
+            exit 1
+          fi
+          echo "path=$PATH_FOUND" >> $GITHUB_OUTPUT
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ../../../talos-${{ matrix.target }}.tar.gz ${{ steps.binname.outputs.name }}
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        run: |
+          cd target/${{ matrix.target }}/release
+          zip ../../../talos-${{ matrix.target }}.zip ${{ steps.binname.outputs.name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: talos-${{ matrix.target }}
+          path: |
+            talos-${{ matrix.target }}.tar.gz
+            talos-${{ matrix.target }}.zip
+          if-no-files-found: ignore
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts/
+
+      - name: Build release notes
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n 1 || true)"
+          
+          {
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "## Changes since \`$PREVIOUS_TAG\`"
+              echo
+              git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..${TAG}" |
+                sed -E 's/ \[model:[^]]+\]//g'
+              echo
+              echo
+              echo "Compare: https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG}"
+            else
+              echo "## Initial release"
+              echo
+              git log --pretty=format:'- %s (%h)' "$TAG" |
+                sed -E 's/ \[model:[^]]+\]//g'
+            fi
+
+            cat <<'NOTES'
+
+            ## Downloads
+
+            | Platform | Architecture | File |
+            |----------|-------------|------|
+            | Linux | x86_64 | `talos-x86_64-unknown-linux-gnu.tar.gz` |
+            | Linux | ARM64 | `talos-aarch64-unknown-linux-gnu.tar.gz` |
+            | macOS | Intel | `talos-x86_64-apple-darwin.tar.gz` |
+            | macOS | Apple Silicon | `talos-aarch64-apple-darwin.tar.gz` |
+            | Windows | x86_64 | `talos-x86_64-pc-windows-msvc.zip` |
+            | Windows | ARM64 | `talos-aarch64-pc-windows-msvc.zip` |
+
+            ### Install
+
+            ```bash
+            # Linux/macOS
+            curl -L https://github.com/${{ github.repository }}/releases/download/${TAG}/talos-<target>.tar.gz | tar xz
+            sudo mv talos /usr/local/bin/
+
+            # Windows
+            # Download the .zip, extract, and add talos.exe to PATH
+            ```
+            NOTES
+          } | sed 's/^  //' > RELEASE_BODY.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          body_path: RELEASE_BODY.md
+          files: artifacts/*

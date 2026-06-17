@@ -2,19 +2,33 @@ name: CI
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  rust:
-    runs-on: macos-latest
+  check:
+    name: Check + Clippy + Test
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
       - name: Check
         run: cargo check --workspace
-      - name: Test
-        run: cargo test --workspace
+
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
