@@ -906,6 +906,12 @@ impl Agent {
             }
         };
 
+        if let Err(e) = registry.validate_input(&call.name, &call.input) {
+            return Ok(ToolExecutionResult::error(format!(
+                "invalid input for {e}"
+            )));
+        }
+
         let normalized_input = normalize_tool_input(&call.name, call.input.clone());
 
         let result = if call.name == "bash" {

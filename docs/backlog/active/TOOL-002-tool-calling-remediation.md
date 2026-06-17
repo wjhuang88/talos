@@ -171,8 +171,8 @@ Phase 3 (P2):
 ### P1 — Important (partially complete)
 
 - [x] Tool syntax is not visible in TUI during streaming (#5, ToolSyntaxFilter implemented)
-- [ ] Tool inputs are validated against schema before execution (#7)
-- [ ] Duplicate tool calls within a turn are deduplicated (#8)
+- [x] Tool inputs are validated against schema before execution (#7, `registry.validate_input()` called before `tool.execute()`)
+- [x] Duplicate tool calls within a turn are deduplicated (#8, `HashSet<(String, String)>` in `execute_tools`)
 - [ ] Provider code dedup: shared ToolCallPipeline (#6)
 
 ### P2 — Nice to Have (partially complete)
