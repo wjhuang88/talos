@@ -125,22 +125,21 @@ impl ContextLoader {
         let mut parts: Vec<String> = Vec::new();
 
         // 1. Load global AGENTS.md (missing files are skipped gracefully)
-        if let Some(global_path) = self.global_agents_path() {
-            if let Some(content) = self.read_if_present(&global_path)? {
-                if !content.trim().is_empty() {
-                    parts.push(self.format_section(&global_path, &content));
-                }
-            }
+        if let Some(global_path) = self.global_agents_path()
+            && let Some(content) = self.read_if_present(&global_path)?
+            && !content.trim().is_empty()
+        {
+            parts.push(self.format_section(&global_path, &content));
         }
 
         // 2. Walk from workspace_root up to git root (or filesystem root)
         let mut current: Option<&Path> = Some(&self.workspace_root);
         while let Some(dir) = current {
             let agents_path = dir.join(AGENTS_MD);
-            if let Some(content) = self.read_if_present(&agents_path)? {
-                if !content.trim().is_empty() {
-                    parts.push(self.format_section(&agents_path, &content));
-                }
+            if let Some(content) = self.read_if_present(&agents_path)?
+                && !content.trim().is_empty()
+            {
+                parts.push(self.format_section(&agents_path, &content));
             }
 
             // Stop at git root
