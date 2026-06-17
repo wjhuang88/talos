@@ -76,6 +76,26 @@ jobs:
         if: matrix.cross == 'xwin'
         run: pip install cargo-xwin
 
+      - name: Configure llvm-lib for xwin
+        if: matrix.cross == 'xwin'
+        run: |
+          LLVM_LIB_BIN="$(command -v llvm-lib || true)"
+          if [ -z "$LLVM_LIB_BIN" ]; then
+            shopt -s nullglob
+            llvm_lib_bins=(/usr/bin/llvm-lib-*)
+            shopt -u nullglob
+            if [ "${#llvm_lib_bins[@]}" -gt 0 ]; then
+              LLVM_LIB_BIN="$(printf '%s\n' "${llvm_lib_bins[@]}" | sort -V | tail -n1)"
+            fi
+          fi
+          if [ -z "$LLVM_LIB_BIN" ]; then
+            echo "::error::Unable to locate llvm-lib (or versioned llvm-lib-*) for cargo-xwin"
+            exit 1
+          fi
+          TARGET_UNDERSCORE="${{ matrix.target }}"
+          TARGET_UNDERSCORE="${TARGET_UNDERSCORE//-/_}"
+          echo "AR_${TARGET_UNDERSCORE}=${LLVM_LIB_BIN}" >> "$GITHUB_ENV"
+
       - name: Build (Windows xwin)
         if: matrix.cross == 'xwin'
         run: cargo xwin build --release --target ${{ matrix.target }} -p talos-cli
