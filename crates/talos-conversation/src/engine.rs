@@ -412,7 +412,12 @@ impl ConversationEngine {
             out.push_str(&format!("  {}\n", tool_call.arguments));
             if let Some(ref result) = tool_call.result {
                 let icon = if result.is_error { "✗" } else { "✓" };
-                out.push_str(&format!("  {icon} {}\n", result.content));
+                let content = if result.content.is_empty() {
+                    "(no output)"
+                } else {
+                    &result.content
+                };
+                out.push_str(&format!("  {icon} {content}\n"));
             }
         }
     }

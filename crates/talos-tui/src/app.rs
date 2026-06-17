@@ -889,7 +889,9 @@ impl Tui {
                         .lines()
                         .find(|l| !l.trim().is_empty())
                         .unwrap_or(&display.content);
-                    if first.len() > 120 {
+                    if first.is_empty() {
+                        "(no output)".to_string()
+                    } else if first.len() > 120 {
                         format!("{}…", &first[..120])
                     } else {
                         first.to_string()
