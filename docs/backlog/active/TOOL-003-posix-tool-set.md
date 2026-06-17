@@ -270,6 +270,7 @@ Workspace-root auto-approval (from TOOL-002 permission fix) applies to all read-
 
 ### P3
 - [ ] `tree` tool renders directory structure
+- [ ] Mermaid code blocks (` ```mermaid `) render as Unicode diagrams via `mermaid-text`
 
 ## Risk Assessment
 
@@ -450,5 +451,146 @@ bash = "allow"
 3. Refactor `PermissionEngine` to use nature-based decisions
 4. Remove name-based matching code (`is_file_tool`, hardcoded rules in `add_default_rules`)
 5. Update tests
+
+## Mermaid Code Block Rendering
+
+**Status**: Planned — Library selected (`mermaid-text` v0.56.0, MIT), integration plan documented
+
+### Library Selection
+
+Survey of 8+ Rust crates for Mermaid-to-terminal-text rendering:
+
+| Crate | License | Version | Deps | Diagram Types | Verdict |
+|-------|---------|---------|------|---------------|---------|
+| **mermaid-text** | MIT | 0.56.0 | 1 (unicode-width) | 18+ | **Selected** |
+| graphs-tui | AGPL-3.0 | 0.4.0 | 0 | 4 | Rejected (license) |
+| mermaid-ascii | MIT | α | 3 | 5 | Good but less mature |
+
+**Selection rationale**:
+- MIT license — fully compatible with Talos's Apache-2.0
+- v0.56.0 — battle-tested in production (`leboiko/markdown-reader` TUI app, 28 stars)
+- 18+ diagram types (flowchart, sequence, class, ER, state, pie, gantt, gitGraph, timeline, mindmap, sankey, architecture, quadrantChart, requirementDiagram, xychart, block, packet, journey)
+- 1 dependency (`unicode-width`) — truly lightweight
+- Explicitly designed for LLM agent consumption
+- API: `mermaid_text::render(src) -> Result<String, Error>` — dead simple
+
+### Integration Plan
+
+#### Current Code Block Pipeline (reference)
+
+The existing Markdown block rendering flow in `crates/talos-tui/src/`:
+
+```
+StreamBlockClassifier (stream_markdown.rs)
+  │  classifies incoming lines into MarkdownBlockKind
+  │
+  ▼
+app.rs::render_block_lines()  [line 249]
+  │  if kind == CodeFence:
+  │    ├── try_highlight_code_block()  [line 273]
+  │    │     extracts lang from opening line (e.g. ```rust → "rust")
+  │    │     → HighlightEngine → build_code_block()
+  │    │
+  │    └── fallback: render_code_block()  [line 1284]
+  │          → build_code_block()  [line 1304]
+  │            renders with: ─── [lang] ─── border + line numbers + content
+  │
+  ▼
+ScrollbackLine[] → TUI display
+```
+
+#### Insertion Point
+
+In `app.rs::render_block_lines()`, add a **mermaid check before syntax highlighting**:
+
+```rust
+// app.rs, in render_block_lines()
+if kind == &MarkdownBlockKind::CodeFence {
+    let opening = &block_lines[0];
+    let lang = opening.trim_start().trim_start_matches(['`', '~']).trim();
+
+    // NEW: Mermaid rendering path
+    if lang == "mermaid" {
+        let code_lines = &block_lines[1..block_lines.len() - 1];
+        let mermaid_src = code_lines.join("\n");
+        return Self::render_mermaid_block(&mermaid_src, bg);
+    }
+
+    // Existing: syntax highlighting path (unchanged)
+    // ...
+}
+```
+
+#### New Method: `render_mermaid_block()`
+
+```rust
+fn render_mermaid_block(mermaid_src: &str, bg: Option<CColor>) -> Vec<ScrollbackLine> {
+    match mermaid_text::render(mermaid_src) {
+        Ok(rendered) => {
+            let header = ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("   [mermaid] {}", "─".repeat(40)),
+                    to_crossterm_color(semantic::DIM_TEXT),
+                    HistoryAttrs::default(),
+                )],
+                bg,
+            );
+            let mut lines = vec![header];
+            for text_line in rendered.lines() {
+                lines.push(ScrollbackLine::styled(
+                    vec![HistorySegment::styled(
+                        format!("   {text_line}"),
+                        to_crossterm_color(semantic::CODE_BLOCK_TEXT),
+                        HistoryAttrs::default(),
+                    )],
+                    bg,
+                ));
+            }
+            lines
+        }
+        Err(_) => {
+            // Fallback: show Mermaid source as plain code block
+            let plain_lines: Vec<Vec<(String, Option<CColor>)>> = mermaid_src
+                .lines()
+                .map(|l| vec![(l.to_string(), None)])
+                .collect();
+            build_code_block(&plain_lines, "mermaid", bg)
+        }
+    }
+}
+```
+
+#### Dependency
+
+Add to `crates/talos-tui/Cargo.toml`:
+
+```toml
+mermaid-text = "0.56"
+```
+
+This pulls in only `unicode-width` (already a transitive dep via `tui-markdown`).
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `crates/talos-tui/Cargo.toml` | Add `mermaid-text = "0.56"` |
+| `crates/talos-tui/src/app.rs` | Add `render_mermaid_block()` method + mermaid check in `render_block_lines()` |
+| (no new files needed) | |
+
+### Error Handling
+
+- Mermaid parse failure → fall back to plain code block rendering (existing `build_code_block`)
+- Empty diagram → show "empty mermaid diagram" placeholder
+- Overly large output (>200 lines) → truncate with `... (truncated)` indicator
+
+### Acceptance Criteria
+
+- [ ] ` ```mermaid ` code blocks render as Unicode box-drawing diagrams
+- [ ] Invalid Mermaid source falls back to plain code block display
+- [ ] Non-mermaid code blocks unaffected (regression test)
+- [ ] Width-constrained rendering respects terminal width
+- [ ] Existing highlight/table/list/quote rendering unaffected
+- [ ] Tests: `test_mermaid_block_renders_diagram`, `test_mermaid_fallback_on_invalid_syntax`, `test_non_mermaid_code_block_unchanged`
 
 Each batch is independently shippable.
