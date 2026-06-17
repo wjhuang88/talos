@@ -26,7 +26,7 @@ jobs:
           # Linux
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
-            cross: zigbuild
+            cross: native
             archive: tar.gz
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest
