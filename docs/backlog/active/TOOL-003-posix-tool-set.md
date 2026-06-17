@@ -593,4 +593,66 @@ This pulls in only `unicode-width` (already a transitive dep via `tui-markdown`)
 - [ ] Existing highlight/table/list/quote rendering unaffected
 - [ ] Tests: `test_mermaid_block_renders_diagram`, `test_mermaid_fallback_on_invalid_syntax`, `test_non_mermaid_code_block_unchanged`
 
+### Prerequisite Bug Fix: Fence Info-String Misdetection
+
+**Status**: Planned — Root cause identified, fix documented, not yet implemented
+
+#### Problem
+
+`stream_markdown.rs::is_matching_fence_close()` incorrectly treats ANY line starting with backticks as a closing fence, including opening fences with info strings:
+
+```rust
+// Current (line 401-403)
+fn is_matching_fence_close(line: &str, marker: &str) -> bool {
+    line.trim_start().starts_with(marker)  // "```rust" matches "```" → false close
+}
+```
+
+| Input | Current | Correct |
+|-------|---------|---------|
+| ```` ```rust ```` | 当成闭合 ❌ | 不应闭合（后面有 info string） |
+| ```` ``` ```` | 当成闭合 ✅ | 应闭合（后面只有空白） |
+| 不同级反引号（` ``` ` vs ` ```` `） | 外层被内层提前闭合 ❌ | 不闭合（数量不够） |
+
+#### Proposed Fix
+
+Replace `Option<String>` with `(String, usize)` to track actual backtick count, and add info-string awareness:
+
+```rust
+// fence_marker → return (marker, count) instead of Option<String>
+fn fence_marker(line: &str) -> Option<(String, usize)> {
+    let trimmed = line.trim_start();
+    if let Some(rest) = trimmed.strip_prefix("```") {
+        let count = 3 + rest.chars().take_while(|c| *c == '`').count();
+        Some(("```".to_string(), count))
+    } else if let Some(rest) = trimmed.strip_prefix("~~~") {
+        let count = 3 + rest.chars().take_while(|c| *c == '~').count();
+        Some(("~~~".to_string(), count))
+    } else {
+        None
+    }
+}
+
+// is_matching_fence_close → check: count >= open_count + rest is whitespace-only
+fn is_matching_fence_close(line: &str, marker: &str, open_count: usize) -> bool {
+    let trimmed = line.trim_start();
+    let ch = marker.chars().next().unwrap_or('`');
+    let close_count = trimmed.chars().take_while(|c| *c == ch).count();
+    close_count >= open_count && trimmed[close_count..].trim().is_empty()
+}
+```
+
+#### Files Changed
+
+| File | Change | Effort |
+|------|--------|--------|
+| `crates/talos-tui/src/stream_markdown.rs` | `ClassifierState::Holding.fence_marker` type, `fence_marker()` return type, `is_matching_fence_close()` signature + logic | ~30 lines |
+
+#### Acceptance Criteria
+
+- [ ] ` ```rust ` opening line NOT treated as closing fence
+- [ ] ` ```` ` (4 backticks) NOT closed by inner ` ``` ` (3 backticks)  
+- [ ] Existing code block detection not regressed (` ```text ... ``` ` still works)
+- [ ] Tests: `test_fence_info_string_not_closed`, `test_fence_nested_backtick_count`
+
 Each batch is independently shippable.
