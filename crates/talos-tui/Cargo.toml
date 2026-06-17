@@ -17,6 +17,7 @@ tokio = { version = "1", features = ["sync", "macros", "time", "rt"] }
 futures = "0.3"
 serde_json = "1"
 tui-markdown = "0.3"
+mermaid-text = "0.56"
 arborium = { version = "2.16", default-features = false, features = [
     "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
     "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",

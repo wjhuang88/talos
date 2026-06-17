@@ -255,6 +255,17 @@ impl StreamRenderState {
         if kind == &MarkdownBlockKind::CodeFence {
             let bg_source = self.source().cloned();
             let bg = stream_bg_for(bg_source.as_ref());
+
+            if block_lines.len() >= 3 {
+                let opening = &block_lines[0];
+                let lang = opening.trim_start().trim_start_matches(['`', '~']).trim();
+                if lang == "mermaid" {
+                    let code_lines = &block_lines[1..block_lines.len() - 1];
+                    let mermaid_src = code_lines.join("\n");
+                    return render_mermaid_block(&mermaid_src, bg);
+                }
+            }
+
             if let Some(rendered) =
                 Self::try_highlight_code_block(&mut self.highlight_engine, &block_lines, bg_source)
             {
@@ -1281,6 +1292,45 @@ fn render_code_block_line(line: &str) -> Vec<HistorySegment> {
     )]
 }
 
+fn render_mermaid_block(mermaid_src: &str, bg: Option<CColor>) -> Vec<ScrollbackLine> {
+    let dim_color = to_crossterm_color(semantic::DIM_TEXT);
+    let text_color = to_crossterm_color(semantic::MARKDOWN_CODE);
+
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        mermaid_text::render(mermaid_src)
+    })) {
+        Ok(Ok(rendered)) => {
+            let header = ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("   [mermaid] {}", "─".repeat(40)),
+                    dim_color,
+                    HistoryAttrs::default(),
+                )],
+                bg,
+            );
+            let mut lines = vec![header];
+            for text_line in rendered.lines() {
+                lines.push(ScrollbackLine::styled(
+                    vec![HistorySegment::styled(
+                        format!("   {text_line}"),
+                        text_color,
+                        HistoryAttrs::default(),
+                    )],
+                    bg,
+                ));
+            }
+            lines
+        }
+        Ok(Err(_)) | Err(_) => {
+            let plain_lines: Vec<Vec<(String, Option<CColor>)>> = mermaid_src
+                .lines()
+                .map(|l| vec![(l.to_string(), None)])
+                .collect();
+            build_code_block(&plain_lines, "mermaid", bg)
+        }
+    }
+}
+
 fn render_code_block(block_lines: &[String], bg: Option<CColor>) -> Vec<ScrollbackLine> {
     if block_lines.len() < 3 {
         return block_lines
@@ -2225,6 +2275,21 @@ mod tests {
         assert!(result[0].text.contains("rust"), "language label");
         assert!(result[1].text.contains("1"), "line number");
         assert!(result[1].text.contains("fn main() {}"), "code content");
+    }
+
+    #[test]
+    fn mermaid_block_renders_diagram() {
+        let src = "flowchart LR\n    A[Start] --> B[End]";
+        let result = render_mermaid_block(src, None);
+        assert!(!result.is_empty(), "should produce output lines");
+        assert!(result[0].text.contains("mermaid"), "should have mermaid header");
+    }
+
+    #[test]
+    fn mermaid_block_falls_back_on_invalid_syntax() {
+        let src = "this is not valid mermaid at all";
+        let result = render_mermaid_block(src, None);
+        assert!(!result.is_empty(), "fallback should still produce output");
     }
 
     #[test]
