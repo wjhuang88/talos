@@ -295,9 +295,20 @@ impl Agent {
     }
 
     pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
-        if protocol == ToolProtocol::TalosStrict {
-            self.prompt_builder =
-                std::mem::take(&mut self.prompt_builder).with_strict_tool_format();
+        match protocol {
+            ToolProtocol::TalosStrict => {
+                self.prompt_builder =
+                    std::mem::take(&mut self.prompt_builder).with_strict_tool_format();
+            }
+            ToolProtocol::Compat => {
+                self.prompt_builder =
+                    std::mem::take(&mut self.prompt_builder)
+                        .with_tool_format(prompt::TOOL_CALLING_FORMAT);
+            }
+            ToolProtocol::Native => {
+                self.prompt_builder =
+                    std::mem::take(&mut self.prompt_builder).with_tool_format("");
+            }
         }
     }
 

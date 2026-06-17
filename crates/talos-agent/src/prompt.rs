@@ -165,12 +165,17 @@ impl SystemPromptBuilder {
             user_preferences: String::new(),
             custom_prompt: None,
             append_prompt: None,
-            tool_call_format: TOOL_CALLING_FORMAT,
+            tool_call_format: "",
         }
     }
 
     pub fn with_strict_tool_format(mut self) -> Self {
         self.tool_call_format = TOOL_CALLING_STRICT;
+        self
+    }
+
+    pub fn with_tool_format(mut self, format: &'static str) -> Self {
+        self.tool_call_format = format;
         self
     }
 
@@ -305,7 +310,9 @@ impl SystemPromptBuilder {
                 }
                 tools_section.push('\n');
             }
-            tools_section.push_str(self.tool_call_format);
+            if !self.tool_call_format.is_empty() {
+                tools_section.push_str(self.tool_call_format);
+            }
             parts.push(tools_section);
         }
 
