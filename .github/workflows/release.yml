@@ -154,11 +154,30 @@ jobs:
       - name: List artifacts
         run: ls -lh artifacts/
 
+      - name: Detect pre-release
+        id: prerelease
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if echo "$TAG" | grep -qE '^v[0-9]+(\.[0-9]+)*-(alpha|beta|rc|pre|dev)\.'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "Pre-release detected: $TAG"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "Stable release: $TAG"
+          fi
+
       - name: Build release notes
+        env:
+          IS_PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n 1 || true)"
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "⚠️ **This is a pre-release build. Expect bugs and breaking changes.**" > RELEASE_BODY.md
+            echo >> RELEASE_BODY.md
+          fi
           
           {
             if [ -n "$PREVIOUS_TAG" ]; then
@@ -200,7 +219,7 @@ jobs:
             # Download the .zip, extract, and add talos.exe to PATH
             ```
             NOTES
-          } | sed 's/^  //' > RELEASE_BODY.md
+          } | sed 's/^  //' >> RELEASE_BODY.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -209,4 +228,5 @@ jobs:
           name: ${{ github.ref_name }}
           fail_on_unmatched_files: true
           body_path: RELEASE_BODY.md
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           files: artifacts/*
