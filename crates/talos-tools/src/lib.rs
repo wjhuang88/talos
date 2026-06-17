@@ -5,6 +5,7 @@
 //! AST-aware symbol queries.
 
 pub mod symbol;
+pub mod git;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

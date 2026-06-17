@@ -51,6 +51,7 @@ use talos_provider::openai::OpenAIProvider;
 use talos_rpc::RpcServer;
 use talos_session::{IndexError, Session, SessionInfo, SessionManager};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
+use talos_tools::git::{GitBranchListTool, GitDiffTool, GitLogTool, GitShowTool, GitStatusTool};
 use talos_tools::{BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::mpsc;
@@ -1364,9 +1365,14 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(StatTool::new(workspace_root.clone())),
-        approval,
+        approval: approval.clone(),
         print_mode: false,
     }));
+    registry.register(Arc::new(GitStatusTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitDiffTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitBranchListTool::new(workspace_root.clone())));
 
     let hooks = build_hook_registry(true);
 
@@ -1488,6 +1494,11 @@ fn build_print_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitStatusTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
     registry
 }
 
@@ -1549,9 +1560,14 @@ fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ListImportsTool::new(workspace_root)),
+        inner: Arc::new(ListImportsTool::new(workspace_root.clone())),
         approval: approval_handler,
     }));
+    registry.register(Arc::new(GitStatusTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitDiffTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitBranchListTool::new(workspace_root)));
     registry
 }
 
@@ -1601,6 +1617,11 @@ fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitStatusTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
     registry
 }
 
