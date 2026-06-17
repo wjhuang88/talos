@@ -56,6 +56,12 @@ jobs:
       - name: Install cargo-xwin
         run: pip install cargo-xwin
 
+      - name: Install LLVM (provides llvm-lib and lld-link for cargo-xwin)
+        run: brew install llvm
+
+      - name: Add LLVM to PATH
+        run: echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+
       - name: Build all platforms
         run: ./build.sh
 
