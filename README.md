@@ -146,7 +146,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I021 | Evolution MenteDB Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat / `400 Bad Request` loop. Realigns `Signal.context` semantics, `TurnObservation` schema, and `Pattern` provenance per the MenteDB blueprint; defense layer from `7470ac5` stays as belt-and-suspenders. |
 | I022 | TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
 | I023 | TUI State Model | Complete | Event-driven `talos-conversation` + `talos-tui` state model, styled multiline scrollback, Markdown block classification and conservative styled rendering, spinner, cursor sync. Non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback. |
-| I025 | Tool Pipeline Completion | Active | TOOL-002 P1-P2 residual (schema validation, dedup), TOOL-003 P1 (diff, stat), fence info-string fix, Mermaid code block rendering (mermaid-text), ToolNature attribute. |
+| I025 | Tool Pipeline Completion | Complete | TOOL-002 P1-P2 residual (schema validation, dedup), TOOL-003 P1 (diff, stat), fence info-string fix, Mermaid code block rendering (mermaid-text), ToolNature attribute replacing name-based permission matching. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in

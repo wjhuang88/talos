@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I025 Tool Pipeline Completion | Active | [I025 Tool Pipeline Completion](iterations/I025-tool-pipeline-completion.md) | TOOL-002 P1-P2 residual + TOOL-003 P1 + fence fix + Mermaid rendering + ToolNature |
+| (no active iterations) | — | — | — |
 
 ## Review
 
@@ -51,6 +51,7 @@ acceptance criteria, verification evidence, or iteration state.
 |---|---|---|---|
 | TOOL-003 P0 POSIX Tool Set | P0 Complete | [TOOL-003 POSIX Tool Set](backlog/active/TOOL-003-posix-tool-set.md) | grep/glob/ls/delete + read offset/limit + ls long format; 42 new tests; permission rules; TUI summaries; prompt optimization; clippy clean |
 | TOOL-002 P0 Tool Calling Remediation | P0 Complete | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Schema in prompt, permission pipeline, agent message cleanup, streaming filter, format cleanup; P1-P2 residual in I025 |
+| I025 Tool Pipeline Completion | Complete | [I025 Tool Pipeline Completion](iterations/I025-tool-pipeline-completion.md) | All 5 stories: schema validation+dedup, diff+stat, fence fix, Mermaid rendering, ToolNature. 142+ tests pass |
 | CODE-002 Symbol Tools | Complete | [CODE-002 Symbol Tools](backlog/active/CODE-002-symbol-tools.md) | All 4 tools (find_symbol, find_references, list_symbols, list_imports) implemented in symbol.rs; registered in all 4 builders |
 | CODE-001 Tree-sitter Research | Complete | [CODE-001 Tree-sitter Code Analysis Research](backlog/active/CODE-001-tree-sitter-code-analysis-research.md) | All 7 research questions answered; ADR-020 created; arborium integrated; TUI highlighting delivered; next step CODE-002 Symbol Tools planned |
 | TUI-007 Theme System | Complete | [TUI-007 Theme System](backlog/active/TUI-007-theme-system.md) | Theme struct with 42 semantic roles; Nord + Solarized Dark built-in themes; all rendering files migrated to semantic::; workspace tests pass |

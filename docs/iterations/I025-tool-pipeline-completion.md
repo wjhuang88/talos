@@ -1,7 +1,8 @@
 # I025: Tool Pipeline Completion
 
-**Status**: Active
+**Status**: Complete
 **Started**: 2026-06-17
+**Completed**: 2026-06-17
 **Depends On**: TOOL-002 (P0 Complete), TOOL-003 (P0 Complete), CODE-002 (Complete)
 
 ## Outcome
@@ -114,11 +115,27 @@ stream_markdown fence detection into a single trackable iteration.
 
 ## Exit Criteria
 
-- [ ] S1-S4 complete (S5 optional)
-- [ ] `cargo clippy --workspace -- -D warnings` passes
-- [ ] `cargo test -p talos-tools -p talos-permission -p talos-core -p talos-tui` passes
-- [ ] BOARD.md updated with final state
-- [ ] TOOL-002 and TOOL-003 acceptance criteria updated
+- [x] S1-S5 complete
+- [x] `cargo clippy --workspace -- -D warnings` passes
+- [x] `cargo test -p talos-tools -p talos-permission -p talos-core -p talos-tui` passes
+- [x] BOARD.md updated with final state
+- [x] TOOL-002 and TOOL-003 acceptance criteria updated
+
+## Retrospective
+
+All 5 stories delivered in a single session:
+
+| Story | Commit | Key Change |
+|-------|--------|------------|
+| S1 | `d3bc2e7` | Schema validation (`registry.validate_input()` before execute) |
+| S2 | `38f6205` | diff + stat tools (similar crate + std::os::unix) |
+| S3 | `700c4bc` | Fence info-string fix (backtick count tracking) |
+| S4 | `3f0a1b0` | Mermaid rendering (mermaid-text v0.56, 1 dep) |
+| S5 | `06b6b3f` | ToolNature enum replaces name-based permission matching |
+
+Key architectural win: S5 eliminated all hardcoded tool-name substring matching in the
+permission engine. Adding new tools no longer requires touching `is_file_tool()`,
+`default_decision()`, or `add_default_rules()` — just override `nature()` on the tool.
 
 ## Out of Scope
 
