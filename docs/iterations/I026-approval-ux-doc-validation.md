@@ -1,81 +1,81 @@
-# I026: Approval UX Fix + Documentation Validation
+# I026: Approval UX + Git Tools + Prompt Optimization
 
 **Status**: Active
 **Started**: 2026-06-17
-**Depends On**: TOOL-002 (Approval bug documented), ARCH-002 (Phase 1 planned)
+**Depends On**: TOOL-002 (Approval bug), ARCH-002 (Prompt template/cache), GIT-001 (Git tools)
 
 ## Outcome
 
-Fix the approval-tool call ordering bug so users can clearly see which tool call requires
-approval. Then validate all project documentation against actual implementation to prepare
-for ARCH-002 Phase 2 (architecture audit).
+Fix approval UX, implement comprehensive Git tools (read + write), add dynamic prompt
+templates with cache optimization, and validate project documentation.
+
+## Confirmed Decisions
+
+| Decision | Choice |
+|----------|--------|
+| Git write ops (push/pull/checkout) | host git fallback, error if git not found |
+| Approval rendering | inline below tool call line |
+| Dynamic template slots | tool_protocol_hint, workspace_info, model_info, datetime |
+| datetime placement | append prompt section (end of prompt) to minimize cache breakage |
+| Cache control | Anthropic explicit cache_control + OpenAI message ordering stability |
+| Git auto-commit | No — all git ops are explicit LLM tool calls |
+| Tree tool format | ASCII tree with box-drawing characters |
 
 ## Stories
 
-### S1: Approval-Tool Call Ordering Fix
+### Group A: Approval UX
 
-| Field | Value |
-|-------|-------|
-| Source | TOOL-002 bug section |
-| Est | ~100 LOC |
-| Priority | P1 |
+#### S1: Approval-Tool Call Ordering Fix (~100 LOC, P1)
 
-**Problem**: Approval prompts appear after tool call lines with no visual association. In
-multi-tool batches the user cannot tell which tool call the approval is for.
+Approval prompt appears immediately after the tool call line, before tool executes.
 
-**Fix**: Push approval as inline scrollback lines directly after the tool call line, before
-the tool executes. Each approval block shows:
-```
-→ write, path: poem.txt
-  ⚠ Requires approval — press y/n/a
-  ✓ approved
-  ✓ wrote 921 bytes
-```
+### Group B: Git Tools
 
-**Scope**:
-- `TuiPermissionAwareTool::execute()`: when approval is needed, send tool call display first,
-  then approval request via the existing channel
-- TUI: render approval as scrollback lines tied to the preceding tool call
-- Approval response: push result line inline before tool execution proceeds
-- Auto-allowed tools: no approval lines shown (unchanged behavior)
+#### S2: GIT-001 P0 — Read-Only Git Tools (~350 LOC, P1)
 
-**Acceptance**:
-- [ ] Approval prompt appears immediately after the tool call line
-- [ ] Visual association between tool call and its approval is clear
-- [ ] Multi-tool batches show approval per-tool, not batched at the end
-- [ ] Approved/denied result shown inline before next tool call
-- [ ] No regression for auto-allowed tools
+Tools: git_status, git_diff, git_log, git_show, git_branch_list
+Implementation: gix crate v0.84+ with minimal features
+Permission: ToolNature::Read (auto-allow)
 
-### S2: ARCH-002 Phase 1 — Documentation Validation
+#### S3: GIT-001 P2 — Write Git Tools (~400 LOC, P2)
 
-| Field | Value |
-|-------|-------|
-| Source | ARCH-002 Phase 1 |
-| Est | Research (no code changes) |
-| Priority | P1 |
+Tools:
+- git_add (gix index native)
+- git_commit (gix native)
+- git_push (host git fallback)
+- git_pull (host git fallback)
+- git_checkout (host git fallback)
 
-**Problem**: Project documentation (AGENTS.md, ARCHITECTURE.md, ADRs, backlog stories,
-iteration records) may have drifted from actual implementation after rapid TOOL-003/I025
-development.
+Permission: ToolNature::Write/Execute (Ask). No auto-commit.
+Host git invoked directly (no sh -c), allowlisted shapes, structured args.
 
-**Scope**:
-- Verify AGENTS.md hard constraints still match actual code constraints
-- Verify ARCHITECTURE.md crate dependency graph matches Cargo.toml
-- Verify ADRs referenced in AGENTS.md still exist and are accurate
-- Verify backlog story acceptance criteria match actual implementation evidence
-- Verify iteration records match actual commit history
-- Verify README.md "What Works" section matches actual tool inventory
-- Verify BOARD.md status entries match owner docs
-- Document all discrepancies found
+### Group C: Prompt Optimization
 
-**Acceptance**:
-- [ ] Every AGENTS.md hard constraint verified against code
-- [ ] Architecture dependency graph validated
-- [ ] ADR cross-references valid
-- [ ] Discrepancy list produced and filed as residual work or fixed
+#### S4: Dynamic Prompt Template (~100 LOC, P2)
+
+Convert identity.txt to template with slot variables.
+Template engine: simple key substitution via HashMap.
+
+#### S5: Prompt Cache Control (~120 LOC, P2)
+
+Anthropic: emit cache_control markers on system message content blocks.
+OpenAI: ensure stable message ordering for prefix caching.
+
+### Group D: Small Tools + Validation
+
+#### S6: TOOL-003 P3 — Tree Tool (~50 LOC, P3)
+
+ASCII tree visualization with box-drawing characters.
+Parameters: path (optional), max_depth (optional, default 3).
+Permission: ToolNature::Read (auto-allow).
+
+#### S7: ARCH-002 Phase 1 — Documentation Validation (Research, P1)
+
+Verify all documentation against actual implementation.
 
 ## Exit Criteria
 
-- [ ] S1 and S2 complete
-- [ ] `cargo clippy --workspace -- -D warnings` passes
+- [ ] All 7 stories complete
+- [ ] cargo clippy --workspace -- -D warnings passes
+- [ ] cargo test --workspace passes
 - [ ] BOARD.md updated with final state
