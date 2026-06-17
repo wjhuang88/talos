@@ -174,3 +174,185 @@ Introduce traits where concrete types create tight coupling.
 | Refactoring breaks working features | Medium | High | Each slice ships independently with full test coverage |
 | Over-engineering boundaries | Medium | Medium | Only add ACLs where coupling causes real problems |
 | Breaking public API changes | Low | High | Semver-bound crates need migration plans per ADR |
+
+## Dynamic Prompt Template & Context Cache Optimization
+
+**Status**: Planned — Requirement documented, not yet implemented
+**Related**: `talos-agent/src/prompt.rs` (SystemPromptBuilder), TOOL-002 #1 (schema in prompt)
+
+### Requirement 1: Dynamic Prompt Templates
+
+#### Problem
+
+The current `SystemPromptBuilder` assembles the system prompt as a monolithic string at startup.
+Tool descriptions, parameter schemas, usage instructions, and identity text are all concatenated
+into a single `String`. While tool descriptions are already dynamically populated from the tool
+registry, the structure is rigid:
+
+- Identity text is a static `include_str!()` — cannot be overridden per-session or per-provider
+- Tool section format (parameter listings, summaries) is hardcoded in `build()`
+- No template variable substitution (e.g. `{{workspace_root}}`, `{{model_name}}`)
+- Append/custom prompts are bolt on, not first-class template slots
+
+#### Proposed Direction
+
+Introduce a **template-driven prompt assembly** where the system prompt is composed from named
+slots, each filled at runtime but **stable within a session** (for cache compatibility):
+
+```
+Template: identity.txt
+├── {{tool_section}}      ← populated from tool registry at session start
+├── {{skill_index}}       ← populated from skill loader at session start
+├── {{context_files}}     ← populated from AGENTS.md at session start
+├── {{tool_protocol_hint}} ← populated from config.tool_protocol()
+└── {{user_preferences}}  ← populated from config
+```
+
+Key properties:
+- **Session-stable**: once assembled at session start, the prompt prefix does not change between
+  turns. This is critical for provider-side prompt caching (Anthropic ephemeral cache, OpenAI
+  prefix caching).
+- **Runtime-assembled**: the tool list, skill index, and context are injected at runtime, not
+  compile time. Adding/removing tools or skills does not require recompilation.
+- **Template files**: `identity.txt` becomes a template with `{{slot}}` markers. Additional
+  template files can be added without code changes.
+
+#### Implementation Hints
+
+- `SystemPromptBuilder` gains a `template: String` field (the raw template with `{{slots}}`)
+- A `render_template(template, slots: &HashMap<&str, String>) -> String` helper substitutes slots
+- `build()` calls `render_template()` instead of manual `format!()` concatenation
+- Existing `CacheMarker` logic still works because slot positions are deterministic
+
+#### Files Affected
+
+| File | Change |
+|------|--------|
+| `crates/talos-agent/src/prompt.rs` | Template engine, slot rendering, CacheMarker updates |
+| `prompts/identity.txt` | Add `{{slot}}` markers (backward-compatible: unknown slots left as-is) |
+| `crates/talos-agent/src/lib.rs` | Pass runtime values (tool_protocol_hint, workspace info) as slots |
+
+### Requirement 2: Context Layout for LLM Prompt Cache / KV Cache Optimization
+
+#### Problem
+
+Modern LLM providers (Anthropic, OpenAI) offer **prefix caching** — if the beginning of a prompt
+is identical across requests, the provider reuses the computed KV cache, dramatically reducing
+latency and cost (Anthropic: 90% cost reduction on cache hit; OpenAI: 50% latency reduction).
+
+Talos's current prompt layout is:
+
+```
+[Identity]          ← stable (good)
+[Tools]             ← stable if tool list doesn't change (good)
+[Skills]            ← stable if skill set doesn't change (good)
+[Context files]     ← semi-stable (AGENTS.md rarely changes mid-session)
+[User preferences]  ← semi-stable
+[Conversation]      ← grows every turn (unavoidable)
+```
+
+The `build_with_cache_markers()` method already marks the first 3 sections as `Ephemeral`
+cacheable. But there are gaps:
+
+1. **No Anthropic `cache_control` emission**: `CacheMarker` is computed but never sent to the
+   provider as `cache_control: { type: "ephemeral" }` in the API request. The markers are
+   informational only — the provider doesn't know which parts to cache.
+
+2. **Context files instability**: If `AGENTS.md` is loaded fresh each turn (it shouldn't be, but
+   the code path allows it), the cache breaks. The context section should be assembled once at
+   session start and frozen.
+
+3. **Message ordering**: The provider receives messages as `[System, User, Assistant, Tool, ...]`.
+   The system prompt is always first (good for caching). But if the tool list changes mid-session
+   (e.g., MCP tools discovered after first turn), the system prompt changes and cache invalidates.
+
+4. **No explicit cache breakpoints**: Anthropic supports up to 4 `cache_control` breakpoints per
+   request. Talos should place them strategically:
+   - Breakpoint 1: after Identity (stable across sessions)
+   - Breakpoint 2: after Tools (stable within a session)
+   - Breakpoint 3: after Context files (rarely changes)
+   - Breakpoint 4: at the latest user message boundary (maximizes conversation cache reuse)
+
+#### Proposed Direction
+
+**Phase A: Emit cache_control markers to provider**
+
+In the Anthropic provider's request builder, convert `CacheMarker` offsets into
+`cache_control: { type: "ephemeral" }` annotations on the appropriate content blocks:
+
+```json
+{
+  "type": "text",
+  "text": "...identity + tools + skills...",
+  "cache_control": { "type": "ephemeral" }
+}
+```
+
+**Phase B: Freeze session-stable sections**
+
+Ensure that within a single session:
+- Tool list does not change (MCP tools discovered at startup, not mid-session)
+- Skill index does not change
+- Context files are loaded once and frozen
+- System prompt prefix is computed once and reused for every turn
+
+**Phase C: Strategic cache breakpoints**
+
+Split the system prompt into cache-friendly segments at the provider level:
+
+```
+Segment 1 (cached): Identity + Tools + Skills
+  cache_control: ephemeral
+Segment 2 (cached): Context files
+  cache_control: ephemeral
+Segment 3: User preferences + append prompt (not cached, too small/volatile)
+```
+
+For OpenAI-compatible providers, prefix caching is automatic (no `cache_control` needed), but the
+same ordering principles apply: stable content first, volatile content last.
+
+#### Architecture Discussion Points
+
+1. **Where should cache_control be emitted?**
+   - Option A: In the provider's request builder (Anthropic provider adds cache_control to system
+     message content blocks). Provider-specific, no trait change needed.
+   - Option B: In the agent's prompt builder (generic `CacheMarker` → provider-agnostic). Requires
+     provider trait to accept cache markers.
+   - **Recommendation**: Option A for now — it's the simplest path and cache_control is an
+     Anthropic-specific feature. OpenAI gets caching for free with stable ordering.
+
+2. **How to handle tool list changes mid-session?**
+   - If MCP tools are discovered after the first turn, the system prompt changes and cache
+     invalidates.
+   - **Recommendation**: Discover all tools at session start (including MCP). If tools change
+     mid-session (rare), accept the cache miss — don't try to be clever.
+
+3. **Should the conversation history be cached?**
+   - Anthropic's multi-turn caching can cache conversation prefixes. If Talos sends the full
+     conversation as `[System, msg1, msg2, ..., msgN, new_msg]`, the provider can cache up to
+     `msgN` and only compute `new_msg`.
+   - **Recommendation**: This works automatically with correct ordering — no code change needed.
+     Just ensure messages are appended, not reordered.
+
+4. **Cache invalidation budgeting**
+   - Anthropic charges for cache writes (1.25x base input cost) and gives 90% discount on hits.
+   - If the system prompt changes too frequently, cache write cost exceeds savings.
+   - **Recommendation**: Monitor cache hit rate via response metadata. If hit rate < 50%, audit
+     what's changing.
+
+#### Files Affected (Phase A)
+
+| File | Change |
+|------|--------|
+| `crates/talos-provider/src/lib.rs` | Emit `cache_control` on system message content blocks using `CacheMarker` data |
+| `crates/talos-agent/src/prompt.rs` | Pass `CacheMarker` data through to provider (already partially done via `build_with_cache_markers()`) |
+
+### Acceptance Criteria
+
+- [ ] `identity.txt` supports `{{slot}}` template variables
+- [ ] Tool/skill/context sections are injected at runtime via template slots
+- [ ] System prompt prefix is computed once per session and reused
+- [ ] Anthropic provider emits `cache_control: { type: "ephemeral" }` on cacheable segments
+- [ ] Cache markers align with actual provider request boundaries
+- [ ] Provider request logs show cache hit/miss metadata
+- [ ] No cache invalidation caused by mid-session tool/skill/context changes
