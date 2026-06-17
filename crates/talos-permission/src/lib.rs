@@ -237,6 +237,26 @@ impl PermissionEngine {
             path_pattern: None,
             decision: PermissionDecision::Allow,
         });
+        self.rules.push(PermissionRule {
+            tool_name: "find_symbol".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
+            tool_name: "find_references".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
+            tool_name: "list_symbols".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
+            tool_name: "list_imports".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
 
         self.rules.push(PermissionRule {
             tool_name: "write".to_owned(),
@@ -286,11 +306,9 @@ impl PermissionEngine {
     /// (read/write/edit/list) targeting paths within that directory are
     /// auto-allowed before rule evaluation.
     pub fn evaluate(&self, tool_name: &str, input: &Value) -> PermissionDecision {
-        // Workspace-relative file operations: auto-allow
         if let Some(ref root) = self.workspace_root
-            && let Some(path) = input.get("path").and_then(Value::as_str)
-            && is_path_in_workspace(path, root)
             && is_file_tool(tool_name)
+            && is_workspace_path_allowed(input, root)
         {
             return PermissionDecision::Allow;
         }
@@ -366,6 +384,7 @@ impl PermissionEngine {
             || name_lower == "grep"
             || name_lower == "glob"
             || name_lower == "ls"
+            || name_lower.starts_with("find")
         {
             return PermissionDecision::Allow;
         }
@@ -392,6 +411,18 @@ fn is_file_tool(tool_name: &str) -> bool {
         || name_lower == "grep"
         || name_lower == "glob"
         || name_lower == "ls"
+        || name_lower.starts_with("find")
+}
+
+fn is_workspace_path_allowed(input: &Value, root: &Path) -> bool {
+    for key in &["path", "file"] {
+        if let Some(path_str) = input.get(*key).and_then(Value::as_str)
+            && is_path_in_workspace(path_str, root)
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// Checks whether `path` is within (or relative to) the workspace `root`.
@@ -479,6 +510,48 @@ mod tests {
         let engine = PermissionEngine::new();
         let decision = engine.evaluate("delete", &serde_json::json!({"path": "temp.txt"}));
         assert_eq!(decision, PermissionDecision::Ask);
+    }
+
+    #[test]
+    fn test_default_find_symbol_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("find_symbol", &serde_json::json!({"name": "Tool"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_default_find_references_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("find_references", &serde_json::json!({"name": "Tool", "file": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_default_list_symbols_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("list_symbols", &serde_json::json!({"path": "src/lib.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_default_list_imports_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate("list_imports", &serde_json::json!({"file": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_workspace_auto_allow_file_param() {
+        let engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
+        let decision = engine.evaluate("find_references", &serde_json::json!({"name": "Tool", "file": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_workspace_auto_allow_path_param() {
+        let engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
+        let decision = engine.evaluate("find_symbol", &serde_json::json!({"name": "Tool", "path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
     }
 
     #[test]
