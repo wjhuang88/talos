@@ -147,6 +147,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I022 | TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
 | I023 | TUI State Model | Complete | Event-driven `talos-conversation` + `talos-tui` state model, styled multiline scrollback, Markdown block classification and conservative styled rendering, spinner, cursor sync. Non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback. |
 | I025 | Tool Pipeline Completion | Complete | TOOL-002 P1-P2 residual (schema validation, dedup), TOOL-003 P1 (diff, stat), fence info-string fix, Mermaid code block rendering (mermaid-text), ToolNature attribute replacing name-based permission matching. |
+| I026 | Approval UX Fix + Doc Validation | Active | Fix approval-tool call ordering so approval shows inline after each tool call. Validate all project docs against actual implementation (ARCH-002 Phase 1). |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in

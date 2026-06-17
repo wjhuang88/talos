@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| (no active iterations) | — | — | — |
+| I026 Approval UX Fix + Doc Validation | Active | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | S1: Approval ordering fix + S2: ARCH-002 Phase 1 doc validation |
 
 ## Review
 
