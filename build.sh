@@ -40,33 +40,38 @@ build_xwin() {
   cargo xwin build --release --target "$target" -p talos-cli
 }
 
-copy_binary() {
+package_binary() {
   local target="$1"
-  local src="$SCRIPT_DIR/target/${target}/release/talos"
-  local dst_name
+  local release_dir="$SCRIPT_DIR/target/${target}/release"
+  local archive
 
   case "$target" in
-    *-windows-*) dst_name="talos-${target}.exe"; src="${src}.exe" ;;
-    *)           dst_name="talos-${target}" ;;
+    *-windows-*)
+      archive="$DIST_DIR/talos-${target}.zip"
+      ( cd "$release_dir" && zip -q "$archive" talos.exe )
+      ;;
+    *)
+      archive="$DIST_DIR/talos-${target}.tar.gz"
+      tar -czf "$archive" -C "$release_dir" talos
+      ;;
   esac
 
-  cp "$src" "${DIST_DIR}/${dst_name}"
-  echo "    → ${DIST_DIR}/${dst_name}"
+  echo "    → ${archive}"
 }
 
 for p in "${XWIN_PLATFORMS[@]}"; do
   build_xwin "$p"
-  copy_binary "$p"
+  package_binary "$p"
 done
 
 for p in "${ZIG_PLATFORMS[@]}"; do
   build_zig "$p"
-  copy_binary "$p"
+  package_binary "$p"
 done
 
 for p in "${PLATFORMS[@]}"; do
   build_native "$p"
-  copy_binary "$p"
+  package_binary "$p"
 done
 
 echo ""
