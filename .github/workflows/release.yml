@@ -81,7 +81,12 @@ jobs:
         run: |
           LLVM_LIB_BIN="$(command -v llvm-lib || true)"
           if [ -z "$LLVM_LIB_BIN" ]; then
-            LLVM_LIB_BIN="$(ls /usr/bin/llvm-lib-* 2>/dev/null | sort -V | tail -n1 || true)"
+            shopt -s nullglob
+            llvm_lib_bins=(/usr/bin/llvm-lib-*)
+            shopt -u nullglob
+            if [ "${#llvm_lib_bins[@]}" -gt 0 ]; then
+              LLVM_LIB_BIN="$(printf '%s\n' "${llvm_lib_bins[@]}" | sort -V | tail -n1)"
+            fi
           fi
           if [ -z "$LLVM_LIB_BIN" ]; then
             echo "::error::Unable to locate llvm-lib (or versioned llvm-lib-*) for cargo-xwin"
