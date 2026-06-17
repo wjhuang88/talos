@@ -68,6 +68,20 @@ impl ToolResult {
     }
 }
 
+/// Categorizes a tool by its operational nature for permission decisions.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub enum ToolNature {
+    /// Read-only: inspects files/code without side effects.
+    #[default]
+    Read,
+    /// Writes or modifies files.
+    Write,
+    /// Executes external processes or commands.
+    Execute,
+    /// Makes network requests (HTTP, API calls).
+    Network,
+}
+
 /// A pluggable agent tool that can be registered and invoked dynamically.
 ///
 /// Implementors must provide a name, description, parameter schema, and
@@ -100,6 +114,14 @@ pub trait AgentTool: Send + Sync {
     /// only read data (e.g., file readers, web fetchers).
     fn is_read_only(&self) -> bool {
         false
+    }
+
+    fn nature(&self) -> ToolNature {
+        if self.is_read_only() {
+            ToolNature::Read
+        } else {
+            ToolNature::Write
+        }
     }
 
     /// Returns the provenance of this tool.

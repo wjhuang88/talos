@@ -316,8 +316,18 @@ impl PermissionEngine {
     /// (read/write/edit/list) targeting paths within that directory are
     /// auto-allowed before rule evaluation.
     pub fn evaluate(&self, tool_name: &str, input: &Value) -> PermissionDecision {
+        let nature = infer_nature(tool_name);
+        self.evaluate_with_nature(tool_name, nature, input)
+    }
+
+    pub fn evaluate_with_nature(
+        &self,
+        tool_name: &str,
+        nature: talos_core::tool::ToolNature,
+        input: &Value,
+    ) -> PermissionDecision {
         if let Some(ref root) = self.workspace_root
-            && is_file_tool(tool_name)
+            && nature == talos_core::tool::ToolNature::Read
             && is_workspace_path_allowed(input, root)
         {
             return PermissionDecision::Allow;
@@ -333,7 +343,12 @@ impl PermissionEngine {
             }
         }
 
-        Self::default_decision(tool_name)
+        match nature {
+            talos_core::tool::ToolNature::Read => PermissionDecision::Allow,
+            talos_core::tool::ToolNature::Write
+            | talos_core::tool::ToolNature::Execute
+            | talos_core::tool::ToolNature::Network => PermissionDecision::Ask,
+        }
     }
 
     /// Loads rules from a JSON configuration value.
@@ -384,41 +399,13 @@ impl PermissionEngine {
 
         Ok(())
     }
-
-    /// Returns the default decision for a tool name when no rule matches.
-    fn default_decision(tool_name: &str) -> PermissionDecision {
-        let name_lower = tool_name.to_lowercase();
-
-        if name_lower.contains("read")
-            || name_lower.contains("list")
-            || name_lower == "grep"
-            || name_lower == "glob"
-            || name_lower == "ls"
-            || name_lower == "diff"
-            || name_lower == "stat"
-            || name_lower.starts_with("find")
-        {
-            return PermissionDecision::Allow;
-        }
-
-        if name_lower.contains("write")
-            || name_lower.contains("edit")
-            || name_lower == "delete"
-        {
-            return PermissionDecision::Ask;
-        }
-
-        PermissionDecision::Ask
-    }
 }
 
 /// Returns true if the tool is a file operation that should benefit from
 /// workspace-relative auto-approval.
-fn is_file_tool(tool_name: &str) -> bool {
+fn infer_nature(tool_name: &str) -> talos_core::tool::ToolNature {
     let name_lower = tool_name.to_lowercase();
-    name_lower.contains("read")
-        || name_lower.contains("write")
-        || name_lower.contains("edit")
+    if name_lower.contains("read")
         || name_lower.contains("list")
         || name_lower == "grep"
         || name_lower == "glob"
@@ -426,6 +413,13 @@ fn is_file_tool(tool_name: &str) -> bool {
         || name_lower == "diff"
         || name_lower == "stat"
         || name_lower.starts_with("find")
+    {
+        talos_core::tool::ToolNature::Read
+    } else if name_lower == "bash" || name_lower == "sh" {
+        talos_core::tool::ToolNature::Execute
+    } else {
+        talos_core::tool::ToolNature::Write
+    }
 }
 
 fn is_workspace_path_allowed(input: &Value, root: &Path) -> bool {

@@ -90,6 +90,10 @@ impl AgentTool for BashTool {
         false
     }
 
+    fn nature(&self) -> talos_core::tool::ToolNature {
+        talos_core::tool::ToolNature::Execute
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         let bash_input = match parse_input(input) {
             Ok(i) => i,

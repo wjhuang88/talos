@@ -377,7 +377,7 @@ OpenCode renders write/edit operations as inline content blocks in the conversat
 
 ## Permission Architecture: Tool Nature Attribute
 
-**Status**: Planned — Requirement documented, not yet implemented
+**Status**: Complete — Implemented in I025 S5
 
 ### Problem
 

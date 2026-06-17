@@ -868,11 +868,22 @@ impl Agent {
         };
         let call = effective_call.expect("tool call should be present");
 
+        let tool = match registry.get(&call.name) {
+            Some(t) => t,
+            None => {
+                return Ok(ToolExecutionResult::error(format!(
+                    "tool not found: {}",
+                    call.name
+                )));
+            }
+        };
+
         if let Some(engine) = self.permission_engine.as_deref() {
             self.run_hook(hook_ctx, HookEvent::BeforePermissionCheck { call })
                 .await?;
 
-            let decision = engine.evaluate(&call.name, &call.input);
+            let nature = tool.nature();
+            let decision = engine.evaluate_with_nature(&call.name, nature, &call.input);
             self.run_hook(
                 hook_ctx,
                 HookEvent::AfterPermissionCheck {
@@ -889,22 +900,9 @@ impl Agent {
                         "permission denied: {reason}"
                     )));
                 }
-                PermissionDecision::Ask => {
-                    // In TUI mode, approval is handled by TuiPermissionAwareTool.
-                    // Agent-level fallback: allow the call to proceed.
-                }
+                PermissionDecision::Ask => {}
             }
         }
-
-        let tool = match registry.get(&call.name) {
-            Some(t) => t,
-            None => {
-                return Ok(ToolExecutionResult::error(format!(
-                    "tool not found: {}",
-                    call.name
-                )));
-            }
-        };
 
         if let Err(e) = registry.validate_input(&call.name, &call.input) {
             return Ok(ToolExecutionResult::error(format!(
