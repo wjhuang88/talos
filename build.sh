@@ -7,9 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST_DIR="$SCRIPT_DIR/dist"
 mkdir -p "$DIST_DIR"
 
-PLATFORMS=(
-  "aarch64-apple-darwin"
-  "x86_64-apple-darwin"
+XWIN_PLATFORMS=(
+  "x86_64-pc-windows-msvc"
+  "aarch64-pc-windows-msvc"
 )
 
 ZIG_PLATFORMS=(
@@ -17,9 +17,9 @@ ZIG_PLATFORMS=(
   "x86_64-unknown-linux-gnu"
 )
 
-XWIN_PLATFORMS=(
-  "x86_64-pc-windows-msvc"
-  "aarch64-pc-windows-msvc"
+PLATFORMS=(
+  "aarch64-apple-darwin"
+  "x86_64-apple-darwin"
 )
 
 build_native() {
@@ -54,8 +54,8 @@ copy_binary() {
   echo "    → ${DIST_DIR}/${dst_name}"
 }
 
-for p in "${PLATFORMS[@]}"; do
-  build_native "$p"
+for p in "${XWIN_PLATFORMS[@]}"; do
+  build_xwin "$p"
   copy_binary "$p"
 done
 
@@ -64,8 +64,8 @@ for p in "${ZIG_PLATFORMS[@]}"; do
   copy_binary "$p"
 done
 
-for p in "${XWIN_PLATFORMS[@]}"; do
-  build_xwin "$p"
+for p in "${PLATFORMS[@]}"; do
+  build_native "$p"
   copy_binary "$p"
 done
 
