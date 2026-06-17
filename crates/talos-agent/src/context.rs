@@ -61,6 +61,9 @@ pub struct ContextLoader {
     workspace_root: PathBuf,
     /// Whether context loading is enabled.
     enabled: bool,
+    /// Override directory for the global `AGENTS.md`. When `None`, the global
+    /// file is resolved from `$HOME/.talos`.
+    global_dir: Option<PathBuf>,
 }
 
 impl ContextLoader {
@@ -73,6 +76,7 @@ impl ContextLoader {
         Self {
             workspace_root,
             enabled: true,
+            global_dir: None,
         }
     }
 
@@ -83,6 +87,17 @@ impl ContextLoader {
     #[must_use]
     pub fn with_no_context(mut self) -> Self {
         self.enabled = false;
+        self
+    }
+
+    /// Overrides the directory used to resolve the global `AGENTS.md`.
+    ///
+    /// When set, the global file is read from `<global_dir>/AGENTS.md` instead
+    /// of the default `$HOME/.talos/AGENTS.md`. Primarily intended for tests so
+    /// they do not need to mutate the process-wide `HOME` environment variable.
+    #[must_use]
+    pub fn with_global_dir(mut self, global_dir: PathBuf) -> Self {
+        self.global_dir = Some(global_dir);
         self
     }
 
@@ -109,13 +124,12 @@ impl ContextLoader {
 
         let mut parts: Vec<String> = Vec::new();
 
-        // 1. Load global AGENTS.md
-        if let Some(global_path) = self.global_agents_path()
-            && global_path.exists()
-        {
-            let content = fs::read_to_string(&global_path).map_err(ContextError::IoError)?;
-            if !content.trim().is_empty() {
-                parts.push(self.format_section(&global_path, &content));
+        // 1. Load global AGENTS.md (missing files are skipped gracefully)
+        if let Some(global_path) = self.global_agents_path() {
+            if let Some(content) = self.read_if_present(&global_path)? {
+                if !content.trim().is_empty() {
+                    parts.push(self.format_section(&global_path, &content));
+                }
             }
         }
 
@@ -123,8 +137,7 @@ impl ContextLoader {
         let mut current: Option<&Path> = Some(&self.workspace_root);
         while let Some(dir) = current {
             let agents_path = dir.join(AGENTS_MD);
-            if agents_path.exists() {
-                let content = fs::read_to_string(&agents_path).map_err(ContextError::IoError)?;
+            if let Some(content) = self.read_if_present(&agents_path)? {
                 if !content.trim().is_empty() {
                     parts.push(self.format_section(&agents_path, &content));
                 }
@@ -143,12 +156,31 @@ impl ContextLoader {
     }
 
     /// Returns the path to the global AGENTS.md file.
+    ///
+    /// When a global directory override is set, it is used directly; otherwise
+    /// the path is derived from `$HOME/.talos`.
     fn global_agents_path(&self) -> Option<PathBuf> {
+        if let Some(dir) = &self.global_dir {
+            return Some(dir.join(AGENTS_MD));
+        }
         let home = std::env::var("HOME").ok()?;
         let mut path = PathBuf::from(home);
         path.push(".talos");
         path.push(AGENTS_MD);
         Some(path)
+    }
+
+    /// Reads a file, returning `None` if it does not exist.
+    ///
+    /// This avoids the race between an `exists()` check and a subsequent read,
+    /// and treats a missing file as "skip" rather than a hard error, matching
+    /// the documented behavior that missing files are skipped gracefully.
+    fn read_if_present(&self, path: &Path) -> ContextResult<Option<String>> {
+        match fs::read_to_string(path) {
+            Ok(content) => Ok(Some(content)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(ContextError::IoError(e)),
+        }
     }
 
     /// Formats a section with a clear separator header.
@@ -241,39 +273,18 @@ mod tests {
         fs::create_dir(&talos_dir).expect("failed to create .talos directory");
         create_agents_md(&talos_dir, "# Global Rules\nGlobal content.");
 
-        // Override HOME for this test
-        let original_home = std::env::var("HOME").ok();
-        unsafe {
-            std::env::set_var("HOME", temp_dir.path());
-        }
-
-        let loader = ContextLoader::new(temp_dir.path().join("project"));
+        let loader = ContextLoader::new(temp_dir.path().join("project"))
+            .with_global_dir(talos_dir);
         let context = loader.load().expect("load failed");
 
         assert!(context.contains("# Global Rules"));
         assert!(context.contains("Global content."));
-
-        // Restore HOME
-        if let Some(home) = original_home {
-            unsafe {
-                std::env::set_var("HOME", home);
-            }
-        } else {
-            unsafe {
-                std::env::remove_var("HOME");
-            }
-        }
     }
 
     #[test]
     fn test_size_limit_truncation() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-
-        // Override HOME to temp dir to avoid picking up real global AGENTS.md
-        let original_home = std::env::var("HOME").ok();
-        unsafe {
-            std::env::set_var("HOME", temp_dir.path());
-        }
+        let global_dir = TempDir::new().expect("failed to create global dir");
 
         // Create content that exceeds 20,000 characters
         let head_content = "A".repeat(15_000);
@@ -281,7 +292,8 @@ mod tests {
         let full_content = format!("{}{}", head_content, tail_content);
         create_agents_md(temp_dir.path(), &full_content);
 
-        let loader = ContextLoader::new(temp_dir.path().to_path_buf());
+        let loader = ContextLoader::new(temp_dir.path().to_path_buf())
+            .with_global_dir(global_dir.path().to_path_buf());
         let context = loader.load().expect("load failed");
 
         let char_count = context.chars().count();
@@ -298,17 +310,6 @@ mod tests {
         assert!(context.ends_with(&"B".repeat(100)));
         // Truncation indicator should be present
         assert!(context.contains("\n...\n"));
-
-        // Restore HOME
-        if let Some(home) = original_home {
-            unsafe {
-                std::env::set_var("HOME", home);
-            }
-        } else {
-            unsafe {
-                std::env::remove_var("HOME");
-            }
-        }
     }
 
     #[test]
@@ -327,11 +328,8 @@ mod tests {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let fake_home = TempDir::new().expect("failed to create fake home");
 
-        unsafe {
-            std::env::set_var("HOME", fake_home.path());
-        }
-
-        let loader = ContextLoader::new(temp_dir.path().to_path_buf());
+        let loader = ContextLoader::new(temp_dir.path().to_path_buf())
+            .with_global_dir(fake_home.path().to_path_buf());
         let context = loader.load().expect("load failed");
 
         assert!(context.is_empty());
@@ -380,30 +378,15 @@ mod tests {
     #[test]
     fn test_empty_agents_md_skipped() {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
-        // Create an empty AGENTS.md
+        let global_dir = TempDir::new().expect("failed to create global dir");
+        // Create an empty AGENTS.md in the project root
         fs::write(temp_dir.path().join(AGENTS_MD), "").expect("failed to write empty file");
 
-        // Override HOME to temp dir to avoid picking up real global AGENTS.md
-        let original_home = std::env::var("HOME").ok();
-        unsafe {
-            std::env::set_var("HOME", temp_dir.path());
-        }
-
-        let loader = ContextLoader::new(temp_dir.path().to_path_buf());
+        let loader = ContextLoader::new(temp_dir.path().to_path_buf())
+            .with_global_dir(global_dir.path().to_path_buf());
         let context = loader.load().expect("load failed");
 
         assert!(context.is_empty());
-
-        // Restore HOME
-        if let Some(home) = original_home {
-            unsafe {
-                std::env::set_var("HOME", home);
-            }
-        } else {
-            unsafe {
-                std::env::remove_var("HOME");
-            }
-        }
     }
 
     #[test]
