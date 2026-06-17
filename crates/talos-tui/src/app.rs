@@ -797,6 +797,8 @@ impl Tui {
                 Some(request) = approval_rx.recv() => {
                     self.state.pending_approval_response = Some(request.response);
                     self.show_approval(&request.tool_name, &request.arguments);
+                    let _ = self.flush_pending_scrollback();
+                    self.draw_frame()?;
                 }
                 Some(chunk) = self.next_stream_chunk() => {
                     self.consume_stream_chunk(&chunk);
@@ -1050,6 +1052,33 @@ impl Tui {
                         if !matches!(self.state.approval_state, ApprovalState::Hidden) =>
                     {
                         if let Some(choice) = self.handle_approval_key(c) {
+                            let (icon, color, msg) = match &choice {
+                                ApprovalChoice::ApproveOnce => (
+                                    "✓",
+                                    to_crossterm_color(semantic::TEXT_SUCCESS),
+                                    "approved",
+                                ),
+                                ApprovalChoice::AlwaysApprove => (
+                                    "✓",
+                                    to_crossterm_color(semantic::TEXT_SUCCESS),
+                                    "always approved",
+                                ),
+                                ApprovalChoice::Deny => (
+                                    "✗",
+                                    to_crossterm_color(semantic::TEXT_ERROR),
+                                    "denied",
+                                ),
+                            };
+                            self.pending_scrollback.push(ScrollbackLine::styled(
+                                vec![HistorySegment::styled(
+                                    format!("  {icon} {msg}"),
+                                    color,
+                                    HistoryAttrs::default(),
+                                )],
+                                None,
+                            ));
+                            let _ = self.flush_pending_scrollback();
+
                             if let Some(response_tx) = self.state.pending_approval_response.take() {
                                 let _ = response_tx.send(choice.clone());
                             }
@@ -1058,11 +1087,7 @@ impl Tui {
                                 kind: TipKind::ApprovalResult,
                                 text: format!(
                                     "Tool call {}",
-                                    match choice {
-                                        ApprovalChoice::ApproveOnce => "approved once",
-                                        ApprovalChoice::AlwaysApprove => "always approved",
-                                        ApprovalChoice::Deny => "denied",
-                                    }
+                                    msg
                                 ),
                                 ttl: Duration::from_secs(2),
                                 created_at: Instant::now(),
