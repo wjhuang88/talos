@@ -1085,23 +1085,21 @@ fn format_entry(path: &Path, root: &Path, long: bool) -> String {
     }
 
     let meta = std::fs::symlink_metadata(path).ok();
-    let suffix = match &meta {
+    match &meta {
         Some(m) => {
             let ft = m.file_type();
             if ft.is_dir() {
-                "/"
+                format!("{display}/")
             } else if ft.is_symlink() {
-                "@"
+                format!("{display}@")
             } else if is_executable(m) {
-                "*"
+                format!("{display}* {}", m.len())
             } else {
-                ""
+                format!("{display} {}", m.len())
             }
         }
-        None => "",
-    };
-
-    format!("{display}{suffix}")
+        None => display,
+    }
 }
 
 #[cfg(unix)]
@@ -1930,6 +1928,7 @@ mod ls_tool_tests {
             .find(|l| l.contains("src"))
             .unwrap();
         assert!(src_line.ends_with('/'));
+        assert!(!src_line.contains(' '));
     }
 
     #[tokio::test]
@@ -1945,11 +1944,10 @@ mod ls_tool_tests {
             .find(|l| l.contains("Cargo.toml"))
             .unwrap();
         assert!(!toml_line.ends_with('/'));
-        assert!(!toml_line.ends_with('*'));
     }
 
     #[tokio::test]
-    async fn test_ls_file_size() {
+    async fn test_ls_file_shows_size() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("test.txt"), "hello world").unwrap();
 
@@ -1957,7 +1955,8 @@ mod ls_tool_tests {
         let result = tool.execute(json!({})).await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("test.txt"));
+        let line = result.content.lines().find(|l| l.contains("test.txt")).unwrap();
+        assert!(line.ends_with(" 11"));
     }
 
     #[tokio::test]
