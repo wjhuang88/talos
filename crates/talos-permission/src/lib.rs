@@ -238,6 +238,16 @@ impl PermissionEngine {
             decision: PermissionDecision::Allow,
         });
         self.rules.push(PermissionRule {
+            tool_name: "diff".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
+            tool_name: "stat".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Allow,
+        });
+        self.rules.push(PermissionRule {
             tool_name: "find_symbol".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Allow,
@@ -384,6 +394,8 @@ impl PermissionEngine {
             || name_lower == "grep"
             || name_lower == "glob"
             || name_lower == "ls"
+            || name_lower == "diff"
+            || name_lower == "stat"
             || name_lower.starts_with("find")
         {
             return PermissionDecision::Allow;
@@ -411,6 +423,8 @@ fn is_file_tool(tool_name: &str) -> bool {
         || name_lower == "grep"
         || name_lower == "glob"
         || name_lower == "ls"
+        || name_lower == "diff"
+        || name_lower == "stat"
         || name_lower.starts_with("find")
 }
 

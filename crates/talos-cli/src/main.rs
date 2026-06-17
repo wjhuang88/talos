@@ -51,7 +51,7 @@ use talos_provider::openai::OpenAIProvider;
 use talos_rpc::RpcServer;
 use talos_session::{IndexError, Session, SessionInfo, SessionManager};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
-use talos_tools::{BashTool, DeleteTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, WriteTool};
+use talos_tools::{BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool, WriteTool};
 use talos_tui::Tui;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -1354,6 +1354,16 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(DeleteTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(DiffTool::new(workspace_root.clone())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(StatTool::new(workspace_root.clone())),
         approval,
         print_mode: false,
     }));
@@ -1461,6 +1471,16 @@ fn build_print_tool_registry() -> ToolRegistry {
     }));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(DeleteTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(DiffTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(StatTool::new(PathBuf::from("."))),
         approval,
         print_mode: true,
     }));
@@ -1506,6 +1526,14 @@ fn build_tui_tool_registry(
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(DeleteTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(DiffTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(StatTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -1566,6 +1594,8 @@ fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(GlobTool::new(PathBuf::from("."))));
     registry.register(Arc::new(LsTool::new(PathBuf::from("."))));
     registry.register(Arc::new(DeleteTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(DiffTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(StatTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatusTool));
     registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
     registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));

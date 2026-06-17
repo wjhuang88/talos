@@ -1978,6 +1978,23 @@ fn summarize_tool_args(tool_name: &str, args_str: &str) -> String {
                 fallback()
             }
         }
+        "diff" => {
+            if let Some(ref obj) = obj {
+                let old = obj.get("old_path").and_then(|p| p.as_str()).unwrap_or("?");
+                let new = obj.get("new_path").and_then(|p| p.as_str()).unwrap_or("?");
+                format!("{old} → {new}")
+            } else {
+                fallback()
+            }
+        }
+        "stat" => {
+            if let Some(ref obj) = obj {
+                let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
+                format!("path: {path}")
+            } else {
+                fallback()
+            }
+        }
         "grep" => {
             if let Some(ref obj) = obj {
                 let pattern = obj.get("pattern").and_then(|p| p.as_str()).unwrap_or("?");

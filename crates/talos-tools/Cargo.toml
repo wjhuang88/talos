@@ -18,6 +18,7 @@ tokio = { version = "1", features = ["fs", "process", "time"] }
 regex = "1"
 walkdir = "2"
 glob = "0.3"
+similar = "2"
 arborium = { version = "2.16", default-features = false, features = [
     "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
     "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",
