@@ -476,7 +476,7 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
     };
 
     let hooks = build_hook_registry(true);
-    let agent = Agent::with_security_and_hooks(
+    let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
         build_print_tool_registry(),
         Some(Arc::new(talos_permission::PermissionEngine::new())),
@@ -484,6 +484,7 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
         PathBuf::from("."),
         hooks,
     );
+    agent.set_tool_protocol(config.tool_protocol());
 
     let server = RpcServer::new(Arc::new(agent));
     server.run_stdio().await
@@ -742,6 +743,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
         workspace_root.clone(),
         hooks,
     );
+    agent.set_tool_protocol(config.tool_protocol());
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())
@@ -932,6 +934,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         workspace_root.clone(),
         hooks,
     );
+    agent.set_tool_protocol(config.tool_protocol());
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())
@@ -1118,6 +1121,7 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
         workspace_root.clone(),
         hooks,
     );
+    agent.set_tool_protocol(config.tool_protocol());
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())
@@ -1364,6 +1368,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         workspace_root.clone(),
         hooks,
     );
+    agent.set_tool_protocol(config.tool_protocol());
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())

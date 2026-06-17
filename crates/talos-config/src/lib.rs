@@ -62,10 +62,10 @@ pub struct ModelConfig {
 /// Named provider configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
-    /// Protocol implementation used by this provider.
     #[serde(default)]
     pub protocol: ProviderProtocol,
-    /// Provider base URL. Built-in providers supply defaults when omitted.
+    #[serde(default)]
+    pub tool_protocol: talos_core::tool::ToolProtocol,
     #[serde(default)]
     pub base_url: Option<String>,
     /// Inline API key written directly in the config file.
@@ -331,6 +331,11 @@ impl Config {
         self.active_provider_config().protocol
     }
 
+    #[must_use]
+    pub fn tool_protocol(&self) -> talos_core::tool::ToolProtocol {
+        self.active_provider_config().tool_protocol
+    }
+
     /// Returns the configured context limit for the active provider/model.
     #[must_use]
     pub fn context_limit(&self) -> Option<u32> {
@@ -432,6 +437,7 @@ fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
     match name {
         "anthropic" => Some(ProviderConfig {
             protocol: ProviderProtocol::AnthropicMessages,
+            tool_protocol: Default::default(),
             base_url: None,
             api_key: None,
             api_key_env: Some("ANTHROPIC_API_KEY".to_string()),
@@ -454,6 +460,7 @@ fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         }),
         "openai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
             base_url: None,
             api_key: None,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
@@ -718,6 +725,7 @@ mod tests {
                 "dashscope".to_string(),
                 ProviderConfig {
                     protocol: ProviderProtocol::OpenAIChat,
+                    tool_protocol: Default::default(),
                     base_url: Some("https://example.com/v1".to_string()),
                     api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
                     ..Default::default()
@@ -766,6 +774,7 @@ mod tests {
                 "dashscope".to_string(),
                 ProviderConfig {
                     protocol: ProviderProtocol::OpenAIChat,
+                    tool_protocol: Default::default(),
                     base_url: Some("https://example.com/v1".to_string()),
                     api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
                     ..Default::default()
@@ -801,6 +810,7 @@ mod tests {
                 "dashscope".to_string(),
                 ProviderConfig {
                     protocol: ProviderProtocol::OpenAIChat,
+                    tool_protocol: Default::default(),
                     base_url: Some("https://example.com/v1".to_string()),
                     api_key: None,
                     api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
@@ -961,6 +971,7 @@ mod tests {
                 "custom".to_string(),
                 ProviderConfig {
                     protocol: ProviderProtocol::OpenAIChat,
+                    tool_protocol: Default::default(),
                     api_key: Some("inline".to_string()),
                     ..Default::default()
                 },
@@ -976,6 +987,7 @@ mod tests {
                 "custom".to_string(),
                 ProviderConfig {
                     protocol: ProviderProtocol::OpenAIChat,
+                    tool_protocol: Default::default(),
                     api_key_env: Some("CUSTOM_KEY".to_string()),
                     ..Default::default()
                 },
@@ -994,6 +1006,7 @@ mod tests {
                 "custom".to_string(),
                 ProviderConfig {
                     protocol: ProviderProtocol::OpenAIChat,
+                    tool_protocol: Default::default(),
                     ..Default::default()
                 },
             )]),

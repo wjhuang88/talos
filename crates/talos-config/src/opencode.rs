@@ -82,6 +82,7 @@ pub fn import_opencode_providers(
     for (name, op) in providers {
         let mut config = ProviderConfig {
             protocol: op.npm.as_deref().map(npm_to_protocol).unwrap_or_default(),
+            tool_protocol: Default::default(),
             base_url: op.options.base_url,
             ..ProviderConfig::default()
         };

@@ -28,6 +28,7 @@ pub enum ToolError {
 }
 
 use serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
 
 /// Provenance of a registered tool.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -424,9 +425,8 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-#[derive(Default)]
 pub enum ToolProtocol {
     #[default]
     Native,
