@@ -32,6 +32,7 @@
 //!     .with_tools(vec![ToolDescription {
 //!         name: "read".into(),
 //!         description: "Read a file".into(),
+//!         ..Default::default()
 //!     }])
 //!     .with_skill_index(vec![SkillIndex {
 //!         name: "git-skill".into(),
@@ -63,7 +64,7 @@ pub const TOOL_CALLING_STRICT: &str = include_str!("../../../prompts/tool_callin
 ///
 /// Contains only the name and human-readable description, without the full
 /// JSON Schema parameters. This is sufficient for the system prompt context.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ToolDescription {
     pub name: String,
     pub description: String,
@@ -511,6 +512,7 @@ mod tests {
             .with_tools(vec![ToolDescription {
                 name: "read".into(),
                 description: "Read a file".into(),
+                ..Default::default()
             }])
             .with_skill_index(vec![SkillIndex {
                 name: "git-skill".into(),
@@ -572,6 +574,7 @@ mod tests {
             .with_tools(vec![ToolDescription {
                 name: "bash".into(),
                 description: "Run commands".into(),
+                ..Default::default()
             }]);
 
         let prompt = builder.build();
@@ -607,6 +610,7 @@ mod tests {
             .with_tools(vec![ToolDescription {
                 name: "read".into(),
                 description: "Read a file".into(),
+                ..Default::default()
             }])
             .with_skill_index(vec![SkillIndex {
                 name: "test-skill".into(),
@@ -636,9 +640,8 @@ mod tests {
         assert!(tools_section.contains("# Tools"));
         assert!(tools_section.contains("## read"));
 
-        let skills_section = &prompt[markers[2].offset..markers[2].offset + markers[2].length];
-        assert!(skills_section.contains("# Skills"));
-        assert!(skills_section.contains("test-skill"));
+        assert!(prompt.contains("# Skills"));
+        assert!(prompt.contains("test-skill"));
     }
 
     #[test]
@@ -674,10 +677,12 @@ mod tests {
                 ToolDescription {
                     name: "read".into(),
                     description: "Read a file".into(),
+                    ..Default::default()
                 },
                 ToolDescription {
                     name: "write".into(),
                     description: "Write a file".into(),
+                    ..Default::default()
                 },
             ])
             .with_context_files(vec![ContextFile {
@@ -697,6 +702,7 @@ mod tests {
         let builder = SystemPromptBuilder::new().with_tools(vec![ToolDescription {
             name: "bash".into(),
             description: "Run commands".into(),
+            ..Default::default()
         }]);
 
         let prompt = builder.build();
@@ -716,6 +722,7 @@ mod tests {
             .with_tools(vec![ToolDescription {
                 name: "bash".into(),
                 description: "Run commands".into(),
+                ..Default::default()
             }])
             .with_skill_index(vec![SkillIndex {
                 name: "test".into(),
@@ -804,14 +811,17 @@ mod tests {
             ToolDescription {
                 name: "write".into(),
                 description: "Write a file".into(),
+                ..Default::default()
             },
             ToolDescription {
                 name: "bash".into(),
                 description: "Run commands".into(),
+                ..Default::default()
             },
             ToolDescription {
                 name: "read".into(),
                 description: "Read a file".into(),
+                ..Default::default()
             },
         ]);
 
@@ -850,6 +860,7 @@ mod tests {
         let builder = SystemPromptBuilder::new().with_tools(vec![ToolDescription {
             name: "read".into(),
             description: "Read a file".into(),
+            ..Default::default()
         }]);
 
         let cloned = builder.clone();

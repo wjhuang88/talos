@@ -658,7 +658,7 @@ mod tests {
         let messages = vec![Message::User {
             content: "Hello".into(),
         }];
-        let body = build_request_body("gpt-4o", &messages);
+        let body = build_request_body("gpt-4o", &messages, &[]);
 
         assert_eq!(body["model"], "gpt-4o");
         assert_eq!(body["stream"], true);
@@ -681,7 +681,7 @@ mod tests {
                 }],
             },
         ];
-        let body = build_request_body("gpt-4o", &messages);
+        let body = build_request_body("gpt-4o", &messages, &[]);
 
         assert_eq!(body["messages"][1]["role"], "assistant");
         let tool_calls = body["messages"][1]["tool_calls"].as_array().unwrap();
@@ -700,7 +700,7 @@ mod tests {
                 is_error: false,
             },
         }];
-        let body = build_request_body("gpt-4o", &messages);
+        let body = build_request_body("gpt-4o", &messages, &[]);
 
         assert_eq!(body["messages"][0]["role"], "tool");
         assert_eq!(body["messages"][0]["tool_call_id"], "call_1");
@@ -713,7 +713,7 @@ mod tests {
             content: "I'll help with that.".into(),
             tool_calls: vec![],
         }];
-        let body = build_request_body("gpt-4o", &messages);
+        let body = build_request_body("gpt-4o", &messages, &[]);
 
         assert_eq!(body["messages"][0]["role"], "assistant");
         assert_eq!(body["messages"][0]["content"], "I'll help with that.");
@@ -738,7 +738,7 @@ mod tests {
                 },
             },
         ];
-        let body = build_request_body("gpt-4o", &messages);
+        let body = build_request_body("gpt-4o", &messages, &[]);
 
         assert_eq!(body["messages"][0]["content"], EMPTY_USER_MESSAGE);
         assert_eq!(body["messages"][1]["content"], EMPTY_ASSISTANT_MESSAGE);
@@ -755,7 +755,7 @@ mod tests {
                 input: json!({"command": "true"}),
             }],
         }];
-        let body = build_request_body("gpt-4o", &messages);
+        let body = build_request_body("gpt-4o", &messages, &[]);
 
         assert_eq!(
             body["messages"][0]["content"],

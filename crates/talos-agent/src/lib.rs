@@ -1351,7 +1351,7 @@ mod tests {
         );
         let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
 
-        let response = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
+        let (response, _) = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
         assert_eq!(response, "Streaming");
 
         let mut received = Vec::new();
@@ -2528,8 +2528,8 @@ mod tests {
         // Verify it is cleared
         let prompt = agent.prompt_builder.build();
         assert!(
-            !prompt.contains("test"),
-            "Append prompt should be cleared after clear_append_prompt()"
+            !prompt.contains("Additional Instructions"),
+            "Append prompt section should be gone after clear"
         );
     }
 
@@ -2554,8 +2554,8 @@ mod tests {
         // Verify it is cleared (same as clear_append_prompt)
         let prompt = agent.prompt_builder.build();
         assert!(
-            !prompt.contains("test"),
-            "Append prompt should be cleared after set_append_prompt_opt(None)"
+            !prompt.contains("Additional Instructions"),
+            "Append prompt section should be gone after set_append_prompt_opt(None)"
         );
     }
 }

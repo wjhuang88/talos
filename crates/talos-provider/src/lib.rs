@@ -637,7 +637,7 @@ mod tests {
         let messages = vec![Message::User {
             content: "Hello".into(),
         }];
-        let body = build_request_body("claude-sonnet-4-20250514", &messages);
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
 
         assert_eq!(body["model"], "claude-sonnet-4-20250514");
         assert_eq!(body["max_tokens"], 4096);
@@ -661,7 +661,7 @@ mod tests {
                 }],
             },
         ];
-        let body = build_request_body("claude-sonnet-4-20250514", &messages);
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
 
         assert_eq!(body["messages"][1]["role"], "assistant");
         let blocks = body["messages"][1]["content"].as_array().unwrap();
