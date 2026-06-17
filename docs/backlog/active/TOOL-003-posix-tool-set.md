@@ -350,4 +350,105 @@ OpenCode renders write/edit operations as inline content blocks in the conversat
 
 **Decision needed from user before implementation proceeds.**
 
+## Permission Architecture: Tool Nature Attribute
+
+**Status**: Planned — Requirement documented, not yet implemented
+
+### Problem
+
+Current permission engine (`PermissionEngine`) determines default permissions by matching tool **names** against hardcoded substring patterns:
+
+```
+name_lower.contains("read") → Allow
+name_lower.contains("write") → Ask
+name_lower.starts_with("find") → Allow
+...
+```
+
+This is fragile: adding a new read-only tool requires updating `is_file_tool()`, `add_default_rules()`, and `default_decision()` in three separate places. A tool's permission behavior is implicit in its name, not explicit in its definition.
+
+### Proposed Solution
+
+Add a `ToolNature` enum to categorize every tool by its operational nature, then base default permissions on nature instead of name:
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolNature {
+    /// Read-only: inspects files/code without side effects.
+    Read,
+    /// Writes or modifies files.
+    Write,
+    /// Executes external processes or commands.
+    Execute,
+    /// Makes network requests (HTTP, API calls).
+    Network,
+}
+```
+
+### Changes Required
+
+#### 1. `talos-core/tool.rs` — Add `ToolNature` + default method on `AgentTool`
+
+```rust
+pub trait AgentTool: Send + Sync {
+    // ... existing methods ...
+
+    fn nature(&self) -> ToolNature {
+        ToolNature::Read  // conservative default
+    }
+}
+```
+
+#### 2. Tool implementations — Override `nature()` per tool
+
+| Tool | Nature | Reasoning |
+|------|--------|-----------|
+| read, grep, glob, ls | `Read` | File inspection only |
+| find_symbol, find_references, list_symbols, list_imports | `Read` | AST inspection only |
+| stat (future), diff (future), tree (future) | `Read` | Metadata/comparison only |
+| write, edit | `Write` | Modify files |
+| delete | `Write` | Remove files |
+| bash | `Execute` | Run external commands |
+| (future: curl, web_fetch) | `Network` | HTTP requests |
+
+#### 3. `talos-permission` — Replace name-based matching with nature-based
+
+```rust
+fn default_decision(tool_nature: ToolNature) -> PermissionDecision {
+    match tool_nature {
+        ToolNature::Read => PermissionDecision::Allow,
+        ToolNature::Write => PermissionDecision::Ask,
+        ToolNature::Execute => PermissionDecision::Ask,
+        ToolNature::Network => PermissionDecision::Ask,
+    }
+}
+```
+
+Remove `is_file_tool()` entirely — workspace auto-allow applies to ALL `ToolNature::Read` tools regardless of name.
+
+#### 4. User-configurable overrides (future)
+
+```
+[permissions]
+# Override: require approval for specific read tool
+read = "ask"
+# Override: allow specific execute tool
+bash = "allow"
+```
+
+### Benefits
+
+- **Single source of truth**: tool behavior is declared at the tool definition, not inferred from names
+- **New tools don't need permission plumbing**: just override `nature()`
+- **Harder to misclassify**: explicit enum vs fragile substring matching
+- **Extensible**: add `Network` nature later without changing permission logic
+
+### Implementation Order
+
+1. Add `ToolNature` enum and `nature()` method to `AgentTool` trait
+2. Implement `nature()` on all existing tools
+3. Refactor `PermissionEngine` to use nature-based decisions
+4. Remove name-based matching code (`is_file_tool`, hardcoded rules in `add_default_rules`)
+5. Update tests
+
 Each batch is independently shippable.
