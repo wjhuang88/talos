@@ -517,10 +517,21 @@ impl ReadTool {
         let end = (start + max_lines).min(total_lines);
         let selected = &lines[start..end];
 
+        let show_line_numbers = total_lines > 50
+            || read_input.offset.is_some()
+            || read_input.limit.is_some()
+            || read_input.start_line.is_some()
+            || read_input.end_line.is_some();
+
         let mut output = String::new();
         for (i, line) in selected.iter().enumerate() {
-            let line_num = start + i + 1;
-            output.push_str(&format!("{line_num}: {line}\n"));
+            if show_line_numbers {
+                let line_num = start + i + 1;
+                output.push_str(&format!("{line_num}: {line}\n"));
+            } else {
+                output.push_str(line);
+                output.push('\n');
+            }
         }
 
         let remaining = total_lines.saturating_sub(end);
@@ -833,8 +844,13 @@ impl GrepTool {
         }
 
         let mut output = String::new();
+        let mut current_file = String::new();
         for (file, line_num, line) in &matches {
-            output.push_str(&format!("{file}:{line_num}: {line}\n"));
+            if file != &current_file {
+                output.push_str(&format!("{file}:\n"));
+                current_file = file.clone();
+            }
+            output.push_str(&format!("  {line_num}: {line}\n"));
         }
 
         if matches.len() >= max_results {
@@ -1284,9 +1300,9 @@ mod file_tool_tests {
         let result = tool.execute(json!({ "path": "test.txt" })).await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("1: line1"));
-        assert!(result.content.contains("2: line2"));
-        assert!(result.content.contains("3: line3"));
+        assert!(result.content.contains("line1"));
+        assert!(result.content.contains("line2"));
+        assert!(result.content.contains("line3"));
     }
 
     #[tokio::test]
@@ -1424,9 +1440,9 @@ mod file_tool_tests {
         let result = tool.execute(json!({ "path": "test.txt" })).await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("1: a"));
-        assert!(result.content.contains("2: b"));
-        assert!(result.content.contains("3: c"));
+        assert!(result.content.contains("a"));
+        assert!(result.content.contains("b"));
+        assert!(result.content.contains("c"));
         assert!(!result.content.contains("more lines"));
     }
 
@@ -1636,9 +1652,10 @@ mod grep_tool_tests {
         let result = tool.execute(json!({ "pattern": "hello" })).await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("a.rs:1:"));
-        assert!(result.content.contains("b.txt:1:"));
-        assert!(result.content.contains("sub/c.rs:1:"));
+        assert!(result.content.contains("a.rs:"));
+        assert!(result.content.contains("b.txt:"));
+        assert!(result.content.contains("sub/c.rs:"));
+        assert!(result.content.contains("  1:"));
     }
 
     #[tokio::test]
@@ -1648,8 +1665,9 @@ mod grep_tool_tests {
         let result = tool.execute(json!({ "pattern": "fn \\w+\\(\\)" })).await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("a.rs:1: fn hello()"));
-        assert!(result.content.contains("a.rs:2: fn world()"));
+        assert!(result.content.contains("a.rs:"));
+        assert!(result.content.contains("  1: fn hello()"));
+        assert!(result.content.contains("  2: fn world()"));
         assert!(!result.content.contains("b.txt"));
     }
 
@@ -1662,8 +1680,8 @@ mod grep_tool_tests {
             .await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("a.rs:1:"));
-        assert!(result.content.contains("sub/c.rs:1:"));
+        assert!(result.content.contains("a.rs:"));
+        assert!(result.content.contains("sub/c.rs:"));
         assert!(!result.content.contains("b.txt"));
     }
 
@@ -1676,7 +1694,8 @@ mod grep_tool_tests {
             .await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("b.txt:2: foo bar"));
+        assert!(result.content.contains("b.txt:"));
+        assert!(result.content.contains("2: foo bar"));
     }
 
     #[tokio::test]

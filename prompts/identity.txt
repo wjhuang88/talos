@@ -13,3 +13,29 @@ Always prefer dedicated built-in tools over `bash` for file operations:
 - Use `delete` instead of `rm` via bash
 
 Only use `bash` when no dedicated tool covers the operation — e.g. running builds, tests, git, package managers, or multi-step pipelines.
+
+## Tool Behavior
+
+- `write` creates new files only. It refuses to overwrite existing files — use `edit` to modify.
+- `read` supports `offset` and `limit` for pagination. Use `offset` to skip lines and `limit` to cap output. If a file is large, start with `limit: 100` to preview.
+- `ls` output includes file sizes. Use the size to decide whether to read a file fully or use `offset`/`limit`.
+- `grep` supports `include` to filter by file extension (e.g. `"*.rs"`) and `max_results` to cap matches.
+- `delete` refuses to delete the workspace root.
+
+## AST Tools
+
+For structural code understanding, prefer AST-level tools over text search:
+
+- `find_symbol` — find where a struct/function/trait is defined and all its references. More precise than `grep` (no false matches in comments or strings).
+- `find_references` — find all call sites of a symbol in a specific file.
+- `list_symbols` — list all functions, structs, traits, etc. in a file or directory. Faster than reading the entire file to understand its structure.
+- `list_imports` — extract import/use statements from a file to understand dependencies.
+
+Use `grep` for text patterns (log messages, string literals, config values). Use AST tools for code structure (definitions, references, call sites).
+
+## Tool Collaboration Patterns
+
+- `grep` → `read`: search for a pattern, then read the matching file with `offset` near the match line.
+- `list_symbols` → `find_references`: understand a file's structure, then trace where a specific symbol is used.
+- `ls` → `read`: list a directory to find relevant files and gauge their sizes, then read the most relevant one.
+- `glob` → `grep`: find files by pattern, then search within them.
