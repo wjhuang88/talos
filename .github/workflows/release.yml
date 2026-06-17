@@ -16,163 +16,45 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Linux
-          - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-latest
-            cross: native
-            archive: tar.gz
-          - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-latest
-            cross: zigbuild
-            archive: tar.gz
-          # macOS
-          - target: aarch64-apple-darwin
-            runner: macos-14
-            cross: native
-            archive: tar.gz
-          - target: x86_64-apple-darwin
-            runner: macos-13
-            cross: native
-            archive: tar.gz
-          # Windows
-          - target: x86_64-pc-windows-msvc
-            runner: ubuntu-latest
-            cross: xwin
-            archive: zip
-          - target: aarch64-pc-windows-msvc
-            runner: ubuntu-latest
-            cross: xwin
-            archive: zip
+  build-and-release:
+    name: Check + Test + Build all platforms
+    runs-on: macos-14
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-
-      # ── Linux cross-compile via cargo-zigbuild ──
-      - name: Install cargo-zigbuild
-        if: matrix.cross == 'zigbuild'
-        run: pip install cargo-zigbuild
-
-      - name: Build (Linux zigbuild)
-        if: matrix.cross == 'zigbuild'
-        run: cargo zigbuild --release --target ${{ matrix.target }} -p talos-cli
-
-      # ── Windows cross-compile via cargo-xwin ──
-      - name: Install cargo-xwin
-        if: matrix.cross == 'xwin'
-        run: pip install cargo-xwin
-
-      - name: Configure llvm-lib for xwin
-        if: matrix.cross == 'xwin'
-        run: |
-          LLVM_LIB_BIN="$(command -v llvm-lib || true)"
-          if [ -z "$LLVM_LIB_BIN" ]; then
-            shopt -s nullglob
-            llvm_lib_bins=(/usr/bin/llvm-lib-*)
-            shopt -u nullglob
-            if [ "${#llvm_lib_bins[@]}" -gt 0 ]; then
-              LLVM_LIB_BIN="$(printf '%s\n' "${llvm_lib_bins[@]}" | sort -V | tail -n1)"
-            fi
-          fi
-          if [ -z "$LLVM_LIB_BIN" ]; then
-            echo "::error::Unable to locate llvm-lib (or versioned llvm-lib-*) for cargo-xwin"
-            exit 1
-          fi
-          TARGET_UNDERSCORE="${{ matrix.target }}"
-          TARGET_UNDERSCORE="${TARGET_UNDERSCORE//-/_}"
-          echo "AR_${TARGET_UNDERSCORE}=${LLVM_LIB_BIN}" >> "$GITHUB_ENV"
-
-      - name: Build (Windows xwin)
-        if: matrix.cross == 'xwin'
-        run: cargo xwin build --release --target ${{ matrix.target }} -p talos-cli
-
-      # ── macOS native ──
-      - name: Build (macOS native)
-        if: matrix.cross == 'native'
-        run: cargo build --release --target ${{ matrix.target }} -p talos-cli
-
-      # ── Package ──
-      - name: Determine binary name
-        id: binname
-        run: |
-          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
-            echo "name=talos.exe" >> $GITHUB_OUTPUT
-          else
-            echo "name=talos" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Locate binary
-        id: binpath
-        run: |
-          TARGET="${{ matrix.target }}"
-          BIN="${{ steps.binname.outputs.name }}"
-          
-          if [[ "${{ matrix.cross }}" == "xwin" ]]; then
-            # cargo-xwin puts output in target/<triple>/release/
-            PATH_FOUND="target/${TARGET}/release/${BIN}"
-          else
-            PATH_FOUND="target/${TARGET}/release/${BIN}"
-          fi
-          
-          if [ ! -f "$PATH_FOUND" ]; then
-            echo "::error::Binary not found at $PATH_FOUND"
-            find target/ -name "$BIN" -type f 2>/dev/null || true
-            exit 1
-          fi
-          echo "path=$PATH_FOUND" >> $GITHUB_OUTPUT
-
-      - name: Package (tar.gz)
-        if: matrix.archive == 'tar.gz'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf ../../../talos-${{ matrix.target }}.tar.gz ${{ steps.binname.outputs.name }}
-
-      - name: Package (zip)
-        if: matrix.archive == 'zip'
-        run: |
-          cd target/${{ matrix.target }}/release
-          zip ../../../talos-${{ matrix.target }}.zip ${{ steps.binname.outputs.name }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: talos-${{ matrix.target }}
-          path: |
-            talos-${{ matrix.target }}.tar.gz
-            talos-${{ matrix.target }}.zip
-          if-no-files-found: ignore
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          path: artifacts
-          merge-multiple: true
+          components: clippy
+          targets: |
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-unknown-linux-gnu
+            x86_64-unknown-linux-gnu
+            x86_64-pc-windows-msvc
+            aarch64-pc-windows-msvc
 
-      - name: List artifacts
-        run: ls -lh artifacts/
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check
+        run: cargo check --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Install cargo-zigbuild
+        run: pip install cargo-zigbuild
+
+      - name: Install cargo-xwin
+        run: pip install cargo-xwin
+
+      - name: Build all platforms
+        run: ./build.sh
 
       - name: Detect pre-release
         id: prerelease
@@ -180,10 +62,8 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           if echo "$TAG" | grep -qE '^v[0-9]+(\.[0-9]+)*-(alpha|beta|rc|pre|dev)\.'; then
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
-            echo "Pre-release detected: $TAG"
           else
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
-            echo "Stable release: $TAG"
           fi
 
       - name: Build release notes
@@ -194,12 +74,12 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n 1 || true)"
 
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            echo "⚠️ **This is a pre-release build. Expect bugs and breaking changes.**" > RELEASE_BODY.md
-            echo >> RELEASE_BODY.md
-          fi
-          
           {
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              echo "⚠️ **This is a pre-release build. Expect bugs and breaking changes.**"
+              echo
+            fi
+
             if [ -n "$PREVIOUS_TAG" ]; then
               echo "## Changes since \`$PREVIOUS_TAG\`"
               echo
@@ -215,31 +95,31 @@ jobs:
                 sed -E 's/ \[model:[^]]+\]//g'
             fi
 
-            cat <<'NOTES'
-
-            ## Downloads
-
-            | Platform | Architecture | File |
-            |----------|-------------|------|
-            | Linux | x86_64 | `talos-x86_64-unknown-linux-gnu.tar.gz` |
-            | Linux | ARM64 | `talos-aarch64-unknown-linux-gnu.tar.gz` |
-            | macOS | Intel | `talos-x86_64-apple-darwin.tar.gz` |
-            | macOS | Apple Silicon | `talos-aarch64-apple-darwin.tar.gz` |
-            | Windows | x86_64 | `talos-x86_64-pc-windows-msvc.zip` |
-            | Windows | ARM64 | `talos-aarch64-pc-windows-msvc.zip` |
-
-            ### Install
-
-            ```bash
-            # Linux/macOS
-            curl -L https://github.com/${{ github.repository }}/releases/download/${TAG}/talos-<target>.tar.gz | tar xz
-            sudo mv talos /usr/local/bin/
-
-            # Windows
-            # Download the .zip, extract, and add talos.exe to PATH
-            ```
-            NOTES
-          } | sed 's/^  //' >> RELEASE_BODY.md
+            echo
+            echo "## Downloads"
+            echo
+            echo "| Platform | Architecture | File |"
+            echo "|----------|-------------|------|"
+            echo "| Linux | x86_64 | \`talos-x86_64-unknown-linux-gnu\` |"
+            echo "| Linux | ARM64 | \`talos-aarch64-unknown-linux-gnu\` |"
+            echo "| macOS | Apple Silicon | \`talos-aarch64-apple-darwin\` |"
+            echo "| macOS | Intel | \`talos-x86_64-apple-darwin\` |"
+            echo "| Windows | x86_64 | \`talos-x86_64-pc-windows-msvc.exe\` |"
+            echo "| Windows | ARM64 | \`talos-aarch64-pc-windows-msvc.exe\` |"
+            echo
+            echo "Checksums: [\`dist.sha256\`](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/dist.sha256)"
+            echo
+            echo "### Install"
+            echo
+            echo '```bash'
+            echo "# Linux/macOS"
+            echo "curl -L https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/talos-<target> -o talos"
+            echo "chmod +x talos && sudo mv talos /usr/local/bin/"
+            echo
+            echo "# Windows"
+            echo "# Download the .exe, add to PATH"
+            echo '```'
+          } > RELEASE_BODY.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -249,4 +129,4 @@ jobs:
           fail_on_unmatched_files: true
           body_path: RELEASE_BODY.md
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
-          files: artifacts/*
+          files: dist/*
