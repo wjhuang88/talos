@@ -1968,6 +1968,47 @@ fn summarize_tool_args(tool_name: &str, args_str: &str) -> String {
                 fallback()
             }
         }
+        "find_symbol" => {
+            if let Some(ref obj) = obj {
+                let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                let path = obj.get("path").and_then(|v| v.as_str());
+                match path {
+                    Some(p) => format!("name: {name} in {p}"),
+                    None => format!("name: {name}"),
+                }
+            } else {
+                fallback()
+            }
+        }
+        "find_references" => {
+            if let Some(ref obj) = obj {
+                let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                let file = obj.get("file").and_then(|v| v.as_str()).unwrap_or("?");
+                format!("name: {name} in file: {file}")
+            } else {
+                fallback()
+            }
+        }
+        "list_symbols" => {
+            if let Some(ref obj) = obj {
+                let path = obj.get("path").and_then(|v| v.as_str()).unwrap_or("?");
+                let kind = obj.get("kind").and_then(|v| v.as_str());
+                match kind {
+                    Some(k) => format!("path: {path}, kind: {k}"),
+                    None => format!("path: {path}"),
+                }
+            } else {
+                fallback()
+            }
+        }
+        "list_imports" => {
+            if let Some(ref obj) = obj {
+                let file = obj.get("file").and_then(|v| v.as_str()).unwrap_or("?");
+                format!("file: {file}")
+            } else {
+                fallback()
+            }
+        }
         _ => fallback(),
     }
 }
