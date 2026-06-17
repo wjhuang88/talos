@@ -291,7 +291,9 @@ pub(crate) mod semantic {
     pub(crate) const MARKDOWN_QUOTE_TEXT: Color = THEME.markdown_quote_text;
     pub(crate) const MARKDOWN_LIST_MARKER: Color = THEME.markdown_list_marker;
     pub(crate) const MARKDOWN_TABLE_HEADER: Color = THEME.markdown_table_header;
+    #[allow(dead_code)]
     pub(crate) const APPROVAL_BUTTON: Color = THEME.approval_button;
+    #[allow(dead_code)]
     pub(crate) const APPROVAL_BUTTON_BG: Color = THEME.approval_button_bg;
     pub(crate) const APPROVAL_PROMPT: Color = THEME.approval_prompt;
     pub(crate) const LOGO_GRADIENT: [Color; 6] = THEME.logo_gradient;

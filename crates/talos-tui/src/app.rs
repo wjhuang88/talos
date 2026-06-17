@@ -1124,29 +1124,12 @@ impl Drop for Tui {
 
 pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
     let buffer = &state.input_buffer;
-    let char_count = buffer.chars().count();
-    let cursor_pos = state.cursor_pos.min(char_count);
-    let cursor_style = Style::default()
-        .fg(semantic::APPROVAL_BUTTON)
-        .bg(semantic::APPROVAL_BUTTON_BG);
-
     let prompt_style = Style::default().fg(semantic::APPROVAL_PROMPT);
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut line_index = 0usize;
     let mut spans = vec![Span::styled(" > ", prompt_style)];
-    let mut cursor_rendered = false;
 
-    for (idx, ch) in buffer.chars().enumerate() {
-        if idx == cursor_pos {
-            cursor_rendered = true;
-            if ch == '\n' {
-                spans.push(Span::styled(" ", cursor_style));
-            } else {
-                spans.push(Span::styled(ch.to_string(), cursor_style));
-                continue;
-            }
-        }
-
+    for ch in buffer.chars() {
         if ch == '\n' {
             lines.push(Line::from(spans));
             line_index += 1;
@@ -1154,10 +1137,6 @@ pub(crate) fn build_input_text(state: &TuiState) -> Text<'static> {
         } else {
             spans.push(Span::raw(ch.to_string()));
         }
-    }
-
-    if !cursor_rendered {
-        spans.push(Span::styled(" ", cursor_style));
     }
     lines.push(Line::from(spans));
 

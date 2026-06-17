@@ -314,7 +314,7 @@ mod tests {
 
         assert_eq!(text.lines.len(), 2);
         assert_eq!(text.lines[0].to_string(), " > first");
-        assert_eq!(text.lines[1].to_string(), "   second ");
+        assert_eq!(text.lines[1].to_string(), "   second");
         assert_eq!(input_line_count(&state.input_buffer), 2);
     }
 
