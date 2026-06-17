@@ -299,10 +299,57 @@ All tools will use the `ToolNature` attribute (from I025 S5) for permission clas
 
 ## Open Questions
 
-1. **gix vs host git for write operations**: Does gix 0.66+ support commit, push, and checkout
+1. **gix vs host git for write operations**: Does gix 0.84+ support commit, push, and checkout
    reliably? Or should we use host `git` for all write operations in Phase 2?
 2. **Auto-commit behavior**: Should Talos auto-commit after write/edit operations (like Aider)?
    Or leave all commits to explicit `git_commit` calls?
 3. **Git config**: Should Talos respect `.gitconfig` for user.name/user.email, or require
    explicit config in Talos config?
 4. **Partial clone / sparse checkout**: Should we support large repos with partial clone?
+
+## Reference: Other Agent Git Designs
+
+Survey of how major coding agents handle Git operations (2026-06-17):
+
+### Aider: Auto-Commit Model
+
+- Git is a **first-class citizen**, handled internally by `GitRepo` class
+- **Auto-commits after each AI edit** (default ON, configurable via `--no-auto-commits`)
+- **Dirty-commit before AI edits**: commits current dirty state before LLM touches files
+  (creates undo checkpoint)
+- Conventional Commits format for auto-generated messages
+- Author attribution: appends `(aider)` to committer name
+- No explicit per-commit approval — fully automatic
+- Slash commands: `/diff`, `/undo` (reset --hard HEAD~1), `/commit`, `/git`
+
+### Claude Code: Explicit-Only Model
+
+- **No auto-commit** — Git is driven through Bash tool with slash commands
+- `/commit` slash command: restricted to `git add`, `git status`, `git commit` only
+- Safety constraints: never amends, never skips hooks, never commits secrets
+- `/commit-push-pr`: full workflow (branch → commit → push → PR) as a single command
+- Permission model: `allowed-tools` frontmatter restricts which git operations each command
+  can use; users can configure deny rules like `Bash(git push --force)`
+
+### OpenCode: No Dedicated Git Tools
+
+- **No built-in Git tools** — Git operations go through `bash` tool
+- Internal Git service exists but is read-only (status, diff, branch detection) — not exposed
+  to LLM
+- Community plugin (`@slorenzot/git-plugin-opencode`) provides 19 Git tools as MCP tools
+- Permission model: `BashArity` system allows separate permission rules for `git push`
+  (high-risk) vs `git status` (low-risk)
+
+### Recommended Design for Talos
+
+Based on proven patterns:
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Auto-commit | ❌ Default OFF | Claude Code model — explicit is safer; opt-in config possible later |
+| Commit message | LLM-generated, Conventional Commits | All agents converge on this |
+| Permission tiers | Read → Allow, Write → Ask, Destructive → Ask | ToolNature::Read/Write/Execute |
+| Secret protection | Block `.env`, `credentials.*`, `*.key` | Claude Code safety pattern |
+| Safe git config | `--no-optional-locks`, `core.autocrlf=false` | OpenCode pattern |
+| Force push | Always Ask (never auto-allow) | Universal across all agents |
+| Commit attribution | No forced attribution | Unlike Aider — user's commits are theirs |
