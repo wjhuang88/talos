@@ -29,11 +29,23 @@ esac
 target="${arch_part}-${os_part}"
 archive="talos-${target}.tar.gz"
 
+# GitHub's /releases/latest excludes prereleases, so for a prerelease-only
+# project the "latest/download" shortcut 404s. Resolve the newest release tag
+# (prereleases included) via the API instead.
+resolve_latest_tag() {
+  curl -fsSL "https://api.github.com/repos/${1}/releases?per_page=1" \
+    | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    | head -n1
+}
+
 if [ "$version" = "latest" ]; then
-  base="https://github.com/${owner_repo}/releases/latest/download"
-else
-  base="https://github.com/${owner_repo}/releases/download/${version}"
+  version="$(resolve_latest_tag "$owner_repo")"
+  if [ -z "$version" ]; then
+    printf 'error: unable to resolve latest release tag for %s\n' "$owner_repo" >&2
+    exit 1
+  fi
 fi
+base="https://github.com/${owner_repo}/releases/download/${version}"
 
 install_dir="${TALOS_INSTALL_DIR:-${HOME}/.talos/bin}"
 tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t talos)"

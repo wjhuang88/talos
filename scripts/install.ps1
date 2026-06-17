@@ -20,11 +20,17 @@ $Arch = switch ($env:PROCESSOR_ARCHITECTURE) {
 $Target = "$Arch-pc-windows-msvc"
 $Archive = "talos-$Target.zip"
 
-$Base = if ($Version -eq 'latest') {
-  "https://github.com/$Repo/releases/latest/download"
-} else {
-  "https://github.com/$Repo/releases/download/$Version"
+# GitHub's /releases/latest excludes prereleases, so for a prerelease-only
+# project the "latest/download" shortcut 404s. Resolve the newest release tag
+# (prereleases included) via the API instead.
+if ($Version -eq 'latest') {
+  $rel = @(Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$Repo/releases?per_page=1")
+  if (-not $rel -or -not $rel[0].tag_name) {
+    throw "unable to resolve latest release tag for $Repo"
+  }
+  $Version = $rel[0].tag_name
 }
+$Base = "https://github.com/$Repo/releases/download/$Version"
 
 $InstallDir = if ($env:TALOS_INSTALL_DIR) { $env:TALOS_INSTALL_DIR } else { Join-Path $env:USERPROFILE '.talos\bin' }
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
