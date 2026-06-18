@@ -10,7 +10,6 @@ rust-version.workspace = true
 talos-core = { path = "../talos-core" }
 talos-config = { path = "../talos-config" }
 talos-plugin = { path = "../talos-plugin" }
-talos-agent = { path = "../talos-agent" }
 # I009-S4 begin
 talos-permission = { path = "../talos-permission" }
 rmcp = { version = "1.7.0", default-features = false, features = ["server", "client", "transport-io", "transport-child-process", "transport-async-rw"] }
