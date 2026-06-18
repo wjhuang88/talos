@@ -24,9 +24,29 @@ pub enum EvolutionError {
     /// Filesystem operation failed.
     #[error("filesystem operation failed: {0}")]
     Io(#[from] std::io::Error),
-    /// SQLite persistence operation failed.
+    /// Knowledge store operation failed.
     #[error("knowledge store operation failed: {0}")]
-    Store(#[from] rusqlite::Error),
+    Store(#[from] StoreError),
+}
+
+/// Errors originating from the SQLite knowledge store.
+#[derive(Debug, Error)]
+pub enum StoreError {
+    /// A database operation failed.
+    #[error("database operation failed: {0}")]
+    Database(String),
+}
+
+impl From<rusqlite::Error> for StoreError {
+    fn from(err: rusqlite::Error) -> Self {
+        StoreError::Database(err.to_string())
+    }
+}
+
+impl From<rusqlite::Error> for EvolutionError {
+    fn from(err: rusqlite::Error) -> Self {
+        EvolutionError::Store(StoreError::from(err))
+    }
 }
 
 /// Result type for evolution operations.

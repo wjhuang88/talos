@@ -21,9 +21,9 @@ use crate::{Session, SessionInfo};
 /// Errors that can occur during SQLite index operations.
 #[derive(Debug, Error)]
 pub enum IndexError {
-    /// A rusqlite error occurred.
-    #[error("SQLite error: {0}")]
-    SqliteError(#[from] rusqlite::Error),
+    /// An index store operation failed.
+    #[error("index store error: {0}")]
+    Store(#[from] IndexStoreError),
 
     /// An I/O error occurred.
     #[error("I/O error: {0}")]
@@ -32,6 +32,26 @@ pub enum IndexError {
     /// Failed to parse a UUID.
     #[error("invalid UUID: {0}")]
     InvalidUuid(String),
+}
+
+/// Errors originating from the SQLite index store.
+#[derive(Debug, Error)]
+pub enum IndexStoreError {
+    /// A database operation failed.
+    #[error("database operation failed: {0}")]
+    Database(String),
+}
+
+impl From<rusqlite::Error> for IndexStoreError {
+    fn from(err: rusqlite::Error) -> Self {
+        IndexStoreError::Database(err.to_string())
+    }
+}
+
+impl From<rusqlite::Error> for IndexError {
+    fn from(err: rusqlite::Error) -> Self {
+        IndexError::Store(IndexStoreError::from(err))
+    }
 }
 
 /// A search result from the FTS5 index.
@@ -315,10 +335,10 @@ impl SessionIndex {
                 let message_count: i64 = row.get(3)?;
                 let updated_at_str: String = row.get(4)?;
 
-                let id = Uuid::parse_str(&id_str).map_err(|_e| {
+                let id = Uuid::parse_str(&id_str).map_err(|_| {
                     rusqlite::Error::InvalidColumnType(
                         0,
-                        "uuid".to_string(),
+                        id_str.clone(),
                         rusqlite::types::Type::Text,
                     )
                 })?;
@@ -369,10 +389,10 @@ impl SessionIndex {
                 let message_count: i64 = row.get(3)?;
                 let updated_at_str: String = row.get(4)?;
 
-                let id = Uuid::parse_str(&id_str).map_err(|_e| {
+                let id = Uuid::parse_str(&id_str).map_err(|_| {
                     rusqlite::Error::InvalidColumnType(
                         0,
-                        "uuid".to_string(),
+                        id_str.clone(),
                         rusqlite::types::Type::Text,
                     )
                 })?;
