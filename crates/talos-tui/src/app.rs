@@ -733,9 +733,10 @@ impl Tui {
         };
         let warn = to_crossterm_color(semantic::TEXT_WARNING);
         let accent = to_crossterm_color(semantic::TEXT_ACCENT);
+        let args_short = truncate_single_line(arguments, 80);
         self.pending_scrollback.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("⚠ Approval required: {}", tool_name),
+                format!("   ⚠ {tool_name}: {args_short}"),
                 warn,
                 HistoryAttrs {
                     bold: true,
@@ -746,7 +747,7 @@ impl Tui {
         ));
         self.pending_scrollback.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                "[y] approve once  [a] always  [n] deny",
+                "   [y] approve  [a] always  [n] deny",
                 accent,
                 HistoryAttrs::default(),
             )],
@@ -1062,7 +1063,7 @@ impl Tui {
                             };
                             self.pending_scrollback.push(ScrollbackLine::styled(
                                 vec![HistorySegment::styled(
-                                    format!("  {icon} {msg}"),
+                                    format!("   {icon} {msg}"),
                                     color,
                                     HistoryAttrs::default(),
                                 )],
