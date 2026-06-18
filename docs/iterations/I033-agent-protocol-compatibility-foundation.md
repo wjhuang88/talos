@@ -37,7 +37,8 @@ types to unstable external schemas.
 - The Agent protocol ecosystem may change quickly; do not hard-code a convention without dated
   source evidence.
 - `~/.agent` must not become a dumping ground for Talos private state.
-- Remote session control, WASM plugins, and provider plugins are adjacent but separate work.
+- Runtime Skill activation, MCP session integration, remote session control, WASM plugins, and
+  provider plugins are adjacent but separate work.
 
 ## Verification Log
 

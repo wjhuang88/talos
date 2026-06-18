@@ -1,0 +1,56 @@
+# SKILL-001: Runtime Skill Activation
+
+**Status**: Planned
+**Priority**: P1
+**Source**: User correction 2026-06-18
+**Depends on**: ARCH-009 preferred, prompt cache stability, session startup flow
+
+## Problem
+
+Talos has a `talos-skill` crate that can parse and manage `SKILL.md` files, and the agent prompt
+can render a skill index. However, the runtime startup path does not yet discover skills, inject
+the Level 0 index into the agent, or activate Level 1/Level 2 skill content during a session.
+
+This means the mechanism exists as a library, but users cannot rely on Talos to actually call
+skills in normal CLI/TUI usage.
+
+## Scope
+
+- Discover skills at session startup from the existing search paths:
+  `.talos/skills/`, `~/.talos/skills/`, and inherited parent `.talos/skills/`.
+- Inject the Level 0 skill index into `Agent::set_skill_index(...)` before the first model turn.
+- Define runtime activation rules for Level 1 skill body loading:
+  model-visible skill index first, then explicit activation by matching task/trigger or a user
+  command if needed.
+- Support Level 2 reference/resource loading through existing `SkillManager::load_reference(...)`.
+- Surface available and active skills in TUI/CLI visibility paths without leaking full skill body
+  content into history by default.
+- Keep prompt cache semantics explicit: skill set is session-stable unless the session is rebuilt.
+- Handle bad skills deterministically: skip with diagnostic, or fail startup only under strict mode.
+
+## Acceptance Criteria
+
+- [ ] Normal CLI/TUI startup discovers skills and injects Level 0 skill metadata into the system
+      prompt.
+- [ ] A session with no skills still renders a clear `No skills available` prompt section.
+- [ ] A session with one valid skill exposes that skill name/description to the model before the
+      first turn.
+- [ ] Level 1 skill body activation is implemented or explicitly gated behind a visible command.
+- [ ] Level 2 reference loading is covered by tests.
+- [ ] Bad or duplicate skills do not crash normal startup.
+- [ ] Prompt cache invalidation rules are documented and tested.
+- [ ] User-facing docs explain where to put skills and how Talos activates them.
+
+## Verification Notes
+
+Add targeted tests around discovery, prompt injection, activation, bad skill handling, duplicate
+skill priority, and reference loading. Include at least one CLI or agent integration test proving
+runtime startup wires `SkillLoader` to `Agent::set_skill_index(...)`.
+
+## Required Reads
+
+- `docs/backlog/active/ARCH-009-skill-module-decomposition.md`
+- `docs/iterations/I031-skill-and-cli-module-cleanup.md`
+- `crates/talos-skill/src/lib.rs`
+- `crates/talos-agent/src/prompt.rs`
+- `crates/talos-agent/src/lib.rs`

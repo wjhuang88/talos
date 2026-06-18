@@ -35,6 +35,8 @@ Design and implement support for comparatively standard, common Agent protocol c
 - Implementing remote multi-agent orchestration under this story; that remains adjacent to
   REMOTE-001.
 - Implementing WASM runtime plugins; that remains PLUGIN-001.
+- Implementing runtime Skill activation or MCP session integration; those are tracked by
+  SKILL-001 and MCP-001.
 
 ## Acceptance Criteria
 
@@ -60,3 +62,5 @@ other local coding agents. Treat findings as time-sensitive and cite source date
 - `docs/decisions/021-tool-call-protocol-architecture.md`
 - `docs/backlog/active/REMOTE-001-remote-session-protocol.md`
 - `docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md`
+- `docs/backlog/active/SKILL-001-runtime-skill-activation.md`
+- `docs/backlog/active/MCP-001-session-mcp-integration.md`
