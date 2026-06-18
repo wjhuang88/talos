@@ -36,7 +36,6 @@ use talos_config::McpServerConfig;
 use talos_config::{Config, ProviderProtocol};
 use talos_conversation::{ConversationEngine, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
-use talos_core::TuiApprovalRequest;
 use talos_core::message::AgentEvent;
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
@@ -66,17 +65,17 @@ use crate::logging::init_logger;
 /// via oneshot channels. Unlike [`ApprovalPrompt`], this does not block
 /// on stdin — the TUI renders an overlay and handles user interaction.
 pub(crate) struct TuiApprovalHandler {
-    approval_tx: mpsc::UnboundedSender<TuiApprovalRequest>,
+    ui_output_tx: mpsc::UnboundedSender<UiOutput>,
     engine: Mutex<talos_permission::PermissionEngine>,
 }
 
 impl TuiApprovalHandler {
     fn new(
-        approval_tx: mpsc::UnboundedSender<TuiApprovalRequest>,
+        ui_output_tx: mpsc::UnboundedSender<UiOutput>,
         workspace_root: std::path::PathBuf,
     ) -> Self {
         Self {
-            approval_tx,
+            ui_output_tx,
             engine: Mutex::new(talos_permission::PermissionEngine::with_workspace_root(
                 workspace_root,
             )),
@@ -93,15 +92,17 @@ impl TuiApprovalHandler {
             talos_permission::PermissionDecision::Deny(_) => ApprovalChoice::Deny,
             talos_permission::PermissionDecision::Ask => {
                 let formatted = ApprovalPrompt::format_input(input);
-                let (response, response_rx) = tokio::sync::oneshot::channel();
+                let (response_tx, response_rx) = tokio::sync::oneshot::channel();
 
-                let request = TuiApprovalRequest {
-                    tool_name: tool_name.to_string(),
-                    arguments: formatted,
-                    response,
-                };
-
-                if self.approval_tx.send(request).is_err() {
+                if self
+                    .ui_output_tx
+                    .send(UiOutput::ToolApprovalRequest {
+                        tool_name: tool_name.to_string(),
+                        arguments: formatted,
+                        response: response_tx,
+                    })
+                    .is_err()
+                {
                     return ApprovalChoice::Deny;
                 }
 
@@ -919,9 +920,9 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let workspace_root = resolve_workspace_root(&cli)?;
 
-    // TUI approval channel: tools send requests here, TUI handles them
-    let (approval_tx, approval_rx) = mpsc::unbounded_channel::<TuiApprovalRequest>();
-    let approval_handler = Arc::new(TuiApprovalHandler::new(approval_tx, workspace_root.clone()));
+    // Unified UiOutput channel: tools, results, AND approval requests all flow here
+    let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
+    let approval_handler = Arc::new(TuiApprovalHandler::new(ui_output_tx.clone(), workspace_root.clone()));
 
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);
@@ -1063,7 +1064,6 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.hydrate_history(&visible_history);
 
     // Channels between conversation engine and UI
-    let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
     let (user_input_tx, user_input_rx) = mpsc::unbounded_channel::<UserInput>();
 
     tui.set_ui_output_rx(ui_output_rx);
@@ -1085,7 +1085,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         .await;
     });
 
-    tui.run_with_approval(approval_rx).await?;
+    tui.run().await?;
     Ok(())
 }
 

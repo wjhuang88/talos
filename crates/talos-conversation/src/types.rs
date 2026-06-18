@@ -89,6 +89,11 @@ pub enum UiOutput {
     ToolCallStarted { name: String },
     ToolCall(ToolCallDisplay),
     ToolResult(ToolResultDisplay),
+    ToolApprovalRequest {
+        tool_name: String,
+        arguments: String,
+        response: tokio::sync::oneshot::Sender<talos_core::ApprovalChoice>,
+    },
     Exit,
 }
 

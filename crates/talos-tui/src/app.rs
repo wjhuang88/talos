@@ -18,7 +18,6 @@ use talos_conversation::{
     MessageSource, StatusSnapshot, TipKind, ToolCallDisplay, UiOutput, UserInput,
 };
 use talos_core::ApprovalChoice;
-use talos_core::TuiApprovalRequest;
 use talos_core::message::Message;
 use talos_core::tool::ToolProvenance;
 use talos_core::tool_filter::ToolSyntaxFilter;
@@ -759,17 +758,11 @@ impl Tui {
         self.state.approval_state = ApprovalState::Hidden;
     }
 
-    pub async fn run_with_approval(
-        &mut self,
-        mut approval_rx: mpsc::UnboundedReceiver<TuiApprovalRequest>,
-    ) -> io::Result<()> {
+    pub async fn run(&mut self) -> io::Result<()> {
         let mut event_stream = EventStream::new();
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
 
-        // Establish the viewport before flushing restored history. Otherwise the
-        // first scrollback lines can be written into the future input area and
-        // then erased by the first frame draw.
         self.draw_frame()?;
 
         loop {
@@ -785,7 +778,7 @@ impl Tui {
                     }
                 }
                 Some(output) = ui_output_rx.recv() => {
-                    let is_tool = matches!(&output, UiOutput::ToolCall(_));
+                    let is_tool = matches!(&output, UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. });
                     if self.handle_ui_output(output) {
                         break;
                     }
@@ -793,18 +786,6 @@ impl Tui {
                         self.flush_pending_scrollback()?;
                         self.draw_frame()?;
                     }
-                }
-                Some(request) = approval_rx.recv() => {
-                    while let Ok(pending) = ui_output_rx.try_recv() {
-                        self.handle_ui_output(pending);
-                    }
-                    self.flush_pending_scrollback()?;
-                    self.draw_frame()?;
-
-                    self.state.pending_approval_response = Some(request.response);
-                    self.show_approval(&request.tool_name, &request.arguments);
-                    let _ = self.flush_pending_scrollback();
-                    self.draw_frame()?;
                 }
                 Some(chunk) = self.next_stream_chunk() => {
                     self.consume_stream_chunk(&chunk);
@@ -913,6 +894,10 @@ impl Tui {
                 )];
                 self.pending_scrollback
                     .push(ScrollbackLine::styled(segments, None));
+            }
+            UiOutput::ToolApprovalRequest { tool_name, arguments, response } => {
+                self.state.pending_approval_response = Some(response);
+                self.show_approval(&tool_name, &arguments);
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
