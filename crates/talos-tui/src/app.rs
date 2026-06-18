@@ -40,11 +40,12 @@ pub(crate) struct ScrollbackLine {
     pub(crate) text: String,
     segments: Vec<HistorySegment>,
     bg: Option<CColor>,
+    fill: Option<HistorySegment>,
 }
 
 impl PartialEq for ScrollbackLine {
     fn eq(&self, other: &Self) -> bool {
-        self.text == other.text && self.bg == other.bg
+        self.text == other.text && self.bg == other.bg && self.fill == other.fill
     }
 }
 
@@ -55,18 +56,35 @@ impl ScrollbackLine {
             segments: vec![HistorySegment::raw(text.clone())],
             text,
             bg,
+            fill: None,
         }
     }
 
     fn styled(segments: Vec<HistorySegment>, bg: Option<CColor>) -> Self {
+        Self::styled_with_fill(segments, bg, None)
+    }
+
+    fn styled_with_fill(
+        segments: Vec<HistorySegment>,
+        bg: Option<CColor>,
+        fill: Option<HistorySegment>,
+    ) -> Self {
         let text = segments
             .iter()
             .map(|segment| segment.text.as_str())
             .collect::<String>();
-        Self { text, segments, bg }
+        Self {
+            text,
+            segments,
+            bg,
+            fill,
+        }
     }
 
     fn has_plain_segments_only(&self) -> bool {
+        if self.fill.is_some() {
+            return false;
+        }
         self.segments
             .iter()
             .all(|segment| segment.fg.is_none() && segment.attrs == HistoryAttrs::default())
@@ -184,6 +202,11 @@ impl StreamRenderState {
                 ..HistoryAttrs::default()
             },
         )];
+        if block.is_none() && is_horizontal_rule(line) {
+            let fill = horizontal_rule_segment("─");
+            segments.push(fill.clone());
+            return ScrollbackLine::styled_with_fill(segments, self.bg(), Some(fill));
+        }
         segments.extend(render_markdown_segments(line, block));
         ScrollbackLine::styled(segments, self.bg())
     }
@@ -912,12 +935,15 @@ impl Tui {
             return Ok(());
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
-        for line in &lines {
+        for line in lines {
             if line.has_plain_segments_only() {
                 self.terminal.insert_history(&line.text, line.bg)?;
             } else {
-                self.terminal
-                    .insert_styled_history(&line.segments, line.bg)?;
+                let mut segments = line.segments;
+                if let Some(fill) = line.fill {
+                    append_fill_segment(&mut segments, fill, self.terminal.screen_size().width);
+                }
+                self.terminal.insert_styled_history(&segments, line.bg)?;
             }
         }
         Ok(())
@@ -1568,6 +1594,24 @@ fn history_segments_width(segments: &[HistorySegment]) -> usize {
         .sum()
 }
 
+fn append_fill_segment(
+    segments: &mut Vec<HistorySegment>,
+    fill: HistorySegment,
+    target_width: u16,
+) {
+    let target = target_width as usize;
+    let width = history_segments_width(segments);
+    if target <= width {
+        return;
+    }
+
+    let fill_width = unicode_width::UnicodeWidthStr::width(fill.text.as_str()).max(1);
+    let repeat = (target - width).div_ceil(fill_width);
+    let mut fill_segment = fill;
+    fill_segment.text = fill_segment.text.repeat(repeat);
+    segments.push(fill_segment);
+}
+
 fn is_table_separator_line(line: &str) -> bool {
     let trimmed = line.trim().trim_matches('|').trim();
     if trimmed.is_empty() {
@@ -1626,11 +1670,7 @@ fn render_quote_line(line: &str) -> Vec<HistorySegment> {
 fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
     if is_horizontal_rule(line) {
         let hr_width = 40usize;
-        return vec![HistorySegment::styled(
-            "─".repeat(hr_width),
-            to_crossterm_color(semantic::STATUS_VALUE),
-            HistoryAttrs::default(),
-        )];
+        return vec![horizontal_rule_segment("─".repeat(hr_width))];
     }
 
     if let Some((indent, marker, heading)) = split_heading(line) {
@@ -1653,6 +1693,14 @@ fn render_inline_markdown(line: &str) -> Vec<HistorySegment> {
     }
 
     parse_inline_delimiters(line)
+}
+
+fn horizontal_rule_segment(text: impl Into<String>) -> HistorySegment {
+    HistorySegment::styled(
+        text,
+        to_crossterm_color(semantic::STATUS_VALUE),
+        HistoryAttrs::default(),
+    )
 }
 
 fn is_horizontal_rule(line: &str) -> bool {
@@ -2299,10 +2347,17 @@ mod tests {
 
         assert_eq!(lines.len(), 1);
         assert!(
-            lines[0].text.starts_with(" ● ──"),
+            lines[0].text.starts_with(" ● ─"),
             "horizontal rule with prefix and dashes"
         );
-        assert!(lines[0].text.len() > 40, "horizontal rule should be long");
+        assert!(
+            lines[0].fill.is_some(),
+            "horizontal rule should fill the history row"
+        );
+
+        let mut segments = lines[0].segments.clone();
+        append_fill_segment(&mut segments, lines[0].fill.clone().unwrap(), 20);
+        assert_eq!(history_segments_width(&segments), 20);
     }
 
     #[test]
