@@ -27,8 +27,8 @@ pub enum ToolError {
     ExecutionError(String),
 }
 
-use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// Provenance of a registered tool.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

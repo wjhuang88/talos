@@ -117,11 +117,9 @@ impl StreamBlockClassifier {
                     MarkdownBlockKind::CodeFence => {
                         lines.push(line);
                         let is_closed = lines.last().is_some_and(|last| {
-                            fence_marker
-                                .as_ref()
-                                .is_some_and(|(marker, count)| {
-                                    is_matching_fence_close(last, marker, *count)
-                                })
+                            fence_marker.as_ref().is_some_and(|(marker, count)| {
+                                is_matching_fence_close(last, marker, *count)
+                            })
                         });
                         if is_closed {
                             let status = hold_status(
@@ -583,19 +581,25 @@ mod tests {
 
         let decisions = classifier.push_line("```rust".to_string());
         assert!(
-            decisions.iter().all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
+            decisions
+                .iter()
+                .all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
             "info-string line ```rust should NOT close the fence"
         );
 
         let decisions = classifier.push_line("fn main() {}".to_string());
         assert!(
-            decisions.iter().all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
+            decisions
+                .iter()
+                .all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
             "content after non-close should still be held"
         );
 
         let decisions = classifier.push_line("```".to_string());
         assert!(
-            decisions.iter().any(|d| matches!(d, BlockDecision::FinishHold { .. })),
+            decisions
+                .iter()
+                .any(|d| matches!(d, BlockDecision::FinishHold { .. })),
             "bare ``` should close the fence"
         );
     }
@@ -609,13 +613,17 @@ mod tests {
 
         let decisions = classifier.push_line("```".to_string());
         assert!(
-            decisions.iter().all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
+            decisions
+                .iter()
+                .all(|d| !matches!(d, BlockDecision::FinishHold { .. })),
             "3-backtick line should NOT close 4-backtick fence"
         );
 
         let decisions = classifier.push_line("````".to_string());
         assert!(
-            decisions.iter().any(|d| matches!(d, BlockDecision::FinishHold { .. })),
+            decisions
+                .iter()
+                .any(|d| matches!(d, BlockDecision::FinishHold { .. })),
             "4-backtick line should close 4-backtick fence"
         );
     }

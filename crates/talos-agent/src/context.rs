@@ -272,8 +272,7 @@ mod tests {
         fs::create_dir(&talos_dir).expect("failed to create .talos directory");
         create_agents_md(&talos_dir, "# Global Rules\nGlobal content.");
 
-        let loader = ContextLoader::new(temp_dir.path().join("project"))
-            .with_global_dir(talos_dir);
+        let loader = ContextLoader::new(temp_dir.path().join("project")).with_global_dir(talos_dir);
         let context = loader.load().expect("load failed");
 
         assert!(context.contains("# Global Rules"));

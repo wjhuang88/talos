@@ -61,8 +61,7 @@ impl AgentTool for TreeTool {
 
 impl TreeTool {
     async fn execute_inner(&self, input: Value) -> Result<String, String> {
-        let tree_input: TreeInput = serde_json::from_value(input)
-            .map_err(|e| e.to_string())?;
+        let tree_input: TreeInput = serde_json::from_value(input).map_err(|e| e.to_string())?;
 
         let max_depth = tree_input.max_depth.unwrap_or(3) as usize;
 
@@ -131,11 +130,7 @@ fn build_tree(
         let path = entry.path();
         let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
 
-        let display_name = if is_dir {
-            format!("{name}/")
-        } else {
-            name
-        };
+        let display_name = if is_dir { format!("{name}/") } else { name };
 
         output.push_str(&format!("{prefix}{branch}{display_name}\n"));
 

@@ -4,8 +4,8 @@
 //! agent operations such as shell command execution, file operations, and
 //! AST-aware symbol queries.
 
-pub mod symbol;
 pub mod git;
+pub mod symbol;
 pub mod tree;
 
 pub use tree::TreeTool;
@@ -756,7 +756,7 @@ impl AgentTool for GrepTool {
     fn is_read_only(&self) -> bool {
         true
     }
-            fn summary_fields(&self) -> &'static [&'static str] {
+    fn summary_fields(&self) -> &'static [&'static str] {
         &["pattern", "path", "include"]
     }
 }
@@ -959,8 +959,8 @@ impl GlobTool {
         for entry in glob::glob_with(&pattern_str, opts)
             .map_err(|e| FileToolError::InvalidInput(format!("invalid glob pattern: {e}")))?
         {
-            let path = entry
-                .map_err(|e| FileToolError::InvalidInput(format!("glob error: {e}")))?;
+            let path =
+                entry.map_err(|e| FileToolError::InvalidInput(format!("glob error: {e}")))?;
             let display_path = path
                 .strip_prefix(&canonical_root)
                 .unwrap_or(&path)
@@ -1092,10 +1092,7 @@ impl LsTool {
             .collect();
 
         entries.sort_by_key(|e| {
-            let is_dir = e
-                .file_type()
-                .map(|ft| ft.is_dir())
-                .unwrap_or(false);
+            let is_dir = e.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
             (!is_dir, e.file_name())
         });
 
@@ -1159,7 +1156,9 @@ fn format_entry_long(path: &Path, display: &str) -> String {
 
     let meta = match std::fs::symlink_metadata(path) {
         Ok(m) => m,
-        Err(_) => return format!("?---------    -      -      -        -  ????-??-?? ??:??  {display}"),
+        Err(_) => {
+            return format!("?---------    -      -      -        -  ????-??-?? ??:??  {display}");
+        }
     };
 
     let ft = meta.file_type();
@@ -1178,9 +1177,7 @@ fn format_entry_long(path: &Path, display: &str) -> String {
     let size = meta.len();
     let mtime = format_mtime(meta.mtime());
 
-    format!(
-        "{type_char}{perms}  {nlink:>3}  {uid:>5}  {gid:>5}  {size:>8}  {mtime}  {display}"
-    )
+    format!("{type_char}{perms}  {nlink:>3}  {uid:>5}  {gid:>5}  {size:>8}  {mtime}  {display}")
 }
 
 #[cfg(not(unix))]
@@ -1193,9 +1190,15 @@ fn format_entry_long(path: &Path, display: &str) -> String {
 #[cfg(unix)]
 fn format_permissions(mode: u32) -> String {
     let bits: [(u32, char); 9] = [
-        (0o400, 'r'), (0o200, 'w'), (0o100, 'x'),
-        (0o040, 'r'), (0o020, 'w'), (0o010, 'x'),
-        (0o004, 'r'), (0o002, 'w'), (0o001, 'x'),
+        (0o400, 'r'),
+        (0o200, 'w'),
+        (0o100, 'x'),
+        (0o040, 'r'),
+        (0o020, 'w'),
+        (0o010, 'x'),
+        (0o004, 'r'),
+        (0o002, 'w'),
+        (0o001, 'x'),
     ];
     bits.iter()
         .map(|(bit, c)| if mode & bit != 0 { *c } else { '-' })
@@ -1211,7 +1214,11 @@ fn format_mtime(mtime: i64) -> String {
     let min = (rem % 3600) / 60;
 
     let z = days as i64 + 719468;
-    let era = if z >= 0 { z / 146097 } else { (z - 146096) / 146097 };
+    let era = if z >= 0 {
+        z / 146097
+    } else {
+        (z - 146096) / 146097
+    };
     let doe = (z - era * 146097) as u64;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     let y = yoe as i64 + era * 400;
@@ -1351,7 +1358,7 @@ impl AgentTool for DiffTool {
     fn is_read_only(&self) -> bool {
         true
     }
-        fn summary_fields(&self) -> &'static [&'static str] {
+    fn summary_fields(&self) -> &'static [&'static str] {
         &["old_path", "new_path"]
     }
 }
@@ -1391,7 +1398,9 @@ impl DiffTool {
         }
 
         if output.trim().is_empty() || output.lines().all(|l| l.starts_with(' ')) {
-            return Ok(format!("no differences between {old_display} and {new_display}"));
+            return Ok(format!(
+                "no differences between {old_display} and {new_display}"
+            ));
         }
 
         let added = output.lines().filter(|l| l.starts_with('+')).count();
@@ -1930,7 +1939,11 @@ mod grep_tool_tests {
             .await;
 
         assert!(!result.is_error);
-        let match_count = result.content.lines().filter(|l| l.contains(": ") && !l.starts_with("...")).count();
+        let match_count = result
+            .content
+            .lines()
+            .filter(|l| l.contains(": ") && !l.starts_with("..."))
+            .count();
         assert_eq!(match_count, 1);
         assert!(result.content.contains("showing first 1"));
     }
@@ -1992,7 +2005,11 @@ mod glob_tool_tests {
         fs::create_dir_all(dir.path().join("src")).unwrap();
         fs::write(dir.path().join("src/mod.rs"), "pub mod sub;\n").unwrap();
         fs::create_dir_all(dir.path().join("tests")).unwrap();
-        fs::write(dir.path().join("tests/integration.rs"), "#[test]\nfn test() {}\n").unwrap();
+        fs::write(
+            dir.path().join("tests/integration.rs"),
+            "#[test]\nfn test() {}\n",
+        )
+        .unwrap();
         dir
     }
 
@@ -2152,11 +2169,7 @@ mod ls_tool_tests {
         let result = tool.execute(json!({})).await;
 
         assert!(!result.is_error);
-        let src_line = result
-            .content
-            .lines()
-            .find(|l| l.contains("src"))
-            .unwrap();
+        let src_line = result.content.lines().find(|l| l.contains("src")).unwrap();
         assert!(src_line.ends_with('/'));
         assert!(!src_line.contains(' '));
     }
@@ -2185,7 +2198,11 @@ mod ls_tool_tests {
         let result = tool.execute(json!({})).await;
 
         assert!(!result.is_error);
-        let line = result.content.lines().find(|l| l.contains("test.txt")).unwrap();
+        let line = result
+            .content
+            .lines()
+            .find(|l| l.contains("test.txt"))
+            .unwrap();
         assert!(line.ends_with(" 11"));
     }
 
@@ -2253,7 +2270,11 @@ mod ls_tool_tests {
         let result = tool.execute(json!({ "long": true })).await;
 
         assert!(!result.is_error);
-        let line = result.content.lines().find(|l| l.contains("test.txt")).unwrap();
+        let line = result
+            .content
+            .lines()
+            .find(|l| l.contains("test.txt"))
+            .unwrap();
         let perms_field = line.split_whitespace().nth(0).unwrap_or("");
         assert!(perms_field.starts_with('-'));
         assert!(perms_field.len() == 10);
@@ -2328,7 +2349,9 @@ mod delete_tool_tests {
         fs::write(&outside, "secret").unwrap();
 
         let tool = DeleteTool::new(dir.path().to_path_buf());
-        let result = tool.execute(json!({ "path": "../outside_target.txt" })).await;
+        let result = tool
+            .execute(json!({ "path": "../outside_target.txt" }))
+            .await;
 
         assert!(result.is_error);
         assert!(result.content.contains("path escapes workspace root"));
@@ -2367,7 +2390,9 @@ mod diff_tool_tests {
         fs::write(dir.path().join("b.txt"), "hello\n").unwrap();
 
         let tool = DiffTool::new(dir.path().to_path_buf());
-        let result = tool.execute(json!({ "old_path": "a.txt", "new_path": "b.txt" })).await;
+        let result = tool
+            .execute(json!({ "old_path": "a.txt", "new_path": "b.txt" }))
+            .await;
 
         assert!(!result.is_error);
         assert!(result.content.contains("no differences"));
@@ -2380,7 +2405,9 @@ mod diff_tool_tests {
         fs::write(dir.path().join("b.txt"), "line1\nchanged\nline3\n").unwrap();
 
         let tool = DiffTool::new(dir.path().to_path_buf());
-        let result = tool.execute(json!({ "old_path": "a.txt", "new_path": "b.txt" })).await;
+        let result = tool
+            .execute(json!({ "old_path": "a.txt", "new_path": "b.txt" }))
+            .await;
 
         assert!(!result.is_error);
         assert!(result.content.contains("-line2"));
@@ -2395,7 +2422,9 @@ mod diff_tool_tests {
         fs::write(dir.path().join("a.txt"), "hello\n").unwrap();
 
         let tool = DiffTool::new(dir.path().to_path_buf());
-        let result = tool.execute(json!({ "old_path": "a.txt", "new_path": "missing.txt" })).await;
+        let result = tool
+            .execute(json!({ "old_path": "a.txt", "new_path": "missing.txt" }))
+            .await;
 
         assert!(result.is_error);
     }

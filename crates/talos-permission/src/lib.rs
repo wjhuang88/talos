@@ -530,7 +530,10 @@ mod tests {
     #[test]
     fn test_default_find_references_allowed() {
         let engine = PermissionEngine::new();
-        let decision = engine.evaluate("find_references", &serde_json::json!({"name": "Tool", "file": "src/main.rs"}));
+        let decision = engine.evaluate(
+            "find_references",
+            &serde_json::json!({"name": "Tool", "file": "src/main.rs"}),
+        );
         assert_eq!(decision, PermissionDecision::Allow);
     }
 
@@ -551,14 +554,20 @@ mod tests {
     #[test]
     fn test_workspace_auto_allow_file_param() {
         let engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
-        let decision = engine.evaluate("find_references", &serde_json::json!({"name": "Tool", "file": "src/main.rs"}));
+        let decision = engine.evaluate(
+            "find_references",
+            &serde_json::json!({"name": "Tool", "file": "src/main.rs"}),
+        );
         assert_eq!(decision, PermissionDecision::Allow);
     }
 
     #[test]
     fn test_workspace_auto_allow_path_param() {
         let engine = PermissionEngine::with_workspace_root(PathBuf::from("/tmp"));
-        let decision = engine.evaluate("find_symbol", &serde_json::json!({"name": "Tool", "path": "src/main.rs"}));
+        let decision = engine.evaluate(
+            "find_symbol",
+            &serde_json::json!({"name": "Tool", "path": "src/main.rs"}),
+        );
         assert_eq!(decision, PermissionDecision::Allow);
     }
 

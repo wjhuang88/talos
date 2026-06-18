@@ -25,9 +25,8 @@ pub enum GitToolError {
 }
 
 fn discover_repo(workspace_root: &std::path::Path) -> Result<gix::Repository, GitToolError> {
-    gix::discover(workspace_root).map_err(|_| GitToolError::NotARepository(
-        workspace_root.display().to_string(),
-    ))
+    gix::discover(workspace_root)
+        .map_err(|_| GitToolError::NotARepository(workspace_root.display().to_string()))
 }
 
 // ─── git_status ───
@@ -50,11 +49,19 @@ impl GitStatusTool {
 
 #[async_trait]
 impl AgentTool for GitStatusTool {
-    fn name(&self) -> &str { "git_status" }
-    fn description(&self) -> &str { "Show working tree status" }
-    fn parameters(&self) -> Value { tool_parameters!(GitStatusInput) }
+    fn name(&self) -> &str {
+        "git_status"
+    }
+    fn description(&self) -> &str {
+        "Show working tree status"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitStatusInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["path"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -62,13 +69,15 @@ impl AgentTool for GitStatusTool {
         }
     }
 
-    fn is_read_only(&self) -> bool { true }
+    fn is_read_only(&self) -> bool {
+        true
+    }
 }
 
 impl GitStatusTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitStatusInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitStatusInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let search_path = match git_input.path {
             Some(ref p) => self.workspace_root.join(p),
@@ -81,7 +90,9 @@ impl GitStatusTool {
             .map_err(|e| GitToolError::Git(e.to_string()))?
             .untracked_files(gix::status::UntrackedFiles::Files);
 
-        let iter = platform.into_index_worktree_iter(Vec::<gix::bstr::BString>::new()).map_err(|e| GitToolError::Git(e.to_string()))?;
+        let iter = platform
+            .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
 
         let mut output = String::new();
         for item in iter {
@@ -128,11 +139,19 @@ impl GitLogTool {
 
 #[async_trait]
 impl AgentTool for GitLogTool {
-    fn name(&self) -> &str { "git_log" }
-    fn description(&self) -> &str { "Show commit history" }
-    fn parameters(&self) -> Value { tool_parameters!(GitLogInput) }
+    fn name(&self) -> &str {
+        "git_log"
+    }
+    fn description(&self) -> &str {
+        "Show commit history"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitLogInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["max_count"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["max_count"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -140,29 +159,42 @@ impl AgentTool for GitLogTool {
         }
     }
 
-    fn is_read_only(&self) -> bool { true }
+    fn is_read_only(&self) -> bool {
+        true
+    }
 }
 
 impl GitLogTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitLogInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitLogInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let max_count = git_input.max_count.unwrap_or(20) as usize;
         let repo = discover_repo(&self.workspace_root)?;
-        let head = repo.rev_parse_single("HEAD")
+        let head = repo
+            .rev_parse_single("HEAD")
             .map_err(|e| GitToolError::Git(e.to_string()))?;
-        let commit = head.object().map_err(|e| GitToolError::Git(e.to_string()))?
-            .try_into_commit().map_err(|e| GitToolError::Git(e.to_string()))?;
+        let commit = head
+            .object()
+            .map_err(|e| GitToolError::Git(e.to_string()))?
+            .try_into_commit()
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
 
         let mut output = String::new();
 
-        for (count, info) in repo.rev_walk([commit.id]).all().map_err(|e| GitToolError::Git(e.to_string()))?.enumerate() {
+        for (count, info) in repo
+            .rev_walk([commit.id])
+            .all()
+            .map_err(|e| GitToolError::Git(e.to_string()))?
+            .enumerate()
+        {
             if count >= max_count {
                 break;
             }
             let info = info.map_err(|e| GitToolError::Git(e.to_string()))?;
-            let obj = info.object().map_err(|e| GitToolError::Git(e.to_string()))?;
+            let obj = info
+                .object()
+                .map_err(|e| GitToolError::Git(e.to_string()))?;
             let commit_ref = obj.decode().map_err(|e| GitToolError::Git(e.to_string()))?;
             let author = commit_ref.author;
 
@@ -206,11 +238,19 @@ impl GitBranchListTool {
 
 #[async_trait]
 impl AgentTool for GitBranchListTool {
-    fn name(&self) -> &str { "git_branch_list" }
-    fn description(&self) -> &str { "List branches" }
-    fn parameters(&self) -> Value { tool_parameters!(GitBranchListInput) }
+    fn name(&self) -> &str {
+        "git_branch_list"
+    }
+    fn description(&self) -> &str {
+        "List branches"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitBranchListInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["remote"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["remote"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -218,13 +258,15 @@ impl AgentTool for GitBranchListTool {
         }
     }
 
-    fn is_read_only(&self) -> bool { true }
+    fn is_read_only(&self) -> bool {
+        true
+    }
 }
 
 impl GitBranchListTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitBranchListInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitBranchListInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let repo = discover_repo(&self.workspace_root)?;
         let current_head = repo.head_name().ok().flatten();
@@ -234,10 +276,12 @@ impl GitBranchListTool {
         let mut local_branches = Vec::new();
         let mut remote_branches = Vec::new();
 
-        let ref_platform = repo.references()
+        let ref_platform = repo
+            .references()
             .map_err(|e| GitToolError::Git(e.to_string()))?;
 
-        let local_iter = ref_platform.local_branches()
+        let local_iter = ref_platform
+            .local_branches()
             .map_err(|e| GitToolError::Git(e.to_string()))?;
         for reference in local_iter {
             let reference = match reference {
@@ -251,7 +295,8 @@ impl GitBranchListTool {
         }
 
         if git_input.remote {
-            let remote_iter = ref_platform.remote_branches()
+            let remote_iter = ref_platform
+                .remote_branches()
                 .map_err(|e| GitToolError::Git(e.to_string()))?;
             for reference in remote_iter {
                 let reference = match reference {
@@ -312,11 +357,19 @@ impl GitDiffTool {
 
 #[async_trait]
 impl AgentTool for GitDiffTool {
-    fn name(&self) -> &str { "git_diff" }
-    fn description(&self) -> &str { "Show changes (staged or unstaged)" }
-    fn parameters(&self) -> Value { tool_parameters!(GitDiffInput) }
+    fn name(&self) -> &str {
+        "git_diff"
+    }
+    fn description(&self) -> &str {
+        "Show changes (staged or unstaged)"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitDiffInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["staged", "max_lines"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["staged", "max_lines"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -324,13 +377,15 @@ impl AgentTool for GitDiffTool {
         }
     }
 
-    fn is_read_only(&self) -> bool { true }
+    fn is_read_only(&self) -> bool {
+        true
+    }
 }
 
 impl GitDiffTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitDiffInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitDiffInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
         let max_lines = git_input.max_lines.unwrap_or(200) as usize;
 
         let repo = discover_repo(&self.workspace_root)?;
@@ -339,7 +394,9 @@ impl GitDiffTool {
             .map_err(|e| GitToolError::Git(e.to_string()))?
             .untracked_files(gix::status::UntrackedFiles::Files);
 
-        let iter = platform.into_index_worktree_iter(Vec::<gix::bstr::BString>::new()).map_err(|e| GitToolError::Git(e.to_string()))?;
+        let iter = platform
+            .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
 
         let mut output = String::new();
         let mut line_count = 0;
@@ -362,9 +419,7 @@ impl GitDiffTool {
             line_count += 1;
 
             if line_count >= max_lines {
-                output.push_str(&format!(
-                    "\n... (truncated at {max_lines} entries)"
-                ));
+                output.push_str(&format!("\n... (truncated at {max_lines} entries)"));
                 break;
             }
         }
@@ -396,11 +451,19 @@ impl GitShowTool {
 
 #[async_trait]
 impl AgentTool for GitShowTool {
-    fn name(&self) -> &str { "git_show" }
-    fn description(&self) -> &str { "Show details of a specific commit" }
-    fn parameters(&self) -> Value { tool_parameters!(GitShowInput) }
+    fn name(&self) -> &str {
+        "git_show"
+    }
+    fn description(&self) -> &str {
+        "Show details of a specific commit"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitShowInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["revision"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["revision"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -408,21 +471,30 @@ impl AgentTool for GitShowTool {
         }
     }
 
-    fn is_read_only(&self) -> bool { true }
+    fn is_read_only(&self) -> bool {
+        true
+    }
 }
 
 impl GitShowTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitShowInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitShowInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let repo = discover_repo(&self.workspace_root)?;
-        let rev = repo.rev_parse_single(git_input.revision.as_str())
-            .map_err(|e| GitToolError::Git(format!("revision '{}' not found: {e}", git_input.revision)))?;
+        let rev = repo
+            .rev_parse_single(git_input.revision.as_str())
+            .map_err(|e| {
+                GitToolError::Git(format!("revision '{}' not found: {e}", git_input.revision))
+            })?;
 
         let obj = rev.object().map_err(|e| GitToolError::Git(e.to_string()))?;
-        let commit = obj.try_into_commit().map_err(|e| GitToolError::Git(e.to_string()))?;
-        let commit_ref = commit.decode().map_err(|e| GitToolError::Git(e.to_string()))?;
+        let commit = obj
+            .try_into_commit()
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
+        let commit_ref = commit
+            .decode()
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
         let author = commit_ref.author;
 
         let hex_str = commit.id().to_hex().to_string();
@@ -452,7 +524,11 @@ fn format_unix_timestamp(secs: u64) -> String {
     let min = (rem % 3600) / 60;
 
     let z = days as i64 + 719468;
-    let era = if z >= 0 { z / 146097 } else { (z - 146096) / 146097 };
+    let era = if z >= 0 {
+        z / 146097
+    } else {
+        (z - 146096) / 146097
+    };
     let doe = (z - era * 146097) as u64;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     let y = yoe as i64 + era * 400;
@@ -469,13 +545,13 @@ fn format_unix_timestamp(secs: u64) -> String {
 
 async fn get_workdir(workspace_root: &std::path::Path) -> Result<PathBuf, GitToolError> {
     let repo = discover_repo(workspace_root)?;
-    Ok(repo.work_dir().map(|p| p.to_path_buf()).unwrap_or_else(|| workspace_root.to_path_buf()))
+    Ok(repo
+        .work_dir()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| workspace_root.to_path_buf()))
 }
 
-async fn run_host_git(
-    workdir: &std::path::Path,
-    args: &[&str],
-) -> Result<String, GitToolError> {
+async fn run_host_git(workdir: &std::path::Path, args: &[&str]) -> Result<String, GitToolError> {
     let output = tokio::process::Command::new("git")
         .args(args)
         .current_dir(workdir)
@@ -523,11 +599,19 @@ impl GitAddTool {
 
 #[async_trait]
 impl AgentTool for GitAddTool {
-    fn name(&self) -> &str { "git_add" }
-    fn description(&self) -> &str { "Stage files for commit" }
-    fn parameters(&self) -> Value { tool_parameters!(GitAddInput) }
+    fn name(&self) -> &str {
+        "git_add"
+    }
+    fn description(&self) -> &str {
+        "Stage files for commit"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitAddInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["paths"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["paths"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -538,8 +622,8 @@ impl AgentTool for GitAddTool {
 
 impl GitAddTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitAddInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitAddInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         if git_input.paths.is_empty() {
             return Err(GitToolError::InvalidInput("paths cannot be empty".into()));
@@ -577,11 +661,19 @@ impl GitCommitTool {
 
 #[async_trait]
 impl AgentTool for GitCommitTool {
-    fn name(&self) -> &str { "git_commit" }
-    fn description(&self) -> &str { "Create a commit with a message" }
-    fn parameters(&self) -> Value { tool_parameters!(GitCommitInput) }
+    fn name(&self) -> &str {
+        "git_commit"
+    }
+    fn description(&self) -> &str {
+        "Create a commit with a message"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitCommitInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["message", "all"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["message", "all"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -592,8 +684,8 @@ impl AgentTool for GitCommitTool {
 
 impl GitCommitTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitCommitInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitCommitInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let workdir = get_workdir(&self.workspace_root).await?;
 
@@ -605,7 +697,11 @@ impl GitCommitTool {
         run_host_git(&workdir, &args).await?;
         let log_output = run_host_git(&workdir, &["rev-parse", "--short", "HEAD"]).await?;
         let short_sha = log_output.trim();
-        let first_line = git_input.message.lines().next().unwrap_or(&git_input.message);
+        let first_line = git_input
+            .message
+            .lines()
+            .next()
+            .unwrap_or(&git_input.message);
 
         Ok(format!("committed: {short_sha} {first_line}"))
     }
@@ -635,11 +731,19 @@ impl GitPushTool {
 
 #[async_trait]
 impl AgentTool for GitPushTool {
-    fn name(&self) -> &str { "git_push" }
-    fn description(&self) -> &str { "Push to remote repository" }
-    fn parameters(&self) -> Value { tool_parameters!(GitPushInput) }
+    fn name(&self) -> &str {
+        "git_push"
+    }
+    fn description(&self) -> &str {
+        "Push to remote repository"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitPushInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["remote", "branch", "force"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["remote", "branch", "force"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -654,8 +758,8 @@ impl AgentTool for GitPushTool {
 
 impl GitPushTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitPushInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitPushInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let workdir = get_workdir(&self.workspace_root).await?;
 
@@ -694,11 +798,19 @@ impl GitPullTool {
 
 #[async_trait]
 impl AgentTool for GitPullTool {
-    fn name(&self) -> &str { "git_pull" }
-    fn description(&self) -> &str { "Pull from remote repository" }
-    fn parameters(&self) -> Value { tool_parameters!(GitPullInput) }
+    fn name(&self) -> &str {
+        "git_pull"
+    }
+    fn description(&self) -> &str {
+        "Pull from remote repository"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitPullInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["remote"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["remote"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -713,8 +825,8 @@ impl AgentTool for GitPullTool {
 
 impl GitPullTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitPullInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitPullInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let workdir = get_workdir(&self.workspace_root).await?;
 
@@ -750,11 +862,19 @@ impl GitCheckoutTool {
 
 #[async_trait]
 impl AgentTool for GitCheckoutTool {
-    fn name(&self) -> &str { "git_checkout" }
-    fn description(&self) -> &str { "Switch branches" }
-    fn parameters(&self) -> Value { tool_parameters!(GitCheckoutInput) }
+    fn name(&self) -> &str {
+        "git_checkout"
+    }
+    fn description(&self) -> &str {
+        "Switch branches"
+    }
+    fn parameters(&self) -> Value {
+        tool_parameters!(GitCheckoutInput)
+    }
 
-    fn summary_fields(&self) -> &'static [&'static str] { &["branch", "create"] }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["branch", "create"]
+    }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -765,8 +885,8 @@ impl AgentTool for GitCheckoutTool {
 
 impl GitCheckoutTool {
     async fn execute_inner(&self, input: Value) -> Result<String, GitToolError> {
-        let git_input: GitCheckoutInput = serde_json::from_value(input)
-            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        let git_input: GitCheckoutInput =
+            serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
 
         let workdir = get_workdir(&self.workspace_root).await?;
 

@@ -134,7 +134,11 @@ impl ConversationEngine {
                     name: name.to_string(),
                 });
             }
-            AgentEvent::ToolCall { call, provenance, summary_fields } => {
+            AgentEvent::ToolCall {
+                call,
+                provenance,
+                summary_fields,
+            } => {
                 self.close_stream();
                 self.record_provenance(provenance);
                 self.messages.push(ChatMessage {
