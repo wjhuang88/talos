@@ -39,16 +39,13 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I030 Session Module Decomposition | Planned | [I030 Session Module Decomposition](iterations/I030-session-module-decomposition.md) | Complete ARCH-008; `talos-session/src/lib.rs` <=400 lines; session tests/clippy pass |
-| I031 Skill And CLI Module Cleanup | Planned | [I031 Skill And CLI Module Cleanup](iterations/I031-skill-and-cli-module-cleanup.md) | Complete ARCH-009 and CLI slice of ARCH-010; skill/CLI tests and clippy pass |
+| I031 Skill And CLI Module Cleanup | Planned (CLI slice remaining) | [I031 Skill And CLI Module Cleanup](iterations/I031-skill-and-cli-module-cleanup.md) | Extract CLI mode runners; talos-cli tests/clippy pass |
 | I032 Tools Module Cleanup | Planned | [I032 Tools Module Cleanup](iterations/I032-tools-module-cleanup.md) | Split file_tools; talos-tools tests/clippy and workspace tests pass |
 | I033 Runtime Skill Activation | Planned | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Discover skills at startup; inject Level 0 metadata; define Level 1/2 activation |
 | I034 MCP Session Integration | Planned | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | MCP startup discovery, tool registry injection, permission routing, provenance/status |
 | I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
-| ARCH-008 Session Module Decomposition | Planned | [ARCH-008](backlog/active/ARCH-008-session-module-decomposition.md) | Split talos-session/src/lib.rs (1737 lines) into session_actor, jsonl, topology modules |
-| ARCH-009 Skill Module Decomposition | Planned | [ARCH-009](backlog/active/ARCH-009-skill-module-decomposition.md) | Split talos-skill/src/lib.rs (1484 lines) into parser, manager, loader modules |
 | SKILL-001 Runtime Skill Activation | Planned | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | Discover skills at startup; inject Level 0 metadata; define Level 1/2 activation |
 | MCP-001 MCP Session Integration | Planned | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Discover configured MCP tools at startup; route through permissions and provenance |
 | ARCH-010 CLI and Tools Module Cleanup | Planned | [ARCH-010](backlog/active/ARCH-010-cli-tools-module-cleanup.md) | talos-cli/main.rs (1250 lines) + talos-tools/file_tools.rs (1308 lines) residual cleanup |
@@ -64,6 +61,9 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I029 Architecture Cleanup Completion | Complete | [I029 Architecture Cleanup](iterations/I029-architecture-cleanup-completion.md) | ARCH-004/007/006/005 all landed. 10345→2082 lines across 4 god modules (-80%). |
+| I030 Session Module Decomposition | Complete | [I030 Session Module Decomposition](iterations/I030-session-module-decomposition.md) | ARCH-008 landed: `talos-session/src/lib.rs` 1737→45 lines; session tests and clippy pass. |
+| ARCH-008 Session Module Decomposition | Complete | [ARCH-008](backlog/active/ARCH-008-session-module-decomposition.md) | error/types/jsonl/topology/manager/tests split landed; public `talos_session::*` imports preserved. |
+| ARCH-009 Skill Module Decomposition | Complete | [ARCH-009](backlog/active/ARCH-009-skill-module-decomposition.md) | error/types/token/parser/loader/manager/tests split landed; public `talos_skill::*` imports preserved. |
 | I027 ARCH-003 Crate Boundary Cleanup | Complete | [I027 Crate Boundary Cleanup](iterations/I027-crate-boundary-cleanup.md) | All 3 stories landed. |
 | I026 Approval UX + Git + Prompt Optimization | Complete | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | All 7 stories. |
 | TOOL-002 P0 Tool Calling Remediation | P0 Complete | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Schema in prompt, permission pipeline, agent message cleanup, streaming filter, format cleanup; P1-P2 residual in I025 |

@@ -45,6 +45,39 @@ Talos crates are introduced progressively across iterations (see Implementation 
 | `talos-rpc` | I009 | API layer for remote interaction and frontend integration. |
 | `talos-conversation` | I023 | Business logic layer between agent and TUI: owns conversation state, emits typed `UiOutput` events via async channels. |
 
+### Session Persistence Boundary
+
+`talos-session` is the persistence boundary for local conversation history and session indexes. Its
+public API is intentionally re-exported from `lib.rs`, while implementation details live in focused
+modules:
+
+| Module | Responsibility |
+|--------|----------------|
+| `types.rs` | Public session data types and in-memory branch helpers. |
+| `jsonl.rs` | Append-only JSONL source-of-truth persistence, replay, preview scanning, and compatibility reads for old JSONL lines. |
+| `topology.rs` | Workspace directory identity helpers for workspace-scoped session layout. |
+| `manager.rs` | `SessionManager` disk scanning, resume/list/search coordination, and lazy SQLite index access. |
+| `sqlite.rs` | SQLite FTS/session index implementation. |
+| `error.rs` | Session error surface. |
+
+The session actor (`AppServerSession`) is part of `talos-agent`; queue protocol types (`SessionOp`,
+`SessionEvent`, `SessionHandle`, `SessionConfig`) live in `talos-core::session`.
+
+### Skill Loading Boundary
+
+`talos-skill` owns SKILL.md parsing and progressive-disclosure loading. Runtime skill activation is
+handled by later agent/session integration work; this crate only provides the parsed and indexed
+skill data.
+
+| Module | Responsibility |
+|--------|----------------|
+| `types.rs` | Public skill data types and disclosure-level enum. |
+| `parser.rs` | Frontmatter splitting and validation for SKILL.md files. |
+| `loader.rs` | Filesystem discovery, SKILL.md parsing, default search-path construction, and Level 0 index generation. |
+| `manager.rs` | Progressive-disclosure cache: Level 0 index, Level 1 skill loading, Level 2 reference loading, trigger matching. |
+| `token.rs` | Lightweight token estimation for skill index budgeting. |
+| `error.rs` | Skill error surface. |
+
 ## Dependency Graph
 
 The architecture follows a strict hierarchy to prevent circular dependencies.
