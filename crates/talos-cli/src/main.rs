@@ -165,6 +165,14 @@ impl AgentTool for TuiPermissionAwareTool {
     fn is_read_only(&self) -> bool {
         self.inner.is_read_only()
     }
+
+    fn nature(&self) -> talos_core::tool::ToolNature {
+        self.inner.nature()
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        self.inner.summary_fields()
+    }
 }
 
 /// Runtime mode selection.
@@ -244,6 +252,14 @@ impl AgentTool for PermissionAwareTool {
 
     fn is_read_only(&self) -> bool {
         self.inner.is_read_only()
+    }
+
+    fn nature(&self) -> talos_core::tool::ToolNature {
+        self.inner.nature()
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        self.inner.summary_fields()
     }
 }
 
