@@ -1,146 +1,180 @@
 # Talos
 
-安全优先、精简内核的 Rust Agent 运行时。Talos 从 CLI 编码助手起步，正在收敛为完整的 Agent runtime：具备自进化、扩展接口、便携工具，以及更接近普通命令行的终端体验。
+[![Release](https://github.com/wjhuang88/talos/actions/workflows/release.yml/badge.svg)](https://github.com/wjhuang88/talos/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/wjhuang88/talos?include_prereleases)](https://github.com/wjhuang88/talos/releases)
+[![License](https://img.shields.io/github/license/wjhuang88/talos)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.95%2B-orange)](https://www.rust-lang.org/)
 
-**[English](README.md)** | 中文
+[English](README.md)
 
-## 当前状态
+Talos 是一个 Rust 原生的本地编码 Agent 运行时。它提供终端 UI、模型提供商适配、会话、内置工具、权限控制、Skills、MCP/RPC 集成和自进化钩子，同时保持核心边界清晰、默认安全。
 
-| 范围 | 状态 | 说明 |
-|------|------|------|
-| Runtime | Active | 12 个 crate 共 532 个测试通过。TTY 默认启动 Nord 主题 TUI；`--repl` 保留旧 readline 模式。 |
-| R1 Review Closure | Complete | I008/I009 已关闭；I009 TUI consumer 工作已延期到 #I009-S6；I010 R2 已完成，R3 产品打磨是下一步。 |
-| I008 Learning Agent | Complete | `EvolutionHookHandler` 已通过 hook 方式覆盖所有运行路径；运行时证据已记录。 |
-| I009 Extensible Agent | Complete | Hook、MCP client/server、JSON-RPC、`ToolProvenance` producer 已交付；TUI provenance marker 与 `/plugins` 延期到 #I009-S6。 |
-| I010 Polished Agent | Active (R3 planned) | R2 AppServerSession 收敛和 inline mode 已完成；R3 覆盖 TUI 打磨、Markdown、diff 和 slash commands。 |
-| I011 Open Providers | Paused | S1 OpenAI-compatible `base_url` override 已落地；S2 provider plugin architecture 暂缓。 |
-| I012 Portable Tools | Planned | Rust-native POSIX 基本工具子集 + 工具包嵌入接口，降低外部环境依赖。 |
+Talos 仍处于 1.0 之前的活跃开发阶段。核心 CLI/TUI、工具管线、Git 工具、会话、Skills、MCP/RPC 服务、模型配置、提示词缓存和工程治理流程已经可用。工程进度请查看[项目状态](#项目状态)中的链接。
 
-R0 已关闭权限安全、session index、fork identity、搜索高亮、process hardening 等架构修复项。详见 [R0 remediation](docs/iterations/R0-remediation-gate.md)。
+## 主要能力
 
-## 快速开始
+- **终端优先的 Agent 体验**：提供交互式 TUI，也支持脚本友好的 print 模式。
+- **Rust 原生核心**：基于 Cargo workspace 的小 crate 架构，边界明确。
+- **内置工具**：覆盖文件、搜索、编辑、Shell、符号索引、目录树、diff/stat 和 Git 操作。
+- **写操作权限控制**：文件写入、删除、Git 写操作和命令执行都会进入批准流程。
+- **模型提供商适配**：支持 Anthropic Messages、OpenAI Chat、OpenAI Responses 和 OpenAI 兼容网关。
+- **会话记忆**：基于 SQLite 的会话、搜索、摘要、分支和导出能力。
+- **可扩展性**：支持 Skills、Hooks、MCP 工具、RPC 服务和面向协议的扩展设计。
 
-```bash
-cargo build -p talos-cli
-```
+## 安装
 
-配置 provider token：
+### 下载 Release
 
-```bash
-export ANTHROPIC_API_KEY="<your key>"
-# 或
-export OPENAI_API_KEY="<your key>"
-```
-
-运行默认 TUI：
+从 [GitHub Releases](https://github.com/wjhuang88/talos/releases) 下载对应平台的压缩包，然后解压：
 
 ```bash
-cargo run -p talos-cli -- "help me inspect this repository"
+tar -xzf talos-aarch64-apple-darwin.tar.gz
+chmod +x talos
+./talos --help
 ```
 
-使用 print mode 获得更接近普通命令行的输出：
+Windows 发布包是 `.zip`，macOS 和 Linux 发布包是 `.tar.gz`。
+
+### 从源码构建
+
+环境要求：
+
+- Rust 1.95 或更新版本
+- Cargo
 
 ```bash
-cargo run -p talos-cli -- -p "summarize the project status"
+cargo build --release -p talos-cli
+./target/release/talos --help
 ```
 
-使用 OpenAI-compatible gateway：
+如需在本地构建全部发布产物：
+
+```bash
+./build.sh
+```
+
+多平台构建产物和校验和会写入 `dist/`。
+
+## 配置模型提供商
+
+Talos 从 `~/.talos/config.toml` 读取配置。密钥建议放在环境变量中。
+
+Anthropic 示例：
 
 ```toml
-# ~/.talos/config.toml
-provider = "openai"
-model = "your-model"
-base_url = "https://your-gateway.example.com/v1"
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[providers.anthropic]
+api_key_env = "ANTHROPIC_API_KEY"
 ```
+
+OpenAI 兼容网关示例：
+
+```toml
+provider = "my-gateway"
+model = "your-model"
+
+[providers.my-gateway]
+protocol = "openai-chat"
+base_url = "https://your-gateway.example.com/v1"
+api_key_env = "OPENAI_COMPAT_API_KEY"
+
+[providers.my-gateway.models.your-model]
+context_limit = 202752
+output_limit = 4096
+```
+
+启动 Talos 前设置对应的环境变量：
 
 ```bash
-export OPENAI_COMPAT_API_KEY="<your gateway key>"
-cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
+export ANTHROPIC_API_KEY="..."
 ```
 
-## 已具备能力
+## 运行 Talos
 
-- 文件和 Shell 操作通过权限管线执行。
-- JSONL 会话源数据 + bundled SQLite 搜索/索引。
-- `SKILL.md` 技能系统、渐进式披露和 prompt 集成。
-- Anthropic、OpenAI、OpenAI-compatible gateway 多模型支持。
-- 运行时自进化：观察 -> 积累 -> 提取 -> 应用。
-- 扩展接口：hook、MCP client/server、stdio JSON-RPC、typed tool provenance。
+在当前目录启动交互式 TUI：
 
-## 路线图
-
-| 迭代 | 代号 | 状态 | 结果 |
-|------|------|------|------|
-| I001-I007 | Foundation through Skilled Agent | Complete | CLI、工具、权限、TUI 基础、会话、SQLite 搜索、技能、多 provider。 |
-| R0 | Remediation Gate | Complete | 架构、安全、会话正确性问题关闭。 |
-| R1 | Review Closure | Complete | I008/I009 已关闭；I009 TUI consumer 工作延期到 #I009-S6。 |
-| I008 | Learning Agent | Complete | 运行时自进化通过 hook-based `EvolutionHookHandler` 覆盖所有路径。 |
-| I009 | Extensible Agent | Complete | Hook、MCP client/server、JSON-RPC、provenance producer 已交付。 |
-| I010 | Polished Agent | Active (R3 planned) | R2 Codex-like 终端体验已完成；R3 目标是发布级 TUI 工作流。 |
-| I011 | Open Providers | Paused | 可配置 OpenAI-compatible gateway 已交付；Provider 插件架构暂缓。 |
-| I012 | Portable Tools | Planned | 内置 POSIX-style 工具和工具包嵌入。 |
-
-项目按垂直切片推进：每轮迭代都应交付可运行、可测试的 `talos` 二进制。需求闭环见 [Requirement Convergence](docs/roadmap/REQUIREMENT-CONVERGENCE.md)。
-
-## 架构
-
-Talos 遵循简单内核、灵活扩展的设计：
-
-- **核心 crates**：config、provider、agent、CLI、共享协议/类型。
-- **扩展 crates**：tools、session、sandbox、permissions、TUI、skills、evolution、plugins、MCP、RPC。
-
-```text
-[ talos-cli / talos-rpc ]
-          |
-          v
-    [ talos-agent ]
-    /     |     \
-   v      v      v
-[tools][session][provider][permission][skill][plugin][mcp]
-   \      |      /           |           |      /     /
-    \     v     /            v           v     /     /
-     [ talos-core ] <-------------------------------'
-                      |
-                      v
-               [ talos-evolution ]
+```bash
+talos "inspect this repository"
 ```
 
-## 关键设计决策
+使用 print 模式执行一次性提示：
 
-- **流式优先**：LLM 通信围绕 SSE streaming 和双通道异步流构建。
-- **全链路安全**：工具调用必须经过权限、沙箱和审批策略。
-- **自进化是运行时能力**：学习是 runtime primitive，不是技能系统功能。见 [ADR-001](docs/decisions/001-runtime-self-evolution.md)。
-- **渐进式存储**：先 JSONL，需要 FTS/index/query 行为时引入 SQLite。见 [ADR-002](docs/decisions/002-local-storage-architecture.md)。
-- **内置 SQLite**：`rusqlite/bundled` 是已批准的存储例外；Talos 不依赖系统 SQLite。见 [ADR-008](docs/decisions/008-sqlite-bundled-storage.md)。
-- **工具来源追踪**：native 和 MCP-remote 工具有 typed provenance，服务后续 TUI/plugin/RPC consumer。见 [ADR-009](docs/decisions/009-tool-provenance.md)。
+```bash
+talos -p "summarize this repository"
+```
+
+显式指定工作区：
+
+```bash
+talos --workspace /path/to/project "analyze the current architecture"
+```
+
+使用 mock provider 做确定性的本地冒烟测试：
+
+```bash
+talos -p --mock "/mock-request summarize this repository"
+```
+
+## 内置能力
+
+Talos 自带一组面向编码 Agent 工作流的工具：
+
+- 文件和目录：`read`、`write`、`edit`、`delete`、`ls`、`tree`、`glob`
+- 搜索和检查：`grep`、`diff`、`stat`
+- 代码智能：`find_symbol`、`find_references`、`list_symbols`、`list_imports`
+- Git：`git_status`、`git_diff`、`git_log`、`git_show`、`git_branch_list`、`git_add`、`git_commit`、`git_push`、`git_pull`、`git_checkout`
+- Shell 兜底：`bash`
+
+默认提示词会要求模型优先使用内置工具，只有在原生工具无法覆盖任务时才使用 Shell 命令兜底。
+
+## 安全模型
+
+- 只读工作区工具可以免批准执行。
+- 文件写入、删除、Git 写操作和 Shell 执行会进入权限流程。
+- 工具展示优先显示工具定义声明的关键参数，而不是原始 JSON。
+- 本地密钥应放在环境变量或私有配置文件中，不应进入源码。
+- Talos 不会自动提交代码。Git 提交只会在用户或工具显式请求时发生。
+
+## 开发
+
+常用检查命令：
+
+```bash
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+cargo fmt --all
+```
+
+GitHub Release 工作流由 tag 触发：
+
+- 稳定版本：`v0.1.0`
+- 预发布版本：`v0.1.0-alpha.1`、`v0.1.0-beta.1`、`v0.1.0-rc.1`、`v0.1.0-pre.1`、`v0.1.0-dev.1`
+
+Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
+
+## 项目状态
+
+Talos 正从核心运行时实现阶段进入产品化加固阶段。当前工程状态不再放在 README 中维护，请查看项目治理文档：
+
+- [Board](docs/BOARD.md)：当前、Review 和下一步工作
+- [Implementation Roadmap](docs/roadmap/IMPLEMENTATION-ROADMAP.md)：阶段规划
+- [Product Backlog](docs/backlog/PRODUCT-BACKLOG.md)：需求和故事清单
+- [Iterations](docs/iterations/)：迭代记录和验收证据
 
 ## 文档
 
-项目治理由 [agent-project-governance](https://github.com/wjhuang88/agent-project-governance)
-skill 辅助建立和审计。
+| 主题 | 文档 |
+| --- | --- |
+| 架构 | [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) |
+| 参考项目 | [docs/reference/REFERENCE-PROJECTS.md](docs/reference/REFERENCE-PROJECTS.md) |
+| 决策记录 | [docs/decisions/](docs/decisions/) |
+| 本地开发 | [docs/sop/LOCAL-DEV.md](docs/sop/LOCAL-DEV.md) |
+| 测试策略 | [docs/sop/TESTING.md](docs/sop/TESTING.md) |
+| Git 工作流 | [docs/sop/GIT-WORKFLOW.md](docs/sop/GIT-WORKFLOW.md) |
 
-| 路径 | 用途 |
-|------|------|
-| [AGENTS.md](AGENTS.md) | Agent 编码指南、硬性约束、任务路由 |
-| [docs/README.md](docs/README.md) | 文档地图 |
-| [docs/roadmap/REQUIREMENT-CONVERGENCE.md](docs/roadmap/REQUIREMENT-CONVERGENCE.md) | 需求到实现的闭环追踪 |
-| [docs/roadmap/IMPLEMENTATION-ROADMAP.md](docs/roadmap/IMPLEMENTATION-ROADMAP.md) | 迭代计划和执行顺序 |
-| [docs/backlog/PRODUCT-BACKLOG.md](docs/backlog/PRODUCT-BACKLOG.md) | 用户故事、验收标准、计划工作 |
-| [docs/iterations/](docs/iterations/) | 迭代计划、状态、执行证据 |
-| [docs/decisions/](docs/decisions/) | 架构决策记录（ADR） |
-| [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) | 完整架构参考 |
+## License
 
-## 技术栈
-
-| 层 | 选择 |
-|----|------|
-| 语言 | Rust stable, edition 2024 |
-| 异步 | tokio |
-| 序列化 | serde + schemars |
-| 错误处理 | library 使用 thiserror，CLI 使用 anyhow |
-| 存储 | JSONL、TOML、SQLite via `rusqlite/bundled` |
-| TUI | ratatui + crossterm |
-
-## 许可证
-
-基于 [Apache License 2.0](LICENSE) 许可。
+Talos 使用 [Apache License 2.0](LICENSE) 授权。
