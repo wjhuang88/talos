@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| (no active iteration — see Next for candidates) | — | — | Pick next from BOARD Next after I027 closure |
+| I028 Delayed and Scheduled Task Execution | Planned → activation pending | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; no external deps |
 
 ## Review
 
