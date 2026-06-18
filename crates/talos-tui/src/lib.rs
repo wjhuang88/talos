@@ -4,11 +4,13 @@ pub mod evolution;
 mod export;
 mod highlight;
 mod inline_terminal;
+mod scrollback;
 mod sidebar;
 mod splash;
 mod state;
 mod stream_markdown;
 mod theme;
+mod tool_display;
 mod widgets;
 
 pub use app::Tui;

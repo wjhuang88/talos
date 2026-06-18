@@ -7,7 +7,7 @@ mod tests {
     use talos_core::ApprovalChoice;
     use talos_core::message::Usage;
 
-    use crate::app::{
+    use crate::scrollback::{
         build_input_text, build_status_text, calculate_cost, cursor_line_col, input_line_count,
         stream_padding_for,
     };
