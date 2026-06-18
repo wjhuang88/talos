@@ -49,9 +49,15 @@ use talos_provider::AnthropicProvider;
 use talos_provider::openai::OpenAIProvider;
 use talos_rpc::RpcServer;
 use talos_session::{IndexError, Session, SessionInfo, SessionManager};
+use talos_tools::git::{
+    GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
+    GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
+};
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
-use talos_tools::git::{GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool, GitPullTool, GitPushTool, GitShowTool, GitStatusTool};
-use talos_tools::{BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool, TreeTool, WriteTool};
+use talos_tools::{
+    BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool,
+    TreeTool, WriteTool,
+};
 use talos_tui::Tui;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -82,7 +88,12 @@ impl TuiApprovalHandler {
         }
     }
 
-    async fn request_approval(&self, tool_name: &str, input: &serde_json::Value) -> ApprovalChoice {
+    async fn request_approval(
+        &self,
+        tool_name: &str,
+        input: &serde_json::Value,
+        summary_fields: Vec<String>,
+    ) -> ApprovalChoice {
         let decision = {
             let engine = self.engine.lock().expect("engine lock poisoned");
             engine.evaluate(tool_name, input)
@@ -91,14 +102,14 @@ impl TuiApprovalHandler {
             talos_permission::PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
             talos_permission::PermissionDecision::Deny(_) => ApprovalChoice::Deny,
             talos_permission::PermissionDecision::Ask => {
-                let formatted = ApprovalPrompt::format_input(input);
                 let (response_tx, response_rx) = tokio::sync::oneshot::channel();
 
                 if self
                     .ui_output_tx
                     .send(UiOutput::ToolApprovalRequest {
                         tool_name: tool_name.to_string(),
-                        arguments: formatted,
+                        arguments: input.clone(),
+                        summary_fields,
                         response: response_tx,
                     })
                     .is_err()
@@ -150,7 +161,16 @@ impl AgentTool for TuiPermissionAwareTool {
 
     async fn execute(&self, input: Value) -> ToolResult {
         let tool_name = self.inner.name().to_owned();
-        let choice = self.approval.request_approval(&tool_name, &input).await;
+        let summary_fields = self
+            .inner
+            .summary_fields()
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect();
+        let choice = self
+            .approval
+            .request_approval(&tool_name, &input, summary_fields)
+            .await;
 
         match choice {
             ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
@@ -938,7 +958,10 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     // Unified UiOutput channel: tools, results, AND approval requests all flow here
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
-    let approval_handler = Arc::new(TuiApprovalHandler::new(ui_output_tx.clone(), workspace_root.clone()));
+    let approval_handler = Arc::new(TuiApprovalHandler::new(
+        ui_output_tx.clone(),
+        workspace_root.clone(),
+    ));
 
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);

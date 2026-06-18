@@ -51,6 +51,9 @@
 //! assert!(prompt.contains("# Skills"));
 //! ```
 
+use std::collections::HashMap;
+
+use talos_core::message::{SystemCacheMarker, SystemCacheType};
 use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
 use talos_skill::SkillIndex;
 
@@ -108,6 +111,31 @@ pub struct CacheMarker {
     pub cache_type: CacheType,
 }
 
+impl From<CacheMarker> for SystemCacheMarker {
+    fn from(marker: CacheMarker) -> Self {
+        let cache_type = match marker.cache_type {
+            CacheType::Ephemeral => SystemCacheType::Ephemeral,
+        };
+        Self {
+            offset: marker.offset,
+            length: marker.length,
+            cache_type,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PromptSectionKind {
+    Cacheable,
+    Dynamic,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PromptSection {
+    text: String,
+    kind: PromptSectionKind,
+}
+
 /// Builder for assembling a system prompt from multiple components.
 ///
 /// The builder uses a fluent API to configure each component of the system
@@ -149,6 +177,8 @@ pub struct SystemPromptBuilder {
     /// Appended to the end of the prompt when provided.
     append_prompt: Option<String>,
     tool_call_format: &'static str,
+    /// Runtime template values used for `{{slot}}` substitution.
+    template_vars: HashMap<String, String>,
 }
 
 impl SystemPromptBuilder {
@@ -158,6 +188,16 @@ impl SystemPromptBuilder {
     /// configure tools, skills, context files, and other components.
     #[must_use]
     pub fn new() -> Self {
+        let mut template_vars = HashMap::new();
+        template_vars.insert(
+            "workspace_info".to_string(),
+            "Workspace information unavailable.".to_string(),
+        );
+        template_vars.insert(
+            "model_info".to_string(),
+            "Provider model metadata unavailable.".to_string(),
+        );
+
         Self {
             identity: DEFAULT_IDENTITY.to_string(),
             tools: Vec::new(),
@@ -167,6 +207,7 @@ impl SystemPromptBuilder {
             custom_prompt: None,
             append_prompt: None,
             tool_call_format: "",
+            template_vars,
         }
     }
 
@@ -178,6 +219,25 @@ impl SystemPromptBuilder {
     pub fn with_tool_format(mut self, format: &'static str) -> Self {
         self.tool_call_format = format;
         self
+    }
+
+    /// Sets a template slot value for `{{slot}}` substitution.
+    #[must_use]
+    pub fn with_template_var(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.template_vars.insert(key.into(), value.into());
+        self
+    }
+
+    /// Sets workspace information for the default identity template.
+    #[must_use]
+    pub fn with_workspace_info(self, value: impl Into<String>) -> Self {
+        self.with_template_var("workspace_info", value)
+    }
+
+    /// Sets model information for the default identity template.
+    #[must_use]
+    pub fn with_model_info(self, value: impl Into<String>) -> Self {
+        self.with_template_var("model_info", value)
     }
 
     /// Sets the tool descriptions for inclusion in the system prompt.
@@ -250,34 +310,58 @@ impl SystemPromptBuilder {
         self.append_prompt = prompt;
     }
 
-    /// Assembles and returns the final system prompt as a string.
-    ///
-    /// Components are assembled in the optimal order for caching:
-    /// 1. Identity (or custom prompt if provided)
-    /// 2. Tools (sorted by name)
-    /// 3. Skill index
-    /// 4. Context files
-    /// 5. User preferences
-    /// 6. Append prompt (if provided)
-    ///
-    /// Empty components are omitted from the output.
-    #[must_use]
-    pub fn build(&self) -> String {
-        let mut parts: Vec<String> = Vec::new();
-
-        // 1. Identity or custom prompt
-        if let Some(ref custom) = self.custom_prompt {
-            parts.push(format!("# Identity\n{custom}\n"));
-        } else {
-            parts.push(format!("# Identity\n{}\n", self.identity));
+    fn render_template(&self, template: &str, extra_vars: &[(&str, String)]) -> String {
+        let mut rendered = template.to_string();
+        let mut vars = self.template_vars.clone();
+        for (key, value) in extra_vars {
+            vars.insert((*key).to_string(), value.clone());
         }
 
-        // 2. Tools
+        for (key, value) in vars {
+            rendered = rendered.replace(&format!("{{{{{key}}}}}"), &value);
+        }
+        rendered
+    }
+
+    fn current_datetime() -> String {
+        let seconds = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0);
+        format!("unix_seconds={seconds}")
+    }
+
+    fn tool_protocol_hint(&self) -> String {
+        if self.tool_call_format.is_empty() {
+            "Native tool calling is enabled. Use provider-native tool calls; do not emit textual tool-call JSON unless the provider requires a fallback.".to_string()
+        } else {
+            self.tool_call_format.trim().to_string()
+        }
+    }
+
+    fn prompt_sections(&self) -> Vec<PromptSection> {
+        let mut sections: Vec<PromptSection> = Vec::new();
+
+        let stable_vars = [("tool_protocol_hint", self.tool_protocol_hint())];
+
+        let identity = if let Some(ref custom) = self.custom_prompt {
+            self.render_template(custom, &stable_vars)
+        } else {
+            self.render_template(&self.identity, &stable_vars)
+        };
+        sections.push(PromptSection {
+            text: format!("# Identity\n{identity}\n"),
+            kind: PromptSectionKind::Cacheable,
+        });
+
         let mut sorted_tools: Vec<&ToolDescription> = self.tools.iter().collect();
         sorted_tools.sort_by(|a, b| a.name.cmp(&b.name));
 
         if sorted_tools.is_empty() {
-            parts.push(String::from("# Tools\nNo tools available.\n"));
+            sections.push(PromptSection {
+                text: String::from("# Tools\nNo tools available.\n"),
+                kind: PromptSectionKind::Cacheable,
+            });
         } else {
             let mut tools_section = String::from("# Tools\n");
             for tool in &sorted_tools {
@@ -311,46 +395,89 @@ impl SystemPromptBuilder {
                 }
                 tools_section.push('\n');
             }
-            if !self.tool_call_format.is_empty() {
-                tools_section.push_str(self.tool_call_format);
-            }
-            parts.push(tools_section);
+            sections.push(PromptSection {
+                text: tools_section,
+                kind: PromptSectionKind::Cacheable,
+            });
         }
 
-        // 3. Skill index
         if self.skill_index.is_empty() {
-            parts.push(String::from("# Skills\nNo skills available.\n"));
+            sections.push(PromptSection {
+                text: String::from("# Skills\nNo skills available.\n"),
+                kind: PromptSectionKind::Cacheable,
+            });
         } else {
             let mut skills_section = String::from("# Skills\n");
             for skill in &self.skill_index {
                 skills_section.push_str(&format!("- **{}**: {}\n", skill.name, skill.description));
             }
             skills_section.push('\n');
-            parts.push(skills_section);
+            sections.push(PromptSection {
+                text: skills_section,
+                kind: PromptSectionKind::Cacheable,
+            });
         }
 
-        // 4. Context files
         if self.context_files.is_empty() {
-            parts.push(String::from("# Context\nNo context files loaded.\n"));
+            sections.push(PromptSection {
+                text: String::from("# Context\nNo context files loaded.\n"),
+                kind: PromptSectionKind::Dynamic,
+            });
         } else {
             let mut context_section = String::from("# Context\n");
             for file in &self.context_files {
                 context_section.push_str(&format!("--- {} ---\n{}\n\n", file.path, file.content));
             }
-            parts.push(context_section);
+            sections.push(PromptSection {
+                text: context_section,
+                kind: PromptSectionKind::Dynamic,
+            });
         }
 
-        // 5. User preferences
         if !self.user_preferences.is_empty() {
-            parts.push(format!("# User Preferences\n{}\n", self.user_preferences));
+            sections.push(PromptSection {
+                text: format!("# User Preferences\n{}\n", self.user_preferences),
+                kind: PromptSectionKind::Dynamic,
+            });
         }
 
-        // 6. Append prompt
+        let runtime_section = self.render_template(
+            "# Runtime Context\nCurrent datetime: {{datetime}}\n",
+            &[("datetime", Self::current_datetime())],
+        );
+        sections.push(PromptSection {
+            text: runtime_section,
+            kind: PromptSectionKind::Dynamic,
+        });
+
         if let Some(ref append) = self.append_prompt {
-            parts.push(format!("# Additional Instructions\n{append}\n"));
+            sections.push(PromptSection {
+                text: format!("# Additional Instructions\n{append}\n"),
+                kind: PromptSectionKind::Dynamic,
+            });
         }
 
-        parts.join("\n")
+        sections
+    }
+
+    /// Assembles and returns the final system prompt as a string.
+    ///
+    /// Components are assembled in the optimal order for caching:
+    /// 1. Identity (or custom prompt if provided)
+    /// 2. Tools (sorted by name)
+    /// 3. Skill index
+    /// 4. Context files
+    /// 5. User preferences
+    /// 6. Append prompt (if provided)
+    ///
+    /// Empty components are omitted from the output.
+    #[must_use]
+    pub fn build(&self) -> String {
+        self.prompt_sections()
+            .into_iter()
+            .map(|section| section.text)
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Assembles the system prompt and emits the `OnSystemPromptBuilt` hook.
@@ -361,8 +488,9 @@ impl SystemPromptBuilder {
         &self,
         hook_registry: &HookRegistry,
         ctx: &HookContext,
-    ) -> Result<String, String> {
-        let prompt = self.build();
+    ) -> Result<(String, Vec<SystemCacheMarker>), String> {
+        let (prompt, markers) = self.build_with_cache_markers();
+        let original_prompt = prompt.clone();
         let outcome = hook_registry
             .dispatch(ctx, HookEvent::OnSystemPromptBuilt { prompt: &prompt })
             .await;
@@ -370,10 +498,18 @@ impl SystemPromptBuilder {
         match outcome {
             HookOutcome::Continue(HookEvent::OnSystemPromptBuilt { prompt })
             | HookOutcome::Skip(HookEvent::OnSystemPromptBuilt { prompt }) => {
-                Ok(prompt.to_string())
+                let prompt = prompt.to_string();
+                let markers = if prompt == original_prompt {
+                    markers.into_iter().map(Into::into).collect()
+                } else {
+                    Vec::new()
+                };
+                Ok((prompt, markers))
             }
             HookOutcome::Deny { reason, .. } => Err(reason),
-            HookOutcome::Continue(_) | HookOutcome::Skip(_) => Ok(prompt),
+            HookOutcome::Continue(_) | HookOutcome::Skip(_) => {
+                Ok((prompt, markers.into_iter().map(Into::into).collect()))
+            }
         }
     }
 
@@ -391,72 +527,24 @@ impl SystemPromptBuilder {
     /// append prompt are not marked for caching.
     #[must_use]
     pub fn build_with_cache_markers(&self) -> (String, Vec<CacheMarker>) {
-        let prompt = self.build();
         let mut markers: Vec<CacheMarker> = Vec::new();
-        let mut offset: usize = 0;
+        let sections = self.prompt_sections();
+        let mut prompt = String::new();
 
-        // Marker 1: Identity section
-        let identity_header = "# Identity\n";
-        if let Some(ref custom) = self.custom_prompt {
-            let section_len = identity_header.len() + custom.len() + 1; // +1 for trailing \n
-            markers.push(CacheMarker {
-                offset,
-                length: section_len,
-                cache_type: CacheType::Ephemeral,
-            });
-            offset += section_len;
-        } else {
-            let section_len = identity_header.len() + self.identity.len() + 1;
-            markers.push(CacheMarker {
-                offset,
-                length: section_len,
-                cache_type: CacheType::Ephemeral,
-            });
-            offset += section_len;
-        }
-
-        // Skip the separator \n between sections
-        offset += 1;
-
-        // Marker 2: Tools section
-        let tools_header = "# Tools\n";
-        let tools_len = if self.tools.is_empty() {
-            tools_header.len() + "No tools available.\n".len()
-        } else {
-            let built = self.build();
-            let tools_start = built.find("# Tools\n").unwrap_or(0);
-            let tools_end = built
-                .find("# Skills\n")
-                .or_else(|| built.find("# Context\n"))
-                .unwrap_or(built.len());
-            built[tools_start..tools_end].len()
-        };
-        markers.push(CacheMarker {
-            offset,
-            length: tools_len,
-            cache_type: CacheType::Ephemeral,
-        });
-        offset += tools_len;
-
-        // Skip the separator \n between sections
-        offset += 1;
-
-        // Marker 3: Skill index section
-        let skills_header = "# Skills\n";
-        let skills_len = if self.skill_index.is_empty() {
-            skills_header.len() + "No skills available.\n".len()
-        } else {
-            let mut len = skills_header.len();
-            for skill in &self.skill_index {
-                len += format!("- **{}**: {}\n", skill.name, skill.description).len();
+        for (index, section) in sections.iter().enumerate() {
+            if index > 0 {
+                prompt.push('\n');
             }
-            len + 1 // +1 for trailing \n
-        };
-        markers.push(CacheMarker {
-            offset,
-            length: skills_len,
-            cache_type: CacheType::Ephemeral,
-        });
+            let offset = prompt.len();
+            prompt.push_str(&section.text);
+            if section.kind == PromptSectionKind::Cacheable {
+                markers.push(CacheMarker {
+                    offset,
+                    length: section.text.len(),
+                    cache_type: CacheType::Ephemeral,
+                });
+            }
+        }
 
         (prompt, markers)
     }
@@ -642,6 +730,45 @@ mod tests {
 
         assert!(prompt.contains("# Skills"));
         assert!(prompt.contains("test-skill"));
+    }
+
+    #[test]
+    fn test_identity_template_slots_are_rendered() {
+        let builder = SystemPromptBuilder::new()
+            .with_template_var("custom_slot", "custom value")
+            .with_workspace_info("Workspace root: /repo")
+            .with_model_info("Model: test-model")
+            .with_custom_prompt(
+                "{{workspace_info}}\n{{model_info}}\n{{tool_protocol_hint}}\n{{custom_slot}}"
+                    .into(),
+            );
+
+        let prompt = builder.build();
+
+        assert!(prompt.contains("Workspace root: /repo"));
+        assert!(prompt.contains("Model: test-model"));
+        assert!(prompt.contains("Native tool calling is enabled"));
+        assert!(prompt.contains("custom value"));
+        assert!(!prompt.contains("{{workspace_info}}"));
+        assert!(!prompt.contains("{{model_info}}"));
+        assert!(!prompt.contains("{{tool_protocol_hint}}"));
+    }
+
+    #[test]
+    fn test_datetime_lives_after_cache_markers() {
+        let builder = SystemPromptBuilder::new();
+        let (prompt, markers) = builder.build_with_cache_markers();
+
+        let runtime_pos = prompt
+            .find("# Runtime Context")
+            .expect("runtime context should be present");
+        assert!(prompt.contains("Current datetime: unix_seconds="));
+        for marker in markers {
+            assert!(
+                marker.offset + marker.length <= runtime_pos,
+                "cache marker must not include dynamic datetime section"
+            );
+        }
     }
 
     #[test]

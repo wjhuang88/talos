@@ -302,7 +302,7 @@ TUI handles `ToolStreamChunk` by appending `text` to a pending tool result area.
 
 ## Bug: Approval-Tool Call Ordering and Visual Association
 
-**Status**: Planned — Bug documented, not yet fixed
+**Status**: Complete in I026
 **Priority**: P1
 
 ### Problem
@@ -368,24 +368,33 @@ However, ordering is STILL wrong because:
 Result: all ToolCall lines appear first, then approvals, then results — not interleaved
 per-tool.
 
-### Required Fix (Deferred)
+### Implemented Fix (2026-06-18)
 
-The fix requires changing WHEN ToolCall events are emitted:
+The fix changes WHEN `AgentEvent::ToolCall` is emitted to the UI:
 
-- **Option A**: Agent buffers ToolCall events during streaming, emits them right before
-  each tool executes (one at a time, paired with its ToolResult)
-- **Option B**: Route ToolApprovalRequest through the conversation engine (same hop as
-  ToolCall/ToolResult) to guarantee FIFO ordering
-- **Option C**: Restructure execution to emit ToolCall → execute → ToolResult sequentially
-  for write tools, instead of collect-all → execute-all → emit-all
+- During provider streaming, `Agent` collects tool calls but does **not** forward full
+  `AgentEvent::ToolCall` display events to the UI.
+- In `run_streaming()` only, execution emits each `ToolCall` immediately before that tool is
+  executed, then emits its `ToolResult` immediately after observation.
+- Permission approval still occurs inside `execute_single_tool()`, so the TUI receives:
+  `ToolCall -> ToolApprovalRequest(if Ask) -> ToolResult` for each tool.
+- Non-streaming `Agent::run()` keeps the existing read-only concurrency path; the ordering fix is
+  scoped to the UI event stream where visual association matters.
 
-This is an architectural change to the agent's event flow. Not a quick fix.
+This implements the documented Option A/C without adding another UI channel and preserves the
+single-consumer event-loop boundary from ADR-006.
 
 ### Acceptance Criteria
 
-- [ ] Approval prompt appears immediately after the tool call line
-- [ ] Visual association between tool call and its approval is clear
-- [ ] Multi-tool batches show approval per-tool, not batched at the end
-- [ ] Approved/denied result shown inline before next tool call
-- [ ] No regression for auto-allowed tools (read-only tools skip approval entirely)
-- `prompts/tool_calling_strict.txt`
+- [x] Approval prompt appears immediately after the tool call line
+- [x] Visual association between tool call and its approval is clear
+- [x] Multi-tool batches show approval per-tool, not batched at the end
+- [x] Approved/denied result shown inline before next tool call
+- [x] No regression for auto-allowed tools (read-only tools skip approval entirely)
+
+### Verification
+
+- `cargo test -p talos-agent test_streaming_tool_events_are_interleaved_per_tool` — passed.
+- `cargo test -p talos-agent` — passed.
+- `cargo test -p talos-conversation` — passed.
+- `cargo test -p talos-tui` — passed.

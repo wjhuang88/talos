@@ -287,7 +287,7 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
     let openai_messages: Vec<OpenAIMessage> = messages
         .iter()
         .map(|msg| match msg {
-            Message::System { content } => OpenAIMessage {
+            Message::System { content, .. } => OpenAIMessage {
                 role: "system".into(),
                 content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
                 tool_calls: None,
@@ -450,8 +450,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         .send(AgentEvent::ToolCall {
                             call,
                             provenance: ToolProvenance::Native,
-                        summary_fields: vec![],
-                    })
+                            summary_fields: vec![],
+                        })
                         .await;
                 }
                 let _ = tx
@@ -566,8 +566,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         .send(AgentEvent::ToolCall {
                             call,
                             provenance: ToolProvenance::Native,
-                        summary_fields: vec![],
-                    })
+                            summary_fields: vec![],
+                        })
                         .await;
                 }
 
@@ -594,8 +594,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             .send(AgentEvent::ToolCall {
                 call,
                 provenance: ToolProvenance::Native,
-            summary_fields: vec![],
-                    })
+                summary_fields: vec![],
+            })
             .await;
     }
 
@@ -669,6 +669,24 @@ mod tests {
         assert_eq!(body["stream"], true);
         assert_eq!(body["messages"][0]["role"], "user");
         assert_eq!(body["messages"][0]["content"], "Hello");
+    }
+
+    #[test]
+    fn build_request_body_keeps_system_message_first() {
+        let messages = vec![
+            Message::System {
+                content: "Stable system prompt".into(),
+                cache_markers: Vec::new(),
+            },
+            Message::User {
+                content: "Hello".into(),
+            },
+        ];
+        let body = build_request_body("gpt-4o", &messages, &[]);
+
+        assert_eq!(body["messages"][0]["role"], "system");
+        assert_eq!(body["messages"][0]["content"], "Stable system prompt");
+        assert_eq!(body["messages"][1]["role"], "user");
     }
 
     #[test]

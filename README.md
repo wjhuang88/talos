@@ -24,6 +24,7 @@ English | **[中文](README.zh-CN.md)**
 | I021 Evolution Realignment | Complete | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits realigned `talos-evolution` with the MenteDB blueprint; 7470ac5 byte-cap stays as defense-in-depth. |
 | I022 TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
 | I023 TUI State Model | Complete | Event-driven architecture: `talos-conversation` crate owns business logic, `talos-tui` owns pure UI state. Two-loop design with typed async channels. Codex-style single-row history insertion with styled scrollback, 3-column line padding, Nord-themed multiline user message blocks with top/bottom padding, single-row preview with Markdown block classification and conservative styled Markdown rendering, animated braille spinner, native cursor sync. Non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback. 114 focused TUI+conversation tests pass. |
+| I026 Approval UX + Git + Prompt Optimization | Review | Approval/tool-call ordering fixed in the streamed UI event flow. Built-in Git tools delivered. Dynamic prompt template slots and Anthropic cache-control emission landed. |
 
 Recent remediation work closed R0 architecture findings around permission safety,
 session index correctness, fork identity, search highlighting, and process hardening.
@@ -118,7 +119,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 ## What Works
 
 - Safe file and shell operations through the permission pipeline.
-- 12 built-in tools: bash, read (with offset/limit), write, edit, delete, grep, glob, ls (with long format), find_symbol, find_references, list_symbols, list_imports.
+- 25 built-in tools: bash, read (with offset/limit), write, edit, delete, grep, glob, ls (with long format), diff, stat, tree, find_symbol, find_references, list_symbols, list_imports, git_status, git_diff, git_log, git_show, git_branch_list, git_add, git_commit, git_push, git_pull, git_checkout.
 - Workspace-aware permissions: read-only tools auto-allowed in workspace; write/execute require approval.
 - System prompt guides the LLM to prefer dedicated tools over bash for file operations.
 - Session storage with JSONL source-of-truth and bundled SQLite search/indexing.
@@ -147,7 +148,7 @@ cargo run -p talos-cli -- -p "用中文回答: 1+1=?"
 | I022 | TUI Inline-by-Default | Complete | Codex-style inline-by-default TUI: fixed 4-line viewport, real-time scrollback flush, status bar tips with TTL. 127 TUI tests pass. |
 | I023 | TUI State Model | Complete | Event-driven `talos-conversation` + `talos-tui` state model, styled multiline scrollback, Markdown block classification and conservative styled rendering, spinner, cursor sync. Non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback. |
 | I025 | Tool Pipeline Completion | Complete | TOOL-002 P1-P2 residual (schema validation, dedup), TOOL-003 P1 (diff, stat), fence info-string fix, Mermaid code block rendering (mermaid-text), ToolNature attribute replacing name-based permission matching. |
-| I026 | Approval UX Fix + Doc Validation | Active | Fix approval-tool call ordering so approval shows inline after each tool call. Validate all project docs against actual implementation (ARCH-002 Phase 1). |
+| I026 | Approval UX + Git + Prompt Optimization | Review | Approval/tool-call ordering fixed in streamed UI events; read/write Git tools delivered; dynamic prompt template slots and Anthropic cache-control emission landed; active owner docs synchronized. |
 
 Implementation follows vertical slices: every iteration should produce a runnable,
 testable `talos` binary. Requirement closure is tracked in

@@ -9,7 +9,7 @@ through structured tool calls.
 
 ## Status
 
-Planned. Selected into a future iteration.
+P0-P2 complete in I026. P3 advanced operations remain planned.
 
 ## Priority
 
@@ -34,7 +34,7 @@ The agent currently relies on `bash git ...` for all Git operations. This has th
 
 ## Proposed Tool Set
 
-### P0 — Read-Only (Auto-Allow in Workspace)
+### P0 — Read-Only (Auto-Allow in Workspace) — Complete
 
 #### 1. `git_status`
 
@@ -91,7 +91,7 @@ List branches.
 | **Output** | One branch per line, `*` marks current: `* main` / `  feature/x` |
 | **Implementation** | `gix` reference API |
 
-### P1 — Navigation (Ask)
+### P1 — Navigation (Ask) — Partial Complete
 
 #### 6. `git_checkout`
 
@@ -104,6 +104,9 @@ Switch branches or restore files.
 | **Output** | `switched to branch {branch}` |
 | **Implementation** | `gix` checkout API (if supported) or host `git checkout` fallback |
 
+Delivered in I026 via host `git checkout` fallback because `gix` does not provide porcelain
+checkout/switch orchestration.
+
 #### 7. `git_stash_list`
 
 List stashed changes.
@@ -115,7 +118,9 @@ List stashed changes.
 | **Output** | One line per stash: `stash@{0}: WIP on main: a1b2c3d message` |
 | **Implementation** | `gix` stash reading or host fallback |
 
-### P2 — Write Operations (Ask, Destructive)
+Not delivered in I026. Remains future scope.
+
+### P2 — Write Operations (Ask, Destructive) — Complete
 
 #### 8. `git_add`
 
@@ -225,11 +230,15 @@ Operations using host `git` fallback:
 - `git_checkout` — no gix checkout orchestration
 - `git_push` — gix has no push support
 - `git_pull` — gix fetch works, but no worktree update after fetch
-- `git_stash_list` — gix stash is placeholder
+- `git_stash_list` — gix stash is placeholder (not delivered in I026)
 
 Operations using native `gix`:
 - `git_add` — via `gix::index` manipulation
 - `git_commit` — via `gix::Repository::commit()`
+
+I026 implementation note: `git_add` and `git_commit` are delivered through the same structured
+host-git adapter as the other write operations while native gix write orchestration remains under
+evaluation. The externally visible contract stays explicit, permission-gated, and shell-free.
 
 ### Phase 3: gix Migration (Future)
 
@@ -256,6 +265,19 @@ to `gix` implementations. Track gix releases for:
 | git_pull | Execute | Ask | Network + modifies working tree |
 
 All tools will use the `ToolNature` attribute (from I025 S5) for permission classification.
+
+## Delivered in I026
+
+- `git_status`
+- `git_diff`
+- `git_log`
+- `git_show`
+- `git_branch_list`
+- `git_add`
+- `git_commit`
+- `git_push`
+- `git_pull`
+- `git_checkout`
 
 ## Design Constraints
 

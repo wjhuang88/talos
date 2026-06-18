@@ -85,13 +85,19 @@ pub struct StreamMessage {
 pub enum UiOutput {
     Stream(StreamMessage),
     Status(StatusSnapshot),
-    Tip { text: String, kind: TipKind },
-    ToolCallStarted { name: String },
+    Tip {
+        text: String,
+        kind: TipKind,
+    },
+    ToolCallStarted {
+        name: String,
+    },
     ToolCall(ToolCallDisplay),
     ToolResult(ToolResultDisplay),
     ToolApprovalRequest {
         tool_name: String,
-        arguments: String,
+        arguments: serde_json::Value,
+        summary_fields: Vec<String>,
         response: tokio::sync::oneshot::Sender<talos_core::ApprovalChoice>,
     },
     Exit,

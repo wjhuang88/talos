@@ -33,7 +33,9 @@ use talos_core::message::{
     AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult, Usage,
 };
 use talos_core::provider::{LanguageModel, ProviderError};
-use talos_core::tool::{ToolProtocol, ToolRegistry, ToolResult as ToolExecutionResult};
+use talos_core::tool::{
+    ToolProtocol, ToolProvenance, ToolRegistry, ToolResult as ToolExecutionResult,
+};
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnEndReason,
@@ -57,6 +59,12 @@ const MAX_CONCURRENT_READ_ONLY: usize = 10;
 /// Threshold for doom loop detection — same tool+args this many times triggers
 /// an early stop.
 const DOOM_LOOP_THRESHOLD: u32 = 3;
+
+#[derive(Debug, Clone)]
+struct PendingToolCall {
+    call: ToolCall,
+    provenance: ToolProvenance,
+}
 
 /// Errors that can occur during agent execution.
 #[derive(Debug, Error)]
@@ -174,7 +182,7 @@ impl Agent {
             permission_engine: None,
             sandbox: None,
             workspace_root: PathBuf::from("."),
-            prompt_builder: SystemPromptBuilder::new(),
+            prompt_builder: SystemPromptBuilder::new().with_workspace_info("Workspace root: ."),
             hook_registry: Arc::new(HookRegistry::new()),
             workspace_context: None,
             tool_definitions: Vec::new(),
@@ -262,7 +270,9 @@ impl Agent {
             })
             .collect();
 
-        let prompt_builder = SystemPromptBuilder::new().with_tools(descriptions.clone());
+        let prompt_builder = SystemPromptBuilder::new()
+            .with_workspace_info(format!("Workspace root: {}", workspace_root.display()))
+            .with_tools(descriptions.clone());
 
         let tool_definitions: Vec<talos_core::provider::ToolDefinition> = descriptions
             .into_iter()
@@ -301,13 +311,11 @@ impl Agent {
                     std::mem::take(&mut self.prompt_builder).with_strict_tool_format();
             }
             ToolProtocol::Compat => {
-                self.prompt_builder =
-                    std::mem::take(&mut self.prompt_builder)
-                        .with_tool_format(prompt::TOOL_CALLING_FORMAT);
+                self.prompt_builder = std::mem::take(&mut self.prompt_builder)
+                    .with_tool_format(prompt::TOOL_CALLING_FORMAT);
             }
             ToolProtocol::Native => {
-                self.prompt_builder =
-                    std::mem::take(&mut self.prompt_builder).with_tool_format("");
+                self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_tool_format("");
             }
         }
     }
@@ -421,7 +429,7 @@ impl Agent {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
-        let system_prompt = match self
+        let (system_prompt, cache_markers) = match self
             .prompt_builder
             .build_with_hooks(self.hook_registry.as_ref(), &hook_ctx)
             .await
@@ -450,6 +458,7 @@ impl Agent {
         if !system_prompt.is_empty() {
             messages.push(Message::System {
                 content: system_prompt,
+                cache_markers,
             });
         }
 
@@ -529,27 +538,16 @@ impl Agent {
                 }
             };
 
-            let mut turn_tool_calls: Vec<ToolCall> = Vec::new();
+            let mut turn_tool_calls: Vec<PendingToolCall> = Vec::new();
             let mut turn_text = String::new();
             let mut saw_turn_end = false;
             let mut usage = talos_core::message::Usage::default();
 
             while let Some(event) = rx.recv().await {
-                if let Some(ref tx) = event_tx {
-                    let event = match &event {
-                        AgentEvent::ToolCall { call, provenance, .. } => {
-                            let sf = self.tools.get(&call.name)
-                                .map(|t| t.summary_fields().iter().map(|s| s.to_string()).collect())
-                                .unwrap_or_default();
-                            AgentEvent::ToolCall {
-                                call: call.clone(),
-                                provenance: provenance.clone(),
-                                summary_fields: sf,
-                            }
-                        }
-                        other => other.clone(),
-                    };
-                    let _ = tx.send(event);
+                if let Some(ref tx) = event_tx
+                    && !matches!(event, AgentEvent::ToolCall { .. })
+                {
+                    let _ = tx.send(event.clone());
                 }
 
                 match event {
@@ -568,16 +566,21 @@ impl Agent {
                             }
                         }
                     }
-                    AgentEvent::ToolCall { call, .. } => {
+                    AgentEvent::ToolCall {
+                        call, provenance, ..
+                    } => {
                         match self
                             .run_hook(&hook_ctx, HookEvent::OnToolCallProposed { call: &call })
                             .await
                         {
                             Ok(HookOutcome::Continue(HookEvent::OnToolCallProposed { call }))
                             | Ok(HookOutcome::Skip(HookEvent::OnToolCallProposed { call })) => {
-                                turn_tool_calls.push(call.clone());
+                                turn_tool_calls.push(PendingToolCall {
+                                    call: call.clone(),
+                                    provenance,
+                                });
                             }
-                            Ok(_) => turn_tool_calls.push(call),
+                            Ok(_) => turn_tool_calls.push(PendingToolCall { call, provenance }),
                             Err(error) => {
                                 break 'turn_loop (Err(error), TurnStatus::Denied);
                             }
@@ -641,18 +644,23 @@ impl Agent {
                 break (Ok((turn_text, persisted)), TurnStatus::Success);
             }
 
+            let proposed_tool_calls: Vec<ToolCall> = turn_tool_calls
+                .iter()
+                .map(|pending| pending.call.clone())
+                .collect();
+
             let effective_tool_calls = match self
                 .run_hook(
                     &hook_ctx,
                     HookEvent::BeforeToolBatch {
-                        calls: &turn_tool_calls,
+                        calls: &proposed_tool_calls,
                     },
                 )
                 .await
             {
                 Ok(HookOutcome::Continue(HookEvent::BeforeToolBatch { calls })) => calls.to_vec(),
                 Ok(HookOutcome::Skip(_)) => Vec::new(),
-                Ok(_) => turn_tool_calls.clone(),
+                Ok(_) => proposed_tool_calls,
                 Err(error) => {
                     break 'turn_loop (Err(error), TurnStatus::Denied);
                 }
@@ -700,11 +708,80 @@ impl Agent {
                 }
             }
 
-            let tool_results = match self.execute_tools(&hook_ctx, &effective_tool_calls).await {
-                Ok(results) => results,
-                Err(error) => {
-                    break 'turn_loop (Err(error), TurnStatus::Denied);
+            let cleaned_turn_text = talos_core::message::strip_tool_syntax(&turn_text);
+            let assistant_msg = Message::Assistant {
+                content: cleaned_turn_text,
+                tool_calls: effective_tool_calls.clone(),
+            };
+            messages.push(assistant_msg);
+
+            let tool_results = if let Some(ref tx) = event_tx {
+                let effective_pending =
+                    self.pending_calls_with_provenance(&effective_tool_calls, &turn_tool_calls);
+                match self
+                    .execute_tools_for_ui(&hook_ctx, &effective_pending, tx, &mut messages)
+                    .await
+                {
+                    Ok(results) => results,
+                    Err(error) => {
+                        break 'turn_loop (Err(error), TurnStatus::Denied);
+                    }
                 }
+            } else {
+                let tool_results = match self.execute_tools(&hook_ctx, &effective_tool_calls).await
+                {
+                    Ok(results) => results,
+                    Err(error) => {
+                        break 'turn_loop (Err(error), TurnStatus::Denied);
+                    }
+                };
+
+                for (call, result) in effective_tool_calls.iter().zip(tool_results.iter()) {
+                    let observation = ToolObservation {
+                        call: call.clone(),
+                        result: result.clone(),
+                    };
+                    let observed = match self
+                        .run_hook(
+                            &hook_ctx,
+                            HookEvent::OnToolResultObserved {
+                                observation: &observation,
+                            },
+                        )
+                        .await
+                    {
+                        Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved {
+                            observation,
+                        }))
+                        | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => {
+                            observation.clone()
+                        }
+                        Ok(_) => observation,
+                        Err(error) => {
+                            break 'turn_loop (Err(error), TurnStatus::Denied);
+                        }
+                    };
+
+                    let ui_result = MessageToolResult {
+                        tool_use_id: observed.call.id.clone(),
+                        content: observed.result.content.clone(),
+                        is_error: observed.result.is_error,
+                    };
+                    let llm_result = if observed.result.is_error {
+                        MessageToolResult {
+                            content: format!(
+                                "{}\n\n[Analyze the error above and try a different approach.]",
+                                observed.result.content
+                            ),
+                            ..ui_result.clone()
+                        }
+                    } else {
+                        ui_result.clone()
+                    };
+                    messages.push(Message::Tool { result: llm_result });
+                }
+
+                tool_results
             };
 
             let _ = self
@@ -715,60 +792,6 @@ impl Agent {
                     },
                 )
                 .await;
-
-            let cleaned_turn_text = talos_core::message::strip_tool_syntax(&turn_text);
-            let assistant_msg = Message::Assistant {
-                content: cleaned_turn_text,
-                tool_calls: effective_tool_calls.clone(),
-            };
-            messages.push(assistant_msg);
-
-            for (call, result) in effective_tool_calls.iter().zip(tool_results.iter()) {
-                let observation = ToolObservation {
-                    call: call.clone(),
-                    result: result.clone(),
-                };
-                let observed = match self
-                    .run_hook(
-                        &hook_ctx,
-                        HookEvent::OnToolResultObserved {
-                            observation: &observation,
-                        },
-                    )
-                    .await
-                {
-                    Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved { observation }))
-                    | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => {
-                        observation.clone()
-                    }
-                    Ok(_) => observation,
-                    Err(error) => {
-                        break 'turn_loop (Err(error), TurnStatus::Denied);
-                    }
-                };
-
-                let ui_result = MessageToolResult {
-                    tool_use_id: observed.call.id.clone(),
-                    content: observed.result.content.clone(),
-                    is_error: observed.result.is_error,
-                };
-                let llm_result = if observed.result.is_error {
-                    MessageToolResult {
-                        content: format!(
-                            "{}\n\n[Analyze the error above and try a different approach.]",
-                            observed.result.content
-                        ),
-                        ..ui_result.clone()
-                    }
-                } else {
-                    ui_result.clone()
-                };
-                messages.push(Message::Tool { result: llm_result });
-
-                if let Some(ref tx) = event_tx {
-                    let _ = tx.send(AgentEvent::ToolResult { result: ui_result });
-                }
-            }
         };
 
         self.emit_turn_complete(&hook_ctx, final_status).await;
@@ -864,6 +887,115 @@ impl Agent {
             .collect())
     }
 
+    fn tool_call_event(&self, call: &ToolCall, provenance: &ToolProvenance) -> AgentEvent {
+        let summary_fields = self
+            .tools
+            .get(&call.name)
+            .map(|tool| {
+                tool.summary_fields()
+                    .iter()
+                    .map(|field| (*field).to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        AgentEvent::ToolCall {
+            call: call.clone(),
+            provenance: provenance.clone(),
+            summary_fields,
+        }
+    }
+
+    fn pending_calls_with_provenance(
+        &self,
+        calls: &[ToolCall],
+        proposed: &[PendingToolCall],
+    ) -> Vec<PendingToolCall> {
+        calls
+            .iter()
+            .map(|call| {
+                let provenance = proposed
+                    .iter()
+                    .find(|pending| pending.call.id == call.id)
+                    .map(|pending| pending.provenance.clone())
+                    .unwrap_or_default();
+                PendingToolCall {
+                    call: call.clone(),
+                    provenance,
+                }
+            })
+            .collect()
+    }
+
+    async fn execute_tools_for_ui(
+        &self,
+        hook_ctx: &HookContext,
+        calls: &[PendingToolCall],
+        event_tx: &mpsc::UnboundedSender<AgentEvent>,
+        messages: &mut Vec<Message>,
+    ) -> AgentResult<Vec<ToolExecutionResult>> {
+        let mut seen: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
+        let deduped: Vec<PendingToolCall> = calls
+            .iter()
+            .filter(|pending| {
+                seen.insert((pending.call.name.clone(), pending.call.input.to_string()))
+            })
+            .cloned()
+            .collect();
+
+        let mut results = Vec::with_capacity(deduped.len());
+        for pending in deduped {
+            let _ = event_tx.send(self.tool_call_event(&pending.call, &pending.provenance));
+
+            let result = self
+                .execute_single_tool(hook_ctx, &self.tools, &pending.call)
+                .await?;
+            let observation = ToolObservation {
+                call: pending.call.clone(),
+                result,
+            };
+            let observed = match self
+                .run_hook(
+                    hook_ctx,
+                    HookEvent::OnToolResultObserved {
+                        observation: &observation,
+                    },
+                )
+                .await
+            {
+                Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved { observation }))
+                | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => {
+                    observation.clone()
+                }
+                Ok(_) => observation,
+                Err(error) => return Err(error),
+            };
+
+            let ui_result = MessageToolResult {
+                tool_use_id: observed.call.id.clone(),
+                content: observed.result.content.clone(),
+                is_error: observed.result.is_error,
+            };
+            let llm_result = if observed.result.is_error {
+                MessageToolResult {
+                    content: format!(
+                        "{}\n\n[Analyze the error above and try a different approach.]",
+                        observed.result.content
+                    ),
+                    ..ui_result.clone()
+                }
+            } else {
+                ui_result.clone()
+            };
+            messages.push(Message::Tool { result: llm_result });
+            let _ = event_tx.send(AgentEvent::ToolResult { result: ui_result });
+            results.push(observed.result);
+        }
+
+        Ok(results)
+    }
+
     async fn execute_single_tool(
         &self,
         hook_ctx: &HookContext,
@@ -918,9 +1050,7 @@ impl Agent {
         }
 
         if let Err(e) = registry.validate_input(&call.name, &call.input) {
-            return Ok(ToolExecutionResult::error(format!(
-                "invalid input for {e}"
-            )));
+            return Ok(ToolExecutionResult::error(format!("invalid input for {e}")));
         }
 
         let normalized_input = normalize_tool_input(&call.name, call.input.clone());
@@ -2084,6 +2214,88 @@ mod tests {
             1,
             "Expected 1 ToolResult event, got: {:?}",
             events
+        );
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)] // Agent::new is correct for unit tests
+    async fn test_streaming_tool_events_are_interleaved_per_tool() {
+        let responses = vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_1".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({ "message": "first" }),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::ToolCall {
+                    call: ToolCall {
+                        id: "call_2".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({ "message": "second" }),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Done".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: talos_core::message::Usage::default(),
+                },
+            ],
+        ];
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TimedMockTool {
+            tool_name: "echo".into(),
+            read_only: true,
+            delay_ms: 0,
+            result: ToolExecutionResult::success("ok"),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+        }));
+
+        let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+        let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
+
+        let _response = agent
+            .run_streaming("Echo twice".into(), vec![], tx)
+            .await
+            .unwrap();
+
+        let mut sequence = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            match event {
+                AgentEvent::ToolCall { call, .. } => {
+                    sequence.push(format!("call:{}", call.id));
+                }
+                AgentEvent::ToolResult { result } => {
+                    sequence.push(format!("result:{}", result.tool_use_id));
+                }
+                _ => {}
+            }
+        }
+
+        assert_eq!(
+            sequence,
+            vec![
+                "call:call_1",
+                "result:call_1",
+                "call:call_2",
+                "result:call_2"
+            ]
         );
     }
 

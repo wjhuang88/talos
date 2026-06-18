@@ -177,7 +177,7 @@ Introduce traits where concrete types create tight coupling.
 
 ## Dynamic Prompt Template & Context Cache Optimization
 
-**Status**: Planned — Requirement documented, not yet implemented
+**Status**: Phase A complete in I026; broader architecture cleanup remains planned
 **Related**: `talos-agent/src/prompt.rs` (SystemPromptBuilder), TOOL-002 #1 (schema in prompt)
 
 ### Requirement 1: Dynamic Prompt Templates
@@ -194,18 +194,19 @@ registry, the structure is rigid:
 - No template variable substitution (e.g. `{{workspace_root}}`, `{{model_name}}`)
 - Append/custom prompts are bolt on, not first-class template slots
 
-#### Proposed Direction
+#### Implemented Direction (I026)
 
-Introduce a **template-driven prompt assembly** where the system prompt is composed from named
-slots, each filled at runtime but **stable within a session** (for cache compatibility):
+I026 introduced template-driven prompt assembly where stable runtime slots are rendered into the
+embedded prompt asset and volatile data is appended after cacheable sections:
 
 ```
 Template: identity.txt
-├── {{tool_section}}      ← populated from tool registry at session start
-├── {{skill_index}}       ← populated from skill loader at session start
-├── {{context_files}}     ← populated from AGENTS.md at session start
 ├── {{tool_protocol_hint}} ← populated from config.tool_protocol()
-└── {{user_preferences}}  ← populated from config
+├── {{workspace_info}}     ← populated from Agent workspace root
+└── {{model_info}}         ← currently provider metadata unavailable
+
+Dynamic runtime tail:
+└── {{datetime}}           ← rendered after cache markers
 ```
 
 Key properties:
@@ -214,23 +215,26 @@ Key properties:
   prefix caching).
 - **Runtime-assembled**: the tool list, skill index, and context are injected at runtime, not
   compile time. Adding/removing tools or skills does not require recompilation.
-- **Template files**: `identity.txt` becomes a template with `{{slot}}` markers. Additional
-  template files can be added without code changes.
+- **Template files**: `identity.txt` is now a template with `{{slot}}` markers. Unknown slots are
+  left as-is so future prompt assets can be staged without panics.
 
 #### Implementation Hints
 
-- `SystemPromptBuilder` gains a `template: String` field (the raw template with `{{slots}}`)
-- A `render_template(template, slots: &HashMap<&str, String>) -> String` helper substitutes slots
-- `build()` calls `render_template()` instead of manual `format!()` concatenation
-- Existing `CacheMarker` logic still works because slot positions are deterministic
+- `SystemPromptBuilder` uses `render_template()` with a `HashMap<String, String>` slot map.
+- `build()` assembles section objects, then joins them into the final prompt.
+- `build_with_cache_markers()` computes offsets from the same section objects, avoiding duplicated
+  offset math.
+- Prompt hooks still work. If a hook rewrites the prompt text, cache markers are dropped for that
+  turn so stale byte ranges are not sent to providers.
 
 #### Files Affected
 
 | File | Change |
 |------|--------|
-| `crates/talos-agent/src/prompt.rs` | Template engine, slot rendering, CacheMarker updates |
-| `prompts/identity.txt` | Add `{{slot}}` markers (backward-compatible: unknown slots left as-is) |
-| `crates/talos-agent/src/lib.rs` | Pass runtime values (tool_protocol_hint, workspace info) as slots |
+| `crates/talos-agent/src/prompt.rs` | Template engine, slot rendering, section-based CacheMarker updates |
+| `prompts/identity.txt` | Stable `{{slot}}` markers |
+| `crates/talos-agent/src/lib.rs` | Pass workspace info and cache markers into `Message::System` |
+| `crates/talos-core/src/message.rs` | `SystemCacheMarker` metadata on system messages |
 
 ### Requirement 2: Context Layout for LLM Prompt Cache / KV Cache Optimization
 
@@ -251,12 +255,13 @@ Talos's current prompt layout is:
 [Conversation]      ← grows every turn (unavoidable)
 ```
 
-The `build_with_cache_markers()` method already marks the first 3 sections as `Ephemeral`
-cacheable. But there are gaps:
+The `build_with_cache_markers()` method marks Identity, Tools, and Skills as `Ephemeral`
+cacheable. I026 closed the provider-emission gap and left the larger session-freezing questions
+for future ARCH-002 slices:
 
-1. **No Anthropic `cache_control` emission**: `CacheMarker` is computed but never sent to the
-   provider as `cache_control: { type: "ephemeral" }` in the API request. The markers are
-   informational only — the provider doesn't know which parts to cache.
+1. **Anthropic `cache_control` emission**: Implemented. System prompt cache markers travel on
+   `Message::System` and are emitted as Anthropic top-level `system` content blocks with
+   `cache_control: { type: "ephemeral" }`.
 
 2. **Context files instability**: If `AGENTS.md` is loaded fresh each turn (it shouldn't be, but
    the code path allows it), the cache breaks. The context section should be assembled once at
@@ -273,11 +278,11 @@ cacheable. But there are gaps:
    - Breakpoint 3: after Context files (rarely changes)
    - Breakpoint 4: at the latest user message boundary (maximizes conversation cache reuse)
 
-#### Proposed Direction
+#### Implemented Direction / Remaining Direction
 
 **Phase A: Emit cache_control markers to provider**
 
-In the Anthropic provider's request builder, convert `CacheMarker` offsets into
+Implemented. In the Anthropic provider's request builder, `SystemCacheMarker` offsets become
 `cache_control: { type: "ephemeral" }` annotations on the appropriate content blocks:
 
 ```json
@@ -344,15 +349,17 @@ same ordering principles apply: stable content first, volatile content last.
 
 | File | Change |
 |------|--------|
-| `crates/talos-provider/src/lib.rs` | Emit `cache_control` on system message content blocks using `CacheMarker` data |
-| `crates/talos-agent/src/prompt.rs` | Pass `CacheMarker` data through to provider (already partially done via `build_with_cache_markers()`) |
+| `crates/talos-provider/src/lib.rs` | Emits `cache_control` on Anthropic system message content blocks using `SystemCacheMarker` data |
+| `crates/talos-provider/src/openai.rs` | Keeps system message first for automatic prefix caching |
+| `crates/talos-agent/src/prompt.rs` | Produces prompt text and cache markers from shared section assembly |
+| `crates/talos-core/src/message.rs` | Carries system cache metadata across the provider boundary |
 
 ### Acceptance Criteria
 
-- [ ] `identity.txt` supports `{{slot}}` template variables
-- [ ] Tool/skill/context sections are injected at runtime via template slots
+- [x] `identity.txt` supports `{{slot}}` template variables
+- [x] Tool/skill/context sections are injected at runtime by `SystemPromptBuilder`
 - [ ] System prompt prefix is computed once per session and reused
-- [ ] Anthropic provider emits `cache_control: { type: "ephemeral" }` on cacheable segments
-- [ ] Cache markers align with actual provider request boundaries
+- [x] Anthropic provider emits `cache_control: { type: "ephemeral" }` on cacheable segments
+- [x] Cache markers align with actual provider request boundaries
 - [ ] Provider request logs show cache hit/miss metadata
 - [ ] No cache invalidation caused by mid-session tool/skill/context changes

@@ -9,7 +9,9 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
 use talos_core::message::ToolCall;
-use talos_core::message::{AgentEvent, Message, StopReason, Usage};
+use talos_core::message::{
+    AgentEvent, Message, StopReason, SystemCacheMarker, SystemCacheType, Usage,
+};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
@@ -176,13 +178,21 @@ pub fn anthropic_request_debug_snapshot(
 }
 
 fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition]) -> Value {
+    let mut system_blocks = Vec::new();
+    for msg in messages {
+        if let Message::System {
+            content,
+            cache_markers,
+        } = msg
+        {
+            system_blocks.extend(anthropic_system_blocks(content, cache_markers));
+        }
+    }
+
     let anthropic_messages: Vec<Value> = messages
         .iter()
+        .filter(|msg| !matches!(msg, Message::System { .. }))
         .map(|msg| match msg {
-            Message::System { content } => json!({
-                "role": "user",
-                "content": content,
-            }),
             Message::Context { content } => json!({
                 "role": "user",
                 "content": content,
@@ -229,6 +239,7 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
                     "content": [block],
                 })
             }
+            Message::System { .. } => unreachable!("system messages are filtered above"),
         })
         .collect();
 
@@ -253,7 +264,85 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
         body["tools"] = json!(tools_json);
     }
 
+    if !system_blocks.is_empty() {
+        body["system"] = json!(system_blocks);
+    }
+
     body
+}
+
+fn anthropic_system_blocks(content: &str, markers: &[SystemCacheMarker]) -> Vec<Value> {
+    if content.is_empty() {
+        return Vec::new();
+    }
+
+    if markers.is_empty() {
+        return vec![json!({
+            "type": "text",
+            "text": content,
+        })];
+    }
+
+    let mut blocks = Vec::new();
+    let mut cursor = 0;
+    let mut sorted_markers = markers.to_vec();
+    sorted_markers.sort_by_key(|marker| marker.offset);
+
+    for marker in sorted_markers {
+        if marker.offset < cursor {
+            continue;
+        }
+        let Some(marker_end) = marker.offset.checked_add(marker.length) else {
+            return vec![json!({"type": "text", "text": content})];
+        };
+        if marker_end > content.len()
+            || !content.is_char_boundary(marker.offset)
+            || !content.is_char_boundary(marker_end)
+        {
+            return vec![json!({"type": "text", "text": content})];
+        }
+        if cursor < marker.offset
+            && let Some(text) = content.get(cursor..marker.offset)
+            && !text.is_empty()
+        {
+            blocks.push(json!({
+                "type": "text",
+                "text": text,
+            }));
+        }
+        if let Some(text) = content.get(marker.offset..marker_end)
+            && !text.is_empty()
+        {
+            let mut block = json!({
+                "type": "text",
+                "text": text,
+            });
+            if matches!(marker.cache_type, SystemCacheType::Ephemeral) {
+                block["cache_control"] = json!({ "type": "ephemeral" });
+            }
+            blocks.push(block);
+        }
+        cursor = marker_end;
+    }
+
+    if cursor < content.len()
+        && let Some(text) = content.get(cursor..)
+        && !text.is_empty()
+    {
+        blocks.push(json!({
+            "type": "text",
+            "text": text,
+        }));
+    }
+
+    if blocks.is_empty() {
+        vec![json!({
+            "type": "text",
+            "text": content,
+        })]
+    } else {
+        blocks
+    }
 }
 
 fn redact_secret(secret: &str) -> String {
@@ -670,6 +759,40 @@ mod tests {
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0]["type"], "tool_use");
         assert_eq!(blocks[0]["id"], "call_1");
+    }
+
+    #[test]
+    fn build_request_body_system_cache_control() {
+        let content = "# Identity\nstable\n\n# Runtime Context\ndynamic\n";
+        let messages = vec![
+            Message::System {
+                content: content.into(),
+                cache_markers: vec![SystemCacheMarker {
+                    offset: 0,
+                    length: "# Identity\nstable\n".len(),
+                    cache_type: SystemCacheType::Ephemeral,
+                }],
+            },
+            Message::User {
+                content: "Hello".into(),
+            },
+        ];
+
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
+
+        assert_eq!(body["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(body["messages"][0]["role"], "user");
+        let system = body["system"].as_array().unwrap();
+        assert_eq!(system[0]["type"], "text");
+        assert_eq!(system[0]["cache_control"]["type"], "ephemeral");
+        assert!(system[0]["text"].as_str().unwrap().contains("# Identity"));
+        assert!(
+            system[1]["text"]
+                .as_str()
+                .unwrap()
+                .contains("# Runtime Context")
+        );
+        assert!(system[1].get("cache_control").is_none());
     }
 
     #[test]

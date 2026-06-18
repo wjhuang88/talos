@@ -4,6 +4,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::tool::ToolProvenance;
 
+/// Provider-side caching behavior for a system prompt range.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemCacheType {
+    /// Cache this prompt range ephemerally when the provider supports it.
+    Ephemeral,
+}
+
+/// A byte range in the system prompt that is stable enough for provider caching.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SystemCacheMarker {
+    /// Starting byte offset in the system prompt content.
+    pub offset: usize,
+    /// Length of the cacheable range in bytes.
+    pub length: usize,
+    /// Cache behavior requested for this range.
+    pub cache_type: SystemCacheType,
+}
+
 /// A tool call requested by the assistant.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
@@ -34,6 +53,9 @@ pub enum Message {
     System {
         /// System prompt content.
         content: String,
+        /// Stable prompt ranges suitable for provider-side caching.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        cache_markers: Vec<SystemCacheMarker>,
     },
     /// Workspace context (AGENTS.md, history summary, retrieved files).
     Context {

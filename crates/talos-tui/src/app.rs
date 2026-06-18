@@ -15,7 +15,7 @@ use ratatui::{
     widgets::{Block, Padding, Paragraph},
 };
 use talos_conversation::{
-    MessageSource, StatusSnapshot, TipKind, ToolCallDisplay, UiOutput, UserInput,
+    MessageSource, StatusSnapshot, TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput, UserInput,
 };
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
@@ -873,32 +873,20 @@ impl Tui {
                 } else {
                     to_crossterm_color(semantic::TEXT_SUCCESS)
                 };
-                let content_trunc = {
-                    let first = display
-                        .content
-                        .lines()
-                        .find(|l| !l.trim().is_empty())
-                        .unwrap_or(&display.content);
-                    if first.is_empty() {
-                        "(no output)".to_string()
-                    } else if first.len() > 120 {
-                        format!("{}…", &first[..120])
-                    } else {
-                        first.to_string()
-                    }
-                };
-                let line_text = format!("   {} {}", icon, content_trunc);
-                let segments = vec![HistorySegment::styled(
-                    line_text,
-                    color,
-                    HistoryAttrs::default(),
-                )];
                 self.pending_scrollback
-                    .push(ScrollbackLine::styled(segments, None));
+                    .extend(build_tool_result_scrollback_lines(&display, icon, color));
             }
-            UiOutput::ToolApprovalRequest { tool_name, arguments, response } => {
+            UiOutput::ToolApprovalRequest {
+                tool_name,
+                arguments,
+                summary_fields,
+                response,
+            } => {
                 self.state.pending_approval_response = Some(response);
-                self.show_approval(&tool_name, &arguments);
+                let args_str = serde_json::to_string_pretty(&arguments)
+                    .unwrap_or_else(|_| arguments.to_string());
+                let summary = summarize_tool_args(&tool_name, &args_str, &summary_fields);
+                self.show_approval(&tool_name, &summary);
             }
             UiOutput::Status(snapshot) => {
                 self.state.status = snapshot;
@@ -1045,21 +1033,17 @@ impl Tui {
                     {
                         if let Some(choice) = self.handle_approval_key(c) {
                             let (icon, color, msg) = match &choice {
-                                ApprovalChoice::ApproveOnce => (
-                                    "✓",
-                                    to_crossterm_color(semantic::TEXT_SUCCESS),
-                                    "approved",
-                                ),
+                                ApprovalChoice::ApproveOnce => {
+                                    ("✓", to_crossterm_color(semantic::TEXT_SUCCESS), "approved")
+                                }
                                 ApprovalChoice::AlwaysApprove => (
                                     "✓",
                                     to_crossterm_color(semantic::TEXT_SUCCESS),
                                     "always approved",
                                 ),
-                                ApprovalChoice::Deny => (
-                                    "✗",
-                                    to_crossterm_color(semantic::TEXT_ERROR),
-                                    "denied",
-                                ),
+                                ApprovalChoice::Deny => {
+                                    ("✗", to_crossterm_color(semantic::TEXT_ERROR), "denied")
+                                }
                             };
                             self.pending_scrollback.push(ScrollbackLine::styled(
                                 vec![HistorySegment::styled(
@@ -1077,10 +1061,7 @@ impl Tui {
                             self.hide_approval();
                             self.state.tip = Some(Tip {
                                 kind: TipKind::ApprovalResult,
-                                text: format!(
-                                    "Tool call {}",
-                                    msg
-                                ),
+                                text: format!("Tool call {}", msg),
                                 ttl: Duration::from_secs(2),
                                 created_at: Instant::now(),
                             });
@@ -1255,7 +1236,7 @@ fn history_message_parts(message: &Message) -> Option<(MessageSource, &str)> {
             },
             result.content.as_str(),
         )),
-        Message::System { content } => Some((MessageSource::System, content.as_str())),
+        Message::System { content, .. } => Some((MessageSource::System, content.as_str())),
         Message::Context { content } => Some((MessageSource::System, content.as_str())),
     }
 }
@@ -1951,8 +1932,8 @@ fn truncate_end_to_width(s: &str, max_width: u16) -> String {
 }
 
 fn summarize_tool_args(_tool_name: &str, args_str: &str, summary_fields: &[String]) -> String {
-    let obj: serde_json::Value = serde_json::from_str(args_str)
-        .unwrap_or(serde_json::Value::Object(Default::default()));
+    let obj: serde_json::Value =
+        serde_json::from_str(args_str).unwrap_or(serde_json::Value::Object(Default::default()));
 
     let parts: Vec<String> = summary_fields
         .iter()
@@ -1961,7 +1942,8 @@ fn summarize_tool_args(_tool_name: &str, args_str: &str, summary_fields: &[Strin
                 let display = match val {
                     serde_json::Value::String(s) => s.clone(),
                     serde_json::Value::Array(arr) => {
-                        let strs: Vec<String> = arr.iter()
+                        let strs: Vec<String> = arr
+                            .iter()
                             .filter_map(|v| v.as_str().map(String::from))
                             .collect();
                         strs.join(", ")
@@ -1993,10 +1975,46 @@ fn truncate_single_line(s: &str, max: usize) -> String {
     }
 }
 
+fn build_tool_result_scrollback_lines(
+    display: &ToolResultDisplay,
+    icon: &str,
+    color: Option<CColor>,
+) -> Vec<ScrollbackLine> {
+    const MAX_RESULT_LINE_CHARS: usize = 120;
+
+    if display.content.is_empty() {
+        return vec![ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("   {icon} (no output)"),
+                color,
+                HistoryAttrs::default(),
+            )],
+            None,
+        )];
+    }
+
+    let mut lines = Vec::new();
+    for (idx, line) in display.content.lines().enumerate() {
+        let prefix = if idx == 0 { icon } else { " " };
+        let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("   {prefix} {truncated}"),
+                color,
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+    }
+
+    lines
+}
+
 fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {
     let args_str = serde_json::to_string_pretty(&tool_call.arguments)
         .unwrap_or_else(|_| tool_call.arguments.to_string());
-    let args_summary = summarize_tool_args(&tool_call.tool_name, &args_str, &tool_call.summary_fields);
+    let args_summary =
+        summarize_tool_args(&tool_call.tool_name, &args_str, &tool_call.summary_fields);
     let provenance_marker = match &tool_call.provenance {
         ToolProvenance::Native => None,
         ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", server)),
@@ -2051,6 +2069,34 @@ mod tests {
     #[test]
     fn truncate_to_width_short_enough() {
         assert_eq!(truncate_end_to_width("hi", 10), "hi");
+    }
+
+    #[test]
+    fn approval_summary_uses_tool_summary_fields() {
+        let args = serde_json::json!({
+            "command": "cd /repo && git status --short",
+            "other": "hidden"
+        });
+        let args_str = serde_json::to_string_pretty(&args).unwrap();
+        let summary = summarize_tool_args("bash", &args_str, &["command".to_string()]);
+
+        assert_eq!(summary, "command: cd /repo && git status --short");
+        assert!(!summary.contains('{'));
+        assert!(!summary.contains("other"));
+    }
+
+    #[test]
+    fn tool_result_scrollback_keeps_multiple_lines() {
+        let display = ToolResultDisplay {
+            is_error: false,
+            content: "├── backend/\n├── frontend/\n└── docs/".to_string(),
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].text, "   ✓ ├── backend/");
+        assert_eq!(lines[1].text, "     ├── frontend/");
+        assert_eq!(lines[2].text, "     └── docs/");
     }
 
     #[test]
@@ -2212,7 +2258,10 @@ mod tests {
         let src = "flowchart LR\n    A[Start] --> B[End]";
         let result = render_mermaid_block(src, None);
         assert!(!result.is_empty(), "should produce output lines");
-        assert!(result[0].text.contains("mermaid"), "should have mermaid header");
+        assert!(
+            result[0].text.contains("mermaid"),
+            "should have mermaid header"
+        );
     }
 
     #[test]

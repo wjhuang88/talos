@@ -524,7 +524,7 @@ fn messages_to_text(messages: &[Message]) -> String {
         .iter()
         .map(|msg| match msg {
             Message::User { content } => format!("User: {content}"),
-            Message::System { content } => format!("System: {content}"),
+            Message::System { content, .. } => format!("System: {content}"),
             Message::Context { content } => format!("Context: {content}"),
             Message::Assistant {
                 content,

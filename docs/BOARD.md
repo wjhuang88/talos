@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I026 Approval UX Fix + Doc Validation | Active | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | S1: Approval ordering fix + S2: ARCH-002 Phase 1 doc validation |
+| I026 Approval UX Fix + Doc Validation | Review | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | All 7 stories implemented; clippy, workspace tests, and governance validation pass |
 
 ## Review
 
@@ -41,7 +41,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
-| ARCH-002 Architecture Optimization | Planned | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Survey complete; 5-phase plan: doc validation → audit → ACL → decomposition → traits |
+| ARCH-002 Architecture Optimization | Planned | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Prompt template/cache Phase A complete; remaining: full doc audit → architecture audit → ACL → decomposition → traits |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 
@@ -64,6 +64,6 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | REMOTE-001 Remote Session Protocol | Research | [REMOTE-001 Remote Session Protocol](backlog/active/REMOTE-001-remote-session-protocol.md) | Research transport, auth, and minimum viable slice before any implementation |
-| I017 Embedded Git Tools | Planned | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Start after I016 or explicit Git priority; follow ADR-010 |
+| I017 Embedded Git Tools | P0-P2 Complete | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Read/write Git tools delivered in I026; future scope starts from P3 advanced tools |
 | I019 Layered Memory Foundation | Planned | [MEM-001 Layered Memory Foundation](backlog/active/MEM-001-layered-memory-foundation.md) | Start after I018 or explicit memory priority; follow ADR-016 |
 | I020 Exploration Library | Planned | [RES-001 Exploration Library](backlog/active/RES-001-exploration-library.md) | Start after I019 or explicit research priority; follow ADR-017 |
