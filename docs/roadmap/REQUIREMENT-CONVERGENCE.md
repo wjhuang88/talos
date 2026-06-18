@@ -41,7 +41,11 @@ verification evidence, and public status all agree.
 | Four-layer memory architecture | ADR-016 | #I019-S1/S2; I019 Layered Memory Foundation | Planned | Working, episodic, semantic, and procedural memory are separate; consolidation is explicit and provenance-backed |
 | Conversation context continuity (Working + Episodic) | ADR-016; session-context-contamination proposal | MEM-002 → I024 | Review | Agent receives session history in every turn; JSONL-backed resume is tested; layers 1-3 compaction are wired. Complete requires final runtime evidence or explicit closeout note; layers 4-5 residual is tracked by MEM-003. |
 | Built-in exploration and local research library | ADR-017 | #I020-S1/S2; I020 Exploration Library | Planned | Research runs store sources, claims, syntheses, and unresolved questions locally; vector/graph stores stay Spike-gated |
+| Zvec as possible SQLite replacement or retrieval-index supplement | ADR-008; ADR-017; STORE-001 | STORE-001; I036 Research Consolidation | Research | Decide via Spike whether Zvec is rejected, watch-only, optional derived vector/hybrid index, or ADR-ready; no production dependency before ADR |
+| Permission-aware web/API/document fetching | WEBFETCH-001; ADR-010; ADR-017 | WEBFETCH-001; I036 Research Consolidation | Research | Define context-oriented HTTP/API fetch, URL auto-detection, HTML extraction, link storage, separate URL save/download tool, and phased document conversion with permission, SSRF, size, write, and dependency gates |
 | Reasoning/thinking provider fields | Reasoning proposal; ADR required before story implementation; MODEL-001 | MODEL-001; I036 research consolidation | Planned | Provider request schema, stream event shape, persistence, TUI/RPC exposure, model catalog capability flags, usage/cost handling, and evolution hook impact are recorded before code |
+| Local micro-model for low-risk agent decisions | MODEL-002; ADR-010; ADR-016 | MODEL-002; I036 Research Consolidation | Research | Decide via evaluation whether a local small model is rejected, watch-only, or ADR-ready for bounded hints; it must not approve permissions or become authoritative for write/security decisions |
+| Optional runtime asset distribution for bulky features | DIST-001; ADR-010 | DIST-001; I036 Research Consolidation | Research | Define post-install opt-in download/install for large model files, WASM plugins, and similar assets with verification, mirrors/offline mode, cleanup, and graceful fallback |
 | Self-evolution runtime wiring | ADR-001; ADR-005 hook-driven evolution clarification | I008 Complete | Complete (2026-06-03) | Hook-based EvolutionHookHandler registered uniformly across all paths; runtime evidence recorded |
 
 ## Closed Documentation Corrections
@@ -69,8 +73,10 @@ verification evidence, and public status all agree.
   logging crate require follow-up decision coverage if they expand the public observability contract.
 - Embedded prompt assets must follow ADR-015; user-editable prompt packs require a separate
   permission/provenance decision.
-- Memory and exploration work must follow ADR-016/ADR-017; vector or graph database dependencies
-  require Spike evidence and a follow-up dependency ADR before code.
+- Memory and exploration work must follow ADR-016/ADR-017; vector, graph, or Zvec-like native
+  database dependencies require Spike evidence and a follow-up dependency ADR before code.
+- Web/API/document fetch work must remain permission-aware and dependency-gated; advanced crawling,
+  browser rendering, OCR, hosted extraction, or AGPL components require separate review.
 
 ## Operating Rule
 

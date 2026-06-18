@@ -19,6 +19,8 @@ P2.
 - `docs/decisions/017-exploration-library-storage.md`
 - `docs/decisions/008-sqlite-bundled-storage.md`
 - `docs/backlog/active/MEM-001-layered-memory-foundation.md`
+- `docs/backlog/active/STORE-001-zvec-storage-evaluation.md`
+- `docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`
 
 ## Acceptance Criteria
 
@@ -27,9 +29,10 @@ P2.
 - [ ] Conclusions cite source IDs and distinguish evidence from inference.
 - [ ] Vector/graph stores are evaluated by Spike before any dependency lands.
 - [ ] Network/paper search tools remain permission-aware and can be disabled.
+- [ ] Web/document fetch tools, if used, follow WEBFETCH-001 detection, extraction, and
+      permission boundaries.
 
 ## Residual Work Destination
 
-Adopting LanceDB, SQLite vector extensions, Kuzu, or another store requires Spike evidence and a
-follow-up ADR.
-
+Adopting LanceDB, SQLite vector extensions, Zvec, Kuzu, or another store requires Spike evidence
+and a follow-up ADR.

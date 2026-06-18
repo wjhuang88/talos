@@ -69,7 +69,9 @@ Before implementation, evaluate:
 ## Non-Goals
 
 - No plugin marketplace in v1.
-- No network package installation.
+- No network package installation in the first implementation slice. Runtime-downloadable plugin
+  packages require the shared optional asset distribution strategy from `DIST-001` and a follow-up
+  ADR.
 - No native dynamic library loading.
 - No Node.js or Python plugin runtime.
 - No provider plugin execution unless a later ADR expands the scope.

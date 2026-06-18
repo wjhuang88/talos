@@ -35,6 +35,8 @@ host calls, sandbox limits, compatibility, and failure behavior.
 - Define permission boundaries for plugin-provided tools and host calls.
 - Define lifecycle events: load, initialize, register, execute, shutdown, error.
 - Define compatibility/version negotiation.
+- Define whether bulky plugin packages are bundled, locally installed, or downloaded through the
+  shared optional asset distribution flow.
 - Define deterministic failure behavior when a plugin panics, times out, traps, or returns
   malformed protocol messages.
 - Decide whether the first implementation should use WASI component model, raw WASM + host ABI,
@@ -48,6 +50,7 @@ host calls, sandbox limits, compatibility, and failure behavior.
 - Native dynamic library loading.
 - Node/Python plugin runtimes.
 - Provider plugin execution.
+  Runtime-downloadable plugin packages require DIST-001 and a follow-up ADR before implementation.
 
 ## Acceptance Criteria
 
@@ -59,11 +62,14 @@ host calls, sandbox limits, compatibility, and failure behavior.
 - [ ] Sandbox/resource limits are specified, including timeout, memory, filesystem/network access,
       and host-call allowlist.
 - [ ] Version negotiation and forward/backward compatibility rules are specified.
+- [ ] Optional plugin package distribution is aligned with DIST-001 instead of adding a separate
+      download path.
 - [ ] No implementation starts until the spec and ADR are accepted.
 
 ## Required Reads
 
 - `docs/proposals/wasm-runtime-plugin-protocol.md`
+- `docs/backlog/active/DIST-001-optional-runtime-asset-distribution.md`
 - `docs/iterations/I009-extensible-agent.md`
 - `docs/decisions/009-tool-provenance.md`
 - `docs/decisions/013-provider-config-schema-boundary.md`
