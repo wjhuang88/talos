@@ -408,7 +408,7 @@ mod tests {
     fn test_estimate_tool_message() {
         let estimator = TokenEstimator::new();
         let messages = vec![Message::Tool {
-            result: talos_core::message::ToolResult {
+            result: talos_core::message::MessageToolResult {
                 tool_use_id: "call_1".into(),
                 content: "file content here".into(),
                 is_error: false,

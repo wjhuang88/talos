@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use talos_core::message::{AgentEvent, StopReason, ToolCall, ToolResult, Usage};
+use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
@@ -20,8 +20,8 @@ fn make_tool_call(name: &str, _provenance: ToolProvenance) -> ToolCall {
     }
 }
 
-fn make_tool_result(content: &str, is_error: bool) -> ToolResult {
-    ToolResult {
+fn make_tool_result(content: &str, is_error: bool) -> MessageToolResult {
+    MessageToolResult {
         tool_use_id: "tc-1".to_string(),
         content: content.to_string(),
         is_error,

@@ -29,7 +29,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use talos_core::message::{AgentEvent, Message, ToolResult};
+use talos_core::message::{AgentEvent, Message, MessageToolResult};
 use talos_core::provider::LanguageModel;
 use thiserror::Error;
 
@@ -255,7 +255,7 @@ impl Compactor {
                         let mut truncated = result.content[..MAX_TOOL_RESULT_CHARS].to_string();
                         truncated.push_str(TRUNCATION_SUFFIX);
                         Message::Tool {
-                            result: ToolResult {
+                            result: MessageToolResult {
                                 content: truncated,
                                 ..result
                             },
@@ -300,7 +300,7 @@ impl Compactor {
                 if in_trimmed_turn && matches!(&msg, Message::Tool { .. }) {
                     if let Message::Tool { result } = msg {
                         Message::Tool {
-                            result: ToolResult {
+                            result: MessageToolResult {
                                 content: String::new(),
                                 ..result
                             },
@@ -339,7 +339,7 @@ impl Compactor {
                         Message::Tool { result }
                     } else {
                         Message::Tool {
-                            result: ToolResult {
+                            result: MessageToolResult {
                                 content: String::new(),
                                 ..result
                             },
@@ -557,7 +557,7 @@ mod tests {
     /// Helper: create a tool result message.
     fn tool_msg(id: &str, content: &str) -> Message {
         Message::Tool {
-            result: ToolResult {
+            result: MessageToolResult {
                 tool_use_id: id.into(),
                 content: content.into(),
                 is_error: false,

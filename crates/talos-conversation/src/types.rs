@@ -34,7 +34,7 @@ pub struct ToolCallInfo {
     pub tool_name: String,
     pub arguments: String,
     pub provenance: ToolProvenance,
-    pub result: Option<talos_core::message::ToolResult>,
+    pub result: Option<talos_core::message::MessageToolResult>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

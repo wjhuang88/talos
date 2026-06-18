@@ -717,7 +717,7 @@ mod tests {
     #[test]
     fn build_request_body_tool_result() {
         let messages = vec![Message::Tool {
-            result: talos_core::message::ToolResult {
+            result: talos_core::message::MessageToolResult {
                 tool_use_id: "call_1".into(),
                 content: "file1.rs\nfile2.rs".into(),
                 is_error: false,
@@ -754,7 +754,7 @@ mod tests {
                 tool_calls: vec![],
             },
             Message::Tool {
-                result: talos_core::message::ToolResult {
+                result: talos_core::message::MessageToolResult {
                     tool_use_id: "call_1".into(),
                     content: String::new(),
                     is_error: false,

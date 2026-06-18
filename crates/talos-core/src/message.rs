@@ -34,9 +34,9 @@ pub struct ToolCall {
     pub input: serde_json::Value,
 }
 
-/// Result of a tool execution.
+/// Result of a tool execution (message-layer).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ToolResult {
+pub struct MessageToolResult {
     /// ID of the tool call this result corresponds to.
     pub tool_use_id: String,
     /// Text output from the tool.
@@ -78,7 +78,7 @@ pub enum Message {
     /// Result of a tool execution.
     Tool {
         /// The tool result.
-        result: ToolResult,
+        result: MessageToolResult,
     },
 }
 
@@ -138,7 +138,7 @@ pub enum AgentEvent {
     /// A tool call completed.
     ToolResult {
         /// The tool result.
-        result: ToolResult,
+        result: MessageToolResult,
     },
     /// Turn has ended.
     TurnEnd {
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn message_roundtrip_tool() {
         let msg = Message::Tool {
-            result: ToolResult {
+            result: MessageToolResult {
                 tool_use_id: "call_1".into(),
                 content: "fn main() {}".into(),
                 is_error: false,
@@ -214,7 +214,7 @@ mod tests {
                 summary_fields: vec![],
             },
             AgentEvent::ToolResult {
-                result: ToolResult {
+                result: MessageToolResult {
                     tool_use_id: "c1".into(),
                     content: "file.rs".into(),
                     is_error: false,

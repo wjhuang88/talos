@@ -1028,7 +1028,7 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let session_manager_for_persist = session_manager.clone();
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
-        let mut pending_tool_results: Vec<talos_core::message::ToolResult> = Vec::new();
+        let mut pending_tool_results: Vec<talos_core::message::MessageToolResult> = Vec::new();
         while let Some(session_event) = bridge_forwarder.recv().await {
             match session_event {
                 SessionEvent::AgentEvent(ref agent_event) => {

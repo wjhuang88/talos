@@ -422,7 +422,7 @@ impl Session {
                     } else {
                         // Treat as tool result
                         Some(Message::Tool {
-                            result: talos_core::message::ToolResult {
+                            result: talos_core::message::MessageToolResult {
                                 tool_use_id: "unknown".to_string(),
                                 content: entry.content,
                                 is_error: false,
@@ -829,7 +829,7 @@ impl Default for SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_core::message::{StopReason, ToolCall, ToolResult, Usage};
+    use talos_core::message::{MessageToolResult, StopReason, ToolCall, Usage};
 
     fn test_manager() -> SessionManager {
         let dir = tempfile::tempdir().unwrap();
@@ -1121,7 +1121,7 @@ mod tests {
         let session = manager.create_session("test-project", "").unwrap();
 
         let msg = Message::Tool {
-            result: ToolResult {
+            result: MessageToolResult {
                 tool_use_id: "call_1".into(),
                 content: "fn main() {}".into(),
                 is_error: false,
@@ -1136,7 +1136,7 @@ mod tests {
         assert_eq!(
             messages[0],
             Message::Tool {
-                result: ToolResult {
+                result: MessageToolResult {
                     tool_use_id: "unknown".into(),
                     content: "fn main() {}".into(),
                     is_error: false,

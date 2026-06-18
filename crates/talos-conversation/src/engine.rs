@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use futures::stream;
-use talos_core::message::{AgentEvent, StopReason, ToolResult, Usage};
+use talos_core::message::{AgentEvent, MessageToolResult, StopReason, Usage};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
@@ -470,7 +470,7 @@ impl ConversationEngine {
         });
     }
 
-    fn set_tool_result(&mut self, result: &ToolResult) -> Option<String> {
+    fn set_tool_result(&mut self, result: &MessageToolResult) -> Option<String> {
         for msg in self.messages.iter_mut().rev() {
             if let Some(ref mut tool_call) = msg.tool_call
                 && tool_call.result.is_none()

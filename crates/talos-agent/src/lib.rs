@@ -29,9 +29,7 @@ pub mod session;
 
 use futures_util::future::join_all;
 use serde_json::Value;
-use talos_core::message::{
-    AgentEvent, Message, StopReason, ToolCall, ToolResult as MessageToolResult, Usage,
-};
+use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{
     ToolProtocol, ToolProvenance, ToolRegistry, ToolResult as ToolExecutionResult,
