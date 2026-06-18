@@ -58,3 +58,5 @@ docs/proposals/
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.
 - [Remote Session Protocol](remote-session-protocol.md) — far-future research proposal for remote
   session query and command protocol (mobile app, web dashboard, cross-device continuity).
+- [WASM Runtime Plugin Protocol](wasm-runtime-plugin-protocol.md) — long-term protocol-first
+  design for WASM plugins that can provide tools, hooks, filters, and future capabilities.
