@@ -28,7 +28,10 @@ protocol servers, load WASM, or build UI surfaces.
       decide produce/consume/bidirectional direction for Talos.
 - [ ] #I036-S5: Reconcile MEM-005 context compaction policy with session/resource usage UX so
       future long-session work has clear trigger and observability rules.
-- [ ] #I036-S6: Produce a follow-up execution map: which items become ADRs, which become
+- [ ] #I036-S6: Refine MODEL-001 into an ADR-ready plan for built-in model data, models.dev
+      import/cache, reasoning/thinking capability handling, pricing, and compaction-limit
+      integration.
+- [ ] #I036-S7: Produce a follow-up execution map: which items become ADRs, which become
       implementation stories, which stay deferred, and which dependencies block each path.
 
 ## Research Inputs
@@ -38,6 +41,7 @@ protocol servers, load WASM, or build UI surfaces.
 - `docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md`
 - `docs/backlog/active/OKF-001-native-okf-support.md`
 - `docs/backlog/active/MEM-005-context-compaction-policy.md`
+- `docs/backlog/active/MODEL-001-model-catalog-and-reasoning.md`
 - `docs/backlog/active/AGENT-001-standard-agent-protocol-support.md`
 - `docs/backlog/active/MCP-001-session-mcp-integration.md`
 - `docs/backlog/active/SKILL-001-runtime-skill-activation.md`
@@ -53,6 +57,8 @@ protocol servers, load WASM, or build UI surfaces.
 - [ ] OKF-001 cites the live upstream SPEC commit/date used for the research.
 - [ ] MEM-005 has clear integration notes for token/resource visibility and TUI exit/session
       summary behavior.
+- [ ] MODEL-001 has clear decisions for built-in model data, models.dev import/cache,
+      reasoning/thinking handling, and compaction limit precedence.
 - [ ] Backlog rows and proposal docs are synchronized with the research outcomes.
 - [ ] No implementation code is changed except documentation, proposals, ADRs, or tests for
       governance validation.
@@ -65,6 +71,8 @@ protocol servers, load WASM, or build UI surfaces.
 - OKF upstream may change; all OKF conclusions must cite the exact live source version.
 - WASM runtime selection is dependency-sensitive under ADR-010; do not choose a runtime without
   explicit ADR review.
+- Model catalog data may become stale. Built-in data and refreshed catalog cache must expose
+  source dates and never override explicit user config.
 - Research can sprawl. If a question cannot be closed inside I036, record the blocker and keep it
   deferred instead of starting implementation.
 

@@ -30,6 +30,11 @@ Required policy decisions:
 
 - Trigger thresholds based on provider context window, estimated token usage,
   tool-result pressure, and reserved output budget.
+- Model metadata source precedence for context/output limits, including explicit
+  user config, refreshed catalog cache, built-in model data, and conservative
+  fallback.
+- Reserved reasoning/thinking budget when the active model uses hidden or
+  interleaved reasoning tokens.
 - Pre-turn compaction behavior before sending messages to the provider.
 - Post-turn maintenance behavior after large tool outputs or long assistant
   responses.
@@ -53,10 +58,21 @@ Implementation may land in either order if scoped carefully:
 - MEM-005 can first formalize policy around existing layers 1-3.
 - MEM-003 is needed before the policy can use full LLM summarization.
 
+## Relationship To MODEL-001
+
+MODEL-001 supplies the model metadata needed by this policy: context window,
+output limit, pricing, and reasoning/thinking capability. MEM-005 should not
+hardcode a single default context limit when catalog or user-configured limits
+are available.
+
 ## Acceptance Criteria
 
 - [ ] Compaction trigger thresholds are documented and configurable through
       provider/model limits where available.
+- [ ] Trigger calculation reserves output budget and reasoning/thinking budget
+      when the active model requires it.
+- [ ] Limit source precedence is documented: user config, refreshed catalog,
+      built-in model dataset, then fallback.
 - [ ] Pre-turn compaction runs before provider calls when context pressure
       exceeds the threshold.
 - [ ] Post-turn maintenance can mark the session as needing compaction after
@@ -79,8 +95,9 @@ Implementation may land in either order if scoped carefully:
 
 - `docs/backlog/active/MEM-002-conversation-context-continuity.md`
 - `docs/backlog/active/MEM-003-llm-compaction.md`
+- `docs/backlog/active/MODEL-001-model-catalog-and-reasoning.md`
 - `docs/backlog/active/TUI-009-input-and-session-exit-polish.md`
-- `docs/decisions/016-memory-layering.md`
+- `docs/decisions/016-layered-memory-architecture.md`
 - `crates/talos-agent/src/compaction.rs`
 - `crates/talos-agent/src/lib.rs`
 - `crates/talos-session/src/lib.rs`

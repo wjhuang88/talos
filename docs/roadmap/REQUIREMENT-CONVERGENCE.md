@@ -41,7 +41,7 @@ verification evidence, and public status all agree.
 | Four-layer memory architecture | ADR-016 | #I019-S1/S2; I019 Layered Memory Foundation | Planned | Working, episodic, semantic, and procedural memory are separate; consolidation is explicit and provenance-backed |
 | Conversation context continuity (Working + Episodic) | ADR-016; session-context-contamination proposal | MEM-002 → I024 | Review | Agent receives session history in every turn; JSONL-backed resume is tested; layers 1-3 compaction are wired. Complete requires final runtime evidence or explicit closeout note; layers 4-5 residual is tracked by MEM-003. |
 | Built-in exploration and local research library | ADR-017 | #I020-S1/S2; I020 Exploration Library | Planned | Research runs store sources, claims, syntheses, and unresolved questions locally; vector/graph stores stay Spike-gated |
-| Reasoning/thinking provider fields | Reasoning proposal; ADR required before story implementation | Future story after #I011-S2 or explicit activation | Proposal | Provider request schema, stream event shape, persistence, TUI/RPC exposure, and evolution hook impact are recorded before code |
+| Reasoning/thinking provider fields | Reasoning proposal; ADR required before story implementation; MODEL-001 | MODEL-001; I036 research consolidation | Planned | Provider request schema, stream event shape, persistence, TUI/RPC exposure, model catalog capability flags, usage/cost handling, and evolution hook impact are recorded before code |
 | Self-evolution runtime wiring | ADR-001; ADR-005 hook-driven evolution clarification | I008 Complete | Complete (2026-06-03) | Hook-based EvolutionHookHandler registered uniformly across all paths; runtime evidence recorded |
 
 ## Closed Documentation Corrections
@@ -63,7 +63,8 @@ verification evidence, and public status all agree.
 - Guardian auto-approval and exec policy DSL must follow ADR-011 and ADR-012 respectively.
 - Provider plugin S2 must follow ADR-013. Reasoning/thinking support must not use proposals alone
   as execution authority when it changes config schema, provider protocol, persisted session fields,
-  or public stream/RPC events.
+  or public stream/RPC events; MODEL-001 is the backlog owner for turning the proposal into an
+  ADR-ready design.
 - Logging R2 file output and cleanup must follow ADR-014. JSON logs, span contracts, or a shared
   logging crate require follow-up decision coverage if they expand the public observability contract.
 - Embedded prompt assets must follow ADR-015; user-editable prompt packs require a separate
