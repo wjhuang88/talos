@@ -36,6 +36,10 @@ pub enum BashError {
 pub struct BashInput {
     /// The shell command to execute.
     pub command: String,
+    /// Optional timeout in seconds. Clamped to [1, 600]. Defaults to 120 if omitted.
+    #[serde(default)]
+    #[schemars(range(min = 1, max = 600))]
+    pub timeout_secs: Option<u64>,
 }
 
 /// A tool that executes shell commands via `sh -c`.
@@ -108,13 +112,19 @@ impl AgentTool for BashTool {
             Err(e) => return ToolResult::error(e.to_string()),
         };
 
-        let result = timeout(self.timeout, self.run_command(&bash_input.command)).await;
+        const MAX_TIMEOUT_SECS: u64 = 600;
+        let timeout_duration = bash_input
+            .timeout_secs
+            .map(|s| Duration::from_secs(s.clamp(1, MAX_TIMEOUT_SECS)))
+            .unwrap_or(self.timeout);
+
+        let result = timeout(timeout_duration, self.run_command(&bash_input.command)).await;
 
         match result {
             Ok(exec_result) => exec_result,
             Err(_) => ToolResult::error(format!(
                 "command timed out after {}ms",
-                self.timeout.as_millis()
+                timeout_duration.as_millis()
             )),
         }
     }
@@ -210,8 +220,11 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
         .and_then(Value::as_str)
         .ok_or_else(|| BashError::InvalidInput("missing required field 'command'".to_owned()))?;
 
+    let timeout_secs = obj.get("timeout_secs").and_then(Value::as_u64);
+
     Ok(BashInput {
         command: command.to_owned(),
+        timeout_secs,
     })
 }
 
