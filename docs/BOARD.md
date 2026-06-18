@@ -54,6 +54,7 @@ acceptance criteria, verification evidence, or iteration state.
 | ARCH-011 Architecture Watchlist | Planned | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Track tests.rs, prompt.rs, scrollback.rs as observation-only module-growth risks |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Planned | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input instead of Esc; clean exit prints compact session usage summary |
+| TUI-010 Slash Command Menu Below Input | Planned | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | Typing `/` opens a Codex-like command menu below the composer with filtering and keyboard navigation |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 

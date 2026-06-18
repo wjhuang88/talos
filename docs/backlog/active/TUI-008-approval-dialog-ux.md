@@ -22,6 +22,9 @@ appears at the bottom right corner of the TUI. This position is:
 - Move approval dialog to a more prominent position (center overlay or inline)
 - Add a brief attention animation or border highlight on appearance
 - Ensure the dialog is visible even when terminal is narrow
+- Once TUI-010's input-layer popup stack exists, evaluate rendering approval
+  through that shared layer instead of maintaining a separate bottom-right
+  overlay.
 
 ## Acceptance Criteria
 
@@ -33,3 +36,4 @@ appears at the bottom right corner of the TUI. This position is:
 
 - `crates/talos-tui/src/widgets.rs` (ApprovalOverlay)
 - `crates/talos-tui/src/app.rs` (approval rendering)
+- `docs/backlog/active/TUI-010-slash-command-menu.md`
