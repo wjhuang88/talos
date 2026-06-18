@@ -53,6 +53,7 @@ acceptance criteria, verification evidence, or iteration state.
 | ARCH-010 CLI and Tools Module Cleanup | Planned | [ARCH-010](backlog/active/ARCH-010-cli-tools-module-cleanup.md) | talos-cli/main.rs (1250 lines) + talos-tools/file_tools.rs (1308 lines) residual cleanup |
 | ARCH-011 Architecture Watchlist | Planned | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Track tests.rs, prompt.rs, scrollback.rs as observation-only module-growth risks |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
+| TUI-009 Input Clear And Session Exit Summary | Planned | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input instead of Esc; clean exit prints compact session usage summary |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 
@@ -80,4 +81,5 @@ acceptance criteria, verification evidence, or iteration state.
 | PLUGIN-001 WASM Runtime Plugin Protocol | Research | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Design protocol spec for WASM plugins providing tools, hooks, and filters; ADR required before runtime implementation |
 | I017 Embedded Git Tools | P0-P2 Complete | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Read/write Git tools delivered in I026; future scope starts from P3 advanced tools |
 | I019 Layered Memory Foundation | Planned | [MEM-001 Layered Memory Foundation](backlog/active/MEM-001-layered-memory-foundation.md) | Start after I018 or explicit memory priority; follow ADR-016 |
+| MEM-005 Context Compaction Policy | Planned | [MEM-005 Context Compaction Policy](backlog/active/MEM-005-context-compaction-policy.md) | Define automatic/manual compaction triggers, pre-turn ordering, status visibility, and failure fallback |
 | I020 Exploration Library | Planned | [RES-001 Exploration Library](backlog/active/RES-001-exploration-library.md) | Start after I019 or explicit research priority; follow ADR-017 |
