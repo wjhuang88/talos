@@ -9,6 +9,8 @@ pub mod error;
 pub mod framing;
 pub mod methods;
 pub mod protocol;
+pub mod runtime;
 pub mod server;
 
+pub use runtime::{Runtime, RuntimeError};
 pub use server::RpcServer;

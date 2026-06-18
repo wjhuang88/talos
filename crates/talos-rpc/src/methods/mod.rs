@@ -6,11 +6,11 @@ pub mod system;
 use std::sync::Arc;
 
 use serde_json::Value;
-use talos_agent::Agent;
 
 use crate::cancel::CancelRegistry;
 use crate::error::RpcError;
 use crate::protocol::{JsonRpcId, JsonRpcNotification};
+use crate::runtime::Runtime;
 
 /// Method invocation result including optional notifications.
 pub struct MethodResult {
@@ -23,8 +23,8 @@ pub struct MethodResult {
 /// Shared context for RPC method handlers.
 #[derive(Clone)]
 pub struct MethodContext {
-    /// Agent instance backing method execution.
-    pub agent: Arc<Agent>,
+    /// Runtime instance backing method execution.
+    pub agent: Arc<dyn Runtime>,
     /// In-flight cancellation token registry.
     pub cancel_registry: Arc<CancelRegistry>,
 }

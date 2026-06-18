@@ -12,6 +12,7 @@ use crate::error::RpcError;
 use crate::framing::{read_line, write_json_line};
 use crate::methods::{MethodContext, dispatch_method, response_id_or_null};
 use crate::protocol::{JSON_RPC_VERSION, JsonRpcRequest, JsonRpcResponse};
+use crate::runtime::Runtime;
 
 /// JSON-RPC server.
 pub struct RpcServer {
@@ -19,9 +20,9 @@ pub struct RpcServer {
 }
 
 impl RpcServer {
-    /// Creates a new RPC server bound to an [`talos_agent::Agent`].
+    /// Creates a new RPC server bound to a [`Runtime`].
     #[must_use]
-    pub fn new(agent: Arc<talos_agent::Agent>) -> Self {
+    pub fn new(agent: Arc<dyn Runtime>) -> Self {
         Self {
             ctx: MethodContext {
                 agent,

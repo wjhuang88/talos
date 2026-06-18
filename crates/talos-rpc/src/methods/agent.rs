@@ -137,7 +137,6 @@ pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodRes
             result = &mut run_task => {
                 result
                     .map_err(|e| RpcError::Internal(e.to_string()))?
-                    .map(|(text, _)| text)
                     .map_err(|e| RpcError::Internal(e.to_string()))?
             }
         }

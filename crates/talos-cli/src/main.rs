@@ -16,6 +16,7 @@ mod approval;
 mod colors;
 mod event_loop;
 mod logging;
+mod runtime_adapter;
 
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
@@ -524,7 +525,7 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
     );
     agent.set_tool_protocol(config.tool_protocol());
 
-    let server = RpcServer::new(Arc::new(agent));
+    let server = RpcServer::new(Arc::new(runtime_adapter::AgentRuntime(agent)));
     server.run_stdio().await
     // I009-S5 end
 }

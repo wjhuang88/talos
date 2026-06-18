@@ -1,16 +1,32 @@
 use std::sync::Arc;
 
-use talos_agent::Agent;
-use talos_core::tool::ToolRegistry;
-use talos_provider::mock::MockProvider;
-use talos_rpc::server::RpcServer;
+use async_trait::async_trait;
+use talos_core::message::{AgentEvent, Message};
+use talos_rpc::{RpcServer, Runtime, RuntimeError};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::mpsc;
+
+struct StubRuntime;
+
+#[async_trait]
+impl Runtime for StubRuntime {
+    async fn run(&self, _user_message: String) -> Result<String, RuntimeError> {
+        Ok(String::new())
+    }
+
+    async fn run_streaming(
+        &self,
+        _user_message: String,
+        _history: Vec<Message>,
+        _event_tx: mpsc::UnboundedSender<AgentEvent>,
+    ) -> Result<String, RuntimeError> {
+        Ok(String::new())
+    }
+}
 
 #[tokio::test]
 async fn unknown_method_returns_method_not_found() {
-    #[allow(deprecated)]
-    let agent = Agent::new(Arc::new(MockProvider::new()), ToolRegistry::new());
-    let server = RpcServer::new(Arc::new(agent));
+    let server = RpcServer::new(Arc::new(StubRuntime));
 
     let (mut client_in, server_in) = tokio::io::duplex(8 * 1024);
     let (server_out, mut client_out) = tokio::io::duplex(8 * 1024);
