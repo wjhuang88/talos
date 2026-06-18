@@ -3,13 +3,13 @@
 //! Keep all direct `rmcp` model interactions in this file so future version
 //! bumps have a single adaptation point.
 
-use rmcp::model::Tool;
 use serde_json::Value;
 
 use crate::error::{McpError, Result};
+use crate::types::McpToolDescriptor;
 
-/// Parses the `tools/list` JSON-RPC result into a vector of rmcp tools.
-pub fn decode_tools_list(result: Value, server: &str) -> Result<Vec<Tool>> {
+/// Parses the `tools/list` JSON-RPC result into a vector of Talos-owned tool descriptors.
+pub fn decode_tools_list(result: Value, server: &str) -> Result<Vec<McpToolDescriptor>> {
     let raw_tools = if let Some(array) = result.as_array() {
         Value::Array(array.clone())
     } else {
@@ -20,55 +20,49 @@ pub fn decode_tools_list(result: Value, server: &str) -> Result<Vec<Tool>> {
         })?
     };
 
-    serde_json::from_value(raw_tools).map_err(McpError::from)
-}
+    let tools_array = raw_tools.as_array().ok_or_else(|| McpError::Rpc {
+        server: server.to_string(),
+        method: "tools/list".to_string(),
+        message: "'tools' field is not an array".to_string(),
+    })?;
 
-/// Returns the tool name.
-pub fn tool_name(tool: &Tool) -> Option<String> {
-    serde_json::to_value(tool)
-        .ok()?
-        .get("name")?
-        .as_str()
-        .map(ToOwned::to_owned)
-}
-
-/// Returns the tool description if present.
-pub fn tool_description(tool: &Tool) -> Option<String> {
-    serde_json::to_value(tool)
-        .ok()?
-        .get("description")?
-        .as_str()
-        .map(ToOwned::to_owned)
-}
-
-/// Returns the tool input schema, defaulting to `{ "type": "object" }`.
-pub fn tool_input_schema(tool: &Tool) -> Value {
-    let fallback = serde_json::json!({ "type": "object" });
-    match serde_json::to_value(tool) {
-        Ok(value) => value
+    let mut descriptors = Vec::with_capacity(tools_array.len());
+    for tool_value in tools_array {
+        let name = tool_value
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_owned();
+        let description = tool_value
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned();
+        let fallback = serde_json::json!({ "type": "object" });
+        let input_schema = tool_value
             .get("inputSchema")
             .cloned()
-            .or_else(|| value.get("input_schema").cloned())
-            .unwrap_or(fallback),
-        Err(_) => fallback,
+            .or_else(|| tool_value.get("input_schema").cloned())
+            .unwrap_or(fallback);
+        let read_only_hint = tool_value
+            .get("annotations")
+            .and_then(Value::as_object)
+            .and_then(|ann| {
+                ann.get("readOnlyHint")
+                    .or_else(|| ann.get("read_only_hint"))
+            })
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+        descriptors.push(McpToolDescriptor {
+            name,
+            description,
+            input_schema,
+            read_only_hint,
+        });
     }
-}
 
-/// Returns whether the tool is hinted as read-only.
-pub fn tool_is_read_only(tool: &Tool) -> bool {
-    let Ok(value) = serde_json::to_value(tool) else {
-        return false;
-    };
-
-    value
-        .get("annotations")
-        .and_then(Value::as_object)
-        .and_then(|ann| {
-            ann.get("readOnlyHint")
-                .or_else(|| ann.get("read_only_hint"))
-        })
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
+    Ok(descriptors)
 }
 
 /// Converts `tools/call` result payload into user-visible text.

@@ -3,10 +3,12 @@
 use std::sync::Arc;
 
 use rmcp::ErrorData as McpError;
-use rmcp::model::{CallToolRequestParams, ErrorCode};
+use rmcp::model::ErrorCode;
 use talos_core::message::ToolCall;
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{HookContext, HookEvent, HookRegistry};
+
+use crate::types::McpCallRequest;
 
 /// Permission gate that enforces hook dispatch and permission decisions.
 pub struct McpPermissionGate {
@@ -28,7 +30,7 @@ impl McpPermissionGate {
     pub async fn evaluate_call(
         &self,
         hook_context: &HookContext,
-        request: &CallToolRequestParams,
+        request: &McpCallRequest,
     ) -> Result<(), McpError> {
         let tool_call = to_tool_call(request);
 
@@ -51,7 +53,7 @@ impl McpPermissionGate {
             .unwrap_or_else(|| serde_json::json!({}));
         let decision = self
             .permission_engine
-            .evaluate(request.name.as_ref(), &input);
+            .evaluate(request.name.as_str(), &input);
 
         self.run_hook(
             hook_context,
@@ -90,10 +92,10 @@ impl McpPermissionGate {
     }
 }
 
-fn to_tool_call(request: &CallToolRequestParams) -> ToolCall {
+fn to_tool_call(request: &McpCallRequest) -> ToolCall {
     ToolCall {
         id: format!("mcp:{}", request.name),
-        name: request.name.to_string(),
+        name: request.name.clone(),
         input: request
             .arguments
             .clone()

@@ -67,8 +67,12 @@ impl ServerHandler for TalosMcpHandler {
         _context: rmcp::service::RequestContext<rmcp::RoleServer>,
     ) -> Result<CallToolResult, McpError> {
         let hook_context = HookContext::new(TurnId::new(), std::path::PathBuf::from("."));
+        let talos_request = crate::types::McpCallRequest {
+            name: request.name.to_string(),
+            arguments: request.arguments.clone(),
+        };
         self.permission_gate
-            .evaluate_call(&hook_context, &request)
+            .evaluate_call(&hook_context, &talos_request)
             .await?;
 
         let Some(tool) = self.tool_registry.get(request.name.as_ref()) else {

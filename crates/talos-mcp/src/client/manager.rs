@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use talos_config::{McpConfig, McpServerConfig};
 use talos_core::tool::AgentTool;
 use talos_plugin::HookRegistry;
 use tokio::process::Child;
@@ -12,6 +11,7 @@ use crate::client::adapter::{McpRemoteTool, McpToolAdapter};
 use crate::client::dispatcher::McpDispatcher;
 use crate::client::transport::spawn_stdio_transport;
 use crate::error::{McpError, Result};
+use crate::types::{McpClientConfig, McpServerLaunchConfig};
 
 /// Non-fatal startup failure for one MCP server.
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ pub struct McpClientManager {
 
 impl McpClientManager {
     /// Starts all configured MCP clients.
-    pub async fn start(config: &McpConfig, hook_registry: Arc<HookRegistry>) -> Result<Self> {
+    pub async fn start(config: &McpClientConfig, hook_registry: Arc<HookRegistry>) -> Result<Self> {
         let mut clients = Vec::new();
         let mut startup_failures = Vec::new();
 
@@ -63,7 +63,7 @@ impl McpClientManager {
         })
     }
 
-    async fn start_one(server: &McpServerConfig) -> Result<ManagedClient> {
+    async fn start_one(server: &McpServerLaunchConfig) -> Result<ManagedClient> {
         if server.transport != "stdio" {
             // TODO: I009-future support HTTP transport.
             return Err(McpError::InvalidConfig(format!(
@@ -119,13 +119,12 @@ impl McpClientManager {
                             server: client.dispatcher.server().to_string(),
                             original,
                         };
-                        if let Some(adapter) = McpToolAdapter::new(
+                        let adapter = McpToolAdapter::new(
                             remote,
                             client.dispatcher.clone(),
                             self.hook_registry.clone(),
-                        ) {
-                            tools.push(Arc::new(adapter));
-                        }
+                        );
+                        tools.push(Arc::new(adapter));
                     }
                 }
                 Err(error) => {

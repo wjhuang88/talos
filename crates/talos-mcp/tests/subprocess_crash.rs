@@ -2,17 +2,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use talos_config::{McpConfig, McpServerConfig};
 use talos_mcp::client::McpClientManager;
+use talos_mcp::types::{McpClientConfig, McpServerLaunchConfig};
 use talos_plugin::HookRegistry;
 
 #[tokio::test]
 async fn subprocess_crash_is_reported_and_other_servers_continue() {
     let fixture_path = build_fixture_binary();
 
-    let config = McpConfig {
+    let config = McpClientConfig {
         servers: vec![
-            McpServerConfig {
+            McpServerLaunchConfig {
                 name: "crash".to_string(),
                 transport: "stdio".to_string(),
                 command: "/usr/bin/false".to_string(),
@@ -20,7 +20,7 @@ async fn subprocess_crash_is_reported_and_other_servers_continue() {
                 env: HashMap::new(),
                 cwd: None,
             },
-            McpServerConfig {
+            McpServerLaunchConfig {
                 name: "ok".to_string(),
                 transport: "stdio".to_string(),
                 command: fixture_path.to_string_lossy().to_string(),

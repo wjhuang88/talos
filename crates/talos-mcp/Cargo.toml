@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { path = "../talos-core" }
-talos-config = { path = "../talos-config" }
 talos-plugin = { path = "../talos-plugin" }
 # I009-S4 begin
 talos-permission = { path = "../talos-permission" }

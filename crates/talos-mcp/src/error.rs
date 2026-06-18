@@ -45,7 +45,12 @@ pub enum McpError {
     #[error("MCP IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// rmcp-specific failure.
-    #[error("rmcp error: {0}")]
-    Rmcp(#[from] rmcp::ErrorData),
+    /// MCP protocol-level error (code + message from the remote).
+    #[error("MCP protocol error: {message}")]
+    Protocol {
+        /// Protocol error code.
+        code: i64,
+        /// Error message.
+        message: String,
+    },
 }

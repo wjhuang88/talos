@@ -10,4 +10,7 @@ pub mod error;
 pub mod server;
 // I009-S4 end
 
+pub mod types;
+
 pub use error::{McpError, Result};
+pub use types::{McpCallRequest, McpClientConfig, McpServerLaunchConfig, McpToolDescriptor};

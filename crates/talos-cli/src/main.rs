@@ -32,8 +32,6 @@ use talos_agent::Agent;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
-#[cfg(debug_assertions)]
-use talos_config::McpServerConfig;
 use talos_config::{Config, ProviderProtocol};
 use talos_conversation::{ConversationEngine, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
@@ -44,6 +42,7 @@ use talos_evolution::store::KnowledgeStore;
 use talos_evolution::{EvolutionConfig, EvolutionHookHandler};
 use talos_mcp::client::McpClientManager;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
+use talos_mcp::types::{McpClientConfig, McpServerLaunchConfig};
 use talos_permission::{PermissionDecision, PermissionRule};
 use talos_plugin::{HookRegistry, LoggingHandler};
 use talos_provider::AnthropicProvider;
@@ -65,6 +64,23 @@ use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
+
+fn config_to_mcp_client_config(config: &talos_config::McpConfig) -> McpClientConfig {
+    McpClientConfig {
+        servers: config
+            .servers
+            .iter()
+            .map(|s| McpServerLaunchConfig {
+                name: s.name.clone(),
+                transport: s.transport.clone(),
+                command: s.command.clone(),
+                args: s.args.clone(),
+                env: s.env.clone(),
+                cwd: s.cwd.clone(),
+            })
+            .collect(),
+    }
+}
 
 /// Non-blocking approval handler for TUI mode.
 ///
@@ -723,7 +739,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     // I009-S3 begin
     #[cfg(debug_assertions)]
     if let Some(path) = cli.mcp_server_fixture.clone() {
-        config.mcp.servers = vec![McpServerConfig {
+        config.mcp.servers = vec![talos_config::McpServerConfig {
             name: "fixture".to_string(),
             transport: "stdio".to_string(),
             command: path.to_string_lossy().to_string(),
@@ -741,7 +757,8 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     #[cfg(not(debug_assertions))]
     let fixture_mode = false;
 
-    let mcp_manager = McpClientManager::start(&config.mcp, hooks.clone()).await?;
+    let mcp_manager =
+        McpClientManager::start(&config_to_mcp_client_config(&config.mcp), hooks.clone()).await?;
     for startup_failure in mcp_manager.startup_failures() {
         eprintln!(
             "Warning: MCP server '{}' failed to start: {}",
@@ -1853,7 +1870,7 @@ fn run_search_mode(cli: Cli) -> Result<()> {
     let manager = SessionManager::new().context("failed to initialize session manager")?;
 
     let results = manager.search(query, cli.limit).map_err(|e| match e {
-        IndexError::SqliteError(e) => {
+        IndexError::Store(e) => {
             anyhow!("search error: {e}\nHint: run a session first to build the index.")
         }
         IndexError::IoError(e) => anyhow!("I/O error: {e}"),
@@ -1908,7 +1925,7 @@ fn run_list_mode(cli: Cli) -> Result<()> {
     let manager = SessionManager::new().context("failed to initialize session manager")?;
 
     let sessions = manager.list_recent(cli.limit).map_err(|e| match e {
-        IndexError::SqliteError(e) => {
+        IndexError::Store(e) => {
             anyhow!("list error: {e}\nHint: run `talos --search <term>` first to build the index.")
         }
         IndexError::IoError(e) => anyhow!("I/O error: {e}"),

@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use rmcp::model::Tool;
 use serde_json::Value;
 use talos_core::message::ToolCall;
 use talos_core::tool::{AgentTool, ToolResult};
@@ -11,14 +10,15 @@ use talos_plugin::{HookEvent, HookRegistry, ToolObservation};
 
 use crate::client::dispatcher::McpDispatcher;
 use crate::client::facade;
+use crate::types::McpToolDescriptor;
 
 /// MCP remote tool metadata stored for adapter construction.
 #[derive(Clone)]
 pub struct McpRemoteTool {
     /// MCP server name.
     pub server: String,
-    /// Original rmcp tool descriptor.
-    pub original: Tool,
+    /// Talos-owned tool descriptor.
+    pub original: McpToolDescriptor,
 }
 
 /// A small adapter that bridges MCP remote tools into Talos `AgentTool`.
@@ -38,16 +38,18 @@ impl McpToolAdapter {
         remote: McpRemoteTool,
         dispatcher: Arc<McpDispatcher>,
         hook_registry: Arc<HookRegistry>,
-    ) -> Option<Self> {
-        let name = facade::tool_name(&remote.original)?;
+    ) -> Self {
+        let name = &remote.original.name;
         let prefixed_name = format!("mcp:{}:{}", remote.server, name);
-        let description = facade::tool_description(&remote.original).unwrap_or_else(|| {
+        let description = if remote.original.description.is_empty() {
             format!("Remote MCP tool '{}' from server '{}'", name, remote.server)
-        });
-        let schema = facade::tool_input_schema(&remote.original);
-        let read_only = facade::tool_is_read_only(&remote.original);
+        } else {
+            remote.original.description.clone()
+        };
+        let schema = remote.original.input_schema.clone();
+        let read_only = remote.original.read_only_hint;
 
-        Some(Self {
+        Self {
             prefixed_name,
             description,
             schema,
@@ -55,11 +57,7 @@ impl McpToolAdapter {
             remote,
             dispatcher,
             hook_registry,
-        })
-    }
-
-    fn original_name(&self) -> Option<String> {
-        facade::tool_name(&self.remote.original)
+        }
     }
 }
 
@@ -93,19 +91,17 @@ impl AgentTool for McpToolAdapter {
             .dispatch(&ctx, HookEvent::OnToolCallProposed { call: &call })
             .await;
 
-        let result = match self.original_name() {
-            Some(original_name) => match self.dispatcher.call_tool(&original_name, input).await {
-                Ok(payload) => {
-                    let content = facade::call_result_to_text(payload);
-                    tracing::info!(tool = %self.prefixed_name, content = %content, "MCP remote tool call succeeded");
-                    ToolResult::success(content)
-                }
-                Err(error) => {
-                    tracing::warn!(tool = %self.prefixed_name, %error, "MCP remote tool call failed");
-                    ToolResult::error(error.to_string())
-                }
-            },
-            None => ToolResult::error("MCP tool missing name"),
+        let original_name = &self.remote.original.name;
+        let result = match self.dispatcher.call_tool(original_name, input).await {
+            Ok(payload) => {
+                let content = facade::call_result_to_text(payload);
+                tracing::info!(tool = %self.prefixed_name, content = %content, "MCP remote tool call succeeded");
+                ToolResult::success(content)
+            }
+            Err(error) => {
+                tracing::warn!(tool = %self.prefixed_name, %error, "MCP remote tool call failed");
+                ToolResult::error(error.to_string())
+            }
         };
 
         let observation = ToolObservation {

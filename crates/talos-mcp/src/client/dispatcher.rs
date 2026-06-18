@@ -2,12 +2,12 @@
 
 use std::sync::Arc;
 
-use rmcp::model::Tool;
 use serde_json::{Value, json};
 
 use crate::client::facade;
 use crate::client::transport::McpTransport;
 use crate::error::{McpError, Result};
+use crate::types::McpToolDescriptor;
 
 /// Method dispatcher bound to one MCP server transport.
 #[derive(Clone)]
@@ -26,7 +26,7 @@ impl McpDispatcher {
     }
 
     /// Lists tools exposed by the remote server.
-    pub async fn list_tools(&self) -> Result<Vec<Tool>> {
+    pub async fn list_tools(&self) -> Result<Vec<McpToolDescriptor>> {
         let result = self
             .transport
             .request("tools/list", Some(json!({})))
