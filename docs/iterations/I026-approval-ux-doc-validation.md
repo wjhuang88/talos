@@ -1,7 +1,8 @@
 # I026: Approval UX + Git Tools + Prompt Optimization
 
-**Status**: Review
+**Status**: Complete
 **Started**: 2026-06-17
+**Closed**: 2026-06-18
 **Depends On**: TOOL-002 (Approval bug), ARCH-002 (Prompt template/cache), GIT-001 (Git tools)
 
 ## Outcome
@@ -117,9 +118,20 @@ Residual documentation debt:
 ## Exit Criteria
 
 - [x] All 7 stories complete
-- [ ] cargo clippy --workspace -- -D warnings passes
-- [ ] cargo test --workspace passes
+- [x] cargo clippy --workspace -- -D warnings passes
+- [x] cargo test --workspace passes
 - [x] BOARD.md updated with final state
+
+## Residual Work
+
+- **ARCH-007 — Workspace `clippy --all-targets` cleanup**: the I026 verification command
+  `cargo clippy --workspace -- -D warnings` (lib + bin targets only) passes, but
+  `cargo clippy --workspace --all-targets -- -D warnings` surfaces ~35 pre-existing
+  `clippy::unwrap_used` warnings in `crates/talos-conversation/src/engine_tests.rs` (and
+  possibly elsewhere) because `[workspace.lints.clippy] unwrap_used = "warn"` is set in the
+  root `Cargo.toml`. These warnings predate I026 and are not caused by any I026 change, but the
+  verification scope gap is now registered as a follow-up cleanup story. See
+  `docs/backlog/active/ARCH-007-clippy-all-targets-cleanup.md`.
 
 ## Verification Log
 
@@ -134,3 +146,17 @@ Residual documentation debt:
 - `cargo clippy --workspace -- -D warnings` — passed.
 - `cargo test --workspace` — passed (1 ignored timing-sensitive test).
 - `scripts/validate_project_governance.sh .` — passed with 0 warnings.
+
+## Closure Verification (2026-06-18)
+
+Re-ran the two unchecked exit-criteria commands before marking Complete:
+
+- `cargo clippy --workspace -- -D warnings` — passed (5.54s, no warnings).
+  Scope note: this is the lib + bin target scope; `--all-targets` test-target failures are
+  pre-existing and registered as ARCH-007.
+- `cargo test --workspace` — passed. All suites green (142 + 91 + 81 + 63 + 55×2 + 46 + 42 +
+  36 + 33 + 26 + 25×2 + 13 + 4 + 3 + 2×4 + 1×8 + 0×6 across all crates). One pre-existing
+  ignored timing-sensitive test retained.
+
+No I026-introduced regressions found. The iteration is closed; ARCH-007 tracks the only
+residual verification scope gap.

@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I026 Approval UX Fix + Doc Validation | Review | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | All 7 stories implemented; clippy, workspace tests, and governance validation pass |
+| (no active iteration — see Next for candidates) | — | — | Pick next from BOARD Next after I027 closure |
 
 ## Review
 
@@ -41,7 +41,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
-| ARCH-003 Crate Boundary Cleanup | Planned | [ARCH-003 Crate Boundary Cleanup](backlog/active/ARCH-003-crate-boundary-cleanup.md) | Remove dead MCP dependency, decouple RPC from concrete Agent, disambiguate ToolResult types |
+| ARCH-007 Workspace clippy --all-targets cleanup | Planned | [ARCH-007 clippy --all-targets cleanup](backlog/active/ARCH-007-clippy-all-targets-cleanup.md) | Resolve ~35 pre-existing `clippy::unwrap_used` warnings in test targets; small independent cleanup |
 | ARCH-004 Anti-Corruption Layers | Planned | [ARCH-004 Anti-Corruption Layers](backlog/active/ARCH-004-anti-corruption-layers.md) | Keep rmcp, rusqlite, and config DTOs behind Talos-owned boundaries |
 | ARCH-006 Prompt Cache Stability | Planned | [ARCH-006 Prompt Cache Stability](backlog/active/ARCH-006-prompt-cache-stability.md) | Make prompt prefix stability a session contract and expose cache metadata |
 | ARCH-005 God Module Decomposition | Planned | [ARCH-005 God Module Decomposition](backlog/active/ARCH-005-god-module-decomposition.md) | Split large modules after ARCH-003/004 stabilize boundary APIs |
@@ -52,6 +52,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I027 ARCH-003 Crate Boundary Cleanup | Complete | [I027 Crate Boundary Cleanup](iterations/I027-crate-boundary-cleanup.md) | All 3 stories landed: dead `talos-mcp -> talos-agent` dep removed; `message::ToolResult` → `MessageToolResult` (14 files); RPC `Runtime` trait decouples `talos-rpc` from concrete `Agent`. Workspace check/tests/clippy/fmt/governance all clean. |
+| I026 Approval UX + Git + Prompt Optimization | Complete | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | All 7 stories implemented; closure re-verification 2026-06-18 passed `cargo clippy --workspace -- -D warnings` and `cargo test --workspace`. Residual: `--all-targets` clippy gap registered as ARCH-007. |
 | TOOL-003 P0 POSIX Tool Set | P0 Complete | [TOOL-003 POSIX Tool Set](backlog/active/TOOL-003-posix-tool-set.md) | grep/glob/ls/delete + read offset/limit + ls long format; 42 new tests; permission rules; TUI summaries; prompt optimization; clippy clean |
 | ARCH-002 Architecture Optimization Audit | Complete | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Documentation validation and architecture audit complete; audit report plus ARCH-003..ARCH-006 follow-up stories created |
 | TOOL-002 P0 Tool Calling Remediation | P0 Complete | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Schema in prompt, permission pipeline, agent message cleanup, streaming filter, format cleanup; P1-P2 residual in I025 |
