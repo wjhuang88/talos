@@ -41,7 +41,10 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
-| ARCH-002 Architecture Optimization | Planned | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Prompt template/cache Phase A complete; remaining: full doc audit → architecture audit → ACL → decomposition → traits |
+| ARCH-003 Crate Boundary Cleanup | Planned | [ARCH-003 Crate Boundary Cleanup](backlog/active/ARCH-003-crate-boundary-cleanup.md) | Remove dead MCP dependency, decouple RPC from concrete Agent, disambiguate ToolResult types |
+| ARCH-004 Anti-Corruption Layers | Planned | [ARCH-004 Anti-Corruption Layers](backlog/active/ARCH-004-anti-corruption-layers.md) | Keep rmcp, rusqlite, and config DTOs behind Talos-owned boundaries |
+| ARCH-006 Prompt Cache Stability | Planned | [ARCH-006 Prompt Cache Stability](backlog/active/ARCH-006-prompt-cache-stability.md) | Make prompt prefix stability a session contract and expose cache metadata |
+| ARCH-005 God Module Decomposition | Planned | [ARCH-005 God Module Decomposition](backlog/active/ARCH-005-god-module-decomposition.md) | Split large modules after ARCH-003/004 stabilize boundary APIs |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 
@@ -50,6 +53,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | TOOL-003 P0 POSIX Tool Set | P0 Complete | [TOOL-003 POSIX Tool Set](backlog/active/TOOL-003-posix-tool-set.md) | grep/glob/ls/delete + read offset/limit + ls long format; 42 new tests; permission rules; TUI summaries; prompt optimization; clippy clean |
+| ARCH-002 Architecture Optimization Audit | Complete | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Documentation validation and architecture audit complete; audit report plus ARCH-003..ARCH-006 follow-up stories created |
 | TOOL-002 P0 Tool Calling Remediation | P0 Complete | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Schema in prompt, permission pipeline, agent message cleanup, streaming filter, format cleanup; P1-P2 residual in I025 |
 | I025 Tool Pipeline Completion | Complete | [I025 Tool Pipeline Completion](iterations/I025-tool-pipeline-completion.md) | All 5 stories: schema validation+dedup, diff+stat, fence fix, Mermaid rendering, ToolNature. 142+ tests pass |
 | CODE-002 Symbol Tools | Complete | [CODE-002 Symbol Tools](backlog/active/CODE-002-symbol-tools.md) | All 4 tools (find_symbol, find_references, list_symbols, list_imports) implemented in symbol.rs; registered in all 4 builders |

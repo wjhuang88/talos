@@ -132,6 +132,10 @@ valid backend interrupt.
 | `Stream { stream, source }` | New content stream (user message or AI response). UI consumes via `Stream::next()` in `select!` loop. |
 | `Status { snapshot }` | Status update (model name, token usage, processing state). |
 | `Tip { text, kind }` | Transient tip message with TTL auto-expiry. |
+| `ToolCallStarted { name }` | Lightweight tool-start marker for paths that do not yet have full display metadata. |
+| `ToolCall(ToolCallDisplay)` | Full tool call display event with tool name, arguments, provenance, and summary fields. |
+| `ToolResult(ToolResultDisplay)` | Tool result display event with tool name, error flag, and content or summary policy. |
+| `ToolApprovalRequest` | Inline approval request flowing through the same `UiOutput` channel; TUI returns the user's decision through a oneshot response. |
 | `Exit` | Signal to terminate the UI loop. |
 
 ### Stream Consumption
@@ -157,7 +161,11 @@ Each scrollback line carries a three-column prefix aligned with the input box pr
 
 ### Styled Scrollback
 
-`ScrollbackLine` carries `text: String` + `bg: Option<Color>`. User message lines receive the Nord Polar Night background (`#3B4252`) via `crossterm::style::SetBackgroundColor`. Empty padding lines fill the full terminal width with spaces so the background color covers the entire row.
+`ScrollbackLine` carries plain text, styled `HistorySegment`s, optional background color, and an
+optional fill segment for full-row elements such as Markdown horizontal rules. User message lines
+receive the Nord Polar Night background (`#3B4252`) via `crossterm::style::SetBackgroundColor`.
+Empty padding lines fill the full terminal width with spaces so the background color covers the
+entire row.
 
 User messages are visually grouped with top/bottom padding rows (same background
 color), creating a block effect. Each stream after the first is preceded by a

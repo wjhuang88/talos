@@ -3,13 +3,13 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-15"
-status_note: "Governance refresh (2026-06-15): major session work — TUI-005 splash fix, TUI-007 theme system (Nord + Solarized Dark), MEM-004 workspace session topology (SHA256 hash dirs), CODE-001 tree-sitter research closed, TUI-006 code block rendering + syntax highlighting (arborium 23 langs), CODE-002 symbol tools, TOOL-002 tool calling remediation tracked (10 issues), ADR-020 (tree-sitter), ADR-021 (tool protocol architecture), AGENTS.md HC #9 (catch_unwind for native deps), EVOLUTION.md lesson #25. All workspace tests pass (47 suites), clippy clean, governance validator 0 warnings."
+last_audited_at: "2026-06-18"
+status_note: "Governance refresh (2026-06-18): ARCH-002 documentation validation and architecture audit closed. Produced docs/reference/ARCHITECTURE-AUDIT-2026-06-18.md, synchronized ARCH-002 status, Board, Product Backlog, iterations index, architecture reference, and created follow-up stories ARCH-003 through ARCH-006. Governance validator passes with 0 warnings."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-06-15"
+  last_refresh: "2026-06-18"
 
 entrypoints:
   agent_guide: "AGENTS.md"
@@ -61,9 +61,9 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "TOOL-002 P0: add tool parameter schema to system prompt (models currently guessing args)"
-    - "TOOL-002 P0: fix permission bypass for text-parsed tool calls"
-    - "TOOL-002 P1: unify dual parsing paths (provider vs session)"
+    - "ARCH-003: crate boundary cleanup — remove dead MCP dependency, decouple RPC from concrete Agent, disambiguate ToolResult types"
+    - "ARCH-004: anti-corruption layers — hide rmcp, rusqlite, and config DTOs behind Talos-owned boundaries"
+    - "ARCH-006: prompt cache stability — freeze session-stable prompt prefix and expose cache metadata"
+    - "ARCH-005: God module decomposition — split largest modules after boundary cleanup"
     - "TUI-008: approval dialog UX — move from bottom-right to prominent position"
-    - "CODE-002: verify symbol tools work end-to-end with real LLM"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"
