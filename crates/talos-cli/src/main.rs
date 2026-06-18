@@ -16,201 +16,57 @@ mod approval;
 mod colors;
 mod event_loop;
 mod logging;
+mod provider_setup;
+mod registry;
 mod runtime_adapter;
+mod session_setup;
+mod tui_bridge;
 
-use std::io::{self, IsTerminal, Read, Write};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::io::{self, IsTerminal, Write};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
-use async_trait::async_trait;
 use clap::Parser;
 use clap::ValueEnum;
 use rmcp::ServiceExt;
-use serde_json::Value;
 use talos_agent::Agent;
 use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
-use talos_config::{Config, ProviderProtocol};
+use talos_config::Config;
 use talos_conversation::{ConversationEngine, UiOutput, UserInput};
-use talos_core::ApprovalChoice;
 use talos_core::message::AgentEvent;
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
-use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
-use talos_evolution::store::KnowledgeStore;
-use talos_evolution::{EvolutionConfig, EvolutionHookHandler};
+use talos_core::tool::ToolRegistry;
 use talos_mcp::client::McpClientManager;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
-use talos_mcp::types::{McpClientConfig, McpServerLaunchConfig};
-use talos_permission::{PermissionDecision, PermissionRule};
+use talos_permission::PermissionRule;
 use talos_plugin::{HookRegistry, LoggingHandler};
-use talos_provider::AnthropicProvider;
-use talos_provider::openai::OpenAIProvider;
-use talos_rpc::RpcServer;
-use talos_session::{IndexError, Session, SessionInfo, SessionManager};
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
 };
-use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool,
     TreeTool, WriteTool,
 };
 use talos_tui::Tui;
 use tokio::sync::mpsc;
-use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
-
-fn config_to_mcp_client_config(config: &talos_config::McpConfig) -> McpClientConfig {
-    McpClientConfig {
-        servers: config
-            .servers
-            .iter()
-            .map(|s| McpServerLaunchConfig {
-                name: s.name.clone(),
-                transport: s.transport.clone(),
-                command: s.command.clone(),
-                args: s.args.clone(),
-                env: s.env.clone(),
-                cwd: s.cwd.clone(),
-            })
-            .collect(),
-    }
-}
-
-/// Non-blocking approval handler for TUI mode.
-///
-/// Sends approval requests to the TUI via a channel and awaits responses
-/// via oneshot channels. Unlike [`ApprovalPrompt`], this does not block
-/// on stdin — the TUI renders an overlay and handles user interaction.
-pub(crate) struct TuiApprovalHandler {
-    ui_output_tx: mpsc::UnboundedSender<UiOutput>,
-    engine: Mutex<talos_permission::PermissionEngine>,
-}
-
-impl TuiApprovalHandler {
-    fn new(
-        ui_output_tx: mpsc::UnboundedSender<UiOutput>,
-        workspace_root: std::path::PathBuf,
-    ) -> Self {
-        Self {
-            ui_output_tx,
-            engine: Mutex::new(talos_permission::PermissionEngine::with_workspace_root(
-                workspace_root,
-            )),
-        }
-    }
-
-    async fn request_approval(
-        &self,
-        tool_name: &str,
-        input: &serde_json::Value,
-        summary_fields: Vec<String>,
-    ) -> ApprovalChoice {
-        let decision = {
-            let engine = self.engine.lock().expect("engine lock poisoned");
-            engine.evaluate(tool_name, input)
-        };
-        match decision {
-            talos_permission::PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
-            talos_permission::PermissionDecision::Deny(_) => ApprovalChoice::Deny,
-            talos_permission::PermissionDecision::Ask => {
-                let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-
-                if self
-                    .ui_output_tx
-                    .send(UiOutput::ToolApprovalRequest {
-                        tool_name: tool_name.to_string(),
-                        arguments: input.clone(),
-                        summary_fields,
-                        response: response_tx,
-                    })
-                    .is_err()
-                {
-                    return ApprovalChoice::Deny;
-                }
-
-                match response_rx.await {
-                    Ok(choice) => choice,
-                    Err(_) => ApprovalChoice::Deny,
-                }
-            }
-        }
-    }
-
-    fn add_always_allow_rule(&self, tool_name: &str) {
-        use talos_permission::{PermissionDecision, PermissionRule};
-        let mut engine = self.engine.lock().expect("engine lock poisoned");
-        engine.add_rule(PermissionRule::new(
-            tool_name,
-            None,
-            PermissionDecision::Allow,
-        ));
-    }
-}
-
-/// Permission-aware tool wrapper for TUI mode.
-///
-/// Unlike [`PermissionAwareTool`], this uses [`TuiApprovalHandler`] for
-/// non-blocking approval via channels instead of blocking on stdin.
-pub(crate) struct TuiPermissionAwareTool {
-    inner: Arc<dyn AgentTool>,
-    approval: Arc<TuiApprovalHandler>,
-}
-
-#[async_trait]
-impl AgentTool for TuiPermissionAwareTool {
-    fn name(&self) -> &str {
-        self.inner.name()
-    }
-
-    fn description(&self) -> &str {
-        self.inner.description()
-    }
-
-    fn parameters(&self) -> Value {
-        self.inner.parameters()
-    }
-
-    async fn execute(&self, input: Value) -> ToolResult {
-        let tool_name = self.inner.name().to_owned();
-        let summary_fields = self
-            .inner
-            .summary_fields()
-            .iter()
-            .map(|field| (*field).to_string())
-            .collect();
-        let choice = self
-            .approval
-            .request_approval(&tool_name, &input, summary_fields)
-            .await;
-
-        match choice {
-            ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
-            ApprovalChoice::AlwaysApprove => {
-                self.approval.add_always_allow_rule(&tool_name);
-                self.inner.execute(input).await
-            }
-            ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
-        }
-    }
-
-    fn is_read_only(&self) -> bool {
-        self.inner.is_read_only()
-    }
-
-    fn nature(&self) -> talos_core::tool::ToolNature {
-        self.inner.nature()
-    }
-
-    fn summary_fields(&self) -> &'static [&'static str] {
-        self.inner.summary_fields()
-    }
-}
+use crate::provider_setup::{build_provider, config_to_mcp_client_config, parse_provider};
+use crate::registry::{
+    PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
+    build_tui_tool_registry,
+};
+use crate::session_setup::{
+    ResumeSelection, canonical_workspace_root, resolve_prompt, resolve_session_for_workspace,
+    resolve_workspace_root, run_learned_mode, run_list_mode, run_search_mode,
+    workspace_display_name,
+};
+use crate::tui_bridge::run_conversation_loop;
 
 /// Runtime mode selection.
 #[derive(Debug, Clone, ValueEnum)]
@@ -225,79 +81,6 @@ pub enum Mode {
     McpServer,
     /// JSON-RPC placeholder.
     Rpc,
-}
-
-/// Permission-aware tool wrapper that checks the permission engine before
-/// executing the underlying tool. In interactive mode, [`PermissionDecision::Ask`]
-/// triggers a user prompt. In print mode, it defaults to deny.
-pub(crate) struct PermissionAwareTool {
-    inner: Arc<dyn AgentTool>,
-    approval: Arc<Mutex<ApprovalPrompt>>,
-    print_mode: bool,
-}
-
-#[async_trait]
-impl AgentTool for PermissionAwareTool {
-    fn name(&self) -> &str {
-        self.inner.name()
-    }
-
-    fn description(&self) -> &str {
-        self.inner.description()
-    }
-
-    fn parameters(&self) -> Value {
-        self.inner.parameters()
-    }
-
-    async fn execute(&self, input: Value) -> ToolResult {
-        let tool_name = self.inner.name().to_owned();
-        let decision = {
-            let mut approval = self.approval.lock().expect("approval lock poisoned");
-            let engine_decision = approval.engine().evaluate(&tool_name, &input);
-
-            match engine_decision {
-                PermissionDecision::Allow => PermissionDecision::Allow,
-                PermissionDecision::Deny(reason) => PermissionDecision::Deny(reason),
-                PermissionDecision::Ask => {
-                    if self.print_mode {
-                        PermissionDecision::Deny(
-                            "Print mode: interactive approval unavailable".to_string(),
-                        )
-                    } else {
-                        match approval.prompt(&tool_name, &input) {
-                            Ok(decision) => decision,
-                            Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
-                        }
-                    }
-                }
-            }
-        };
-
-        match decision {
-            PermissionDecision::Allow => self.inner.execute(input).await,
-            PermissionDecision::Deny(reason) => {
-                ToolResult::error(format!("Permission denied: {reason}"))
-            }
-            PermissionDecision::Ask => {
-                unreachable!(
-                    "Ask decision should have been resolved by prompt or print-mode default"
-                )
-            }
-        }
-    }
-
-    fn is_read_only(&self) -> bool {
-        self.inner.is_read_only()
-    }
-
-    fn nature(&self) -> talos_core::tool::ToolNature {
-        self.inner.nature()
-    }
-
-    fn summary_fields(&self) -> &'static [&'static str] {
-        self.inner.summary_fields()
-    }
 }
 
 #[derive(Parser, Clone)]
@@ -413,9 +196,6 @@ async fn main() -> Result<()> {
         return run_mcp_server().await;
     }
 
-    // Terminal-UI modes (tui, default interactive REPL) own the terminal display,
-    // so tracing must NOT write to stderr (it corrupts the ratatui/REPL layout).
-    // Redirect those to a log file; machine/stdout modes keep stderr.
     let terminal_ui = cli.tui
         || (!cli.print
             && cli.search.is_none()
@@ -468,47 +248,6 @@ async fn main() -> Result<()> {
     run_tui_mode(cli).await
 }
 
-fn run_learned_mode(_cli: Cli) -> Result<()> {
-    let db_path = dirs::home_dir()
-        .context("failed to find home directory")?
-        .join(".talos")
-        .join("index.db");
-
-    if !db_path.exists() {
-        println!("No evolution data found. Run talos with an agent to start learning.");
-        return Ok(());
-    }
-
-    let store = KnowledgeStore::open(db_path.to_str().unwrap_or_default())
-        .context("failed to open knowledge store")?;
-
-    let patterns = store.get_all_patterns().context("failed to get patterns")?;
-
-    if patterns.is_empty() {
-        println!("No patterns learned yet. Use the agent and provide feedback to start learning.");
-        return Ok(());
-    }
-
-    println!("=== Learned Patterns ===\n");
-
-    for (i, pattern) in patterns.iter().enumerate() {
-        let status = if pattern.active { "active" } else { "inactive" };
-        println!(
-            "{}. [{}] {} (confidence: {:.0}%, evidence: {}, status: {})",
-            i + 1,
-            pattern.category,
-            pattern.description,
-            pattern.confidence * 100.0,
-            pattern.evidence_count,
-            status
-        );
-        println!("   Instruction: {}", pattern.instruction);
-        println!();
-    }
-
-    Ok(())
-}
-
 async fn run_rpc_mode(cli: Cli) -> Result<()> {
     // I009-S5 begin
     let mut config = Config::load().context("failed to load configuration")?;
@@ -541,172 +280,9 @@ async fn run_rpc_mode(cli: Cli) -> Result<()> {
     );
     agent.set_tool_protocol(config.tool_protocol());
 
-    let server = RpcServer::new(Arc::new(runtime_adapter::AgentRuntime(agent)));
+    let server = talos_rpc::RpcServer::new(Arc::new(runtime_adapter::AgentRuntime(agent)));
     server.run_stdio().await
     // I009-S5 end
-}
-
-fn resolve_workspace_root(cli: &Cli) -> Result<PathBuf> {
-    match &cli.workspace {
-        Some(path) => {
-            let abs = if PathBuf::from(path).is_absolute() {
-                PathBuf::from(path)
-            } else {
-                std::env::current_dir()
-                    .context("failed to determine working directory")?
-                    .join(path)
-            };
-            if !abs.is_dir() {
-                bail!(
-                    "workspace path does not exist or is not a directory: {}",
-                    abs.display()
-                );
-            }
-            Ok(abs)
-        }
-        None => std::env::current_dir().context("failed to determine working directory"),
-    }
-}
-
-fn workspace_display_name(workspace_root: &Path) -> String {
-    workspace_root
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("default")
-        .to_string()
-}
-
-fn canonical_workspace_root(workspace_root: &Path) -> String {
-    workspace_root
-        .canonicalize()
-        .unwrap_or_else(|_| workspace_root.to_path_buf())
-        .to_string_lossy()
-        .to_string()
-}
-
-#[derive(Clone, Copy)]
-enum ResumeSelection {
-    Disabled,
-    Latest,
-    Prompt,
-}
-
-fn resolve_session_for_workspace(
-    manager: &SessionManager,
-    workspace_root: &str,
-    display_name: &str,
-    cli: &Cli,
-    resume_selection: ResumeSelection,
-    allow_fork: bool,
-) -> Result<Session> {
-    if allow_fork && let Some(ref source_session_id) = cli.fork {
-        return fork_session(manager, source_session_id);
-    }
-
-    if let Some(ref session_id) = cli.session {
-        return manager
-            .resume_session(session_id)
-            .with_context(|| format!("failed to resume session {session_id}"));
-    }
-
-    if cli.r#continue {
-        return resume_latest_workspace_session_or_create(manager, workspace_root, display_name);
-    }
-
-    match resume_selection {
-        ResumeSelection::Disabled => {}
-        ResumeSelection::Latest if cli.resume => {
-            return resume_latest_workspace_session_or_create(
-                manager,
-                workspace_root,
-                display_name,
-            );
-        }
-        ResumeSelection::Prompt if cli.resume => {
-            return prompt_for_workspace_session_or_create(manager, workspace_root, display_name);
-        }
-        ResumeSelection::Latest | ResumeSelection::Prompt => {}
-    }
-
-    manager
-        .create_session(display_name, workspace_root)
-        .context("failed to create session")
-}
-
-fn resume_latest_workspace_session_or_create(
-    manager: &SessionManager,
-    workspace_root: &str,
-    display_name: &str,
-) -> Result<Session> {
-    let Some(most_recent) = manager
-        .latest_workspace_session(workspace_root)
-        .context("failed to list sessions")?
-    else {
-        return manager
-            .create_session(display_name, workspace_root)
-            .context("failed to create session");
-    };
-
-    manager
-        .get_session(&most_recent.id)
-        .with_context(|| format!("failed to resume session {}", most_recent.id))
-}
-
-fn prompt_for_workspace_session_or_create(
-    manager: &SessionManager,
-    workspace_root: &str,
-    display_name: &str,
-) -> Result<Session> {
-    let sessions = manager
-        .list_workspace_sessions(workspace_root)
-        .context("failed to list sessions")?;
-    if sessions.is_empty() {
-        println!("No existing sessions for this workspace. Creating a new one.");
-        return manager
-            .create_session(display_name, workspace_root)
-            .context("failed to create session");
-    }
-
-    println!(
-        "{}Available workspace sessions:{}\n",
-        colors::BOLD,
-        colors::RESET
-    );
-    for (idx, session) in sessions.iter().enumerate() {
-        print_session_selection_row(idx, session);
-    }
-    print!("\nSelect a session (1-{}): ", sessions.len());
-    io::stdout().flush().context("failed to flush stdout")?;
-
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .context("failed to read input")?;
-    let choice: usize = input.trim().parse().context("invalid selection")?;
-    if choice < 1 || choice > sessions.len() {
-        bail!("selection out of range");
-    }
-    let selected = &sessions[choice - 1];
-    manager
-        .get_session(&selected.id)
-        .with_context(|| format!("failed to resume session {}", selected.id))
-}
-
-fn print_session_selection_row(idx: usize, session: &SessionInfo) {
-    let ts = session.timestamp.format("%Y-%m-%d %H:%M");
-    println!(
-        "  {}. {}{}{} ({}{}{}) {}{} messages | {}",
-        idx + 1,
-        colors::NORD8,
-        session.id,
-        colors::RESET,
-        colors::NORD14,
-        session.project,
-        colors::RESET,
-        colors::NORD3,
-        session.message_count,
-        ts,
-    );
 }
 
 async fn run_print_mode(cli: Cli) -> Result<()> {
@@ -770,7 +346,7 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
             permission_engine.add_rule(PermissionRule::new(
                 tool.name(),
                 None,
-                PermissionDecision::Allow,
+                talos_permission::PermissionDecision::Allow,
             ));
         }
         registry.register(tool);
@@ -875,83 +451,6 @@ async fn run_print_mode(cli: Cli) -> Result<()> {
     bail!("session event channel closed unexpectedly");
 }
 
-async fn run_conversation_loop(
-    mut engine: ConversationEngine,
-    mut agent_rx: tokio::sync::mpsc::UnboundedReceiver<AgentEvent>,
-    mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
-    ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
-    submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
-    interrupt_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
-) {
-    loop {
-        tokio::select! {
-            event = agent_rx.recv() => {
-                match event {
-                    Some(agent_event) => {
-                        let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
-                        let outputs = engine.handle_agent_event(&agent_event);
-                        for output in outputs {
-                            let _ = ui_tx.send(output);
-                        }
-                        if is_turn_end
-                            && let Some(msg) = engine.drain_steering_queue()
-                        {
-                            let outputs = engine.start_user_message(&msg);
-                            for output in outputs {
-                                let _ = ui_tx.send(output);
-                            }
-                            let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            let _ = submit_tx.send(msg);
-                        }
-                    }
-                    None => break,
-                }
-            }
-            Some(input) = user_rx.recv() => {
-                match input {
-                    UserInput::Message(msg) => {
-                        if msg.starts_with('/')
-                            && !ConversationEngine::is_model_passthrough_slash_command(&msg)
-                        {
-                            let outputs = engine.handle_slash_command(&msg);
-                            for output in outputs {
-                                match output {
-                                    UiOutput::Exit => {
-                                        let _ = ui_tx.send(UiOutput::Exit);
-                                        return;
-                                    }
-                                    other => { let _ = ui_tx.send(other); }
-                                }
-                            }
-                        } else if engine.is_processing() {
-                            for output in engine.enqueue_steering(msg) {
-                                let _ = ui_tx.send(output);
-                            }
-                        } else {
-                            let outputs = engine.start_user_message(&msg);
-                            for output in outputs {
-                                let _ = ui_tx.send(output);
-                            }
-                            let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            let _ = submit_tx.send(msg);
-                        }
-                    }
-                    UserInput::Cancel => {
-                        let _ = interrupt_tx.send(talos_core::session::SessionOp::Interrupt).await;
-                        for output in engine.cancel_turn() {
-                            let _ = ui_tx.send(output);
-                        }
-                    }
-                    UserInput::Exit => {
-                        let _ = ui_tx.send(UiOutput::Exit);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
-
 async fn run_tui_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -974,7 +473,6 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let workspace_root = resolve_workspace_root(&cli)?;
 
-    // Unified UiOutput channel: tools, results, AND approval requests all flow here
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
     let approval_handler = Arc::new(TuiApprovalHandler::new(
         ui_output_tx.clone(),
@@ -1007,8 +505,8 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     }
 
-    // Session management: create or resume session for history persistence.
-    let session_manager = SessionManager::new().context("failed to initialize session manager")?;
+    let session_manager =
+        talos_session::SessionManager::new().context("failed to initialize session manager")?;
     let display_name = workspace_display_name(&workspace_root);
     let workspace_root_str = canonical_workspace_root(&workspace_root);
     let session = resolve_session_for_workspace(
@@ -1040,7 +538,6 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     });
 
-    // Bridge: SessionEvent → ConversationEngine + JSONL persistence.
     let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
     let session_for_persist = session.clone();
     let session_manager_for_persist = session_manager.clone();
@@ -1096,7 +593,6 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     });
 
-    // Wrap sq_tx to persist user messages before forwarding.
     let session_for_user_persist = session.clone();
     let session_manager_for_user_persist = session_manager.clone();
     let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
@@ -1120,14 +616,12 @@ async fn run_tui_mode(cli: Cli) -> Result<()> {
     let mut tui = Tui::new().context("failed to initialize TUI")?;
     tui.hydrate_history(&visible_history);
 
-    // Channels between conversation engine and UI
     let (user_input_tx, user_input_rx) = mpsc::unbounded_channel::<UserInput>();
 
     tui.set_ui_output_rx(ui_output_rx);
     tui.set_user_input_tx(user_input_tx);
     tui.set_model_name(config.model.clone());
 
-    // Conversation engine task: sits between agent loop and UI loop
     let engine = ConversationEngine::new(config.model.clone());
     let interrupt_tx = handle.sq_tx.clone();
     tokio::spawn(async move {
@@ -1200,7 +694,8 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
         agent.set_append_prompt(append.clone());
     }
 
-    let session_manager = SessionManager::new().context("failed to initialize session manager")?;
+    let session_manager =
+        talos_session::SessionManager::new().context("failed to initialize session manager")?;
     let display_name = workspace_display_name(&workspace_root);
     let workspace_root_str = canonical_workspace_root(&workspace_root);
     let session = resolve_session_for_workspace(
@@ -1264,7 +759,6 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
             })
             .await;
 
-        // Persist user message to JSONL.
         let user_msg = talos_core::message::Message::User {
             content: input.to_string(),
         };
@@ -1339,7 +833,8 @@ async fn run_inline_mode(cli: Cli) -> Result<()> {
 async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let workspace_root = resolve_workspace_root(&cli)?;
 
-    let session_manager = SessionManager::new().context("failed to initialize session manager")?;
+    let session_manager =
+        talos_session::SessionManager::new().context("failed to initialize session manager")?;
     let display_name = workspace_display_name(&workspace_root);
     let workspace_root_str = canonical_workspace_root(&workspace_root);
     let session = resolve_session_for_workspace(
@@ -1370,7 +865,7 @@ async fn run_interactive_mode(cli: Cli) -> Result<()> {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
 
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+    let approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::new(),
     )));
 
@@ -1508,257 +1003,16 @@ fn build_hook_registry(include_evolution: bool) -> Arc<HookRegistry> {
     let mut registry = HookRegistry::new();
     registry.register(Arc::new(LoggingHandler::new()));
     if include_evolution {
-        match EvolutionHookHandler::open_default(EvolutionConfig::default(), None) {
+        match talos_evolution::EvolutionHookHandler::open_default(
+            talos_evolution::EvolutionConfig::default(),
+            None,
+        ) {
             Ok(Some(handler)) => registry.register(Arc::new(handler)),
             Ok(None) => {}
             Err(e) => eprintln!("Warning: evolution disabled: {e}"),
         }
     }
     Arc::new(registry)
-}
-
-fn build_print_tool_registry() -> ToolRegistry {
-    let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::new(),
-    )));
-
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GrepTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GlobTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(LsTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DeleteTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DiffTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(StatTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitStatusTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(TreeTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitAddTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCommitTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPushTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPullTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCheckoutTool::new(PathBuf::from("."))),
-        approval: approval.clone(),
-        print_mode: true,
-    }));
-    registry
-}
-
-fn build_tui_tool_registry(
-    approval_handler: Arc<TuiApprovalHandler>,
-    workspace_root: PathBuf,
-) -> ToolRegistry {
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(BashTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ReadTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(WriteTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GrepTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GlobTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(LsTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(DeleteTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(DiffTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(StatTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(FindSymbolTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(FindReferencesTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ListSymbolsTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ListImportsTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(GitStatusTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitDiffTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitBranchListTool::new(workspace_root.clone())));
-    registry.register(Arc::new(TreeTool::new(workspace_root.clone())));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitAddTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitCommitTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitPushTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitPullTool::new(workspace_root.clone())),
-        approval: approval_handler.clone(),
-    }));
-    registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(GitCheckoutTool::new(workspace_root)),
-        approval: approval_handler.clone(),
-    }));
-    registry
-}
-
-/// A lightweight health/status tool for MCP mode.
-struct StatusTool;
-
-#[async_trait]
-impl AgentTool for StatusTool {
-    fn name(&self) -> &str {
-        "status"
-    }
-
-    fn description(&self) -> &str {
-        "Return Talos MCP server status"
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {}
-        })
-    }
-
-    async fn execute(&self, _input: Value) -> ToolResult {
-        ToolResult::success("talos mcp server alive")
-    }
-
-    fn is_read_only(&self) -> bool {
-        true
-    }
-}
-
-fn build_mcp_tool_registry() -> ToolRegistry {
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(BashTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ReadTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(WriteTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(EditTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GrepTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GlobTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(LsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(DeleteTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(DiffTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(StatTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(StatusTool));
-    registry.register(Arc::new(FindSymbolTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(FindReferencesTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListSymbolsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(ListImportsTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitStatusTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitAddTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitCommitTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitPushTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitPullTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(GitCheckoutTool::new(PathBuf::from("."))));
-    registry.register(Arc::new(TreeTool::new(PathBuf::from("."))));
-    registry
 }
 
 // I009-S4 begin
@@ -1783,261 +1037,6 @@ async fn run_mcp_server() -> Result<()> {
     Ok(())
 }
 // I009-S4 end
-
-fn resolve_prompt(cli_prompt: Option<String>) -> Result<String> {
-    if let Some(prompt) = cli_prompt {
-        return Ok(prompt);
-    }
-
-    if !io::stdin().is_terminal() {
-        let mut buffer = String::new();
-        io::stdin()
-            .read_to_string(&mut buffer)
-            .context("failed to read from stdin")?;
-        let trimmed = buffer.trim().to_string();
-        if trimmed.is_empty() {
-            return Err(anyhow!("stdin is empty"));
-        }
-        return Ok(trimmed);
-    }
-
-    Err(anyhow!(
-        "no prompt provided. Usage: talos \"your prompt\" -p, or echo \"prompt\" | talos -p"
-    ))
-}
-
-pub(crate) fn parse_provider(s: &str) -> Result<String> {
-    let provider = s.trim().to_lowercase();
-    if provider.is_empty() {
-        bail!("provider must be non-empty");
-    }
-    Ok(provider)
-}
-
-pub(crate) fn build_provider(
-    config: &Config,
-    api_key: &str,
-    mock: bool,
-) -> Arc<dyn talos_core::provider::LanguageModel> {
-    if mock {
-        use talos_provider::mock::MockProvider;
-        let api_key = api_key.to_string();
-        let model = config.model.clone();
-        let base_url = config.base_url();
-        let provider_protocol = config.provider_protocol();
-        return Arc::new(MockProvider::new().with_request_debug_builder(move |messages| {
-            let snapshot = match &provider_protocol {
-                ProviderProtocol::AnthropicMessages => talos_provider::anthropic_request_debug_snapshot(
-                    &api_key,
-                    &model,
-                    base_url.as_deref(),
-                    messages,
-                ),
-                ProviderProtocol::OpenAIChat => talos_provider::openai::openai_request_debug_snapshot(
-                    &api_key,
-                    &model,
-                    base_url.as_deref(),
-                    messages,
-                ),
-            };
-            format!(
-                "I'm a mock LLM. I did not make a real API call.\n\nCommand: {}\n\nWould send this request:\n{}",
-                talos_provider::mock::REQUEST_DEBUG_COMMAND,
-                serde_json::to_string_pretty(&snapshot).unwrap_or_else(|_| snapshot.to_string())
-            )
-        }));
-    }
-    match config.provider_protocol() {
-        ProviderProtocol::AnthropicMessages => {
-            let mut provider = AnthropicProvider::new(api_key, &config.model);
-            if let Some(base_url) = config.base_url() {
-                provider = provider.with_base_url(base_url);
-            }
-            Arc::new(provider)
-        }
-        ProviderProtocol::OpenAIChat => {
-            let mut provider = OpenAIProvider::new(api_key, &config.model);
-            if let Some(base_url) = config.base_url() {
-                provider = provider.with_base_url(base_url);
-            }
-            Arc::new(provider)
-        }
-    }
-}
-
-fn run_search_mode(cli: Cli) -> Result<()> {
-    let query = cli.search.as_ref().expect("search query required");
-    let manager = SessionManager::new().context("failed to initialize session manager")?;
-
-    let results = manager.search(query, cli.limit).map_err(|e| match e {
-        IndexError::Store(e) => {
-            anyhow!("search error: {e}\nHint: run a session first to build the index.")
-        }
-        IndexError::IoError(e) => anyhow!("I/O error: {e}"),
-        IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
-    })?;
-
-    if results.is_empty() {
-        println!("No results found for '{query}'.");
-        return Ok(());
-    }
-
-    println!(
-        "{}Found {} result(s) for '{}':{}\n",
-        colors::BOLD,
-        results.len(),
-        query,
-        colors::RESET
-    );
-
-    for (i, result) in results.iter().enumerate() {
-        let ts = result.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
-        let snippet = highlight_snippet(&result.snippet);
-        println!(
-            "{:>3}. {}{}{} {}{}{} {}{}{}\n     {}\n",
-            i + 1,
-            colors::NORD3,
-            ts,
-            colors::RESET,
-            colors::NORD8,
-            result.session_id,
-            colors::RESET,
-            colors::NORD14,
-            result.project,
-            colors::RESET,
-            snippet,
-        );
-    }
-
-    Ok(())
-}
-
-/// Format a search snippet with Nord theme highlighting for matched terms.
-///
-/// Replaces FTS5 `<b>...</b>` markers with ANSI color codes.
-fn highlight_snippet(snippet: &str) -> String {
-    snippet
-        .replace("<b>", &format!("{}{}", colors::NORD13, colors::BOLD))
-        .replace("</b>", &format!("{}{}", colors::RESET, colors::NORD13))
-}
-
-fn run_list_mode(cli: Cli) -> Result<()> {
-    let manager = SessionManager::new().context("failed to initialize session manager")?;
-
-    let sessions = manager.list_recent(cli.limit).map_err(|e| match e {
-        IndexError::Store(e) => {
-            anyhow!("list error: {e}\nHint: run `talos --search <term>` first to build the index.")
-        }
-        IndexError::IoError(e) => anyhow!("I/O error: {e}"),
-        IndexError::InvalidUuid(e) => anyhow!("invalid UUID: {e}"),
-    })?;
-
-    if sessions.is_empty() {
-        println!("No indexed sessions found. Run `talos --search <term>` to build the index.");
-        return Ok(());
-    }
-
-    println!(
-        "{}Recent sessions ({}):{}\n",
-        colors::BOLD,
-        sessions.len(),
-        colors::RESET
-    );
-
-    for (i, session) in sessions.iter().enumerate() {
-        let ts = session.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
-        println!(
-            "{:>3}. {}{}{} | {}{}{} | {} messages | {}{}{}",
-            i + 1,
-            colors::NORD8,
-            session.id,
-            colors::RESET,
-            colors::NORD14,
-            session.project,
-            colors::RESET,
-            session.message_count,
-            colors::NORD3,
-            ts,
-            colors::RESET,
-        );
-    }
-
-    Ok(())
-}
-
-/// Fork an existing session, creating a new session file with entries up to the
-/// fork point. Records the fork relationship in the SQLite index.
-fn fork_session(
-    manager: &SessionManager,
-    source_session_id: &str,
-) -> Result<talos_session::Session> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-    use talos_session::Session;
-
-    let source = manager
-        .resume_session(source_session_id)
-        .with_context(|| format!("failed to load source session {source_session_id}"))?;
-
-    let entries = source
-        .read_entries()
-        .context("failed to read source entries")?;
-    if entries.is_empty() {
-        bail!("cannot fork an empty session");
-    }
-
-    let fork_entry_id = entries
-        .last()
-        .expect("entries checked non-empty above")
-        .id
-        .clone();
-
-    let new_id = Uuid::new_v4();
-    let project_dir = manager
-        .list_sessions()
-        .context("failed to list sessions")?
-        .iter()
-        .find(|s| s.id.to_string() == source_session_id)
-        .map(|s| s.project.clone())
-        .unwrap_or_else(|| "default".to_string());
-
-    let sessions_dir = manager.sessions_dir();
-    let project_path = sessions_dir.join(&project_dir);
-    std::fs::create_dir_all(&project_path).context("failed to create project directory")?;
-
-    let new_file_path = project_path.join(format!("{new_id}.jsonl"));
-
-    let mut new_session = Session::new(
-        new_id,
-        project_dir.clone(),
-        source.workspace_root.clone(),
-        new_file_path.clone(),
-    );
-
-    for entry in &entries {
-        let line = serde_json::to_string(entry).map_err(|e| anyhow!("serialize error: {e}"))?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&new_file_path)
-            .context("failed to create fork file")?;
-        writeln!(file, "{line}").context("failed to write fork entry")?;
-    }
-
-    new_session
-        .fork(&fork_entry_id)
-        .context("failed to create fork branch")?;
-
-    if let Ok(mut index) = talos_session::SessionIndex::new(&sessions_dir.join("index.db")) {
-        let _ = index.init_schema();
-        let _ = index.record_fork(source_session_id, &new_id.to_string(), &fork_entry_id);
-        let _ = index.index_session(&new_session);
-    }
-
-    eprintln!("Forked session {source_session_id} -> {new_id} (from entry {fork_entry_id})");
-
-    Ok(new_session)
-}
 
 #[cfg(test)]
 #[allow(warnings)]
@@ -2068,7 +1067,7 @@ mod tests {
     #[test]
     fn highlight_snippet_replaces_b_tags() {
         let input = "This is a <b>matched</b> term in the snippet.";
-        let output = highlight_snippet(input);
+        let output = registry::highlight_snippet(input);
         assert!(output.contains(colors::NORD13));
         assert!(output.contains(colors::BOLD));
         assert!(!output.contains("BOLD"));
@@ -2079,8 +1078,7 @@ mod tests {
     #[test]
     fn highlight_snippet_multiple_matches() {
         let input = "<b>first</b> and <b>second</b> match";
-        let output = highlight_snippet(input);
-        // Each match produces 2 NORD13 sequences (before and after BOLD/RESET)
+        let output = registry::highlight_snippet(input);
         let nord13_count = output.matches(colors::NORD13).count();
         assert_eq!(
             nord13_count, 4,
@@ -2091,13 +1089,13 @@ mod tests {
     #[test]
     fn highlight_snippet_no_tags_passthrough() {
         let input = "No matches in this snippet.";
-        let output = highlight_snippet(input);
+        let output = registry::highlight_snippet(input);
         assert_eq!(output, input);
     }
 
     #[test]
     fn highlight_snippet_empty_string() {
-        let output = highlight_snippet("");
+        let output = registry::highlight_snippet("");
         assert_eq!(output, "");
     }
 
@@ -2133,7 +1131,6 @@ mod tests {
 
     #[test]
     fn color_constants_contain_ansi_escape() {
-        // All color constants should start with the ANSI escape sequence
         for color in [colors::NORD3, colors::NORD8, colors::NORD13, colors::NORD14] {
             assert!(
                 color.starts_with("\x1b["),
@@ -2235,9 +1232,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
 
-        // Search on empty index may return empty results or error if DB not initialized
         let results = manager.search("nonexistent", 10);
-        // Either empty results or an error is acceptable for uninitialized index
         if let Ok(r) = results {
             assert!(r.is_empty());
         }
