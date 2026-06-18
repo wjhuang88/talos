@@ -163,8 +163,9 @@ impl ConversationEngine {
             }
             AgentEvent::ToolResult { result } => {
                 self.close_stream();
-                self.set_tool_result(result);
+                let tool_name = self.set_tool_result(result);
                 outputs.push(UiOutput::ToolResult(ToolResultDisplay {
+                    tool_name,
                     is_error: result.is_error,
                     content: result.content.clone(),
                 }));
@@ -469,15 +470,17 @@ impl ConversationEngine {
         });
     }
 
-    fn set_tool_result(&mut self, result: &ToolResult) {
+    fn set_tool_result(&mut self, result: &ToolResult) -> Option<String> {
         for msg in self.messages.iter_mut().rev() {
             if let Some(ref mut tool_call) = msg.tool_call
                 && tool_call.result.is_none()
             {
+                let tool_name = tool_call.tool_name.clone();
                 tool_call.result = Some(result.clone());
-                break;
+                return Some(tool_name);
             }
         }
+        None
     }
 
     fn record_provenance(&mut self, provenance: &ToolProvenance) {

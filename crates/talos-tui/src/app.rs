@@ -2030,6 +2030,17 @@ fn build_tool_result_scrollback_lines(
 ) -> Vec<ScrollbackLine> {
     const MAX_RESULT_LINE_CHARS: usize = 120;
 
+    if should_suppress_tool_result_content(display) {
+        return vec![ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("   {icon} {}", suppressed_tool_result_summary(display)),
+                color,
+                HistoryAttrs::default(),
+            )],
+            None,
+        )];
+    }
+
     if display.content.is_empty() {
         return vec![ScrollbackLine::styled(
             vec![HistorySegment::styled(
@@ -2056,6 +2067,17 @@ fn build_tool_result_scrollback_lines(
     }
 
     lines
+}
+
+fn should_suppress_tool_result_content(display: &ToolResultDisplay) -> bool {
+    !display.is_error && matches!(display.tool_name.as_deref(), Some("read"))
+}
+
+fn suppressed_tool_result_summary(display: &ToolResultDisplay) -> String {
+    let line_count = display.content.lines().count();
+    let byte_count = display.content.len();
+    let line_label = if line_count == 1 { "line" } else { "lines" };
+    format!("read {line_count} {line_label}, {byte_count} bytes")
 }
 
 fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {
@@ -2136,6 +2158,7 @@ mod tests {
     #[test]
     fn tool_result_scrollback_keeps_multiple_lines() {
         let display = ToolResultDisplay {
+            tool_name: Some("tree".to_string()),
             is_error: false,
             content: "├── backend/\n├── frontend/\n└── docs/".to_string(),
         };
@@ -2145,6 +2168,35 @@ mod tests {
         assert_eq!(lines[0].text, "   ✓ ├── backend/");
         assert_eq!(lines[1].text, "     ├── frontend/");
         assert_eq!(lines[2].text, "     └── docs/");
+    }
+
+    #[test]
+    fn read_tool_result_hides_content_from_scrollback() {
+        let display = ToolResultDisplay {
+            tool_name: Some("read".to_string()),
+            is_error: false,
+            content: "secret line\nanother line\n".to_string(),
+        };
+
+        let lines = build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].text.contains("2 lines"));
+        assert!(!lines[0].text.contains("secret line"));
+    }
+
+    #[test]
+    fn read_tool_error_result_remains_visible() {
+        let display = ToolResultDisplay {
+            tool_name: Some("read".to_string()),
+            is_error: true,
+            content: "file not found".to_string(),
+        };
+
+        let lines = build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red));
+
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].text.contains("file not found"));
     }
 
     #[test]

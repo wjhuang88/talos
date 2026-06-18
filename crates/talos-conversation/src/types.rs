@@ -113,6 +113,7 @@ pub struct ToolCallDisplay {
 
 #[derive(Debug, Clone)]
 pub struct ToolResultDisplay {
+    pub tool_name: Option<String>,
     pub is_error: bool,
     pub content: String,
 }

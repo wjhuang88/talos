@@ -248,6 +248,7 @@ async fn tool_result_produces_stream_and_updates_message() {
 
     assert_eq!(outputs.len(), 1);
     let display = find_tool_result(&outputs).unwrap();
+    assert_eq!(display.tool_name.as_deref(), Some("read_file"));
     assert!(!display.is_error);
     assert_eq!(display.content, "file contents");
 
