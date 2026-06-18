@@ -484,6 +484,7 @@ impl SystemPromptBuilder {
     ///
     /// Handlers may replace the final prompt by returning
     /// [`talos_plugin::HookResult::Modify`]. `Skip` leaves the prompt unchanged.
+    #[allow(dead_code)]
     pub(crate) async fn build_with_hooks(
         &self,
         hook_registry: &HookRegistry,
@@ -511,6 +512,103 @@ impl SystemPromptBuilder {
                 Ok((prompt, markers.into_iter().map(Into::into).collect()))
             }
         }
+    }
+
+    /// Runs a pre-assembled prompt through the `OnSystemPromptBuilt` hook.
+    ///
+    /// The `stable_prefix_len` indicates the byte length of the stable prefix
+    /// (Identity + Tools + Skills) within the combined prompt. A cache marker
+    /// is emitted for this range if the hook does not modify the prompt.
+    pub(crate) async fn build_with_hooks_from_prompt(
+        &self,
+        hook_registry: &HookRegistry,
+        ctx: &HookContext,
+        prompt: &str,
+        stable_prefix_len: usize,
+    ) -> Result<(String, Vec<SystemCacheMarker>), String> {
+        let original_prompt = prompt.to_string();
+        let outcome = hook_registry
+            .dispatch(ctx, HookEvent::OnSystemPromptBuilt { prompt })
+            .await;
+
+        match outcome {
+            HookOutcome::Continue(HookEvent::OnSystemPromptBuilt { prompt })
+            | HookOutcome::Skip(HookEvent::OnSystemPromptBuilt { prompt }) => {
+                let prompt = prompt.to_string();
+                let markers = if prompt == original_prompt && stable_prefix_len > 0 {
+                    vec![SystemCacheMarker {
+                        offset: 0,
+                        length: stable_prefix_len,
+                        cache_type: SystemCacheType::Ephemeral,
+                    }]
+                } else {
+                    Vec::new()
+                };
+                Ok((prompt, markers))
+            }
+            HookOutcome::Deny { reason, .. } => Err(reason),
+            HookOutcome::Continue(_) | HookOutcome::Skip(_) => {
+                let markers = if stable_prefix_len > 0 {
+                    vec![SystemCacheMarker {
+                        offset: 0,
+                        length: stable_prefix_len,
+                        cache_type: SystemCacheType::Ephemeral,
+                    }]
+                } else {
+                    Vec::new()
+                };
+                Ok((prompt.to_string(), markers))
+            }
+        }
+    }
+
+    /// Builds only the stable prefix (Identity + Tools + Skills).
+    ///
+    /// These sections are cacheable and do not change between turns unless
+    /// tools, skills, or the identity/custom prompt are modified. The result
+    /// can be cached by the caller and reused across turns.
+    ///
+    /// Returns `None` if there are no stable sections (should not happen in
+    /// practice since Identity is always present).
+    #[must_use]
+    pub fn build_stable_prefix(&self) -> String {
+        let sections = self.prompt_sections();
+        let mut prefix = String::new();
+        let mut first = true;
+        for section in &sections {
+            if section.kind != PromptSectionKind::Cacheable {
+                break;
+            }
+            if !first {
+                prefix.push('\n');
+            }
+            prefix.push_str(&section.text);
+            first = false;
+        }
+        prefix
+    }
+
+    /// Builds only the dynamic suffix (Context + User Preferences + Runtime + Append).
+    ///
+    /// These sections change every turn (e.g., datetime) or are semi-stable
+    /// (context files, user preferences). Combined with a cached stable prefix,
+    /// they form the complete system prompt.
+    #[must_use]
+    pub fn build_dynamic_suffix(&self) -> String {
+        let sections = self.prompt_sections();
+        let mut suffix = String::new();
+        let mut first = true;
+        for section in &sections {
+            if section.kind == PromptSectionKind::Cacheable {
+                continue;
+            }
+            if !first {
+                suffix.push('\n');
+            }
+            suffix.push_str(&section.text);
+            first = false;
+        }
+        suffix
     }
 
     /// Assembles the system prompt with cache control markers.

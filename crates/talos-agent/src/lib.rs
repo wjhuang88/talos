@@ -153,6 +153,9 @@ pub struct Agent {
     workspace_context: Option<String>,
     /// Cached tool definitions for native API calls.
     tool_definitions: Vec<talos_core::provider::ToolDefinition>,
+    /// Cached stable prefix (Identity + Tools + Skills) computed once and
+    /// reused across turns. Invalidated when tools, skills, or identity change.
+    cached_stable_prefix: std::sync::Mutex<Option<String>>,
 }
 
 impl Agent {
@@ -184,6 +187,7 @@ impl Agent {
             hook_registry: Arc::new(HookRegistry::new()),
             workspace_context: None,
             tool_definitions: Vec::new(),
+            cached_stable_prefix: std::sync::Mutex::new(None),
         }
     }
 
@@ -291,6 +295,7 @@ impl Agent {
             hook_registry,
             workspace_context: None,
             tool_definitions,
+            cached_stable_prefix: std::sync::Mutex::new(None),
         }
     }
 
@@ -300,6 +305,7 @@ impl Agent {
     /// to ensure stable ordering across turns.
     pub fn set_tools(&mut self, tools: Vec<ToolDescription>) {
         self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_tools(tools);
+        self.invalidate_stable_prefix_cache();
     }
 
     pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
@@ -316,6 +322,7 @@ impl Agent {
                 self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_tool_format("");
             }
         }
+        self.invalidate_stable_prefix_cache();
     }
 
     /// Sets the skill index for the system prompt builder.
@@ -323,6 +330,7 @@ impl Agent {
     /// Only Level 0 metadata (name, description, triggers) is included.
     pub fn set_skill_index(&mut self, skills: Vec<SkillIndex>) {
         self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_skill_index(skills);
+        self.invalidate_stable_prefix_cache();
     }
 
     /// Sets the context files for the system prompt builder.
@@ -342,6 +350,7 @@ impl Agent {
     /// Sets a custom prompt that replaces the default identity.
     pub fn set_custom_prompt(&mut self, prompt: String) {
         self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_custom_prompt(prompt);
+        self.invalidate_stable_prefix_cache();
     }
 
     /// Sets an append prompt that is added at the end of the system prompt.
@@ -414,6 +423,13 @@ impl Agent {
         self.run_inner(user_message, history, Some(event_tx)).await
     }
 
+    fn invalidate_stable_prefix_cache(&self) {
+        *self
+            .cached_stable_prefix
+            .lock()
+            .expect("cache lock poisoned") = None;
+    }
+
     /// Internal implementation shared by [`run`] and [`run_streaming`].
     ///
     /// Executes the full turn loop: user message → provider → tool calls →
@@ -427,9 +443,38 @@ impl Agent {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
+        let stable_prefix = {
+            let mut cache = self
+                .cached_stable_prefix
+                .lock()
+                .expect("cache lock poisoned");
+            match cache.as_ref() {
+                Some(cached) => cached.clone(),
+                None => {
+                    let prefix = self.prompt_builder.build_stable_prefix();
+                    *cache = Some(prefix.clone());
+                    prefix
+                }
+            }
+        };
+        let stable_prefix_len = stable_prefix.len();
+        let dynamic_suffix = self.prompt_builder.build_dynamic_suffix();
+        let combined = if stable_prefix.is_empty() {
+            dynamic_suffix
+        } else if dynamic_suffix.is_empty() {
+            stable_prefix
+        } else {
+            format!("{stable_prefix}\n{dynamic_suffix}")
+        };
+
         let (system_prompt, cache_markers) = match self
             .prompt_builder
-            .build_with_hooks(self.hook_registry.as_ref(), &hook_ctx)
+            .build_with_hooks_from_prompt(
+                self.hook_registry.as_ref(),
+                &hook_ctx,
+                &combined,
+                stable_prefix_len,
+            )
             .await
         {
             Ok(prompt) => prompt,
@@ -590,6 +635,14 @@ impl Agent {
                     } => {
                         saw_turn_end = true;
                         usage = turn_usage;
+                        if usage.cache_read_tokens > 0 || usage.cache_write_tokens > 0 {
+                            tracing::debug!(
+                                cache_read = usage.cache_read_tokens,
+                                cache_write = usage.cache_write_tokens,
+                                input_tokens = usage.input_tokens,
+                                "provider cache metadata"
+                            );
+                        }
                         let reason = Self::turn_end_reason(stop_reason);
                         if let Err(error) = self
                             .run_hook(&hook_ctx, HookEvent::OnTurnEnd { reason })
@@ -2806,6 +2859,256 @@ mod tests {
             !prompt.contains("Additional Instructions"),
             "Append prompt section should be gone after set_append_prompt_opt(None)"
         );
+    }
+
+    /// Mock model that captures the system prompt from each stream call.
+    struct CapturingModel {
+        responses: Arc<Mutex<Vec<Vec<AgentEvent>>>>,
+        captured_system_prompts: Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    impl CapturingModel {
+        fn new(responses: Vec<Vec<AgentEvent>>) -> (Self, Arc<std::sync::Mutex<Vec<String>>>) {
+            let captured = Arc::new(std::sync::Mutex::new(Vec::new()));
+            (
+                Self {
+                    responses: Arc::new(Mutex::new(responses)),
+                    captured_system_prompts: captured.clone(),
+                },
+                captured,
+            )
+        }
+    }
+
+    #[async_trait]
+    impl LanguageModel for CapturingModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            for msg in messages {
+                if let Message::System { content, .. } = msg {
+                    self.captured_system_prompts
+                        .lock()
+                        .expect("lock poisoned")
+                        .push(content.clone());
+                }
+            }
+            let (tx, rx) = mpsc::channel(64);
+            let responses = self.responses.clone();
+            tokio::spawn(async move {
+                let mut responses = responses.lock().await;
+                let events = responses.pop_front().unwrap_or_default();
+                for event in events {
+                    tx.send(event).await.expect("receiver dropped");
+                }
+            });
+            Ok(rx)
+        }
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn test_stable_prefix_identical_across_turns() {
+        let response_events = vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta { delta: "OK".into() },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ];
+
+        let all_responses = vec![
+            response_events.clone(),
+            response_events.clone(),
+            response_events.clone(),
+        ];
+
+        let (model, captured) = CapturingModel::new(all_responses);
+        let agent = Agent::new(Arc::new(model), ToolRegistry::new());
+
+        // Run 3 turns
+        let _ = agent.run("turn 1".into()).await.unwrap();
+        let _ = agent.run("turn 2".into()).await.unwrap();
+        let _ = agent.run("turn 3".into()).await.unwrap();
+
+        let prompts = captured.lock().expect("lock poisoned");
+        assert_eq!(prompts.len(), 3, "should have 3 system prompts");
+
+        // Extract the stable prefix portion (everything before "# Context" or "# Runtime Context")
+        // The stable prefix is Identity + Tools + Skills, which ends before the dynamic sections.
+        fn stable_part(prompt: &str) -> &str {
+            // Find the start of the first dynamic section
+            for marker in ["# Runtime Context", "# Context", "# User Preferences"] {
+                if let Some(pos) = prompt.find(marker) {
+                    return &prompt[..pos];
+                }
+            }
+            prompt
+        }
+
+        let stable_0 = stable_part(&prompts[0]);
+        let stable_1 = stable_part(&prompts[1]);
+        let stable_2 = stable_part(&prompts[2]);
+
+        assert_eq!(
+            stable_0, stable_1,
+            "stable prefix should be identical between turn 1 and 2"
+        );
+        assert_eq!(
+            stable_1, stable_2,
+            "stable prefix should be identical between turn 2 and 3"
+        );
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn test_stable_prefix_changes_after_set_tools() {
+        let response_events = vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta { delta: "OK".into() },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ];
+
+        let (model, captured) =
+            CapturingModel::new(vec![response_events.clone(), response_events.clone()]);
+        let mut agent = Agent::new(Arc::new(model), ToolRegistry::new());
+
+        // Run first turn
+        let _ = agent.run("turn 1".into()).await.unwrap();
+
+        // Change tools — should invalidate cache
+        agent.set_tools(vec![ToolDescription {
+            name: "new_tool".into(),
+            description: "A new tool".into(),
+            ..Default::default()
+        }]);
+
+        // Run second turn
+        let _ = agent.run("turn 2".into()).await.unwrap();
+
+        let prompts = captured.lock().expect("lock poisoned");
+        assert_eq!(prompts.len(), 2, "should have 2 system prompts");
+
+        fn stable_part(prompt: &str) -> &str {
+            for marker in ["# Runtime Context", "# Context", "# User Preferences"] {
+                if let Some(pos) = prompt.find(marker) {
+                    return &prompt[..pos];
+                }
+            }
+            prompt
+        }
+
+        let stable_0 = stable_part(&prompts[0]);
+        let stable_1 = stable_part(&prompts[1]);
+
+        assert_ne!(
+            stable_0, stable_1,
+            "stable prefix should differ after set_tools()"
+        );
+        assert!(
+            stable_1.contains("new_tool"),
+            "new stable prefix should contain the new tool"
+        );
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn test_stable_prefix_changes_after_set_skill_index() {
+        let response_events = vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta { delta: "OK".into() },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ];
+
+        let (model, captured) =
+            CapturingModel::new(vec![response_events.clone(), response_events.clone()]);
+        let mut agent = Agent::new(Arc::new(model), ToolRegistry::new());
+
+        let _ = agent.run("turn 1".into()).await.unwrap();
+
+        agent.set_skill_index(vec![SkillIndex {
+            name: "new-skill".into(),
+            description: "A new skill".into(),
+            triggers: vec!["new".into()],
+            estimated_tokens: 0,
+        }]);
+
+        let _ = agent.run("turn 2".into()).await.unwrap();
+
+        let prompts = captured.lock().expect("lock poisoned");
+        assert_eq!(prompts.len(), 2);
+
+        fn stable_part(prompt: &str) -> &str {
+            for marker in ["# Runtime Context", "# Context", "# User Preferences"] {
+                if let Some(pos) = prompt.find(marker) {
+                    return &prompt[..pos];
+                }
+            }
+            prompt
+        }
+
+        let stable_0 = stable_part(&prompts[0]);
+        let stable_1 = stable_part(&prompts[1]);
+
+        assert_ne!(
+            stable_0, stable_1,
+            "stable prefix should differ after set_skill_index()"
+        );
+        assert!(
+            stable_1.contains("new-skill"),
+            "new stable prefix should contain the new skill"
+        );
+    }
+
+    #[test]
+    fn test_build_stable_prefix_and_dynamic_suffix() {
+        use crate::prompt::SystemPromptBuilder;
+
+        let builder = SystemPromptBuilder::new()
+            .with_tools(vec![ToolDescription {
+                name: "read".into(),
+                description: "Read a file".into(),
+                ..Default::default()
+            }])
+            .with_skill_index(vec![SkillIndex {
+                name: "test-skill".into(),
+                description: "A test skill".into(),
+                triggers: vec!["test".into()],
+                estimated_tokens: 0,
+            }]);
+
+        let stable = builder.build_stable_prefix();
+        let dynamic = builder.build_dynamic_suffix();
+
+        // Stable prefix should contain Identity, Tools, Skills
+        assert!(stable.contains("# Identity"));
+        assert!(stable.contains("# Tools"));
+        assert!(stable.contains("## read"));
+        assert!(stable.contains("# Skills"));
+        assert!(stable.contains("test-skill"));
+
+        // Stable prefix should NOT contain dynamic sections
+        assert!(!stable.contains("# Runtime Context"));
+
+        // Dynamic suffix should contain Runtime Context
+        assert!(dynamic.contains("# Runtime Context"));
+        assert!(dynamic.contains("unix_seconds="));
+
+        // Combined should equal full build
+        let combined = if stable.is_empty() {
+            dynamic.clone()
+        } else if dynamic.is_empty() {
+            stable.clone()
+        } else {
+            format!("{stable}\n{dynamic}")
+        };
+        let full = builder.build();
+        assert_eq!(combined, full);
     }
 }
 
