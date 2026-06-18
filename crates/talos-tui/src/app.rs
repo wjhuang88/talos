@@ -727,10 +727,15 @@ impl Tui {
             } else {
                 let mut segments = line.segments;
                 if let Some(fill) = line.fill {
+                    let trailing = segments
+                        .first()
+                        .map(|s| unicode_width::UnicodeWidthStr::width(s.text.as_str()))
+                        .unwrap_or(0);
                     crate::scrollback::append_fill_segment(
                         &mut segments,
                         fill,
                         self.terminal.screen_size().width,
+                        trailing,
                     );
                 }
                 self.terminal.insert_styled_history(&segments, line.bg)?;

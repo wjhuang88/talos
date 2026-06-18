@@ -690,18 +690,26 @@ pub(crate) fn append_fill_segment(
     segments: &mut Vec<HistorySegment>,
     fill: HistorySegment,
     target_width: u16,
+    trailing_padding: usize,
 ) {
     let target = target_width as usize;
     let width = history_segments_width(segments);
-    if target <= width {
+    let avail = target
+        .saturating_sub(width)
+        .saturating_sub(trailing_padding);
+    if avail == 0 {
         return;
     }
 
     let fill_width = unicode_width::UnicodeWidthStr::width(fill.text.as_str()).max(1);
-    let repeat = (target - width).div_ceil(fill_width);
+    let repeat = avail.div_ceil(fill_width);
     let mut fill_segment = fill;
     fill_segment.text = fill_segment.text.repeat(repeat);
     segments.push(fill_segment);
+
+    if trailing_padding > 0 {
+        segments.push(HistorySegment::raw(" ".repeat(trailing_padding)));
+    }
 }
 
 fn is_table_separator_line(line: &str) -> bool {

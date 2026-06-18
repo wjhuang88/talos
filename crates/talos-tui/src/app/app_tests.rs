@@ -314,7 +314,7 @@ fn stream_render_state_renders_horizontal_rule() {
     );
 
     let mut segments = lines[0].segments.clone();
-    scrollback::append_fill_segment(&mut segments, lines[0].fill.clone().unwrap(), 20);
+    scrollback::append_fill_segment(&mut segments, lines[0].fill.clone().unwrap(), 20, 3);
     assert_eq!(scrollback::history_segments_width(&segments), 20);
 }
 
