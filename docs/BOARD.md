@@ -49,10 +49,9 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I027 ARCH-003 Crate Boundary Cleanup | Complete | [I027 Crate Boundary Cleanup](iterations/I027-crate-boundary-cleanup.md) | All 3 stories landed: dead `talos-mcp -> talos-agent` dep removed; `message::ToolResult` → `MessageToolResult` (14 files); RPC `Runtime` trait decouples `talos-rpc` from concrete `Agent`. Workspace check/tests/clippy/fmt/governance all clean. |
-| I026 Approval UX + Git + Prompt Optimization | Complete | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | All 7 stories implemented; closure re-verification 2026-06-18 passed `cargo clippy --workspace -- -D warnings` and `cargo test --workspace`. Residual: `--all-targets` clippy gap registered as ARCH-007. |
-| TOOL-003 P0 POSIX Tool Set | P0 Complete | [TOOL-003 POSIX Tool Set](backlog/active/TOOL-003-posix-tool-set.md) | grep/glob/ls/delete + read offset/limit + ls long format; 42 new tests; permission rules; TUI summaries; prompt optimization; clippy clean |
-| ARCH-002 Architecture Optimization Audit | Complete | [ARCH-002 Architecture Optimization](backlog/active/ARCH-002-architecture-optimization.md) | Documentation validation and architecture audit complete; audit report plus ARCH-003..ARCH-006 follow-up stories created |
+| I029 Architecture Cleanup Completion | Partial Complete | [I029 Architecture Cleanup](iterations/I029-architecture-cleanup-completion.md) | ARCH-004/007/006/005(partial) landed. Residual: talos-tui/app.rs + talos-tools/lib.rs decomposition deferred (P3). |
+| I027 ARCH-003 Crate Boundary Cleanup | Complete | [I027 Crate Boundary Cleanup](iterations/I027-crate-boundary-cleanup.md) | All 3 stories landed. |
+| I026 Approval UX + Git + Prompt Optimization | Complete | [I026 Approval UX + Doc Validation](iterations/I026-approval-ux-doc-validation.md) | All 7 stories. |
 | TOOL-002 P0 Tool Calling Remediation | P0 Complete | [TOOL-002 Tool Calling Remediation](backlog/active/TOOL-002-tool-calling-remediation.md) | Schema in prompt, permission pipeline, agent message cleanup, streaming filter, format cleanup; P1-P2 residual in I025 |
 | I025 Tool Pipeline Completion | Complete | [I025 Tool Pipeline Completion](iterations/I025-tool-pipeline-completion.md) | All 5 stories: schema validation+dedup, diff+stat, fence fix, Mermaid rendering, ToolNature. 142+ tests pass |
 | CODE-002 Symbol Tools | Complete | [CODE-002 Symbol Tools](backlog/active/CODE-002-symbol-tools.md) | All 4 tools (find_symbol, find_references, list_symbols, list_imports) implemented in symbol.rs; registered in all 4 builders |
