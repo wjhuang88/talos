@@ -31,7 +31,7 @@ const MAX_RETRIES: u32 = 3;
 const BASE_RETRY_DELAY_MS: u64 = 500;
 const EMPTY_USER_MESSAGE: &str = "[empty user message]";
 const EMPTY_ASSISTANT_MESSAGE: &str = "[empty assistant message]";
-const EMPTY_ASSISTANT_TOOL_CALL_MESSAGE: &str = "[assistant requested tool calls]";
+const EMPTY_ASSISTANT_TOOL_CALL_MESSAGE: &str = "Calling tools…";
 const EMPTY_TOOL_RESULT_MESSAGE: &str = "[tool returned no output]";
 
 /// OpenAI Chat Completions provider implementing [`LanguageModel`].
