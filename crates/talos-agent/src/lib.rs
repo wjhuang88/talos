@@ -536,7 +536,20 @@ impl Agent {
 
             while let Some(event) = rx.recv().await {
                 if let Some(ref tx) = event_tx {
-                    let _ = tx.send(event.clone());
+                    let event = match &event {
+                        AgentEvent::ToolCall { call, provenance, .. } => {
+                            let sf = self.tools.get(&call.name)
+                                .map(|t| t.summary_fields().iter().map(|s| s.to_string()).collect())
+                                .unwrap_or_default();
+                            AgentEvent::ToolCall {
+                                call: call.clone(),
+                                provenance: provenance.clone(),
+                                summary_fields: sf,
+                            }
+                        }
+                        other => other.clone(),
+                    };
+                    let _ = tx.send(event);
                 }
 
                 match event {
