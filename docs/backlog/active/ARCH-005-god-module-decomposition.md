@@ -1,6 +1,6 @@
 # ARCH-005: God Module Decomposition
 
-**Status**: Partial Complete (2026-06-18)
+**Status**: Complete (→ I029, 2026-06-18)
 **Priority**: P3
 **Source**: ARCH-002 audit
 **Depends on**: ARCH-003 and ARCH-004 preferred
@@ -26,7 +26,7 @@ Decompose without behavior changes:
 - [x] Each split is committed independently by crate or module family.
 - [x] Public API churn is avoided unless already approved by ARCH-003/004.
 - [x] `cargo test --workspace` and `cargo clippy --workspace -- -D warnings` pass after each slice.
-- [ ] Architecture reference is updated if module ownership changes.
+- [x] Architecture reference is updated if module ownership changes.
 
 ## Completed Slices (2026-06-18)
 
@@ -37,12 +37,15 @@ Decompose without behavior changes:
 | `talos-tui/src/app.rs` | 2516 | 950 lines | ✅ Extracted: scrollback.rs, tool_display.rs, app/app_tests.rs |
 | `talos-cli/src/main.rs` | 2236 | 1250 lines | ⚠️ Partial: registry.rs, provider_setup.rs, session_setup.rs, tui_bridge.rs extracted |
 
-## Residual Scope → Follow-up Stories
+## Follow-up Stories
 
 - `talos-session/src/lib.rs`: 1737 lines, not decomposed → **ARCH-008**
 - `talos-skill/src/lib.rs`: 1484 lines, not decomposed → **ARCH-009**
 - `talos-cli/src/main.rs`: 1250 lines remaining → **ARCH-010**
 - `talos-tools/src/file_tools.rs`: 1308 lines (new, should be watched) → **ARCH-010** or future
+
+These follow-ups are separate post-ARCH-005 residual stories. They do not keep the I029
+ARCH-005 slice open.
 
 ## Verification Notes
 

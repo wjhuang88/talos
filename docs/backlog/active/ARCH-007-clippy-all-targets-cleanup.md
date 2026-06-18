@@ -1,6 +1,6 @@
 # ARCH-007: Workspace `clippy --all-targets` Cleanup
 
-**Status**: Planned
+**Status**: Complete (→ I029, 2026-06-18)
 **Priority**: P3
 **Source**: I026 closure verification (2026-06-18)
 **Depends on**: None (independent cleanup)
@@ -27,11 +27,11 @@ clippy-clean, the gap must be tracked.
 
 ## Acceptance Criteria
 
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` exits 0.
-- [ ] `cargo test --workspace` still passes.
-- [ ] No `unwrap()` remains in `crates/talos-conversation/src/engine_tests.rs` unless each one
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` exits 0.
+- [x] `cargo test --workspace` still passes.
+- [x] No `unwrap()` remains in `crates/talos-conversation/src/engine_tests.rs` unless each one
       is justified inline.
-- [ ] No runtime behavior change (diff is `unwrap()` → `expect()` only, no logic changes).
+- [x] No runtime behavior change (diff is `unwrap()` → `expect()` only, no logic changes).
 
 ## Verification Notes
 
@@ -40,3 +40,5 @@ clippy-clean, the gap must be tracked.
   during cleanup, then expand to the full workspace command before closing.
 - Consider updating the I026 / future iteration exit criteria templates to use
   `--all-targets` so this scope gap does not recur.
+- 2026-06-18: Completed in I029. `cargo clippy --workspace --all-targets -- -D warnings`
+  passed; `cargo test --workspace` remained clean.

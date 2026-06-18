@@ -1,6 +1,6 @@
 # ARCH-004: Anti-Corruption Layers
 
-**Status**: Planned
+**Status**: Complete (→ I029, 2026-06-18)
 **Priority**: P2
 **Source**: ARCH-002 audit
 **Depends on**: ARCH-003 recommended first
@@ -20,15 +20,18 @@ upgrades more expensive and exposes implementation details as public API.
 
 ## Acceptance Criteria
 
-- [ ] Public `talos-mcp` client facade no longer exposes `rmcp::model::Tool`.
-- [ ] Public `talos-mcp` errors no longer expose `rmcp::ErrorData`.
-- [ ] `talos-evolution` and `talos-session` public error types do not expose `rusqlite::Error` as
+- [x] Public `talos-mcp` client facade no longer exposes `rmcp::model::Tool`.
+- [x] Public `talos-mcp` errors no longer expose `rmcp::ErrorData`.
+- [x] `talos-evolution` and `talos-session` public error types do not expose `rusqlite::Error` as
       their primary public variant names.
-- [ ] `talos-mcp` no longer imports `talos_config` in public client manager APIs.
-- [ ] Duplicate `ToolDefinition` semantics are either unified or explicitly renamed.
-- [ ] `cargo check --workspace` passes.
+- [x] `talos-mcp` no longer imports `talos_config` in public client manager APIs.
+- [x] Duplicate `ToolDefinition` semantics are either unified or explicitly renamed.
+- [x] `cargo check --workspace` passes.
 
 ## Verification Notes
 
 Run targeted `rg` checks for `rmcp::`, `rusqlite::`, `talos_config::`, and duplicate
 `ToolDefinition` definitions after implementation.
+
+- 2026-06-18: Completed in I029. `cargo check --workspace`, `cargo test --workspace`, and
+  `cargo clippy --workspace -- -D warnings` passed.

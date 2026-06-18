@@ -15,18 +15,18 @@ closed.
 
 ### Group A: Anti-Corruption Layers (ARCH-004, P2)
 
-- [ ] #ARCH-004-A: Define Talos-owned MCP descriptors/errors so `rmcp` types stay inside MCP adapter modules
-- [ ] #ARCH-004-B: Define crate-owned SQLite store errors for `talos-evolution` and `talos-session`
-- [ ] #ARCH-004-C: Replace `talos-mcp` direct config dependency with MCP-owned config DTOs
-- [ ] #ARCH-004-D: Resolve duplicate `ToolDefinition` types
+- [x] #ARCH-004-A: Define Talos-owned MCP descriptors/errors so `rmcp` types stay inside MCP adapter modules
+- [x] #ARCH-004-B: Define crate-owned SQLite store errors for `talos-evolution` and `talos-session`
+- [x] #ARCH-004-C: Replace `talos-mcp` direct config dependency with MCP-owned config DTOs
+- [x] #ARCH-004-D: Resolve duplicate `ToolDefinition` types
 
 ### Group B: Cleanup (ARCH-007, P3)
 
-- [ ] #ARCH-007: Fix ~35 pre-existing `clippy::unwrap_used` warnings in test targets
+- [x] #ARCH-007: Fix ~35 pre-existing `clippy::unwrap_used` warnings in test targets
 
 ### Group C: Prompt Cache Stability (ARCH-006, P2)
 
-- [ ] #ARCH-006: Make prompt prefix stability a session contract and expose cache metadata
+- [x] #ARCH-006: Make prompt prefix stability a session contract and expose cache metadata
 
 ### Group D: God Module Decomposition (ARCH-005, P3)
 
@@ -54,17 +54,18 @@ closed.
 
 ## Acceptance Criteria
 
-- [ ] `rmcp::` types do not appear in `talos-mcp` public API.
-- [ ] `rusqlite::Error` is not the primary public variant in `talos-evolution` or
+- [x] `rmcp::` types do not appear in `talos-mcp` public API.
+- [x] `rusqlite::Error` is not the primary public variant in `talos-evolution` or
       `talos-session` error enums.
-- [ ] `talos-mcp` no longer imports `talos_config` in public client manager APIs.
-- [ ] Duplicate `ToolDefinition` is unified or explicitly renamed.
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` exits 0.
-- [ ] Prompt prefix stability is documented as a session contract.
-- [ ] No module exceeds ~800 lines after decomposition (best-effort; tests may push higher).
-- [ ] `cargo check --workspace` passes.
-- [ ] `cargo test --workspace` passes.
-- [ ] `cargo clippy --workspace -- -D warnings` passes.
+- [x] `talos-mcp` no longer imports `talos_config` in public client manager APIs.
+- [x] Duplicate `ToolDefinition` is unified or explicitly renamed.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` exits 0.
+- [x] Prompt prefix stability is documented as a session contract.
+- [x] I029 primary decomposition targets were reduced and residual large files were registered as
+      follow-up stories (ARCH-008/009/010) rather than kept inside I029.
+- [x] `cargo check --workspace` passes.
+- [x] `cargo test --workspace` passes.
+- [x] `cargo clippy --workspace -- -D warnings` passes.
 
 ## Verification Log
 

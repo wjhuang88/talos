@@ -16,7 +16,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I029 Architecture Cleanup Completion | Active | [ARCH-004 Anti-Corruption Layers](backlog/active/ARCH-004-anti-corruption-layers.md) | Complete ARCH-004/005/006/007: anti-corruption DTOs, prompt cache stability, clippy cleanup, god module splits |
 
 ## Review
 
@@ -44,6 +43,7 @@ acceptance criteria, verification evidence, or iteration state.
 | ARCH-008 Session Module Decomposition | Planned | [ARCH-008](backlog/active/ARCH-008-session-module-decomposition.md) | Split talos-session/src/lib.rs (1737 lines) into session_actor, jsonl, topology modules |
 | ARCH-009 Skill Module Decomposition | Planned | [ARCH-009](backlog/active/ARCH-009-skill-module-decomposition.md) | Split talos-skill/src/lib.rs (1484 lines) into parser, manager, loader modules |
 | ARCH-010 CLI and Tools Module Cleanup | Planned | [ARCH-010](backlog/active/ARCH-010-cli-tools-module-cleanup.md) | talos-cli/main.rs (1250 lines) + talos-tools/file_tools.rs (1308 lines) residual cleanup |
+| ARCH-011 Architecture Watchlist | Planned | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Track tests.rs, prompt.rs, scrollback.rs as observation-only module-growth risks |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
