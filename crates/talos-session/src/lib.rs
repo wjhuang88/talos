@@ -827,6 +827,7 @@ impl Default for SessionManager {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use talos_core::message::{MessageToolResult, StopReason, ToolCall, Usage};

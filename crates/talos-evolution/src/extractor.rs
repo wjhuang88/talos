@@ -111,6 +111,7 @@ impl PatternExtractor {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

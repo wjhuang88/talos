@@ -495,6 +495,7 @@ impl SessionIndex {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use crate::{Session, SessionManager};

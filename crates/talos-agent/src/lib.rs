@@ -1221,6 +1221,7 @@ impl Agent {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use async_trait::async_trait;

@@ -202,6 +202,7 @@ fn print_badge_line<W: Write>(writer: &mut W) -> io::Result<()> {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

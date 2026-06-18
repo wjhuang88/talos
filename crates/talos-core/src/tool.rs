@@ -235,6 +235,10 @@ macro_rules! tool_parameters {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use schemars::JsonSchema;

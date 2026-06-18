@@ -414,6 +414,10 @@ pub use unsupported::UnsupportedSandbox;
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

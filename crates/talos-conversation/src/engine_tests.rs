@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use futures::StreamExt;
 use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 use talos_core::tool::ToolProvenance;

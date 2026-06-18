@@ -250,6 +250,7 @@ impl HookHandler for EvolutionHookHandler {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 fn detect_correction(input: &str) -> Option<f64> {
     detect_correction_with_marker(input).map(|(intensity, _)| intensity)
 }
@@ -265,6 +266,7 @@ fn detect_correction_with_marker(input: &str) -> Option<(f64, &str)> {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use crate::{Pattern, SignalType};

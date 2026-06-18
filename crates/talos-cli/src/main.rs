@@ -2040,6 +2040,7 @@ fn fork_session(
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

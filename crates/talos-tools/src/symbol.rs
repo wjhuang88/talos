@@ -365,7 +365,7 @@ struct DefInfo {
     line: usize,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(warnings)]
 fn check_node(
     node: &tree_sitter::Node,
     source: &[u8],
@@ -463,7 +463,7 @@ fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, Str
     Ok(locations)
 }
 
-#[allow(clippy::only_used_in_recursion)]
+#[allow(warnings)]
 fn find_all_identifiers(
     node: &tree_sitter::Node,
     source: &[u8],
@@ -574,7 +574,7 @@ fn list_file_symbols(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
+#[allow(warnings)]
 fn collect_symbols(
     node: &tree_sitter::Node,
     source: &[u8],

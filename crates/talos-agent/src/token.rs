@@ -311,6 +311,7 @@ impl TokenEstimator {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

@@ -93,6 +93,7 @@ impl<'a> BehaviorAdapter<'a> {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

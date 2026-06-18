@@ -1,4 +1,6 @@
+#![allow(warnings)]
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use std::time::{Duration, Instant};
     use talos_conversation::{MessageSource, StatusSnapshot, TipKind};

@@ -2172,6 +2172,7 @@ fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLin
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

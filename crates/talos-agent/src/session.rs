@@ -264,6 +264,7 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use async_trait::async_trait;

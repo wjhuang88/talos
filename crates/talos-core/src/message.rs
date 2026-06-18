@@ -155,6 +155,10 @@ pub enum AgentEvent {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

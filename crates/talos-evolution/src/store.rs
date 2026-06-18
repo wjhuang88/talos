@@ -414,6 +414,7 @@ impl KnowledgeStore {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

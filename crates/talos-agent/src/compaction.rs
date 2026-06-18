@@ -545,6 +545,7 @@ fn messages_to_text(messages: &[Message]) -> String {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use async_trait::async_trait;

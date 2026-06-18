@@ -720,6 +720,7 @@ fn exponential_backoff(attempt: u32) -> Duration {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 

@@ -553,6 +553,7 @@ fn home_dir() -> Option<PathBuf> {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use std::fs;

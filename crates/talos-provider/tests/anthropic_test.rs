@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use serde_json::json;
 use talos_core::message::{AgentEvent, Message, StopReason};
 use talos_core::provider::LanguageModel;

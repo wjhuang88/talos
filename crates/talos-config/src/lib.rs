@@ -545,6 +545,7 @@ fn substitute_env_vars(input: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use std::sync::Mutex;

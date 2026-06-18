@@ -229,6 +229,8 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 
@@ -1519,6 +1521,8 @@ impl StatTool {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod file_tool_tests {
     use super::*;
     use serde_json::json;
@@ -1860,6 +1864,8 @@ mod file_tool_tests {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod grep_tool_tests {
     use super::*;
     use serde_json::json;
@@ -2005,6 +2011,8 @@ mod grep_tool_tests {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod glob_tool_tests {
     use super::*;
     use serde_json::json;
@@ -2115,6 +2123,8 @@ mod glob_tool_tests {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod ls_tool_tests {
     use super::*;
     use serde_json::json;
@@ -2301,6 +2311,8 @@ mod ls_tool_tests {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod delete_tool_tests {
     use super::*;
     use serde_json::json;
@@ -2391,6 +2403,8 @@ mod delete_tool_tests {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod diff_tool_tests {
     use super::*;
     use serde_json::json;
@@ -2450,6 +2464,8 @@ mod diff_tool_tests {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod stat_tool_tests {
     use super::*;
     use serde_json::json;

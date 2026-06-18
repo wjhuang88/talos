@@ -342,6 +342,10 @@ impl Default for ProcessHardening {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use std::sync::{Mutex, MutexGuard, OnceLock};

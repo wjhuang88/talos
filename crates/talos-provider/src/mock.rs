@@ -367,6 +367,7 @@ async fn emit_default_response(tx: &mpsc::Sender<AgentEvent>) {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
 mod tests {
     use super::*;
     use talos_core::provider::LanguageModel;

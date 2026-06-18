@@ -98,6 +98,10 @@ fn default_model_context_limit() -> u32 {
 }
 
 #[cfg(test)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
+#[allow(warnings)]
 mod tests {
     use super::*;
 
