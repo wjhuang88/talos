@@ -2023,6 +2023,10 @@ fn truncate_single_line(s: &str, max: usize) -> String {
     }
 }
 
+/// When a tool's result exceeds this many lines, the scrollback shows a summary
+/// instead of the full content. Only applies to tools in the threshold-summarize set.
+const SUMMARIZE_OUTPUT_THRESHOLD_LINES: usize = 30;
+
 fn build_tool_result_scrollback_lines(
     display: &ToolResultDisplay,
     icon: &str,
@@ -2070,14 +2074,59 @@ fn build_tool_result_scrollback_lines(
 }
 
 fn should_suppress_tool_result_content(display: &ToolResultDisplay) -> bool {
-    !display.is_error && matches!(display.tool_name.as_deref(), Some("read"))
+    if display.is_error {
+        return false;
+    }
+    let Some(name) = display.tool_name.as_deref() else {
+        return false;
+    };
+    const ALWAYS_SUMMARIZE: &[&str] = &["read", "list_symbols", "find_symbol", "find_references"];
+    if ALWAYS_SUMMARIZE.contains(&name) {
+        return true;
+    }
+    const THRESHOLD_SUMMARIZE: &[&str] = &["glob", "ls", "list_imports"];
+    if THRESHOLD_SUMMARIZE.contains(&name) {
+        return display.content.lines().count() > SUMMARIZE_OUTPUT_THRESHOLD_LINES;
+    }
+    false
+}
+
+fn summarize_symbol_results(content: &str, noun: &str) -> String {
+    let count = serde_json::from_str::<serde_json::Value>(content)
+        .ok()
+        .and_then(|v| v.as_array().map(|a| a.len()))
+        .unwrap_or_else(|| content.lines().count());
+    let singular = noun.strip_suffix('s').unwrap_or(noun);
+    let label = if count == 1 { singular } else { noun };
+    format!("found {count} {label}")
 }
 
 fn suppressed_tool_result_summary(display: &ToolResultDisplay) -> String {
     let line_count = display.content.lines().count();
     let byte_count = display.content.len();
-    let line_label = if line_count == 1 { "line" } else { "lines" };
-    format!("read {line_count} {line_label}, {byte_count} bytes")
+    let name = display.tool_name.as_deref().unwrap_or("tool");
+    match name {
+        "read" => {
+            let label = if line_count == 1 { "line" } else { "lines" };
+            format!("read {line_count} {label}, {byte_count} bytes")
+        }
+        "list_symbols" => summarize_symbol_results(&display.content, "symbols"),
+        "find_symbol" => summarize_symbol_results(&display.content, "matching symbols"),
+        "find_references" => summarize_symbol_results(&display.content, "references"),
+        "glob" => {
+            let label = if line_count == 1 { "file" } else { "files" };
+            format!("glob matched {line_count} {label}, {byte_count} bytes")
+        }
+        "ls" => {
+            let label = if line_count == 1 { "entry" } else { "entries" };
+            format!("ls returned {line_count} {label}, {byte_count} bytes")
+        }
+        "list_imports" => summarize_symbol_results(&display.content, "imports"),
+        _ => {
+            let label = if line_count == 1 { "line" } else { "lines" };
+            format!("{line_count} {label}, {byte_count} bytes")
+        }
+    }
 }
 
 fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {
@@ -2512,5 +2561,184 @@ mod tests {
 
     fn state_line(text: &str) -> ScrollbackLine {
         ScrollbackLine::plain(text, None)
+    }
+
+    // --- tool result summarization tests ---
+
+    #[test]
+    fn read_always_summarized() {
+        let display = ToolResultDisplay {
+            tool_name: Some("read".to_string()),
+            is_error: false,
+            content: "single line".to_string(),
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert_eq!(summary, "read 1 line, 11 bytes");
+    }
+
+    #[test]
+    fn read_error_not_suppressed() {
+        let display = ToolResultDisplay {
+            tool_name: Some("read".to_string()),
+            is_error: true,
+            content: "permission denied".to_string(),
+        };
+        assert!(!should_suppress_tool_result_content(&display));
+    }
+
+    #[test]
+    fn list_symbols_always_summarized() {
+        let display = ToolResultDisplay {
+            tool_name: Some("list_symbols".to_string()),
+            is_error: false,
+            content: "[{\"name\": \"foo\", \"kind\": \"function\"}]\n".to_string(),
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert_eq!(summary, "found 1 symbol");
+    }
+
+    #[test]
+    fn find_symbol_always_summarized() {
+        let content = serde_json::to_string_pretty(&serde_json::json!([
+            {"name": "App", "kind": "struct"},
+            {"name": "App", "kind": "impl"}
+        ]))
+        .unwrap();
+        let display = ToolResultDisplay {
+            tool_name: Some("find_symbol".to_string()),
+            is_error: false,
+            content,
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert_eq!(summary, "found 2 matching symbols");
+    }
+
+    #[test]
+    fn find_references_always_summarized() {
+        let content = serde_json::to_string_pretty(&serde_json::json!([
+            {"file": "main.rs", "line": 10},
+            {"file": "main.rs", "line": 25},
+            {"file": "lib.rs", "line": 5}
+        ]))
+        .unwrap();
+        let display = ToolResultDisplay {
+            tool_name: Some("find_references".to_string()),
+            is_error: false,
+            content,
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert_eq!(summary, "found 3 references");
+    }
+
+    #[test]
+    fn glob_under_threshold_not_summarized() {
+        let content = "src/main.rs\nsrc/lib.rs\nCargo.toml\n";
+        let display = ToolResultDisplay {
+            tool_name: Some("glob".to_string()),
+            is_error: false,
+            content: content.to_string(),
+        };
+        assert!(!should_suppress_tool_result_content(&display));
+    }
+
+    #[test]
+    fn glob_over_threshold_summarized() {
+        let content = (0..35)
+            .map(|i| format!("src/file_{i}.rs"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let display = ToolResultDisplay {
+            tool_name: Some("glob".to_string()),
+            is_error: false,
+            content,
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert!(summary.contains("35 files"));
+        assert!(summary.contains("bytes"));
+    }
+
+    #[test]
+    fn ls_under_threshold_not_summarized() {
+        let display = ToolResultDisplay {
+            tool_name: Some("ls".to_string()),
+            is_error: false,
+            content: "drwxr-xr-x  src\n-rw-r--r--  Cargo.toml\n".to_string(),
+        };
+        assert!(!should_suppress_tool_result_content(&display));
+    }
+
+    #[test]
+    fn ls_over_threshold_summarized() {
+        let content = (0..35)
+            .map(|i| format!("-rw-r--r--  file_{i}.txt"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let display = ToolResultDisplay {
+            tool_name: Some("ls".to_string()),
+            is_error: false,
+            content,
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert!(summary.contains("35 entries"));
+    }
+
+    #[test]
+    fn list_imports_under_threshold_not_summarized() {
+        let display = ToolResultDisplay {
+            tool_name: Some("list_imports".to_string()),
+            is_error: false,
+            content: "[{\"module\": \"std::fs\"}]\n".to_string(),
+        };
+        assert!(!should_suppress_tool_result_content(&display));
+    }
+
+    #[test]
+    fn list_imports_over_threshold_summarized() {
+        let imports: Vec<_> = (0..35)
+            .map(|i| serde_json::json!({"module": format!("mod_{i}")}))
+            .collect();
+        let content = serde_json::to_string_pretty(&imports).unwrap();
+        let display = ToolResultDisplay {
+            tool_name: Some("list_imports".to_string()),
+            is_error: false,
+            content,
+        };
+        assert!(should_suppress_tool_result_content(&display));
+        let summary = suppressed_tool_result_summary(&display);
+        assert_eq!(summary, "found 35 imports");
+    }
+
+    #[test]
+    fn unknown_tool_not_suppressed() {
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            is_error: false,
+            content: "output\n".to_string(),
+        };
+        assert!(!should_suppress_tool_result_content(&display));
+    }
+
+    #[test]
+    fn summarize_symbol_results_fallback_on_invalid_json() {
+        let content = "not json\nline two\nline three\n";
+        let summary = summarize_symbol_results(content, "symbols");
+        assert_eq!(summary, "found 3 symbols");
+    }
+
+    #[test]
+    fn suppressed_summary_fallback_for_unknown_tool() {
+        let display = ToolResultDisplay {
+            tool_name: Some("unknown_tool".to_string()),
+            is_error: false,
+            content: "line one\nline two\n".to_string(),
+        };
+        let summary = suppressed_tool_result_summary(&display);
+        assert_eq!(summary, "2 lines, 18 bytes");
     }
 }
