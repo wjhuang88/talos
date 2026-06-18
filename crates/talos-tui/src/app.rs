@@ -795,6 +795,12 @@ impl Tui {
                     }
                 }
                 Some(request) = approval_rx.recv() => {
+                    while let Ok(pending) = ui_output_rx.try_recv() {
+                        self.handle_ui_output(pending);
+                    }
+                    self.flush_pending_scrollback()?;
+                    self.draw_frame()?;
+
                     self.state.pending_approval_response = Some(request.response);
                     self.show_approval(&request.tool_name, &request.arguments);
                     let _ = self.flush_pending_scrollback();
