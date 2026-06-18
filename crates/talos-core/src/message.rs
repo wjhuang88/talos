@@ -110,6 +110,8 @@ pub enum AgentEvent {
         call: ToolCall,
         /// The provenance of the tool being called.
         provenance: ToolProvenance,
+        /// Fields to display in the TUI summary (from tool summary_fields()).
+        summary_fields: Vec<String>,
     },
     /// A tool call completed.
     ToolResult {
@@ -187,6 +189,7 @@ mod tests {
                     input: serde_json::json!({"command": "ls"}),
                 },
                 provenance: ToolProvenance::Native,
+                summary_fields: vec![],
             },
             AgentEvent::ToolResult {
                 result: ToolResult {

@@ -53,6 +53,10 @@ impl AgentTool for TreeTool {
     fn is_read_only(&self) -> bool {
         true
     }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path", "max_depth"]
+    }
 }
 
 impl TreeTool {

@@ -98,6 +98,10 @@ impl AgentTool for BashTool {
         talos_core::tool::ToolNature::Execute
     }
 
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["command"]
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         let bash_input = match parse_input(input) {
             Ok(i) => i,
@@ -479,6 +483,9 @@ impl AgentTool for ReadTool {
     fn is_read_only(&self) -> bool {
         true
     }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
+    }
 }
 
 impl ReadTool {
@@ -749,6 +756,9 @@ impl AgentTool for GrepTool {
     fn is_read_only(&self) -> bool {
         true
     }
+            fn summary_fields(&self) -> &'static [&'static str] {
+        &["pattern", "path", "include"]
+    }
 }
 
 impl GrepTool {
@@ -916,6 +926,9 @@ impl AgentTool for GlobTool {
     fn is_read_only(&self) -> bool {
         true
     }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["pattern", "path"]
+    }
 }
 
 impl GlobTool {
@@ -1020,6 +1033,9 @@ impl AgentTool for LsTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
     }
 }
 
@@ -1335,6 +1351,9 @@ impl AgentTool for DiffTool {
     fn is_read_only(&self) -> bool {
         true
     }
+        fn summary_fields(&self) -> &'static [&'static str] {
+        &["old_path", "new_path"]
+    }
 }
 
 impl DiffTool {
@@ -1425,6 +1444,9 @@ impl AgentTool for StatTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
     }
 }
 

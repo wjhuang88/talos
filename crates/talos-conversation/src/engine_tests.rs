@@ -177,6 +177,7 @@ async fn tool_call_produces_stream_and_message() {
     let outputs = engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
 
     assert_eq!(outputs.len(), 1);
@@ -215,6 +216,7 @@ async fn tool_call_closes_previous_stream() {
     let outputs = engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("read", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
 
     let chunks: Vec<String> = stream_msg.stream.collect().await;
@@ -237,6 +239,7 @@ async fn tool_result_produces_stream_and_updates_message() {
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("read_file", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
@@ -262,6 +265,7 @@ async fn tool_result_error_flag_propagates() {
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
@@ -681,6 +685,7 @@ fn provenance_native_key() {
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
 
     assert_eq!(engine.plugin_observations.len(), 1);
@@ -702,6 +707,7 @@ fn provenance_mcp_remote_key() {
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
+        summary_fields: vec![],
     });
 
     assert_eq!(engine.plugin_observations.len(), 1);
@@ -724,6 +730,7 @@ fn provenance_truncates_long_server_names() {
         provenance: ToolProvenance::McpRemote {
             server: long_name.clone(),
         },
+        summary_fields: vec![],
     });
 
     assert_eq!(engine.plugin_observations.len(), 1);
@@ -741,14 +748,17 @@ fn provenance_increment_existing() {
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
 
     assert_eq!(engine.plugin_observations.len(), 1);
@@ -769,6 +779,7 @@ fn provenance_groups_mcp_servers() {
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
+        summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call(
@@ -780,6 +791,7 @@ fn provenance_groups_mcp_servers() {
         provenance: ToolProvenance::McpRemote {
             server: "filesystem".to_string(),
         },
+        summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call(
@@ -791,6 +803,7 @@ fn provenance_groups_mcp_servers() {
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
+        summary_fields: vec![],
     });
 
     assert_eq!(engine.plugin_observations.len(), 2);
@@ -917,6 +930,7 @@ async fn transcript_plain_text_includes_tool_call_details() {
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolResult {
         result: make_tool_result("output", false),
@@ -934,6 +948,7 @@ async fn transcript_markdown_includes_tool_call_details() {
     engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("bash", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolResult {
         result: make_tool_result("output", false),
@@ -1047,6 +1062,7 @@ async fn full_turn_lifecycle() {
     let outputs = engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("calculator", ToolProvenance::Native),
         provenance: ToolProvenance::Native,
+        summary_fields: vec![],
     });
     let display = find_tool_call(&outputs).unwrap();
     assert_eq!(display.tool_name, "calculator");
@@ -1112,6 +1128,7 @@ fn tool_call_records_provenance() {
         provenance: ToolProvenance::McpRemote {
             server: "github".to_string(),
         },
+        summary_fields: vec![],
     });
 
     assert_eq!(engine.plugin_observations.len(), 1);

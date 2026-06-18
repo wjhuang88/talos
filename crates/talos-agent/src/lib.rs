@@ -1240,6 +1240,7 @@ mod tests {
                 AgentEvent::ToolCall {
                     call,
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1378,6 +1379,7 @@ mod tests {
                         input: serde_json::json!({ "message": "hello" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1423,6 +1425,7 @@ mod tests {
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::ToolCall {
                     call: ToolCall {
@@ -1431,6 +1434,7 @@ mod tests {
                         input: serde_json::json!({ "path": "b.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1476,6 +1480,7 @@ mod tests {
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::ToolCall {
                     call: ToolCall {
@@ -1484,6 +1489,7 @@ mod tests {
                         input: serde_json::json!({ "path": "b.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::ToolCall {
                     call: ToolCall {
@@ -1492,6 +1498,7 @@ mod tests {
                         input: serde_json::json!({ "path": "c.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1560,6 +1567,7 @@ mod tests {
                         input: serde_json::json!({ "path": "a.txt", "content": "a" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::ToolCall {
                     call: ToolCall {
@@ -1568,6 +1576,7 @@ mod tests {
                         input: serde_json::json!({ "path": "b.txt", "content": "b" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1620,6 +1629,7 @@ mod tests {
                     input: serde_json::json!({ "message": format!("msg_{i}") }),
                 },
                 provenance: Default::default(),
+                summary_fields: vec![],
             });
         }
         events.push(AgentEvent::TurnEnd {
@@ -1657,6 +1667,7 @@ mod tests {
                     input: serde_json::json!({ "message": format!("msg_{i}") }),
                 },
                 provenance: Default::default(),
+                summary_fields: vec![],
             });
         }
         tool_events.push(AgentEvent::TurnEnd {
@@ -1703,6 +1714,7 @@ mod tests {
                 input: serde_json::json!({ "message": "same" }),
             },
             provenance: Default::default(),
+            summary_fields: vec![],
         };
 
         let responses = vec![
@@ -1763,6 +1775,7 @@ mod tests {
                         input: serde_json::json!({ "message": "first" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1778,6 +1791,7 @@ mod tests {
                         input: serde_json::json!({ "message": "second" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1823,6 +1837,7 @@ mod tests {
                         input: serde_json::json!({}),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1860,6 +1875,7 @@ mod tests {
                         input: serde_json::json!({}),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -1906,6 +1922,7 @@ mod tests {
                         input: serde_json::json!({ "path": "a.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::ToolCall {
                     call: ToolCall {
@@ -1914,6 +1931,7 @@ mod tests {
                         input: serde_json::json!({ "path": "b.txt", "content": "b" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::ToolCall {
                     call: ToolCall {
@@ -1922,6 +1940,7 @@ mod tests {
                         input: serde_json::json!({ "path": "c.txt" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -2002,6 +2021,7 @@ mod tests {
                         input: serde_json::json!({ "message": "test" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -2127,6 +2147,7 @@ mod tests {
                         input: serde_json::json!({ "message": "hello" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -2189,6 +2210,7 @@ mod tests {
                         input: serde_json::json!({ "message": "hello" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -2251,6 +2273,7 @@ mod tests {
                         input: serde_json::json!({ "message": "hello" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -2311,6 +2334,7 @@ mod tests {
                         input: serde_json::json!({ "command": "echo hello" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,
@@ -2371,6 +2395,7 @@ mod tests {
                         input: serde_json::json!({ "command": "echo hello" }),
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::ToolUse,

@@ -148,7 +148,7 @@ impl ListImportsTool {
 }
 
 macro_rules! impl_read_only_tool {
-    ($name:expr, $desc:expr, $struct:ty, $input:ty, $execute:expr) => {
+    ($name:expr, $desc:expr, $struct:ty, $input:ty, $execute:expr, $summary:expr) => {
         #[async_trait]
         impl AgentTool for $struct {
             fn name(&self) -> &str {
@@ -163,6 +163,9 @@ macro_rules! impl_read_only_tool {
             fn is_read_only(&self) -> bool {
                 true
             }
+            fn summary_fields(&self) -> &'static [&'static str] {
+                $summary
+            }
             async fn execute(&self, input: Value) -> ToolResult {
                 $execute(self, input).await
             }
@@ -175,7 +178,8 @@ impl_read_only_tool!(
     "Find a symbol (function, struct, class, etc.) by name across workspace files",
     FindSymbolTool,
     FindSymbolInput,
-    execute_find_symbol
+    execute_find_symbol,
+    &["name", "path"]
 );
 
 impl_read_only_tool!(
@@ -183,7 +187,8 @@ impl_read_only_tool!(
     "Find all usages of a named symbol within a specific file",
     FindReferencesTool,
     FindReferencesInput,
-    execute_find_references
+    execute_find_references,
+    &["name", "file"]
 );
 
 impl_read_only_tool!(
@@ -191,7 +196,8 @@ impl_read_only_tool!(
     "List symbols of a given kind (function, struct, class) in a directory or file",
     ListSymbolsTool,
     ListSymbolsInput,
-    execute_list_symbols
+    execute_list_symbols,
+    &["path", "kind"]
 );
 
 impl_read_only_tool!(
@@ -199,7 +205,8 @@ impl_read_only_tool!(
     "List all imports/exports in a file",
     ListImportsTool,
     ListImportsInput,
-    execute_list_imports
+    execute_list_imports,
+    &["file"]
 );
 
 async fn execute_find_symbol(tool: &FindSymbolTool, input: Value) -> ToolResult {

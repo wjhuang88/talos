@@ -102,6 +102,7 @@ pub struct ToolCallDisplay {
     pub tool_name: String,
     pub arguments: serde_json::Value,
     pub provenance: ToolProvenance,
+    pub summary_fields: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

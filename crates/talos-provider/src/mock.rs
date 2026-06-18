@@ -308,6 +308,7 @@ async fn emit_tool_call_response(
                 input,
             },
             provenance: Default::default(),
+            summary_fields: vec![],
         })
         .await;
     let _ = tx

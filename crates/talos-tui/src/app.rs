@@ -1949,138 +1949,53 @@ fn truncate_end_to_width(s: &str, max_width: u16) -> String {
     chars[start..].iter().collect()
 }
 
-fn summarize_tool_args(tool_name: &str, args_str: &str) -> String {
-    let fallback = || args_str.chars().take(80).collect::<String>();
-    let obj = serde_json::from_str::<serde_json::Value>(args_str).ok();
+fn summarize_tool_args(_tool_name: &str, args_str: &str, summary_fields: &[String]) -> String {
+    let obj: serde_json::Value = serde_json::from_str(args_str)
+        .unwrap_or(serde_json::Value::Object(Default::default()));
 
-    match tool_name {
-        "write" | "edit" => {
-            if let Some(ref obj) = obj {
-                let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
-                let content_len = obj
-                    .get("content")
-                    .and_then(|c| c.as_str())
-                    .map(|s| s.len())
-                    .unwrap_or(0);
-                format!("path: {path} ({content_len} bytes)")
-            } else {
-                fallback()
-            }
-        }
-        "read" | "delete" => {
-            if let Some(ref obj) = obj {
-                let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
-                format!("path: {path}")
-            } else {
-                fallback()
-            }
-        }
-        "diff" => {
-            if let Some(ref obj) = obj {
-                let old = obj.get("old_path").and_then(|p| p.as_str()).unwrap_or("?");
-                let new = obj.get("new_path").and_then(|p| p.as_str()).unwrap_or("?");
-                format!("{old} → {new}")
-            } else {
-                fallback()
-            }
-        }
-        "stat" => {
-            if let Some(ref obj) = obj {
-                let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or("?");
-                format!("path: {path}")
-            } else {
-                fallback()
-            }
-        }
-        "grep" => {
-            if let Some(ref obj) = obj {
-                let pattern = obj.get("pattern").and_then(|p| p.as_str()).unwrap_or("?");
-                format!("pattern: {pattern}")
-            } else {
-                fallback()
-            }
-        }
-        "glob" => {
-            if let Some(ref obj) = obj {
-                let pattern = obj.get("pattern").and_then(|p| p.as_str()).unwrap_or("?");
-                format!("pattern: {pattern}")
-            } else {
-                fallback()
-            }
-        }
-        "ls" => {
-            if let Some(ref obj) = obj {
-                let path = obj
-                    .get("path")
-                    .and_then(|p| p.as_str())
-                    .unwrap_or(".");
-                format!("path: {path}")
-            } else {
-                fallback()
-            }
-        }
-        "bash" => {
-            if let Some(ref obj) = obj {
-                let cmd = obj.get("command").and_then(|c| c.as_str()).unwrap_or("?");
-                let display = if cmd.len() > 80 {
-                    format!("{}...", &cmd[..80])
-                } else {
-                    cmd.to_string()
+    let parts: Vec<String> = summary_fields
+        .iter()
+        .filter_map(|field| {
+            obj.get(field.as_str()).map(|val| {
+                let display = match val {
+                    serde_json::Value::String(s) => s.clone(),
+                    serde_json::Value::Array(arr) => {
+                        let strs: Vec<String> = arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect();
+                        strs.join(", ")
+                    }
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    _ => val.to_string(),
                 };
-                format!("command: {display}")
-            } else {
-                fallback()
-            }
-        }
-        "find_symbol" => {
-            if let Some(ref obj) = obj {
-                let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-                let path = obj.get("path").and_then(|v| v.as_str());
-                match path {
-                    Some(p) => format!("name: {name} in {p}"),
-                    None => format!("name: {name}"),
-                }
-            } else {
-                fallback()
-            }
-        }
-        "find_references" => {
-            if let Some(ref obj) = obj {
-                let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-                let file = obj.get("file").and_then(|v| v.as_str()).unwrap_or("?");
-                format!("name: {name} in file: {file}")
-            } else {
-                fallback()
-            }
-        }
-        "list_symbols" => {
-            if let Some(ref obj) = obj {
-                let path = obj.get("path").and_then(|v| v.as_str()).unwrap_or("?");
-                let kind = obj.get("kind").and_then(|v| v.as_str());
-                match kind {
-                    Some(k) => format!("path: {path}, kind: {k}"),
-                    None => format!("path: {path}"),
-                }
-            } else {
-                fallback()
-            }
-        }
-        "list_imports" => {
-            if let Some(ref obj) = obj {
-                let file = obj.get("file").and_then(|v| v.as_str()).unwrap_or("?");
-                format!("file: {file}")
-            } else {
-                fallback()
-            }
-        }
-        _ => fallback(),
+                let truncated = truncate_single_line(&display, 60);
+                format!("{field}: {truncated}")
+            })
+        })
+        .collect();
+
+    if parts.is_empty() {
+        truncate_single_line(&args_str.replace('\n', " "), 120)
+    } else {
+        parts.join(", ")
+    }
+}
+
+fn truncate_single_line(s: &str, max: usize) -> String {
+    let single = s.replace('\n', " ");
+    let chars: Vec<char> = single.chars().collect();
+    if chars.len() <= max {
+        single
+    } else {
+        format!("{}…", chars[..max].iter().collect::<String>())
     }
 }
 
 fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {
     let args_str = serde_json::to_string_pretty(&tool_call.arguments)
         .unwrap_or_else(|_| tool_call.arguments.to_string());
-    let args_summary = summarize_tool_args(&tool_call.tool_name, &args_str);
+    let args_summary = summarize_tool_args(&tool_call.tool_name, &args_str, &tool_call.summary_fields);
     let provenance_marker = match &tool_call.provenance {
         ToolProvenance::Native => None,
         ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", server)),

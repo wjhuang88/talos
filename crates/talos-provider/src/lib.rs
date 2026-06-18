@@ -382,6 +382,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                     input: input_json,
                                 },
                                 provenance: ToolProvenance::Native,
+                                summary_fields: vec![],
                             })
                             .await;
                     }
@@ -397,6 +398,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                 .send(AgentEvent::ToolCall {
                                     call,
                                     provenance: ToolProvenance::Native,
+                                    summary_fields: vec![],
                                 })
                                 .await;
                         }

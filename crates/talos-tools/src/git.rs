@@ -54,6 +54,7 @@ impl AgentTool for GitStatusTool {
     fn description(&self) -> &str { "Show working tree status" }
     fn parameters(&self) -> Value { tool_parameters!(GitStatusInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["path"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -131,6 +132,7 @@ impl AgentTool for GitLogTool {
     fn description(&self) -> &str { "Show commit history" }
     fn parameters(&self) -> Value { tool_parameters!(GitLogInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["max_count"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -208,6 +210,7 @@ impl AgentTool for GitBranchListTool {
     fn description(&self) -> &str { "List branches" }
     fn parameters(&self) -> Value { tool_parameters!(GitBranchListInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["remote"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -313,6 +316,7 @@ impl AgentTool for GitDiffTool {
     fn description(&self) -> &str { "Show changes (staged or unstaged)" }
     fn parameters(&self) -> Value { tool_parameters!(GitDiffInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["staged", "max_lines"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -396,6 +400,7 @@ impl AgentTool for GitShowTool {
     fn description(&self) -> &str { "Show details of a specific commit" }
     fn parameters(&self) -> Value { tool_parameters!(GitShowInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["revision"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -522,6 +527,7 @@ impl AgentTool for GitAddTool {
     fn description(&self) -> &str { "Stage files for commit" }
     fn parameters(&self) -> Value { tool_parameters!(GitAddInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["paths"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -575,6 +581,7 @@ impl AgentTool for GitCommitTool {
     fn description(&self) -> &str { "Create a commit with a message" }
     fn parameters(&self) -> Value { tool_parameters!(GitCommitInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["message", "all"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -632,6 +639,7 @@ impl AgentTool for GitPushTool {
     fn description(&self) -> &str { "Push to remote repository" }
     fn parameters(&self) -> Value { tool_parameters!(GitPushInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["remote", "branch", "force"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -690,6 +698,7 @@ impl AgentTool for GitPullTool {
     fn description(&self) -> &str { "Pull from remote repository" }
     fn parameters(&self) -> Value { tool_parameters!(GitPullInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["remote"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -745,6 +754,7 @@ impl AgentTool for GitCheckoutTool {
     fn description(&self) -> &str { "Switch branches" }
     fn parameters(&self) -> Value { tool_parameters!(GitCheckoutInput) }
 
+    fn summary_fields(&self) -> &'static [&'static str] { &["branch", "create"] }
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),

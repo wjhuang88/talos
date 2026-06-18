@@ -450,7 +450,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         .send(AgentEvent::ToolCall {
                             call,
                             provenance: ToolProvenance::Native,
-                        })
+                        summary_fields: vec![],
+                    })
                         .await;
                 }
                 let _ = tx
@@ -541,6 +542,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                     input: args,
                                 },
                                 provenance: Default::default(),
+                                summary_fields: vec![],
                             })
                             .await;
                     }
@@ -564,7 +566,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         .send(AgentEvent::ToolCall {
                             call,
                             provenance: ToolProvenance::Native,
-                        })
+                        summary_fields: vec![],
+                    })
                         .await;
                 }
 
@@ -591,7 +594,8 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
             .send(AgentEvent::ToolCall {
                 call,
                 provenance: ToolProvenance::Native,
-            })
+            summary_fields: vec![],
+                    })
             .await;
     }
 
@@ -608,6 +612,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         input: args,
                     },
                     provenance: Default::default(),
+                    summary_fields: vec![],
                 })
                 .await;
         }

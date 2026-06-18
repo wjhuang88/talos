@@ -124,6 +124,10 @@ pub trait AgentTool: Send + Sync {
         }
     }
 
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     /// Returns the provenance of this tool.
     ///
     /// The default implementation returns [`ToolProvenance::Native`].
