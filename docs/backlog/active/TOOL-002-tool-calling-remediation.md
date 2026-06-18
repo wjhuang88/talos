@@ -354,79 +354,32 @@ The user cannot tell which tool call the approval is for.
 Each tool call that needs approval shows its own approval block **immediately after** the tool
 call line, before moving to the next tool.
 
-### Root Cause
+### Root Cause (Updated 2026-06-17)
 
-The approval happens **inside** `TuiPermissionAwareTool::execute()`, which is called by the
-agent's `execute_single_tool()`. But the `UiOutput::ToolCall` event is emitted by the
-conversation engine **before** the agent executes the tool. There is no mechanism to:
+The approval channel has been merged into `UiOutput` (single-channel design per ADR-006).
+However, ordering is STILL wrong because:
 
-1. Pause after showing the tool call line
-2. Show approval inline
-3. Then show the result
+1. `AgentEvent::ToolCall` is forwarded to the conversation engine during provider streaming
+   (ALL tool calls emitted before ANY execution)
+2. `ToolApprovalRequest` goes through `TuiApprovalHandler` → `ui_output_tx` directly,
+   bypassing the conversation engine
+3. `ToolResult` events arrive at the conversation engine after execution completes
 
-The approval is a separate channel (`approval_tx`) that is disconnected from the scrollback
-rendering pipeline.
+Result: all ToolCall lines appear first, then approvals, then results — not interleaved
+per-tool.
 
-### Proposed Fix
+### Required Fix (Deferred)
 
-**Option A: Approval-as-UiOutput (recommended)**
+The fix requires changing WHEN ToolCall events are emitted:
 
-Add approval to the `UiOutput` enum so it flows through the same rendering pipeline as tool
-calls:
+- **Option A**: Agent buffers ToolCall events during streaming, emits them right before
+  each tool executes (one at a time, paired with its ToolResult)
+- **Option B**: Route ToolApprovalRequest through the conversation engine (same hop as
+  ToolCall/ToolResult) to guarantee FIFO ordering
+- **Option C**: Restructure execution to emit ToolCall → execute → ToolResult sequentially
+  for write tools, instead of collect-all → execute-all → emit-all
 
-```rust
-pub enum UiOutput {
-    // ... existing ...
-    ToolApprovalRequest {
-        tool_name: String,
-        arguments: String,
-    },
-    ToolApprovalResponse {
-        approved: bool,
-    },
-}
-```
-
-Flow becomes:
-```
-UiOutput::ToolCall          → push "→ write, path: poem.txt" to scrollback
-UiOutput::ToolApprovalRequest → push "⚠ Requires approval" + key hints to scrollback
-                              → wait for user keypress
-UiOutput::ToolApprovalResponse → push "✓ approved" or "✗ denied"
-UiOutput::ToolResult        → push "✓ wrote 921 bytes" or "✗ permission denied"
-```
-
-The TuiPermissionAwareTool sends approval requests through the UiOutput channel instead of
-a separate approval_tx channel. This ensures correct ordering and visual association.
-
-**Option B: Inline approval in scrollback (simpler)**
-
-Instead of a separate approval overlay/prompt, push the approval as styled scrollback lines
-directly after the tool call line:
-
-```
-→ write, path: poem.txt
-  ⚠ Requires approval — press y/n/a
-```
-
-The key handling reads y/n/a from the input loop, then pushes the result line:
-
-```
-→ write, path: poem.txt
-  ⚠ Requires approval — press y/n/a
-  ✓ approved
-```
-
-This is simpler but requires the input handler to know about pending approval state.
-
-### Files Affected
-
-| File | Change |
-|------|--------|
-| `crates/talos-conversation/src/types.rs` | New UiOutput variants (Option A) |
-| `crates/talos-cli/src/main.rs` | TuiPermissionAwareTool sends approval via UiOutput channel |
-| `crates/talos-tui/src/app.rs` | Handle approval UiOutput variants in handle_ui_output() |
-| `crates/talos-tui/src/state.rs` | Approval pending state (if Option B) |
+This is an architectural change to the agent's event flow. Not a quick fix.
 
 ### Acceptance Criteria
 
