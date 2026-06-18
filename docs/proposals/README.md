@@ -51,6 +51,9 @@ docs/proposals/
   handling.
 - [Session Context Contamination](session-context-contamination.md) — context contamination
   investigation and mitigation direction.
+- [Standard Agent Protocol Support](standard-agent-protocol-support.md) — medium-term
+  compatibility direction for common Agent protocol/config conventions such as shared `~/.agent`
+  configuration.
 - [TUI Stream Markdown Rendering](tui-stream-markdown-rendering.md) — single-line and block
   Markdown recognition/rendering direction for the inline TUI stream renderer.
 - [Tree-sitter Code Analysis](tree-sitter-code-analysis.md) — research proposal for adding
