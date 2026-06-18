@@ -1,8 +1,8 @@
-# I033: Agent Protocol Compatibility Foundation
+# I035: Agent Protocol Compatibility Foundation
 
 **Status**: Planned
-**Target Window**: Week 4 of next month plan
-**Depends On**: I030-I032 complete preferred; may proceed as research-only if implementation
+**Target Window**: After architecture cleanup and runtime Skill/MCP activation
+**Depends On**: I030-I034 complete preferred; may proceed as research-only if implementation
 dependencies slip
 
 ## Outcome

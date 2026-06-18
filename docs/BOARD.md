@@ -40,10 +40,11 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I030 Session Module Decomposition | Planned | [I030 Session Module Decomposition](iterations/I030-session-module-decomposition.md) | Complete ARCH-008; `talos-session/src/lib.rs` <=400 lines; session tests/clippy pass |
-| I031 Skill Runtime Activation And CLI Cleanup | Planned | [I031 Skill Runtime Activation](iterations/I031-skill-and-cli-module-cleanup.md) | Complete ARCH-009 and SKILL-001; sessions discover/inject skills before first turn |
+| I031 Skill And CLI Module Cleanup | Planned | [I031 Skill And CLI Module Cleanup](iterations/I031-skill-and-cli-module-cleanup.md) | Complete ARCH-009 and CLI slice of ARCH-010; skill/CLI tests and clippy pass |
 | I032 Tools Module Cleanup | Planned | [I032 Tools Module Cleanup](iterations/I032-tools-module-cleanup.md) | Split file_tools; talos-tools tests/clippy and workspace tests pass |
-| I033 Agent Protocol Compatibility Foundation | Planned | [I033 Agent Protocol Compatibility Foundation](iterations/I033-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
+| I033 Runtime Skill Activation | Planned | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Discover skills at startup; inject Level 0 metadata; define Level 1/2 activation |
 | I034 MCP Session Integration | Planned | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | MCP startup discovery, tool registry injection, permission routing, provenance/status |
+| I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
 | ARCH-008 Session Module Decomposition | Planned | [ARCH-008](backlog/active/ARCH-008-session-module-decomposition.md) | Split talos-session/src/lib.rs (1737 lines) into session_actor, jsonl, topology modules |
 | ARCH-009 Skill Module Decomposition | Planned | [ARCH-009](backlog/active/ARCH-009-skill-module-decomposition.md) | Split talos-skill/src/lib.rs (1484 lines) into parser, manager, loader modules |
