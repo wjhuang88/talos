@@ -19,7 +19,8 @@
 //! # Example
 //!
 //! ```
-//! use talos_agent::caching::{PromptCache, ToolDefinition};
+//! use talos_agent::caching::PromptCache;
+//! use talos_core::provider::ToolDefinition;
 //!
 //! let mut cache = PromptCache::new();
 //! let tools = vec![
@@ -36,49 +37,7 @@
 //! ```
 
 use serde_json::{Value, json};
-
-/// A tool definition for inclusion in the system prompt.
-///
-/// Tool definitions are sorted by name to ensure stable ordering across
-/// turns, maximizing cache hit rates.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ToolDefinition {
-    /// Unique name of the tool.
-    pub name: String,
-    /// Human-readable description of what the tool does.
-    pub description: String,
-    /// JSON Schema describing the tool's input parameters.
-    pub parameters: Value,
-}
-
-impl ToolDefinition {
-    /// Creates a new tool definition.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` — Unique identifier for the tool.
-    /// * `description` — Human-readable description.
-    /// * `parameters` — JSON Schema for the tool's input parameters.
-    #[must_use]
-    pub fn new(name: impl Into<String>, description: impl Into<String>, parameters: Value) -> Self {
-        Self {
-            name: name.into(),
-            description: description.into(),
-            parameters,
-        }
-    }
-
-    /// Formats this tool definition as a text block suitable for inclusion
-    /// in the system prompt.
-    fn to_prompt_text(&self) -> String {
-        format!(
-            "## {}\n{}\nParameters: {}",
-            self.name,
-            self.description,
-            serde_json::to_string_pretty(&self.parameters).unwrap_or_default()
-        )
-    }
-}
+use talos_core::provider::ToolDefinition;
 
 /// A structured system prompt with cache control breakpoints.
 ///

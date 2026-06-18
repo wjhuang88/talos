@@ -27,11 +27,35 @@ pub enum ProviderError {
 
 pub type ProviderResult<T> = Result<T, ProviderError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub parameters: Value,
+}
+
+impl ToolDefinition {
+    /// Creates a new tool definition.
+    #[must_use]
+    pub fn new(name: impl Into<String>, description: impl Into<String>, parameters: Value) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            parameters,
+        }
+    }
+
+    /// Formats this tool definition as a text block suitable for inclusion
+    /// in the system prompt.
+    #[must_use]
+    pub fn to_prompt_text(&self) -> String {
+        format!(
+            "## {}\n{}\nParameters: {}",
+            self.name,
+            self.description,
+            serde_json::to_string_pretty(&self.parameters).unwrap_or_default()
+        )
+    }
 }
 
 #[async_trait::async_trait]
