@@ -1,6 +1,6 @@
 # ARCH-005: God Module Decomposition
 
-**Status**: Planned
+**Status**: Partial Complete (2026-06-18)
 **Priority**: P3
 **Source**: ARCH-002 audit
 **Depends on**: ARCH-003 and ARCH-004 preferred
@@ -22,11 +22,27 @@ Decompose without behavior changes:
 
 ## Acceptance Criteria
 
-- [ ] No behavior changes are intentionally introduced in decomposition commits.
-- [ ] Each split is committed independently by crate or module family.
-- [ ] Public API churn is avoided unless already approved by ARCH-003/004.
-- [ ] `cargo test --workspace` and `cargo clippy --workspace -- -D warnings` pass after each slice.
+- [x] No behavior changes are intentionally introduced in decomposition commits.
+- [x] Each split is committed independently by crate or module family.
+- [x] Public API churn is avoided unless already approved by ARCH-003/004.
+- [x] `cargo test --workspace` and `cargo clippy --workspace -- -D warnings` pass after each slice.
 - [ ] Architecture reference is updated if module ownership changes.
+
+## Completed Slices (2026-06-18)
+
+| File | Before | After | Status |
+|------|--------|-------|--------|
+| `talos-agent/src/lib.rs` | 2833 | 862 lines | ✅ Extracted: tool_execution.rs, tests.rs, helpers.rs |
+| `talos-tools/src/lib.rs` | 2484 | 23 lines | ✅ Extracted: bash_tool.rs, file_tools.rs, search_tools.rs, diff_stat.rs |
+| `talos-tui/src/app.rs` | 2516 | 950 lines | ✅ Extracted: scrollback.rs, tool_display.rs, app/app_tests.rs |
+| `talos-cli/src/main.rs` | 2236 | 1250 lines | ⚠️ Partial: registry.rs, provider_setup.rs, session_setup.rs, tui_bridge.rs extracted |
+
+## Residual Scope → Follow-up Stories
+
+- `talos-session/src/lib.rs`: 1737 lines, not decomposed → **ARCH-008**
+- `talos-skill/src/lib.rs`: 1484 lines, not decomposed → **ARCH-009**
+- `talos-cli/src/main.rs`: 1250 lines remaining → **ARCH-010**
+- `talos-tools/src/file_tools.rs`: 1308 lines (new, should be watched) → **ARCH-010** or future
 
 ## Verification Notes
 
