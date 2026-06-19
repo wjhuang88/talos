@@ -197,11 +197,16 @@ impl InlineTerminal {
         self.screen_size = screen_size;
 
         let mut area = self.viewport_area;
+        let old_height = area.height;
         area.height = height.min(screen_size.height);
         area.width = screen_size.width;
 
         if area.bottom() > screen_size.height {
             area.y = screen_size.height.saturating_sub(area.height);
+        } else if area.height > old_height {
+            area.y = area
+                .y
+                .saturating_sub(area.height.saturating_sub(old_height));
         }
 
         let area_changed = area != self.viewport_area;
