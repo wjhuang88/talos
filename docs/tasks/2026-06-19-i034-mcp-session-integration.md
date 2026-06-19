@@ -182,3 +182,7 @@ Incidental confirmed fact requested by the user: the built-in `grep` tool is not
 and does not invoke host `rg`. It uses Rust `regex`, `walkdir`, `glob`, and
 `std::fs::read_to_string` in `crates/talos-tools/src/search_tools.rs`. Any performance/ignore-rule
 upgrade belongs to TOOL-001, not I034.
+
+User-requested residual created: TOOL-004 is a timeboxed Research Spike evaluating embedded
+ripgrep crates, external `rg`, and the current engine. No grep implementation changes are in this
+long-running task.
