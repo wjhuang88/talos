@@ -936,7 +936,8 @@ impl Tui {
             let diff = total_height - self.last_total_height;
             let viewport = self.terminal.viewport_area();
             let screen_h = self.terminal.screen_size().height;
-            if viewport.bottom() >= screen_h {
+            let would_overflow = viewport.y.saturating_add(total_height) > screen_h;
+            if would_overflow {
                 for _ in 0..diff {
                     let _ = self.terminal.insert_history("", None);
                 }
