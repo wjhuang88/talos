@@ -33,7 +33,7 @@ Talos crates are introduced progressively across iterations (see Implementation 
 
 | Crate | Iteration | Responsibility |
 |-------|-----------|----------------|
-| `talos-tools` | I003 | Implementations of standard system and developer tools. |
+| `talos-tools` | I003 | Implementations of standard system and developer tools. File tools are split by behavior (`read`, `write/edit`, `delete`, `ls`) behind stable crate re-exports. |
 | `talos-session` | I003 | Persistence layer for message history and session state. |
 | `talos-sandbox` | I004 | Process isolation, filesystem virtualization, and secure execution environments. |
 | `talos-permission` | I004 | Policy engine, capability-based security, and user approval workflows. |
