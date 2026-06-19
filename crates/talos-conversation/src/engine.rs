@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::time::Instant;
 
 use futures::stream;
@@ -6,9 +7,9 @@ use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
 use crate::types::{
-    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, PluginObservation,
-    ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
-    ToolCallInfo, ToolResultDisplay, UiOutput,
+    ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
+    PluginObservation, ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind,
+    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -28,44 +29,175 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
 
 const MOCK_REQUEST_COMMAND: &str = "/mock-request";
 
-struct BuiltinCommandDefinition {
-    name: &'static str,
-    usage: &'static str,
-    description: &'static str,
+/// Origin of a slash command — determines how metadata and execution are resolved.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandOrigin {
+    /// Command owned by a typed runtime module (Conversation, Session, TUI, etc.).
+    Builtin,
+    /// Command backed by a registered tool; description, schema, and nature resolve
+    /// from the live [`talos_core::tool::ToolRegistry`] at runtime.
+    ToolBacked { tool_name: &'static str },
 }
 
-const BUILTIN_COMMANDS: &[BuiltinCommandDefinition] = &[
-    BuiltinCommandDefinition {
-        name: "/help",
-        usage: "/help",
-        description: "Show this help",
-    },
-    BuiltinCommandDefinition {
-        name: "/quit",
-        usage: "/quit",
-        description: "Exit Talos",
-    },
-    BuiltinCommandDefinition {
-        name: "/exit",
-        usage: "/exit",
-        description: "Exit Talos",
-    },
-    BuiltinCommandDefinition {
-        name: "/status",
-        usage: "/status",
-        description: "Show session info",
-    },
-    BuiltinCommandDefinition {
-        name: "/plugins",
-        usage: "/plugins",
-        description: "List observed tool provenance",
-    },
-    BuiltinCommandDefinition {
-        name: "/skills",
-        usage: "/skills",
-        description: "List available runtime skills",
-    },
-];
+/// Availability predicate type — returns `true` when the command's owner is ready.
+pub type AvailabilityPredicate = fn() -> bool;
+
+/// Always-available predicate for commands whose owners are unconditionally present.
+pub const fn always_available() -> bool {
+    true
+}
+
+/// Definition of a built-in slash command — consumed by help, completion, and the TUI-010 menu.
+pub struct CommandDefinition {
+    pub name: &'static str,
+    pub aliases: &'static [&'static str],
+    pub usage: &'static str,
+    pub description: &'static str,
+    /// Optional argument hint (e.g. `"<path>"` for `/export <path>`).
+    pub arg_hint: Option<&'static str>,
+    /// How the command's metadata and execution are resolved.
+    pub origin: CommandOrigin,
+    /// Runtime availability check — command is hidden from help/completion when this
+    /// returns `false`. Tool-backed commands gate on tool presence; owner-typed commands
+    /// gate on their module being active.
+    pub available: AvailabilityPredicate,
+}
+
+/// Ordered registry of built-in slash commands.
+pub struct CommandRegistry {
+    commands: Vec<CommandDefinition>,
+}
+
+impl CommandRegistry {
+    fn new(commands: Vec<CommandDefinition>) -> Self {
+        Self { commands }
+    }
+
+    pub fn list(&self) -> &[CommandDefinition] {
+        &self.commands
+    }
+
+    /// Returns only the commands whose availability predicate returns `true`.
+    pub fn available_commands(&self) -> Vec<&CommandDefinition> {
+        self.commands
+            .iter()
+            .filter(|cmd| (cmd.available)())
+            .collect()
+    }
+
+    pub fn find(&self, name: &str) -> Option<&CommandDefinition> {
+        self.commands
+            .iter()
+            .find(|cmd| cmd.name == name || cmd.aliases.contains(&name))
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = Vec::new();
+        for cmd in &self.commands {
+            names.push(cmd.name);
+            names.extend(cmd.aliases);
+        }
+        names
+    }
+
+    /// Returns only available names (filtered by availability predicates).
+    pub fn available_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = Vec::new();
+        for cmd in &self.commands {
+            if (cmd.available)() {
+                names.push(cmd.name);
+                names.extend(cmd.aliases);
+            }
+        }
+        names
+    }
+
+    pub fn complete(&self, prefix: &str) -> Vec<&str> {
+        self.commands
+            .iter()
+            .filter(|cmd| (cmd.available)())
+            .flat_map(|cmd| {
+                let mut completions: Vec<&str> = Vec::new();
+                if cmd.name.starts_with(prefix) {
+                    completions.push(cmd.name);
+                }
+                for alias in cmd.aliases {
+                    if alias.starts_with(prefix) {
+                        completions.push(*alias);
+                    }
+                }
+                completions
+            })
+            .collect()
+    }
+}
+static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyLock::new(|| {
+    CommandRegistry::new(vec![
+        CommandDefinition {
+            name: "/help",
+            aliases: &[],
+            usage: "/help",
+            description: "Show this help",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/quit",
+            aliases: &["/exit"],
+            usage: "/quit | /exit",
+            description: "Exit Talos",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/status",
+            aliases: &[],
+            usage: "/status",
+            description: "Show session info",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/plugins",
+            aliases: &[],
+            usage: "/plugins",
+            description: "List observed tool provenance",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/skills",
+            aliases: &[],
+            usage: "/skills",
+            description: "List available runtime skills",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/copy",
+            aliases: &[],
+            usage: "/copy last | /copy all",
+            description: "Copy transcript to clipboard",
+            arg_hint: Some("last | all"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/export",
+            aliases: &[],
+            usage: "/export <path>",
+            description: "Export transcript to file",
+            arg_hint: Some("<path>"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+    ])
+});
 
 pub struct ConversationEngine {
     pub(crate) messages: Vec<ChatMessage>,
@@ -87,10 +219,11 @@ pub struct ConversationEngine {
 impl ConversationEngine {
     /// Slash command names currently exposed by help and completion.
     ///
-    /// Retained as a compatibility view while CMD-001 evolves the registry into
-    /// public command definitions with tool-backed metadata resolution.
-    pub const SLASH_COMMANDS: &'static [&'static str] =
-        &["/help", "/quit", "/exit", "/status", "/plugins", "/skills"];
+    /// Derived from the shared `CommandRegistry` so help, completion, and TUI-010
+    /// always reflect the same executable command set.
+    pub fn slash_commands() -> Vec<&'static str> {
+        COMMAND_REGISTRY.available_names()
+    }
 
     pub fn new(model_name: String) -> Self {
         Self {
@@ -297,15 +430,15 @@ impl ConversationEngine {
     pub fn handle_slash_command(&mut self, input: &str) -> Vec<UiOutput> {
         let parts: Vec<&str> = input.splitn(2, ' ').collect();
         let cmd = parts[0];
-        let _arg = parts.get(1).copied().unwrap_or("");
+        let arg = parts.get(1).copied().unwrap_or("");
         let mut outputs = Vec::new();
 
         match cmd {
             "/help" => {
                 let mut text = String::from("[System] Available commands:\n");
-                for command in BUILTIN_COMMANDS {
+                for command in COMMAND_REGISTRY.available_commands() {
                     text.push_str(&format!(
-                        "[System]   {:<10} — {}\n",
+                        "[System]   {:<20} — {}\n",
                         command.usage, command.description
                     ));
                 }
@@ -333,6 +466,12 @@ impl ConversationEngine {
             "/skills" => {
                 outputs.extend(self.handle_skills_command());
             }
+            "/copy" => {
+                outputs.extend(self.handle_copy_command(arg));
+            }
+            "/export" => {
+                outputs.extend(self.handle_export_command(arg));
+            }
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
@@ -343,6 +482,75 @@ impl ConversationEngine {
             }
         }
 
+        outputs
+    }
+
+    fn handle_copy_command(&self, scope: &str) -> Vec<UiOutput> {
+        let (text, scope_enum, label) = match scope {
+            "last" => {
+                let content = self
+                    .last_assistant_text()
+                    .unwrap_or_else(|| "(no assistant messages yet)".to_string());
+                (content, CopyScope::Last, "last assistant message")
+            }
+            "all" => {
+                let content = self.transcript_plain_text();
+                if content.is_empty() {
+                    ("(empty transcript)".to_string(), CopyScope::All, "all")
+                } else {
+                    (content, CopyScope::All, "full transcript")
+                }
+            }
+            _ => {
+                let hint = "[Error] Usage: /copy last | /copy all\n".to_string();
+                return vec![UiOutput::Stream(StreamMessage {
+                    source: MessageSource::Error,
+                    stream: Box::pin(stream::once(async move { hint })),
+                })];
+            }
+        };
+
+        let confirm = format!("[System] Copying {label} to clipboard…\n");
+        let mut outputs = vec![UiOutput::Stream(StreamMessage {
+            source: MessageSource::System,
+            stream: Box::pin(stream::once(async move { confirm })),
+        })];
+        outputs.push(UiOutput::CopyToClipboard {
+            text,
+            scope: scope_enum,
+        });
+        outputs
+    }
+
+    fn handle_export_command(&self, path_arg: &str) -> Vec<UiOutput> {
+        let path = path_arg.trim();
+        if path.is_empty() {
+            let hint =
+                "[Error] Usage: /export <path>\nExample: /export transcript.md\n".to_string();
+            return vec![UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(stream::once(async move { hint })),
+            })];
+        }
+
+        let content = self.transcript_plain_text();
+        if content.is_empty() {
+            let msg = "[System] Transcript is empty — nothing to export.\n".to_string();
+            return vec![UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(stream::once(async move { msg })),
+            })];
+        }
+
+        let confirm = format!("[System] Exporting transcript to {path}…\n");
+        let mut outputs = vec![UiOutput::Stream(StreamMessage {
+            source: MessageSource::System,
+            stream: Box::pin(stream::once(async move { confirm })),
+        })];
+        outputs.push(UiOutput::ExportToFile {
+            path: PathBuf::from(path),
+            content,
+        });
         outputs
     }
 
@@ -439,11 +647,7 @@ impl ConversationEngine {
     }
 
     pub fn complete_slash_command(&self, input: &str) -> Vec<&str> {
-        BUILTIN_COMMANDS
-            .iter()
-            .map(|command| command.name)
-            .filter(|name| name.starts_with(input))
-            .collect()
+        COMMAND_REGISTRY.complete(input)
     }
 
     pub fn last_assistant_text(&self) -> Option<String> {

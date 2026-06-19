@@ -425,9 +425,10 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/status"));
     assert!(text.contains("/plugins"));
     assert!(text.contains("/skills"));
+    assert!(text.contains("/copy"));
+    assert!(text.contains("/export"));
     assert!(!text.contains("/new"));
     assert!(!text.contains("/compact"));
-    assert!(!text.contains("/copy"));
     assert!(!text.contains("/mock-request"));
 }
 
@@ -988,11 +989,15 @@ fn complete_slash_command_empty_prefix_returns_all() {
 
     let completions = engine.complete_slash_command("");
 
-    assert_eq!(
-        completions,
-        vec!["/help", "/quit", "/exit", "/status", "/plugins", "/skills"]
-    );
-    assert_eq!(completions, ConversationEngine::SLASH_COMMANDS);
+    assert!(completions.contains(&"/help"));
+    assert!(completions.contains(&"/quit"));
+    assert!(completions.contains(&"/exit"));
+    assert!(completions.contains(&"/status"));
+    assert!(completions.contains(&"/plugins"));
+    assert!(completions.contains(&"/skills"));
+    assert!(completions.contains(&"/copy"));
+    assert!(completions.contains(&"/export"));
+    assert_eq!(completions, ConversationEngine::slash_commands());
 }
 
 #[test]
@@ -1019,7 +1024,7 @@ fn complete_slash_command_multiple_matches() {
 
     let completions = engine.complete_slash_command("/c");
 
-    assert!(completions.is_empty());
+    assert_eq!(completions, vec!["/copy"]);
 }
 
 #[test]

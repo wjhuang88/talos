@@ -8,7 +8,7 @@ use crossterm::{
     terminal::enable_raw_mode,
 };
 use futures::{Stream, StreamExt};
-use talos_conversation::{MessageSource, TipKind, UiOutput, UserInput};
+use talos_conversation::{CopyScope, MessageSource, TipKind, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
@@ -707,6 +707,59 @@ impl Tui {
                     ttl: Duration::from_secs(2),
                     created_at: Instant::now(),
                 });
+            }
+            UiOutput::CopyToClipboard { text, scope } => {
+                let label = match scope {
+                    CopyScope::Last => "last message",
+                    CopyScope::All => "transcript",
+                };
+                match crate::clipboard::copy_text(&text) {
+                    Ok(backend) => {
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::Info,
+                            text: format!("Copied {label} to clipboard (via {backend:?})",),
+                            ttl: Duration::from_secs(3),
+                            created_at: Instant::now(),
+                        });
+                    }
+                    Err(e) => {
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::Error,
+                            text: format!("Failed to copy {label}: {e:?}"),
+                            ttl: Duration::from_secs(4),
+                            created_at: Instant::now(),
+                        });
+                    }
+                }
+            }
+            UiOutput::ExportToFile { path, content } => {
+                let engine = talos_permission::PermissionEngine::default();
+                match crate::export::export_transcript(&engine, &path, &content) {
+                    Ok(()) => {
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::Info,
+                            text: format!("Exported transcript to {}", path.display()),
+                            ttl: Duration::from_secs(3),
+                            created_at: Instant::now(),
+                        });
+                    }
+                    Err(crate::export::ExportError::PermissionDenied(reason)) => {
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::Error,
+                            text: format!("Export denied: {reason}"),
+                            ttl: Duration::from_secs(4),
+                            created_at: Instant::now(),
+                        });
+                    }
+                    Err(crate::export::ExportError::WriteFailed(reason)) => {
+                        self.state.tip = Some(Tip {
+                            kind: TipKind::Error,
+                            text: format!("Export failed: {reason}"),
+                            ttl: Duration::from_secs(4),
+                            created_at: Instant::now(),
+                        });
+                    }
+                }
             }
             UiOutput::Exit => {
                 self.state.should_exit = true;

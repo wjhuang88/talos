@@ -129,6 +129,21 @@ Talos ships with built-in tools for common coding-agent work:
 
 The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a native tool cannot cover the task.
 
+## Slash Commands
+
+Type `/` in the TUI to access these commands:
+
+| Command | Description |
+|---|---|
+| `/help` | Show available commands |
+| `/quit`, `/exit` | Exit Talos |
+| `/status` | Show session info (model, token usage) |
+| `/plugins` | List observed tool provenance and MCP server status |
+| `/skills` | List available runtime skills (Level 0 metadata) |
+| `/copy last` | Copy the last assistant message to clipboard |
+| `/copy all` | Copy the full transcript to clipboard |
+| `/export <path>` | Export transcript to a file (permission-gated) |
+
 ## Skills
 
 Talos discovers `SKILL.md` files at session startup and injects Level 0 metadata

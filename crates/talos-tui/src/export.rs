@@ -7,8 +7,6 @@
 //! refused with a user-facing reason — same surface as the inline
 //! permission pipeline used by tools.
 
-#![allow(dead_code)] // Preserved for the planned TUI slash-command rewire of `/export`.
-
 use std::io::Write;
 use std::path::Path;
 

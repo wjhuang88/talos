@@ -119,6 +119,18 @@ pub enum UiOutput {
         summary_fields: Vec<String>,
         response: tokio::sync::oneshot::Sender<talos_core::ApprovalChoice>,
     },
+    /// Request the TUI/bridge to copy text to clipboard.
+    /// The engine prepares the text; the bridge executes the I/O.
+    CopyToClipboard {
+        text: String,
+        scope: CopyScope,
+    },
+    /// Request the TUI/bridge to write transcript content to a file.
+    /// The engine prepares the content; the bridge handles permissions and I/O.
+    ExportToFile {
+        path: std::path::PathBuf,
+        content: String,
+    },
     Exit,
 }
 
@@ -135,6 +147,15 @@ pub struct ToolResultDisplay {
     pub tool_name: Option<String>,
     pub is_error: bool,
     pub content: String,
+}
+
+/// Scope for the `/copy` slash command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CopyScope {
+    /// Copy only the last assistant text message.
+    Last,
+    /// Copy the full transcript as plain text.
+    All,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

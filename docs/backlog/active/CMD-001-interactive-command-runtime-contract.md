@@ -4,7 +4,7 @@
 |---|---|
 | Priority | P1 |
 | Type | Technical Story |
-| Status | In Progress (truthful catalog landed; registry and copy/export remain) |
+| Status | Complete (2026-06-19) — shared registry + copy/export restored + tool-backed infrastructure + README sync |
 | Depends On | ADR-006 event boundary; existing ToolRegistry and session seam |
 | Integrates With | SESSION-001, TUI-001, TUI-002, TUI-010, SKILL-001, MCP-001, MEM-005, MODEL-001, GIT-001, PLUGIN-001 |
 
@@ -113,13 +113,13 @@ Registration rules:
 - [x] `/help` and completion no longer expose placeholder or internal-only commands.
 - [x] `/new` no longer claims to create a session by clearing presentation state only.
 - [x] A regression test executes every visible command and rejects `Unknown command` results.
-- [ ] Parser, help, completion, and TUI-010 consume one shared `CommandDefinition` registry.
-- [ ] Tool-backed command metadata and availability resolve from the live tool registry rather than
+- [x] Parser, help, completion, and TUI-010 consume one shared `CommandDefinition` registry.
+- [x] Tool-backed command metadata and availability resolve from the live tool registry rather than
       copying tool descriptions or schemas into command code.
-- [ ] `/copy` and `/export` have end-to-end TUI-facing tests and TUI-001 is closed again.
-- [ ] Each remaining command is exposed only after its owner story supplies an executable typed path.
-- [ ] `README.md` documents only commands proven executable through the runtime path.
-- [ ] CMD-001, TUI-001, TUI-010, Product Backlog, iteration record, and Board statuses are synchronized.
+- [x] `/copy` and `/export` have end-to-end TUI-facing tests and TUI-001 is closed again.
+- [x] Each remaining command is exposed only after its owner story supplies an executable typed path.
+- [x] `README.md` documents only commands proven executable through the runtime path.
+- [x] CMD-001, TUI-001, TUI-010, Product Backlog, iteration record, and Board statuses are synchronized.
 
 ## Required Reads
 

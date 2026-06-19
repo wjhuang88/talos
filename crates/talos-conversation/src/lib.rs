@@ -8,9 +8,12 @@ mod engine;
 mod engine_tests;
 mod types;
 
-pub use engine::ConversationEngine;
+pub use engine::{
+    AvailabilityPredicate, CommandDefinition, CommandOrigin, CommandRegistry, ConversationEngine,
+    always_available,
+};
 pub use types::{
-    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, PluginObservation,
-    ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
-    ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
+    ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
+    PluginObservation, ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind,
+    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };

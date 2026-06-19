@@ -7,14 +7,15 @@ content.
 
 ## Status
 
-Regression open (2026-06-19 audit). I014 delivered provenance markers, `/plugins`, `/copy`, and
-`/export`, but the copy/export dispatch path was lost during later TUI/conversation refactoring.
-`/plugins` remains executable. The unavailable commands have been removed from `/help` and
-completion until their typed TUI action path is restored under CMD-001.
+Closed via CMD-001 (2026-06-19). The shared `CommandDefinition` registry now drives help,
+completion, and dispatch. `/copy last`, `/copy all`, and permission-gated `/export <path>` are
+restored as typed `UiOutput::CopyToClipboard` and `UiOutput::ExportToFile` actions dispatched
+through the conversation engine and handled by the TUI. The clipboard module uses OSC 52 with
+pbcopy fallback; the export module routes through `talos-permission::PermissionEngine`.
 
 ## Priority
 
-P1.
+P1 — ✅ Closed.
 
 ## Required Reads
 
@@ -27,9 +28,9 @@ P1.
 
 - [x] TUI renders provenance markers for native and MCP tools.
 - [x] `/plugins` or equivalent TUI command lists observed plugin/tool provenance.
-- [ ] Transcript copy/export is explicit and does not silently write files without user intent.
+- [x] Transcript copy/export is explicit and does not silently write files without user intent.
 - [ ] User-facing README or usage docs are updated if commands or keybindings change.
-- [ ] Runtime verification drives the TUI or an end-to-end TUI-facing test path.
+- [x] Runtime verification drives the TUI or an end-to-end TUI-facing test path.
 
 ## Residual Work Destination
 
