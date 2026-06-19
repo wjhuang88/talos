@@ -1,6 +1,6 @@
 # ARCH-011: Architecture Watchlist
 
-**Status**: Planned
+**Status**: Tracking (reviewed 2026-06-19)
 **Priority**: P4
 **Source**: Post-ARCH-005 architecture follow-up
 **Depends on**: I029 complete
@@ -28,11 +28,22 @@ tracked explicitly so Agents do not turn observation-only concerns into speculat
 
 ## Acceptance Criteria
 
-- [ ] Watchlist is reviewed during future architecture cleanup sessions.
-- [ ] A watched file is promoted only with a new owner story and explicit acceptance criteria.
-- [ ] No code changes are made directly under this item.
+- [x] Watchlist is reviewed during future architecture cleanup sessions.
+- [x] A watched file is promoted only with a new owner story and explicit acceptance criteria.
+- [x] No code changes are made directly under this item.
 
 ## Verification Notes
 
 This is a governance tracking item. Validation is documentation consistency plus future review
 evidence, not code execution.
+
+2026-06-19 review after ARCH-010/I032 closure:
+
+- `crates/talos-agent/src/tests.rs` remains watch-only. It is large, but no current architecture
+  task is blocked by its shape.
+- `crates/talos-agent/src/prompt.rs` remains watch-only. Prompt template/cache work is stable after
+  I026/I029; no new provider-specific leakage was observed in this architecture pass.
+- `crates/talos-tui/src/scrollback.rs` remains watch-only. Rendering growth is expected to be driven
+  by future TUI input-layer and hidden-output work, so promotion should wait for concrete change
+  pressure.
+- No watched file was promoted to a new owner story in this pass.
