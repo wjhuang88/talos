@@ -44,14 +44,14 @@ docs/iterations/
 | R0 | Remediation Gate | **Complete** (2026-06-01) | All 7 ARCH findings closed; 480 tests pass; I009 unblocked |
 | R1 | Review Closure | **Complete** (2026-06-03) | I008/I009 moved to Complete; I009 TUI consumer work deferred to #I009-S6. I010 R2 is the next mainline slice. See `R1-review-closure.md`. |
 | I009 | Extensible Agent | **Complete** (2026-06-03) | Backend/runtime surface shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance producers). TUI consumer markers + `/plugins` deferred to #I009-S6. See `I009-extensible-agent.md`. |
-| I010 | Polished Agent | **Active** (R3 Complete 2026-06-04) | R2: AppServerSession convergence, TUI approval, inline mode. R3: Nord theme, markdown rendering, diff display, steering queues, slash commands. 567 tests. See `I010-polished-agent.md`. |
+| I010 | Polished Agent | **Complete** (2026-06-04; status repaired 2026-06-19) | R2 and R3 evidence is preserved; later command/session/TUI residuals have separate owners. See `I010-polished-agent.md`. |
 | I011 | Open Providers | **Paused** (S1 landed 2026-06-02; S2 deferred) | OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var shipped. S2 provider-plugin architecture is deferred until after R1/I010 or explicit priority change. See `I011-open-providers.md`. |
-| I012 | Portable Tools | Planned | Native POSIX-style tool subset, embeddable tool-pack registration, Rust-native workspace search, and `gix`-first structured Git tools without first-slice `git2`/libgit2. See `I012-portable-tools.md` and ADR-010. |
+| I012 | Portable Tools | **Superseded** (2026-06-19 mapping) | Umbrella split into I016/I017; actual deliveries mapped to I025/I026 with residuals under TOOL-001/GIT-001. See `I012-portable-tools.md`. |
 | I013 | Boundary Control | **Complete** (2026-06-05) | Front-loaded high-risk boundary work: ADR-011 Guardian, ADR-012 exec DSL, ADR-013 provider schema, and #ARCH-S8 R1 centralized logging. See `I013-boundary-control.md`. |
 | I014 | TUI Completion | **Complete** (2026-06-06) | Finish TUI provenance/plugin visibility and copy/export workflows. Two stories: #I009-S6 (provenance markers + `/plugins`) and #I010-S9 (clipboard copy/export) landed via 2 atomic commits. 652 tests pass workspace-wide (was 615; +37 from talos-tui). See `I014-tui-completion.md`; EXT-001 backlog; ADR-009. |
 | I015 | Provider Schema | **Complete** (2026-06-08) | Schema types and built-in defaults landed 2026-06-06; one-way opencode import (`talos-config::opencode`) with 9 unit tests landed 2026-06-08. `cargo test -p talos-config -p talos-provider -p talos-cli` passes. See `I015-provider-schema.md`; `PROV-001-provider-schema.md`; ADR-013. |
-| I016 | Portable File And Search Tools | Planned | Split I012 file/tool-pack/search work into a smaller native tools iteration. See `I016-portable-file-search.md`. |
-| I017 | Embedded Git Tools | Planned | Split I012 Git work into a dedicated `gix`-first read-only Git tools iteration. See `I017-embedded-git-tools.md`. |
+| I016 | Portable File And Search Tools | **Superseded** by I025 | Native tool outcome delivered through I025/TOOL-003; residual portability/index work remains TOOL-001. |
+| I017 | Embedded Git Tools | **Superseded** by I026 | P0-P2 Git outcome delivered through I026/GIT-001; advanced/fallback residuals remain GIT-001. |
 | I018 | Observability and Prompt Assets | Planned | Bounded file-log retention and compile-time embedded prompt assets. See `I018-observability-prompt-assets.md`. |
 | I019 | Layered Memory Foundation | Planned | Four-layer memory foundation under ADR-016. See `I019-layered-memory-foundation.md`. |
 | I020 | Exploration Library | Planned | Local research library, source/claim/synthesis storage, and vector/graph storage Spike under ADR-017. See `I020-exploration-library.md`. |
@@ -82,11 +82,7 @@ rewrite published iteration baselines.
 
 | Iteration | Current State | Disposition Before Next Activation |
 |---|---|---|
-| I010 | Active (legacy drift) | No current implementation. Register owner-file closure/status repair; do not treat as the active development iteration. |
 | I011 | Paused | Continue paused; provider schema work moved through I015 and broader plugin architecture remains deferred. |
-| I012 | Planned (legacy umbrella) | Do not activate; file/search and Git work were split into I016/I017 and later delivered in other slices. Supersession audit remains a governance residual. |
-| I016 | Planned | Deferred; only residual TOOL-001 scope remains and is not selected next. |
-| I017 | Planned | Do not activate for delivered P0-P2 Git scope; advanced P3 remains under GIT-001. Supersession audit remains a residual. |
 | I018 | Planned | Deferred; remains a valid future observability/prompt-assets baseline. |
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
@@ -96,8 +92,8 @@ rewrite published iteration baselines.
 | I035 | Planned | Blocked from activation until I034 completes or its research-only fallback is explicitly activated. |
 | I036 | Planned | Deferred to the end of the current plan; no implementation code belongs to this research iteration. |
 
-Residual status repair for legacy I010/I012/I016/I017 is recorded in the governance Manifest and
-does not authorize silently changing their published objectives.
+I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
+Complete/Superseded dispositions without erasing their published objectives.
 
 ## Next Execution Rounds
 

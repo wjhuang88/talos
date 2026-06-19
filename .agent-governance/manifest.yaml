@@ -1,10 +1,10 @@
 schema_version: "1"
 managed_by: "agent-project-governance"
 profile: "high-risk"
-status: "degraded"
+status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-19"
-status_note: "Governance refresh (2026-06-19): reloaded agent-project-governance 2.0.0; added published-baseline, ready-story, local harness, and long-running-task rules; moved I033 to Review pending binary evidence. Status is degraded only for registered legacy I010/I012/I016/I017 iteration-state/supersession drift; current capabilities and routes validate."
+status_note: "Governance refresh (2026-06-19): current planning/long-task rules are locally visible and harnessed; GOV-002 closed I010 and mapped I012/I016/I017 supersession without rewriting baselines. I033 remains an explicit Review gate, not governance drift. Validators pass with 0 warnings."
 
 governance:
   skill_name: "agent-project-governance"
@@ -68,5 +68,4 @@ migration:
     - "SKILL-002: resolve context/cache ownership, then plan explicit Level 1/2 activation in a new iteration"
     - "SESSION-001: implement atomic interactive new/resume/fork lifecycle after the command registry foundation"
     - "MCP-001/I034: activate configured MCP tools at session startup after current review/priority work is dispositioned"
-    - "GOV-002: repair legacy I010/I012/I016/I017 active/planned versus delivered/superseded drift without overwriting baselines"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

@@ -35,7 +35,6 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I011 S2 Provider Plugin Architecture | Paused | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Resume as I015 schema-only work under ADR-013 |
-| Governance State | Degraded | [GOV-002](backlog/active/GOV-002-legacy-iteration-status-repair.md) | Return Manifest to conformant after I010/I012/I016/I017 baseline/status drift is repaired and validated |
 
 ## Next
 
@@ -63,6 +62,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I029 Architecture Cleanup Completion | Complete | [I029 Architecture Cleanup](iterations/I029-architecture-cleanup-completion.md) | ARCH-004/007/006/005 all landed. 10345→2082 lines across 4 god modules (-80%). |
+| GOV-002 Legacy Iteration Status Repair | Complete | [GOV-002](backlog/active/GOV-002-legacy-iteration-status-repair.md) | I010 closed and I012/I016/I017 supersession mapped; Manifest governance state restored |
 | I030 Session Module Decomposition | Complete | [I030 Session Module Decomposition](iterations/I030-session-module-decomposition.md) | ARCH-008 landed: `talos-session/src/lib.rs` 1737→45 lines; session tests and clippy pass. |
 | ARCH-008 Session Module Decomposition | Complete | [ARCH-008](backlog/active/ARCH-008-session-module-decomposition.md) | error/types/jsonl/topology/manager/tests split landed; public `talos_session::*` imports preserved. |
 | ARCH-009 Skill Module Decomposition | Complete | [ARCH-009](backlog/active/ARCH-009-skill-module-decomposition.md) | error/types/token/parser/loader/manager/tests split landed; public `talos_skill::*` imports preserved. |

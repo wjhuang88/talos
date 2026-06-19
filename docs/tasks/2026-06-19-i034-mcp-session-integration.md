@@ -38,7 +38,7 @@ with provenance/status without crashing when its server is unavailable.
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| T1 | Repair GOV-002 legacy iteration state | I010/I012/I016/I017 preserve baselines and have explicit dispositions; Manifest can return conformant | Confirmation | Shell and PowerShell governance validators pass with semantic owner review | If historical evidence conflicts, keep degraded and record the exact unknown; do not guess | Planned |
+| T1 | Repair GOV-002 legacy iteration state | I010/I012/I016/I017 preserve baselines and have explicit dispositions; Manifest can return conformant | Confirmation | Shell and PowerShell governance validators pass with semantic owner review | If historical evidence conflicts, keep degraded and record the exact unknown; do not guess | Complete |
 | T2 | Close I033 runtime evidence gap | Real `talos` binary output proves workspace Skill Level 0 reaches the provider request | T1 | Deterministic binary/integration test plus I033/README/status sync | If mock diagnostics cannot safely prove it after two approaches, leave I033 Review and stop before I034 | Planned |
 | T3 | Activate I034 baseline | Published baseline gains activation record, MVP, docs list, and prerequisite disposition without target rewrite | T1, T2 | I034, MCP-001, iterations index, and Board agree on Active state | If prerequisites remain unresolved, keep I034 Planned and stop | Planned |
 | T4 | Inventory and centralize MCP startup composition | One bounded startup integration path replaces mode-specific duplication where needed | T3 | Targeted tests and no `rmcp` DTO leakage/public API break | Preserve existing adapters; register architectural residual instead of broad refactor | Planned |
@@ -162,3 +162,23 @@ Next task item: T1 GOV-002 evidence audit
 Recovery or resume instruction: open this record, verify the feature branch exists at 954cda6,
 then audit I010/I012/I016/I017 without rewriting their published baselines
 ```
+
+### Checkpoint 1 - T1 GOV-002 Complete
+
+```text
+Completed task items: T1
+Current state and artifacts: I010 Complete; I012/I016/I017 Superseded with original baselines preserved;
+GOV-002 Complete; Manifest conformant
+Commands/checks and actual results: Git history and I025/I026 evidence reviewed;
+`scripts/validate_project_governance.sh .` and PowerShell validator both passed with 0 warnings;
+`git diff --check` passed
+Open risks or deviations: none for T1; I033 remains Review
+Next task item: T2 repair mock request-preview evidence path and close I033
+Recovery or resume instruction: run both governance validators, commit T1, then inspect Agent debug
+preview handling before changing Skill runtime code
+```
+
+Incidental confirmed fact requested by the user: the built-in `grep` tool is not based on ripgrep
+and does not invoke host `rg`. It uses Rust `regex`, `walkdir`, `glob`, and
+`std::fs::read_to_string` in `crates/talos-tools/src/search_tools.rs`. Any performance/ignore-rule
+upgrade belongs to TOOL-001, not I034.

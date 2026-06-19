@@ -3,7 +3,7 @@
 **User can**: Use Talos as a daily coding companion with a Codex-like terminal experience, unified
 run paths, headless automation, SDK embedding, and release-grade TUI workflows.
 
-## Status: ACTIVE — R3 Product Polish complete (2026-06-04)
+## Status: COMPLETE — R2/R3 delivered (2026-06-04; status repaired 2026-06-19)
 
 I010 has two planned slices. R2 is architecture convergence: make all run paths share one
 session/event/approval surface and add the Codex-like inline terminal mode. R3 is product polish.
@@ -188,3 +188,16 @@ Commits:
 - `58edece` feat(tui): add slash commands with tab completion (#I010-S5)
 - `b28a8fc` feat(tui): add markdown rendering, Nord-theme evolution panel (#I010-S2 #I010-S1)
 - `38105c2` feat(tui): add diff rendering and steering/follow-up queues (#I010-S3 #I010-S4)
+
+## 2026-06-19 Status Repair
+
+The published R2 and R3 slices both recorded passing verification and were completed in 2026-06.
+The `ACTIVE` header was stale and did not represent ongoing I010 execution.
+
+Later regressions or broader capabilities do not reopen this baseline:
+
+- command catalog/dispatch truthfulness and copy/export restoration are owned by CMD-001/TUI-001;
+- interactive session lifecycle is owned by SESSION-001;
+- remaining TUI popup/keymap work is owned by TUI-008/009/010 and TUI-002 residual slices.
+
+Disposition: Complete. Original objective and evidence remain preserved above.

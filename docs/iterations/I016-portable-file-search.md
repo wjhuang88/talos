@@ -3,7 +3,7 @@
 **User can**: Perform common file, listing, and search operations through native structured tools on
 minimal machines without relying on host POSIX utilities.
 
-## Status: PLANNED
+## Status: SUPERSEDED — implementation delivered through I025/TOOL-003
 
 ## Decision Gate
 
@@ -37,3 +37,15 @@ Follow ADR-010 for search dependency boundaries. Create a follow-up ADR before p
 - [ ] Search rejects path escape and does not follow symlinks by default.
 - [ ] Tool-pack provenance is visible to list-tools consumers if public listing changes land.
 - [ ] `cargo test -p talos-tools -p talos-core -p talos-cli` passes.
+
+## 2026-06-19 Supersession Record
+
+I016 was never activated as its own execution batch. The runnable native file/search tool outcome
+was delivered later through I025 and TOOL-003, including grep, glob, ls, delete, diff, stat, tree,
+read limits, schemas, permission classification, and display integration.
+
+This record does not claim every original I016 acceptance item passed under this iteration. Residual
+persistent indexes, extra native dependencies, and broader tool-pack portability remain under
+TOOL-001.
+
+Disposition: Superseded by I025 for delivered scope; residuals remain explicitly owned.

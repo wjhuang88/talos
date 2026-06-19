@@ -4,7 +4,7 @@
 host POSIX utilities, while still exposing native tools through the same plugin/MCP/RPC
 surfaces as external tools.
 
-## Status: PLANNED
+## Status: SUPERSEDED — split into I016/I017; later delivery mapped 2026-06-19
 
 This iteration captures the requirement to reduce external environment dependency by
 shipping a small Rust-native POSIX-style tool subset and agent-oriented workspace search
@@ -116,3 +116,17 @@ Residual work:
   no-shell invocation.
 - Run the eventual I012 tool verification on a deliberately minimal `PATH`; Git-dependent tests
   should pass through the `gix` path or assert clear fallback/unavailable-tool behavior.
+
+## 2026-06-19 Supersession Record
+
+I012 was a published umbrella plan. It was deliberately split before activation:
+
+- file/search/tool-pack scope moved to I016;
+- structured Git scope moved to I017;
+- actual native tool delivery later landed through I025/TOOL-003;
+- actual read/write Git delivery later landed through I026/GIT-001.
+
+The umbrella itself must not be activated. Unfinished persistent-index/tool-pack portability scope
+remains under TOOL-001; advanced/fallback Git scope remains under GIT-001.
+
+Disposition: Superseded, not Complete. The original baseline remains visible above.

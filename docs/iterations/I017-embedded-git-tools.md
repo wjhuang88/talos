@@ -3,7 +3,7 @@
 **User can**: Inspect repository status, diffs, history, and branches through structured Git tools
 without requiring a host `git` binary for the first read-only slice.
 
-## Status: PLANNED
+## Status: SUPERSEDED — P0-P2 delivered through I026/GIT-001
 
 ## Decision Gate
 
@@ -35,3 +35,14 @@ that dependency.
 - [ ] Any operation-level fallback records rationale and replacement trigger.
 - [ ] Search can consume Git status hints without failing when Git metadata is unavailable.
 - [ ] `cargo test -p talos-tools --features git-tools` or the equivalent workspace test passes.
+
+## 2026-06-19 Supersession Record
+
+I017 was not activated under this file. I026/GIT-001 later delivered the read-only `gix` tools
+(`git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`) and explicit write tools with
+documented host-git fallbacks where `gix` lacks porcelain/network support.
+
+The original minimal-PATH and search-ranking acceptance is not retroactively claimed here. Advanced
+Git operations and fallback replacement triggers remain under GIT-001 P3.
+
+Disposition: Superseded by I026 for P0-P2; residuals remain explicitly owned.
