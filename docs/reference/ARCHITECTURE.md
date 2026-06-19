@@ -78,6 +78,21 @@ skill data.
 | `token.rs` | Lightweight token estimation for skill index budgeting. |
 | `error.rs` | Skill error surface. |
 
+### CLI Runtime Boundary
+
+`talos-cli` keeps argument parsing and top-level mode dispatch in `main.rs`. Mode execution is
+isolated in `mode_runners.rs` so startup composition can be reviewed without scrolling through the
+full TUI/print/inline/RPC/MCP execution bodies.
+
+| Module | Responsibility |
+|--------|----------------|
+| `main.rs` | `Cli`, `Mode`, logging setup, mode selection, and hook registry construction. |
+| `mode_runners.rs` | Execution bodies for print, TUI, inline REPL, legacy interactive REPL, RPC, and MCP server modes. |
+| `registry.rs` | Tool registry construction and permission-aware wrappers. |
+| `session_setup.rs` | Workspace/session resolution and session utility modes (`--search`, `--list`, `--learned`). |
+| `provider_setup.rs` | Provider parsing and provider/client config construction. |
+| `tui_bridge.rs` / `event_loop.rs` | TUI and legacy interactive event-loop bridges. |
+
 ## Dependency Graph
 
 The architecture follows a strict hierarchy to prevent circular dependencies.
