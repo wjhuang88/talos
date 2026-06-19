@@ -6,6 +6,7 @@
 |-----------|---------|-----------|
 | `backlog/` | Planned work and story tracking | `PRODUCT-BACKLOG.md` |
 | `iterations/` | Iteration plans, progress, and retrospectives | `README.md` |
+| `tasks/` | Long-running task contracts, checkpoints, and recovery records | Created per `sop/LONG-RUNNING-TASK.md` |
 | `decisions/` | Architecture Decision Records (ADRs) | `README.md` |
 | `roadmap/` | Phased implementation plan and requirement traceability | `IMPLEMENTATION-ROADMAP.md`, `REQUIREMENT-CONVERGENCE.md` |
 | `proposals/` | Uncommitted ideas for future consideration | `README.md` |
