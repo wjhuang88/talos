@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::{home_dir, ConfigError, ProviderConfig};
+use crate::{ConfigError, ProviderConfig, home_dir};
 
 /// Default path for Talos's shared Agent config: `~/.agents/talos/config.toml`.
 pub fn default_agents_config_path() -> PathBuf {
@@ -73,10 +73,7 @@ pub fn import_agents_config(
         if e.kind() == std::io::ErrorKind::NotFound {
             ConfigError::IoError(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!(
-                    "shared agent config not found: {}",
-                    file_path.display()
-                ),
+                format!("shared agent config not found: {}", file_path.display()),
             ))
         } else {
             ConfigError::IoError(e)
@@ -143,7 +140,10 @@ output_limit = 8192
 
         assert_eq!(result.len(), 1);
         let provider = result.get("anthropic").expect("anthropic provider");
-        assert_eq!(provider.protocol, crate::ProviderProtocol::AnthropicMessages);
+        assert_eq!(
+            provider.protocol,
+            crate::ProviderProtocol::AnthropicMessages
+        );
         assert_eq!(provider.api_key_env.as_deref(), Some("ANTHROPIC_API_KEY"));
         let model = provider
             .models
@@ -167,7 +167,10 @@ api_key_env = "CUSTOM_KEY"
 
         let provider = result.get("custom").expect("custom provider");
         assert_eq!(provider.protocol, crate::ProviderProtocol::OpenAIChat);
-        assert_eq!(provider.base_url.as_deref(), Some("https://api.example.com/v1"));
+        assert_eq!(
+            provider.base_url.as_deref(),
+            Some("https://api.example.com/v1")
+        );
         assert_eq!(provider.api_key_env.as_deref(), Some("CUSTOM_KEY"));
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -233,6 +236,9 @@ api_key_env = "CUSTOM_KEY"
         let s = path.to_string_lossy();
         assert!(s.contains(".agents"), "path should contain .agents: {s}");
         assert!(s.contains("talos"), "path should contain talos: {s}");
-        assert!(s.ends_with("config.toml"), "path should end with config.toml: {s}");
+        assert!(
+            s.ends_with("config.toml"),
+            "path should end with config.toml: {s}"
+        );
     }
 }

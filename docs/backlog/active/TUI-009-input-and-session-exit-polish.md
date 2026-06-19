@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-009 |
 | Priority | P2 |
-| Status | Planned |
+| Status | Complete (2026-06-19) |
 | Depends On | TUI-004 |
 | Origin | User feedback 2026-06-18 — input clearing should use Ctrl+C, and exit should print Codex-style session resource usage |
 
@@ -66,19 +66,19 @@ not be guessed.
 
 ## Acceptance Criteria
 
-- [ ] In an idle session with non-empty composer input, pressing `Ctrl+C`
+- [x] In an idle session with non-empty composer input, pressing `Ctrl+C`
       clears the composer and does not exit the app.
-- [ ] In an active turn, pressing `Ctrl+C` still triggers the existing
+- [x] In an active turn, pressing `Ctrl+C` still triggers the existing
       cancellation path.
-- [ ] In an idle session with empty composer input, the existing exit affordance
+- [x] In an idle session with empty composer input, the existing exit affordance
       remains available and clearly communicated.
-- [ ] Pressing `Esc` does not clear normal composer text.
-- [ ] On clean exit, terminal scrollback contains a compact session usage
+- [x] Pressing `Esc` does not clear normal composer text.
+- [x] On clean exit, terminal scrollback contains a compact session usage
       summary.
-- [ ] Exit summary never includes secrets, hidden tool output, or full file
+- [x] Exit summary never includes secrets, hidden tool output, or full file
       contents.
-- [ ] Missing usage fields degrade gracefully without panics.
-- [ ] TUI keyboard and state tests cover the new key behavior and exit summary
+- [x] Missing usage fields degrade gracefully without panics.
+- [x] TUI keyboard and state tests cover the new key behavior and exit summary
       formatting.
 
 ## Required Reads

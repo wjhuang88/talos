@@ -563,6 +563,7 @@ impl Tui {
     }
 
     pub async fn run(&mut self) -> io::Result<()> {
+        let session_start = Instant::now();
         let mut event_stream = EventStream::new();
         let mut render_interval = tokio::time::interval(Duration::from_millis(50));
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
@@ -601,8 +602,76 @@ impl Tui {
             }
         }
 
+        let elapsed = session_start.elapsed();
+        self.print_exit_summary(elapsed);
+
         self.restore();
         Ok(())
+    }
+
+    fn print_exit_summary(&mut self, elapsed: Duration) {
+        let status = &self.state.status;
+        let elapsed_secs = elapsed.as_secs();
+        let minutes = elapsed_secs / 60;
+        let seconds = elapsed_secs % 60;
+
+        let mut lines = vec![ScrollbackLine::plain(String::new(), None)];
+
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                "── Session Summary ──".to_string(),
+                to_crossterm_color(semantic::DIM_TEXT),
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+
+        if !status.model_name.is_empty() {
+            lines.push(ScrollbackLine::plain(
+                format!("  Model:    {}", status.model_name),
+                None,
+            ));
+        }
+
+        lines.push(ScrollbackLine::plain(
+            format!("  Duration: {minutes}m {seconds}s"),
+            None,
+        ));
+
+        lines.push(ScrollbackLine::plain(
+            format!("  Turns:    {}", self.stream_count),
+            None,
+        ));
+
+        let usage = &status.usage;
+        if usage.input_tokens > 0 || usage.output_tokens > 0 {
+            lines.push(ScrollbackLine::plain(
+                format!(
+                    "  Tokens:   {} in / {} out",
+                    usage.input_tokens, usage.output_tokens
+                ),
+                None,
+            ));
+            if let Some(cost) = self.estimate_cost(usage) {
+                lines.push(ScrollbackLine::plain(
+                    format!("  Est cost: ${cost:.4}"),
+                    None,
+                ));
+            }
+        }
+
+        for line in lines {
+            let _ = self.terminal.insert_history(&line.text, line.bg);
+        }
+    }
+
+    fn estimate_cost(&self, usage: &talos_core::message::Usage) -> Option<f64> {
+        if usage.input_tokens == 0 && usage.output_tokens == 0 {
+            return None;
+        }
+        let input_cost = usage.input_tokens as f64 * 3.0 / 1_000_000.0;
+        let output_cost = usage.output_tokens as f64 * 15.0 / 1_000_000.0;
+        Some(input_cost + output_cost)
     }
 
     async fn next_stream_chunk(&mut self) -> Option<String> {
@@ -892,6 +961,17 @@ impl Tui {
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         let was_processing = self.state.status.is_processing;
+                        if !was_processing && !self.state.input_buffer.is_empty() {
+                            self.state.input_clear();
+                            self.state.ctrl_c_state = CtrlCState::Idle;
+                            self.state.tip = Some(Tip {
+                                kind: TipKind::Info,
+                                text: "Input cleared. Press Ctrl+C twice to exit.".to_string(),
+                                ttl: Duration::from_secs(2),
+                                created_at: Instant::now(),
+                            });
+                            return false;
+                        }
                         let should_exit = self.state.handle_ctrl_c();
                         if was_processing && let Some(ref tx) = self.user_input_tx {
                             let _ = tx.send(UserInput::Cancel);
@@ -968,7 +1048,6 @@ impl Tui {
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        self.state.input_clear();
                     }
                     _ => {}
                 }
