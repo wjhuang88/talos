@@ -934,8 +934,12 @@ impl Tui {
 
         if total_height > self.last_total_height && self.last_total_height > 0 {
             let diff = total_height - self.last_total_height;
-            for _ in 0..diff {
-                let _ = self.terminal.insert_history("", None);
+            let viewport = self.terminal.viewport_area();
+            let screen_h = self.terminal.screen_size().height;
+            if viewport.bottom() >= screen_h {
+                for _ in 0..diff {
+                    let _ = self.terminal.insert_history("", None);
+                }
             }
         }
         self.last_total_height = total_height;
