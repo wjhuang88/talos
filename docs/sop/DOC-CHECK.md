@@ -37,6 +37,12 @@ There is exactly one source of truth for each fact. All other mentions must agre
 - [ ] Every iteration marked Complete has recorded **runtime** evidence, not only unit tests
       (see `ITERATION-WORKFLOW.md` §3a).
 - [ ] `docs/iterations/README.md` "Current Iterations" table reflects every existing iteration.
+- [ ] Every Active, Review, Planned, and Blocked iteration has a current disposition before new
+      backlog work is activated.
+- [ ] Published iteration objectives, dependencies, exclusions, acceptance, validation, and
+      documentation targets remain visible; replacement work has a different iteration ID.
+- [ ] Every non-infrastructure iteration identifies a runnable, testable deliverable and records
+      end-to-end evidence for it.
 - [ ] `.agent-governance/manifest.yaml` `status`, `last_audited_at`, `governance.skill_version`, `governance.last_refresh`, and `next_actions` are current.
 - [ ] If the governing skill was updated, the affected capability was compared with the current `agent-project-governance` references before trusting existing SOPs.
 - [ ] `scripts/assess_project_scale.sh .` still supports the manifest profile, branch mode, and worktree mode assumptions.

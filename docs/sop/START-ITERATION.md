@@ -22,6 +22,10 @@ Before selecting new work, check `docs/iterations/` for:
 
 Do not bypass unresolved iterations to start fresh work.
 
+Record the inventory and disposition in `docs/iterations/README.md` or the activation record. A
+`Planned` item must be activated, explicitly deferred, kept blocked with its blocker, or marked
+superseded before unrelated backlog work is selected.
+
 ### 2. Select Stories
 
 1. Review the implementation roadmap for the current phase.
@@ -38,19 +42,26 @@ Create `docs/iterations/I{NNN}-{slug}.md` with:
 ```markdown
 # Iteration I{NNN}: {Title}
 
-## Scope
-{What this iteration delivers}
+> Document status: Planned
+> Published plan date: YYYY-MM-DD
+> Planned objective: ...
+> Baseline rule: preserve this target; changed targets use a new iteration ID.
+> MVP deliverable: the runnable/testable result produced by this iteration.
 
-## Selected Stories
-- [ ] #E{epic}-S{story}: {Title}
-- [ ] #E{epic}-S{story}: {Title}
+## Published Baseline
+- Selected ready Stories and parent relationship
+- Dependencies and execution order
+- Scope and explicit non-goals
+- Acceptance and planned validation
+- Risks and rollback assumptions
+- User-facing documentation to update
 
-## Acceptance Criteria
-{What must be true when this iteration is complete}
-
-## Risks
-{What could go wrong and mitigation strategies}
+## Actual Activation And Execution
+| Date | Type | Record |
+|---|---|---|
 ```
+
+Use `docs/iterations/TEMPLATE.md`; do not replace a committed plan with a newer objective.
 
 ### 4. Begin Work
 
@@ -62,3 +73,6 @@ Create `docs/iterations/I{NNN}-{slug}.md` with:
 - One active iteration at a time unless explicitly approved.
 - Iteration scope changes require `CHANGE-CONTROL.md`.
 - Record results by appending to the iteration file, not overwriting the plan.
+- Select ready child Stories, not a multi-stage parent Epic with unresolved children.
+- The selected set must produce a runnable, testable deliverable. If it cannot, refine the slice
+  or record an explicit infrastructure-only exception.

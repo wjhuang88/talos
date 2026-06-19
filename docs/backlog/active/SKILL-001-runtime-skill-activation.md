@@ -5,6 +5,8 @@
 **Source**: User correction 2026-06-18
 **Depends on**: ARCH-009 preferred, prompt cache stability, session startup flow
 
+**Residual owner**: [SKILL-002 explicit runtime activation](SKILL-002-explicit-runtime-activation.md)
+
 ## Problem
 
 Talos has a `talos-skill` crate that can parse and manage `SKILL.md` files, and the agent prompt
@@ -60,12 +62,15 @@ runtime startup wires `SkillLoader` to `Agent::set_skill_index(...)`.
   the TUI layout.
 - Prompt cache semantics: the skill set is session-start stable. Changing skill files requires
   rebuilding the session/runtime to refresh the stable prompt prefix.
+- Level 1/2 execution is not an I033 scope extension. SKILL-002 owns the separate explicit
+  activation workflow and remains in Refinement until its context/cache ownership is resolved.
 
 ## Required Reads
 
 - `docs/backlog/active/ARCH-009-skill-module-decomposition.md`
 - `docs/iterations/I031-skill-and-cli-module-cleanup.md`
 - `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
+- `docs/backlog/active/SKILL-002-explicit-runtime-activation.md`
 - `crates/talos-skill/src/lib.rs`
 - `crates/talos-agent/src/prompt.rs`
 - `crates/talos-agent/src/lib.rs`

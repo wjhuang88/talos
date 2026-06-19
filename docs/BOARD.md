@@ -28,30 +28,32 @@ acceptance criteria, verification evidence, or iteration state.
 | I010 R3 Product Polish | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All 5 stories done; 567 tests, clippy clean |
 | I010 R2 Architecture Convergence | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All acceptance criteria met; 532 tests, clippy clean |
 | I015 Provider Schema | Complete | [I015 Provider Schema](iterations/I015-provider-schema.md) | Schema types and built-in defaults landed 2026-06-06; one-way opencode import with 9 tests landed 2026-06-08; `cargo test -p talos-config -p talos-provider -p talos-cli` passes |
+| I033 Runtime Skill Activation | Review | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Close after a deterministic binary-facing test proves Level 0 discovery/injection through the real `talos` entrypoint |
 
 ## Blocked / Paused
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I011 S2 Provider Plugin Architecture | Paused | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Resume as I015 schema-only work under ADR-013 |
+| Governance State | Degraded | [GOV-002](backlog/active/GOV-002-legacy-iteration-status-repair.md) | Return Manifest to conformant after I010/I012/I016/I017 baseline/status drift is repaired and validated |
 
 ## Next
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I033 Runtime Skill Activation | Partial | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Level 0 runtime discovery/injection landed; Level 1/2 explicit activation remains follow-up |
 | I034 MCP Session Integration | Planned | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | MCP startup discovery, tool registry injection, permission routing, provenance/status |
 | I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
 | SKILL-001 Runtime Skill Activation | Partial | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | `/skills` lists Level 0 metadata; full body/reference activation remains explicitly gated |
+| SKILL-002 Explicit Runtime Skill Activation | Refinement | [SKILL-002](backlog/active/SKILL-002-explicit-runtime-activation.md) | Resolve context/cache ownership and complete CMD-001 before selecting into a new iteration |
 | MCP-001 MCP Session Integration | Planned | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Discover configured MCP tools at startup; route through permissions and provenance |
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Planned | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input instead of Esc; clean exit prints compact session usage summary |
 | TUI-010 Slash Command Menu Below Input | Planned | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | Typing `/` opens a Codex-like command menu below the composer with filtering and keyboard navigation |
-| CMD-001 Interactive Command Runtime Contract | Partial | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Restore commands only through typed owner paths; `/copy` and `/export` regression is the first closure gate |
-| SESSION-001 Interactive Session Lifecycle | Planned | [SESSION-001](backlog/active/SESSION-001-interactive-session-lifecycle.md) | Start after CMD-001 registry foundation; expose `/new`, `/resume`, and `/fork` only after atomic transition and rollback tests pass |
+| CMD-001 Interactive Command Runtime Contract | In Progress | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Extract shared BuiltinCommand registry and restore `/copy`/`/export` through typed owners before exposing more commands |
+| SESSION-001 Interactive Session Lifecycle | Refinement | [SESSION-001](backlog/active/SESSION-001-interactive-session-lifecycle.md) | Select ready child SESSION-001-A first; expose `/new`, `/resume`, and `/fork` only through later verified children |
 | TUI-001 TUI Completion | Regression Open | [TUI-001](backlog/active/TUI-001-completion.md) | Restore and verify `/copy` and permission-gated `/export`; provenance and `/plugins` remain available |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |

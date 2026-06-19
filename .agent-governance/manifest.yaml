@@ -1,20 +1,21 @@
 schema_version: "1"
 managed_by: "agent-project-governance"
 profile: "high-risk"
-status: "conformant"
+status: "degraded"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-18"
-status_note: "Governance refresh (2026-06-18): ARCH-002 documentation validation and architecture audit closed. Produced docs/reference/ARCHITECTURE-AUDIT-2026-06-18.md, synchronized ARCH-002 status, Board, Product Backlog, iterations index, architecture reference, and created follow-up stories ARCH-003 through ARCH-006. Governance validator passes with 0 warnings."
+last_audited_at: "2026-06-19"
+status_note: "Governance refresh (2026-06-19): reloaded agent-project-governance 2.0.0; added published-baseline, ready-story, local harness, and long-running-task rules; moved I033 to Review pending binary evidence. Status is degraded only for registered legacy I010/I012/I016/I017 iteration-state/supersession drift; current capabilities and routes validate."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-06-18"
+  last_refresh: "2026-06-19"
 
 entrypoints:
   agent_guide: "AGENTS.md"
   evolution: "EVOLUTION.md"
   evolution_feedback: "docs/sop/EVOLUTION-FEEDBACK.md"
+  long_running_task: "docs/sop/LONG-RUNNING-TASK.md"
   document_map: "docs/README.md"
   board: "docs/BOARD.md"
   backlog: "docs/backlog/PRODUCT-BACKLOG.md"
@@ -32,6 +33,7 @@ entrypoints:
 capabilities:
   task_router: "conformant"
   evolution_feedback: "conformant"
+  long_running_task: "conformant"
   testing_policy: "conformant"
   git_workflow: "conformant"
   requirement_intake: "conformant"
@@ -61,9 +63,10 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "ARCH-003: crate boundary cleanup — remove dead MCP dependency, decouple RPC from concrete Agent, disambiguate ToolResult types"
-    - "ARCH-004: anti-corruption layers — hide rmcp, rusqlite, and config DTOs behind Talos-owned boundaries"
-    - "ARCH-006: prompt cache stability — freeze session-stable prompt prefix and expose cache metadata"
-    - "ARCH-005: God module decomposition — split largest modules after boundary cleanup"
-    - "TUI-008: approval dialog UX — move from bottom-right to prominent position"
+    - "I033 review: add deterministic binary-facing evidence for Level 0 Skill discovery/injection"
+    - "CMD-001: extract the first-class BuiltinCommand registry and restore copy/export through typed owners"
+    - "SKILL-002: resolve context/cache ownership, then plan explicit Level 1/2 activation in a new iteration"
+    - "SESSION-001: implement atomic interactive new/resume/fork lifecycle after the command registry foundation"
+    - "MCP-001/I034: activate configured MCP tools at session startup after current review/priority work is dispositioned"
+    - "GOV-002: repair legacy I010/I012/I016/I017 active/planned versus delivered/superseded drift without overwriting baselines"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

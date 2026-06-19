@@ -3,8 +3,9 @@
 | Field | Value |
 |---|---|
 | Story ID | SESSION-001 |
+| Type | Epic |
 | Priority | P1 |
-| Status | Planned |
+| Status | Refinement |
 | Depends On | MEM-002 and MEM-004 complete; CMD-001 registry foundation; ADR-005 and ADR-006 |
 | Integrates With | TUI-010 command menu; `talos-session`; CLI/TUI composition root |
 
@@ -23,6 +24,17 @@ a complete TUI runtime path.
 Implementing these commands as local Conversation or TUI mutations would create split-brain state:
 the screen, Agent history, JSONL/SQLite metadata, and subsequent writes could refer to different
 sessions.
+
+## Child Stories
+
+| Child | Outcome | Status | Depends On | Iteration |
+|---|---|---|---|---|
+| [SESSION-001-A](SESSION-001-A-runtime-transition-service.md) | Prepare/commit/rollback one atomic runtime transition | Ready | MEM-002, MEM-004, ADR-005/006 | - |
+| [SESSION-001-B](SESSION-001-B-new-resume.md) | Users create or resume a workspace session interactively | Proposed | SESSION-001-A, CMD-001 | - |
+| [SESSION-001-C](SESSION-001-C-fork.md) | Users fork without writing subsequent turns to the source | Proposed | SESSION-001-A, CMD-001 | - |
+
+The Epic completes when all three child outcomes pass their runtime evidence and documentation
+gates. Iterations select child Stories, not this parent.
 
 ## Scope
 

@@ -201,6 +201,7 @@ if (Test-Path -LiteralPath $Board) {
 
 Test-CapabilityFile "task_router" @("AGENTS.md")
 Test-CapabilityFile "evolution_feedback" @("EVOLUTION.md", "docs/sop/EVOLUTION-FEEDBACK.md")
+Test-CapabilityFile "long_running_task" @("docs/sop/LONG-RUNNING-TASK.md")
 $AgentGuide = Join-Path $script:Root "AGENTS.md"
 if ((Get-CapabilityValue "evolution_feedback") -eq "conformant" -and
     (Test-Path -LiteralPath $AgentGuide) -and
@@ -214,6 +215,55 @@ Test-CapabilityFile "iteration_workflow" @("docs/sop/START-ITERATION.md", "docs/
 Test-CapabilityFile "change_control" @("docs/sop/CHANGE-CONTROL.md")
 Test-CapabilityFile "decision_records" @("docs/decisions/README.md")
 Test-CapabilityFile "release_workflow" @("docs/sop/RELEASE.md")
+
+if ((Get-CapabilityValue "iteration_workflow") -eq "conformant") {
+    $IterationTemplate = Join-Path $script:Root "docs/iterations/TEMPLATE.md"
+    if (-not (Test-Path -LiteralPath $IterationTemplate)) {
+        Add-ErrorMessage "conformant iteration workflow is missing published-baseline template: docs/iterations/TEMPLATE.md"
+    }
+    elseif (-not (Get-Content -LiteralPath $IterationTemplate -Raw).Contains("Published plan date")) {
+        Add-ErrorMessage "iteration template is missing published baseline metadata: Published plan date"
+    }
+
+    $AgentGuideText = Get-Content -LiteralPath (Join-Path $script:Root "AGENTS.md") -Raw
+    if (-not $AgentGuideText.Contains("published baseline")) {
+        Add-ErrorMessage "AGENTS.md does not expose the published iteration baseline rule"
+    }
+
+    $StartIterationText = Get-Content -LiteralPath (Join-Path $script:Root "docs/sop/START-ITERATION.md") -Raw
+    if (-not $StartIterationText.Contains("Inventory Existing Iterations")) {
+        Add-ErrorMessage "START-ITERATION does not require non-terminal iteration inventory"
+    }
+    if (-not $StartIterationText.Contains("runnable, testable deliverable")) {
+        Add-ErrorMessage "START-ITERATION does not require a runnable, testable deliverable"
+    }
+
+    $ChangeControlText = Get-Content -LiteralPath (Join-Path $script:Root "docs/sop/CHANGE-CONTROL.md") -Raw
+    if (-not $ChangeControlText.Contains("Never overwrite a published iteration baseline")) {
+        Add-ErrorMessage "CHANGE-CONTROL does not preserve published iteration baselines"
+    }
+}
+
+if ((Get-CapabilityValue "requirement_intake") -eq "conformant") {
+    $RequirementIntakeText = Get-Content -LiteralPath (Join-Path $script:Root "docs/sop/REQUIREMENT-INTAKE.md") -Raw
+    foreach ($RequiredText in @("Given/When/Then", "Required Reads", "Decision links", "user-facing documentation")) {
+        if (-not $RequirementIntakeText.Contains($RequiredText)) {
+            Add-ErrorMessage "REQUIREMENT-INTAKE is missing current ready-story rule: $RequiredText"
+        }
+    }
+}
+
+if ((Get-CapabilityValue "long_running_task") -eq "conformant") {
+    $LongRunningTaskText = Get-Content -LiteralPath (Join-Path $script:Root "docs/sop/LONG-RUNNING-TASK.md") -Raw
+    foreach ($RequiredText in @("Startup Contract", "Consolidated Confirmation", "Recovery or resume instruction", "Completion Gate")) {
+        if (-not $LongRunningTaskText.Contains($RequiredText)) {
+            Add-ErrorMessage "LONG-RUNNING-TASK is missing required contract section: $RequiredText"
+        }
+    }
+    if (-not (Get-Content -LiteralPath (Join-Path $script:Root "AGENTS.md") -Raw).Contains("docs/sop/LONG-RUNNING-TASK.md")) {
+        Add-ErrorMessage "conformant long-running task workflow is not routed from AGENTS.md"
+    }
+}
 
 if ((Test-Path -LiteralPath $AgentGuide) -and $ProjectProfile -in @("product", "high-risk") -and (Get-CapabilityValue "task_router") -eq "conformant") {
     $GuideText = Get-Content -LiteralPath $AgentGuide -Raw

@@ -67,13 +67,37 @@ docs/iterations/
 | I030 | Session Module Decomposition | **Complete** (2026-06-19) | ARCH-008 closed: `talos-session/src/lib.rs` split into error/types/jsonl/topology/manager/tests modules with no behavior change. See `I030-session-module-decomposition.md`. |
 | I031 | Skill And CLI Module Cleanup | **Complete** (2026-06-19) | ARCH-009 skill split and ARCH-010 CLI mode-runner extraction landed; `talos-cli/src/main.rs` is now 241 lines. See `I031-skill-and-cli-module-cleanup.md`. |
 | I032 | Tools Module Cleanup | **Complete** (2026-06-19) | Finished ARCH-010 tools cleanup: `talos-tools/src/file_tools.rs` is now a 108-line shared/re-export module with focused child modules for read, write/edit, delete, and ls. See `I032-tools-module-cleanup.md`. |
-| I033 | Runtime Skill Activation | **Partial** (2026-06-19) | Level 0 runtime discovery/injection landed across CLI/TUI startup paths; `/skills` exposes diagnostics. Level 1/2 explicit activation remains follow-up. See `I033-runtime-skill-activation.md`. |
+| I033 | Runtime Skill Activation | **Review** (2026-06-19) | Published Level 0/gate scope landed, but binary request diagnostics did not expose the final prompt during runtime verification. Level 1/2 execution is a separate follow-up, not an I033 scope extension. See `I033-runtime-skill-activation.md`. |
 | I034 | MCP Session Integration | **Planned** | Make MCP a first-class session capability: startup discovery, tool registry injection, permission routing, provenance/status, and prompt cache semantics. See `I034-mcp-session-integration.md`. |
 | I035 | Agent Protocol Compatibility Foundation | **Planned** | Turn AGENT-001 into a dated protocol/config compatibility plan and read/import-first foundation for shared Agent config such as `~/.agent`. See `I035-agent-protocol-compatibility-foundation.md`. |
 | I036 | Research Consolidation | **Planned** | End-of-plan research-only iteration that consolidates REMOTE-001, WEB-001, PLUGIN-001, OKF-001, MEM-005, MODEL-001/002, DIST-001, WEBFETCH-001, and STORE-001 into decisions, ADR candidates, and executable follow-up stories. See `I036-research-consolidation.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
+
+## Non-Terminal Inventory (2026-06-19 Refresh)
+
+This inventory is the required disposition before selecting or activating more work. It does not
+rewrite published iteration baselines.
+
+| Iteration | Current State | Disposition Before Next Activation |
+|---|---|---|
+| I010 | Active (legacy drift) | No current implementation. Register owner-file closure/status repair; do not treat as the active development iteration. |
+| I011 | Paused | Continue paused; provider schema work moved through I015 and broader plugin architecture remains deferred. |
+| I012 | Planned (legacy umbrella) | Do not activate; file/search and Git work were split into I016/I017 and later delivered in other slices. Supersession audit remains a governance residual. |
+| I016 | Planned | Deferred; only residual TOOL-001 scope remains and is not selected next. |
+| I017 | Planned | Do not activate for delivered P0-P2 Git scope; advanced P3 remains under GIT-001. Supersession audit remains a residual. |
+| I018 | Planned | Deferred; remains a valid future observability/prompt-assets baseline. |
+| I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
+| I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
+| I028 | Planned | Deferred; scheduling is not the current priority. |
+| I033 | Review | Must obtain deterministic binary Skill discovery/injection evidence or record a blocker before another iteration becomes Active. |
+| I034 | Planned | Baseline preserved; remains the next published feature plan after I033 review unless change control explicitly inserts CMD-001 work. |
+| I035 | Planned | Blocked from activation until I034 completes or its research-only fallback is explicitly activated. |
+| I036 | Planned | Deferred to the end of the current plan; no implementation code belongs to this research iteration. |
+
+Residual status repair for legacy I010/I012/I016/I017 is recorded in the governance Manifest and
+does not authorize silently changing their published objectives.
 
 ## Next Execution Rounds
 
@@ -102,7 +126,7 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R17: Session Boundary Cleanup | ✅ Done (2026-06-19) | `I030-session-module-decomposition.md`; `../backlog/active/ARCH-008-session-module-decomposition.md` | `talos-session/src/lib.rs` decomposed without behavior change; session tests/clippy pass. |
 | R18: Skill And CLI Cleanup | ✅ Done (2026-06-19) | `I031-skill-and-cli-module-cleanup.md`; `../backlog/active/ARCH-009-skill-module-decomposition.md`; `../backlog/active/ARCH-010-cli-tools-module-cleanup.md` | ARCH-009 and ARCH-010 CLI slice complete; targeted tests/clippy pass. |
 | R19: Tools Cleanup | ✅ Done (2026-06-19) | `I032-tools-module-cleanup.md`; `../backlog/active/ARCH-010-cli-tools-module-cleanup.md` | `file_tools.rs` split before new tool growth; tool tests/clippy and workspace tests pass. |
-| R20: Runtime Skill Activation | Next architecture-enabled feature slice | `I033-runtime-skill-activation.md`; `../backlog/active/SKILL-001-runtime-skill-activation.md` | Normal sessions discover/inject skills before first turn; Level 1/2 activation path is defined. |
+| R20: Runtime Skill Activation | Review | `I033-runtime-skill-activation.md`; `../backlog/active/SKILL-001-runtime-skill-activation.md` | Published implementation landed; close only after deterministic binary evidence proves runtime discovery/injection. Level 1/2 execution uses a new iteration. |
 | R21: MCP Session Integration | After R20 or in parallel only if startup path is stable | `I034-mcp-session-integration.md`; `../backlog/active/MCP-001-session-mcp-integration.md` | MCP tools are discovered at session startup, registered with provenance, and routed through permissions. |
 | R22: Agent Protocol Compatibility | After R20-R21 or as research-only if implementation slips | `I035-agent-protocol-compatibility-foundation.md`; `../backlog/active/AGENT-001-standard-agent-protocol-support.md`; `../proposals/standard-agent-protocol-support.md` | Dated protocol/config survey, ADR, and read/import-first plan for shared Agent config such as `~/.agent`. |
 | R23: Research Consolidation | End of current one-month plan | `I036-research-consolidation.md`; `../backlog/active/REMOTE-001-remote-session-protocol.md`; `../backlog/active/WEB-001-embedded-web-control-surface.md`; `../backlog/active/PLUGIN-001-wasm-runtime-plugins.md`; `../backlog/active/OKF-001-native-okf-support.md`; `../backlog/active/MEM-005-context-compaction-policy.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md`; `../backlog/active/MODEL-002-local-micro-model-decision-layer.md`; `../backlog/active/DIST-001-optional-runtime-asset-distribution.md`; `../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`; `../backlog/active/STORE-001-zvec-storage-evaluation.md` | Research-heavy items are deduplicated into ADR candidates, deferred decisions, or executable follow-up stories; no implementation code changes. |

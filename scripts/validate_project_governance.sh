@@ -203,6 +203,7 @@ fi
 
 check_capability_file task_router AGENTS.md
 check_capability_file evolution_feedback EVOLUTION.md docs/sop/EVOLUTION-FEEDBACK.md
+check_capability_file long_running_task docs/sop/LONG-RUNNING-TASK.md
 if [ "$(capability_value evolution_feedback)" = "conformant" ] && [ -f "$root/AGENTS.md" ] && ! grep -Fq "docs/sop/EVOLUTION-FEEDBACK.md" "$root/AGENTS.md"; then
   error "conformant evolution_feedback is not routed from AGENTS.md: docs/sop/EVOLUTION-FEEDBACK.md"
 fi
@@ -213,6 +214,45 @@ check_capability_file iteration_workflow docs/sop/START-ITERATION.md docs/sop/IT
 check_capability_file change_control docs/sop/CHANGE-CONTROL.md
 check_capability_file decision_records docs/decisions/README.md
 check_capability_file release_workflow docs/sop/RELEASE.md
+
+if [ "$(capability_value iteration_workflow)" = "conformant" ]; then
+  if [ ! -f "$root/docs/iterations/TEMPLATE.md" ]; then
+    error "conformant iteration workflow is missing published-baseline template: docs/iterations/TEMPLATE.md"
+  elif ! contains_text "$root/docs/iterations/TEMPLATE.md" "Published plan date"; then
+    error "iteration template is missing published baseline metadata: Published plan date"
+  fi
+  if ! contains_text "$root/AGENTS.md" "published baseline"; then
+    error "AGENTS.md does not expose the published iteration baseline rule"
+  fi
+  if ! contains_text "$root/docs/sop/START-ITERATION.md" "Inventory Existing Iterations"; then
+    error "START-ITERATION does not require non-terminal iteration inventory"
+  fi
+  if ! contains_text "$root/docs/sop/START-ITERATION.md" "runnable, testable deliverable"; then
+    error "START-ITERATION does not require a runnable, testable deliverable"
+  fi
+  if ! contains_text "$root/docs/sop/CHANGE-CONTROL.md" "Never overwrite a published iteration baseline"; then
+    error "CHANGE-CONTROL does not preserve published iteration baselines"
+  fi
+fi
+
+if [ "$(capability_value requirement_intake)" = "conformant" ]; then
+  for required_text in "Given/When/Then" "Required Reads" "Decision links" "user-facing documentation"; do
+    if ! contains_text "$root/docs/sop/REQUIREMENT-INTAKE.md" "$required_text"; then
+      error "REQUIREMENT-INTAKE is missing current ready-story rule: $required_text"
+    fi
+  done
+fi
+
+if [ "$(capability_value long_running_task)" = "conformant" ]; then
+  for required_text in "Startup Contract" "Consolidated Confirmation" "Recovery or resume instruction" "Completion Gate"; do
+    if ! contains_text "$root/docs/sop/LONG-RUNNING-TASK.md" "$required_text"; then
+      error "LONG-RUNNING-TASK is missing required contract section: $required_text"
+    fi
+  done
+  if ! contains_text "$root/AGENTS.md" "docs/sop/LONG-RUNNING-TASK.md"; then
+    error "conformant long-running task workflow is not routed from AGENTS.md"
+  fi
+fi
 
 if [ -f "$root/AGENTS.md" ] && { [ "$profile" = "product" ] || [ "$profile" = "high-risk" ]; } && [ "$(capability_value task_router)" = "conformant" ]; then
   for section in "Hard Constraints" "Coding Behavior" "Git Rules" "Task Router" "Session End Checklist"; do

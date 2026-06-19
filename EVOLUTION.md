@@ -34,8 +34,24 @@ repeating known mistakes.
 | 23 | Code Style | Rust 2024 let-chains (`if let X && let Y`) 替代嵌套 if-let 金字塔 | I023 |
 | 24 | TUI | 流内容应按完整 block 渲染（积累 buffer → finalize 时一次性输出），不要逐行分割 | I023 |
 | 25 | Safety | 外部 C/Native 依赖的 panic 必须 `catch_unwind` 捕获 + 降级，不能静默崩溃 | TUI-006/CODE-001 |
+| 26 | Governance | Partial 状态不能成为静默扩展已发布迭代基线的理由 | I033 |
 
 ## Lessons
+
+### 26. 2026-06-19 - Partial 状态不能成为静默扩展已发布迭代基线的理由
+
+- Trigger: 用户要求继续开发时，准备把 I033 从 Level 0 Skill 接入直接扩展到 Level 1/2
+  执行；重新加载治理 Skill 后复查已发布迭代基线。
+- Symptom: I033 的所有已发布 Story 和验收均已完成，却因 Level 1/2 产品能力仍未实现而
+  标记 Partial，导致后续工作看起来可以继续写入同一迭代。
+- Root cause: 需求父目标、迭代 MVP 和后续产品扩展没有分开；状态描述把“产品还有后续”
+  错当成“本迭代范围未完成”。
+- Fix: 保留 I033 的 Level 0/gate 基线并转 Review；Level 1/2 使用独立需求和迭代；补齐
+  AGENTS、START-ITERATION、CHANGE-CONTROL、DOC-CHECK 和迭代模板中的基线规则。
+- Prevention: 迭代状态只评价已发布基线。相同子系统但不同可观察结果或验收目标必须使用
+  新迭代 ID；开始新工作前盘点并处置所有非终态迭代。
+- Promoted to rule/check: `AGENTS.md`; `docs/sop/START-ITERATION.md`;
+  `docs/sop/CHANGE-CONTROL.md`; `docs/sop/DOC-CHECK.md`; `docs/iterations/TEMPLATE.md`.
 
 ### 21. 2026-06-10 - 不要擅自更改已经与用户确认的设计决策
 

@@ -30,6 +30,7 @@
 | `NEW-FEATURE.md` | Implementing a new feature during an iteration |
 | `TESTING.md` | Writing and running tests |
 | `GIT-WORKFLOW.md` | Committing, branching, and PR workflow |
+| `LONG-RUNNING-TASK.md` | Planning and executing unattended or multi-phase work with one confirmation and durable checkpoints |
 | `DOC-CHECK.md` | Keeping documentation synchronized with code reality |
 
 ## Quick Reference

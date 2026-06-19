@@ -3,7 +3,8 @@
 | Field | Value |
 |---|---|
 | Priority | P1 |
-| Status | Partial (truthful catalog landed 2026-06-19) |
+| Type | Technical Story |
+| Status | In Progress (truthful catalog landed; registry and copy/export remain) |
 | Depends On | ADR-006 event boundary; existing ToolRegistry and session seam |
 | Integrates With | SESSION-001, TUI-001, TUI-002, TUI-010, SKILL-001, MCP-001, MEM-005, MODEL-001, GIT-001, PLUGIN-001 |
 
@@ -94,8 +95,8 @@ Registration rules:
 2. Extract the public BuiltinCommand definition/handler/registry contract and route help,
    completion, parser, and TUI-010 through it.
 3. Add typed domain executors only as their owner stories land: Session, compaction, model, Git.
-4. Specify PluginCommand ABI and security behavior in PLUGIN-001, then add plugin registration after
-   its ADR. Plugin support must not block the useful built-in registry foundation.
+4. Leave PluginCommand ABI/runtime implementation to PLUGIN-001 after its ADR. Plugin support must
+   not block this built-in registry Story.
 
 ## Non-Goals
 
@@ -104,6 +105,8 @@ Registration rules:
   alias references it; model tool invocation and user command invocation remain distinct protocols.
 - Do not bypass the permission pipeline for `/export` or future write-capable commands.
 - Do not introduce a global event bus; follow ADR-006 and the existing single-consumer flow.
+- Do not implement PluginCommand loading or Session lifecycle operations in this Story; PLUGIN-001
+  and SESSION-001 own those outcomes.
 
 ## Acceptance Criteria
 
@@ -113,13 +116,10 @@ Registration rules:
 - [ ] Parser, help, completion, and TUI-010 consume one shared `CommandDefinition` registry.
 - [ ] Tool-backed command metadata and availability resolve from the live tool registry rather than
       copying tool descriptions or schemas into command code.
-- [ ] The registry merges `BuiltinCommand` and namespaced `PluginCommand` definitions with
-      deterministic collision, provenance, load, and unload behavior.
-- [ ] Plugin command execution is bounded and cannot bypass tool permissions or issue arbitrary
-      Session/TUI events.
-- [ ] Session commands replace/fork the active Agent, persistence target, and visible transcript atomically.
 - [ ] `/copy` and `/export` have end-to-end TUI-facing tests and TUI-001 is closed again.
 - [ ] Each remaining command is exposed only after its owner story supplies an executable typed path.
+- [ ] `README.md` documents only commands proven executable through the runtime path.
+- [ ] CMD-001, TUI-001, TUI-010, Product Backlog, iteration record, and Board statuses are synchronized.
 
 ## Required Reads
 

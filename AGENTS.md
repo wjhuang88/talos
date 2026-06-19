@@ -59,6 +59,14 @@ These are immutable facts that every change must respect:
 - Define verifiable success criteria before starting.
 - For multi-step tasks, state the plan with verification checkpoints.
 - Loop until verified, not until "it looks right."
+- Treat a committed `Planned` iteration as a published baseline. Preserve its objective,
+  dependencies, exclusions, acceptance, validation, and documentation targets; append execution
+  facts instead of replacing the plan.
+- Before selecting or activating iteration work, inventory every Active, Review, Planned, and
+  Blocked iteration and record its disposition. A different objective or acceptance target uses a
+  new iteration ID, even when it continues the same product area.
+- Every iteration must name a runnable, testable deliverable and affected user-facing
+  documentation. Infrastructure-only exceptions must be explicit and cannot claim user behavior.
 
 ### Dependency Discipline
 
@@ -104,6 +112,7 @@ These are immutable facts that every change must respect:
 | "How do I set up local dev?" | `docs/sop/LOCAL-DEV.md` |
 | "What's the testing strategy?" | `docs/sop/TESTING.md` |
 | "How do I commit my work?" | `docs/sop/GIT-WORKFLOW.md` |
+| "Run an unattended / overnight / long-running task" | `docs/sop/LONG-RUNNING-TASK.md` |
 | "Where is the architecture documented?" | `docs/reference/ARCHITECTURE.md` |
 | "What are the reference projects?" | `docs/reference/REFERENCE-PROJECTS.md` |
 | "I have a technical tradeoff to decide" | `docs/decisions/README.md` (then create a new ADR) |
@@ -134,6 +143,8 @@ Before ending a session, verify:
 8. **README sync**: Update `README.md` to reflect any new features, usage changes, or architecture updates from this session. README is a living document, not a one-time setup.
 9. **Board sync**: If active/review/paused/next work changed, update `docs/BOARD.md` after the owner docs. The board is a derived view, not a source of truth.
 10. **Governance harness**: If governance files changed, run `scripts/validate_project_governance.sh .`; when profile, branch mode, worktree mode, or governance depth is affected, also run `scripts/assess_project_scale.sh .`.
+11. **Long task recovery**: If a long-running task record is active, append validation evidence,
+    current state, next item, and recovery/resume instructions before stopping.
 
 ## Current Known Traps
 

@@ -1,6 +1,13 @@
 # I033: Runtime Skill Activation
 
-**Status**: Partial (Level 0 runtime activation landed 2026-06-19)
+> Document status: Review
+> Published plan date: 2026-06-19
+> Planned objective: discover and inject Level 0 Skill metadata and define the Level 1/2 gate.
+> Baseline rule: preserve this target; Level 1/2 runtime execution uses a new requirement/iteration.
+> MVP deliverable: a normal Talos runtime discovers workspace Skills before the first turn and
+> exposes them through `/skills` diagnostics.
+
+**Status**: Review (baseline implementation landed; binary runtime evidence incomplete)
 **Target Window**: After I030-I032 architecture cleanup
 **Depends On**: I031 complete preferred, prompt cache stability
 
@@ -55,3 +62,25 @@ define the activation path for Level 1 skill bodies and Level 2 references.
   - `cargo test -p talos-conversation` passed.
   - `cargo test -p talos-cli` passed.
   - `cargo clippy -p talos-cli -p talos-conversation -- -D warnings` passed.
+
+## Baseline Clarification And Review
+
+2026-06-19 governance refresh:
+
+- The published I033 scope is Level 0 runtime activation plus an explicit Level 1/2 gate. All
+  selected implementation items are complete; implementing Level 1/2 execution here would silently
+  expand the published acceptance target.
+- Level 1/2 runtime execution remains product work and is moved to
+  `docs/backlog/active/SKILL-002-explicit-runtime-activation.md`; it requires a separate iteration.
+- Binary verification attempt:
+  `cargo run -q -p talos-cli -- --mock --print --workspace . -- "/mock-request verify runtime skill discovery"`.
+  The binary ran, but the mock provider returned its generic response instead of request diagnostics,
+  so the final provider request could not be inspected for the temporary Skill metadata.
+- Result: I033 stays in Review until a deterministic binary-facing test or observable diagnostic
+  proves startup discovery through the actual `talos` entrypoint. Library/CLI integration tests are
+  confirmed evidence, but they do not satisfy the stricter runtime gate by themselves.
+
+## Documentation
+
+- `README.md` already documents Skill locations and Level 0 activation behavior.
+- Level 1/2 documentation changes belong to the follow-up requirement when that behavior ships.
