@@ -26,6 +26,8 @@ Without this, MCP remains an extension subsystem rather than a first-class sessi
 - Surface MCP connection/tool status in CLI/TUI diagnostics without adding a global event bus.
 - Define behavior when an MCP server becomes unavailable mid-session.
 - Keep MCP DTOs isolated at crate boundaries per ARCH-004.
+- Keep `/plugins` as a BuiltinCommand status surface from CMD-001. MCP tools remain ToolRegistry
+  entries; MCP prompts are not automatically exposed as commands in I034.
 
 ## Acceptance Criteria
 
@@ -52,3 +54,4 @@ tested.
 - `docs/decisions/006-event-architecture-boundary.md`
 - `docs/decisions/009-tool-provenance.md`
 - `docs/decisions/021-tool-call-protocol-architecture.md`
+- `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`

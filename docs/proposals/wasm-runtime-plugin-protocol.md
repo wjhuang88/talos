@@ -19,6 +19,7 @@ Plugins may provide these capability kinds:
 | Capability | Purpose | Existing Talos boundary |
 | --- | --- | --- |
 | Tool | Adds callable operations to the agent tool registry. | `AgentTool`, permission pipeline, `ToolProvenance`. |
+| Command | Adds user-invoked operations to the session command registry. | CMD-001 `PluginCommand`, command provenance, typed execution adapters. |
 | Hook | Observes or modifies lifecycle events. | `talos-plugin::HookHandler`. |
 | Filter | Applies deterministic transformations or policy decisions over messages, context, tool
   inputs, or tool outputs. | Related to hooks, but may need stricter ordering and error policy. |
@@ -29,8 +30,9 @@ The exact encoding is undecided, but v1 should define these message families:
 
 - `plugin.manifest`: identity, version, API compatibility, declared capabilities.
 - `plugin.initialize`: host version, workspace metadata, allowed host calls, resource limits.
-- `plugin.register`: capability descriptors for tools, hooks, and filters.
+- `plugin.register`: capability descriptors for tools, commands, hooks, and filters.
 - `tool.execute`: tool input, call id, permission/provenance metadata.
+- `command.execute`: namespaced command id, validated arguments, invocation context, and bounded result.
 - `hook.invoke`: hook event payload and mutable/immutable fields.
 - `filter.apply`: filter input and expected output contract.
 - `plugin.shutdown`: graceful unload.
@@ -39,6 +41,9 @@ The exact encoding is undecided, but v1 should define these message families:
 ## Safety Requirements
 
 - Plugin-provided tools must go through the same permission pipeline as built-in tools.
+- Plugin commands must be namespaced, cannot override built-in commands, and cannot emit arbitrary
+  Session/TUI events. Any host operation they request follows the owning capability and permission
+  boundary.
 - Every plugin capability must carry provenance visible to TUI/RPC consumers.
 - Host calls are deny-by-default and explicitly allowlisted.
 - Filesystem and network access are disabled unless explicitly granted by a future ADR-backed

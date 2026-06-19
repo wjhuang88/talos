@@ -27,6 +27,9 @@ skills in normal CLI/TUI usage.
   content into history by default.
 - Keep prompt cache semantics explicit: skill set is session-stable unless the session is rebuilt.
 - Handle bad skills deterministically: skip with diagnostic, or fail startup only under strict mode.
+- Expose diagnostics and future explicit activation through BuiltinCommand definitions from
+  CMD-001. Skill files do not register arbitrary commands; executable extension commands belong to
+  the PluginCommand protocol.
 
 ## Acceptance Criteria
 
@@ -62,6 +65,7 @@ runtime startup wires `SkillLoader` to `Agent::set_skill_index(...)`.
 
 - `docs/backlog/active/ARCH-009-skill-module-decomposition.md`
 - `docs/iterations/I031-skill-and-cli-module-cleanup.md`
+- `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
 - `crates/talos-skill/src/lib.rs`
 - `crates/talos-agent/src/prompt.rs`
 - `crates/talos-agent/src/lib.rs`

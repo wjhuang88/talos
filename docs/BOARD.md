@@ -50,6 +50,9 @@ acceptance criteria, verification evidence, or iteration state.
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Planned | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input instead of Esc; clean exit prints compact session usage summary |
 | TUI-010 Slash Command Menu Below Input | Planned | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | Typing `/` opens a Codex-like command menu below the composer with filtering and keyboard navigation |
+| CMD-001 Interactive Command Runtime Contract | Partial | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Restore commands only through typed owner paths; `/copy` and `/export` regression is the first closure gate |
+| SESSION-001 Interactive Session Lifecycle | Planned | [SESSION-001](backlog/active/SESSION-001-interactive-session-lifecycle.md) | Start after CMD-001 registry foundation; expose `/new`, `/resume`, and `/fork` only after atomic transition and rollback tests pass |
+| TUI-001 TUI Completion | Regression Open | [TUI-001](backlog/active/TUI-001-completion.md) | Restore and verify `/copy` and permission-gated `/export`; provenance and `/plugins` remain available |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 
@@ -80,7 +83,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | REMOTE-001 Remote Session Protocol | Research | [REMOTE-001 Remote Session Protocol](backlog/active/REMOTE-001-remote-session-protocol.md) | Research transport, auth, and minimum viable slice before any implementation |
-| PLUGIN-001 WASM Runtime Plugin Protocol | Research | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Design protocol spec for WASM plugins providing tools, hooks, and filters; ADR required before runtime implementation |
+| PLUGIN-001 WASM Runtime Plugin Protocol | Research | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Design protocol spec for WASM plugins providing tools, commands, hooks, and filters; PluginCommand follows CMD-001 and requires ADR before runtime implementation |
 | I017 Embedded Git Tools | P0-P2 Complete | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Read/write Git tools delivered in I026; future scope starts from P3 advanced tools |
 | I019 Layered Memory Foundation | Planned | [MEM-001 Layered Memory Foundation](backlog/active/MEM-001-layered-memory-foundation.md) | Start after I018 or explicit memory priority; follow ADR-016 |
 | MODEL-001 Model Catalog And Reasoning Capability Foundation | Planned | [MODEL-001 Model Catalog And Reasoning Capability Foundation](backlog/active/MODEL-001-model-catalog-and-reasoning.md) | Built-in model dataset, models.dev import/cache, reasoning/thinking support, and compaction limit source |

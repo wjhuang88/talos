@@ -5,7 +5,7 @@
 | Story ID | TUI-010 |
 | Priority | P2 |
 | Status | Planned |
-| Depends On | TUI-002 sub-slice C/D; TUI-009 |
+| Depends On | TUI-002 sub-slice C/D; TUI-009; CMD-001 |
 | Origin | User feedback 2026-06-18 — implement a Codex-like menu layer when typing `/`, rendered below the input area |
 
 ## Problem
@@ -48,6 +48,14 @@ above-input placement, but this fallback must be deterministic and tested.
 The menu must not overwrite scrollback history or tool output. It is an active
 input-layer surface, not a transcript message.
 
+CMD-001 owns command executability and availability. TUI-010 must consume that registry and must
+not recreate commands from historical roadmap lists. Commands remain hidden or disabled until
+their domain owner provides a typed runtime action.
+
+For explicit tool-backed aliases, the command registry references the registered tool and derives
+its descriptive/schema metadata from that tool definition. The menu does not enumerate every model
+tool as a user command.
+
 ## Relationship To Existing TUI Work
 
 TUI-002 already defines the architectural pieces (`bottom_pane/`,
@@ -68,7 +76,8 @@ follow-up integration point, not required for the first slash menu slice.
 
 - Do not add a large new command catalog as part of this story.
 - Do not implement command-specific full-screen views such as model picker or
-  session picker unless an existing command already owns that behavior.
+  session picker unless an existing command already owns that behavior. SESSION-001 now owns the
+  lifecycle behavior; any picker added here remains presentation-only.
 - Do not migrate approval rendering in the first slash menu slice; keep that
   as the TUI-008 integration path after this layer exists.
 - Do not introduce a global event bus. Follow ADR-006 and route through the
@@ -95,6 +104,8 @@ follow-up integration point, not required for the first slash menu slice.
 
 - `docs/backlog/active/TUI-002-codex-overhaul.md`
 - `docs/backlog/active/TUI-009-input-and-session-exit-polish.md`
+- `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
+- `docs/backlog/active/SESSION-001-interactive-session-lifecycle.md`
 - `docs/proposals/tui-codex-overhaul.md`
 - `docs/decisions/006-event-architecture-boundary.md`
 - `crates/talos-tui/src/app.rs`

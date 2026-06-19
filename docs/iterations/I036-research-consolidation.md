@@ -22,7 +22,7 @@ protocol servers, load WASM, or build UI surfaces.
 - [ ] #I036-S2: Analyze REMOTE-001 and WEB-001 together and decide whether they share a handler
       backbone, auth model, and read-only first slice.
 - [ ] #I036-S3: Advance PLUGIN-001 by turning the WASM plugin protocol proposal into an ADR-ready
-      design outline, including tools/hooks/filters, host calls, resource limits, and failure
+      design outline, including tools/commands/hooks/filters, host calls, resource limits, and failure
       policy.
 - [ ] #I036-S4: Refresh OKF-001 from the live upstream SPEC, record the fetched commit/date, and
       decide produce/consume/bidirectional direction for Talos.

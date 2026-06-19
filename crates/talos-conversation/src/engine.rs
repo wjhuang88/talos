@@ -28,6 +28,45 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
 
 const MOCK_REQUEST_COMMAND: &str = "/mock-request";
 
+struct BuiltinCommandDefinition {
+    name: &'static str,
+    usage: &'static str,
+    description: &'static str,
+}
+
+const BUILTIN_COMMANDS: &[BuiltinCommandDefinition] = &[
+    BuiltinCommandDefinition {
+        name: "/help",
+        usage: "/help",
+        description: "Show this help",
+    },
+    BuiltinCommandDefinition {
+        name: "/quit",
+        usage: "/quit",
+        description: "Exit Talos",
+    },
+    BuiltinCommandDefinition {
+        name: "/exit",
+        usage: "/exit",
+        description: "Exit Talos",
+    },
+    BuiltinCommandDefinition {
+        name: "/status",
+        usage: "/status",
+        description: "Show session info",
+    },
+    BuiltinCommandDefinition {
+        name: "/plugins",
+        usage: "/plugins",
+        description: "List observed tool provenance",
+    },
+    BuiltinCommandDefinition {
+        name: "/skills",
+        usage: "/skills",
+        description: "List available runtime skills",
+    },
+];
+
 pub struct ConversationEngine {
     pub(crate) messages: Vec<ChatMessage>,
     pub(crate) current_turn_text: String,
@@ -45,6 +84,13 @@ pub struct ConversationEngine {
 }
 
 impl ConversationEngine {
+    /// Slash command names currently exposed by help and completion.
+    ///
+    /// Retained as a compatibility view while CMD-001 evolves the registry into
+    /// public command definitions with tool-backed metadata resolution.
+    pub const SLASH_COMMANDS: &'static [&'static str] =
+        &["/help", "/quit", "/exit", "/status", "/plugins", "/skills"];
+
     pub fn new(model_name: String) -> Self {
         Self {
             messages: Vec::new(),
@@ -249,27 +295,16 @@ impl ConversationEngine {
 
         match cmd {
             "/help" => {
-                let text = "\
-[System] Available commands:\n\
-[System]   /help       — Show this help\n\
-[System]   /quit       — Exit Talos\n\
-[System]   /status     — Show session info\n\
-[System]   /new        — Start fresh session\n\
-[System]   /compact    — Compact conversation context\n\
-[System]   /diff       — Show git diff\n\
-[System]   /model      — Switch model\n\
-[System]   /resume     — Resume a session\n\
-[System]   /fork       — Fork current session\n\
-[System]   /vim        — Toggle vim keybindings\n\
-[System]   /plugins    — List observed tool provenance\n\
-[System]   /skills     — List available runtime skills\n\
-[System]   /copy last  — Copy last assistant message\n\
-[System]   /copy all   — Copy full transcript\n\
-[System]   /export <p> — Export transcript to path\n\
-[System]   /mock-request <prompt> — Show mock provider request diagnostics\n";
+                let mut text = String::from("[System] Available commands:\n");
+                for command in BUILTIN_COMMANDS {
+                    text.push_str(&format!(
+                        "[System]   {:<10} — {}\n",
+                        command.usage, command.description
+                    ));
+                }
                 outputs.push(UiOutput::Stream(StreamMessage {
                     source: MessageSource::System,
-                    stream: Box::pin(stream::once(async move { text.to_string() })),
+                    stream: Box::pin(stream::once(async move { text })),
                 }));
             }
             "/quit" | "/exit" => {
@@ -280,20 +315,6 @@ impl ConversationEngine {
                     "[System] Model: {} | Input: {} | Output: {} tokens\n",
                     self.model_name, self.usage.input_tokens, self.usage.output_tokens,
                 );
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(stream::once(async move { text })),
-                }));
-            }
-            "/new" => {
-                self.messages.clear();
-                self.current_turn_text.clear();
-                self.usage = Usage::default();
-                self.branch_id = None;
-                self.plugin_observations.clear();
-                self.scrollback.scrolled_line_count = 0;
-                self.last_flushed_message = 0;
-                let text = "[System] New session started.\n".to_string();
                 outputs.push(UiOutput::Stream(StreamMessage {
                     source: MessageSource::System,
                     stream: Box::pin(stream::once(async move { text })),
@@ -375,25 +396,6 @@ impl ConversationEngine {
         }
     }
 
-    pub const SLASH_COMMANDS: &[&str] = &[
-        "/help",
-        "/quit",
-        "/exit",
-        "/status",
-        "/new",
-        "/compact",
-        "/diff",
-        "/model",
-        "/resume",
-        "/fork",
-        "/vim",
-        "/plugins",
-        "/skills",
-        "/copy",
-        "/export",
-        MOCK_REQUEST_COMMAND,
-    ];
-
     pub fn is_model_passthrough_slash_command(input: &str) -> bool {
         let trimmed = input.trim_start();
         if trimmed == MOCK_REQUEST_COMMAND {
@@ -407,10 +409,10 @@ impl ConversationEngine {
     }
 
     pub fn complete_slash_command(&self, input: &str) -> Vec<&str> {
-        Self::SLASH_COMMANDS
+        BUILTIN_COMMANDS
             .iter()
-            .filter(|c| c.starts_with(input))
-            .copied()
+            .map(|command| command.name)
+            .filter(|name| name.starts_with(input))
             .collect()
     }
 

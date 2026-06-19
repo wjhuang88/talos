@@ -423,12 +423,12 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/help"));
     assert!(text.contains("/quit"));
     assert!(text.contains("/status"));
-    assert!(text.contains("/new"));
     assert!(text.contains("/plugins"));
     assert!(text.contains("/skills"));
-    assert!(text.contains("/copy"));
-    assert!(text.contains("/export"));
-    assert!(text.contains("/mock-request"));
+    assert!(!text.contains("/new"));
+    assert!(!text.contains("/compact"));
+    assert!(!text.contains("/copy"));
+    assert!(!text.contains("/mock-request"));
 }
 
 // ---------------------------------------------------------------------------
@@ -481,42 +481,6 @@ async fn slash_status_shows_model_and_tokens() {
     assert!(text.contains("claude-sonnet-4"));
     assert!(text.contains("42"));
     assert!(text.contains("17"));
-}
-
-// ---------------------------------------------------------------------------
-// handle_slash_command: /new
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-async fn slash_new_clears_everything() {
-    let mut engine = new_engine();
-
-    engine.handle_user_message("hello");
-    engine.current_turn_text = "partial".to_string();
-    engine.usage = Usage {
-        input_tokens: 100,
-        output_tokens: 50,
-        ..Default::default()
-    };
-    engine.branch_id = Some("branch-1".to_string());
-    engine.plugin_observations.push(PluginObservation {
-        key: "native".to_string(),
-        count: 3,
-    });
-    engine.scrollback.scrolled_line_count = 10;
-
-    let outputs = engine.handle_slash_command("/new");
-
-    assert!(engine.messages.is_empty());
-    assert!(engine.current_turn_text.is_empty());
-    assert_eq!(engine.usage, Usage::default());
-    assert!(engine.branch_id.is_none());
-    assert!(engine.plugin_observations.is_empty());
-    assert_eq!(engine.scrollback.scrolled_line_count, 0);
-
-    assert_eq!(outputs.len(), 1);
-    let (_, text) = collect_stream(outputs).await.unwrap();
-    assert_eq!(text, "[System] New session started.\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -1008,7 +972,11 @@ fn complete_slash_command_empty_prefix_returns_all() {
 
     let completions = engine.complete_slash_command("");
 
-    assert_eq!(completions.len(), ConversationEngine::SLASH_COMMANDS.len());
+    assert_eq!(
+        completions,
+        vec!["/help", "/quit", "/exit", "/status", "/plugins", "/skills"]
+    );
+    assert_eq!(completions, ConversationEngine::SLASH_COMMANDS);
 }
 
 #[test]
@@ -1035,17 +1003,37 @@ fn complete_slash_command_multiple_matches() {
 
     let completions = engine.complete_slash_command("/c");
 
-    assert!(completions.contains(&"/compact"));
-    assert!(completions.contains(&"/copy"));
+    assert!(completions.is_empty());
 }
 
 #[test]
-fn complete_slash_command_includes_mock_request() {
+fn complete_slash_command_hides_mock_request_diagnostics() {
     let engine = new_engine();
 
     let completions = engine.complete_slash_command("/mock");
 
-    assert_eq!(completions, vec!["/mock-request"]);
+    assert!(completions.is_empty());
+}
+
+#[tokio::test]
+async fn every_visible_slash_command_has_an_execution_path() {
+    let mut engine = new_engine();
+    let commands: Vec<String> = engine
+        .complete_slash_command("")
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+
+    for command in commands {
+        let outputs = engine.handle_slash_command(&command);
+        assert!(!outputs.is_empty(), "{command} produced no output");
+        if let Some((_, text)) = collect_stream(outputs).await {
+            assert!(
+                !text.contains("Unknown command"),
+                "{command} is only a placeholder"
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

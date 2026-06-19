@@ -6,7 +6,7 @@
 | Status | Research |
 | Priority | P4 |
 | Source | User request, 2026-06-18 |
-| Relates To | I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc` |
+| Relates To | CMD-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc` |
 
 ## Requirement
 
@@ -14,6 +14,7 @@ Design a protocol specification and runtime architecture for loading WASM-based 
 Plugins may provide:
 
 - tools;
+- commands;
 - hooks;
 - filters;
 - future extension capabilities registered through the same protocol boundary.
@@ -31,7 +32,9 @@ host calls, sandbox limits, compatibility, and failure behavior.
 
 - Define the plugin manifest format.
 - Define host/plugin protocol messages for capability discovery and registration.
-- Define how WASM plugins expose tools, hooks, and filters.
+- Define how WASM plugins expose tools, commands, hooks, and filters.
+- Define `PluginCommand` registration, namespacing, collision handling, provenance, availability,
+  execution, and unload behavior against the session-scoped command registry from CMD-001.
 - Define permission boundaries for plugin-provided tools and host calls.
 - Define lifecycle events: load, initialize, register, execute, shutdown, error.
 - Define compatibility/version negotiation.
@@ -56,7 +59,9 @@ host calls, sandbox limits, compatibility, and failure behavior.
 
 - [ ] A protocol specification is written under `docs/reference/` or `docs/proposals/`.
 - [ ] A decision record is created before adding a WASM runtime dependency.
-- [ ] The spec defines tools, hooks, and filters as first-class plugin capabilities.
+- [ ] The spec defines tools, commands, hooks, and filters as first-class plugin capabilities.
+- [ ] Plugin commands cannot override built-in commands or bypass Tool, Session, permission, or UI
+      ownership boundaries.
 - [ ] Plugin-provided tools use the existing permission pipeline and provenance model.
 - [ ] Hook/filter execution order and failure policy are specified.
 - [ ] Sandbox/resource limits are specified, including timeout, memory, filesystem/network access,
@@ -70,6 +75,7 @@ host calls, sandbox limits, compatibility, and failure behavior.
 
 - `docs/proposals/wasm-runtime-plugin-protocol.md`
 - `docs/backlog/active/DIST-001-optional-runtime-asset-distribution.md`
+- `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
 - `docs/iterations/I009-extensible-agent.md`
 - `docs/decisions/009-tool-provenance.md`
 - `docs/decisions/013-provider-config-schema-boundary.md`
@@ -86,3 +92,5 @@ host calls, sandbox limits, compatibility, and failure behavior.
    host calls?
 4. How should plugin provenance appear in TUI/RPC outputs alongside native and MCP tools?
 5. What is the minimum useful host-call surface for v1?
+6. Should v1 plugin commands execute dedicated plugin handlers, alias plugin tools, or support both
+   through separate executor kinds?

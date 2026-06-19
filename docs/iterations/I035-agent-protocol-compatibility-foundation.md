@@ -31,6 +31,8 @@ types to unstable external schemas.
 - [ ] Secrets remain env-var based or explicit-permission gated.
 - [ ] Tests cover precedence and non-overwrite behavior if implementation starts.
 - [ ] User docs explain what is supported and what is intentionally unsupported.
+- [ ] Imported shared config may enable known plugins or alias policy but cannot define executable
+      command bodies outside BuiltinCommand/PluginCommand registration.
 
 ## Risks
 

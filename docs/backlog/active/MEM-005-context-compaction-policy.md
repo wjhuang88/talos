@@ -40,6 +40,8 @@ Required policy decisions:
   responses.
 - Manual compaction command behavior, including whether `/compact` is allowed
   during an active turn.
+- Register `/compact` as a CMD-001 BuiltinCommand that delegates a typed operation to the session
+  compaction owner rather than mutating conversation display state.
 - User-visible status: compact notification, before/after token estimate, and
   failure reason when compaction is skipped.
 - Persistence semantics: compacted context sent to the provider may differ
@@ -97,6 +99,7 @@ are available.
 - `docs/backlog/active/MEM-003-llm-compaction.md`
 - `docs/backlog/active/MODEL-001-model-catalog-and-reasoning.md`
 - `docs/backlog/active/TUI-009-input-and-session-exit-polish.md`
+- `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
 - `docs/decisions/016-layered-memory-architecture.md`
 - `crates/talos-agent/src/compaction.rs`
 - `crates/talos-agent/src/lib.rs`

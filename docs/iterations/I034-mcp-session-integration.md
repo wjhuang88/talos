@@ -19,6 +19,8 @@ conversation surfaces.
 - [ ] #MCP-001-D: Route MCP tool calls through permission and summary/display metadata
 - [ ] #MCP-001-E: Surface MCP connection/tool status and provenance in TUI/CLI diagnostics
 - [ ] #MCP-001-F: Define unavailable-server behavior and prompt cache semantics
+- [ ] #MCP-001-G: Feed MCP status to the CMD-001 `/plugins` BuiltinCommand without treating MCP
+      prompts as an additional command-definition origin
 
 ## Acceptance Criteria
 
@@ -29,6 +31,7 @@ conversation surfaces.
 - [ ] Prompt cache behavior is documented for startup-discovered versus unavailable MCP tools.
 - [ ] Tests cover discovery, permission routing, provenance, and unavailable server behavior.
 - [ ] No `rmcp` DTOs leak outside the MCP boundary.
+- [ ] I034 does not create a parallel command registry or auto-publish MCP prompts as slash commands.
 
 ## Risks
 
