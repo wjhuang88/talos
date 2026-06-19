@@ -256,7 +256,7 @@ const THEME: &Theme = NORD_THEME;
 
 /// Semantic color assignments — all TUI rendering paths route through these roles.
 pub(crate) mod semantic {
-    use super::{Color, THEME};
+    use super::{Color, THEME, nord};
 
     pub(crate) const TEXT_PRIMARY: Color = THEME.text_primary;
     pub(crate) const TEXT_ACCENT: Color = THEME.text_accent;
@@ -266,6 +266,7 @@ pub(crate) mod semantic {
     pub(crate) const TEXT_WARNING: Color = THEME.text_warning;
     pub(crate) const TEXT_SPECIAL: Color = THEME.text_special;
     pub(crate) const INPUT_BG: Color = THEME.input_bg;
+    pub(crate) const NORD2: Color = nord::NORD2;
     pub(crate) const PREVIEW_FG: Color = THEME.preview_fg;
     pub(crate) const DIM_TEXT: Color = THEME.dim_text;
     pub(crate) const STATUS_VALUE: Color = THEME.status_value;

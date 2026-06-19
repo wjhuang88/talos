@@ -20,7 +20,7 @@ use crate::inline_terminal::{
     ComponentStack, HistoryAttrs, HistorySegment, InlineTerminal, ViewportComponent,
 };
 use crate::sidebar::{SkillInfo, SkillSidebar};
-use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
+use crate::state::{ApprovalState, CtrlCState, SlashMenuState, Tip, TuiState};
 use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
 use crate::theme::{semantic, to_crossterm_color};
 
@@ -911,6 +911,9 @@ impl Tui {
         };
         let input_pad_top = crate::scrollback::InputPadComponent;
         let input = crate::scrollback::InputComponent { state };
+        let slash_menu = crate::scrollback::SlashMenuComponent {
+            menu: &state.slash_menu,
+        };
         let input_pad_bot = crate::scrollback::InputPadComponent;
         let status_comp = crate::scrollback::StatusComponent { status };
 
@@ -920,6 +923,7 @@ impl Tui {
             &tips,
             &input_pad_top,
             &input,
+            &slash_menu,
             &input_pad_bot,
             &status_comp,
         ]);
@@ -963,6 +967,7 @@ impl Tui {
                         let was_processing = self.state.status.is_processing;
                         if !was_processing && !self.state.input_buffer.is_empty() {
                             self.state.input_clear();
+                            self.state.slash_menu.close();
                             self.state.ctrl_c_state = CtrlCState::Idle;
                             self.state.tip = Some(Tip {
                                 kind: TipKind::Info,
@@ -980,7 +985,29 @@ impl Tui {
                     }
                     KeyCode::Char('e') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.slash_menu.close();
                         self.toggle_evolution_panel();
+                    }
+                    KeyCode::Up if self.state.slash_menu.is_open => {
+                        self.state.slash_menu.select_prev();
+                    }
+                    KeyCode::Down if self.state.slash_menu.is_open => {
+                        self.state.slash_menu.select_next();
+                    }
+                    KeyCode::Tab if self.state.slash_menu.is_open => {
+                        if let Some(cmd) = self.state.slash_menu.selected_command() {
+                            self.state.input_insert_command(&cmd);
+                        }
+                        self.state.slash_menu.close();
+                    }
+                    KeyCode::Enter if self.state.slash_menu.is_open => {
+                        if let Some(cmd) = self.state.slash_menu.selected_command() {
+                            self.state.input_insert_command(&cmd);
+                        }
+                        self.state.slash_menu.close();
+                    }
+                    KeyCode::Esc if self.state.slash_menu.is_open => {
+                        self.state.slash_menu.close();
                     }
                     KeyCode::Char(c)
                         if !matches!(self.state.approval_state, ApprovalState::Hidden) =>
@@ -1021,20 +1048,42 @@ impl Tui {
                             });
                         }
                     }
+                    KeyCode::Char('/')
+                        if self.state.input_buffer.is_empty()
+                            && matches!(self.state.approval_state, ApprovalState::Hidden) =>
+                    {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        let registry = talos_conversation::command_registry();
+                        self.state.slash_menu = SlashMenuState::open(registry);
+                    }
                     KeyCode::Char(c) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        self.state.input_append_char(c);
+                        if self.state.slash_menu.is_open {
+                            self.state.slash_menu.filter_text.push(c);
+                            self.state.slash_menu.selected_index = 0;
+                        } else {
+                            self.state.input_append_char(c);
+                        }
                     }
                     KeyCode::Backspace => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        if self.state.slash_menu.is_open {
+                            self.state.slash_menu.close();
+                        }
                         self.state.input_backspace();
                     }
                     KeyCode::Left => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        if self.state.slash_menu.is_open {
+                            self.state.slash_menu.close();
+                        }
                         self.state.input_cursor_left();
                     }
                     KeyCode::Right => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        if self.state.slash_menu.is_open {
+                            self.state.slash_menu.close();
+                        }
                         self.state.input_cursor_right();
                     }
                     KeyCode::Enter => {
@@ -1054,6 +1103,7 @@ impl Tui {
             }
             Event::Paste(text) => {
                 self.state.ctrl_c_state = CtrlCState::Idle;
+                self.state.slash_menu.close();
                 self.state.input_append_str(text);
             }
             Event::Resize(_, _) => {}

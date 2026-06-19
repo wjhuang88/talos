@@ -12,7 +12,7 @@ mod tests {
         stream_padding_for,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
-    use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
+    use crate::state::{ApprovalState, CtrlCState, SlashMenuItem, SlashMenuState, Tip, TuiState};
     use crate::{contrast_ratio, rgb_components};
 
     // ── TuiState (pure UI) ─────────────────────────────────────────────
@@ -360,5 +360,106 @@ mod tests {
             ),
             "   "
         );
+    }
+
+    // ── Slash Menu ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_slash_menu_default_is_closed() {
+        let menu = SlashMenuState::default();
+        assert!(!menu.is_open);
+        assert!(menu.items.is_empty());
+        assert_eq!(menu.selected_index, 0);
+        assert!(menu.filter_text.is_empty());
+    }
+
+    #[test]
+    fn test_slash_menu_opens_with_commands() {
+        let registry = talos_conversation::command_registry();
+        let menu = SlashMenuState::open(registry);
+        assert!(menu.is_open);
+        assert!(!menu.items.is_empty());
+        assert_eq!(menu.selected_index, 0);
+    }
+
+    #[test]
+    fn test_slash_menu_filters_by_name() {
+        let registry = talos_conversation::command_registry();
+        let mut menu = SlashMenuState::open(registry);
+        menu.filter_text.push_str("help");
+        let filtered = menu.filtered_items();
+        assert!(!filtered.is_empty());
+        assert!(filtered.iter().any(|item| item.name == "/help"));
+    }
+
+    #[test]
+    fn test_slash_menu_filters_by_description() {
+        let registry = talos_conversation::command_registry();
+        let mut menu = SlashMenuState::open(registry);
+        menu.filter_text.push_str("exit");
+        let filtered = menu.filtered_items();
+        assert!(!filtered.is_empty());
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.name == "/quit" || item.name == "/exit")
+        );
+    }
+
+    #[test]
+    fn test_slash_menu_selection_wraps() {
+        let registry = talos_conversation::command_registry();
+        let mut menu = SlashMenuState::open(registry);
+        let len = menu.filtered_items().len();
+        assert!(len > 0);
+
+        menu.select_prev();
+        assert_eq!(menu.selected_index, len - 1);
+
+        menu.select_next();
+        assert_eq!(menu.selected_index, 0);
+    }
+
+    #[test]
+    fn test_slash_menu_selected_command_returns_name() {
+        let registry = talos_conversation::command_registry();
+        let mut menu = SlashMenuState::open(registry);
+        let cmd = menu.selected_command();
+        assert!(cmd.is_some());
+        assert!(cmd.unwrap().starts_with('/'));
+    }
+
+    #[test]
+    fn test_slash_menu_close_clears_state() {
+        let registry = talos_conversation::command_registry();
+        let mut menu = SlashMenuState::open(registry);
+        menu.filter_text.push_str("test");
+        menu.select_next();
+        menu.close();
+        assert!(!menu.is_open);
+        assert!(menu.items.is_empty());
+        assert_eq!(menu.selected_index, 0);
+        assert!(menu.filter_text.is_empty());
+    }
+
+    #[test]
+    fn test_slash_menu_no_match_returns_empty() {
+        let registry = talos_conversation::command_registry();
+        let mut menu = SlashMenuState::open(registry);
+        menu.filter_text.push_str("zzzznonexistent");
+        let filtered = menu.filtered_items();
+        assert!(filtered.is_empty());
+        assert!(menu.selected_command().is_none());
+    }
+
+    #[test]
+    fn test_slash_menu_item_with_arg_hint() {
+        let item = SlashMenuItem {
+            name: "/export".to_string(),
+            description: "Export transcript".to_string(),
+            arg_hint: Some("<path>".to_string()),
+        };
+        assert_eq!(item.name, "/export");
+        assert_eq!(item.arg_hint, Some("<path>".to_string()));
     }
 }

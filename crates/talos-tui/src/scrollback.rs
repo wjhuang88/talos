@@ -234,6 +234,99 @@ impl ViewportComponent for StatusComponent<'_> {
     }
 }
 
+pub(crate) struct SlashMenuComponent<'a> {
+    pub(crate) menu: &'a crate::state::SlashMenuState,
+}
+
+impl ViewportComponent for SlashMenuComponent<'_> {
+    fn height_hint(&self, _w: u16) -> u16 {
+        if !self.menu.is_open {
+            return 0;
+        }
+        let filtered = self.menu.filtered_items().len();
+        let visible = filtered.min(crate::state::SLASH_MENU_MAX_VISIBLE);
+        (visible as u16) + 2
+    }
+
+    fn render(&self, frame: &mut InlineFrame, area: Rect) {
+        if !self.menu.is_open {
+            return;
+        }
+
+        let filtered = self.menu.filtered_items();
+        if filtered.is_empty() {
+            let dim = Style::default().fg(semantic::DIM_TEXT);
+            let text = Line::from(Span::styled(" No matching commands", dim));
+            frame.render_widget(
+                Paragraph::new(text).style(Style::default().bg(semantic::INPUT_BG)),
+                area,
+            );
+            return;
+        }
+
+        let max_visible = crate::state::SLASH_MENU_MAX_VISIBLE;
+        let total = filtered.len();
+        let visible = total.min(max_visible);
+
+        let scroll_offset = if self.menu.selected_index >= visible {
+            self.menu.selected_index - visible + 1
+        } else {
+            0
+        };
+
+        let dim = Style::default().fg(semantic::DIM_TEXT);
+        let primary = Style::default().fg(semantic::TEXT_PRIMARY);
+        let selected_style = Style::default()
+            .fg(semantic::TEXT_ACCENT)
+            .bg(semantic::NORD2);
+
+        let mut lines: Vec<Line<'static>> = Vec::with_capacity(visible + 1);
+
+        lines.push(Line::from(Span::styled(
+            " ────────────────────────────────────────────────",
+            dim,
+        )));
+
+        for i in 0..visible {
+            let idx = scroll_offset + i;
+            if idx >= total {
+                break;
+            }
+            let item = filtered[idx];
+            let is_selected = idx == self.menu.selected_index;
+
+            let name = if let Some(ref hint) = item.arg_hint {
+                format!("  /{} {}", &item.name[1..], hint)
+            } else {
+                format!("  /{}", &item.name[1..])
+            };
+
+            let desc = format!("  —  {}", item.description);
+
+            if is_selected {
+                let name_span = Span::styled(name, selected_style);
+                let desc_span = Span::styled(desc, selected_style);
+                lines.push(Line::from(vec![name_span, desc_span]));
+            } else {
+                let name_span = Span::styled(name, primary);
+                let desc_span = Span::styled(desc, dim);
+                lines.push(Line::from(vec![name_span, desc_span]));
+            }
+        }
+
+        if total > max_visible {
+            let indicator = format!("  … {}/{}", scroll_offset + visible, total);
+            lines.push(Line::from(Span::styled(indicator, dim)));
+        }
+
+        let text = Text::from(lines);
+        frame.render_widget(
+            Paragraph::new(text).style(Style::default().bg(semantic::INPUT_BG)),
+            area,
+        );
+    }
+}
+
 pub(crate) fn truncate_end_to_width(s: &str, max_width: u16) -> String {
     let max = max_width as usize;
     if unicode_width::UnicodeWidthStr::width(s) <= max {

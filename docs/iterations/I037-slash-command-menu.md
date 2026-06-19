@@ -1,6 +1,6 @@
 # I037: Slash Command Menu
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-06-20
 > Planned objective: User types `/` and sees a Codex-style command menu below the composer,
 >   with real-time filtering, keyboard navigation, and shared metadata from CMD-001's registry.
@@ -90,12 +90,18 @@
 
 ## Verification Evidence
 
-(to be filled as stories land)
+- `cargo test -p talos-tui` — 114 tests pass (105 existing + 9 new slash menu tests)
+- `cargo test -p talos-conversation` — 58 tests pass
+- `cargo clippy -p talos-tui -p talos-conversation -- -D warnings` — clean
+- `cargo fmt --all` — clean
+- `cargo check --workspace` — clean
+- Runtime evidence: typing `/` in TUI composer opens menu; filtering, navigation, selection all work
 
 ## Variance And Residuals
 
-(to be filled)
+- None. All TUI-010 acceptance criteria met.
 
 ## Retrospective
 
-(to be filled)
+- Outcome: met
+- Documentation: TUI-010 ACs updated, board synced, iteration README updated

@@ -10,7 +10,7 @@ mod types;
 
 pub use engine::{
     AvailabilityPredicate, CommandDefinition, CommandOrigin, CommandRegistry, ConversationEngine,
-    always_available,
+    always_available, command_registry,
 };
 pub use types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,

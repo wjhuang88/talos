@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-010 |
 | Priority | P2 |
-| Status | Planned |
+| Status | Complete (2026-06-20, I037) |
 | Depends On | TUI-002 sub-slice C/D; TUI-009; CMD-001 |
 | Origin | User feedback 2026-06-18 — implement a Codex-like menu layer when typing `/`, rendered below the input area |
 
@@ -85,19 +85,19 @@ follow-up integration point, not required for the first slash menu slice.
 
 ## Acceptance Criteria
 
-- [ ] Typing `/` at composer start opens a menu attached to the input area.
-- [ ] Menu placement prefers below-input rendering and falls back predictably
+- [x] Typing `/` at composer start opens a menu attached to the input area.
+- [x] Menu placement prefers below-input rendering and falls back predictably
       when terminal height is insufficient.
-- [ ] Filtering updates as the user types after `/`.
-- [ ] Keyboard navigation supports `Up`, `Down`, `Enter`, `Tab`, and `Esc`.
-- [ ] `Esc` closes the menu but does not clear ordinary composer text.
-- [ ] `Ctrl+C` behavior remains consistent with TUI-009.
-- [ ] Slash command metadata comes from one command registry used by parser,
+- [x] Filtering updates as the user types after `/`.
+- [x] Keyboard navigation supports `Up`, `Down`, `Enter`, `Tab`, and `Esc`.
+- [x] `Esc` closes the menu but does not clear ordinary composer text.
+- [x] `Ctrl+C` behavior remains consistent with TUI-009.
+- [x] Slash command metadata comes from one command registry used by parser,
       completion, and menu rendering.
-- [ ] The menu does not write transient UI text into scrollback history.
-- [ ] The layer exposes enough structure for TUI-008 to later render approval
+- [x] The menu does not write transient UI text into scrollback history.
+- [x] The layer exposes enough structure for TUI-008 to later render approval
       prompts through the same popup stack.
-- [ ] TUI tests cover opening, filtering, selection, cancellation, placement
+- [x] TUI tests cover opening, filtering, selection, cancellation, placement
       fallback, and disabled/hidden command states.
 
 ## Required Reads

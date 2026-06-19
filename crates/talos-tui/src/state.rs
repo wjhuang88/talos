@@ -9,6 +9,92 @@ use talos_conversation::{StatusSnapshot, TipKind};
 use talos_core::ApprovalChoice;
 
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
+pub(crate) const SLASH_MENU_MAX_VISIBLE: usize = 8;
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SlashMenuItem {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) arg_hint: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct SlashMenuState {
+    pub(crate) is_open: bool,
+    pub(crate) items: Vec<SlashMenuItem>,
+    pub(crate) selected_index: usize,
+    pub(crate) filter_text: String,
+}
+
+impl SlashMenuState {
+    pub(crate) fn open(registry: &talos_conversation::CommandRegistry) -> Self {
+        let items = registry
+            .available_commands()
+            .into_iter()
+            .map(|cmd| SlashMenuItem {
+                name: cmd.name.to_string(),
+                description: cmd.description.to_string(),
+                arg_hint: cmd.arg_hint.map(|h| h.to_string()),
+            })
+            .collect();
+        Self {
+            is_open: true,
+            items,
+            selected_index: 0,
+            filter_text: String::new(),
+        }
+    }
+
+    pub(crate) fn filtered_items(&self) -> Vec<&SlashMenuItem> {
+        if self.filter_text.is_empty() {
+            return self.items.iter().collect();
+        }
+        let lower = self.filter_text.to_lowercase();
+        self.items
+            .iter()
+            .filter(|item| {
+                item.name[1..].to_lowercase().contains(&lower)
+                    || item.description.to_lowercase().contains(&lower)
+            })
+            .collect()
+    }
+
+    pub(crate) fn selected_command(&self) -> Option<String> {
+        let filtered = self.filtered_items();
+        if filtered.is_empty() {
+            return None;
+        }
+        let idx = self.selected_index.min(filtered.len() - 1);
+        Some(filtered[idx].name.clone())
+    }
+
+    pub(crate) fn close(&mut self) {
+        self.is_open = false;
+        self.items.clear();
+        self.selected_index = 0;
+        self.filter_text.clear();
+    }
+
+    pub(crate) fn select_next(&mut self) {
+        let len = self.filtered_items().len();
+        if len == 0 {
+            return;
+        }
+        self.selected_index = (self.selected_index + 1) % len;
+    }
+
+    pub(crate) fn select_prev(&mut self) {
+        let len = self.filtered_items().len();
+        if len == 0 {
+            return;
+        }
+        if self.selected_index == 0 {
+            self.selected_index = len - 1;
+        } else {
+            self.selected_index -= 1;
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum ApprovalState {
@@ -46,6 +132,7 @@ pub(crate) struct TuiState {
     pub pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
     pub tip: Option<Tip>,
     pub status: StatusSnapshot,
+    pub slash_menu: SlashMenuState,
 }
 
 impl TuiState {
@@ -98,6 +185,12 @@ impl TuiState {
     pub(crate) fn input_clear(&mut self) {
         self.input_buffer.clear();
         self.cursor_pos = 0;
+    }
+
+    pub(crate) fn input_insert_command(&mut self, command: &str) {
+        self.input_buffer.clear();
+        self.cursor_pos = 0;
+        self.input_append_str(command);
     }
 
     pub(crate) fn input_submit(&mut self) -> String {

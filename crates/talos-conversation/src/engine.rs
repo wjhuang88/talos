@@ -199,6 +199,11 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
     ])
 });
 
+/// Returns the shared static command registry for TUI-010 menu and help rendering.
+pub fn command_registry() -> &'static CommandRegistry {
+    &COMMAND_REGISTRY
+}
+
 pub struct ConversationEngine {
     pub(crate) messages: Vec<ChatMessage>,
     pub(crate) current_turn_text: String,
