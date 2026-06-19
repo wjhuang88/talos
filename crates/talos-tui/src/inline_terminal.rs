@@ -345,6 +345,31 @@ impl InlineTerminal {
         Ok(())
     }
 
+    /// Pushes scrollback content above the viewport up by `count` rows.
+    ///
+    /// Used when the viewport must grow upward into the scrollback (e.g. the
+    /// slash menu opens and the bottom pane overflows the screen). Unlike
+    /// `insert_history`, this always scrolls the region above the viewport up
+    /// (BRANCH 2), regardless of whether the viewport is at the screen bottom.
+    /// The oldest `count` scrollback rows are consumed; `count` blank rows are
+    /// freed at the viewport top for the grown viewport to render into.
+    pub fn push_scrollback_up(&mut self, count: u16) {
+        let top = self.viewport_area.top();
+        if count == 0 || top <= 1 {
+            return;
+        }
+        let writer = self.backend_mut();
+        let _ = queue!(writer, crossterm::style::Print(format!("\x1b[1;{top}r")));
+        let _ = queue!(writer, MoveTo(0, top - 1));
+        for _ in 0..count {
+            let _ = queue!(writer, crossterm::style::Print("\r\n"));
+        }
+        let _ = queue!(writer, Clear(ClearType::UntilNewLine));
+        let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
+        let _ = std::io::Write::flush(writer);
+        self.needs_clear = true;
+    }
+
     pub fn set_cursor(&mut self, col: u16, row: u16) -> io::Result<()> {
         self.last_known_cursor_pos = Position::new(col, row);
         let writer = self.backend_mut();

@@ -937,9 +937,7 @@ impl Tui {
             let screen_h = self.terminal.screen_size().height;
             let new_bottom = viewport.y.saturating_add(total_height);
             let overflow = new_bottom.saturating_sub(screen_h);
-            for _ in 0..overflow {
-                let _ = self.terminal.insert_history("", None);
-            }
+            self.terminal.push_scrollback_up(overflow);
         }
         self.last_total_height = total_height;
 
