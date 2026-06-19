@@ -424,6 +424,7 @@ pub struct Tui {
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
+    last_total_height: u16,
 }
 
 impl Tui {
@@ -460,6 +461,7 @@ impl Tui {
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
+            last_total_height: 0,
         })
     }
 
@@ -929,6 +931,14 @@ impl Tui {
         ]);
 
         let total_height = stack.total_height(self.terminal.screen_size().width);
+
+        if total_height > self.last_total_height && self.last_total_height > 0 {
+            let diff = total_height - self.last_total_height;
+            for _ in 0..diff {
+                let _ = self.terminal.insert_history("", None);
+            }
+        }
+        self.last_total_height = total_height;
 
         self.terminal.draw(total_height, |frame| {
             let layout = stack.layout(frame.area(), frame.area().width);
