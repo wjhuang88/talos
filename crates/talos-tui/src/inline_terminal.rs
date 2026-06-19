@@ -170,7 +170,7 @@ impl InlineTerminal {
         self.viewport_area
     }
 
-    pub fn set_viewport_area(&mut self, area: Rect) {
+    pub fn set_viewport_area(&mut self, mut area: Rect) {
         if area == self.viewport_area {
             return;
         }
@@ -180,11 +180,36 @@ impl InlineTerminal {
             let _ = queue!(writer, MoveTo(0, area.bottom()));
             let _ = queue!(writer, Clear(ClearType::FromCursorDown));
             let _ = std::io::Write::flush(writer);
+        } else if area.height > self.viewport_area.height && self.viewport_area.height > 0 {
+            let diff = area.height - self.viewport_area.height;
+            if self.viewport_area.bottom() < self.screen_size.height {
+                self.insert_history_lines(area.y, diff);
+                area.y += diff;
+            }
         }
 
         self.viewport_area = area;
         self.buffers[1 - self.current] = Buffer::empty(area);
         self.buffers[self.current] = Buffer::empty(area);
+    }
+
+    fn insert_history_lines(&mut self, at_row: u16, count: u16) {
+        let screen_height = self.screen_size.height;
+        if at_row == 0 || count == 0 || screen_height == 0 {
+            return;
+        }
+        let writer = self.backend_mut();
+        let top_1based = at_row + 1;
+        let _ = queue!(
+            writer,
+            crossterm::style::Print(format!("\x1b[{};{}r", top_1based, screen_height))
+        );
+        let _ = queue!(writer, MoveTo(0, at_row));
+        for _ in 0..count {
+            let _ = queue!(writer, crossterm::style::Print("\x1bM"));
+        }
+        let _ = queue!(writer, crossterm::style::Print("\x1b[r"));
+        let _ = std::io::Write::flush(writer);
     }
 
     #[allow(dead_code)]
