@@ -28,7 +28,6 @@ acceptance criteria, verification evidence, or iteration state.
 | I010 R3 Product Polish | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All 5 stories done; 567 tests, clippy clean |
 | I010 R2 Architecture Convergence | Complete | [I010 Polished Agent](iterations/I010-polished-agent.md) | All acceptance criteria met; 532 tests, clippy clean |
 | I015 Provider Schema | Complete | [I015 Provider Schema](iterations/I015-provider-schema.md) | Schema types and built-in defaults landed 2026-06-06; one-way opencode import with 9 tests landed 2026-06-08; `cargo test -p talos-config -p talos-provider -p talos-cli` passes |
-| I033 Runtime Skill Activation | Review | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Close after a deterministic binary-facing test proves Level 0 discovery/injection through the real `talos` entrypoint |
 
 ## Blocked / Paused
 
@@ -44,7 +43,6 @@ acceptance criteria, verification evidence, or iteration state.
 | I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
-| SKILL-001 Runtime Skill Activation | Partial | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | `/skills` lists Level 0 metadata; full body/reference activation remains explicitly gated |
 | SKILL-002 Explicit Runtime Skill Activation | Refinement | [SKILL-002](backlog/active/SKILL-002-explicit-runtime-activation.md) | Resolve context/cache ownership and complete CMD-001 before selecting into a new iteration |
 | MCP-001 MCP Session Integration | Planned | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Discover configured MCP tools at startup; route through permissions and provenance |
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
@@ -61,6 +59,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I033 Runtime Skill Activation | Complete | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Real-binary request-preview regression proves Level 0 discovery/injection; Level 1/2 activation remains SKILL-002 |
+| SKILL-001 Runtime Skill Activation | Complete | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | Published Level 0 runtime scope verified; explicit body/reference activation remains SKILL-002 |
 | I029 Architecture Cleanup Completion | Complete | [I029 Architecture Cleanup](iterations/I029-architecture-cleanup-completion.md) | ARCH-004/007/006/005 all landed. 10345→2082 lines across 4 god modules (-80%). |
 | GOV-002 Legacy Iteration Status Repair | Complete | [GOV-002](backlog/active/GOV-002-legacy-iteration-status-repair.md) | I010 closed and I012/I016/I017 supersession mapped; Manifest governance state restored |
 | I030 Session Module Decomposition | Complete | [I030 Session Module Decomposition](iterations/I030-session-module-decomposition.md) | ARCH-008 landed: `talos-session/src/lib.rs` 1737→45 lines; session tests and clippy pass. |

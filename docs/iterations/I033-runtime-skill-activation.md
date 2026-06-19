@@ -1,13 +1,13 @@
 # I033: Runtime Skill Activation
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-06-19
 > Planned objective: discover and inject Level 0 Skill metadata and define the Level 1/2 gate.
 > Baseline rule: preserve this target; Level 1/2 runtime execution uses a new requirement/iteration.
 > MVP deliverable: a normal Talos runtime discovers workspace Skills before the first turn and
 > exposes them through `/skills` diagnostics.
 
-**Status**: Review (baseline implementation landed; binary runtime evidence incomplete)
+**Status**: Complete (2026-06-19)
 **Target Window**: After I030-I032 architecture cleanup
 **Depends On**: I031 complete preferred, prompt cache stability
 
@@ -84,3 +84,17 @@ define the activation path for Level 1 skill bodies and Level 2 references.
 
 - `README.md` already documents Skill locations and Level 0 activation behavior.
 - Level 1/2 documentation changes belong to the follow-up requirement when that behavior ships.
+
+## Closure Evidence
+
+2026-06-19:
+
+- Repaired the mock request-preview boundary so `Agent` can pass its already-normalized message list
+  directly to the provider diagnostic renderer without requiring `/mock-request` to be parsed twice.
+- Added `crates/talos-cli/tests/skill_runtime_e2e.rs`. The test creates a valid workspace Skill,
+  invokes the real `talos --mock --print --workspace ...` binary, and verifies that the provider
+  request contains the Skill name and description before the first model turn.
+- `cargo test -p talos-provider -p talos-agent -p talos-cli` passed outside the restricted sandbox:
+  146 agent tests passed with one pre-existing ignored timing test, 29 CLI unit tests and all CLI
+  integration tests passed, and 44 provider unit plus 4 Anthropic integration tests passed.
+- Level 1/2 explicit activation remains owned by SKILL-002 and does not reopen I033.

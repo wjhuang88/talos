@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-19"
-status_note: "Governance refresh (2026-06-19): current planning/long-task rules are locally visible and harnessed; GOV-002 closed I010 and mapped I012/I016/I017 supersession without rewriting baselines. I033 remains an explicit Review gate, not governance drift. Validators pass with 0 warnings."
+status_note: "Governance refresh (2026-06-19): current planning/long-task rules are locally visible and harnessed; GOV-002 closed I010 and mapped I012/I016/I017 supersession without rewriting baselines. I033 binary evidence is complete, so I034 is eligible for activation."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,7 +63,6 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "I033 review: add deterministic binary-facing evidence for Level 0 Skill discovery/injection"
     - "CMD-001: extract the first-class BuiltinCommand registry and restore copy/export through typed owners"
     - "SKILL-002: resolve context/cache ownership, then plan explicit Level 1/2 activation in a new iteration"
     - "SESSION-001: implement atomic interactive new/resume/fork lifecycle after the command registry foundation"

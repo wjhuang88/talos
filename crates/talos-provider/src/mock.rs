@@ -242,9 +242,9 @@ impl LanguageModel for MockProvider {
     }
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {
-        let debug_messages = request_debug_messages(messages)?;
         self.request_debug_builder.as_ref().map(|builder| {
-            serde_json::from_str::<Value>(&builder(&debug_messages)).unwrap_or(Value::Null)
+            let rendered = builder(messages);
+            serde_json::from_str::<Value>(&rendered).unwrap_or(Value::String(rendered))
         })
     }
 }
@@ -595,6 +595,40 @@ mod tests {
             &events[1],
             AgentEvent::TextDelta { delta } if delta == "queued"
         ));
+    }
+
+    #[test]
+    fn request_preview_uses_prepared_messages_without_debug_command() {
+        let provider = MockProvider::new().with_request_debug_builder(|messages| {
+            serde_json::to_string(messages).expect("messages should serialize")
+        });
+        let messages = vec![
+            Message::System {
+                content: "skill: review".into(),
+                cache_markers: vec![],
+            },
+            Message::User {
+                content: "inspect this".into(),
+            },
+        ];
+
+        let preview = provider
+            .request_preview(&messages)
+            .expect("request preview");
+
+        assert!(preview.to_string().contains("skill: review"));
+        assert!(preview.to_string().contains("inspect this"));
+        assert!(!preview.to_string().contains(REQUEST_DEBUG_COMMAND));
+    }
+
+    #[test]
+    fn request_preview_preserves_non_json_builder_output() {
+        let provider = MockProvider::new().with_request_debug_builder(|_| "plain preview".into());
+
+        assert_eq!(
+            provider.request_preview(&[]),
+            Some(Value::String("plain preview".into()))
+        );
     }
 
     #[tokio::test]

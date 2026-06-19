@@ -1,6 +1,6 @@
 # SKILL-001: Runtime Skill Activation
 
-**Status**: Partial (Level 0 runtime activation landed 2026-06-19)
+**Status**: Complete (Level 0 runtime activation and explicit Level 1/2 gate verified 2026-06-19)
 **Priority**: P1
 **Source**: User correction 2026-06-18
 **Depends on**: ARCH-009 preferred, prompt cache stability, session startup flow
@@ -64,6 +64,9 @@ runtime startup wires `SkillLoader` to `Agent::set_skill_index(...)`.
   rebuilding the session/runtime to refresh the stable prompt prefix.
 - Level 1/2 execution is not an I033 scope extension. SKILL-002 owns the separate explicit
   activation workflow and remains in Refinement until its context/cache ownership is resolved.
+- A binary-facing regression test now creates a workspace Skill, launches the real `talos`
+  executable in mock request-preview mode, and verifies that Level 0 metadata reaches the provider
+  request. This closes SKILL-001's published runtime wiring scope.
 
 ## Required Reads
 
