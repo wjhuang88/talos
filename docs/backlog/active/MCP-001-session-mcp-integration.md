@@ -31,20 +31,32 @@ Without this, MCP remains an extension subsystem rather than a first-class sessi
 
 ## Acceptance Criteria
 
-- [ ] A configured MCP tool is discoverable and visible to the model before the first turn.
-- [ ] MCP tool execution flows through the same permission pipeline as native tools.
-- [ ] TUI/history display distinguishes MCP provenance where provenance is available.
-- [ ] MCP discovery failures are visible but do not crash sessions unless strict mode is enabled.
-- [ ] Prompt cache behavior is documented for startup-discovered versus mid-session MCP tools.
-- [ ] Tests cover MCP tool discovery, permission routing, unavailable server behavior, and
+- [x] A configured MCP tool is discoverable and visible to the model before the first turn.
+- [x] MCP tool execution flows through the same permission pipeline as native tools.
+- [x] TUI/history display distinguishes MCP provenance where provenance is available.
+- [x] MCP discovery failures are visible but do not crash sessions unless strict mode is enabled.
+- [x] Prompt cache behavior is documented for startup-discovered versus mid-session MCP tools.
+- [x] Tests cover MCP tool discovery, permission routing, unavailable server behavior, and
       provenance display metadata.
-- [ ] No `rmcp` external DTOs leak into public APIs outside the MCP boundary.
+- [x] No `rmcp` external DTOs leak into public APIs outside the MCP boundary.
 
 ## Verification Notes
 
 Use existing MCP e2e tests as a starting point, then add session-start integration coverage. Avoid
 mid-session dynamic tool mutation unless the prompt/cache behavior is explicitly designed and
 tested.
+
+2026-06-19 implementation evidence:
+
+- `talos-cli::mcp_runtime` composes startup once for every normal runtime mode and retains the MCP
+  child-process manager for the session lifetime.
+- `McpServerStatus` remains a Talos-owned boundary DTO; conversation receives a separate diagnostic
+  projection and does not import `rmcp` types.
+- The real CLI fixture test verifies pre-turn provider visibility, remote execution output, hooks,
+  and MCP provenance. Unit tests cover write denial, read-only allowance, startup degradation,
+  status rendering, timeout cleanup, and subprocess failure isolation.
+- README and architecture docs define stdio-only support, session-stable tool/cache behavior,
+  permission semantics, `/plugins`, restart requirements, and failure handling.
 
 ## Required Reads
 

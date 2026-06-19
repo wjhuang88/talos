@@ -6,9 +6,9 @@ use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
 use crate::types::{
-    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, ScrollbackState,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, UiOutput,
+    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, PluginObservation,
+    ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
+    ToolCallInfo, ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -76,6 +76,7 @@ pub struct ConversationEngine {
     pub(crate) model_name: String,
     pub(crate) branch_id: Option<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
+    pub(crate) mcp_servers: Vec<McpServerDiagnostic>,
     pub(crate) skills: Vec<SkillDiagnostic>,
     pub(crate) scrollback: ScrollbackState,
     pub(crate) is_processing: bool,
@@ -101,6 +102,7 @@ impl ConversationEngine {
             model_name,
             branch_id: None,
             plugin_observations: Vec::new(),
+            mcp_servers: Vec::new(),
             skills: Vec::new(),
             scrollback: ScrollbackState::default(),
             is_processing: false,
@@ -111,6 +113,11 @@ impl ConversationEngine {
 
     pub fn with_skills(mut self, skills: Vec<SkillDiagnostic>) -> Self {
         self.skills = skills;
+        self
+    }
+
+    pub fn with_mcp_servers(mut self, servers: Vec<McpServerDiagnostic>) -> Self {
+        self.mcp_servers = servers;
         self
     }
 
@@ -340,21 +347,44 @@ impl ConversationEngine {
     }
 
     fn handle_plugins_command(&mut self) -> Vec<UiOutput> {
-        if self.plugin_observations.is_empty() {
-            let text = "[System] No tool provenance observed yet.\n".to_string();
+        if self.mcp_servers.is_empty() && self.plugin_observations.is_empty() {
+            let text = "[System] No MCP servers configured and no tool provenance observed yet.\n"
+                .to_string();
             return vec![UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
                 stream: Box::pin(stream::once(async move { text })),
             })];
         }
-        let mut text = String::from("[System] Observed tool provenance (this session):\n");
-        for entry in &self.plugin_observations {
-            text.push_str(&format!(
-                "[System]   {} ({} call{})\n",
-                entry.key,
-                entry.count,
-                if entry.count == 1 { "" } else { "s" },
-            ));
+        let mut text = String::new();
+        if !self.mcp_servers.is_empty() {
+            text.push_str("[System] MCP servers (startup snapshot):\n");
+            for server in &self.mcp_servers {
+                if server.connected {
+                    text.push_str(&format!(
+                        "[System]   {} (connected, {} tool{})\n",
+                        server.name,
+                        server.tool_count,
+                        if server.tool_count == 1 { "" } else { "s" },
+                    ));
+                } else {
+                    let error = server.error.as_deref().unwrap_or("unavailable");
+                    text.push_str(&format!(
+                        "[System]   {} (unavailable: {error})\n",
+                        server.name
+                    ));
+                }
+            }
+        }
+        if !self.plugin_observations.is_empty() {
+            text.push_str("[System] Observed tool provenance (this session):\n");
+            for entry in &self.plugin_observations {
+                text.push_str(&format!(
+                    "[System]   {} ({} call{})\n",
+                    entry.key,
+                    entry.count,
+                    if entry.count == 1 { "" } else { "s" },
+                ));
+            }
         }
         vec![UiOutput::Stream(StreamMessage {
             source: MessageSource::System,

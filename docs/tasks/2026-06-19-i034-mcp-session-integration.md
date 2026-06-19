@@ -41,11 +41,11 @@ with provenance/status without crashing when its server is unavailable.
 | T1 | Repair GOV-002 legacy iteration state | I010/I012/I016/I017 preserve baselines and have explicit dispositions; Manifest can return conformant | Confirmation | Shell and PowerShell governance validators pass with semantic owner review | If historical evidence conflicts, keep degraded and record the exact unknown; do not guess | Complete |
 | T2 | Close I033 runtime evidence gap | Real `talos` binary output proves workspace Skill Level 0 reaches the provider request | T1 | Deterministic binary/integration test plus I033/README/status sync | If mock diagnostics cannot safely prove it after two approaches, leave I033 Review and stop before I034 | Complete |
 | T3 | Activate I034 baseline | Published baseline gains activation record, MVP, docs list, and prerequisite disposition without target rewrite | T1, T2 | I034, MCP-001, iterations index, and Board agree on Active state | If prerequisites remain unresolved, keep I034 Planned and stop | Complete |
-| T4 | Inventory and centralize MCP startup composition | One bounded startup integration path replaces mode-specific duplication where needed | T3 | Targeted tests and no `rmcp` DTO leakage/public API break | Preserve existing adapters; register architectural residual instead of broad refactor | Planned |
-| T5 | Discover/register MCP tools before first turn | Configured local MCP tools enter the live ToolRegistry in supported CLI/TUI paths | T4 | Integration tests prove model-visible definitions before first provider call | Restrict first runnable slice to startup-stable local stdio servers and record unsupported modes | Planned |
-| T6 | Enforce permission, provenance, and status routing | MCP calls use normal permission/display flow; `/plugins` reports session MCP state/provenance | T5 | Read/write fixture tests, provenance assertions, no bypass of ADR-006/permission gates | Disable unsupported capability with visible diagnostic | Planned |
-| T7 | Define unavailable-server and cache behavior | Startup/mid-session failures degrade visibly; session-stable tool set/cache rules documented | T5 | Failure-path tests and prompt/cache assertions | Default non-strict mode skips failed server; strict-mode work is residual unless already configured | Planned |
-| T8 | End-to-end runtime acceptance | Actual `talos` binary invokes a local MCP fixture and records observable result/provenance | T6, T7 | Binary command exits 0; fixture call/result and status evidence recorded in I034 | Retry twice; if environment-only bind/process restriction occurs, use approved local fallback and record limitation | Planned |
+| T4 | Inventory and centralize MCP startup composition | One bounded startup integration path replaces mode-specific duplication where needed | T3 | Targeted tests and no `rmcp` DTO leakage/public API break | Preserve existing adapters; register architectural residual instead of broad refactor | Complete |
+| T5 | Discover/register MCP tools before first turn | Configured local MCP tools enter the live ToolRegistry in supported CLI/TUI paths | T4 | Integration tests prove model-visible definitions before first provider call | Restrict first runnable slice to startup-stable local stdio servers and record unsupported modes | Complete |
+| T6 | Enforce permission, provenance, and status routing | MCP calls use normal permission/display flow; `/plugins` reports session MCP state/provenance | T5 | Read/write fixture tests, provenance assertions, no bypass of ADR-006/permission gates | Disable unsupported capability with visible diagnostic | Complete |
+| T7 | Define unavailable-server and cache behavior | Startup/mid-session failures degrade visibly; session-stable tool set/cache rules documented | T5 | Failure-path tests and prompt/cache assertions | Default non-strict mode skips failed server; strict-mode work is residual unless already configured | Complete |
+| T8 | End-to-end runtime acceptance | Actual `talos` binary invokes a local MCP fixture and records observable result/provenance | T6, T7 | Binary command exits 0; fixture call/result and status evidence recorded in I034 | Retry twice; if environment-only bind/process restriction occurs, use approved local fallback and record limitation | Complete |
 | T9 | Full closure and delivery | Workspace green, docs/status/retrospective synchronized, residuals owned | T8 | fmt, check, clippy `-D warnings`, workspace tests, both governance validators, diff check | Do not mark Complete; leave Review/Partial with checkpoint and exact failing gate | Planned |
 
 ### Dependencies And Prerequisites
@@ -213,4 +213,19 @@ Open risks or deviations: CMD-001 remains separate; no MCP prompt-to-command beh
 Next task item: T4 inventory current MCP composition and centralize only the duplicated startup seam
 Recovery or resume instruction: commit this activation checkpoint, then read the required ADRs and
 current talos-mcp/CLI composition before editing runtime code
+```
+
+### Checkpoint 4 - T4-T8 Implementation Complete
+
+```text
+Completed task items: T4, T5, T6, T7, T8
+Current state and artifacts: shared session MCP runtime; all normal modes register startup-cached
+tools; permission/provenance/status routing active; bounded timeout/process cleanup documented
+Commands/checks and actual results: targeted MCP/conversation/CLI checks and tests pass; clippy
+-D warnings, fmt check, and diff check pass; real fixture executes and appears in provider preview
+Open risks or deviations: HTTP and mid-session dynamic tool mutation remain explicitly unsupported;
+strict startup mode is not configured and was not added
+Next task item: T9 full workspace verification, closure status sync, retrospective, commit, push
+Recovery or resume instruction: review the implementation diff, commit the coherent MCP slice, then
+run the full workspace and governance gates before marking I034 Complete
 ```

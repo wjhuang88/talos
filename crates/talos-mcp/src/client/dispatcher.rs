@@ -31,11 +31,7 @@ impl McpDispatcher {
             .transport
             .request("tools/list", Some(json!({})))
             .await
-            .map_err(|error| McpError::Rpc {
-                server: self.server.clone(),
-                method: "tools/list".to_string(),
-                message: error.to_string(),
-            })?;
+            .map_err(|error| self.method_error("tools/list", error))?;
         facade::decode_tools_list(result, &self.server)
     }
 
@@ -50,15 +46,22 @@ impl McpDispatcher {
                 })),
             )
             .await
-            .map_err(|error| McpError::Rpc {
-                server: self.server.clone(),
-                method: "tools/call".to_string(),
-                message: error.to_string(),
-            })
+            .map_err(|error| self.method_error("tools/call", error))
     }
 
     /// Returns the bound server name.
     pub fn server(&self) -> &str {
         &self.server
+    }
+
+    fn method_error(&self, method: &str, error: McpError) -> McpError {
+        match error {
+            McpError::Timeout { .. } => error,
+            _ => McpError::Rpc {
+                server: self.server.clone(),
+                method: method.to_string(),
+                message: error.to_string(),
+            },
+        }
     }
 }

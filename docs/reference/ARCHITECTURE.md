@@ -65,9 +65,9 @@ The session actor (`AppServerSession`) is part of `talos-agent`; queue protocol 
 
 ### Skill Loading Boundary
 
-`talos-skill` owns SKILL.md parsing and progressive-disclosure loading. Runtime skill activation is
-handled by later agent/session integration work; this crate only provides the parsed and indexed
-skill data.
+`talos-skill` owns SKILL.md parsing and progressive-disclosure loading. The CLI discovers Level 0
+metadata at session startup and injects it into the Agent's stable prompt prefix; this crate
+provides the parsed and indexed skill data while explicit Level 1/2 activation remains separate.
 
 | Module | Responsibility |
 |--------|----------------|
@@ -91,7 +91,18 @@ full TUI/print/inline/RPC/MCP execution bodies.
 | `registry.rs` | Tool registry construction and permission-aware wrappers. |
 | `session_setup.rs` | Workspace/session resolution and session utility modes (`--search`, `--list`, `--learned`). |
 | `provider_setup.rs` | Provider parsing and provider/client config construction. |
+| `mcp_runtime.rs` | Session-scoped MCP startup, cached discovery results, child-process lifetime, and status projection. |
 | `tui_bridge.rs` / `event_loop.rs` | TUI and legacy interactive event-loop bridges. |
+
+### MCP Session Boundary
+
+`talos-mcp` owns transport, dispatch, Talos-owned MCP DTOs, startup discovery, and remote tool
+adapters. `talos-cli::mcp_runtime` is the composition boundary: it starts configured local stdio
+servers once per session, retains their process lifetime, registers cached tool adapters through
+the mode's existing permission wrapper, and projects startup status into conversation diagnostics.
+The discovered tool set is session-stable; Talos does not mutate model-visible tools mid-session.
+Unavailable servers are reported and skipped, while request timeouts and process drop cleanup keep
+dependency failures bounded.
 
 ## Dependency Graph
 

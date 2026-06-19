@@ -15,9 +15,7 @@ use talos_conversation::{ConversationEngine, UiOutput, UserInput};
 use talos_core::message::AgentEvent;
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
-use talos_mcp::client::McpClientManager;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
-use talos_permission::PermissionRule;
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -31,10 +29,11 @@ use tokio::sync::mpsc;
 
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
-use crate::provider_setup::{build_provider, config_to_mcp_client_config, parse_provider};
+use crate::mcp_runtime::McpSessionRuntime;
+use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
-    build_tui_tool_registry,
+    build_tui_tool_registry, register_permission_aware_tools, register_tui_permission_aware_tools,
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
@@ -68,10 +67,18 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
 
     let hooks = build_hook_registry(true);
     let workspace_root = PathBuf::from(".");
+    apply_mcp_fixture_config(&mut config, &cli);
+    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_print_tool_registry();
+    let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+    )));
+    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
-        build_print_tool_registry(),
+        registry,
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
         workspace_root,
@@ -106,54 +113,26 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     };
 
     let workspace_root = resolve_workspace_root(&cli)?;
+    apply_mcp_fixture_config(&mut config, &cli);
     let prompt = resolve_prompt(cli.prompt)?;
 
     let hooks = build_hook_registry(true);
     let mut registry = build_print_tool_registry();
-    let mut permission_engine =
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone());
-    // I009-S3 begin
-    #[cfg(debug_assertions)]
-    if let Some(path) = cli.mcp_server_fixture.clone() {
-        config.mcp.servers = vec![talos_config::McpServerConfig {
-            name: "fixture".to_string(),
-            transport: "stdio".to_string(),
-            command: path.to_string_lossy().to_string(),
-            args: Vec::new(),
-            env: std::collections::HashMap::from([(
-                "ECHO_PREFIX".to_string(),
-                "fixture".to_string(),
-            )]),
-            cwd: std::env::current_dir().ok(),
-        }];
-    }
 
     #[cfg(debug_assertions)]
     let fixture_mode = cli.mcp_server_fixture.is_some();
     #[cfg(not(debug_assertions))]
     let fixture_mode = false;
+    let request_preview_mode = prompt.trim_start().starts_with("/mock-request");
 
-    let mcp_manager =
-        McpClientManager::start(&config_to_mcp_client_config(&config.mcp), hooks.clone()).await?;
-    for startup_failure in mcp_manager.startup_failures() {
-        eprintln!(
-            "Warning: MCP server '{}' failed to start: {}",
-            startup_failure.server, startup_failure.error
-        );
-    }
-    for tool in mcp_manager.discover_tools().await {
-        if tool.is_read_only() {
-            permission_engine.add_rule(PermissionRule::new(
-                tool.name(),
-                None,
-                talos_permission::PermissionDecision::Allow,
-            ));
-        }
-        registry.register(tool);
-    }
-    // I009-S3 end
+    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
+    mcp_runtime.report_startup_failures();
+    let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+    )));
+    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
 
-    let provider = if fixture_mode && cli.mock {
+    let provider = if fixture_mode && cli.mock && !request_preview_mode {
         use talos_provider::mock::MockProvider;
         Arc::new(
             MockProvider::new()
@@ -283,7 +262,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);
-    let registry = build_tui_tool_registry(approval_handler, workspace_root.clone());
+    apply_mcp_fixture_config(&mut config, &cli);
+    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.clone());
+    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
         provider,
@@ -426,8 +409,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_user_input_tx(user_input_tx);
     tui.set_model_name(config.model.clone());
 
-    let engine =
-        ConversationEngine::new(config.model.clone()).with_skills(runtime_skills.diagnostics());
+    let engine = ConversationEngine::new(config.model.clone())
+        .with_skills(runtime_skills.diagnostics())
+        .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
     let interrupt_tx = handle.sq_tx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
@@ -468,7 +452,14 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     let workspace_root = resolve_workspace_root(&cli)?;
     let hooks = build_hook_registry(true);
     let provider = build_provider(&config, &api_key, cli.mock);
-    let registry = build_print_tool_registry();
+    apply_mcp_fixture_config(&mut config, &cli);
+    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_print_tool_registry();
+    let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+    )));
+    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
 
     let mut agent = Agent::with_security_and_hooks(
         provider,
@@ -760,6 +751,10 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }));
 
     let hooks = build_hook_registry(true);
+    apply_mcp_fixture_config(&mut config, &cli);
+    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
+    mcp_runtime.report_startup_failures();
+    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval.clone(), false);
 
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
@@ -806,6 +801,26 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);
     event_loop.run().await
+}
+
+fn apply_mcp_fixture_config(config: &mut Config, cli: &Cli) {
+    #[cfg(debug_assertions)]
+    if let Some(path) = cli.mcp_server_fixture.clone() {
+        config.mcp.servers = vec![talos_config::McpServerConfig {
+            name: "fixture".to_string(),
+            transport: "stdio".to_string(),
+            command: path.to_string_lossy().to_string(),
+            args: Vec::new(),
+            env: std::collections::HashMap::from([(
+                "ECHO_PREFIX".to_string(),
+                "fixture".to_string(),
+            )]),
+            cwd: std::env::current_dir().ok(),
+        }];
+    }
+
+    #[cfg(not(debug_assertions))]
+    let _ = (config, cli);
 }
 pub(crate) async fn run_mcp_server() -> Result<()> {
     let config_for_logging = Config::load().ok();

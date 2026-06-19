@@ -59,3 +59,16 @@ pub struct McpClientConfig {
     /// Declared MCP servers to launch.
     pub servers: Vec<McpServerLaunchConfig>,
 }
+
+/// Startup status for one configured MCP server.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpServerStatus {
+    /// Stable configured server name.
+    pub server: String,
+    /// Whether startup and initial tool discovery succeeded.
+    pub connected: bool,
+    /// Number of tools discovered during startup.
+    pub tool_count: usize,
+    /// Non-fatal startup error when the server is unavailable.
+    pub error: Option<String>,
+}

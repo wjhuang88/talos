@@ -16,6 +16,7 @@ mod approval;
 mod colors;
 mod event_loop;
 mod logging;
+mod mcp_runtime;
 mod mode_runners;
 mod provider_setup;
 mod registry;

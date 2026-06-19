@@ -146,6 +146,30 @@ activation and reference loading are intentionally gated for a later explicit
 activation flow, so large skill content is not dumped into the prompt or history
 by default.
 
+## MCP Tools
+
+Configure local stdio MCP servers in `~/.talos/config.toml`:
+
+```toml
+[[mcp.servers]]
+name = "filesystem"
+transport = "stdio"
+command = "/path/to/mcp-server"
+args = ["/path/to/workspace"]
+env = {}
+```
+
+Talos starts configured servers and discovers their tools before the first model turn in TUI,
+print, inline, interactive, and RPC modes. Tool names use the
+`mcp:<server>:<tool>` form. Read-only annotations are honored; other MCP tools use the normal
+approval path and are denied when interactive approval is unavailable. Startup failures are
+reported without aborting the session, and each MCP request has a bounded timeout. Use `/plugins`
+in the TUI to inspect the startup connection snapshot and observed tool provenance.
+
+The MCP tool set is fixed for the lifetime of a session so the model-visible tool definitions and
+prompt cache prefix remain stable. Restart the session after changing MCP configuration. Only
+local stdio transport is currently supported.
+
 ## Safety Model
 
 - Read-only workspace tools can run without approval.

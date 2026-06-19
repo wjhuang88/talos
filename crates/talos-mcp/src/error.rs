@@ -26,6 +26,17 @@ pub enum McpError {
     #[error("MCP server '{0}' disconnected")]
     Disconnected(String),
 
+    /// MCP request exceeded its bounded response deadline.
+    #[error("MCP server '{server}' timed out calling '{method}' after {timeout_secs}s")]
+    Timeout {
+        /// Server name.
+        server: String,
+        /// MCP method name.
+        method: String,
+        /// Configured timeout in seconds.
+        timeout_secs: u64,
+    },
+
     /// JSON-RPC request/response failed.
     #[error("MCP RPC error from '{server}' method '{method}': {message}")]
     Rpc {

@@ -44,6 +44,18 @@ pub struct PluginObservation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpServerDiagnostic {
+    /// Stable configured MCP server name.
+    pub name: String,
+    /// Whether startup and initial tool discovery succeeded.
+    pub connected: bool,
+    /// Number of tools discovered at session startup.
+    pub tool_count: usize,
+    /// Non-fatal startup error when unavailable.
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillDiagnostic {
     pub name: String,
     pub description: String,

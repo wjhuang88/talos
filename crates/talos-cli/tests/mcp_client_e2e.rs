@@ -37,6 +37,32 @@ fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
         proposed_count >= 2,
         "expected at least two tool proposals (provider + MCP adapter), got {proposed_count}. stderr: {stderr}"
     );
+    assert!(
+        stderr.contains("mcp:fixture:echo") && stderr.contains("fixture:ping"),
+        "stderr missing MCP provenance/result evidence: {stderr}"
+    );
+
+    let preview = Command::new(env!("CARGO_BIN_EXE_talos"))
+        .args([
+            "--print",
+            "--mock",
+            "--mcp-server-fixture",
+            fixture_bin.to_string_lossy().as_ref(),
+            "/mock-request inspect MCP tools",
+        ])
+        .output()
+        .expect("run talos request preview with MCP fixture");
+    assert!(
+        preview.status.success(),
+        "stdout:\n{}\n\nstderr:\n{}",
+        String::from_utf8_lossy(&preview.stdout),
+        String::from_utf8_lossy(&preview.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&preview.stdout);
+    assert!(
+        stdout.contains("mcp:fixture:echo") && stdout.contains("Echo text back"),
+        "provider request missing MCP tool definition: {stdout}"
+    );
 }
 
 fn build_fixture_binary() -> PathBuf {

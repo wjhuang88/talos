@@ -5,8 +5,8 @@ use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
 use crate::types::{
-    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, SkillDiagnostic,
-    TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput,
+    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, PluginObservation,
+    SkillDiagnostic, TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -516,7 +516,23 @@ async fn slash_plugins_empty_shows_no_tools_message() {
 
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert!(text.contains("No tool provenance observed"));
+    assert!(text.contains("No MCP servers configured"));
+}
+
+#[tokio::test]
+async fn slash_plugins_shows_startup_mcp_status_before_any_call() {
+    let mut engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "github".to_string(),
+        connected: true,
+        tool_count: 3,
+        error: None,
+    }]);
+
+    let outputs = engine.handle_slash_command("/plugins");
+
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("MCP servers (startup snapshot)"));
+    assert!(text.contains("github (connected, 3 tools)"));
 }
 
 // ---------------------------------------------------------------------------

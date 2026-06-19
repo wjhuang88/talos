@@ -50,12 +50,13 @@ impl TuiApprovalHandler {
     async fn request_approval(
         &self,
         tool_name: &str,
+        nature: talos_core::tool::ToolNature,
         input: &serde_json::Value,
         summary_fields: Vec<String>,
     ) -> ApprovalChoice {
         let decision = {
             let engine = self.engine.lock().expect("engine lock poisoned");
-            engine.evaluate(tool_name, input)
+            engine.evaluate_with_nature(tool_name, nature, input)
         };
         match decision {
             PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
@@ -127,7 +128,7 @@ impl AgentTool for TuiPermissionAwareTool {
             .collect();
         let choice = self
             .approval
-            .request_approval(&tool_name, &input, summary_fields)
+            .request_approval(&tool_name, self.inner.nature(), &input, summary_fields)
             .await;
 
         match choice {
@@ -150,6 +151,10 @@ impl AgentTool for TuiPermissionAwareTool {
 
     fn summary_fields(&self) -> &'static [&'static str] {
         self.inner.summary_fields()
+    }
+
+    fn provenance(&self) -> talos_core::tool::ToolProvenance {
+        self.inner.provenance()
     }
 }
 
@@ -180,7 +185,10 @@ impl AgentTool for PermissionAwareTool {
         let tool_name = self.inner.name().to_owned();
         let decision = {
             let mut approval = self.approval.lock().expect("approval lock poisoned");
-            let engine_decision = approval.engine().evaluate(&tool_name, &input);
+            let engine_decision =
+                approval
+                    .engine()
+                    .evaluate_with_nature(&tool_name, self.inner.nature(), &input);
 
             match engine_decision {
                 PermissionDecision::Allow => PermissionDecision::Allow,
@@ -223,6 +231,38 @@ impl AgentTool for PermissionAwareTool {
 
     fn summary_fields(&self) -> &'static [&'static str] {
         self.inner.summary_fields()
+    }
+
+    fn provenance(&self) -> talos_core::tool::ToolProvenance {
+        self.inner.provenance()
+    }
+}
+
+pub(crate) fn register_permission_aware_tools(
+    registry: &mut ToolRegistry,
+    tools: &[Arc<dyn AgentTool>],
+    approval: Arc<Mutex<ApprovalPrompt>>,
+    print_mode: bool,
+) {
+    for tool in tools {
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: tool.clone(),
+            approval: approval.clone(),
+            print_mode,
+        }));
+    }
+}
+
+pub(crate) fn register_tui_permission_aware_tools(
+    registry: &mut ToolRegistry,
+    tools: &[Arc<dyn AgentTool>],
+    approval: Arc<TuiApprovalHandler>,
+) {
+    for tool in tools {
+        registry.register(Arc::new(TuiPermissionAwareTool {
+            inner: tool.clone(),
+            approval: approval.clone(),
+        }));
     }
 }
 
@@ -475,4 +515,87 @@ pub(crate) fn highlight_snippet(snippet: &str) -> String {
     snippet
         .replace("<b>", &format!("{}{}", colors::NORD13, colors::BOLD))
         .replace("</b>", &format!("{}{}", colors::RESET, colors::NORD13))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_core::tool::{ToolNature, ToolProvenance};
+
+    struct RemoteTool {
+        nature: ToolNature,
+    }
+
+    #[async_trait]
+    impl AgentTool for RemoteTool {
+        fn name(&self) -> &str {
+            "mcp:test:fixture"
+        }
+
+        fn description(&self) -> &str {
+            "fixture"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type": "object"})
+        }
+
+        async fn execute(&self, _input: Value) -> ToolResult {
+            ToolResult::success("executed")
+        }
+
+        fn nature(&self) -> ToolNature {
+            self.nature
+        }
+
+        fn provenance(&self) -> ToolProvenance {
+            ToolProvenance::McpRemote {
+                server: "test".to_string(),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn print_wrapper_denies_write_mcp_tool_and_preserves_provenance() {
+        let tool = PermissionAwareTool {
+            inner: Arc::new(RemoteTool {
+                nature: ToolNature::Write,
+            }),
+            approval: Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new()))),
+            print_mode: true,
+        };
+
+        assert_eq!(
+            tool.provenance(),
+            ToolProvenance::McpRemote {
+                server: "test".to_string()
+            }
+        );
+        let result = tool.execute(serde_json::json!({})).await;
+        assert!(result.is_error);
+        assert!(result.content.contains("interactive approval unavailable"));
+    }
+
+    #[tokio::test]
+    async fn tui_wrapper_allows_read_only_mcp_tool_without_prompt() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let tool = TuiPermissionAwareTool {
+            inner: Arc::new(RemoteTool {
+                nature: ToolNature::Read,
+            }),
+            approval: Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
+        };
+
+        let result = tool.execute(serde_json::json!({})).await;
+
+        assert!(!result.is_error);
+        assert_eq!(result.content, "executed");
+        assert!(rx.try_recv().is_err());
+        assert_eq!(
+            tool.provenance(),
+            ToolProvenance::McpRemote {
+                server: "test".to_string()
+            }
+        );
+    }
 }

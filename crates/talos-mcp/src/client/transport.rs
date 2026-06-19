@@ -13,6 +13,11 @@ use tokio::sync::{Mutex, oneshot};
 
 use crate::error::{McpError, Result};
 
+#[cfg(not(test))]
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+#[cfg(test)]
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
+
 /// Minimal JSON-RPC request envelope used by MCP.
 #[derive(Debug, Serialize)]
 struct RpcRequest<'a> {
@@ -138,7 +143,7 @@ impl McpTransport {
         };
 
         let serialized = serde_json::to_string(&request)?;
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
 
         {
             let mut pending = self.state.pending.lock().await;
@@ -152,9 +157,19 @@ impl McpTransport {
             writer.flush().await?;
         }
 
-        match rx.await {
-            Ok(result) => result,
-            Err(_) => Err(McpError::Disconnected(self.state.server.clone())),
+        tokio::select! {
+            result = &mut rx => match result {
+                Ok(result) => result,
+                Err(_) => Err(McpError::Disconnected(self.state.server.clone())),
+            },
+            _ = tokio::time::sleep(REQUEST_TIMEOUT) => {
+                self.state.pending.lock().await.remove(&id);
+                Err(McpError::Timeout {
+                    server: self.state.server.clone(),
+                    method: method.to_string(),
+                    timeout_secs: REQUEST_TIMEOUT.as_secs(),
+                })
+            }
         }
     }
 
@@ -187,7 +202,8 @@ pub async fn spawn_stdio_transport(
     }
     cmd.stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true);
 
     let mut child = cmd.spawn().map_err(|source| McpError::Spawn {
         server: server.to_string(),
@@ -203,4 +219,24 @@ pub async fn spawn_stdio_transport(
 
     let transport = McpTransport::from_io(server.to_string(), child_stdout, child_stdin);
     Ok((transport, child))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn silent_server_times_out_and_removes_pending_request() {
+        let (client, _server) = tokio::io::duplex(256);
+        let (reader, writer) = tokio::io::split(client);
+        let transport = McpTransport::from_io("silent".to_string(), reader, writer);
+
+        let error = transport
+            .request("tools/list", Some(serde_json::json!({})))
+            .await
+            .expect_err("silent server should time out");
+
+        assert!(matches!(error, McpError::Timeout { .. }));
+        assert!(transport.state.pending.lock().await.is_empty());
+    }
 }

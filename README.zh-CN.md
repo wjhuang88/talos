@@ -129,6 +129,28 @@ Talos 自带一组面向编码 Agent 工作流的工具：
 
 默认提示词会要求模型优先使用内置工具，只有在原生工具无法覆盖任务时才使用 Shell 命令兜底。
 
+## MCP 工具
+
+在 `~/.talos/config.toml` 中配置本地 stdio MCP 服务：
+
+```toml
+[[mcp.servers]]
+name = "filesystem"
+transport = "stdio"
+command = "/path/to/mcp-server"
+args = ["/path/to/workspace"]
+env = {}
+```
+
+Talos 会在 TUI、print、inline、interactive 和 RPC 模式的首个模型回合前启动已配置的
+服务并发现工具。工具名称使用 `mcp:<server>:<tool>` 格式。只读标注会被保留，其他 MCP
+工具进入正常批准流程；无法交互批准时默认拒绝。单个服务启动失败不会中止会话，每个
+MCP 请求也有超时上限。TUI 中可使用 `/plugins` 查看启动连接快照和本会话已观察到的
+工具来源。
+
+会话期间 MCP 工具集保持不变，以维持模型可见工具定义和提示词缓存前缀稳定。修改 MCP
+配置后需要重启会话。当前仅支持本地 stdio transport。
+
 ## 安全模型
 
 - 只读工作区工具可以免批准执行。

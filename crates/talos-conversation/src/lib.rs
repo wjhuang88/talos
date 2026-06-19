@@ -10,7 +10,7 @@ mod types;
 
 pub use engine::ConversationEngine;
 pub use types::{
-    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, ScrollbackState,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, UiOutput, UserInput,
+    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, PluginObservation,
+    ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
+    ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };

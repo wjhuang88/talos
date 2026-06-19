@@ -26,7 +26,7 @@ model = "claude-sonnet-4-20250514"
 # ── MCP Servers ───────────────────────────────────────────────────────────────
 # [[mcp.servers]]
 # name = "my-mcp-server"
-# transport = "stdio"                   # "stdio" or "http"
+# transport = "stdio"                   # currently only "stdio" is supported
 # command = "npx"
 # args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 # env = { }                             # extra environment variables

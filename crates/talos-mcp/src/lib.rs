@@ -13,4 +13,6 @@ pub mod server;
 pub mod types;
 
 pub use error::{McpError, Result};
-pub use types::{McpCallRequest, McpClientConfig, McpServerLaunchConfig, McpToolDescriptor};
+pub use types::{
+    McpCallRequest, McpClientConfig, McpServerLaunchConfig, McpServerStatus, McpToolDescriptor,
+};

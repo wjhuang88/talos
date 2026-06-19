@@ -5,13 +5,12 @@ use std::sync::Arc;
 use talos_core::tool::AgentTool;
 use talos_plugin::HookRegistry;
 use tokio::process::Child;
-use tracing::warn;
 
 use crate::client::adapter::{McpRemoteTool, McpToolAdapter};
 use crate::client::dispatcher::McpDispatcher;
 use crate::client::transport::spawn_stdio_transport;
 use crate::error::{McpError, Result};
-use crate::types::{McpClientConfig, McpServerLaunchConfig};
+use crate::types::{McpClientConfig, McpServerLaunchConfig, McpServerStatus, McpToolDescriptor};
 
 /// Non-fatal startup failure for one MCP server.
 #[derive(Debug, Clone)]
@@ -24,6 +23,7 @@ pub struct McpStartupFailure {
 
 struct ManagedClient {
     dispatcher: Arc<McpDispatcher>,
+    tools: Vec<McpToolDescriptor>,
     _child: Child,
 }
 
@@ -42,8 +42,11 @@ impl McpClientManager {
 
         for server in &config.servers {
             match Self::start_one(server).await {
-                Ok(client) => match client.dispatcher.list_tools().await {
-                    Ok(_) => clients.push(client),
+                Ok(mut client) => match client.dispatcher.list_tools().await {
+                    Ok(tools) => {
+                        client.tools = tools;
+                        clients.push(client);
+                    }
                     Err(error) => startup_failures.push(McpStartupFailure {
                         server: server.name.clone(),
                         error: error.to_string(),
@@ -98,6 +101,7 @@ impl McpClientManager {
         let dispatcher = Arc::new(McpDispatcher::new(server.name.clone(), transport));
         Ok(ManagedClient {
             dispatcher,
+            tools: Vec::new(),
             _child: child,
         })
     }
@@ -107,36 +111,83 @@ impl McpClientManager {
         &self.startup_failures
     }
 
+    /// Returns a startup-stable status snapshot for all configured servers.
+    pub fn server_statuses(&self) -> Vec<McpServerStatus> {
+        let mut statuses = self
+            .clients
+            .iter()
+            .map(|client| McpServerStatus {
+                server: client.dispatcher.server().to_string(),
+                connected: true,
+                tool_count: client.tools.len(),
+                error: None,
+            })
+            .collect::<Vec<_>>();
+        statuses.extend(self.startup_failures.iter().map(|failure| McpServerStatus {
+            server: failure.server.clone(),
+            connected: false,
+            tool_count: 0,
+            error: Some(failure.error.clone()),
+        }));
+        statuses.sort_by(|left, right| left.server.cmp(&right.server));
+        statuses
+    }
+
     /// Discovers all MCP tools and returns Talos tool adapters.
     pub async fn discover_tools(&self) -> Vec<Arc<dyn AgentTool>> {
         let mut tools: Vec<Arc<dyn AgentTool>> = Vec::new();
 
         for client in &self.clients {
-            match client.dispatcher.list_tools().await {
-                Ok(remote_tools) => {
-                    for original in remote_tools {
-                        let remote = McpRemoteTool {
-                            server: client.dispatcher.server().to_string(),
-                            original,
-                        };
-                        let adapter = McpToolAdapter::new(
-                            remote,
-                            client.dispatcher.clone(),
-                            self.hook_registry.clone(),
-                        );
-                        tools.push(Arc::new(adapter));
-                    }
-                }
-                Err(error) => {
-                    warn!(
-                        server = %client.dispatcher.server(),
-                        %error,
-                        "failed to discover MCP tools"
-                    );
-                }
+            for original in client.tools.clone() {
+                let remote = McpRemoteTool {
+                    server: client.dispatcher.server().to_string(),
+                    original,
+                };
+                let adapter = McpToolAdapter::new(
+                    remote,
+                    client.dispatcher.clone(),
+                    self.hook_registry.clone(),
+                );
+                tools.push(Arc::new(adapter));
             }
         }
 
         tools
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn invalid_server_is_reported_without_failing_manager_startup() {
+        let config = McpClientConfig {
+            servers: vec![McpServerLaunchConfig {
+                name: "broken".to_string(),
+                transport: "stdio".to_string(),
+                command: String::new(),
+                args: Vec::new(),
+                env: HashMap::new(),
+                cwd: None,
+            }],
+        };
+
+        let manager = McpClientManager::start(&config, Arc::new(HookRegistry::new()))
+            .await
+            .expect("manager startup should degrade per server");
+
+        assert!(manager.discover_tools().await.is_empty());
+        assert_eq!(manager.server_statuses().len(), 1);
+        let status = &manager.server_statuses()[0];
+        assert_eq!(status.server, "broken");
+        assert!(!status.connected);
+        assert!(
+            status
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("missing"))
+        );
     }
 }
