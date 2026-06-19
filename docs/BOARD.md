@@ -16,6 +16,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I034 MCP Session Integration | Active | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | Close after startup discovery, permission/provenance/status routing, failure behavior, and real fixture evidence pass |
+| MCP-001 MCP Session Integration | In Progress | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Deliver the I034 startup-stable local stdio MVP without a parallel command registry |
 
 ## Review
 
@@ -39,12 +41,10 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I034 MCP Session Integration | Planned | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | MCP startup discovery, tool registry injection, permission routing, provenance/status |
 | I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
 | SKILL-002 Explicit Runtime Skill Activation | Refinement | [SKILL-002](backlog/active/SKILL-002-explicit-runtime-activation.md) | Resolve context/cache ownership and complete CMD-001 before selecting into a new iteration |
-| MCP-001 MCP Session Integration | Planned | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Discover configured MCP tools at startup; route through permissions and provenance |
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Planned | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input instead of Esc; clean exit prints compact session usage summary |

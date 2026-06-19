@@ -68,7 +68,7 @@ docs/iterations/
 | I031 | Skill And CLI Module Cleanup | **Complete** (2026-06-19) | ARCH-009 skill split and ARCH-010 CLI mode-runner extraction landed; `talos-cli/src/main.rs` is now 241 lines. See `I031-skill-and-cli-module-cleanup.md`. |
 | I032 | Tools Module Cleanup | **Complete** (2026-06-19) | Finished ARCH-010 tools cleanup: `talos-tools/src/file_tools.rs` is now a 108-line shared/re-export module with focused child modules for read, write/edit, delete, and ls. See `I032-tools-module-cleanup.md`. |
 | I033 | Runtime Skill Activation | **Complete** (2026-06-19) | Real `talos` binary regression evidence proves workspace Skill Level 0 metadata reaches the provider request. Level 1/2 execution remains a separate SKILL-002 follow-up. See `I033-runtime-skill-activation.md`. |
-| I034 | MCP Session Integration | **Planned** | Make MCP a first-class session capability: startup discovery, tool registry injection, permission routing, provenance/status, and prompt cache semantics. See `I034-mcp-session-integration.md`. |
+| I034 | MCP Session Integration | **Active** (2026-06-19) | Make MCP a first-class session capability: startup discovery, tool registry injection, permission routing, provenance/status, and prompt cache semantics. See `I034-mcp-session-integration.md`. |
 | I035 | Agent Protocol Compatibility Foundation | **Planned** | Turn AGENT-001 into a dated protocol/config compatibility plan and read/import-first foundation for shared Agent config such as `~/.agent`. See `I035-agent-protocol-compatibility-foundation.md`. |
 | I036 | Research Consolidation | **Planned** | End-of-plan research-only iteration that consolidates REMOTE-001, WEB-001, PLUGIN-001, OKF-001, MEM-005, MODEL-001/002, DIST-001, WEBFETCH-001, and STORE-001 into decisions, ADR candidates, and executable follow-up stories. See `I036-research-consolidation.md`. |
 
@@ -87,7 +87,7 @@ rewrite published iteration baselines.
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Planned | Deferred; scheduling is not the current priority. |
-| I034 | Planned | Baseline preserved; remains the next published feature plan after I033 review unless change control explicitly inserts CMD-001 work. |
+| I034 | Active | I033 and governance prerequisites are complete; execute the preserved startup-stable MCP baseline without expanding into command-registry redesign. |
 | I035 | Planned | Blocked from activation until I034 completes or its research-only fallback is explicitly activated. |
 | I036 | Planned | Deferred to the end of the current plan; no implementation code belongs to this research iteration. |
 

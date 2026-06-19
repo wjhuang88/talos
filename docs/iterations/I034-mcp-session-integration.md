@@ -1,6 +1,13 @@
 # I034: MCP Session Integration
 
-**Status**: Planned
+> Document status: Active
+> Published plan date: 2026-06-19
+> Planned objective: make startup-configured MCP tools a first-class, permission-routed session capability.
+> Baseline rule: preserve startup-stable discovery; mid-session mutation and MCP command publication are out of scope.
+> MVP deliverable: a local stdio MCP tool is model-visible before the first turn, executes through
+> normal permissions, and reports provenance/status with non-fatal startup failure handling.
+
+**Status**: Active (2026-06-19)
 **Target Window**: After I031 or parallel only after Skill startup path is stable
 **Depends On**: ARCH-003/004 complete, I031 preferred
 
@@ -43,4 +50,14 @@ conversation surfaces.
 
 ## Verification Log
 
-(to be filled as stories land)
+2026-06-19 activation:
+
+- I033 and SKILL-001 closed with real-binary runtime evidence; the startup composition prerequisite
+  is satisfied.
+- GOV-002 is complete and both governance validators pass, so no unresolved status conflict blocks
+  activation.
+- Required documentation owners for closure: this iteration, MCP-001, `README.md`, architecture
+  reference if the composition boundary changes, Product Backlog, iterations index, Board, and the
+  confirmed long-task record.
+- Implementation begins with a current-wiring inventory and one bounded startup composition path;
+  no new dependency, public API break, or command registry is authorized by this activation.

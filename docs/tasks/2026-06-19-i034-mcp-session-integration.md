@@ -40,7 +40,7 @@ with provenance/status without crashing when its server is unavailable.
 |---|---|---|---|---|---|---|
 | T1 | Repair GOV-002 legacy iteration state | I010/I012/I016/I017 preserve baselines and have explicit dispositions; Manifest can return conformant | Confirmation | Shell and PowerShell governance validators pass with semantic owner review | If historical evidence conflicts, keep degraded and record the exact unknown; do not guess | Complete |
 | T2 | Close I033 runtime evidence gap | Real `talos` binary output proves workspace Skill Level 0 reaches the provider request | T1 | Deterministic binary/integration test plus I033/README/status sync | If mock diagnostics cannot safely prove it after two approaches, leave I033 Review and stop before I034 | Complete |
-| T3 | Activate I034 baseline | Published baseline gains activation record, MVP, docs list, and prerequisite disposition without target rewrite | T1, T2 | I034, MCP-001, iterations index, and Board agree on Active state | If prerequisites remain unresolved, keep I034 Planned and stop | Planned |
+| T3 | Activate I034 baseline | Published baseline gains activation record, MVP, docs list, and prerequisite disposition without target rewrite | T1, T2 | I034, MCP-001, iterations index, and Board agree on Active state | If prerequisites remain unresolved, keep I034 Planned and stop | Complete |
 | T4 | Inventory and centralize MCP startup composition | One bounded startup integration path replaces mode-specific duplication where needed | T3 | Targeted tests and no `rmcp` DTO leakage/public API break | Preserve existing adapters; register architectural residual instead of broad refactor | Planned |
 | T5 | Discover/register MCP tools before first turn | Configured local MCP tools enter the live ToolRegistry in supported CLI/TUI paths | T4 | Integration tests prove model-visible definitions before first provider call | Restrict first runnable slice to startup-stable local stdio servers and record unsupported modes | Planned |
 | T6 | Enforce permission, provenance, and status routing | MCP calls use normal permission/display flow; `/plugins` reports session MCP state/provenance | T5 | Read/write fixture tests, provenance assertions, no bypass of ADR-006/permission gates | Disable unsupported capability with visible diagnostic | Planned |
@@ -199,4 +199,18 @@ Open risks or deviations: one pre-existing timing-sensitive agent test remains i
 Next task item: T3 activate the preserved I034 baseline and MCP-001
 Recovery or resume instruction: verify this checkpoint and commit, then update I034/MCP-001/index/
 Board to Active before changing MCP runtime code
+```
+
+### Checkpoint 3 - T3 I034 Active
+
+```text
+Completed task items: T3
+Current state and artifacts: I034 Active; MCP-001 In Progress; published objective, baseline rule,
+MVP deliverable, prerequisite disposition, and closure documentation owners recorded
+Commands/checks and actual results: owner docs, Product Backlog, iterations index, Board, Manifest,
+and long-task record synchronized; governance validators and diff check required before commit
+Open risks or deviations: CMD-001 remains separate; no MCP prompt-to-command behavior authorized
+Next task item: T4 inventory current MCP composition and centralize only the duplicated startup seam
+Recovery or resume instruction: commit this activation checkpoint, then read the required ADRs and
+current talos-mcp/CLI composition before editing runtime code
 ```

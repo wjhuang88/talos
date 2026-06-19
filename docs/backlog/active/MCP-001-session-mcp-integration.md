@@ -1,6 +1,6 @@
 # MCP-001: MCP Session Integration
 
-**Status**: Planned
+**Status**: In Progress (I034, 2026-06-19)
 **Priority**: P1
 **Source**: User correction 2026-06-18
 **Depends on**: ARCH-003/004 complete, prompt cache stability, permission pipeline stability
