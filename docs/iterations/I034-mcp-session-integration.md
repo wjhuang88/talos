@@ -1,13 +1,13 @@
 # I034: MCP Session Integration
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-06-19
 > Planned objective: make startup-configured MCP tools a first-class, permission-routed session capability.
 > Baseline rule: preserve startup-stable discovery; mid-session mutation and MCP command publication are out of scope.
 > MVP deliverable: a local stdio MCP tool is model-visible before the first turn, executes through
 > normal permissions, and reports provenance/status with non-fatal startup failure handling.
 
-**Status**: Active (2026-06-19)
+**Status**: Complete (2026-06-19)
 **Target Window**: After I031 or parallel only after Skill startup path is stable
 **Depends On**: ARCH-003/004 complete, I031 preferred
 
@@ -81,3 +81,15 @@ conversation surfaces.
   pre-turn tool definition (`mcp:fixture:echo`, description, and schema).
 - Targeted `cargo check`, tests, clippy with `-D warnings`, fmt check, and diff check pass. Full
   workspace closure remains T9.
+
+2026-06-19 closure:
+
+- `cargo fmt --all -- --check`, `cargo check --workspace`, and
+  `cargo clippy --workspace -- -D warnings` passed.
+- `cargo test --workspace` passed outside the restricted sandbox, including the real MCP fixture,
+  provider listener tests, subprocess failure isolation, and all doctests. The existing
+  timing-sensitive agent interrupt test remains ignored; I034 added no ignored tests.
+- Both governance validators and `git diff --check` passed with 0 warnings/errors.
+- Implementation commit: `ab9f77e`.
+- Accepted residuals: HTTP transport, strict startup mode, and mid-session dynamic tool mutation are
+  outside the published I034 baseline and require separate requirements before implementation.

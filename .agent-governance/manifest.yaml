@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-19"
-status_note: "Governance refresh (2026-06-19): GOV-002 and I033 are complete; I034 is the single active iteration under its confirmed long-running task contract. Validators pass with 0 warnings."
+status_note: "Governance refresh (2026-06-19): GOV-002, I033, and I034 are complete; no iteration is Active. Full workspace and governance gates passed for I034."
 
 governance:
   skill_name: "agent-project-governance"
@@ -66,5 +66,4 @@ migration:
     - "CMD-001: extract the first-class BuiltinCommand registry and restore copy/export through typed owners"
     - "SKILL-002: resolve context/cache ownership, then plan explicit Level 1/2 activation in a new iteration"
     - "SESSION-001: implement atomic interactive new/resume/fork lifecycle after the command registry foundation"
-    - "MCP-001/I034: execute startup-stable MCP discovery, permission, provenance, status, and failure handling"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

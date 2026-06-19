@@ -1,6 +1,6 @@
 # Long-Running Task: I034 MCP Session Integration
 
-> Status: In Progress
+> Status: Complete
 > Created: 2026-06-19
 > Owner iteration: I034 after prerequisite closure
 > Baseline rule: this confirmed task inventory is preserved; unrelated work goes to residuals.
@@ -46,7 +46,7 @@ with provenance/status without crashing when its server is unavailable.
 | T6 | Enforce permission, provenance, and status routing | MCP calls use normal permission/display flow; `/plugins` reports session MCP state/provenance | T5 | Read/write fixture tests, provenance assertions, no bypass of ADR-006/permission gates | Disable unsupported capability with visible diagnostic | Complete |
 | T7 | Define unavailable-server and cache behavior | Startup/mid-session failures degrade visibly; session-stable tool set/cache rules documented | T5 | Failure-path tests and prompt/cache assertions | Default non-strict mode skips failed server; strict-mode work is residual unless already configured | Complete |
 | T8 | End-to-end runtime acceptance | Actual `talos` binary invokes a local MCP fixture and records observable result/provenance | T6, T7 | Binary command exits 0; fixture call/result and status evidence recorded in I034 | Retry twice; if environment-only bind/process restriction occurs, use approved local fallback and record limitation | Complete |
-| T9 | Full closure and delivery | Workspace green, docs/status/retrospective synchronized, residuals owned | T8 | fmt, check, clippy `-D warnings`, workspace tests, both governance validators, diff check | Do not mark Complete; leave Review/Partial with checkpoint and exact failing gate | Planned |
+| T9 | Full closure and delivery | Workspace green, docs/status/retrospective synchronized, residuals owned | T8 | fmt, check, clippy `-D warnings`, workspace tests, both governance validators, diff check | Do not mark Complete; leave Review/Partial with checkpoint and exact failing gate | Complete |
 
 ### Dependencies And Prerequisites
 
@@ -228,4 +228,21 @@ strict startup mode is not configured and was not added
 Next task item: T9 full workspace verification, closure status sync, retrospective, commit, push
 Recovery or resume instruction: review the implementation diff, commit the coherent MCP slice, then
 run the full workspace and governance gates before marking I034 Complete
+```
+
+### Checkpoint 5 - T9 Complete
+
+```text
+Completed task items: T9; long-running task complete
+Current state and artifacts: I034 and MCP-001 Complete; Board/Backlog/index/Manifest synchronized;
+README and architecture describe the delivered stdio MCP session behavior
+Commands/checks and actual results: workspace fmt/check/clippy passed; cargo test --workspace passed
+outside the restricted sandbox; shell and PowerShell governance validators passed with 0 warnings;
+git diff --check passed
+Open risks or deviations: one pre-existing timing-sensitive agent test remains ignored; HTTP,
+strict startup mode, and dynamic mid-session MCP tools remain outside this baseline
+Next task item: none in this task; I035 is the next published iteration, while CMD-001 and SKILL-002
+remain separate backlog owners
+Recovery or resume instruction: verify closure commit and remote branch, then start any next work
+through the normal iteration activation gate
 ```

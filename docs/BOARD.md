@@ -16,8 +16,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I034 MCP Session Integration | Active | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | Close after startup discovery, permission/provenance/status routing, failure behavior, and real fixture evidence pass |
-| MCP-001 MCP Session Integration | In Progress | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Deliver the I034 startup-stable local stdio MVP without a parallel command registry |
 
 ## Review
 
@@ -59,6 +57,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I034 MCP Session Integration | Complete | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | Startup-stable stdio MCP tools, permissions, provenance/status, failure handling, and real fixture evidence all passed |
+| MCP-001 MCP Session Integration | Complete | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Published session integration scope closed in I034; HTTP/dynamic follow-ups require new requirements |
 | I033 Runtime Skill Activation | Complete | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Real-binary request-preview regression proves Level 0 discovery/injection; Level 1/2 activation remains SKILL-002 |
 | SKILL-001 Runtime Skill Activation | Complete | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | Published Level 0 runtime scope verified; explicit body/reference activation remains SKILL-002 |
 | I029 Architecture Cleanup Completion | Complete | [I029 Architecture Cleanup](iterations/I029-architecture-cleanup-completion.md) | ARCH-004/007/006/005 all landed. 10345→2082 lines across 4 god modules (-80%). |

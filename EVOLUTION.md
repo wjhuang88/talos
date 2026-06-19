@@ -35,8 +35,22 @@ repeating known mistakes.
 | 24 | TUI | 流内容应按完整 block 渲染（积累 buffer → finalize 时一次性输出），不要逐行分割 | I023 |
 | 25 | Safety | 外部 C/Native 依赖的 panic 必须 `catch_unwind` 捕获 + 降级，不能静默崩溃 | TUI-006/CODE-001 |
 | 26 | Governance | Partial 状态不能成为静默扩展已发布迭代基线的理由 | I033 |
+| 27 | Safety | 工具装饰器必须透传安全与来源元数据，权限判断不能退化为名称推断 | I034 |
 
 ## Lessons
+
+### 27. 2026-06-19 - 工具装饰器必须透传安全与来源元数据
+
+- Trigger: I034 将 MCP 工具接入所有会话模式时审计现有审批包装器。
+- Symptom: 包装后的 MCP 工具丢失 `ToolProvenance`，且包装器按工具名推断权限；print
+  模式还把未包装的写型 MCP 工具交给只记录 `Ask`、不执行交互批准的 Agent 路径。
+- Root cause: `AgentTool` 装饰器只代理了执行和 schema，没有完整代理 `nature()`、
+  `provenance()`、`summary_fields()` 等策略元数据；权限层把名称启发式当成类型事实。
+- Fix: 两类审批包装器统一按 `evaluate_with_nature(...)` 判定并透传 provenance/summary；
+  所有 MCP 工具先经过对应模式的包装器，headless `Ask` 明确拒绝。
+- Prevention: 新增或修改任何 `AgentTool` 装饰器时，测试必须覆盖执行、`ToolNature`、
+  `ToolProvenance`、summary 字段和 headless `Ask` 行为；不得只测试方法转发。
+- Promoted to rule/check: `crates/talos-cli/src/registry.rs` wrapper tests.
 
 ### 26. 2026-06-19 - Partial 状态不能成为静默扩展已发布迭代基线的理由
 
