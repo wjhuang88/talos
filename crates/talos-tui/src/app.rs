@@ -933,14 +933,12 @@ impl Tui {
         let total_height = stack.total_height(self.terminal.screen_size().width);
 
         if total_height > self.last_total_height && self.last_total_height > 0 {
-            let diff = total_height - self.last_total_height;
             let viewport = self.terminal.viewport_area();
             let screen_h = self.terminal.screen_size().height;
-            let would_overflow = viewport.y.saturating_add(total_height) > screen_h;
-            if would_overflow {
-                for _ in 0..diff {
-                    let _ = self.terminal.insert_history("", None);
-                }
+            let new_bottom = viewport.y.saturating_add(total_height);
+            let overflow = new_bottom.saturating_sub(screen_h);
+            for _ in 0..overflow {
+                let _ = self.terminal.insert_history("", None);
             }
         }
         self.last_total_height = total_height;
