@@ -43,6 +43,26 @@ all at once.
 - Do not change the bash tool's input schema (`BashInput`) or API.
 - Do not change how other tools interact with the bash tool.
 - Do not add a TTY/PTY mode (pseudo-terminal allocation remains out of scope).
+- The rename from `bash` to `sh` and cross-OS native CLI support is tracked
+  separately in TOOL-006; this story should not rename the tool.
+
+## Future: TOOL-006 — Rename to `sh` and Cross-OS Native CLI
+
+The bash tool should eventually be renamed to a more generic name (`sh`) and
+support native command-line invocation across operating systems:
+
+- On **Linux/macOS**: execute via `sh -c <command>` (same as today's `bash`).
+- On **Windows**: execute via `cmd /c <command>` or `powershell -Command <command>`.
+- The tool name should change from `bash` to `sh` to reflect OS-agnostic intent.
+- Backward compatibility: the old `bash` name should remain as a recognized
+  alias during a transition period, with a deprecation notice.
+- The `BashInput` struct, `BashTool` struct, and `BashError` should be renamed
+  to `ShellInput`, `ShellTool`, `ShellError`.
+- `is_read_only()` remains `false`; `nature()` remains `Execute`.
+
+This is tracked as a separate story (**TOOL-006**) to avoid scope creep on
+the streaming output work.  The rename must not ship in the same commit as
+streaming to keep changes auditable.
 
 ## Acceptance Criteria
 
