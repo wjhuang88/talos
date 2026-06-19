@@ -39,7 +39,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
+| I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype import + config precedence specified |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
 | SKILL-002 Explicit Runtime Skill Activation | Refinement | [SKILL-002](backlog/active/SKILL-002-explicit-runtime-activation.md) | Resolve context/cache ownership and complete CMD-001 before selecting into a new iteration |
@@ -47,9 +47,9 @@ acceptance criteria, verification evidence, or iteration state.
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Planned | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input instead of Esc; clean exit prints compact session usage summary |
 | TUI-010 Slash Command Menu Below Input | Planned | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | Typing `/` opens a Codex-like command menu below the composer with filtering and keyboard navigation |
-| CMD-001 Interactive Command Runtime Contract | In Progress | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Extract shared BuiltinCommand registry and restore `/copy`/`/export` through typed owners before exposing more commands |
+| CMD-001 Interactive Command Runtime Contract | Complete | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Shared registry, tool-backed infrastructure, availability predicates, copy/export restored, README synced |
+| I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype `~/.agents/models.json` import + config precedence specified |
 | SESSION-001 Interactive Session Lifecycle | Refinement | [SESSION-001](backlog/active/SESSION-001-interactive-session-lifecycle.md) | Select ready child SESSION-001-A first; expose `/new`, `/resume`, and `/fork` only through later verified children |
-| TUI-001 TUI Completion | Regression Open | [TUI-001](backlog/active/TUI-001-completion.md) | Restore and verify `/copy` and permission-gated `/export`; provenance and `/plugins` remain available |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
 
@@ -96,3 +96,4 @@ acceptance criteria, verification evidence, or iteration state.
 | TOOL-004 Ripgrep Engine Evaluation | Research | [TOOL-004](backlog/active/TOOL-004-ripgrep-engine-evaluation.md) | Timeboxed Spike compares embedded ripgrep crates, external `rg`, and current engine before implementation |
 | MEM-005 Context Compaction Policy | Planned | [MEM-005 Context Compaction Policy](backlog/active/MEM-005-context-compaction-policy.md) | Define automatic/manual compaction triggers, pre-turn ordering, status visibility, and failure fallback |
 | I020 Exploration Library | Planned | [RES-001 Exploration Library](backlog/active/RES-001-exploration-library.md) | Start after I019 or explicit research priority; follow ADR-017 |
+| AGENT-002 dotagentsprotocol Shared Config | Research | [AGENT-002 dotagentsprotocol.com Support](backlog/active/AGENT-002-dotagents-protocol-support.md) | Three sub-areas: A) `models.json` import, B) `skills/` discovery (needs SKILL-002 gate), C) `mcp.json` import (needs server opt-in ADR) |

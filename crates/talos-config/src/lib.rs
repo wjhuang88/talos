@@ -11,6 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
 
+pub mod agents;
 pub mod opencode;
 
 /// Error types for configuration operations.
@@ -486,7 +487,7 @@ fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
 }
 
 /// Returns the user's home directory.
-fn home_dir() -> PathBuf {
+pub(crate) fn home_dir() -> PathBuf {
     if let Some(home) = env::var("HOME").ok().filter(|h| !h.is_empty()) {
         return PathBuf::from(home);
     }

@@ -69,7 +69,7 @@ docs/iterations/
 | I032 | Tools Module Cleanup | **Complete** (2026-06-19) | Finished ARCH-010 tools cleanup: `talos-tools/src/file_tools.rs` is now a 108-line shared/re-export module with focused child modules for read, write/edit, delete, and ls. See `I032-tools-module-cleanup.md`. |
 | I033 | Runtime Skill Activation | **Complete** (2026-06-19) | Real `talos` binary regression evidence proves workspace Skill Level 0 metadata reaches the provider request. Level 1/2 execution remains a separate SKILL-002 follow-up. See `I033-runtime-skill-activation.md`. |
 | I034 | MCP Session Integration | **Complete** (2026-06-19) | Configured stdio MCP tools are discovered before the first turn across normal modes, permission/provenance/status are preserved, and failures degrade with bounded cleanup. See `I034-mcp-session-integration.md`. |
-| I035 | Agent Protocol Compatibility Foundation | **Planned** | Turn AGENT-001 into a dated protocol/config compatibility plan and read/import-first foundation for shared Agent config such as `~/.agent`. See `I035-agent-protocol-compatibility-foundation.md`. |
+| I035 | Agent Protocol Compatibility Foundation | **Complete** (2026-06-19) | Turn AGENT-001 into a dated protocol/config compatibility plan and read/import-first foundation for shared Agent config such as `~/.agents`. See `I035-agent-protocol-compatibility-foundation.md`. |
 | I036 | Research Consolidation | **Planned** | End-of-plan research-only iteration that consolidates REMOTE-001, WEB-001, PLUGIN-001, OKF-001, MEM-005, MODEL-001/002, DIST-001, WEBFETCH-001, and STORE-001 into decisions, ADR candidates, and executable follow-up stories. See `I036-research-consolidation.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
@@ -87,7 +87,7 @@ rewrite published iteration baselines.
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Planned | Deferred; scheduling is not the current priority. |
-| I035 | Planned | Blocked from activation until I034 completes or its research-only fallback is explicitly activated. |
+| I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Planned | Deferred to the end of the current plan; no implementation code belongs to this research iteration. |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
@@ -122,5 +122,5 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R19: Tools Cleanup | ✅ Done (2026-06-19) | `I032-tools-module-cleanup.md`; `../backlog/active/ARCH-010-cli-tools-module-cleanup.md` | `file_tools.rs` split before new tool growth; tool tests/clippy and workspace tests pass. |
 | R20: Runtime Skill Activation | Complete | `I033-runtime-skill-activation.md`; `../backlog/active/SKILL-001-runtime-skill-activation.md` | Real binary request-preview regression proves Level 0 discovery/injection; Level 1/2 execution uses SKILL-002 and a new iteration. |
 | R21: MCP Session Integration | Complete | `I034-mcp-session-integration.md`; `../backlog/active/MCP-001-session-mcp-integration.md` | Startup-stable MCP tools are model-visible, permission/provenance/status routed, and covered by real fixture evidence. |
-| R22: Agent Protocol Compatibility | After R20-R21 or as research-only if implementation slips | `I035-agent-protocol-compatibility-foundation.md`; `../backlog/active/AGENT-001-standard-agent-protocol-support.md`; `../proposals/standard-agent-protocol-support.md` | Dated protocol/config survey, ADR, and read/import-first plan for shared Agent config such as `~/.agent`. |
+| R22: Agent Protocol Compatibility | ✅ Done (2026-06-19) | `I035-agent-protocol-compatibility-foundation.md`; `../backlog/active/AGENT-001-standard-agent-protocol-support.md`; `../proposals/standard-agent-protocol-support.md`; `../decisions/022-agent-config-compatibility-boundary.md` | Survey + ADR-022 + DTOs + prototype `~/.agents/models.json` import landed. |
 | R23: Research Consolidation | End of current one-month plan | `I036-research-consolidation.md`; `../backlog/active/REMOTE-001-remote-session-protocol.md`; `../backlog/active/WEB-001-embedded-web-control-surface.md`; `../backlog/active/PLUGIN-001-wasm-runtime-plugins.md`; `../backlog/active/OKF-001-native-okf-support.md`; `../backlog/active/MEM-005-context-compaction-policy.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md`; `../backlog/active/MODEL-002-local-micro-model-decision-layer.md`; `../backlog/active/DIST-001-optional-runtime-asset-distribution.md`; `../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`; `../backlog/active/STORE-001-zvec-storage-evaluation.md` | Research-heavy items are deduplicated into ADR candidates, deferred decisions, or executable follow-up stories; no implementation code changes. |
