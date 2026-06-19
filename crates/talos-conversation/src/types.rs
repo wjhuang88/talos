@@ -43,6 +43,13 @@ pub struct PluginObservation {
     pub count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillDiagnostic {
+    pub name: String,
+    pub description: String,
+    pub active: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ScrollbackState {
     pub scrolled_line_count: usize,

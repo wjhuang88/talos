@@ -129,6 +129,23 @@ Talos ships with built-in tools for common coding-agent work:
 
 The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a native tool cannot cover the task.
 
+## Skills
+
+Talos discovers `SKILL.md` files at session startup and injects Level 0 metadata
+(skill name, description, and triggers) into the system prompt before the first
+model turn.
+
+Skill search paths, in priority order:
+
+- `.talos/skills/` in the active workspace
+- `~/.talos/skills/`
+- parent `.talos/skills/` directories up to the Git root
+
+Use `/skills` in the TUI to list the runtime-discovered skills. Full skill body
+activation and reference loading are intentionally gated for a later explicit
+activation flow, so large skill content is not dumped into the prompt or history
+by default.
+
 ## Safety Model
 
 - Read-only workspace tools can run without approval.

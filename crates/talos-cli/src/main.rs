@@ -21,6 +21,7 @@ mod provider_setup;
 mod registry;
 mod runtime_adapter;
 mod session_setup;
+mod skill_runtime;
 mod tui_bridge;
 
 use std::io::{self, IsTerminal};

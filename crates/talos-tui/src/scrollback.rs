@@ -178,7 +178,7 @@ impl ViewportComponent for TipsComponent<'_> {
             )))
         } else {
             Text::from(Line::from(Span::styled(
-                " Enter to send, Esc to clear, Ctrl+K skills, Ctrl+E evolution",
+                " Enter to send, Esc to clear, /skills to list skills, Ctrl+E evolution",
                 Style::default().fg(semantic::DIM_TEXT),
             )))
         };

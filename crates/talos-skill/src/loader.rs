@@ -29,41 +29,22 @@ impl SkillLoader {
     /// 2. `~/.talos/skills/` (user-global)
     /// 3. Parent directories up to git root, each with `.talos/skills/`
     pub fn new() -> Self {
-        let mut search_paths = Vec::new();
-
         let cwd = std::env::current_dir().ok();
-        if let Some(ref cwd) = cwd {
-            let project_local = cwd.join(".talos/skills");
-            if project_local.is_dir() {
-                search_paths.push(project_local);
-            }
-        }
-
-        if let Some(home) = home_dir() {
-            let user_global = home.join(".talos/skills");
-            if user_global.is_dir() {
-                search_paths.push(user_global);
-            }
-        }
-
-        if let Some(ref cwd) = cwd {
-            let mut current = cwd.as_path();
-            while let Some(parent) = current.parent() {
-                let git_dir = parent.join(".git");
-                let skills_dir = parent.join(".talos/skills");
-                if git_dir.is_dir() && skills_dir.is_dir() {
-                    search_paths.push(skills_dir);
-                }
-                current = parent;
-                if git_dir.is_dir() {
-                    break;
-                }
-            }
-        }
-
         Self {
             skills: Vec::new(),
-            search_paths,
+            search_paths: default_search_paths(cwd.as_deref()),
+        }
+    }
+
+    /// Creates a new loader with search paths rooted at a specific workspace.
+    ///
+    /// Use this from runtime session startup instead of [`SkillLoader::new`]
+    /// when the process current directory may differ from the active session
+    /// workspace.
+    pub fn for_workspace(workspace_root: impl AsRef<Path>) -> Self {
+        Self {
+            skills: Vec::new(),
+            search_paths: default_search_paths(Some(workspace_root.as_ref())),
         }
     }
 
@@ -165,5 +146,37 @@ fn home_dir() -> Option<PathBuf> {
     #[cfg(not(target_os = "windows"))]
     {
         std::env::var("HOME").ok().map(PathBuf::from)
+    }
+}
+
+fn default_search_paths(workspace_root: Option<&Path>) -> Vec<PathBuf> {
+    let mut search_paths = Vec::new();
+
+    if let Some(root) = workspace_root {
+        push_if_dir(&mut search_paths, root.join(".talos/skills"));
+    }
+
+    if let Some(home) = home_dir() {
+        push_if_dir(&mut search_paths, home.join(".talos/skills"));
+    }
+
+    if let Some(root) = workspace_root {
+        let mut current = root;
+        while let Some(parent) = current.parent() {
+            let git_dir = parent.join(".git");
+            push_if_dir(&mut search_paths, parent.join(".talos/skills"));
+            current = parent;
+            if git_dir.is_dir() {
+                break;
+            }
+        }
+    }
+
+    search_paths
+}
+
+fn push_if_dir(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if path.is_dir() && !paths.iter().any(|existing| existing == &path) {
+        paths.push(path);
     }
 }

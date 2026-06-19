@@ -41,6 +41,7 @@ use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_prompt, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name,
 };
+use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::tui_bridge::run_conversation_loop;
 use crate::{Cli, build_hook_registry, event_loop};
 
@@ -66,15 +67,18 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     };
 
     let hooks = build_hook_registry(true);
+    let workspace_root = PathBuf::from(".");
+    let runtime_skills = discover_runtime_skills(&workspace_root)?;
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
         build_print_tool_registry(),
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
-        PathBuf::from("."),
+        workspace_root,
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    apply_runtime_skills(&mut agent, &runtime_skills);
 
     let server = talos_rpc::RpcServer::new(Arc::new(runtime_adapter::AgentRuntime(agent)));
     server.run_stdio().await
@@ -172,6 +176,8 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())
@@ -288,6 +294,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())
@@ -418,7 +426,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_user_input_tx(user_input_tx);
     tui.set_model_name(config.model.clone());
 
-    let engine = ConversationEngine::new(config.model.clone());
+    let engine =
+        ConversationEngine::new(config.model.clone()).with_skills(runtime_skills.diagnostics());
     let interrupt_tx = handle.sq_tx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
@@ -470,6 +479,8 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())
@@ -759,6 +770,8 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.clone())

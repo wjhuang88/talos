@@ -5,8 +5,8 @@ use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
 use crate::types::{
-    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, TipKind,
-    ToolCallDisplay, ToolResultDisplay, UiOutput,
+    ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, SkillDiagnostic,
+    TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -425,6 +425,7 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/status"));
     assert!(text.contains("/new"));
     assert!(text.contains("/plugins"));
+    assert!(text.contains("/skills"));
     assert!(text.contains("/copy"));
     assert!(text.contains("/export"));
     assert!(text.contains("/mock-request"));
@@ -552,6 +553,39 @@ async fn slash_plugins_empty_shows_no_tools_message() {
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
     assert!(text.contains("No tool provenance observed"));
+}
+
+// ---------------------------------------------------------------------------
+// handle_slash_command: /skills
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn slash_skills_empty_shows_no_skills_message() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/skills");
+
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("No skills available"));
+}
+
+#[tokio::test]
+async fn slash_skills_lists_runtime_skill_metadata() {
+    let mut engine = new_engine().with_skills(vec![SkillDiagnostic {
+        name: "review".to_string(),
+        description: "Review code".to_string(),
+        active: false,
+    }]);
+
+    let outputs = engine.handle_slash_command("/skills");
+
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("Available skills"));
+    assert!(text.contains("review"));
+    assert!(text.contains("Review code"));
+    assert!(text.contains("Level 1 skill bodies"));
 }
 
 // ---------------------------------------------------------------------------

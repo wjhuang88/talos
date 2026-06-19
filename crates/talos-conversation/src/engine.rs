@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, MessageRole, MessageSource, MessageStatus, PluginObservation, ScrollbackState,
-    StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay,
-    UiOutput,
+    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
+    ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -37,6 +37,7 @@ pub struct ConversationEngine {
     pub(crate) model_name: String,
     pub(crate) branch_id: Option<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
+    pub(crate) skills: Vec<SkillDiagnostic>,
     pub(crate) scrollback: ScrollbackState,
     pub(crate) is_processing: bool,
     last_flushed_message: usize,
@@ -54,11 +55,17 @@ impl ConversationEngine {
             model_name,
             branch_id: None,
             plugin_observations: Vec::new(),
+            skills: Vec::new(),
             scrollback: ScrollbackState::default(),
             is_processing: false,
             last_flushed_message: 0,
             stream_tx: None,
         }
+    }
+
+    pub fn with_skills(mut self, skills: Vec<SkillDiagnostic>) -> Self {
+        self.skills = skills;
+        self
     }
 
     pub fn status_snapshot(&self) -> StatusSnapshot {
@@ -255,6 +262,7 @@ impl ConversationEngine {
 [System]   /fork       — Fork current session\n\
 [System]   /vim        — Toggle vim keybindings\n\
 [System]   /plugins    — List observed tool provenance\n\
+[System]   /skills     — List available runtime skills\n\
 [System]   /copy last  — Copy last assistant message\n\
 [System]   /copy all   — Copy full transcript\n\
 [System]   /export <p> — Export transcript to path\n\
@@ -294,6 +302,9 @@ impl ConversationEngine {
             "/plugins" => {
                 outputs.extend(self.handle_plugins_command());
             }
+            "/skills" => {
+                outputs.extend(self.handle_skills_command());
+            }
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
@@ -330,6 +341,32 @@ impl ConversationEngine {
         })]
     }
 
+    fn handle_skills_command(&mut self) -> Vec<UiOutput> {
+        if self.skills.is_empty() {
+            let text = "[System] No skills available.\n".to_string();
+            return vec![UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(stream::once(async move { text })),
+            })];
+        }
+
+        let mut text = String::from("[System] Available skills (Level 0 metadata):\n");
+        for skill in &self.skills {
+            let state = if skill.active { "active" } else { "available" };
+            text.push_str(&format!(
+                "[System]   {} ({state}) — {}\n",
+                skill.name, skill.description,
+            ));
+        }
+        text.push_str(
+            "[System] Level 1 skill bodies and Level 2 references are gated until explicit activation lands.\n",
+        );
+        vec![UiOutput::Stream(StreamMessage {
+            source: MessageSource::System,
+            stream: Box::pin(stream::once(async move { text })),
+        })]
+    }
+
     pub fn drain_steering_queue(&mut self) -> Option<String> {
         if self.steering_queue.is_empty() {
             None
@@ -351,6 +388,7 @@ impl ConversationEngine {
         "/fork",
         "/vim",
         "/plugins",
+        "/skills",
         "/copy",
         "/export",
         MOCK_REQUEST_COMMAND,

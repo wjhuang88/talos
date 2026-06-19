@@ -845,10 +845,6 @@ impl Tui {
                         }
                         return should_exit;
                     }
-                    KeyCode::Char('k') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                        self.state.ctrl_c_state = CtrlCState::Idle;
-                        self.toggle_skill_sidebar();
-                    }
                     KeyCode::Char('e') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.toggle_evolution_panel();

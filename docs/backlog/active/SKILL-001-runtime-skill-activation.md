@@ -1,6 +1,6 @@
 # SKILL-001: Runtime Skill Activation
 
-**Status**: Planned
+**Status**: Partial (Level 0 runtime activation landed 2026-06-19)
 **Priority**: P1
 **Source**: User correction 2026-06-18
 **Depends on**: ARCH-009 preferred, prompt cache stability, session startup flow
@@ -30,22 +30,33 @@ skills in normal CLI/TUI usage.
 
 ## Acceptance Criteria
 
-- [ ] Normal CLI/TUI startup discovers skills and injects Level 0 skill metadata into the system
+- [x] Normal CLI/TUI startup discovers skills and injects Level 0 skill metadata into the system
       prompt.
-- [ ] A session with no skills still renders a clear `No skills available` prompt section.
-- [ ] A session with one valid skill exposes that skill name/description to the model before the
+- [x] A session with no skills still renders a clear `No skills available` prompt section.
+- [x] A session with one valid skill exposes that skill name/description to the model before the
       first turn.
-- [ ] Level 1 skill body activation is implemented or explicitly gated behind a visible command.
-- [ ] Level 2 reference loading is covered by tests.
-- [ ] Bad or duplicate skills do not crash normal startup.
-- [ ] Prompt cache invalidation rules are documented and tested.
-- [ ] User-facing docs explain where to put skills and how Talos activates them.
+- [x] Level 1 skill body activation is implemented or explicitly gated behind a visible command.
+- [x] Level 2 reference loading is covered by tests.
+- [x] Bad or duplicate skills do not crash normal startup.
+- [x] Prompt cache invalidation rules are documented and tested.
+- [x] User-facing docs explain where to put skills and how Talos activates them.
 
 ## Verification Notes
 
 Add targeted tests around discovery, prompt injection, activation, bad skill handling, duplicate
 skill priority, and reference loading. Include at least one CLI or agent integration test proving
 runtime startup wires `SkillLoader` to `Agent::set_skill_index(...)`.
+
+2026-06-19 implementation notes:
+
+- Runtime startup now discovers workspace skills and injects Level 0 metadata before the first
+  turn in RPC, print, TUI, inline, and legacy interactive modes.
+- `/skills` is the visible diagnostic and Level 1/2 gate. It lists available Level 0 metadata and
+  explains that full bodies/references require a future explicit activation flow.
+- The existing `SkillSidebar` was not used for this work because it is not currently rendered in
+  the TUI layout.
+- Prompt cache semantics: the skill set is session-start stable. Changing skill files requires
+  rebuilding the session/runtime to refresh the stable prompt prefix.
 
 ## Required Reads
 

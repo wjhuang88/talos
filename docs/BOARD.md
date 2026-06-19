@@ -39,12 +39,12 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I033 Runtime Skill Activation | Planned | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Discover skills at startup; inject Level 0 metadata; define Level 1/2 activation |
+| I033 Runtime Skill Activation | Partial | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Level 0 runtime discovery/injection landed; Level 1/2 explicit activation remains follow-up |
 | I034 MCP Session Integration | Planned | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | MCP startup discovery, tool registry injection, permission routing, provenance/status |
 | I035 Agent Protocol Compatibility Foundation | Planned | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR + read/import-first shared Agent config plan |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
-| SKILL-001 Runtime Skill Activation | Planned | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | Discover skills at startup; inject Level 0 metadata; define Level 1/2 activation |
+| SKILL-001 Runtime Skill Activation | Partial | [SKILL-001](backlog/active/SKILL-001-runtime-skill-activation.md) | `/skills` lists Level 0 metadata; full body/reference activation remains explicitly gated |
 | MCP-001 MCP Session Integration | Planned | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Discover configured MCP tools at startup; route through permissions and provenance |
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
