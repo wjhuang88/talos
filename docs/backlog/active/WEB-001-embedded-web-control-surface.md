@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Story ID | WEB-001 |
-| Priority | P4 (Future Research) |
+| Priority | P3 (elevated from P4, 2026-06-20 — expanded to include project management UI via GOV-003) |
 | Status | Research |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
@@ -40,6 +40,21 @@ a replacement.
 See `docs/proposals/embedded-web-control-surface.md` for the full design space (framework choice,
 UI toolchain vs Node.js build constraint, realtime transport, lifecycle, auth, and WEB-001 vs
 REMOTE-001 handler convergence).
+
+## Project Management UI (GOV-003 integration)
+
+Beyond the status/log/config pages, the web dashboard should expose project
+management views backed by GOV-003's built-in governance logic:
+
+- **Iteration Board**: Kanban-style view of active iteration stories
+  (columns: Planned / In Progress / Review / Complete)
+- **Product Backlog**: Filterable table with priority, status, dependencies
+- **ADR Index**: Decision records with status and dates
+- **Validation Status**: Governance harness check results
+
+These pages read from the same `docs/` sources as GOV-003's context injection
+layer — single source of truth, no duplication. See GOV-003 for the
+governance state model and data sources.
 
 ## Required Reads
 

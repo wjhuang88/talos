@@ -104,3 +104,5 @@ acceptance criteria, verification evidence, or iteration state.
 | MEM-005 Context Compaction Policy | Planned | [MEM-005 Context Compaction Policy](backlog/active/MEM-005-context-compaction-policy.md) | Define automatic/manual compaction triggers, pre-turn ordering, status visibility, and failure fallback |
 | I020 Exploration Library | Planned | [RES-001 Exploration Library](backlog/active/RES-001-exploration-library.md) | Start after I019 or explicit research priority; follow ADR-017 |
 | AGENT-002 dotagentsprotocol Shared Config | Research | [AGENT-002 dotagentsprotocol.com Support](backlog/active/AGENT-002-dotagents-protocol-support.md) | Three sub-areas: A) `models.json` import, B) `skills/` discovery (needs SKILL-002 gate), C) `mcp.json` import (needs server opt-in ADR) |
+| WEB-001 Embedded Web Control | Research (→ P3) | [WEB-001](backlog/active/WEB-001-embedded-web-control-surface.md) | Loopback HTTP + status/SSE + project management UI (GOV-003)
+| GOV-003 Built-in Project Governance | Planned | [GOV-003](backlog/active/GOV-003-builtin-project-governance.md) | Phase 1: context injection; Phase 2: gate enforcement; Phase 3: PM web UI
