@@ -394,9 +394,16 @@ impl WebSearchTool {
             output.push_str(&format!("{}. {}\n", i + 1, result.title));
             output.push_str(&format!("   {}\n", result.url));
             if include_snippets && !result.snippet.is_empty() {
-                // Truncate long snippets.
+                // Truncate long snippets at UTF-8 character boundary.
                 let snippet = if result.snippet.len() > 300 {
-                    format!("{}…", &result.snippet[..300])
+                    let boundary = result
+                        .snippet
+                        .char_indices()
+                        .take_while(|(i, _)| *i < 300)
+                        .map(|(i, c)| i + c.len_utf8())
+                        .last()
+                        .unwrap_or(300);
+                    format!("{}…", &result.snippet[..boundary])
                 } else {
                     result.snippet.clone()
                 };
@@ -427,7 +434,7 @@ fn urlencoding(s: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 encoded.push(byte as char);
             }
-            b' ' => encoded.push('+'),
+            b' ' => encoded.push_str("%20"),
             _ => {
                 encoded.push_str(&format!("%{:02X}", byte));
             }
@@ -491,6 +498,16 @@ impl AgentTool for WebSearchTool {
         let (results, source) = self
             .execute_search(&parsed.query, max_results, parsed.include_snippets)
             .await;
+
+        if results.is_empty() {
+            return ToolResult::error(
+                WebSearchError::AllBackendsFailed(format!(
+                    "no results found for query \"{}\"",
+                    parsed.query
+                ))
+                .to_string(),
+            );
+        }
 
         let output = self.format_results(&parsed.query, &results, source, parsed.include_snippets);
         ToolResult::success(output)
@@ -595,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_urlencoding_basic() {
-        assert_eq!(urlencoding("hello world"), "hello+world");
+        assert_eq!(urlencoding("hello world"), "hello%20world");
     }
 
     #[test]

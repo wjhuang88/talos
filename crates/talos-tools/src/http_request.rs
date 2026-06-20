@@ -5,6 +5,7 @@
 //! limits, SSRF protection, and redirect control.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -76,6 +77,47 @@ const DEFAULT_REDIRECT_LIMIT: usize = 5;
 /// Default request timeout in seconds.
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
 
+/// Headers that must not be overridden by user input.
+const BLOCKED_HEADERS: &[&str] = &[
+    "host",
+    "authorization",
+    "cookie",
+    "proxy-authorization",
+    "content-length",
+    "transfer-encoding",
+    "expect",
+];
+
+/// Sanitize user-supplied headers. Rejects blocked headers and headers
+/// containing CR/LF to prevent header injection.
+fn sanitize_headers(headers: Option<&HashMap<String, String>>) -> Option<HashMap<String, String>> {
+    let headers = headers?;
+    if headers.is_empty() {
+        return None;
+    }
+
+    let blocked: HashSet<&str> = BLOCKED_HEADERS.iter().copied().collect();
+    let mut sanitized = HashMap::new();
+
+    for (key, value) in headers {
+        let key_lower = key.to_lowercase();
+        if blocked.contains(key_lower.as_str()) {
+            continue;
+        }
+        if key.contains('\r') || key.contains('\n') || value.contains('\r') || value.contains('\n')
+        {
+            continue;
+        }
+        sanitized.insert(key.clone(), value.clone());
+    }
+
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
+}
+
 /// A tool that executes HTTP requests with SSRF protection and size limits.
 ///
 /// Requests are routed through `reqwest` with `rustls` TLS (no native
@@ -115,6 +157,12 @@ impl HttpRequestTool {
     /// Perform the pre-request SSRF check by resolving the host and
     /// verifying that none of the resolved addresses are private or
     /// reserved.
+    ///
+    /// **Limitation**: DNS resolution occurs before the actual HTTP request.
+    /// A DNS rebinding attack could re-resolve to a private IP between this
+    /// check and `reqwest`'s own resolution. For the agent-tool threat model
+    /// (user controls which URLs are fetched), this is an acceptable tradeoff.
+    /// In a server-exposed context, use network-layer enforcement instead.
     async fn check_ssrf(&self, host: &str) -> Result<(), String> {
         // Try to parse as a bare IP address first.
         if let Ok(ip) = host.parse::<IpAddr>() {
@@ -163,8 +211,8 @@ impl HttpRequestTool {
             other => return Err(format!("unsupported HTTP method: {other}")),
         };
 
-        // Apply optional headers.
-        if let Some(ref headers) = input.headers {
+        // Apply sanitized headers only.
+        if let Some(ref headers) = sanitize_headers(input.headers.as_ref()) {
             for (key, value) in headers {
                 req = req.header(key.as_str(), value.as_str());
             }
