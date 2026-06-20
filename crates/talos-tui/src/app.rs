@@ -20,7 +20,7 @@ use crate::inline_terminal::{
     ComponentStack, HistoryAttrs, HistorySegment, InlineTerminal, ViewportComponent,
 };
 use crate::sidebar::{SkillInfo, SkillSidebar};
-use crate::state::{ApprovalState, CtrlCState, SlashMenuState, Tip, TuiState};
+use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
 use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
 use crate::theme::{semantic, to_crossterm_color};
 
@@ -531,11 +531,7 @@ impl Tui {
     }
 
     pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
-        self.state.approval_state = ApprovalState::Visible {
-            tool_name: tool_name.to_string(),
-            arguments: arguments.to_string(),
-            selected: ApprovalChoice::ApproveOnce,
-        };
+        self.state.activate_approval(tool_name, arguments);
         let warn = to_crossterm_color(semantic::TEXT_WARNING);
         let accent = to_crossterm_color(semantic::TEXT_ACCENT);
         let args_short = crate::tool_display::truncate_single_line(arguments, 80);
@@ -562,6 +558,46 @@ impl Tui {
 
     pub fn hide_approval(&mut self) {
         self.state.approval_state = ApprovalState::Hidden;
+    }
+
+    fn handle_pending_approval_input(&mut self, key: KeyCode) {
+        let KeyCode::Char(c) = key else {
+            return;
+        };
+        let Some(choice) = self.handle_approval_key(c) else {
+            return;
+        };
+        let (icon, color, msg) = match &choice {
+            ApprovalChoice::ApproveOnce => {
+                ("✓", to_crossterm_color(semantic::TEXT_SUCCESS), "approved")
+            }
+            ApprovalChoice::AlwaysApprove => (
+                "✓",
+                to_crossterm_color(semantic::TEXT_SUCCESS),
+                "always approved",
+            ),
+            ApprovalChoice::Deny => ("✗", to_crossterm_color(semantic::TEXT_ERROR), "denied"),
+        };
+        self.pending_scrollback.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("   {icon} {msg}"),
+                color,
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+        let _ = self.flush_pending_scrollback();
+
+        if let Some(response_tx) = self.state.pending_approval_response.take() {
+            let _ = response_tx.send(choice);
+        }
+        self.hide_approval();
+        self.state.tip = Some(Tip {
+            kind: TipKind::ApprovalResult,
+            text: format!("Tool call {msg}"),
+            ttl: Duration::from_secs(2),
+            created_at: Instant::now(),
+        });
     }
 
     pub async fn run(&mut self) -> io::Result<()> {
@@ -913,22 +949,59 @@ impl Tui {
         };
         let input_pad_top = crate::scrollback::InputPadComponent;
         let input = crate::scrollback::InputComponent { state };
-        let slash_menu = crate::scrollback::SlashMenuComponent {
+        let query = state.slash_query();
+        let mut slash_menu = crate::scrollback::SlashMenuComponent {
             menu: &state.slash_menu,
+            query,
+            max_height: u16::MAX,
         };
         let input_pad_bot = crate::scrollback::InputPadComponent;
         let status_comp = crate::scrollback::StatusComponent { status };
 
-        let stack = ComponentStack::new(vec![
-            &preview,
-            &queue,
-            &tips,
-            &input_pad_top,
-            &input,
-            &slash_menu,
-            &input_pad_bot,
-            &status_comp,
-        ]);
+        let screen_size = self.terminal.screen_size();
+        let width = screen_size.width;
+        let base_height = preview.height_hint(width)
+            + queue.height_hint(width)
+            + tips.height_hint(width)
+            + input_pad_top.height_hint(width)
+            + input.height_hint(width)
+            + input_pad_bot.height_hint(width)
+            + status_comp.height_hint(width);
+        let natural_menu_height = slash_menu.height_hint(width);
+        let menu_placement = crate::scrollback::slash_menu_placement(
+            screen_size.height,
+            base_height,
+            natural_menu_height,
+        );
+        if matches!(
+            menu_placement,
+            crate::scrollback::SlashMenuPlacement::AboveInput
+        ) {
+            slash_menu.max_height = screen_size.height.saturating_sub(base_height);
+        }
+
+        let stack = match menu_placement {
+            crate::scrollback::SlashMenuPlacement::AboveInput => ComponentStack::new(vec![
+                &preview,
+                &queue,
+                &tips,
+                &slash_menu,
+                &input_pad_top,
+                &input,
+                &input_pad_bot,
+                &status_comp,
+            ]),
+            crate::scrollback::SlashMenuPlacement::BelowInput => ComponentStack::new(vec![
+                &preview,
+                &queue,
+                &tips,
+                &input_pad_top,
+                &input,
+                &slash_menu,
+                &input_pad_bot,
+                &status_comp,
+            ]),
+        };
 
         let total_height = stack.total_height(self.terminal.screen_size().width);
 
@@ -951,10 +1024,16 @@ impl Tui {
         {
             let viewport = self.terminal.viewport_area();
             let screen_w = self.terminal.screen_size().width;
-            let input_y_offset: u16 = preview.height_hint(screen_w)
+            let mut input_y_offset: u16 = preview.height_hint(screen_w)
                 + queue.height_hint(screen_w)
                 + tips.height_hint(screen_w)
                 + input_pad_top.height_hint(screen_w);
+            if matches!(
+                menu_placement,
+                crate::scrollback::SlashMenuPlacement::AboveInput
+            ) {
+                input_y_offset += slash_menu.height_hint(screen_w);
+            }
             let input_top = viewport.bottom().saturating_sub(total_height) + input_y_offset;
             let byte_pos = self.state.cursor_byte_pos();
             let (cursor_row_offset, cursor_col_offset) =
@@ -971,6 +1050,10 @@ impl Tui {
         match event {
             Event::Key(key) => {
                 if key.kind != KeyEventKind::Press {
+                    return false;
+                }
+                if !matches!(self.state.approval_state, ApprovalState::Hidden) {
+                    self.handle_pending_approval_input(key.code);
                     return false;
                 }
                 match key.code {
@@ -1000,78 +1083,31 @@ impl Tui {
                         self.toggle_evolution_panel();
                     }
                     KeyCode::Up if self.state.slash_menu.is_open => {
-                        self.state.slash_menu.select_prev();
+                        let query = self.state.slash_query().to_string();
+                        self.state.slash_menu.select_prev(&query);
                     }
                     KeyCode::Down if self.state.slash_menu.is_open => {
-                        self.state.slash_menu.select_next();
+                        let query = self.state.slash_query().to_string();
+                        self.state.slash_menu.select_next(&query);
                     }
                     KeyCode::Tab if self.state.slash_menu.is_open => {
-                        if let Some(cmd) = self.state.slash_menu.selected_command() {
-                            self.state.input_insert_command(&cmd);
-                        }
-                        self.state.slash_menu.close();
+                        self.state.accept_selected_slash_command();
                     }
                     KeyCode::Enter if self.state.slash_menu.is_open => {
-                        if let Some(cmd) = self.state.slash_menu.selected_command() {
-                            self.state.input_insert_command(&cmd);
-                        }
-                        self.state.slash_menu.close();
+                        self.state.accept_selected_slash_command();
                     }
                     KeyCode::Esc if self.state.slash_menu.is_open => {
                         self.state.slash_menu.close();
                     }
-                    KeyCode::Char(c)
-                        if !matches!(self.state.approval_state, ApprovalState::Hidden) =>
-                    {
-                        if let Some(choice) = self.handle_approval_key(c) {
-                            let (icon, color, msg) = match &choice {
-                                ApprovalChoice::ApproveOnce => {
-                                    ("✓", to_crossterm_color(semantic::TEXT_SUCCESS), "approved")
-                                }
-                                ApprovalChoice::AlwaysApprove => (
-                                    "✓",
-                                    to_crossterm_color(semantic::TEXT_SUCCESS),
-                                    "always approved",
-                                ),
-                                ApprovalChoice::Deny => {
-                                    ("✗", to_crossterm_color(semantic::TEXT_ERROR), "denied")
-                                }
-                            };
-                            self.pending_scrollback.push(ScrollbackLine::styled(
-                                vec![HistorySegment::styled(
-                                    format!("   {icon} {msg}"),
-                                    color,
-                                    HistoryAttrs::default(),
-                                )],
-                                None,
-                            ));
-                            let _ = self.flush_pending_scrollback();
-
-                            if let Some(response_tx) = self.state.pending_approval_response.take() {
-                                let _ = response_tx.send(choice.clone());
-                            }
-                            self.hide_approval();
-                            self.state.tip = Some(Tip {
-                                kind: TipKind::ApprovalResult,
-                                text: format!("Tool call {}", msg),
-                                ttl: Duration::from_secs(2),
-                                created_at: Instant::now(),
-                            });
-                        }
-                    }
-                    KeyCode::Char('/')
-                        if self.state.input_buffer.is_empty()
-                            && matches!(self.state.approval_state, ApprovalState::Hidden) =>
-                    {
+                    KeyCode::Char('/') if self.state.input_buffer.is_empty() => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         let registry = talos_conversation::command_registry();
-                        self.state.slash_menu = SlashMenuState::open(registry);
+                        self.state.open_slash_menu(registry);
                     }
                     KeyCode::Char(c) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         if self.state.slash_menu.is_open {
-                            self.state.slash_menu.filter_text.push(c);
-                            self.state.slash_menu.selected_index = 0;
+                            self.state.append_slash_query_char(c);
                         } else {
                             self.state.input_append_char(c);
                         }
@@ -1079,9 +1115,10 @@ impl Tui {
                     KeyCode::Backspace => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         if self.state.slash_menu.is_open {
-                            self.state.slash_menu.close();
+                            self.state.backspace_slash_query();
+                        } else {
+                            self.state.input_backspace();
                         }
-                        self.state.input_backspace();
                     }
                     KeyCode::Left => {
                         self.state.ctrl_c_state = CtrlCState::Idle;

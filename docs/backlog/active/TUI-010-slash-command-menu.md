@@ -100,6 +100,24 @@ follow-up integration point, not required for the first slash menu slice.
 - [x] TUI tests cover opening, filtering, selection, cancellation, placement
       fallback, and disabled/hidden command states.
 
+## Post-Completion Review
+
+The 2026-06-20 review reopened the completed implementation because its first closure claim was
+not supported by end-to-end interaction and geometry coverage. The repair established these
+invariants:
+
+- The composer buffer is the single source of truth for `/` query text; filtering has no hidden
+  duplicate input state.
+- `Backspace` edits the visible query, and commands with arguments complete with a trailing space.
+- A new Approval request closes the menu, and pending Approval input has priority over menu and
+  composer keys.
+- Placement is deterministic: full menus prefer below-input; insufficient terminal height moves
+  the menu above the composer and caps it to the remaining rows.
+- Menu height matches rendered rows instead of reserving an unused line.
+
+Validation and closure evidence are recorded in
+`docs/iterations/I037-slash-command-menu.md`.
+
 ## Required Reads
 
 - `docs/backlog/active/TUI-002-codex-overhaul.md`

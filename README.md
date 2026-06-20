@@ -117,6 +117,13 @@ Use the mock provider for deterministic local smoke tests:
 talos -p --mock "/mock-request summarize this repository"
 ```
 
+### Interactive Commands
+
+In the interactive TUI, type `/` at the start of the composer to open the command menu. Continue
+typing to filter commands, use `Up`/`Down` to move the selection, and press `Enter` or `Tab` to
+complete it. `Backspace` edits the filter and `Esc` closes the menu without clearing the composer.
+Use `/help` to list the commands available in the current session.
+
 ## Built-In Capabilities
 
 Talos ships with built-in tools for common coding-agent work:

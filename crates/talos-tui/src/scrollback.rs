@@ -236,6 +236,39 @@ impl ViewportComponent for StatusComponent<'_> {
 
 pub(crate) struct SlashMenuComponent<'a> {
     pub(crate) menu: &'a crate::state::SlashMenuState,
+    pub(crate) query: &'a str,
+    pub(crate) max_height: u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SlashMenuPlacement {
+    AboveInput,
+    BelowInput,
+}
+
+pub(crate) const fn slash_menu_placement(
+    screen_height: u16,
+    base_height: u16,
+    menu_height: u16,
+) -> SlashMenuPlacement {
+    if base_height.saturating_add(menu_height) <= screen_height {
+        SlashMenuPlacement::BelowInput
+    } else {
+        SlashMenuPlacement::AboveInput
+    }
+}
+
+pub(crate) fn slash_menu_rows(total: usize, area_height: u16) -> (usize, bool, bool) {
+    let show_separator = area_height >= 2;
+    let row_capacity = area_height.saturating_sub(u16::from(show_separator)) as usize;
+    let initial_visible = total
+        .min(crate::state::SLASH_MENU_MAX_VISIBLE)
+        .min(row_capacity);
+    let show_indicator = total > initial_visible && row_capacity >= 2;
+    let visible = total
+        .min(crate::state::SLASH_MENU_MAX_VISIBLE)
+        .min(row_capacity.saturating_sub(usize::from(show_indicator)));
+    (visible, show_separator, show_indicator)
 }
 
 impl ViewportComponent for SlashMenuComponent<'_> {
@@ -243,9 +276,15 @@ impl ViewportComponent for SlashMenuComponent<'_> {
         if !self.menu.is_open {
             return 0;
         }
-        let filtered = self.menu.filtered_items().len();
-        let visible = filtered.min(crate::state::SLASH_MENU_MAX_VISIBLE);
-        (visible as u16) + 2
+        let filtered = self.menu.filtered_items(self.query).len();
+        let natural_height = if filtered == 0 {
+            1
+        } else {
+            let visible = filtered.min(crate::state::SLASH_MENU_MAX_VISIBLE) as u16;
+            let indicator = u16::from(filtered > crate::state::SLASH_MENU_MAX_VISIBLE);
+            1 + visible + indicator
+        };
+        natural_height.min(self.max_height)
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
@@ -253,7 +292,11 @@ impl ViewportComponent for SlashMenuComponent<'_> {
             return;
         }
 
-        let filtered = self.menu.filtered_items();
+        if area.height == 0 {
+            return;
+        }
+
+        let filtered = self.menu.filtered_items(self.query);
         if filtered.is_empty() {
             let dim = Style::default().fg(semantic::DIM_TEXT);
             let text = Line::from(Span::styled(" No matching commands", dim));
@@ -264,9 +307,8 @@ impl ViewportComponent for SlashMenuComponent<'_> {
             return;
         }
 
-        let max_visible = crate::state::SLASH_MENU_MAX_VISIBLE;
         let total = filtered.len();
-        let visible = total.min(max_visible);
+        let (visible, show_separator, show_indicator) = slash_menu_rows(total, area.height);
 
         let scroll_offset = if self.menu.selected_index >= visible {
             self.menu.selected_index - visible + 1
@@ -280,12 +322,12 @@ impl ViewportComponent for SlashMenuComponent<'_> {
             .fg(semantic::TEXT_ACCENT)
             .bg(semantic::NORD2);
 
-        let mut lines: Vec<Line<'static>> = Vec::with_capacity(visible + 1);
+        let mut lines: Vec<Line<'static>> = Vec::with_capacity(area.height as usize);
 
-        lines.push(Line::from(Span::styled(
-            " ────────────────────────────────────────────────",
-            dim,
-        )));
+        if show_separator {
+            let separator = format!(" {}", "─".repeat(area.width.saturating_sub(1) as usize));
+            lines.push(Line::from(Span::styled(separator, dim)));
+        }
 
         for i in 0..visible {
             let idx = scroll_offset + i;
@@ -295,10 +337,11 @@ impl ViewportComponent for SlashMenuComponent<'_> {
             let item = filtered[idx];
             let is_selected = idx == self.menu.selected_index;
 
+            let command_name = item.name.strip_prefix('/').unwrap_or(&item.name);
             let name = if let Some(ref hint) = item.arg_hint {
-                format!("  /{} {}", &item.name[1..], hint)
+                format!("  /{command_name} {hint}")
             } else {
-                format!("  /{}", &item.name[1..])
+                format!("  /{command_name}")
             };
 
             let desc = format!("  —  {}", item.description);
@@ -314,7 +357,7 @@ impl ViewportComponent for SlashMenuComponent<'_> {
             }
         }
 
-        if total > max_visible {
+        if show_indicator {
             let indicator = format!("  … {}/{}", scroll_offset + visible, total);
             lines.push(Line::from(Span::styled(indicator, dim)));
         }

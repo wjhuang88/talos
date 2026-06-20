@@ -46,7 +46,6 @@ acceptance criteria, verification evidence, or iteration state.
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Complete | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input; Esc no longer clears composer; exit prints session summary with model, duration, turns, tokens, cost |
-| TUI-010 Slash Command Menu Below Input | Complete (I037) | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | `/` opens Codex-style command menu; CMD-001 registry; filter + navigate + Esc close |
 | TUI-011 Status Bar & Exit Output Polish | Planned | [TUI-011 Status Bar & Exit Output Polish](backlog/active/TUI-011-status-bar-exit-polish.md) | Redesign status bar (model│progress│metrics) + polish exit summary with branded header and human-readable numbers |
 | CMD-001 Interactive Command Runtime Contract | Complete | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Shared registry, tool-backed infrastructure, availability predicates, copy/export restored, README synced |
 | I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype `~/.agents/models.json` import + config precedence specified |
@@ -58,6 +57,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I037 Slash Command Menu | Complete | [I037 Slash Command Menu](iterations/I037-slash-command-menu.md) | Post-completion review repaired composer-backed filtering, Approval priority, deterministic height fallback, tests, and documentation sync |
+| TUI-010 Slash Command Menu Below Input | Complete | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | All acceptance paths covered by 120 TUI tests; workspace quality gates pass |
 | I034 MCP Session Integration | Complete | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | Startup-stable stdio MCP tools, permissions, provenance/status, failure handling, and real fixture evidence all passed |
 | MCP-001 MCP Session Integration | Complete | [MCP-001](backlog/active/MCP-001-session-mcp-integration.md) | Published session integration scope closed in I034; HTTP/dynamic follow-ups require new requirements |
 | I033 Runtime Skill Activation | Complete | [I033 Runtime Skill Activation](iterations/I033-runtime-skill-activation.md) | Real-binary request-preview regression proves Level 0 discovery/injection; Level 1/2 activation remains SKILL-002 |

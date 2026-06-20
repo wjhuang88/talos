@@ -117,6 +117,12 @@ talos --workspace /path/to/project "analyze the current architecture"
 talos -p --mock "/mock-request summarize this repository"
 ```
 
+### 交互命令
+
+在交互式 TUI 中，于输入区开头键入 `/` 即可打开命令菜单。继续输入可筛选命令，使用
+`Up`/`Down` 移动选项，按 `Enter` 或 `Tab` 完成命令。`Backspace` 编辑筛选内容，`Esc`
+关闭菜单但保留输入区文本。使用 `/help` 可以查看当前会话可用的命令。
+
 ## 内置能力
 
 Talos 自带一组面向编码 Agent 工作流的工具：

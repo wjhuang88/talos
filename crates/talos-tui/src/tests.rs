@@ -7,8 +7,10 @@ mod tests {
     use talos_core::ApprovalChoice;
     use talos_core::message::Usage;
 
+    use crate::inline_terminal::ViewportComponent;
     use crate::scrollback::{
-        build_input_text, build_status_text, calculate_cost, cursor_line_col, input_line_count,
+        SlashMenuComponent, SlashMenuPlacement, build_input_text, build_status_text,
+        calculate_cost, cursor_line_col, input_line_count, slash_menu_placement, slash_menu_rows,
         stream_padding_for,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
@@ -370,7 +372,6 @@ mod tests {
         assert!(!menu.is_open);
         assert!(menu.items.is_empty());
         assert_eq!(menu.selected_index, 0);
-        assert!(menu.filter_text.is_empty());
     }
 
     #[test]
@@ -386,8 +387,7 @@ mod tests {
     fn test_slash_menu_filters_by_name() {
         let registry = talos_conversation::command_registry();
         let mut menu = SlashMenuState::open(registry);
-        menu.filter_text.push_str("help");
-        let filtered = menu.filtered_items();
+        let filtered = menu.filtered_items("help");
         assert!(!filtered.is_empty());
         assert!(filtered.iter().any(|item| item.name == "/help"));
     }
@@ -396,8 +396,7 @@ mod tests {
     fn test_slash_menu_filters_by_description() {
         let registry = talos_conversation::command_registry();
         let mut menu = SlashMenuState::open(registry);
-        menu.filter_text.push_str("exit");
-        let filtered = menu.filtered_items();
+        let filtered = menu.filtered_items("exit");
         assert!(!filtered.is_empty());
         assert!(
             filtered
@@ -410,13 +409,13 @@ mod tests {
     fn test_slash_menu_selection_wraps() {
         let registry = talos_conversation::command_registry();
         let mut menu = SlashMenuState::open(registry);
-        let len = menu.filtered_items().len();
+        let len = menu.filtered_items("").len();
         assert!(len > 0);
 
-        menu.select_prev();
+        menu.select_prev("");
         assert_eq!(menu.selected_index, len - 1);
 
-        menu.select_next();
+        menu.select_next("");
         assert_eq!(menu.selected_index, 0);
     }
 
@@ -424,7 +423,7 @@ mod tests {
     fn test_slash_menu_selected_command_returns_name() {
         let registry = talos_conversation::command_registry();
         let mut menu = SlashMenuState::open(registry);
-        let cmd = menu.selected_command();
+        let cmd = menu.selected_completion("");
         assert!(cmd.is_some());
         assert!(cmd.unwrap().starts_with('/'));
     }
@@ -433,23 +432,20 @@ mod tests {
     fn test_slash_menu_close_clears_state() {
         let registry = talos_conversation::command_registry();
         let mut menu = SlashMenuState::open(registry);
-        menu.filter_text.push_str("test");
-        menu.select_next();
+        menu.select_next("");
         menu.close();
         assert!(!menu.is_open);
         assert!(menu.items.is_empty());
         assert_eq!(menu.selected_index, 0);
-        assert!(menu.filter_text.is_empty());
     }
 
     #[test]
     fn test_slash_menu_no_match_returns_empty() {
         let registry = talos_conversation::command_registry();
-        let mut menu = SlashMenuState::open(registry);
-        menu.filter_text.push_str("zzzznonexistent");
-        let filtered = menu.filtered_items();
+        let menu = SlashMenuState::open(registry);
+        let filtered = menu.filtered_items("zzzznonexistent");
         assert!(filtered.is_empty());
-        assert!(menu.selected_command().is_none());
+        assert!(menu.selected_completion("zzzznonexistent").is_none());
     }
 
     #[test]
@@ -461,5 +457,87 @@ mod tests {
         };
         assert_eq!(item.name, "/export");
         assert_eq!(item.arg_hint, Some("<path>".to_string()));
+    }
+
+    #[test]
+    fn test_slash_menu_query_is_visible_and_backspace_edits_it() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        state.append_slash_query_char('h');
+        state.append_slash_query_char('e');
+        assert_eq!(state.input_buffer, "/he");
+        assert_eq!(state.slash_query(), "he");
+
+        state.backspace_slash_query();
+        assert_eq!(state.input_buffer, "/h");
+        assert!(state.slash_menu.is_open);
+        state.backspace_slash_query();
+        state.backspace_slash_query();
+        assert!(state.input_buffer.is_empty());
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_slash_menu_accepts_argument_command_with_space() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "export".chars() {
+            state.append_slash_query_char(ch);
+        }
+        state.accept_selected_slash_command();
+        assert_eq!(state.input_buffer, "/export ");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_approval_activation_closes_slash_menu() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        state.activate_approval("bash", "command: cargo test");
+        assert!(!state.slash_menu.is_open);
+        assert!(matches!(
+            state.approval_state,
+            ApprovalState::Visible { .. }
+        ));
+    }
+
+    #[test]
+    fn test_slash_menu_placement_prefers_below_and_falls_back_above() {
+        assert_eq!(
+            slash_menu_placement(24, 8, 10),
+            SlashMenuPlacement::BelowInput
+        );
+        assert_eq!(
+            slash_menu_placement(12, 8, 10),
+            SlashMenuPlacement::AboveInput
+        );
+    }
+
+    #[test]
+    fn test_slash_menu_height_is_exact_and_capped() {
+        let registry = talos_conversation::command_registry();
+        let menu = SlashMenuState::open(registry);
+        let full = SlashMenuComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let capped = SlashMenuComponent {
+            menu: &menu,
+            query: "",
+            max_height: 3,
+        };
+        assert!(full.height_hint(80) > 3);
+        assert_eq!(capped.height_hint(80), 3);
+    }
+
+    #[test]
+    fn test_slash_menu_capped_rows_reserve_overflow_indicator() {
+        assert_eq!(slash_menu_rows(5, 3), (1, true, true));
+        assert_eq!(slash_menu_rows(5, 6), (5, true, false));
+        assert_eq!(slash_menu_rows(10, 10), (8, true, true));
     }
 }

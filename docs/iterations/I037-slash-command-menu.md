@@ -87,21 +87,54 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-06-20 | Activation | Non-terminal inventory clean; TUI-010 dependencies met (CMD-001, TUI-009); activated as I037 |
+| 2026-06-20 | Review reopened | Post-completion audit found hidden filter state, incorrect Backspace behavior, menu priority over a newly arrived Approval, missing placement fallback, and stale governance status. |
+| 2026-06-20 | Remediation | Replaced duplicate query state with composer-backed filtering; made Approval input exclusive; implemented bounded above-input fallback; added interaction, approval, placement, and height tests; synchronized user and governance docs. |
+
+## Remediation Closure Ledger
+
+- Requested outcome: repair every finding from the I037 development review.
+- Artifacts updated: TUI state/input handling, menu rendering/layout, tests, README, story, iteration,
+  product backlog, and board.
+- Existing assets preserved: CMD-001 command registry, ADR-006 single event loop, inline terminal
+  scrollback boundary, and the published I037 baseline.
+- State owners synchronized: TUI-010 owner, I037, product backlog, and derived board.
+- Validation required: formatting, TUI tests, workspace check/clippy/test, governance validators,
+  diff checks, and interactive smoke evidence.
+- Residual destination: none within I037 after all required validation passes.
 
 ## Verification Evidence
 
-- `cargo test -p talos-tui` — 114 tests pass (105 existing + 9 new slash menu tests)
+- `cargo test -p talos-tui` — 120 tests pass, including composer query, Backspace, argument
+  completion, Approval preemption, placement fallback, and bounded-height coverage
 - `cargo test -p talos-conversation` — 58 tests pass
 - `cargo clippy -p talos-tui -p talos-conversation -- -D warnings` — clean
 - `cargo fmt --all` — clean
 - `cargo check --workspace` — clean
-- Runtime evidence: typing `/` in TUI composer opens menu; filtering, navigation, selection all work
+- The original runtime-evidence statement was not accompanied by reproducible geometry or input
+  evidence and was superseded by the post-completion remediation validation below.
+- Reproducible terminal smoke: ran `target/debug/talos --mock --tui` inside detached GNU Screen;
+  `/he` remained visible in the composer and filtered to `/help`, `Backspace` restored the match
+  after a no-match query, and `Esc` closed the menu while preserving `/he`.
+- Small-terminal smoke: resized GNU Screen to 80x12; `/` rendered a five-row capped menu above the
+  composer while keeping the composer and status row visible.
+- `cargo check --workspace` — passed after remediation.
+- `cargo clippy --workspace --all-targets -- -D warnings` — passed after remediation.
+- `cargo test --workspace` — passed after remediation; no failures, one pre-existing
+  timing-sensitive ignored Agent test.
+- `cargo fmt --all -- --check`, `git diff --check`, POSIX governance validation, and PowerShell
+  governance validation — passed.
 
 ## Variance And Residuals
 
-- None. All TUI-010 acceptance criteria met.
+- Initial implementation variance: filtering used hidden menu state instead of the composer;
+  Backspace closed the menu; Approval did not preempt an open menu; above-input fallback was not
+  implemented; user and governance documentation was stale.
+- Resolution: all identified variances were repaired in the 2026-06-20 remediation pass.
 
 ## Retrospective
 
 - Outcome: met
-- Documentation: TUI-010 ACs updated, board synced, iteration README updated
+- Documentation: English and Chinese README files, TUI-010 owner, product backlog, board, and this
+  iteration are synchronized.
+- Lesson: state-only menu tests cannot substantiate input-routing or terminal-geometry acceptance;
+  future popup work must test the owning input state and deterministic placement calculation.

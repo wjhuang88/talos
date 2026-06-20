@@ -23,7 +23,6 @@ pub(crate) struct SlashMenuState {
     pub(crate) is_open: bool,
     pub(crate) items: Vec<SlashMenuItem>,
     pub(crate) selected_index: usize,
-    pub(crate) filter_text: String,
 }
 
 impl SlashMenuState {
@@ -41,50 +40,54 @@ impl SlashMenuState {
             is_open: true,
             items,
             selected_index: 0,
-            filter_text: String::new(),
         }
     }
 
-    pub(crate) fn filtered_items(&self) -> Vec<&SlashMenuItem> {
-        if self.filter_text.is_empty() {
+    pub(crate) fn filtered_items(&self, query: &str) -> Vec<&SlashMenuItem> {
+        if query.is_empty() {
             return self.items.iter().collect();
         }
-        let lower = self.filter_text.to_lowercase();
+        let lower = query.to_lowercase();
         self.items
             .iter()
             .filter(|item| {
-                item.name[1..].to_lowercase().contains(&lower)
+                item.name
+                    .strip_prefix('/')
+                    .unwrap_or(&item.name)
+                    .to_lowercase()
+                    .contains(&lower)
                     || item.description.to_lowercase().contains(&lower)
             })
             .collect()
     }
 
-    pub(crate) fn selected_command(&self) -> Option<String> {
-        let filtered = self.filtered_items();
+    pub(crate) fn selected_completion(&self, query: &str) -> Option<String> {
+        let filtered = self.filtered_items(query);
         if filtered.is_empty() {
             return None;
         }
         let idx = self.selected_index.min(filtered.len() - 1);
-        Some(filtered[idx].name.clone())
+        let item = filtered[idx];
+        let suffix = if item.arg_hint.is_some() { " " } else { "" };
+        Some(format!("{}{suffix}", item.name))
     }
 
     pub(crate) fn close(&mut self) {
         self.is_open = false;
         self.items.clear();
         self.selected_index = 0;
-        self.filter_text.clear();
     }
 
-    pub(crate) fn select_next(&mut self) {
-        let len = self.filtered_items().len();
+    pub(crate) fn select_next(&mut self, query: &str) {
+        let len = self.filtered_items(query).len();
         if len == 0 {
             return;
         }
         self.selected_index = (self.selected_index + 1) % len;
     }
 
-    pub(crate) fn select_prev(&mut self) {
-        let len = self.filtered_items().len();
+    pub(crate) fn select_prev(&mut self, query: &str) {
+        let len = self.filtered_items(query).len();
         if len == 0 {
             return;
         }
@@ -191,6 +194,45 @@ impl TuiState {
         self.input_buffer.clear();
         self.cursor_pos = 0;
         self.input_append_str(command);
+    }
+
+    pub(crate) fn open_slash_menu(&mut self, registry: &talos_conversation::CommandRegistry) {
+        self.input_append_char('/');
+        self.slash_menu = SlashMenuState::open(registry);
+    }
+
+    pub(crate) fn slash_query(&self) -> &str {
+        self.input_buffer.strip_prefix('/').unwrap_or_default()
+    }
+
+    pub(crate) fn append_slash_query_char(&mut self, ch: char) {
+        self.input_append_char(ch);
+        self.slash_menu.selected_index = 0;
+    }
+
+    pub(crate) fn backspace_slash_query(&mut self) {
+        self.input_backspace();
+        self.slash_menu.selected_index = 0;
+        if !self.input_buffer.starts_with('/') {
+            self.slash_menu.close();
+        }
+    }
+
+    pub(crate) fn accept_selected_slash_command(&mut self) {
+        let completion = self.slash_menu.selected_completion(self.slash_query());
+        if let Some(command) = completion {
+            self.input_insert_command(&command);
+        }
+        self.slash_menu.close();
+    }
+
+    pub(crate) fn activate_approval(&mut self, tool_name: &str, arguments: &str) {
+        self.slash_menu.close();
+        self.approval_state = ApprovalState::Visible {
+            tool_name: tool_name.to_string(),
+            arguments: arguments.to_string(),
+            selected: ApprovalChoice::ApproveOnce,
+        };
     }
 
     pub(crate) fn input_submit(&mut self) -> String {
