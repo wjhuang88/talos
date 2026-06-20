@@ -29,7 +29,8 @@ arborium = { version = "2.16", default-features = false, features = [
     "lang-html", "lang-css", "lang-json", "lang-toml", "lang-markdown",
     "lang-ruby", "lang-php", "lang-kotlin", "lang-swift"
 ] }
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json"] }
+rust-websearch = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "1.0.0-alpha.3"

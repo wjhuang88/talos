@@ -12,6 +12,7 @@ pub mod http_request;
 pub mod search_tools;
 pub mod symbol;
 pub mod tree;
+pub mod web_search;
 
 pub use bash_tool::{BashError, BashInput, BashTool};
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
@@ -23,3 +24,4 @@ pub use file_tools::{
 pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 pub use tree::TreeTool;
+pub use web_search::{WebSearchError, WebSearchInput, WebSearchTool};
