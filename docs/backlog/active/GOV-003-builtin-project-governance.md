@@ -26,47 +26,140 @@ rendered in the WEB-001 web dashboard.
 
 ## Scope
 
-### Phase 1: Governance Context Injection
+The goal is to implement the full `agent-project-governance` methodology as a
+built-in Talos subsystem. When active, the agent can discover, initialize,
+maintain, and validate a project's governance structure — guiding the user
+through precise task management without relying on an external SKILL.md file.
 
-Build a governance context layer that reads the project's governance state
-from `docs/` and injects a structured summary into the system prompt:
+### Capability 1: Project Discovery & Classification
+
+When entering a workspace, Talos inspects the project and classifies its
+governance state:
+
+| State | Meaning | Agent behavior |
+|---|---|---|
+| `uninitialized` | No governance entrypoint exists | Explain the gap, offer to initialize the smallest slice |
+| `discovered` | Custom process assets exist, no standard mapping | Summarize reusable assets, propose adoption |
+| `adopting` | Manifest exists, capabilities incomplete | Continue migration slice |
+| `conformant` | Standard structure matches manifest | Use existing router; audit only what the task affects |
+| `degraded` | Declared files/gates missing or stale | Propose baseline repair |
+
+The agent checks `.agent-governance/manifest.yaml`, `AGENTS.md`, and `docs/`
+structure to determine state. Classification happens once on workspace entry,
+refreshed when governance docs change.
+
+### Capability 2: Constraint Classification
+
+The agent classifies every requirement and decision into:
+
+| Type | Meaning | Used for |
+|---|---|---|
+| **Hard** | Immutable fact, platform limit, irreversible operation | Deriving mandatory gates |
+| **Soft** | Policy or convention that can change | Recording in ADRs when a choice affects one |
+| **Assumption** | Unvalidated belief | Flagging for validation; creating Spikes when blocking |
+
+Every gate traces to a specific Hard constraint. The agent challenges
+Soft constraints that are treated as Hard, and flags Assumptions before
+they become implementation decisions.
+
+### Capability 3: Standard Structure Initialization & Adoption
+
+The agent can build a project's governance structure from scratch or migrate
+existing assets:
+
+1. Establish control entrypoints: `AGENTS.md`, `.agent-governance/manifest.yaml`,
+   `EVOLUTION.md`, `docs/sop/EVOLUTION-FEEDBACK.md`
+2. Extract active content from non-standard documents into standard owners
+3. Create standard directories: `docs/backlog/`, `docs/iterations/`,
+   `docs/decisions/`, `docs/roadmap/`, `docs/proposals/`, `docs/reference/`,
+   `docs/sop/`, `docs/archive/`
+4. Record preserved/superseded/archived sources in the manifest migration mapping
+5. Add daily execution gates: testing, Git, requirement intake, iteration flow,
+   change control
+6. Add planning layers: backlog, iterations, decisions, roadmap
+7. Derive `docs/BOARD.md` as an operating view (never source of truth)
+8. Create project-local validation harness for mechanical governance rules
+
+### Capability 4: Backlog & Story Management
+
+The agent manages the product backlog as a first-class data structure:
+
+- **Compact entrypoint** (`PRODUCT-BACKLOG.md`) + **item files** (`docs/backlog/active/`)
+  with `Required Reads` links
+- **Story decomposition**: Epics → executable Stories with parent/child identity,
+  dependencies, and readiness gates
+- **Story formats**: behavior-facing (Given/When/Then), technical, governance, Spike
+- **Acceptance criteria**: testable, verifiable, with explicit evidence requirements
+- **Backlog compaction**: preserve decision usefulness through active item files
+  and archive indexes
+
+### Capability 5: Iteration Management
+
+The agent plans and executes iterations following the SOP:
+
+- **Before selection**: inventory all active/review/planned/blocked iterations
+- **Baseline integrity**: published iteration plans are preserved; changed
+  targets use a new iteration ID
+- **Deliverables**: every iteration produces a runnable, testable result
+- **Execution records**: appended to the plan, not replacing it
+- **Verification**: runtime evidence, not only passing unit tests
+- **Retrospective**: outcome, documentation sync, lessons learned
+
+### Capability 6: Closure Protocol
+
+The agent follows a five-stage closure contract for every governance change:
+
+1. **Establish**: confirm current state, preserved assets, scope, closure items
+2. **Implement**: create or update the smallest complete artifact slice
+3. **Verify**: run structural checks (harness), inspect semantic consistency
+4. **Synchronize**: update manifest/capability state, backlog/iteration status,
+   lessons, dependency/blocker records
+5. **Deliver**: report changed artifacts, checks, residual gaps, and status
+
+Status is strict: `complete` only when implemented + synced + verified + gaps
+registered. Partial and blocked are explicit, not hidden behind recommendations.
+
+### Capability 7: Governance Context Injection
+
+A compact, bounded summary of governance state is injected into the system
+prompt before each turn:
 
 - Current iteration, active stories, blocker status
-- Backlog priority view
-- Recent board state
-- Pending ADRs and decisions
-- Validation status (governance harness results)
+- Backlog priority view (top-N ready items)
+- Recent board state (Now/Next/Blocked)
+- Validation status (harness results)
 
-The injection is **always-on but bounded** — a compact summary, not the full
-governance document dump. The `AGENTS.md` at project root remains the
-authoritative behavior rules; this layer adds project *state* awareness.
+This keeps the agent aware of project context without dumping full governance
+documents into the prompt.
 
-### Phase 2: Governance Gate Enforcement
-
-Add built-in checks that the agent evaluates at key workflow points:
-
-| Gate | Trigger | Check |
-|---|---|---|
-| Story selection | Before starting new work | Inventory active/review/planned/blocked iterations per SOP |
-| Completion claim | Before marking work done | Evidence recorded, status owners synced |
-| Change control | When scope changes mid-iteration | Record variance per CHANGE-CONTROL.md |
-| Evolution feedback | After defect/regression | Capture lesson per EVOLUTION-FEEDBACK.md |
-
-These are not hard blocks — they're **guidance injections** that prompt the
-agent (or the user) to follow governance process. Hard enforcement is a
-future configuration option.
-
-### Phase 3: Project Management Web UI (WEB-001 extension)
+### Capability 8: Project Management Web UI (WEB-001)
 
 Expose governance data through the WEB-001 web dashboard:
 
-- **Iteration Board**: Kanban-style view of current iteration (stories in columns: Planned / In Progress / Review / Complete)
-- **Product Backlog**: Filterable table view of backlog items with priority, status, dependencies
-- **ADR Index**: Decision records with status and date
-- **Validation Status**: Governance harness check results
+- **Iteration Board**: Kanban view (Planned / In Progress / Review / Complete)
+- **Product Backlog**: Filterable table with priority, status, dependencies
+- **ADR Index**: Decision records with status and dates
+- **Validation Status**: Harness check results
+- **Project Classification**: Current governance state and migration progress
 
-The web UI reads from the same `docs/` sources the governance context layer
-uses — single source of truth, no duplication.
+### Capability 9: Validation Harness
+
+The agent can run and interpret the project-local governance validation:
+
+- `scripts/validate_project_governance.sh` on Unix
+- Checks: required files, capability evidence, AGENTS.md sections, local links,
+  completion claims without evidence
+- Result surfaces in TUI status and WEB-001 validation page
+- Failures are actionable: each one links to the owning document
+
+### Capability 10: Change Control & Evolution
+
+- **Change control**: when scope changes mid-iteration, record variance per
+  `docs/sop/CHANGE-CONTROL.md`
+- **Evolution feedback**: after defects, regressions, or planning drift,
+  capture lessons per `docs/sop/EVOLUTION-FEEDBACK.md`
+- **Decision records**: significant technical choices recorded as ADRs with
+  Constraint Decomposition, Decision, and Reversal Trigger
 
 ## Governance State Model
 
