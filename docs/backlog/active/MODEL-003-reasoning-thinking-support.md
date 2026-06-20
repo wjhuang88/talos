@@ -42,6 +42,54 @@ ADR must decide:
 - [ ] Cost model: whether reasoning tokens are billed separately and surfaced in usage
 - [ ] RPC/JSON-RPC exposure
 
+### OpenCode Reference Implementation (2026-06-20 research)
+
+OpenCode (`opencode-ai/opencode`, Go) provides the most mature open-source
+reasoning/thinking implementation. Talos should follow these proven patterns:
+
+**Config shape**: Talos differs from OpenCode here. OpenCode uses a flat
+`reasoningEffort: "low|medium|high"` on the Agent struct. Talos should use
+**per-model options** in `[providers.{name}.models.{id}]` blocks — this is
+already Talos's config pattern and the opencode import module already maps
+per-model `limit` fields. Adding `options.thinking` follows the same pattern.
+
+**Capability gating** (`CanReason bool` on Model struct):
+- MODEL-001 catalog tracks whether each model supports reasoning.
+- Provider code checks this flag before sending reasoning fields.
+- Config validation: if `reasoning` is configured but model lacks `CanReason`,
+  warn and skip (OpenCode does this at config load).
+
+**OpenAI path** (from OpenCode):
+- `reasoning_effort: "low|medium|high"` → maps to `ReasoningEffortLow/Medium/High`.
+- **Critical**: use `max_completion_tokens` instead of `max_tokens` when reasoning
+  is enabled (o-series API requirement).
+- OpenAI streaming SDK does NOT expose reasoning deltas — reasoning content is
+  only in the final response, not as stream chunks.
+
+**Anthropic path** (from OpenCode):
+- `thinking: {type: "enabled", budget_tokens: N}` in request body.
+- **Content-triggered** activation: OpenCode checks if the user prompt contains
+  "think" via `DefaultShouldThinkFn`. The budget is auto-calculated as **80% of
+  maxTokens**, and temperature is forced to 1 (Anthropic requirement).
+- SSE stream: `thinking_delta` events → dedicated `Thinking` field.
+
+**Stream events** (from OpenCode):
+- `ProviderEvent { Type: EventThinkingDelta, Thinking: string }` — dedicated
+  event type, NOT a variant of TextDelta. This keeps thinking and text content
+  cleanly separated.
+- Talos equivalent: add `AgentEvent::ReasoningDelta { delta: String }` variant.
+
+**Message persistence** (from OpenCode):
+- `ReasoningContent` as a `ContentPart` with `Thinking: string` field.
+- Serialized as `{"type":"reasoning","data":{"thinking":"..."}}` in message parts.
+- Stored alongside text content in the same message, not as a separate message.
+- Talos equivalent: add `reasoning_content: Option<String>` to `ChatMessage`.
+
+**TUI rendering** (from OpenCode):
+- Shows thinking content only when no text content exists yet (thinking phase).
+- Once text content arrives, switches to showing text (answer phase).
+- Status bar: "Thinking..." → "Generating..." transition.
+
 ### Implementation (post-ADR)
 
 - Request body construction per provider
@@ -81,3 +129,5 @@ whether reasoning is visible/hidden/interleaved). MODEL-003 implements the
 - `crates/talos-provider/src/anthropic.rs`
 - `crates/talos-provider/src/openai.rs`
 - `crates/talos-core/src/message.rs` (AgentEvent variants)
+- `crates/talos-config/src/opencode.rs` (opencode import precedent)
+- `https://github.com/opencode-ai/opencode` (reference implementation)
