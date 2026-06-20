@@ -6,6 +6,7 @@
 | Priority | P2 |
 | Status | Planned |
 | Depends On | AGENT-001; MEM-005; TUI-009 |
+| Note | Reasoning/thinking support split to MODEL-003 (ADR gate). This story is catalog-only. |
 | Origin | User feedback 2026-06-19 — models.dev should inform Talos model choices, defaults, reasoning/thinking support, pricing, and compaction timing |
 
 ## Problem
