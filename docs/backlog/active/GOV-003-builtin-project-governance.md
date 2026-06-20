@@ -31,7 +31,26 @@ built-in Talos subsystem. When active, the agent can discover, initialize,
 maintain, and validate a project's governance structure — guiding the user
 through precise task management without relying on an external SKILL.md file.
 
-### Capability 1: Project Discovery & Classification
+### Capability 0: Entry Point — `/agile` Command
+
+A slash command registered in CMD-001's `CommandRegistry` as the user-facing
+entry point for project governance:
+
+```
+/agile              → Show current governance state + available actions
+/agile init         → Initialize governance for this project (guided)
+/agile status       → Show iteration/backlog/board/validation summary
+/agile validate     → Run validation harness and report results
+```
+
+Behavior by project state:
+- **uninitialized**: `/agile` shows the gap and offers `/agile init`
+- **adopting**: `/agile` shows migration progress and next slice
+- **conformant**: `/agile` shows iteration status, backlog top-N, validation
+- **degraded**: `/agile` shows what's missing and offers repair
+
+The command delegates to GOV-003's governance engine; it does not mutate
+conversation display state directly. Follows CMD-001 typed-owner pattern.
 
 When entering a workspace, Talos inspects the project and classifies its
 governance state:
@@ -208,7 +227,7 @@ Sources:
 
 | Requirement | Relationship |
 |---|---|
-| WEB-001 | Phase 3 provides the project management web UI |
+| CMD-001 | `/agile` command registered as BuiltinCommand in CommandRegistry |
 | I035 | Shared config may include governance policy flags |
 | SKILL-002 | Governance context injection follows the same activation model |
 | AGENT-001 | Governance docs follow standard `docs/` conventions |
