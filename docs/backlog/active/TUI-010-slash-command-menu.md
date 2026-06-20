@@ -39,6 +39,26 @@ Expected behavior:
 - Commands unavailable in the current state remain hidden or disabled with a
   clear reason.
 
+## Architecture Note: Popup Layer
+
+The slash command menu is the first consumer of a **general-purpose popup/overlay
+layer** rendered below the composer. This layer is not slash-command-specific —
+future TUI interactions share the same rendering surface and key-binding
+conventions:
+
+| Consumer | Story | Status |
+|---|---|---|
+| Slash command menu | TUI-010 | ✅ Complete |
+| Model picker | MODEL-005 | Planned |
+| Approval dialog | TUI-008 | Planned |
+| File picker | Future | — |
+| Session picker | Future | — |
+
+The popup layer should be refactored from `SlashMenuComponent` (slash-specific)
+into a general `PopupComponent` that accepts typed content providers. Each
+consumer provides: item list, filter logic, selection handler, and metadata
+for the tip area.
+
 ## Placement Rule
 
 The preferred placement is below the input area. If the terminal does not have
