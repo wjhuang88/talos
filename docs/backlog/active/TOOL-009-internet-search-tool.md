@@ -1,9 +1,10 @@
 # TOOL-009: Internet Search Tool
 
-**Status**: Planned
+**Status**: In Progress (I039)
 **Priority**: P1
 **Source**: User request 2026-06-20
 **Depends on**: WEBFETCH-001 Phase 0 (for HTTP infrastructure)
+**Iteration**: [I039 Network Tools & TUI Polish](../iterations/I039-network-tools-tui-polish.md)
 
 ## Problem
 

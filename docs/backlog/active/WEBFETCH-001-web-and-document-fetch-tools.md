@@ -8,11 +8,11 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Research. Candidate input to I036 and future implementation after architecture cleanup.
+In Progress (I039 Phase 0). Selected into I039 Network Tools & TUI Polish iteration.
 
 ## Priority
 
-P2.
+P0 (I036 execution map).
 
 ## Origin
 

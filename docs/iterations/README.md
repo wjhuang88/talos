@@ -73,6 +73,7 @@ docs/iterations/
 | I036 | Research Consolidation | **Complete** (2026-06-20) | End-of-plan research-only iteration that consolidates REMOTE-001, WEB-001, PLUGIN-001, OKF-001, MEM-005, MODEL-001/002, DIST-001, WEBFETCH-001, and STORE-001 into decisions, ADR candidates, and executable follow-up stories. See `I036-research-consolidation.md`. |
 | I037 | Slash Command Menu | **Complete** (2026-06-20) | TUI-010: `/` opens Codex-style command menu below composer using CMD-001 registry. See `I037-slash-command-menu.md`. |
 | I038 | Model Catalog Foundation | **Complete** (2026-06-20) | MODEL-001: built-in model dataset + models.dev import. Catalog-only (reasoning split to MODEL-003). See `I038-model-catalog-foundation.md`. |
+| I039 | Network Tools & TUI Polish | **Active** (2026-06-21) | WEBFETCH-001 Phase 0 + TOOL-009 + TUI-011 + TOOL-005. See `I039-network-tools-tui-polish.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -90,7 +91,8 @@ rewrite published iteration baselines.
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Planned | Deferred; scheduling is not the current priority. |
 | I035 | Complete | Removed from non-terminal inventory. |
-| I036 | Complete | Activated 2026-06-20 of the current plan; no implementation code belongs to this research iteration. |
+| I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
+| I039 | Active | Activated 2026-06-21; WEBFETCH-001 + TOOL-009 + TUI-011 + TOOL-005 implementation in progress. |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.
@@ -127,3 +129,4 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R22: Agent Protocol Compatibility | ✅ Done (2026-06-19) | `I035-agent-protocol-compatibility-foundation.md`; `../backlog/active/AGENT-001-standard-agent-protocol-support.md`; `../proposals/standard-agent-protocol-support.md`; `../decisions/022-agent-config-compatibility-boundary.md` | Survey + ADR-022 + DTOs + prototype `~/.agents/models.json` import landed. |
 | R23: Research Consolidation | ✅ Done (2026-06-20) | `I036-research-consolidation.md`; `../backlog/active/REMOTE-001-remote-session-protocol.md`; `../backlog/active/WEB-001-embedded-web-control-surface.md`; `../backlog/active/PLUGIN-001-wasm-runtime-plugins.md`; `../backlog/active/OKF-001-native-okf-support.md`; `../backlog/active/MEM-005-context-compaction-policy.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md`; `../backlog/active/MODEL-002-local-micro-model-decision-layer.md`; `../backlog/active/DIST-001-optional-runtime-asset-distribution.md`; `../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`; `../backlog/active/STORE-001-zvec-storage-evaluation.md` | Research-heavy items are deduplicated into ADR candidates, deferred decisions, or executable follow-up stories; no implementation code changes. |
 | R24: Model Catalog Foundation | ✅ Done (2026-06-20) | `I038-model-catalog-foundation.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md` | Built-in model dataset + models.dev import; catalog-only, reasoning split to MODEL-003. |
+| R25: Network Tools & TUI Polish | ⏳ Active (2026-06-21) | `I039-network-tools-tui-polish.md` | WEBFETCH-001 Phase 0 (http_request) → TOOL-009 (web_search) ∥ TUI-011 (status bar) + TOOL-005 (bash streaming). |

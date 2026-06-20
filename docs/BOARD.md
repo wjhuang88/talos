@@ -16,6 +16,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I039 Network Tools & TUI Polish | Active | [I039 Network Tools & TUI Polish](iterations/I039-network-tools-tui-polish.md) | WEBFETCH-001 Phase 0 + TOOL-009 + TUI-011 + TOOL-005; activate 2026-06-21 |
+|---|---|---|---|
 
 ## Review
 
