@@ -97,18 +97,20 @@ impl GitStatusTool {
         let mut output = String::new();
         for item in iter {
             let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
-            let (status_char, path) = match item {
-                gix::status::index_worktree::iter::Item::Modification { rela_path, .. } => {
-                    ("M", rela_path.to_string())
-                }
-                gix::status::index_worktree::iter::Item::DirectoryContents { entry, .. } => {
-                    ("??", entry.rela_path.to_string())
-                }
-                gix::status::index_worktree::iter::Item::Rewrite { dirwalk_entry, .. } => {
-                    ("R", dirwalk_entry.rela_path.to_string())
-                }
+            let summary = item.summary();
+            let path_str = item.rela_path().to_string();
+            let status_char = match summary {
+                Some(gix::status::index_worktree::iter::Summary::Modified) => "M",
+                Some(gix::status::index_worktree::iter::Summary::Added) => "A",
+                Some(gix::status::index_worktree::iter::Summary::Removed) => "D",
+                Some(gix::status::index_worktree::iter::Summary::Renamed) => "R",
+                Some(gix::status::index_worktree::iter::Summary::Copied) => "C",
+                Some(gix::status::index_worktree::iter::Summary::TypeChange) => "T",
+                Some(gix::status::index_worktree::iter::Summary::Conflict) => "!",
+                Some(gix::status::index_worktree::iter::Summary::IntentToAdd) => "I",
+                None => "?",
             };
-            output.push_str(&format!("{status_char} {path}\n"));
+            output.push_str(&format!("{status_char} {path_str}\n"));
         }
 
         if output.is_empty() {
@@ -196,16 +198,16 @@ impl GitLogTool {
                 .object()
                 .map_err(|e| GitToolError::Git(e.to_string()))?;
             let commit_ref = obj.decode().map_err(|e| GitToolError::Git(e.to_string()))?;
-            let author = commit_ref.author;
+        let author = commit_ref
+            .author()
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
+        let author_name = author.name.to_string();
+        let date = author.time.to_string();
 
             let hex_str = info.id.to_hex().to_string();
             let short = &hex_str[..7.min(hex_str.len())];
             let message = commit_ref.message.to_string();
             let first_line = message.lines().next().unwrap_or("(no message)");
-            let actor = author.actor();
-            let author_name = actor.name.to_string();
-            let seconds = author.time.seconds;
-            let date = format_unix_timestamp(seconds as u64);
 
             output.push_str(&format!("{short} {first_line} ({author_name}, {date})\n"));
         }
@@ -403,19 +405,9 @@ impl GitDiffTool {
 
         for item in iter {
             let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
-            let path = match item {
-                gix::status::index_worktree::iter::Item::Modification { rela_path, .. } => {
-                    rela_path.to_string()
-                }
-                gix::status::index_worktree::iter::Item::DirectoryContents { entry, .. } => {
-                    entry.rela_path.to_string()
-                }
-                gix::status::index_worktree::iter::Item::Rewrite { dirwalk_entry, .. } => {
-                    dirwalk_entry.rela_path.to_string()
-                }
-            };
+            let path_str = item.rela_path().to_string();
 
-            output.push_str(&format!("diff -- {path}\n"));
+            output.push_str(&format!("diff -- {path_str}\n"));
             line_count += 1;
 
             if line_count >= max_lines {
@@ -495,14 +487,14 @@ impl GitShowTool {
         let commit_ref = commit
             .decode()
             .map_err(|e| GitToolError::Git(e.to_string()))?;
-        let author = commit_ref.author;
+            let author = commit_ref
+                .author()
+                .map_err(|e| GitToolError::Git(e.to_string()))?;
+            let author_name = author.name.to_string();
+            let date = author.time.to_string();
 
         let hex_str = commit.id().to_hex().to_string();
         let short = &hex_str[..7.min(hex_str.len())];
-        let actor = author.actor();
-        let author_name = actor.name.to_string();
-        let seconds = author.time.seconds;
-        let date = format_unix_timestamp(seconds as u64);
         let message = commit_ref.message.to_string();
         let first_line = message.lines().next().unwrap_or("(no message)");
 
@@ -515,38 +507,12 @@ impl GitShowTool {
     }
 }
 
-// ─── Helper ───
-
-fn format_unix_timestamp(secs: u64) -> String {
-    let days = secs / 86400;
-    let rem = secs % 86400;
-    let hour = rem / 3600;
-    let min = (rem % 3600) / 60;
-
-    let z = days as i64 + 719468;
-    let era = if z >= 0 {
-        z / 146097
-    } else {
-        (z - 146096) / 146097
-    };
-    let doe = (z - era * 146097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if m <= 2 { y + 1 } else { y };
-
-    format!("{year:04}-{m:02}-{d:02} {hour:02}:{min:02}")
-}
-
 // ─── Host git helpers ───
 
 async fn get_workdir(workspace_root: &std::path::Path) -> Result<PathBuf, GitToolError> {
     let repo = discover_repo(workspace_root)?;
     Ok(repo
-        .work_dir()
+        .workdir()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| workspace_root.to_path_buf()))
 }
