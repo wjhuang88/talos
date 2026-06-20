@@ -20,16 +20,11 @@ story implements it.
 
 ### `/model` Command
 
-Registered as a CMD-001 BuiltinCommand. Without arguments, opens the model
-picker. With subcommands:
+Registered as a CMD-001 BuiltinCommand. Single entry point — no subcommands.
+Opens the interactive model picker immediately.
 
 ```
-/model              → Open interactive model picker
-/model switch       → Alias for picker
-/model info <id>    → Show model metadata (context, pricing, capabilities)
-/model add <provider> <id>  → Register a new model manually
-/model import       → Refresh from models.dev (if previously imported)
-/model current      → Show current active model + provider
+/model   →  Open picker. Select a model → switch. That's it.
 ```
 
 ### Interactive Model Picker
@@ -37,64 +32,59 @@ picker. With subcommands:
 Reuses TUI-010's popup layer. Opens when `/model` is typed:
 
 ```
-┌── Select Model ──────────────────────────────┐
-│                                               │
-│  ● claude-sonnet-4-20250514    (current)      │
-│    Anthropic · 200K ctx · $3/$15 per 1M       │
-│                                               │
-│  ○ claude-opus-4-20250514                     │
-│    Anthropic · 200K ctx · $15/$75 per 1M      │
-│                                               │
-│  ○ gpt-4o                                     │
-│    OpenAI · 128K ctx · $2.50/$10 per 1M       │
-│                                               │
-│  ○ deepseek-v3                                │
-│    DeepSeek · 128K ctx · $0.27/$1.10 per 1M   │
-│                                               │
-│  ── Catalog (not configured) ──               │
-│  ○ claude-haiku-4-20250514                    │
-│    Anthropic · 200K ctx · $0.80/$4 per 1M     │
-│                                               │
-│  ↑↓ navigate  Enter select  Esc cancel        │
-│  / filter   Tab add to config                 │
-└───────────────────────────────────────────────┘
+┌── Models ─────────────────────────────────────┐
+│                                                │
+│  ● claude-sonnet-4-20250514   (active)         │
+│    Anthropic · 200K ctx · $3/$15               │
+│                                                │
+│  ○ gpt-4o                                      │
+│    OpenAI · 128K ctx · $2.50/$10               │
+│                                                │
+│  ○ deepseek-v3                                 │
+│    DeepSeek · 128K ctx · $0.27/$1.10           │
+│                                                │
+│  ── More from catalog ──                       │
+│  ○ claude-haiku-4            Anthropic         │
+│    200K · $0.80/$4                             │
+│                                                │
+│  ↑↓ select   Enter switch   i info   r refresh │
+│  / filter    Esc cancel                        │
+└────────────────────────────────────────────────┘
 ```
 
-### Model Sources
+### Key Bindings
 
-The picker shows three groups:
+| Key | Action |
+|---|---|
+| `↑` `↓` | Navigate |
+| `Enter` | Switch to selected model (add to config if from catalog) |
+| `i` | Toggle info panel: show full metadata for selected model |
+| `r` | Refresh catalog from models.dev (if previously imported) |
+| `/` | Filter list by name/provider |
+| `Esc` | Cancel, keep current model |
 
-| Group | Source | Behavior |
-|---|---|---|
-| **Configured** | `[providers.{name}.models]` in config | Select → switch immediately |
-| **Catalog** | Built-in dataset + models.dev cache | Select → prompt to add to config |
-| **Manual** | `/model add` entries | Select → switch immediately |
+### Selecting a Catalog Model
 
-### Selecting an Unconfigured Model
+When user presses Enter on an unconfigured catalog model:
+- "Added claude-haiku-4 to config. Switching..."
+- Registers + switches in one step. No confirmation prompt.
+- Persists to `~/.talos/config.toml` for future sessions.
 
-When the user selects a catalog model that isn't in their config:
+### Info Panel (i key)
 
-1. Picker shows "This model is in the catalog but not configured."
-2. Prompt: "Add claude-haiku-4 to config and switch? [y/N]"
-3. If yes: writes the model to `~/.talos/config.toml` (or in-memory for the session)
-4. If no: returns to picker
-
-### `/model add` (Runtime Registration)
-
+Toggles below the list:
 ```
-/model add anthropic claude-haiku-4-20250514
+┌── Model Info ──────────────────────────────────┐
+│ claude-haiku-4-20250514                        │
+│ Provider: Anthropic                            │
+│ Context: 200,000 tokens                        │
+│ Output:  8,192 tokens                          │
+│ Pricing: $0.80 / $4.00 per 1M (in/out)        │
+│ Released: 2025-05                              │
+│ Capabilities: tools ✓  reasoning ✗  images ✓   │
+│ Source: built-in catalog                       │
+└────────────────────────────────────────────────┘
 ```
-
-- Looks up metadata from built-in catalog
-- If found: registers the model + provider config for the current session
-- If not found: asks for manual context/output limits
-- Option to persist to `~/.talos/config.toml`
-
-### `/model import` (Catalog Refresh)
-
-- Re-fetches from models.dev (if previously imported)
-- Updates `~/.talos/cache/models/models.json`
-- Shows count: "Imported N models, M new"
 
 ## Non-Goals
 
@@ -104,15 +94,14 @@ When the user selects a catalog model that isn't in their config:
 
 ## Acceptance Criteria
 
-- [ ] `/model` opens interactive picker with configured + catalog models.
-- [ ] Picker shows model name, provider, context window, pricing per group.
-- [ ] ↑↓ navigate, Enter select, Esc cancel, typing filters.
-- [ ] Selecting a configured model switches the active model for the session.
-- [ ] Selecting a catalog model prompts to add to config first.
-- [ ] `/model add <provider> <id>` registers a model at runtime.
-- [ ] `/model info <id>` shows full metadata from catalog.
-- [ ] `/model import` refreshes models.dev cache.
-- [ ] Model switch takes effect on the next turn (not mid-turn).
+- [ ] `/model` opens interactive picker — no subcommands needed.
+- [ ] Picker shows configured models first, catalog models below.
+- [ ] ↑↓ navigate, Enter selects and switches immediately.
+- [ ] Selecting an unconfigured catalog model auto-registers + switches.
+- [ ] `i` toggles full metadata info panel.
+- [ ] `r` refreshes models.dev cache.
+- [ ] `/` filters list by name or provider.
+- [ ] Model switch takes effect on the next turn.
 - [ ] `cargo test -p talos-tui -p talos-config` passes.
 
 ## Required Reads
