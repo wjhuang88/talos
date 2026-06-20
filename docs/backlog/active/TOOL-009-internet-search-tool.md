@@ -31,29 +31,36 @@ structured results:
 
 ### Search Backend (configurable)
 
-Tiered approach — embed-first, no mandatory third-party API keys:
+Uses the `websearch` Rust crate (MIT, 8 providers) for multi-engine search
+abstraction. No need to implement each backend from scratch.
 
-| Tier | Backend | Type | Key required? | Notes |
+| Tier | Provider | API Key? | Config | What it gives |
 |---|---|---|---|---|
-| **Default** | DuckDuckGo Instant Answer | Free API, no scraping | **No** | `api.duckduckgo.com/?q=...&format=json` — definitions, abstracts, related topics |
-| **Fallback** | Wikipedia OpenSearch | Free API, no scraping | **No** | `wikipedia.org/w/api.php?action=opensearch` — encyclopedia results only |
-| **Full search** | SearXNG (self-hosted) | Self-hosted meta-search | **No** (self-hosted) | Aggregates 70+ engines; 5 min Docker setup; JSON API |
+| **Default** | DuckDuckGo (via `websearch`) | No | 零配置 | Full web results (HTML scraping with anti-block headers) |
+| **Fallback** | Wikipedia OpenSearch | No | 零配置 | Encyclopedia results |
+| **Enhanced** | Tavily | Yes (free: 1K/mo) | `TAVILY_API_KEY` env | AI-optimized, LLM-ready structured results |
+| **Self-hosted** | SearXNG | No | `searxng_url` in config | Full multi-engine search, user's own instance |
+| **Optional** | Google CSE, Brave, Exa, Serper | Yes | Per-provider env vars | Via `websearch` crate's other providers |
 
-**Not included** (per embed-first principle):
-- DDG HTML scraping — aggressively blocked on datacenter/VPS IPs. Research
-  (2026-06-20) confirmed CAPTCHA walls, HTTP 202 traps, and "anomaly in the
-  request" blocks. Not reliable as a default backend.
-- Brave Search API, Tavily — require third-party API keys.
+**Dependency**: `websearch = "0.1"` (MIT, pure Rust, async, multi-provider
+strategies: aggregate/failover/race). Already handles DuckDuckGo with
+anti-block headers, result parsing, and rate limiting.
 
-Configuration:
-```toml
-# Optional: only needed for full multi-engine search
-[search]
-searxng_url = "https://search.example.com"  # Self-hosted SearXNG instance
+### Multi-Provider Strategy
+
+The tool queries providers in parallel using a **race + fallback** strategy:
+
 ```
-
-If SearXNG is not configured, the tool uses DuckDuckGo Instant Answer →
-Wikipedia fallback automatically. No config required for basic search.
+web_search("rust async tokio")
+  │
+  ├── DuckDuckGo (no key) ──────┐
+  ├── Tavily (if key set) ───────┤ parallel
+  └── SearXNG (if URL set) ──────┘
+       │
+       ▼
+  First response wins → return results
+  All fail → Wikipedia OpenSearch as last resort
+```
 
 ### Output Format
 
@@ -97,11 +104,12 @@ Results: 10
 ## Acceptance Criteria
 
 - [ ] `web_search` tool is registered with Network nature.
-- [ ] DuckDuckGo Instant Answer API works as default (zero config).
-- [ ] Wikipedia OpenSearch API works as fallback.
-- [ ] SearXNG self-hosted backend works when configured.
-- [ ] Tool works out-of-the-box — no setup required for basic search.
-- [ ] Results include title, URL, and snippet per result.
+- [ ] DuckDuckGo works as default (zero config, via `websearch` crate).
+- [ ] Wikipedia OpenSearch works as last-resort fallback.
+- [ ] Tavily works when `TAVILY_API_KEY` is set.
+- [ ] SearXNG self-hosted works when `searxng_url` is configured.
+- [ ] Multi-provider race strategy: parallel query, first response wins.
+- [ ] Tool works out-of-the-box with zero setup (DDG + Wikipedia).
 - [ ] Permission pipeline gates the tool; it can be disabled.
 - [ ] `cargo test -p talos-tools` passes.
 
