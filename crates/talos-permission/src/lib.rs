@@ -289,6 +289,12 @@ impl PermissionEngine {
             path_pattern: None,
             decision: PermissionDecision::Ask,
         });
+
+        self.rules.push(PermissionRule {
+            tool_name: "http_request".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Ask,
+        });
     }
 
     /// Adds a custom rule to the engine.
@@ -417,6 +423,8 @@ fn infer_nature(tool_name: &str) -> talos_core::tool::ToolNature {
         talos_core::tool::ToolNature::Read
     } else if name_lower == "bash" || name_lower == "sh" {
         talos_core::tool::ToolNature::Execute
+    } else if name_lower == "http_request" || name_lower == "web_search" {
+        talos_core::tool::ToolNature::Network
     } else {
         talos_core::tool::ToolNature::Write
     }

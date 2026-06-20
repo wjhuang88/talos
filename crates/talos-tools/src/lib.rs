@@ -8,6 +8,7 @@ pub mod bash_tool;
 pub mod diff_stat;
 pub mod file_tools;
 pub mod git;
+pub mod http_request;
 pub mod search_tools;
 pub mod symbol;
 pub mod tree;
@@ -19,5 +20,6 @@ pub use file_tools::{
     DeleteError, DeleteInput, DeleteTool, EditInput, EditTool, FileToolError, LsInput, LsTool,
     ReadInput, ReadTool, WriteInput, WriteTool,
 };
+pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 pub use tree::TreeTool;
