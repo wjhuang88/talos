@@ -87,7 +87,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | REMOTE-001 Remote Session Protocol | Research | [REMOTE-001 Remote Session Protocol](backlog/active/REMOTE-001-remote-session-protocol.md) | Research transport, auth, and minimum viable slice before any implementation |
-| PLUGIN-001 WASM Runtime Plugin Protocol | Research | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Design protocol spec for WASM plugins providing tools, commands, hooks, and filters; PluginCommand follows CMD-001 and requires ADR before runtime implementation |
+| PLUGIN-001 WASM Runtime Plugin Protocol | Research (→ P2) | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Elevated P2: unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM loading |
 | I017 Embedded Git Tools | P0-P2 Complete | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Read/write Git tools delivered in I026; future scope starts from P3 advanced tools |
 | I019 Layered Memory Foundation | Planned | [MEM-001 Layered Memory Foundation](backlog/active/MEM-001-layered-memory-foundation.md) | Start after I018 or explicit memory priority; follow ADR-016 |
 | MODEL-001 Model Catalog Foundation | Planned | [MODEL-001 Model Catalog](backlog/active/MODEL-001-model-catalog-and-reasoning.md) | Built-in model dataset + models.dev import; catalog-only (reasoning split to MODEL-003) |

@@ -4,7 +4,7 @@
 | --- | --- |
 | Story ID | PLUGIN-001 |
 | Status | Research |
-| Priority | P4 |
+| Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
 | Source | User request, 2026-06-18 |
 | Relates To | CMD-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
 
