@@ -107,3 +107,4 @@ acceptance criteria, verification evidence, or iteration state.
 | AGENT-002 dotagentsprotocol Shared Config | Research | [AGENT-002 dotagentsprotocol.com Support](backlog/active/AGENT-002-dotagents-protocol-support.md) | Three sub-areas: A) `models.json` import, B) `skills/` discovery (needs SKILL-002 gate), C) `mcp.json` import (needs server opt-in ADR) |
 | WEB-001 Embedded Web Control | Research (→ P3) | [WEB-001](backlog/active/WEB-001-embedded-web-control-surface.md) | Loopback HTTP + status/SSE + project management UI (GOV-003)
 | GOV-003 Built-in Project Governance | Planned | [GOV-003](backlog/active/GOV-003-builtin-project-governance.md) | Phase 1: context injection; Phase 2: gate enforcement; Phase 3: PM web UI
+| TOOL-009 Internet Search Tool | Planned | [TOOL-009](backlog/active/TOOL-009-internet-search-tool.md) | web_search with SearXNG/Brave/Tavily backends; Network gated; depends on WEBFETCH-001 HTTP infra
