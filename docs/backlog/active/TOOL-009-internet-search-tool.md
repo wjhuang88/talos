@@ -62,6 +62,23 @@ web_search("rust async tokio")
   All fail → Wikipedia OpenSearch as last resort
 ```
 
+### Configuration
+
+Follows Talos's `api_key_env` pattern — the env var name is stored in config,
+**never the key itself** (same convention as `[providers.<name>.api_key_env]`):
+
+```toml
+# ~/.talos/config.toml
+[search]
+# Tavily AI-optimized search (1,000 free queries/month)
+tavily_api_key_env = "TAVILY_API_KEY"
+
+# Self-hosted SearXNG instance
+searxng_url = "https://search.example.com"
+```
+
+All fields optional. Tool works with zero config (DuckDuckGo + Wikipedia).
+
 ### Output Format
 
 Compact, model-friendly text:
