@@ -198,11 +198,11 @@ impl GitLogTool {
                 .object()
                 .map_err(|e| GitToolError::Git(e.to_string()))?;
             let commit_ref = obj.decode().map_err(|e| GitToolError::Git(e.to_string()))?;
-        let author = commit_ref
-            .author()
-            .map_err(|e| GitToolError::Git(e.to_string()))?;
-        let author_name = author.name.to_string();
-        let date = author.time.to_string();
+            let author = commit_ref
+                .author()
+                .map_err(|e| GitToolError::Git(e.to_string()))?;
+            let author_name = author.name.to_string();
+            let date = author.time.to_string();
 
             let hex_str = info.id.to_hex().to_string();
             let short = &hex_str[..7.min(hex_str.len())];
@@ -487,11 +487,11 @@ impl GitShowTool {
         let commit_ref = commit
             .decode()
             .map_err(|e| GitToolError::Git(e.to_string()))?;
-            let author = commit_ref
-                .author()
-                .map_err(|e| GitToolError::Git(e.to_string()))?;
-            let author_name = author.name.to_string();
-            let date = author.time.to_string();
+        let author = commit_ref
+            .author()
+            .map_err(|e| GitToolError::Git(e.to_string()))?;
+        let author_name = author.name.to_string();
+        let date = author.time.to_string();
 
         let hex_str = commit.id().to_hex().to_string();
         let short = &hex_str[..7.min(hex_str.len())];

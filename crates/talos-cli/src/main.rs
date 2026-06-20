@@ -151,6 +151,13 @@ pub(crate) struct Cli {
     #[arg(long, value_enum, help = "Explicit runtime mode.")]
     mode: Option<Mode>,
 
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Import model metadata from a models.dev JSON file."
+    )]
+    import_models: Option<PathBuf>,
+
     // I009-S3 begin
     #[cfg(debug_assertions)]
     #[arg(
@@ -165,6 +172,10 @@ pub(crate) struct Cli {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if let Some(path) = &cli.import_models {
+        return run_import_models(path);
+    }
 
     if matches!(cli.mode, Some(Mode::McpServer)) {
         return run_mcp_server().await;
@@ -236,6 +247,40 @@ pub(crate) fn build_hook_registry(include_evolution: bool) -> Arc<HookRegistry> 
         }
     }
     Arc::new(registry)
+}
+
+fn run_import_models(path: &PathBuf) -> Result<()> {
+    let json = std::fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+
+    let models = talos_config::model::import_models_dev(&json)
+        .map_err(|e| anyhow::anyhow!("failed to parse models.dev data: {e}"))?;
+
+    let cache_dir = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".talos")
+        .join("cache")
+        .join("models");
+    std::fs::create_dir_all(&cache_dir)
+        .map_err(|e| anyhow::anyhow!("failed to create cache dir: {e}"))?;
+
+    let cache_path = cache_dir.join("models.json");
+    std::fs::write(&cache_path, &json)
+        .map_err(|e| anyhow::anyhow!("failed to write cache: {e}"))?;
+
+    println!("Imported {} models from models.dev", models.len());
+    println!("Cached to {}", cache_path.display());
+
+    let mut by_provider: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for m in &models {
+        *by_provider.entry(m.provider.clone()).or_insert(0) += 1;
+    }
+    for (provider, count) in by_provider.iter() {
+        println!("  {provider}: {count}");
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

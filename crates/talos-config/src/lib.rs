@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 pub mod agents;
+pub mod model;
 pub mod opencode;
 
 /// Error types for configuration operations.

@@ -1,6 +1,6 @@
 # I038: Model Catalog Foundation
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-06-20
 > Planned objective: Talos ships a built-in model dataset and can import model metadata
 >   from models.dev. The agent knows each model's context window, output limit, pricing,
@@ -87,12 +87,20 @@
 
 ## Verification Evidence
 
-(to be filled as stories land)
+- `cargo test -p talos-config` — 57 tests pass (43 existing + 14 new model tests)
+- `cargo test --workspace` — all pass
+- `cargo clippy -p talos-config -p talos-cli -- -D warnings` — clean
+- `cargo fmt --all` — clean
+- `cargo check --workspace` — clean
+- Runtime evidence: `talos --import-models models.json` parses models.dev JSON, caches, prints provider summary
 
 ## Variance And Residuals
 
-(to be filled)
+- None. All I038 acceptance criteria met.
+- No runtime network dependency added (import is explicit user action with local file path).
 
 ## Retrospective
 
-(to be filled)
+- Outcome: met
+- Deliverables: `model.rs` (14 tests), `models.toml` (24 models), `--import-models` CLI
+- Documentation: I038 plan updated, MODEL-001 backlog updated below
