@@ -16,7 +16,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I036 Research Consolidation | Active | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | 11-story research pass: inventory + classify + converge REMOTE/WEB/PLUGIN/OKF/MEM/MODEL/STORE into decisions |
 
 ## Review
 
