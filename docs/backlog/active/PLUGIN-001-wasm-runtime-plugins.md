@@ -6,7 +6,7 @@
 | Status | Research |
 | Priority | P4 |
 | Source | User request, 2026-06-18 |
-| Relates To | CMD-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc` |
+| Relates To | CMD-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
 
 ## Requirement
 

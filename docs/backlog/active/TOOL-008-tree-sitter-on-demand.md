@@ -49,12 +49,10 @@ Replace compile-time embedding of tree-sitter parsers with on-demand loading:
 
 ### Phase 3: Runtime parser loading (long-term)
 
-- Compile parsers to shared libraries (.so/.dylib/.dll) or WASM modules.
-- Download and cache on first use (similar to tree-sitter WASM approach
-  used by Codex and other tools).
-- **Binary size**: 64 MB → ~20-25 MB (core binary only).
-- Requires: parser distribution infrastructure (DIST-001), security
-  verification for downloaded binaries.
+- Compile parsers to WASM modules using `tree-sitter` WASM compilation target.
+- Load via PLUGIN-001 WASM runtime infrastructure (sandbox, lifecycle, security).
+- Download and cache via DIST-001 optional asset distribution.
+- **Binary size**: 64 MB → ~20-25 MB (core binary only, parsers as WASM modules).
 
 ## Non-Goals
 
@@ -82,6 +80,7 @@ Replace compile-time embedding of tree-sitter parsers with on-demand loading:
 | CODE-001 | Tree-sitter research: parser loading architecture |
 | CODE-002 | Symbol tools: must work with feature-gated parsers |
 | DIST-001 | Phase 3 requires optional asset distribution |
+| PLUGIN-001 | Phase 3 reuses WASM runtime for parser module loading |
 | TOOL-007 | Tool set audit: code intelligence tool relevance |
 
 ## Required Reads
