@@ -31,22 +31,29 @@ structured results:
 
 ### Search Backend (configurable)
 
-| Backend | Type | Notes |
-|---|---|---|
-| SearXNG | Self-hosted, open-source | Default/recommended — no API key, privacy-respecting |
-| Brave Search API | Cloud API | Requires API key; good free tier |
-| Tavily | AI-optimized search | Designed for agent use; paid |
+Tiered approach — embed-first, no mandatory third-party API keys:
 
-Configuration in `~/.talos/config.toml`:
+| Tier | Backend | Type | Key required? | Notes |
+|---|---|---|---|---|
+| **Default** | DuckDuckGo Instant Answer | Free API, no scraping | **No** | `api.duckduckgo.com/?q=...&format=json` — definitions, abstracts, related topics |
+| **Fallback** | Wikipedia OpenSearch | Free API, no scraping | **No** | `wikipedia.org/w/api.php?action=opensearch` — encyclopedia results only |
+| **Full search** | SearXNG (self-hosted) | Self-hosted meta-search | **No** (self-hosted) | Aggregates 70+ engines; 5 min Docker setup; JSON API |
+
+**Not included** (per embed-first principle):
+- DDG HTML scraping — aggressively blocked on datacenter/VPS IPs. Research
+  (2026-06-20) confirmed CAPTCHA walls, HTTP 202 traps, and "anomaly in the
+  request" blocks. Not reliable as a default backend.
+- Brave Search API, Tavily — require third-party API keys.
+
+Configuration:
 ```toml
+# Optional: only needed for full multi-engine search
 [search]
-backend = "searxng"              # or "brave" or "tavily"
-base_url = "https://search.example.com"  # for SearXNG
-api_key_env = "BRAVE_API_KEY"    # for Brave/Tavily
+searxng_url = "https://search.example.com"  # Self-hosted SearXNG instance
 ```
 
-If no backend is configured, the tool returns a clear error:
-"web_search is not configured. Set [search] in ~/.talos/config.toml."
+If SearXNG is not configured, the tool uses DuckDuckGo Instant Answer →
+Wikipedia fallback automatically. No config required for basic search.
 
 ### Output Format
 
@@ -82,19 +89,19 @@ Results: 10
 
 ## Non-Goals
 
+- Do not implement DDG HTML scraping — research confirmed it is unreliable
+  (CAPTCHA walls, HTTP 202 traps, datacenter IP blocking).
+- Do not require third-party API keys for basic functionality.
 - Do not implement a built-in search engine or web crawler.
-- Do not scrape search result pages (use structured APIs only).
-- Do not auto-search without explicit agent invocation.
-- Do not cache search results across sessions in v1.
 
 ## Acceptance Criteria
 
 - [ ] `web_search` tool is registered with Network nature.
-- [ ] SearXNG backend works with user-configured base URL.
-- [ ] Brave Search API backend works with API key.
-- [ ] Tool returns error when no backend is configured.
-- [ ] Output format includes title, URL, and snippet per result.
-- [ ] Results are truncated to max_results (default 10, max 20).
+- [ ] DuckDuckGo Instant Answer API works as default (zero config).
+- [ ] Wikipedia OpenSearch API works as fallback.
+- [ ] SearXNG self-hosted backend works when configured.
+- [ ] Tool works out-of-the-box — no setup required for basic search.
+- [ ] Results include title, URL, and snippet per result.
 - [ ] Permission pipeline gates the tool; it can be disabled.
 - [ ] `cargo test -p talos-tools` passes.
 
