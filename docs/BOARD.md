@@ -16,6 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I038 Model Catalog Foundation | Active | [I038 Model Catalog](iterations/I038-model-catalog-foundation.md) | Built-in TOML dataset (~20 models) + models.dev import; catalog-only, reasoning split to MODEL-003 |
 
 ## Review
 
