@@ -29,62 +29,32 @@ Opens the interactive model picker immediately.
 
 ### Interactive Model Picker
 
-Reuses TUI-010's popup layer. Opens when `/model` is typed:
+Renders as an extension of the existing TUI-010 slash menu popup layer.
+Single-line per model, metadata shown in the tip area on selection change.
 
 ```
-┌── Models ─────────────────────────────────────┐
-│                                                │
-│  ● claude-sonnet-4-20250514   (active)         │
-│    Anthropic · 200K ctx · $3/$15               │
-│                                                │
-│  ○ gpt-4o                                      │
-│    OpenAI · 128K ctx · $2.50/$10               │
-│                                                │
-│  ○ deepseek-v3                                 │
-│    DeepSeek · 128K ctx · $0.27/$1.10           │
-│                                                │
-│  ── More from catalog ──                       │
-│  ○ claude-haiku-4            Anthropic         │
-│    200K · $0.80/$4                             │
-│                                                │
-│  ↑↓ select   Enter switch   i info   r refresh │
-│  / filter    Esc cancel                        │
-└────────────────────────────────────────────────┘
+  /claude-sonnet-4-20250514        Anthropic · 200K · $3/$15
+  /gpt-4o                          OpenAI · 128K · $2.50/$10
+  /deepseek-v3                     DeepSeek · 128K · $0.27/$1.10
+  /claude-haiku-4-20250514         Anthropic · 200K · $0.80/$4
+
+  ↑↓ select   Enter switch   / filter   Esc cancel
 ```
 
-### Key Bindings
+When selection changes, the tip area shows the selected model's metadata:
+```
+Tip: claude-haiku-4 · Anthropic · 200K ctx · $0.80/$4 per 1M · reasoning ✗
+```
 
-| Key | Action |
+### Behavior
+
+| Action | Result |
 |---|---|
-| `↑` `↓` | Navigate |
-| `Enter` | Switch to selected model (add to config if from catalog) |
-| `i` | Toggle info panel: show full metadata for selected model |
-| `r` | Refresh catalog from models.dev (if previously imported) |
-| `/` | Filter list by name/provider |
+| `/model` | Opens picker showing all known models (configured first, then catalog) |
+| `↑` `↓` | Navigate; tip area updates with model metadata |
+| `Enter` | Switch to selected model. Catalog-only models auto-register to config. |
+| `/` | Filter by name or provider |
 | `Esc` | Cancel, keep current model |
-
-### Selecting a Catalog Model
-
-When user presses Enter on an unconfigured catalog model:
-- "Added claude-haiku-4 to config. Switching..."
-- Registers + switches in one step. No confirmation prompt.
-- Persists to `~/.talos/config.toml` for future sessions.
-
-### Info Panel (i key)
-
-Toggles below the list:
-```
-┌── Model Info ──────────────────────────────────┐
-│ claude-haiku-4-20250514                        │
-│ Provider: Anthropic                            │
-│ Context: 200,000 tokens                        │
-│ Output:  8,192 tokens                          │
-│ Pricing: $0.80 / $4.00 per 1M (in/out)        │
-│ Released: 2025-05                              │
-│ Capabilities: tools ✓  reasoning ✗  images ✓   │
-│ Source: built-in catalog                       │
-└────────────────────────────────────────────────┘
-```
 
 ## Non-Goals
 
@@ -94,13 +64,12 @@ Toggles below the list:
 
 ## Acceptance Criteria
 
-- [ ] `/model` opens interactive picker — no subcommands needed.
-- [ ] Picker shows configured models first, catalog models below.
-- [ ] ↑↓ navigate, Enter selects and switches immediately.
-- [ ] Selecting an unconfigured catalog model auto-registers + switches.
-- [ ] `i` toggles full metadata info panel.
-- [ ] `r` refreshes models.dev cache.
-- [ ] `/` filters list by name or provider.
+- [ ] `/model` opens picker in the existing TUI-010 slash menu layer.
+- [ ] Single-line per model: id + provider + context + pricing.
+- [ ] Tip area shows selected model's full metadata on navigation.
+- [ ] ↑↓ navigate, Enter switches immediately.
+- [ ] Catalog-only models auto-register to config on Enter.
+- [ ] `/` filters by name or provider.
 - [ ] Model switch takes effect on the next turn.
 - [ ] `cargo test -p talos-tui -p talos-config` passes.
 
