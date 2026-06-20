@@ -93,7 +93,58 @@ are available.
 - [ ] Tests cover threshold decisions, pre-turn ordering, manual compaction,
       skipped compaction, and failure fallback.
 
-## Required Reads
+## Smart Compaction Strategy (Research 2026-06-20)
+
+The current `should_compact()` uses a purely mechanical 80% token threshold.
+This can fire mid-task, losing critical intermediate tool results. A smarter
+scheduler should detect natural conversation boundaries first.
+
+### Available Signals (already in the codebase)
+
+| Signal | Source | How to use |
+|---|---|---|
+| `StopReason::EndTurn` vs `ToolUse` | AgentEvent per turn | `EndTurn` after tool-call sequence = natural boundary; `ToolUse` = mid-task, don't compact |
+| Tool call count per turn | `turn_tool_calls.len()` | 0-call turns (pure text) are safer compaction targets than 5+ call turns |
+| Tool call names/patterns | `call.name` per ToolCall | Read-only burst → write/edit burst = phase transition boundary |
+| Token usage delta | `Usage` per turn | Large input spike (read_files) followed by output = task completed |
+
+### Phased Implementation
+
+**Phase 1 — Boundary-Aware Trigger (low complexity)**:
+- Before compacting, check if current turn is `EndTurn` with 0 pending tool calls
+  → if yes, this is a natural boundary, safe to compact.
+- If `ToolUse` → defer compaction by 1 turn unless hard overflow.
+- Track tool-call density: turns with 0 tool calls can be compacted more aggressively
+  than turns with 3+ tool calls (current task context).
+
+**Phase 2 — Tool-Call Counter (low complexity)**:
+- Track cumulative tool calls per session, signal at 50/75/100:
+  - 50: "Consider /compact if transitioning phases"
+  - 75: "Good boundary for /compact"
+  - 100: "Strongly recommend /compact before next task"
+- Phase transition detection: exploration (read/grep/glob) → implementation
+  (write/edit/bash) shift signals a natural compaction boundary.
+
+**Phase 3 — Agent Self-Triggered (medium complexity)**:
+- Expose `compact_conversation` as an agent-callable tool with an eligibility gate
+  (only available when context > 50% of threshold).
+- Model decides when prior context is no longer needed, based on system prompt
+  guidance about "good times to compact."
+- The tool is NOT granted by default; user opt-in via config.
+
+**Phase 4 — Task Completion Checkpoint (medium complexity, future)**:
+- `mark_task_done` tool: model explicitly declares task complete.
+- Writes structured record: intent, files modified, decisions, errors, next steps.
+- Subsumes compaction at the boundary — checkpoint IS the compaction artifact.
+
+### What NOT to do
+
+- Embedding-based semantic detection: overkill for a coding agent where
+  tool patterns + stop reasons are more reliable signals.
+- Full 5-tier Claude Code cascade: Talos already has 5 layers; the gap is
+  *when* to trigger, not *how* to compact.
+- ML-based boundary classification: requires training data, adds complexity
+  disproportionate to benefit.
 
 - `docs/backlog/active/MEM-002-conversation-context-continuity.md`
 - `docs/backlog/active/MEM-003-llm-compaction.md`

@@ -253,18 +253,26 @@ incrementally.
 
 ### Phase 2: PDF/Text Documents
 
-- Add PDF text extraction for non-scanned PDFs after dependency Spike.
-- Detect scanned/OCR-needed PDFs and return a clear unsupported or optional-enhancement message.
+- Add PDF text extraction for non-scanned PDFs.
+- Candidate implementation path: WASM plugin (PLUGIN-001) rather than built-in,
+  to avoid embedding heavy PDF parsing dependencies in the core binary.
+- Detect scanned/OCR-needed PDFs and return a clear unsupported message.
 
 ### Phase 3: Office And Archive Documents
 
-- Add DOCX/XLSX/PPTX text/table extraction after per-format POC.
+- Add DOCX/XLSX/PPTX text/table extraction.
+- Candidate implementation path: WASM plugin (PLUGIN-001), same rationale as PDF.
 - Add ZIP dispatch only with recursion, size, and file-count limits.
 
 ### Phase 4: Optional Enhancements
 
-- OCR, audio/video transcription, JS rendering, anti-bot bypass, proxy pools, hosted extraction,
-  and webclaw integration are optional and must go through separate dependency/security review.
+- OCR, audio/video transcription, JS rendering, anti-bot bypass, proxy pools,
+  hosted extraction, and webclaw integration are optional.
+- All heavy format handlers (PDF, Office, image, binary) target PLUGIN-001
+  WASM plugin delivery rather than built-in embedding. This keeps the core
+  binary lean (see TOOL-008 tree-sitter on-demand analysis).
+- Core provides the `http_request` / `fetch_url` fetch + dispatch layer;
+  format-specific extraction plugins are loaded on demand.
 
 ## Permission And Safety Boundaries
 
