@@ -1,6 +1,6 @@
 # I036: Research Consolidation
 
-**Status**: Planned
+**Status**: Active (2026-06-20)
 **Target Window**: End of the current one-month plan, after I035
 **Depends On**: I030-I035 complete preferred; may proceed as research-only if implementation
 iterations slip
