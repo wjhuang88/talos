@@ -1,6 +1,7 @@
 //! Bash tool for shell command execution.
 
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -9,8 +10,8 @@ use serde::Deserialize;
 use serde_json::Value;
 use talos_core::tool::{AgentTool, ToolResult};
 use thiserror::Error;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::time::timeout;
 
 /// Errors that can occur during bash tool execution.
 #[derive(Debug, Error)]
@@ -68,9 +69,13 @@ impl BashTool {
         self.timeout
     }
 
-    async fn run_command(&self, command: &str) -> ToolResult {
+    async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
         let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(command).current_dir(&self.working_dir);
+        cmd.arg("-c")
+            .arg(command)
+            .current_dir(&self.working_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         #[cfg(unix)]
         {
@@ -121,28 +126,88 @@ impl BashTool {
             }
         }
 
-        let output = match cmd.output().await {
-            Ok(o) => o,
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
             Err(e) => return ToolResult::error(format!("failed to spawn shell: {e}")),
         };
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let stdout_pipe = child.stdout.take().expect("stdout is piped");
+        let stderr_pipe = child.stderr.take().expect("stderr is piped");
 
-        let mut content = String::new();
-        if !stdout.is_empty() {
-            content.push_str(&stdout);
-        }
-        if !stderr.is_empty() {
-            if !content.is_empty() {
-                content.push('\n');
+        let mut stdout_reader = BufReader::new(stdout_pipe).lines();
+        let mut stderr_reader = BufReader::new(stderr_pipe).lines();
+
+        let mut output = String::new();
+        output.push_str(&format!("$ {command}\n"));
+
+        let exit_status = loop {
+            tokio::select! {
+                line_result = stdout_reader.next_line() => {
+                    match line_result {
+                        Ok(Some(line)) => {
+                            output.push_str(&line);
+                            output.push('\n');
+                        }
+                        Ok(None) => {} // stdout closed
+                        Err(e) => {
+                            output.push_str(&format!("[stdout error: {e}]\n"));
+                        }
+                    }
+                }
+                line_result = stderr_reader.next_line() => {
+                    match line_result {
+                        Ok(Some(line)) => {
+                            output.push_str(&line);
+                            output.push('\n');
+                        }
+                        Ok(None) => {} // stderr closed
+                        Err(e) => {
+                            output.push_str(&format!("[stderr error: {e}]\n"));
+                        }
+                    }
+                }
+                status = child.wait() => {
+                    // Drain any remaining output after child exits
+                    while let Ok(Some(line)) = stdout_reader.next_line().await {
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    while let Ok(Some(line)) = stderr_reader.next_line().await {
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    break status;
+                }
+                _ = tokio::time::sleep(timeout_duration) => {
+                    let _ = child.kill().await;
+                    let _ = child.wait().await;
+                    // Drain any remaining output after kill
+                    while let Ok(Some(line)) = stdout_reader.next_line().await {
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    while let Ok(Some(line)) = stderr_reader.next_line().await {
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    output.push_str("[timeout]");
+                    return ToolResult::error(output);
+                }
             }
-            content.push_str(&stderr);
+        };
+
+        let exit_status = match exit_status {
+            Ok(s) => s,
+            Err(e) => return ToolResult::error(format!("failed to wait for child: {e}")),
+        };
+
+        let exit_code = exit_status.code().unwrap_or(-1);
+        output.push_str(&format!("[exit {exit_code}]"));
+
+        ToolResult {
+            content: output,
+            is_error: !exit_status.success(),
         }
-
-        let is_error = !output.status.success();
-
-        ToolResult { content, is_error }
     }
 }
 
@@ -184,15 +249,7 @@ impl AgentTool for BashTool {
             .map(|s| Duration::from_secs(s.clamp(1, MAX_TIMEOUT_SECS)))
             .unwrap_or(self.timeout);
 
-        let result = timeout(timeout_duration, self.run_command(&bash_input.command)).await;
-
-        match result {
-            Ok(exec_result) => exec_result,
-            Err(_) => ToolResult::error(format!(
-                "command timed out after {}ms",
-                timeout_duration.as_millis()
-            )),
-        }
+        self.run_command(&bash_input.command, timeout_duration).await
     }
 }
 
@@ -232,7 +289,9 @@ mod tests {
             .await;
 
         assert!(!result.is_error);
-        assert_eq!(result.content.trim(), "hello");
+        assert!(result.content.contains("hello"));
+        assert!(result.content.starts_with("$ echo hello\n"));
+        assert!(result.content.ends_with("[exit 0]"));
     }
 
     #[tokio::test]
@@ -243,6 +302,7 @@ mod tests {
             .await;
 
         assert!(result.is_error);
+        assert!(result.content.starts_with("$ nonexistent_command_xyz_123\n"));
     }
 
     #[tokio::test]
@@ -253,7 +313,7 @@ mod tests {
             .await;
 
         assert!(result.is_error);
-        assert!(result.content.contains("timed out"));
+        assert!(result.content.contains("[timeout]"));
     }
 
     #[tokio::test]
@@ -264,7 +324,9 @@ mod tests {
             .await;
 
         assert!(!result.is_error);
-        assert_eq!(result.content.trim(), "HELLO");
+        assert!(result.content.contains("HELLO"));
+        assert!(result.content.starts_with("$ echo hello | tr a-z A-Z\n"));
+        assert!(result.content.ends_with("[exit 0]"));
     }
 
     #[tokio::test]
@@ -277,7 +339,8 @@ mod tests {
             .await;
 
         assert!(!result.is_error);
-        assert_eq!(result.content.trim(), "test123");
+        assert!(result.content.contains("test123"));
+        assert!(result.content.ends_with("[exit 0]"));
     }
 
     #[tokio::test]
@@ -288,7 +351,8 @@ mod tests {
             .await;
 
         assert!(!result.is_error);
-        assert_eq!(result.content.trim(), "talos-tools");
+        assert!(result.content.contains("talos-tools"));
+        assert!(result.content.ends_with("[exit 0]"));
     }
 
     #[tokio::test]
@@ -348,5 +412,98 @@ mod tests {
     fn test_bash_tool_custom_timeout() {
         let tool = BashTool::new(test_dir()).with_timeout(Duration::from_secs(30));
         assert_eq!(tool.timeout(), Duration::from_secs(30));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_command_header() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "echo test" }))
+            .await;
+
+        assert!(result.content.starts_with("$ echo test\n"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_exit_code_success() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "true" }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.ends_with("[exit 0]"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_exit_code_failure() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "false" }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.ends_with("[exit 1]"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_multiline_output() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "printf 'line1\\nline2\\nline3\\n'" }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("line1"));
+        assert!(result.content.contains("line2"));
+        assert!(result.content.contains("line3"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_stderr_captured() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "echo stderr_msg >&2" }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("stderr_msg"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_timeout_preserves_partial_output() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_millis(500));
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "echo before_sleep && sleep 10 && echo after_sleep"
+            }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("before_sleep"));
+        assert!(result.content.contains("[timeout]"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_empty_output() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "true" }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.starts_with("$ true\n"));
+        assert!(result.content.ends_with("[exit 0]"));
+    }
+
+    #[tokio::test]
+    async fn test_streaming_timeout_input_clamped() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "sleep 10", "timeout_secs": 0 }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("[timeout]"));
     }
 }

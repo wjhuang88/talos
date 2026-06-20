@@ -11,7 +11,7 @@ mod tests {
     use crate::scrollback::{
         SlashMenuComponent, SlashMenuPlacement, build_input_text, build_status_text,
         calculate_cost, cursor_line_col, input_line_count, slash_menu_placement, slash_menu_rows,
-        stream_padding_for,
+        stream_padding_for, truncate_str,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, CtrlCState, SlashMenuItem, SlashMenuState, Tip, TuiState};
@@ -288,10 +288,11 @@ mod tests {
             followup_count: 0,
             is_processing: false,
         };
-        let text = build_status_text(&status);
+        let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
         assert!(!content.contains("S:"));
         assert!(!content.contains("F:"));
+        assert!(!content.contains("queued"));
     }
 
     #[test]
@@ -304,9 +305,9 @@ mod tests {
             followup_count: 0,
             is_processing: false,
         };
-        let text = build_status_text(&status);
+        let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
-        assert!(content.contains("S:3"));
+        assert!(content.contains("3 queued"));
     }
 
     #[test]
@@ -539,5 +540,113 @@ mod tests {
         assert_eq!(slash_menu_rows(5, 3), (1, true, true));
         assert_eq!(slash_menu_rows(5, 6), (5, true, false));
         assert_eq!(slash_menu_rows(10, 10), (8, true, true));
+    }
+
+    // ── Status bar redesign ────────────────────────────────────────────
+
+    #[test]
+    fn test_status_bar_uses_accent_for_model() {
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4".to_string(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("⬡ claude-sonnet-4"));
+    }
+
+    #[test]
+    fn test_status_bar_shows_processing_spinner() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: true,
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("◷"));
+        assert!(content.contains("processing"));
+    }
+
+    #[test]
+    fn test_status_bar_no_spinner_when_idle() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(!content.contains("processing"));
+    }
+
+    #[test]
+    fn test_status_bar_uses_human_readable_tokens() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            usage: Usage {
+                input_tokens: 12_345,
+                output_tokens: 8_900,
+                ..Default::default()
+            },
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("21.2k"));
+        assert!(!content.contains("21245 tokens"));
+    }
+
+    #[test]
+    fn test_status_bar_compact_mode_at_narrow_width() {
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4-20250514".to_string(),
+            usage: Usage {
+                input_tokens: 5_000,
+                output_tokens: 3_000,
+                ..Default::default()
+            },
+            branch_id: None,
+            steering_count: 2,
+            followup_count: 1,
+            is_processing: true,
+        };
+        let wide = build_status_text(&status, 120);
+        let narrow = build_status_text(&status, 60);
+        let wide_text = format!("{:?}", wide);
+        let narrow_text = format!("{:?}", narrow);
+        assert!(wide_text.contains("processing"));
+        assert!(!narrow_text.contains("processing"));
+        assert!(narrow_text.contains("◷"));
+    }
+
+    #[test]
+    fn test_truncate_str_short_enough() {
+        assert_eq!(truncate_str("hello", 10), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_truncates_with_ellipsis() {
+        let result = truncate_str("claude-sonnet-4-20250514", 12);
+        assert!(result.ends_with('…'));
+        assert_eq!(result.chars().count(), 12);
+    }
+
+    #[test]
+    fn test_truncate_str_empty_string() {
+        assert_eq!(truncate_str("", 10), "");
     }
 }

@@ -36,8 +36,13 @@ async fn test_child_ld_preload_stripped() {
         result.content
     );
     assert!(
-        result.content.trim() == "LD_PRELOAD=",
+        result.content.contains("LD_PRELOAD="),
         "LD_PRELOAD should be empty in child, got: {:?}",
+        result.content
+    );
+    assert!(
+        !result.content.contains("/tmp/evil.so"),
+        "LD_PRELOAD value should be stripped, got: {:?}",
         result.content
     );
 
@@ -63,9 +68,8 @@ async fn test_child_core_dump_limit_is_zero() {
         "ulimit -c should succeed, got error: {}",
         result.content
     );
-    assert_eq!(
-        result.content.trim(),
-        "0",
+    assert!(
+        result.content.contains("\n0\n"),
         "RLIMIT_CORE should be 0 in child, got: {:?}",
         result.content
     );

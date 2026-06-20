@@ -650,53 +650,114 @@ impl Tui {
     fn print_exit_summary(&mut self, elapsed: Duration) {
         let status = &self.state.status;
         let elapsed_secs = elapsed.as_secs();
-        let minutes = elapsed_secs / 60;
-        let seconds = elapsed_secs % 60;
+        let usage = &status.usage;
+        let total_tokens = (usage.input_tokens + usage.output_tokens) as u64;
 
         let mut lines = vec![ScrollbackLine::plain(String::new(), None)];
 
+        let header_sep = "─".repeat(32);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                "── Session Summary ──".to_string(),
-                to_crossterm_color(semantic::DIM_TEXT),
+                format!("⬡ Talos session complete {header_sep}"),
+                to_crossterm_color(semantic::TEXT_ACCENT),
                 HistoryAttrs::default(),
             )],
             None,
         ));
 
+        lines.push(ScrollbackLine::plain(String::new(), None));
+
         if !status.model_name.is_empty() {
-            lines.push(ScrollbackLine::plain(
-                format!("  Model:    {}", status.model_name),
+            lines.push(ScrollbackLine::styled(
+                vec![
+                    HistorySegment::styled(
+                        format!("  {}  ", status.model_name),
+                        to_crossterm_color(semantic::TEXT_ACCENT),
+                        HistoryAttrs::default(),
+                    ),
+                    HistorySegment::styled(
+                        format!(
+                            "{}  ",
+                            crate::formatting::format_duration(elapsed_secs)
+                        ),
+                        to_crossterm_color(semantic::STATUS_VALUE),
+                        HistoryAttrs::default(),
+                    ),
+                    HistorySegment::styled(
+                        format!("{} turns", self.stream_count),
+                        to_crossterm_color(semantic::DIM_TEXT),
+                        HistoryAttrs::default(),
+                    ),
+                ],
+                None,
+            ));
+        } else {
+            lines.push(ScrollbackLine::styled(
+                vec![
+                    HistorySegment::styled(
+                        format!(
+                            "{}  ",
+                            crate::formatting::format_duration(elapsed_secs)
+                        ),
+                        to_crossterm_color(semantic::STATUS_VALUE),
+                        HistoryAttrs::default(),
+                    ),
+                    HistorySegment::styled(
+                        format!("{} turns", self.stream_count),
+                        to_crossterm_color(semantic::DIM_TEXT),
+                        HistoryAttrs::default(),
+                    ),
+                ],
                 None,
             ));
         }
 
-        lines.push(ScrollbackLine::plain(
-            format!("  Duration: {minutes}m {seconds}s"),
-            None,
-        ));
-
-        lines.push(ScrollbackLine::plain(
-            format!("  Turns:    {}", self.stream_count),
-            None,
-        ));
-
-        let usage = &status.usage;
         if usage.input_tokens > 0 || usage.output_tokens > 0 {
-            lines.push(ScrollbackLine::plain(
-                format!(
-                    "  Tokens:   {} in / {} out",
-                    usage.input_tokens, usage.output_tokens
-                ),
+            lines.push(ScrollbackLine::plain(String::new(), None));
+            lines.push(ScrollbackLine::styled(
+                vec![
+                    HistorySegment::styled(
+                        format!(
+                            "  {} tokens in",
+                            crate::formatting::format_tokens(usage.input_tokens as u64)
+                        ),
+                        to_crossterm_color(semantic::STATUS_VALUE),
+                        HistoryAttrs::default(),
+                    ),
+                    HistorySegment::styled(
+                        format!(
+                            "      {} tokens out",
+                            crate::formatting::format_tokens(usage.output_tokens as u64)
+                        ),
+                        to_crossterm_color(semantic::STATUS_VALUE),
+                        HistoryAttrs::default(),
+                    ),
+                ],
                 None,
             ));
-            if let Some(cost) = self.estimate_cost(usage) {
-                lines.push(ScrollbackLine::plain(
-                    format!("  Est cost: ${cost:.4}"),
-                    None,
-                ));
-            }
+            lines.push(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("  {} tokens total", crate::formatting::format_tokens(total_tokens)),
+                    to_crossterm_color(semantic::DIM_TEXT),
+                    HistoryAttrs::default(),
+                )],
+                None,
+            ));
         }
+
+        if let Some(cost) = self.estimate_cost(usage) {
+            lines.push(ScrollbackLine::plain(String::new(), None));
+            lines.push(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!("  Est cost: ${cost:.2}"),
+                    to_crossterm_color(semantic::TEXT_ACCENT),
+                    HistoryAttrs::default(),
+                )],
+                None,
+            ));
+        }
+
+        lines.push(ScrollbackLine::plain(String::new(), None));
 
         for line in lines {
             let _ = self.terminal.insert_history(&line.text, line.bg);
@@ -956,10 +1017,11 @@ impl Tui {
             max_height: u16::MAX,
         };
         let input_pad_bot = crate::scrollback::InputPadComponent;
-        let status_comp = crate::scrollback::StatusComponent { status };
 
         let screen_size = self.terminal.screen_size();
         let width = screen_size.width;
+        let status_comp = crate::scrollback::StatusComponent { status, width };
+
         let base_height = preview.height_hint(width)
             + queue.height_hint(width)
             + tips.height_hint(width)

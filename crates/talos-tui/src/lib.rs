@@ -2,6 +2,7 @@ mod app;
 mod clipboard;
 pub mod evolution;
 mod export;
+pub mod formatting;
 mod highlight;
 mod inline_terminal;
 mod scrollback;

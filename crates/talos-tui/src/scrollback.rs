@@ -221,6 +221,7 @@ impl ViewportComponent for InputComponent<'_> {
 
 pub(crate) struct StatusComponent<'a> {
     pub(crate) status: &'a talos_conversation::StatusSnapshot,
+    pub(crate) width: u16,
 }
 
 impl ViewportComponent for StatusComponent<'_> {
@@ -229,7 +230,7 @@ impl ViewportComponent for StatusComponent<'_> {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let text = build_status_text(self.status);
+        let text = build_status_text(self.status, self.width);
         frame.render_widget(Paragraph::new(text), area);
     }
 }
@@ -1170,51 +1171,98 @@ pub(crate) fn input_prefix_for_line(line_index: usize) -> &'static str {
     if line_index == 0 { " > " } else { "   " }
 }
 
-pub(crate) fn build_status_text(status: &talos_conversation::StatusSnapshot) -> Text<'static> {
-    let model_name = status.model_name.clone();
-    let total_tokens = status.usage.input_tokens + status.usage.output_tokens;
-    let cost = calculate_cost(&status.usage);
+pub(crate) fn build_status_text(
+    status: &talos_conversation::StatusSnapshot,
+    width: u16,
+) -> Text<'static> {
+    let compact = width < 80;
 
-    let branch_info = status
-        .branch_id
-        .as_ref()
-        .map(|b| {
-            let short: String = b.chars().take(8).collect();
-            format!(" │ {short}")
-        })
-        .unwrap_or_default();
+    let model_name = &status.model_name;
+    let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
+    let queue_total = status.steering_count + status.followup_count;
 
-    let queue_info = if status.steering_count > 0 || status.followup_count > 0 {
-        let mut parts = Vec::new();
-        if status.steering_count > 0 {
-            parts.push(format!("S:{}", status.steering_count));
-        }
-        if status.followup_count > 0 {
-            parts.push(format!("F:{}", status.followup_count));
-        }
-        format!(" │ {}", parts.join(", "))
+    if compact {
+        return build_compact_status(model_name, status.is_processing, total_tokens, queue_total);
+    }
+
+    build_expanded_status(model_name, status.is_processing, total_tokens, queue_total)
+}
+
+fn build_compact_status(
+    model_name: &str,
+    is_processing: bool,
+    total_tokens: u64,
+    queue_total: usize,
+) -> Text<'static> {
+    let dim = Style::default().fg(semantic::DIM_TEXT);
+    let accent = Style::default().fg(semantic::TEXT_ACCENT);
+    let val = Style::default().fg(semantic::STATUS_VALUE);
+
+    let model_part = format!("⬡ {}", truncate_str(model_name, 20));
+    let spinner_part = if is_processing { " ◷" } else { "" };
+    let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
+    let queue_part = if queue_total > 0 {
+        format!(" · ⬡{queue_total}")
     } else {
         String::new()
     };
 
-    let dim = Style::default().fg(semantic::DIM_TEXT);
-    let sep = Span::styled(" │ ", dim);
-    let val = Style::default().fg(semantic::STATUS_VALUE);
-
-    let spans = vec![
+    Text::from(Line::from(vec![
         Span::styled(" ", dim),
-        Span::styled(model_name, val),
-        sep.clone(),
-        Span::styled(format!("{} tokens", total_tokens), val),
-        Span::styled(branch_info, val),
-        sep.clone(),
-        Span::styled(cost, val),
-        Span::styled(queue_info, val),
-    ];
-
-    Text::from(Line::from(spans))
+        Span::styled(model_part.clone(), accent),
+        Span::styled(spinner_part, dim),
+        Span::styled(tokens_part, val),
+        Span::styled(queue_part, dim),
+    ]))
 }
 
+fn build_expanded_status(
+    model_name: &str,
+    is_processing: bool,
+    total_tokens: u64,
+    queue_total: usize,
+) -> Text<'static> {
+    let dim = Style::default().fg(semantic::DIM_TEXT);
+    let accent = Style::default().fg(semantic::TEXT_ACCENT);
+    let val = Style::default().fg(semantic::STATUS_VALUE);
+
+    let model_part = format!("⬡ {}", truncate_str(model_name, 24));
+    let spinner_part = if is_processing {
+        " ◷ processing…"
+    } else {
+        ""
+    };
+    let tokens_part = format!("{} tokens", crate::formatting::format_tokens(total_tokens));
+    let queue_part = if queue_total > 0 {
+        format!(" · ⬡ {} queued", queue_total)
+    } else {
+        String::new()
+    };
+
+    let right_part = format!("{tokens_part}{queue_part}");
+
+    Text::from(Line::from(vec![
+        Span::styled(" ", dim),
+        Span::styled(model_part, accent),
+        Span::styled(spinner_part, dim),
+        Span::styled("     ", dim),
+        Span::styled(right_part, val),
+    ]))
+}
+
+pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        return s.to_string();
+    }
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= max_len {
+        return s.to_string();
+    }
+    let truncated: String = chars[..max_len - 1].iter().collect();
+    format!("{truncated}…")
+}
+
+#[allow(dead_code)]
 pub(crate) fn calculate_cost(usage: &Usage) -> String {
     let total = usage.input_tokens + usage.output_tokens;
     let cost = (total as f64) * 0.003 / 1000.0;
