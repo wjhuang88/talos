@@ -127,6 +127,45 @@ fn sanitize_headers(headers: Option<&HashMap<String, String>>) -> Option<HashMap
     }
 }
 
+/// Extract readable text from HTML content using the `scraper` crate.
+///
+/// Strips HTML tags, decodes common entities, normalizes whitespace,
+/// and returns the visible text content. Best-effort: JS-heavy SPA
+/// pages will produce limited output since no browser rendering occurs.
+fn extract_html_text(html: &str) -> String {
+    let document = scraper::Html::parse_document(html);
+
+    // Select the body or fall back to the root element.
+    let body_selector =
+        scraper::Selector::parse("body").expect("'body' is a valid CSS selector");
+    let root = document
+        .root_element()
+        .select(&body_selector)
+        .next()
+        .unwrap_or_else(|| document.root_element());
+
+    // Collect text from all text nodes, separated by newlines.
+    let text_items: Vec<String> = root
+        .text()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect();
+
+    if text_items.is_empty() {
+        return "[No visible text content extracted from HTML]".to_string();
+    }
+
+    let mut result = String::new();
+    for item in &text_items {
+        if !result.is_empty() && !result.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push_str(item);
+    }
+
+    result
+}
+
 /// A tool that executes HTTP requests with SSRF protection and size limits.
 ///
 /// Requests are routed through `reqwest` with `rustls` TLS (no native
@@ -405,7 +444,13 @@ impl AgentTool for HttpRequestTool {
             &body_bytes
         };
 
-        let body_str = String::from_utf8_lossy(body_display);
+        // Determine content type.
+        let content_type = response_headers
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        let is_raw_mode = parsed.mode == "raw";
 
         // Format output.
         let mut output = String::new();
@@ -419,18 +464,58 @@ impl AgentTool for HttpRequestTool {
             ));
         }
 
-        output.push_str(&format!("\nBody ({}):\n", {
-            if truncated {
-                format!(
-                    "first {} of {} bytes",
-                    self.max_body_bytes,
-                    body_bytes.len()
-                )
-            } else {
-                format!("{} bytes", body_bytes.len())
+        let size_label = if truncated {
+            format!("first {} of {} bytes", self.max_body_bytes, body_bytes.len())
+        } else {
+            format!("{} bytes", body_bytes.len())
+        };
+
+        if is_raw_mode {
+            // Raw mode: return body as-is.
+            output.push_str(&format!("\nBody ({size_label}):\n",));
+            output.push_str(&String::from_utf8_lossy(body_display));
+        } else if content_type.contains("text/html") {
+            // HTML: extract text content.
+            output.push_str(&format!("\nContent ({size_label}, text/html):\n",));
+            let html_str = String::from_utf8_lossy(body_display);
+            let text = extract_html_text(&html_str);
+            output.push_str(&text);
+        } else if content_type.contains("application/json") {
+            // JSON: pretty-print.
+            output.push_str(&format!("\nContent ({size_label}, application/json):\n",));
+            match serde_json::from_slice::<serde_json::Value>(body_display) {
+                Ok(val) => {
+                    output.push_str(
+                        &serde_json::to_string_pretty(&val)
+                            .unwrap_or_else(|_| String::from_utf8_lossy(body_display).to_string()),
+                    );
+                }
+                Err(_) => {
+                    output.push_str(&String::from_utf8_lossy(body_display));
+                }
             }
-        }));
-        output.push_str(&body_str);
+        } else if content_type.starts_with("text/") {
+            // Text: return as-is.
+            output.push_str(&format!(
+                "\nContent ({size_label}, {content_type}):\n",
+            ));
+            output.push_str(&String::from_utf8_lossy(body_display));
+        } else if content_type.is_empty() || content_type.contains("octet-stream") {
+            // Binary or unknown content type: show info only.
+            output.push_str(&format!(
+                "\nContent: binary/unknown ({size_label})\n",
+            ));
+            if !content_type.is_empty() {
+                output.push_str(&format!("Content-Type: {content_type}\n"));
+            }
+            output.push_str("[Binary or unrecognized content — use mode: \"raw\" to view raw bytes]\n");
+        } else {
+            // Other structured content: return as text.
+            output.push_str(&format!(
+                "\nContent ({size_label}, {content_type}):\n",
+            ));
+            output.push_str(&String::from_utf8_lossy(body_display));
+        }
 
         if truncated {
             output.push_str(&format!(
