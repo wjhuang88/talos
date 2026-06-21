@@ -14,7 +14,7 @@
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
 | SESSION-001-A | SESSION-001 | Ready | MEM-002/004 ✅, ADR-005/006 ✅ | Atomic prepare/commit/rollback session transition service |
-| WEBFETCH-001 Phase 0+ | — | Content gap | http_request tool ✅ | Content-type detection, HTML text extraction, JSON formatting |
+| WEBFETCH-001 Phase 0+ | WEBFETCH-001 | Ready | http_request tool ✅ | Content-type detection, HTML text extraction, JSON formatting. See [WEBFETCH-001 §Phase 0+](../../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md#phase-0--content-type-detection-i040). |
 
 ### Execution Order
 

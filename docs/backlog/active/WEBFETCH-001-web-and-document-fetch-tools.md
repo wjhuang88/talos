@@ -8,7 +8,7 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Complete (I039 Phase 0). Phase 0 http_request tool landed with SSRF guard, header sanitization, and Network permission gating.
+Complete (I039 Phase 0). I040 Phase 0+ remaining: content type detection, HTML text extraction, JSON formatting.
 
 ## Priority
 
@@ -235,6 +235,8 @@ incrementally.
   and redaction.
 - Detect structured responses: JSON, NDJSON, XML, CSV/TSV, text, event stream, binary.
 - Return bounded previews and preserve raw response metadata for debugging.
+- **Phase 0+ (I040)**: Content-type detection, HTML text extraction via scraper, JSON pretty-print.
+  See acceptance criteria below.
 - Keep context-fetch behavior separate from saving remote bytes to disk.
 
 ### Phase 1: Static HTML Page Fetch
@@ -288,6 +290,37 @@ incrementally.
 - Fetching for context and saving to disk are separate tools with separate permission surfaces.
 
 ## Acceptance Criteria
+
+### Phase 0 (I039 — delivered 2026-06-21)
+
+- [x] `http_request` tool implemented with method/body/header/timeout/max-byte and Network permission gating
+- [x] SSRF guard blocking private/reserved IP ranges
+- [x] Header sanitization blocking security-sensitive headers and CR/LF injection
+- [x] Response size capped at 64KB, redirect limit of 5
+
+### Phase 0+ — Content Type Detection (I040)
+
+- Given `http_request` with `mode: "auto"` (default) to a URL returning `Content-Type: text/html`
+  When the tool executes
+  Then response body is HTML-tag-stripped text (via scraper), not raw HTML markup
+
+- Given `http_request` with `mode: "auto"` to a URL returning `Content-Type: application/json`
+  When the tool executes
+  Then response body is pretty-printed JSON
+
+- Given `http_request` with `mode: "auto"` to a URL returning `Content-Type: text/plain`
+  When the tool executes
+  Then response body is returned as-is
+
+- Given `http_request` with `mode: "auto"` to a URL returning binary/non-text content
+  When the tool executes
+  Then response shows content type info and byte count, not raw binary dump
+
+- Given `http_request` with `mode: "raw"`
+  When the tool executes
+  Then response body is returned as-is (preserving current behavior)
+
+### Phase 1+
 
 - [ ] `http_request` requirements define method/body/header/query/timeout/max-byte behavior and
       permission gates.
