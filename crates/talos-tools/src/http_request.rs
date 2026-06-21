@@ -58,10 +58,19 @@ pub struct HttpRequestInput {
     #[serde(default)]
     #[schemars(range(min = 1, max = 60))]
     pub timeout_secs: Option<u64>,
+
+    /// Content extraction mode. "auto" (default) detects HTML and extracts
+    /// text, pretty-prints JSON. "raw" returns the body as-is.
+    #[serde(default = "default_mode")]
+    pub mode: String,
 }
 
 fn default_method() -> String {
     "GET".to_string()
+}
+
+fn default_mode() -> String {
+    "auto".to_string()
 }
 
 // ---------------------------------------------------------------------------

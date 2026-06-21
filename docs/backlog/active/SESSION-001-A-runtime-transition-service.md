@@ -31,6 +31,7 @@ visible history across different sessions.
 
 - [ADR-005](../../decisions/005-tui-event-architecture.md): transitions cross the typed session seam; UI does not rebuild Agent state directly.
 - [ADR-006](../../decisions/006-event-architecture-boundary.md): no global event bus; state replacement remains single-owner and auditable.
+- **Empty-session guard**: A session MUST NOT be created or persisted if the user has not submitted any message. The runtime may prepare a session handle but must not write to durable storage (JSONL/SQLite) until the first user message is received. This prevents empty-session clutter in the session list.
 
 ## Acceptance
 
@@ -38,6 +39,8 @@ visible history across different sessions.
 - [ ] Tests prove successful commit updates Agent history, persistence target, conversation/status,
       visible history source, and session-owned resource handles as one transition.
 - [ ] Active-turn behavior is explicit and cancellation/refusal cannot race transition commit.
+- [ ] **Empty-session guard**: Session durable storage (JSONL/SQLite) is NOT created until the first
+      user message is submitted. Preparing a session handle without writing to disk is valid.
 - [ ] `cargo check --workspace`, clippy, and workspace tests pass.
 - [ ] Parent Epic, Product Backlog, iteration, and Board owners are synchronized.
 
