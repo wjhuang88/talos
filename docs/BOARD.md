@@ -16,6 +16,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I040 Session Foundation & Tool Refinement | Active | [I040 Session Foundation & Tool Refinement](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A + http_request content detection + TUI-006-A; activate 2026-06-21 |
+|---|---|---|---|
 
 ## Review
 

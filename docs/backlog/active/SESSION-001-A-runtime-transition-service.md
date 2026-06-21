@@ -4,9 +4,10 @@
 |---|---|
 | Type | Technical Story |
 | Parent Epic | [SESSION-001](SESSION-001-interactive-session-lifecycle.md) |
-| Status | Ready |
+| Status | In Progress (I040) |
 | Depends On | MEM-002 and MEM-004 complete; ADR-005; ADR-006 |
 | Unlocks | SESSION-001-B; SESSION-001-C |
+| Iteration | [I040 Session Foundation & Tool Refinement](../../iterations/I040-session-foundation-tool-refinement.md) |
 
 ## Objective And Value
 
