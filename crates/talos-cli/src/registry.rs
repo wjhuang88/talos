@@ -18,7 +18,7 @@ use talos_tools::git::{
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, EditTool, FetchUrlTool, GlobTool, GrepTool, HttpRequestTool,
-    LsTool, ReadTool, StatTool, TreeTool, WebSearchTool, WriteTool,
+    LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool, WebSearchTool, WriteTool,
 };
 use tokio::sync::mpsc;
 
@@ -340,6 +340,11 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(SaveUrlTool::new()),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(DiffTool::new(PathBuf::from("."))),
         approval: approval.clone(),
         print_mode: true,
@@ -441,6 +446,10 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(SaveUrlTool::new()),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(DiffTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
@@ -515,6 +524,7 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(GlobTool::new(PathBuf::from("."))));
     registry.register(Arc::new(LsTool::new(PathBuf::from("."))));
     registry.register(Arc::new(DeleteTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(SaveUrlTool::new()));
     registry.register(Arc::new(DiffTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatTool::new(PathBuf::from("."))));
     registry.register(Arc::new(StatusTool));

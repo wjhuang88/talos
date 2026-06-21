@@ -10,6 +10,7 @@ pub mod fetch_url;
 pub mod file_tools;
 pub mod git;
 pub mod http_request;
+pub mod save_url;
 pub mod search_tools;
 pub mod symbol;
 pub mod tree;
@@ -24,6 +25,7 @@ pub use file_tools::{
     ReadInput, ReadTool, WriteInput, WriteTool,
 };
 pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};
+pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 pub use tree::TreeTool;
 pub use web_search::{WebSearchError, WebSearchInput, WebSearchTool};

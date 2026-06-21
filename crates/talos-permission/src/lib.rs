@@ -307,6 +307,12 @@ impl PermissionEngine {
             path_pattern: None,
             decision: PermissionDecision::Ask,
         });
+
+        self.rules.push(PermissionRule {
+            tool_name: "save_url".to_owned(),
+            path_pattern: None,
+            decision: PermissionDecision::Ask,
+        });
     }
 
     /// Adds a custom rule to the engine.
