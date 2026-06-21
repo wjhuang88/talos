@@ -446,6 +446,12 @@ pub(crate) fn stream_opening_lines(
     lines
 }
 
+fn strip_llm_hints(content: &str) -> String {
+    content
+        .trim_end_matches("\n\n[Analyze the error above and try a different approach.]")
+        .to_string()
+}
+
 fn summary_fields_for(tool_name: &str) -> Vec<String> {
     match tool_name {
         "read" | "write" | "edit" | "delete" | "ls" | "stat" => vec!["path".to_string()],
@@ -482,10 +488,11 @@ pub(crate) fn render_history_messages(
                 } else {
                     to_crossterm_color(semantic::TEXT_SUCCESS)
                 };
+                let content = strip_llm_hints(&result.content);
                 let display = talos_conversation::ToolResultDisplay {
                     tool_name: Some(tool_name),
                     is_error: result.is_error,
-                    content: result.content.clone(),
+                    content,
                 };
                 lines.extend(
                     crate::tool_display::build_tool_result_scrollback_lines(&display, icon, color),
