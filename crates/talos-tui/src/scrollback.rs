@@ -451,9 +451,16 @@ pub(crate) fn render_history_messages(
     history: &[Message],
 ) -> Vec<ScrollbackLine> {
     let mut lines = Vec::new();
+    let mut last_tool_calls: Vec<(String, String)> = Vec::new(); // (id, name) pairs
     for message in history {
         match message {
             Message::Tool { result } => {
+                // Resolve tool name from the preceding assistant message's tool calls.
+                let tool_name = last_tool_calls
+                    .iter()
+                    .find(|(id, _)| id == &result.tool_use_id)
+                    .map(|(_, name)| name.clone())
+                    .unwrap_or_else(|| result.tool_use_id.clone());
                 let icon = if result.is_error { "✗" } else { "✓" };
                 let color = if result.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
@@ -461,7 +468,7 @@ pub(crate) fn render_history_messages(
                     to_crossterm_color(semantic::TEXT_SUCCESS)
                 };
                 let display = talos_conversation::ToolResultDisplay {
-                    tool_name: Some(result.tool_use_id.clone()),
+                    tool_name: Some(tool_name),
                     is_error: result.is_error,
                     content: result.content.clone(),
                 };
@@ -474,6 +481,12 @@ pub(crate) fn render_history_messages(
                     talos_core::message::extract_tool_calls_from_text(content);
                 let cleaned = talos_core::message::strip_tool_syntax(content);
 
+                // Track tool calls for result resolution.
+                last_tool_calls.clear();
+                for tc in tool_calls {
+                    last_tool_calls.push((tc.id.clone(), tc.name.clone()));
+                }
+
                 if !cleaned.is_empty() {
                     lines.extend(render_history_message(
                         stream_count,
@@ -482,7 +495,6 @@ pub(crate) fn render_history_messages(
                     ));
                 }
 
-                // Render tool calls from struct field (live sessions) or from text (resume).
                 let calls: Vec<talos_conversation::ToolCallDisplay> = if !tool_calls.is_empty() {
                     tool_calls
                         .iter()
@@ -494,6 +506,9 @@ pub(crate) fn render_history_messages(
                         })
                         .collect()
                 } else if !tool_calls_in_text.is_empty() {
+                    for tc in &tool_calls_in_text {
+                        last_tool_calls.push((tc.id.clone(), tc.name.clone()));
+                    }
                     tool_calls_in_text
                         .iter()
                         .map(|tc| talos_conversation::ToolCallDisplay {

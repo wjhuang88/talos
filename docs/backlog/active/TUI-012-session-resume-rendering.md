@@ -6,10 +6,10 @@
 | Title | Session Resume History Rendering — Full Render Replay |
 | Type | Technical Story |
 | Priority | P0 (urgent) |
-| Status | Refinement |
+| Status | Complete (2026-06-21) |
 | Depends on | Session history loading (I024 ✅), Stream rendering pipeline (I023 ✅) |
 | Source | User report 2026-06-21 |
-| Blocks | — |
+| Fix | `scrollback.rs` `render_history_messages()` now handles `Message::Tool` with suppression logic and `Message::Assistant` with tool call extraction + styling. Commit `143e1a5`. |
 
 ## Problem
 
