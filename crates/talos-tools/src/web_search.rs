@@ -327,31 +327,40 @@ impl WebSearchTool {
     }
 
     /// Run all available backends in parallel (race), with fallback chain.
+    ///
+    /// Only configured backends participate in the race. Unconfigured
+    /// backends use `std::future::pending()` so they never complete
+    /// and cannot preempt the race with a synthetic error.
     async fn execute_search(
         &self,
         query: &str,
         max_results: u32,
         include_snippets: bool,
     ) -> (Vec<WebResult>, ResultSource) {
-        // Try DuckDuckGo (always available) and optional backends in parallel.
+        // DuckDuckGo — always available (zero config).
         let ddg_fut = self.search_duckduckgo(query, max_results);
-        let tavily_fut = async {
-            if self.tavily_api_key.is_some() {
-                self.search_tavily(query, max_results, include_snippets)
-                    .await
-            } else {
-                Err("Tavily not configured".to_string())
-            }
-        };
-        let searxng_fut = async {
-            if self.searxng_url.is_some() {
-                self.search_searxng(query, max_results).await
-            } else {
-                Err("SearXNG not configured".to_string())
-            }
+
+        // Tavily — only race if API key is set. Otherwise never completes,
+        // so it can't steal the race with a "not configured" error.
+        let tavily_fut: std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Vec<WebResult>, String>> + Send>,
+        > = if self.tavily_api_key.is_some() {
+            Box::pin(self.search_tavily(query, max_results, include_snippets))
+        } else {
+            Box::pin(std::future::pending())
         };
 
-        // Race: first successful response wins.
+        // SearXNG — same pattern as Tavily.
+        let searxng_fut: std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Vec<WebResult>, String>> + Send>,
+        > = if self.searxng_url.is_some() {
+            Box::pin(self.search_searxng(query, max_results))
+        } else {
+            Box::pin(std::future::pending())
+        };
+
+        // Race: first successful response wins. Unconfigured backends
+        // are pending() so they cannot interfere.
         let race_result = tokio::select! {
             res = ddg_fut => res.map(|r| (r, ResultSource::DuckDuckGo)),
             res = tavily_fut => res.map(|r| (r, ResultSource::Tavily)),
@@ -361,7 +370,7 @@ impl WebSearchTool {
         match race_result {
             Ok((results, source)) => (results, source),
             Err(_) => {
-                // All primary backends failed. Try Wikipedia as last resort.
+                // All participating backends failed. Try Wikipedia as last resort.
                 match self.search_wikipedia(query, max_results).await {
                     Ok(results) => (results, ResultSource::Wikipedia),
                     Err(_) => (vec![], ResultSource::Wikipedia),
