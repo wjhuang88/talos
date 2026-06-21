@@ -22,6 +22,7 @@ mod provider_setup;
 mod registry;
 mod runtime_adapter;
 mod session_setup;
+mod session_transition;
 mod skill_runtime;
 mod tui_bridge;
 

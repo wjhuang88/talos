@@ -41,6 +41,7 @@ use crate::session_setup::{
     resolve_workspace_root, workspace_display_name,
 };
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
+use crate::session_transition::SessionTransition;
 use crate::tui_bridge::run_conversation_loop;
 use crate::{Cli, build_hook_registry, event_loop};
 
@@ -315,9 +316,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let sq_tx_signal = handle.sq_tx.clone();
     tokio::spawn(async move { actor.run().await });
 
-    let sq_tx_signal = handle.sq_tx.clone();
+    let _transition = SessionTransition::new(handle.sq_tx.clone(), session.clone());
     tokio::spawn(async move {
         loop {
             tokio::signal::ctrl_c().await.ok();
