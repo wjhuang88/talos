@@ -5,9 +5,9 @@
 | ID | TUI-006 |
 | Title | Code Block Rendering — Rounded Border & Syntax Highlighting |
 | Priority | P2 |
-| Status | Planned |
+| Status | Superseded by I023 (2026-06-12) |
 | Depends on | I023 (TUI state model — stable code fence hold/render pipeline); CODE-001 for syntax highlighting |
-| Blocks | None |
+| Closure | Sub-slice B (syntax highlighting) delivered via arborium in I023. Sub-slice A (rounded Unicode border) deferred — current `[lang] ───` flat header with line numbers is sufficient. Rounded border may be revisited independently. |
 | Owner | `crates/talos-tui/src/` |
 
 ## Outcome
@@ -98,34 +98,22 @@ does not align with a future tree-sitter tooling path.
 
 ## Acceptance Criteria
 
-### Sub-slice A: Rounded Border
+### Sub-slice A: Rounded Border (deferred)
 
-- [ ] Opening fence line (``` or ~~~ with optional language tag) is **not** rendered
-      as a visible row in scrollback.
-- [ ] Closing fence line is **not** rendered as a visible row in scrollback.
-- [ ] Code block is framed with rounded border characters (`╭╮╰╯│`).
-- [ ] Language tag (e.g. `rust`) appears as a dim label on the top border row.
-- [ ] Blocks without a language tag render a plain rounded border (no label).
-- [ ] Content lines preserve current code color (`#E5C07B`) as default.
-- [ ] Block boundary detection (via `StreamBlockClassifier`) and hold behavior
-      remain unchanged — only the final rendering of completed code blocks changes.
-- [ ] Fallback path for oversized blocks (`FallbackImmediate`) still emits raw
-      content without data loss.
-- [ ] Existing code fence tests pass or are updated to match new rendering.
-- [ ] `cargo test -p talos-tui` passes.
-- [ ] Runtime verification: 3-line code block with ` ```rust ` renders as 5 rows
-      (top border + 3 content + bottom border) with no visible fence markers.
+Current I023 rendering (`[lang] ───` header + line numbers + code-color content) adequately
+solves the original "fence markers are visual noise" problem. Rounded border is cosmetic and
+may be revisited independently.
 
-### Sub-slice B: Syntax Highlighting
+- [x] Superseded: fence markers replaced with `[rust] ──────` header + line numbers
+- [ ] Rounded border (╭╮╰╯) — deferred, not blocking
 
-- [ ] ADR recorded for adding `tree-sitter` or `syntect` as a dependency.
-- [ ] Code content inside rounded border is syntax-colored using the Nord palette.
-- [ ] Highlighting works for at least Rust, Python, and JavaScript.
-- [ ] Unknown language tags fall back to current flat code color (`#E5C07B`).
-- [ ] Highlight query files are embedded at compile time (no runtime file I/O).
-- [ ] `cargo test -p talos-tui` passes.
-- [ ] Runtime verification: a Rust code block shows distinct colors for keywords,
-      strings, comments, and function names.
+### Sub-slice B: Syntax Highlighting (delivered in I023 via arborium)
+
+- [x] Replaced tree-sitter with arborium for syntax highlighting (23 languages)
+- [x] Code content inside code blocks is syntax-colored using the Nord palette
+- [x] Highlighting works for Rust, Python, JavaScript, TypeScript, Go, Java, and more
+- [x] Unknown language tags fall back to flat code color
+- [x] `cargo test -p talos-tui` passes
 
 ## Dependencies
 
