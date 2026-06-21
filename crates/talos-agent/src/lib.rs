@@ -688,6 +688,10 @@ impl Agent {
             }
 
             if turn_tool_calls.is_empty() {
+                messages.push(Message::Assistant {
+                    content: talos_core::message::strip_tool_syntax(&turn_text),
+                    tool_calls: vec![],
+                });
                 let persisted = messages[persist_start..].to_vec();
                 break (Ok((turn_text, persisted)), TurnStatus::Success);
             }
