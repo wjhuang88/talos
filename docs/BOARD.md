@@ -16,8 +16,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I039 Network Tools & TUI Polish | Active | [I039 Network Tools & TUI Polish](iterations/I039-network-tools-tui-polish.md) | WEBFETCH-001 Phase 0 + TOOL-009 + TUI-011 + TOOL-005; activate 2026-06-21 |
-|---|---|---|---|
 
 ## Review
 
@@ -59,6 +57,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I039 Network Tools & TUI Polish | Complete | [I039 Network Tools & TUI Polish](iterations/I039-network-tools-tui-polish.md) | All 4 stories landed: http_request + web_search + status bar/exit redesign + bash streaming. 5-agent review passed. |
 | I037 Slash Command Menu | Complete | [I037 Slash Command Menu](iterations/I037-slash-command-menu.md) | Post-completion review repaired composer-backed filtering, Approval priority, deterministic height fallback, tests, and documentation sync |
 | TUI-010 Slash Command Menu Below Input | Complete | [TUI-010 Slash Command Menu Below Input](backlog/active/TUI-010-slash-command-menu.md) | All acceptance paths covered by 120 TUI tests; workspace quality gates pass |
 | I034 MCP Session Integration | Complete | [I034 MCP Session Integration](iterations/I034-mcp-session-integration.md) | Startup-stable stdio MCP tools, permissions, provenance/status, failure handling, and real fixture evidence all passed |

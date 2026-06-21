@@ -1,9 +1,8 @@
 # TOOL-005: Bash Tool Streaming Output
 
-**Status**: In Progress (I039)
+**Status**: Complete (I039)
 **Priority**: P2
 **Source**: User request 2026-06-19
-**Depends on**: None (self-contained bash tool change)
 **Iteration**: [I039 Network Tools & TUI Polish](../iterations/I039-network-tools-tui-polish.md)
 
 ## Problem

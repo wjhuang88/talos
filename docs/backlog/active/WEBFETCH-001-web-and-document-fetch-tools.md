@@ -8,11 +8,11 @@ metadata for later follow-up fetches.
 
 ## Status
 
-In Progress (I039 Phase 0). Selected into I039 Network Tools & TUI Polish iteration.
+Complete (I039 Phase 0). Phase 0 http_request tool landed with SSRF guard, header sanitization, and Network permission gating.
 
 ## Priority
 
-P0 (I036 execution map).
+P0 (I036 execution map). Next phases: HTML extraction, link ranking, markdown conversion (Phase 1+).
 
 ## Origin
 

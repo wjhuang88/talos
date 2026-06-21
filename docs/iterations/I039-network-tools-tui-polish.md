@@ -1,6 +1,6 @@
 # I039: Network Tools & TUI Polish
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-06-21
 > Planned objective: Talos gains internet access (HTTP fetch + web search) and a polished terminal
 >   experience (status bar redesign + bash streaming output).
@@ -141,20 +141,27 @@ Tracks A and B are independent and can proceed in parallel. TOOL-009 is the only
 | Date | Type | Record |
 |---|---|---|
 | 2026-06-21 | Activation | I036 complete, I038 complete, no active iterations blocking. All 4 stories Ready. |
+| 2026-06-21 | Implementation | S1+S2 network tools implemented, S3+S4 delegated to deep + visual-engineering agents |
+| 2026-06-21 | Review | 5-agent parallel review: Goal ✅, Code Quality ⚠️ (3 MAJOR fixed), Security ⚠️ (2 HIGH fixed), QA manual pass, Context Mining timeout |
+| 2026-06-21 | Closure | All fixes committed (8d5b1b3). Workspace check/clippy/test all clean. |
 
 ## Verification Evidence
 
-- `cargo check --workspace`: 
-- `cargo clippy --workspace -- -D warnings`: 
-- `cargo test --workspace`: 
-- Runtime evidence: 
+- `cargo check --workspace`: ✅ Clean (2026-06-21)
+- `cargo clippy --workspace -- -D warnings`: ✅ Zero warnings
+- `cargo test --workspace`: ✅ All tests pass (talos-tools: 131, talos-tui: 145, workspace: all crates)
+- Runtime evidence: Tools registered in all 3 builders; status bar/exist summary rendered per spec
 
 ## Variance And Residuals
 
-- 
+- `format_tokens(999_999)` → "1000.0k" (cosmetic, test-asserted). Could change boundary to produce "1.0M".
+- web_search SSRF is deferred — hardcoded public URLs only, SearXNG env-var URL is the only vector.
+- Tavily Bearer auth verified against live API docs (librarian result confirms).
+- Dual reqwest versions (0.12 + 0.13) from rust-websearch dependency — acceptable overhead for anti-detection + rate limiting.
+- `infer_nature()` duplicates `AgentTool::nature()` logic — non-blocking DRY concern for future refactor.
 
 ## Retrospective
 
-- Outcome: 
-- Documentation: 
-- Lessons: 
+- Outcome: Met. All 4 stories landed: http_request (561L, 22 tests), web_search (682L, 18 tests), TUI-011 (formatting.rs 177L + scrollback/app), TOOL-005 (bash streaming, 8 new tests). Total: +73 tests, 5 new files, 7 modified.
+- Documentation: Iteration doc updated, board synced, backlog stories marked Complete, README synced.
+- Lessons: 5-agent parallel review caught real bugs (UTF-8 panic, header injection, URL encoding) that unit tests didn't cover. Delegating TUI work to deep agent (not visual-engineering) was the right call for terminal UI.

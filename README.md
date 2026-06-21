@@ -132,6 +132,7 @@ Talos ships with built-in tools for common coding-agent work:
 - Search and inspection: `grep`, `diff`, `stat`
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
+- Network: `http_request` (SSRF-protected, permission-gated), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
 - Shell escape hatch: `bash`
 
 The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a native tool cannot cover the task.
