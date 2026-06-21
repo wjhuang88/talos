@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-19"
-status_note: "Governance refresh (2026-06-19): GOV-002, I033, and I034 are complete; no iteration is Active. Full workspace and governance gates passed for I034."
+last_audited_at: "2026-06-22"
+status_note: "Governance refresh (2026-06-22): I039 Complete, I040 Active, PERM-002 added. TUI-012 replay fixed. Linked-fix 3 broken backlog links (../iterations -> ../../iterations). Workspace clean."
 
 governance:
   skill_name: "agent-project-governance"
