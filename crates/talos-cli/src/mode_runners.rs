@@ -335,6 +335,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         while let Some(session_event) = bridge_forwarder.recv().await {
             match session_event {
                 SessionEvent::AgentEvent(ref agent_event) => {
+                    let _ = session_for_persist.append_event(agent_event);
                     let _ = bridge_tx.send(agent_event.clone());
                 }
                 SessionEvent::TurnCompleted {

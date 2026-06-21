@@ -446,13 +446,13 @@ pub(crate) fn stream_opening_lines(
     lines
 }
 
-fn strip_llm_hints(content: &str) -> String {
+pub(crate) fn strip_llm_hints(content: &str) -> String {
     content
         .trim_end_matches("\n\n[Analyze the error above and try a different approach.]")
         .to_string()
 }
 
-fn summary_fields_for(tool_name: &str) -> Vec<String> {
+pub(crate) fn summary_fields_for(tool_name: &str) -> Vec<String> {
     match tool_name {
         "read" | "write" | "edit" | "delete" | "ls" | "stat" => vec!["path".to_string()],
         "bash" => vec!["command".to_string()],
@@ -468,6 +468,7 @@ fn summary_fields_for(tool_name: &str) -> Vec<String> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn render_history_messages(
     stream_count: &mut usize,
     history: &[Message],

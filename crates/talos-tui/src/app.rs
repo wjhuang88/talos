@@ -478,11 +478,101 @@ impl Tui {
     }
 
     pub fn hydrate_history(&mut self, history: &[Message]) {
-        self.pending_scrollback
-            .extend(crate::scrollback::render_history_messages(
-                &mut self.stream_count,
-                history,
-            ));
+        use talos_conversation::ToolCallDisplay;
+        use talos_core::tool::ToolProvenance;
+
+        let mut pending_tool_names: Vec<String> = Vec::new();
+
+        for message in history {
+            match message {
+                Message::Tool { result } => {
+                    let tool_name = if !pending_tool_names.is_empty() {
+                        pending_tool_names.remove(0)
+                    } else {
+                        result.tool_use_id.clone()
+                    };
+                    let content = crate::scrollback::strip_llm_hints(&result.content);
+                    self.handle_ui_output(UiOutput::ToolResult(
+                        talos_conversation::ToolResultDisplay {
+                            tool_name: Some(tool_name),
+                            is_error: result.is_error,
+                            content,
+                        },
+                    ));
+                }
+                Message::Assistant { content, tool_calls } => {
+                    let tool_calls_in_text =
+                        talos_core::message::extract_tool_calls_from_text(content);
+                    let cleaned = talos_core::message::strip_tool_syntax(content);
+                    let has_tool_calls = !tool_calls.is_empty() || !tool_calls_in_text.is_empty();
+
+                    pending_tool_names.clear();
+                    for tc in tool_calls {
+                        pending_tool_names.push(tc.name.clone());
+                    }
+
+                    if !has_tool_calls && !cleaned.is_empty() {
+                        let stream = futures::stream::iter(vec![cleaned]);
+                        let msg = talos_conversation::StreamMessage {
+                            source: talos_conversation::MessageSource::Assistant,
+                            stream: Box::pin(stream),
+                        };
+                        self.handle_ui_output(UiOutput::Stream(msg));
+                        self.consume_stream_completely();
+                        self.finalize_active_stream();
+                    }
+
+                    let calls: Vec<ToolCallDisplay> = if !tool_calls.is_empty() {
+                        tool_calls.iter().map(|tc| ToolCallDisplay {
+                            tool_name: tc.name.clone(), arguments: tc.input.clone(),
+                            provenance: ToolProvenance::Native,
+                            summary_fields: crate::scrollback::summary_fields_for(&tc.name),
+                        }).collect()
+                    } else if !tool_calls_in_text.is_empty() {
+                        for tc in &tool_calls_in_text {
+                            pending_tool_names.push(tc.name.clone());
+                        }
+                        tool_calls_in_text.iter().map(|tc| ToolCallDisplay {
+                            tool_name: tc.name.clone(), arguments: tc.input.clone(),
+                            provenance: ToolProvenance::Native,
+                            summary_fields: crate::scrollback::summary_fields_for(&tc.name),
+                        }).collect()
+                    } else { vec![] };
+
+                    for call in &calls {
+                        self.handle_ui_output(UiOutput::ToolCall(call.clone()));
+                    }
+                }
+                Message::User { content } => {
+                    let stream = futures::stream::iter(vec![content.clone()]);
+                    let msg = talos_conversation::StreamMessage {
+                        source: talos_conversation::MessageSource::User,
+                        stream: Box::pin(stream),
+                    };
+                    self.handle_ui_output(UiOutput::Stream(msg));
+                    self.consume_stream_completely();
+                    self.finalize_active_stream();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn consume_stream_completely(&mut self) {
+        while let Some(ref mut stream) = self.active_stream {
+            match stream.as_mut().poll_next(&mut std::task::Context::from_waker(
+                futures::task::noop_waker_ref(),
+            )) {
+                std::task::Poll::Ready(Some(chunk)) => {
+                    self.consume_stream_chunk(&chunk);
+                }
+                std::task::Poll::Ready(None) => {
+                    self.active_stream = None;
+                    break;
+                }
+                std::task::Poll::Pending => break,
+            }
+        }
     }
 
     pub fn toggle_skill_sidebar(&mut self) {
