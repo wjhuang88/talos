@@ -93,7 +93,7 @@ rewrite published iteration baselines.
 | I028 | Planned | Deferred; scheduling is not the current priority. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
-| I040 | Active | Activated 2026-06-21; SESSION-001-A + http_request content detection + TUI-006-A implementation in progress. |
+| I040 | Active | Activated 2026-06-21; SESSION-001-A + http_request content detection implementation in progress. |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.

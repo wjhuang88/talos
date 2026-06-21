@@ -15,7 +15,6 @@
 |---|---|---|---|---|
 | SESSION-001-A | SESSION-001 | Ready | MEM-002/004 ✅, ADR-005/006 ✅ | Atomic prepare/commit/rollback session transition service |
 | WEBFETCH-001 Phase 0+ | — | Content gap | http_request tool ✅ | Content-type detection, HTML text extraction, JSON formatting |
-| TUI-006-A | TUI-006 | Planned (B done) | code block rendering ✅ | Rounded Unicode border frame (╭╮╰╯│) for code blocks |
 
 ### Execution Order
 
@@ -23,11 +22,9 @@
 SESSION-001-A ─── 3-4 days (backend, blocks nothing else)
          ∥
 http_request content detection ─── 1-2 days (tools, independent)
-         ∥
-TUI-006-A rounded borders ─── 1 day (TUI, independent)
 ```
 
-All three are independent and can proceed in parallel.
+Both are independent and can proceed in parallel.
 
 ### Scope
 
@@ -59,7 +56,6 @@ All three are independent and can proceed in parallel.
 
 - SESSION-001-B/C (`/new`, `/resume`, `/fork` commands) — separate iteration after A
 - WEBFETCH Phase 1+ (link ranking, markdown conversion, document extraction)
-- TUI-006-B (syntax highlighting is already done)
 - No new session operations beyond transition service
 - No TUI changes for session transitions (UI flows in B/C)
 - No configurable extraction modes beyond auto/raw
@@ -94,10 +90,6 @@ All three are independent and can proceed in parallel.
   When the tool executes
   Then response body is returned as-is (preserving current behavior)
 
-- Given a code block in the TUI scrollback
-  When rendered with the new border frame
-  Then Unicode rounded corners (╭╮╰╯) frame the block with line numbers preserved
-
 ### Planned Validation
 
 - `cargo check --workspace`
@@ -105,7 +97,6 @@ All three are independent and can proceed in parallel.
 - `cargo test --workspace`
 - SESSION-001-A: unit tests for prepare/commit/rollback, empty-session guard test
 - http_request: test content-type detection with mock responses (HTML, JSON, plain text, binary)
-- TUI-006-A: visual inspection of code block rendering, existing TUI tests pass
 
 ### Documentation To Update
 
@@ -120,8 +111,6 @@ All three are independent and can proceed in parallel.
   Rollback: Use the existing AppServerSession pattern; if public API break is needed, stop for ADR.
 - Risk: HTML text extraction may produce poor-quality output on JS-heavy pages.
   Rollback: `mode: "raw"` is always available as fallback; extraction is best-effort.
-- Risk: TUI-006-A border rendering may break at narrow widths or with long line numbers.
-  Rollback: Keep existing flat header as fallback if Unicode rendering fails.
 
 ## Actual Activation And Execution
 
