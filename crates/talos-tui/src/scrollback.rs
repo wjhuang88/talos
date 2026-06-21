@@ -446,21 +446,37 @@ pub(crate) fn stream_opening_lines(
     lines
 }
 
+fn summary_fields_for(tool_name: &str) -> Vec<String> {
+    match tool_name {
+        "read" | "write" | "edit" | "delete" | "ls" | "stat" => vec!["path".to_string()],
+        "bash" => vec!["command".to_string()],
+        "grep" => vec!["pattern".to_string()],
+        "glob" => vec!["pattern".to_string()],
+        "http_request" => vec!["method".to_string(), "url".to_string()],
+        "fetch_url" => vec!["url".to_string()],
+        "save_url" => vec!["url".to_string(), "destination".to_string()],
+        "web_search" => vec!["query".to_string()],
+        "git_add" | "git_commit" | "git_push" | "git_pull" | "git_checkout" => {
+            vec!["path".to_string()]
+        }
+        _ => vec![],
+    }
+}
+
 pub(crate) fn render_history_messages(
     stream_count: &mut usize,
     history: &[Message],
 ) -> Vec<ScrollbackLine> {
     let mut lines = Vec::new();
-    let mut last_tool_calls: Vec<(String, String)> = Vec::new(); // (id, name) pairs
+    let mut pending_tool_names: Vec<String> = Vec::new();
     for message in history {
         match message {
             Message::Tool { result } => {
-                // Resolve tool name from the preceding assistant message's tool calls.
-                let tool_name = last_tool_calls
-                    .iter()
-                    .find(|(id, _)| id == &result.tool_use_id)
-                    .map(|(_, name)| name.clone())
-                    .unwrap_or_else(|| result.tool_use_id.clone());
+                let tool_name = if !pending_tool_names.is_empty() {
+                    pending_tool_names.remove(0)
+                } else {
+                    result.tool_use_id.clone()
+                };
                 let icon = if result.is_error { "✗" } else { "✓" };
                 let color = if result.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
@@ -481,10 +497,10 @@ pub(crate) fn render_history_messages(
                     talos_core::message::extract_tool_calls_from_text(content);
                 let cleaned = talos_core::message::strip_tool_syntax(content);
 
-                // Track tool calls for result resolution.
-                last_tool_calls.clear();
+                // Track tool calls as queue for result resolution.
+                pending_tool_names.clear();
                 for tc in tool_calls {
-                    last_tool_calls.push((tc.id.clone(), tc.name.clone()));
+                    pending_tool_names.push(tc.name.clone());
                 }
 
                 if !cleaned.is_empty() {
@@ -502,12 +518,12 @@ pub(crate) fn render_history_messages(
                             tool_name: tc.name.clone(),
                             arguments: tc.input.clone(),
                             provenance: talos_core::tool::ToolProvenance::Native,
-                            summary_fields: vec![],
+                            summary_fields: summary_fields_for(&tc.name),
                         })
                         .collect()
                 } else if !tool_calls_in_text.is_empty() {
                     for tc in &tool_calls_in_text {
-                        last_tool_calls.push((tc.id.clone(), tc.name.clone()));
+                        pending_tool_names.push(tc.name.clone());
                     }
                     tool_calls_in_text
                         .iter()
@@ -515,7 +531,7 @@ pub(crate) fn render_history_messages(
                             tool_name: tc.name.clone(),
                             arguments: tc.input.clone(),
                             provenance: talos_core::tool::ToolProvenance::Native,
-                            summary_fields: vec![],
+                            summary_fields: summary_fields_for(&tc.name),
                         })
                         .collect()
                 } else {
