@@ -89,7 +89,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| TUI-012 Session Resume History Rendering | Refinement | [TUI-012](backlog/active/TUI-012-session-resume-rendering.md) | P0 urgent: `--continue` dumps raw text; needs full render replay with StreamRenderState |
+| TUI-012 Session Resume History Rendering | Complete | [TUI-012](backlog/active/TUI-012-session-resume-rendering.md) | Fixed 2026-06-21: root cause was persistence layer, not rendering |
+| PERM-002 Operation-Scoped Permissions | Refinement | [PERM-002](backlog/active/PERM-002-operation-scoped-permissions.md) | P1: no-repeat-approval — same resource auto-allowed after first approval |
 | REMOTE-001 Remote Session Protocol | Research | [REMOTE-001 Remote Session Protocol](backlog/active/REMOTE-001-remote-session-protocol.md) | Research transport, auth, and minimum viable slice before any implementation |
 | PLUGIN-001 WASM Runtime Plugin Protocol | Research (→ P2) | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Elevated P2: unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM loading |
 | I017 Embedded Git Tools | P0-P2 Complete | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Read/write Git tools delivered in I026; future scope starts from P3 advanced tools |
