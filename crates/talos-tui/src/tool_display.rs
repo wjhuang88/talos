@@ -77,7 +77,7 @@ pub(crate) fn should_suppress_tool_result_content(display: &ToolResultDisplay) -
     };
     const ALWAYS_SUMMARIZE: &[&str] = &[
         "read", "list_symbols", "find_symbol", "find_references",
-        "http_request", "fetch_url", "web_search",
+        "http_request", "web_search",
     ];
     if ALWAYS_SUMMARIZE.contains(&name) {
         return true;
@@ -111,7 +111,6 @@ pub(crate) fn suppressed_tool_result_summary(display: &ToolResultDisplay) -> Str
         }
         "list_imports" => summarize_symbol_results(&display.content, "imports"),
         "http_request" => summarize_http_request(&display.content),
-        "fetch_url" => summarize_fetch_url(&display.content),
         "web_search" => summarize_web_search(&display.content),
         _ => {
             let label = if line_count == 1 { "line" } else { "lines" };
@@ -137,35 +136,6 @@ fn summarize_http_request(content: &str) -> String {
         .map(|l| l.split('(').nth(1).and_then(|s| s.split(')').next()).unwrap_or("?").to_string())
         .unwrap_or_else(|| "? bytes".to_string());
     format!("http_request: {status}, {size}, {content_type}")
-}
-
-fn summarize_fetch_url(content: &str) -> String {
-    let url = content
-        .lines()
-        .find(|l| l.starts_with("URL: "))
-        .map(|l| l.trim_start_matches("URL: ").to_string())
-        .unwrap_or_else(|| "?".to_string());
-    let status = content
-        .lines()
-        .find(|l| l.starts_with("Status: "))
-        .map(|l| l.trim_start_matches("Status: ").to_string())
-        .unwrap_or_else(|| "?".to_string());
-    let link_count = content
-        .lines()
-        .find(|l| l.starts_with("── Links ("))
-        .map(|l| {
-            l.split('(').nth(1)
-                .and_then(|s| s.split(' ').next())
-                .unwrap_or("0")
-                .to_string()
-        })
-        .unwrap_or_else(|| "0".to_string());
-    let size = content
-        .lines()
-        .find(|l| l.starts_with("Content ("))
-        .map(|l| l.split('(').nth(1).and_then(|s| s.split(')').next()).unwrap_or("?").to_string())
-        .unwrap_or_else(|| "? bytes".to_string());
-    format!("fetch_url: {status}, {size}, {link_count} links — {url}")
 }
 
 fn summarize_web_search(content: &str) -> String {

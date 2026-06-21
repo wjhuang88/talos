@@ -226,17 +226,16 @@ fn read_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, SessionError
 }
 
 fn parse_tool_result(content: &str) -> (bool, String, String) {
-    if let Some(rest) = content.strip_prefix("__ERROR__:") {
-        if let Some((id, body)) = rest.split_once("__\n") {
-            return (true, id.to_string(), body.to_string());
-        }
+    if let Some(rest) = content.strip_prefix("__ERROR__:")
+        && let Some((id, body)) = rest.split_once("__\n")
+    {
+        return (true, id.to_string(), body.to_string());
     }
-    if let Some(rest) = content.strip_prefix("__OK__:") {
-        if let Some((id, body)) = rest.split_once("__\n") {
-            return (false, id.to_string(), body.to_string());
-        }
+    if let Some(rest) = content.strip_prefix("__OK__:")
+        && let Some((id, body)) = rest.split_once("__\n")
+    {
+        return (false, id.to_string(), body.to_string());
     }
-    // Old format: no prefix. Treat as non-error with unknown ID.
     (false, "unknown".to_string(), content.to_string())
 }
 

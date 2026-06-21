@@ -303,13 +303,7 @@ impl PermissionEngine {
         });
 
         self.rules.push(PermissionRule {
-            tool_name: "fetch_url".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-
-        self.rules.push(PermissionRule {
-            tool_name: "save_url".to_owned(),
+            tool_name: "web_search".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Ask,
         });
@@ -441,7 +435,7 @@ fn infer_nature(tool_name: &str) -> talos_core::tool::ToolNature {
         talos_core::tool::ToolNature::Read
     } else if name_lower == "bash" || name_lower == "sh" {
         talos_core::tool::ToolNature::Execute
-    } else if name_lower == "http_request" || name_lower == "web_search" || name_lower == "fetch_url" {
+    } else if name_lower == "http_request" || name_lower == "web_search" {
         talos_core::tool::ToolNature::Network
     } else {
         talos_core::tool::ToolNature::Write

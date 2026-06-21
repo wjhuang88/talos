@@ -63,6 +63,11 @@ pub struct HttpRequestInput {
     /// text, pretty-prints JSON. "raw" returns the body as-is.
     #[serde(default = "default_mode")]
     pub mode: String,
+
+    /// Extract and return links from HTML pages. Default false.
+    /// Only meaningful when mode is "auto" and Content-Type is text/html.
+    #[serde(default)]
+    pub extract_links: bool,
 }
 
 fn default_method() -> String {
@@ -164,6 +169,44 @@ fn extract_html_text(html: &str) -> String {
     }
 
     result
+}
+
+/// Extract normalized, deduplicated links from HTML content.
+fn extract_links(html: &str, base_url: &str) -> Vec<String> {
+    let document = scraper::Html::parse_document(html);
+    let selector = scraper::Selector::parse("a[href]").expect("valid CSS selector");
+
+    let mut seen = HashSet::new();
+    let mut links = Vec::new();
+
+    for element in document.select(&selector) {
+        if let Some(href) = element.attr("href") {
+            let trimmed = href.trim();
+            if trimmed.is_empty()
+                || trimmed.starts_with('#')
+                || trimmed.starts_with("javascript:")
+            {
+                continue;
+            }
+
+            let resolved = match reqwest::Url::parse(trimmed) {
+                Ok(url) => url.to_string(),
+                Err(_) => match reqwest::Url::parse(base_url) {
+                    Ok(base) => match base.join(trimmed) {
+                        Ok(full) => full.to_string(),
+                        Err(_) => continue,
+                    },
+                    Err(_) => continue,
+                },
+            };
+
+            if seen.insert(resolved.clone()) {
+                links.push(resolved);
+            }
+        }
+    }
+
+    links
 }
 
 /// A tool that executes HTTP requests with SSRF protection and size limits.
@@ -480,6 +523,21 @@ impl AgentTool for HttpRequestTool {
             let html_str = String::from_utf8_lossy(body_display);
             let text = extract_html_text(&html_str);
             output.push_str(&text);
+
+            if parsed.extract_links {
+                let links = extract_links(&html_str, &parsed.url);
+                if !links.is_empty() {
+                    let count = links.len();
+                    let show = count.min(20);
+                    output.push_str(&format!("\n\n── Links ({count} total, showing {show}) ──\n"));
+                    for link in links.iter().take(show) {
+                        output.push_str(&format!("  {link}\n"));
+                    }
+                    if links.len() > show {
+                        output.push_str(&format!("  … and {} more\n", links.len() - show));
+                    }
+                }
+            }
         } else if content_type.contains("application/json") {
             // JSON: pretty-print.
             output.push_str(&format!("\nContent ({size_label}, application/json):\n",));
