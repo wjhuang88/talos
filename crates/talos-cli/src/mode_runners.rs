@@ -340,6 +340,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     ..
                 } => {
                     for msg in &new_messages {
+                        if matches!(msg, talos_core::message::Message::User { .. }) {
+                            continue; // User message handled by separate persister
+                        }
                         if let Err(e) = session_for_persist.append(msg) {
                             eprintln!("Warning: failed to persist message: {e}");
                         }
@@ -570,6 +573,9 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
                     match status {
                         talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages } => {
                             for msg in &new_messages {
+                        if matches!(msg, talos_core::message::Message::User { .. }) {
+                                    continue;
+                                }
                                 if let Err(e) = session.append(msg) {
                                     eprintln!("Warning: failed to persist message: {e}");
                                 }
