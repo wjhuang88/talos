@@ -330,41 +330,23 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let session_manager_for_persist = session_manager.clone();
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
-        let mut pending_tool_results: Vec<talos_core::message::MessageToolResult> = Vec::new();
         while let Some(session_event) = bridge_forwarder.recv().await {
             match session_event {
                 SessionEvent::AgentEvent(ref agent_event) => {
-                    if let AgentEvent::ToolResult { result } = agent_event {
-                        pending_tool_results.push(result.clone());
-                    }
                     let _ = bridge_tx.send(agent_event.clone());
                 }
                 SessionEvent::TurnCompleted {
-                    status: talos_core::session::TurnCompletionStatus::Success { final_text },
+                    status: talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages },
                     ..
-                } if !final_text.is_empty() => {
-                    let assistant_msg = talos_core::message::Message::Assistant {
-                        content: final_text,
-                        tool_calls: vec![],
-                    };
-                    if let Err(e) = session_for_persist.append(&assistant_msg) {
-                        eprintln!("Warning: failed to persist assistant message: {e}");
-                    }
-                    for result in pending_tool_results.drain(..) {
-                        let tool_msg = talos_core::message::Message::Tool { result };
-                        if let Err(e) = session_for_persist.append(&tool_msg) {
-                            eprintln!("Warning: failed to persist tool result: {e}");
+                } => {
+                    for msg in &new_messages {
+                        if let Err(e) = session_for_persist.append(msg) {
+                            eprintln!("Warning: failed to persist message: {e}");
                         }
                     }
                     if let Err(e) = session_manager_for_persist.update_index(&session_for_persist) {
                         eprintln!("Warning: failed to update session index: {e}");
                     }
-                }
-                SessionEvent::TurnCompleted {
-                    status: talos_core::session::TurnCompletionStatus::Success { .. },
-                    ..
-                } => {
-                    pending_tool_results.clear();
                 }
                 SessionEvent::TurnCompleted {
                     status: talos_core::session::TurnCompletionStatus::Error { message },
@@ -586,18 +568,14 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
                 },
                 SessionEvent::TurnCompleted { status, .. } => {
                     match status {
-                        talos_core::session::TurnCompletionStatus::Success { final_text } => {
-                            if !final_text.is_empty() {
-                                let assistant_msg = talos_core::message::Message::Assistant {
-                                    content: final_text,
-                                    tool_calls: vec![],
-                                };
-                                if let Err(e) = session.append(&assistant_msg) {
-                                    eprintln!("Warning: failed to persist assistant message: {e}");
+                        talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages } => {
+                            for msg in &new_messages {
+                                if let Err(e) = session.append(msg) {
+                                    eprintln!("Warning: failed to persist message: {e}");
                                 }
-                                if let Err(e) = session_manager.update_index(&session) {
-                                    eprintln!("Warning: failed to update session index: {e}");
-                                }
+                            }
+                            if let Err(e) = session_manager.update_index(&session) {
+                                eprintln!("Warning: failed to update session index: {e}");
                             }
                         }
                         talos_core::session::TurnCompletionStatus::Cancelled => {

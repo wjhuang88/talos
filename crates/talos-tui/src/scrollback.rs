@@ -468,7 +468,6 @@ pub(crate) fn render_history_messages(
 ) -> Vec<ScrollbackLine> {
     let mut lines = Vec::new();
     let mut pending_tool_names: Vec<String> = Vec::new();
-    let mut deferred_text: Option<(MessageSource, String)> = None;
     for message in history {
         match message {
             Message::Tool { result } => {
@@ -496,40 +495,18 @@ pub(crate) fn render_history_messages(
                 let tool_calls_in_text =
                     talos_core::message::extract_tool_calls_from_text(content);
                 let cleaned = talos_core::message::strip_tool_syntax(content);
-                let has_tool_calls = !tool_calls.is_empty() || !tool_calls_in_text.is_empty();
 
-                // Track tool calls as queue for result resolution.
                 pending_tool_names.clear();
                 for tc in tool_calls {
                     pending_tool_names.push(tc.name.clone());
                 }
 
-                // If this message has tool calls AND there's deferred text from
-                // a previous assistant, flush the deferred text first.
-                if has_tool_calls && let Some((deferred_source, deferred_content)) = deferred_text.take() {
+                if !cleaned.is_empty() {
                     lines.extend(render_history_message(
                         stream_count,
-                        deferred_source,
-                        &deferred_content,
+                        MessageSource::Assistant,
+                        &cleaned,
                     ));
-                }
-
-                if has_tool_calls {
-                    // Defer the assistant's text: it logically belongs AFTER
-                    // the tool results, not before. Save it to render when the
-                    // next assistant message arrives (or at end).
-                    if !cleaned.is_empty() {
-                        deferred_text = Some((MessageSource::Assistant, cleaned));
-                    }
-                } else {
-                    // No tool calls — render normally.
-                    if !cleaned.is_empty() {
-                        lines.extend(render_history_message(
-                            stream_count,
-                            MessageSource::Assistant,
-                            &cleaned,
-                        ));
-                    }
                 }
 
                 let calls: Vec<talos_conversation::ToolCallDisplay> = if !tool_calls.is_empty() {
@@ -573,14 +550,6 @@ pub(crate) fn render_history_messages(
                 lines.extend(render_history_message(stream_count, source, content));
             }
         }
-    }
-    // Flush any remaining deferred assistant text at end of history.
-    if let Some((deferred_source, deferred_content)) = deferred_text.take() {
-        lines.extend(render_history_message(
-            stream_count,
-            deferred_source,
-            &deferred_content,
-        ));
     }
     lines
 }

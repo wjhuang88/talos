@@ -235,10 +235,12 @@ async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     match agent_result {
         Ok(Ok((final_text, new_messages))) => {
+            let cloned_messages = new_messages.clone();
             let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
                 turn_id,
                 status: TurnCompletionStatus::Success {
                     final_text: final_text.clone(),
+                    new_messages: cloned_messages,
                 },
             });
             let _ = result_tx.send(TurnRecord { new_messages });

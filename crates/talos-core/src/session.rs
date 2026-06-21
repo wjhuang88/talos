@@ -56,6 +56,10 @@ pub enum TurnCompletionStatus {
         /// The final assistant response text.
         #[serde(default)]
         final_text: String,
+        /// Messages produced during this turn, in chronological order.
+        /// This is the authoritative sequence for persistence/replay.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        new_messages: Vec<crate::message::Message>,
     },
     /// Turn was cancelled by user interrupt.
     Cancelled,
@@ -142,6 +146,7 @@ mod tests {
                 turn_id: "1".into(),
                 status: TurnCompletionStatus::Success {
                     final_text: String::new(),
+                    new_messages: vec![],
                 },
             },
             SessionEvent::TurnCompleted {
