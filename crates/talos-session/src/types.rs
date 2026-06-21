@@ -119,10 +119,15 @@ pub struct Session {
 
     /// All branches in this session.
     pub branches: HashMap<String, SessionBranch>,
+
+    /// Whether the session file has been persisted to disk.
+    /// Set to true after the first `ensure_persisted()` call.
+    pub persisted: bool,
 }
 
 impl Session {
     /// Create a new session with a single empty root branch.
+    /// The file path MUST already exist on disk.
     pub fn new(id: Uuid, project: String, workspace_root: String, file_path: PathBuf) -> Self {
         let root_id = Uuid::new_v4().to_string();
         let mut branches = HashMap::new();
@@ -142,7 +147,30 @@ impl Session {
             file_path,
             current_branch: root_id,
             branches,
+            persisted: true,
         }
+    }
+
+    /// Create a deferred session — metadata only, no file on disk.
+    /// The file is created lazily on the first `ensure_persisted()` call.
+    pub fn new_deferred(id: Uuid, project: String, workspace_root: String, file_path: PathBuf) -> Self {
+        let mut session = Self::new(id, project, workspace_root, file_path);
+        session.persisted = false;
+        session
+    }
+
+    /// Create the parent directory and empty JSONL file if not yet persisted.
+    /// No-op if already persisted (e.g., resumed or forked sessions).
+    pub fn ensure_persisted(&mut self) -> Result<(), SessionError> {
+        if self.persisted {
+            return Ok(());
+        }
+        if let Some(parent) = self.file_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::File::create(&self.file_path)?;
+        self.persisted = true;
+        Ok(())
     }
 
     /// Fork the current session from a specific entry, creating a new branch.

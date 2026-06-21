@@ -117,9 +117,19 @@ impl Session {
     }
 
     /// Append a raw [`SessionEntry`] to the JSONL file.
+    /// Creates the parent directory and file if this is the first append
+    /// (supports deferred session creation).
     fn append_entry(&self, entry: &SessionEntry) -> Result<(), SessionError> {
         let line =
             serde_json::to_string(entry).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
+
+        // Ensure file and parent directory exist (lazy creation for deferred sessions).
+        if !self.file_path.exists()
+            && let Some(parent) = self.file_path.parent()
+        {
+            fs::create_dir_all(parent)?;
+        }
+
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)

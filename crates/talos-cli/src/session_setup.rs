@@ -93,7 +93,7 @@ pub(crate) fn resolve_session_for_workspace(
     }
 
     manager
-        .create_session(display_name, workspace_root)
+        .defer_create_session(display_name, workspace_root)
         .context("failed to create session")
 }
 
@@ -107,7 +107,7 @@ fn resume_latest_workspace_session_or_create(
         .context("failed to list sessions")?
     else {
         return manager
-            .create_session(display_name, workspace_root)
+            .defer_create_session(display_name, workspace_root)
             .context("failed to create session");
     };
 
@@ -127,7 +127,7 @@ fn prompt_for_workspace_session_or_create(
     if sessions.is_empty() {
         println!("No existing sessions for this workspace. Creating a new one.");
         return manager
-            .create_session(display_name, workspace_root)
+            .defer_create_session(display_name, workspace_root)
             .context("failed to create session");
     }
 

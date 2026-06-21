@@ -65,6 +65,28 @@ impl SessionManager {
         ))
     }
 
+    /// Prepare a new session without creating the file on disk.
+    ///
+    /// Returns a [`Session`] with `persisted = false`. The JSONL file is
+    /// not created until [`Session::ensure_persisted`] is called (triggered
+    /// automatically on the first message append).
+    pub fn defer_create_session(
+        &self,
+        project: &str,
+        workspace_root: &str,
+    ) -> Result<Session, SessionError> {
+        let id = Uuid::new_v4();
+        let project_dir = self.sessions_dir.join(workspace_dir_name(workspace_root));
+        let file_path = project_dir.join(format!("{id}.jsonl"));
+
+        Ok(Session::new_deferred(
+            id,
+            project.to_string(),
+            workspace_root.to_string(),
+            file_path,
+        ))
+    }
+
     /// Load an existing session by ID.
     ///
     /// Scans all workspace directories (both old basename and new hashed layouts)
