@@ -495,13 +495,14 @@ pub(crate) fn render_history_messages(
                 let tool_calls_in_text =
                     talos_core::message::extract_tool_calls_from_text(content);
                 let cleaned = talos_core::message::strip_tool_syntax(content);
+                let has_tool_calls = !tool_calls.is_empty() || !tool_calls_in_text.is_empty();
 
                 pending_tool_names.clear();
                 for tc in tool_calls {
                     pending_tool_names.push(tc.name.clone());
                 }
 
-                if !cleaned.is_empty() {
+                if !has_tool_calls && !cleaned.is_empty() {
                     lines.extend(render_history_message(
                         stream_count,
                         MessageSource::Assistant,
