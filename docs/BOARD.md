@@ -17,9 +17,6 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I040 Session Foundation & Tool Refinement | Active | [I040](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A + http_request content detection + fetch_url merge; activate 2026-06-21 |
-|---|---|---|---|
-| I040 Session Foundation & Tool Refinement | Active | [I040 Session Foundation & Tool Refinement](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A + http_request content detection; activate 2026-06-21 |
-|---|---|---|---|
 
 ## Review
 
@@ -50,9 +47,7 @@ acceptance criteria, verification evidence, or iteration state.
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Complete | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input; Esc no longer clears composer; exit prints session summary with model, duration, turns, tokens, cost |
-| TUI-011 Status Bar & Exit Output Polish | Planned | [TUI-011 Status Bar & Exit Output Polish](backlog/active/TUI-011-status-bar-exit-polish.md) | Redesign status bar (model│progress│metrics) + polish exit summary with branded header and human-readable numbers |
 | CMD-001 Interactive Command Runtime Contract | Complete | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Shared registry, tool-backed infrastructure, availability predicates, copy/export restored, README synced |
-| I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype `~/.agents/models.json` import + config precedence specified |
 | SESSION-001 Interactive Session Lifecycle | Refinement | [SESSION-001](backlog/active/SESSION-001-interactive-session-lifecycle.md) | Select ready child SESSION-001-A first; expose `/new`, `/resume`, and `/fork` only through later verified children |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
 | I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
@@ -86,12 +81,12 @@ acceptance criteria, verification evidence, or iteration state.
 | MEM-004 Workspace Session Topology | Complete | [MEM-004 Workspace-Scoped Session Topology](backlog/active/MEM-004-workspace-session-topology.md) | SHA256-hashed workspace identity; workspace_root column in SQLite; --continue/--resume filtered by workspace; same-basename collision prevented; old sessions backward-compatible |
 | TUI-005 Logo & Splash Screen | Complete (in-scope); overlay deferred | [TUI-005 Logo & Splash Screen](backlog/active/TUI-005-logo-splash.md) | Branded inline `TALOS` block wordmark (Nord Frost gradient), `⬡ The watchman never sleeps` tagline, narrow-width fallback; scrollback-only, no alt-screen. 2026-06-14 correction fixed first-row column drift and preserved the intended blank line before the logo; README synced, 82 TUI tests and workspace verification pass. Phase 3-4 viewport overlay (subsystem badges + auto-dismiss) deferred per Scope Boundary. |
 | I024 Conversation Context | Complete | [I024 Conversation Context](iterations/I024-conversation-context.md) | Closed 2026-06-13: session history reaches provider calls, JSONL resume and visible TUI history hydration work, implicit resume is workspace-scoped, and residual long-session compaction/topology work is registered in MEM-003/MEM-004. |
+| TUI-012 Session Resume History Rendering | Complete | [TUI-012](backlog/active/TUI-012-session-resume-rendering.md) | Fixed 2026-06-21: persistence layer restored agent new_messages; replay matches live |
 
 ## Later
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| TUI-012 Session Resume History Rendering | Complete | [TUI-012](backlog/active/TUI-012-session-resume-rendering.md) | Fixed 2026-06-21: root cause was persistence layer, not rendering |
 | PERM-002 Operation-Scoped Permissions | Refinement | [PERM-002](backlog/active/PERM-002-operation-scoped-permissions.md) | P1: no-repeat-approval — same resource auto-allowed after first approval |
 | REMOTE-001 Remote Session Protocol | Research | [REMOTE-001 Remote Session Protocol](backlog/active/REMOTE-001-remote-session-protocol.md) | Research transport, auth, and minimum viable slice before any implementation |
 | PLUGIN-001 WASM Runtime Plugin Protocol | Research (→ P2) | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Elevated P2: unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM loading |
@@ -101,10 +96,10 @@ acceptance criteria, verification evidence, or iteration state.
 | MODEL-002 Local Micro-Model Decision Layer | Research | [MODEL-002 Local Micro-Model](backlog/active/MODEL-002-local-micro-model-decision-layer.md) | Evaluate local small-model hints; no permission authority before ADR |
 | MODEL-003 Reasoning / Thinking Support | ADR-needed | [MODEL-003 Reasoning/Thinking](backlog/active/MODEL-003-reasoning-thinking-support.md) | Per-provider reasoning fields + stream + persistence + TUI; ADR gate |
 | DIST-001 Optional Runtime Asset Distribution | Research | [DIST-001 Optional Runtime Asset Distribution](backlog/active/DIST-001-optional-runtime-asset-distribution.md) | Keep default release light; optional large assets install post-install with consent, verification, and offline/mirror support |
-| WEBFETCH-001 Web And Document Fetch Tools | Research | [WEBFETCH-001 Web And Document Fetch Tools](backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md) | Design context fetch, URL auto-detection, HTML extraction, link storage, document conversion, and separate URL save tool |
+| WEBFETCH-001 Web And Document Fetch Tools | I039 Complete | [WEBFETCH-001](backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md) | Phase 0 http_request + Phase 1 fetch_url/save_url landed in I039/I040 |
 | STORE-001 Zvec Storage Evaluation | Research | [STORE-001 Zvec Storage Evaluation](backlog/active/STORE-001-zvec-storage-evaluation.md) | Decide whether Zvec is rejected, watch-only, optional derived index, or ADR-ready; no dependency before Spike |
 | TOOL-004 Ripgrep Engine Evaluation | Research | [TOOL-004](backlog/active/TOOL-004-ripgrep-engine-evaluation.md) | Timeboxed Spike compares embedded ripgrep crates, external `rg`, and current engine before implementation |
-| TOOL-005 Bash Streaming Output | Planned | [TOOL-005 Bash Streaming Output](backlog/active/TOOL-005-bash-streaming-output.md) | Print `$ <command>` first, stream stdout/stderr line-by-line; preserve timeout + exit code |
+| TOOL-005 Bash Streaming Output | I039 Complete | [TOOL-005](backlog/active/TOOL-005-bash-streaming-output.md) | Bash streaming: $cmd header + line-by-line output landed in I039 |
 | TOOL-006 Bash → Sh Rename + Cross-OS CLI | Planned | [TOOL-005 §Future](backlog/active/TOOL-005-bash-streaming-output.md) | Rename `bash` → `sh`; Windows `cmd`/`powershell` support; backward-compat alias |
 | TOOL-007 Tool Set Design Audit | Research | [TOOL-007 Tool Set Design Audit](backlog/active/TOOL-007-tool-set-design-audit.md) | Audit 22 tools: orthogonality, coverage, granularity, agent logic, permissions, naming |
 | TOOL-008 Tree-sitter On-Demand Loading | Planned | [TOOL-008 Tree-sitter On-Demand](backlog/active/TOOL-008-tree-sitter-on-demand.md) | Phase 1: LazyLock, Phase 2: feature-gated (~8 default langs, 25-30 MB), Phase 3: WASM runtime loading |
@@ -113,4 +108,4 @@ acceptance criteria, verification evidence, or iteration state.
 | AGENT-002 dotagentsprotocol Shared Config | Research | [AGENT-002 dotagentsprotocol.com Support](backlog/active/AGENT-002-dotagents-protocol-support.md) | Three sub-areas: A) `models.json` import, B) `skills/` discovery (needs SKILL-002 gate), C) `mcp.json` import (needs server opt-in ADR) |
 | WEB-001 Embedded Web Control | Research (→ P3) | [WEB-001](backlog/active/WEB-001-embedded-web-control-surface.md) | Loopback HTTP + status/SSE + project management UI (GOV-003)
 | GOV-003 Built-in Project Governance | Planned | [GOV-003](backlog/active/GOV-003-builtin-project-governance.md) | Phase 1: context injection; Phase 2: gate enforcement; Phase 3: PM web UI
-| TOOL-009 Internet Search Tool | Planned | [TOOL-009](backlog/active/TOOL-009-internet-search-tool.md) | web_search with SearXNG/Brave/Tavily backends; Network gated; depends on WEBFETCH-001 HTTP infra
+| TOOL-009 Internet Search Tool | I039 Complete | [TOOL-009](backlog/active/TOOL-009-internet-search-tool.md) | web_search with DDG/Tavily/SearXNG/Wikipedia landed in I039 |
