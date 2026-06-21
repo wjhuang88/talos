@@ -283,7 +283,7 @@ impl Default for HttpRequestTool {
 
 /// Returns `true` if the IP address is in a private, loopback, link-local,
 /// or otherwise reserved range that should not be reachable via a network tool.
-fn is_private_ip(ip: IpAddr) -> bool {
+pub(crate) fn is_private_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
             v4.is_private()

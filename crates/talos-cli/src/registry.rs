@@ -17,8 +17,8 @@ use talos_tools::git::{
 };
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
-    BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, HttpRequestTool, LsTool,
-    ReadTool, StatTool, TreeTool, WebSearchTool, WriteTool,
+    BashTool, DeleteTool, DiffTool, EditTool, FetchUrlTool, GlobTool, GrepTool, HttpRequestTool,
+    LsTool, ReadTool, StatTool, TreeTool, WebSearchTool, WriteTool,
 };
 use tokio::sync::mpsc;
 
@@ -394,6 +394,11 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
         approval: approval.clone(),
         print_mode: true,
     }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(FetchUrlTool::new()),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
 
     registry
 }
@@ -491,6 +496,10 @@ pub(crate) fn build_tui_tool_registry(
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(WebSearchTool::new()),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(FetchUrlTool::new()),
         approval: approval_handler,
     }));
     registry
@@ -517,6 +526,7 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     registry.register(Arc::new(GitDiffTool::new(PathBuf::from("."))));
     registry.register(Arc::new(HttpRequestTool::new()));
     registry.register(Arc::new(WebSearchTool::new()));
+    registry.register(Arc::new(FetchUrlTool::new()));
     registry.register(Arc::new(GitLogTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GitShowTool::new(PathBuf::from("."))));
     registry.register(Arc::new(GitBranchListTool::new(PathBuf::from("."))));
