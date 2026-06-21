@@ -83,4 +83,8 @@ impl AgentTool for DeleteTool {
             Err(e) => ToolResult::error(e.to_string()),
         }
     }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
+    }
 }

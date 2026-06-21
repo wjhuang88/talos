@@ -71,6 +71,10 @@ impl AgentTool for WriteTool {
             Err(e) => ToolResult::error(e.to_string()),
         }
     }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
+    }
 }
 
 /// Input parameters for the [`EditTool`].
@@ -140,5 +144,9 @@ impl AgentTool for EditTool {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["path"]
     }
 }
