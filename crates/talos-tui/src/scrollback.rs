@@ -452,14 +452,75 @@ pub(crate) fn render_history_messages(
 ) -> Vec<ScrollbackLine> {
     let mut lines = Vec::new();
     for message in history {
-        let Some((source, content)) = history_message_parts(message) else {
-            continue;
-        };
-        if content.is_empty() {
-            continue;
-        }
+        match message {
+            Message::Tool { result } => {
+                let icon = if result.is_error { "✗" } else { "✓" };
+                let color = if result.is_error {
+                    to_crossterm_color(semantic::TEXT_ERROR)
+                } else {
+                    to_crossterm_color(semantic::TEXT_SUCCESS)
+                };
+                let display = talos_conversation::ToolResultDisplay {
+                    tool_name: Some(result.tool_use_id.clone()),
+                    is_error: result.is_error,
+                    content: result.content.clone(),
+                };
+                lines.extend(
+                    crate::tool_display::build_tool_result_scrollback_lines(&display, icon, color),
+                );
+            }
+            Message::Assistant { content, tool_calls } => {
+                let tool_calls_in_text =
+                    talos_core::message::extract_tool_calls_from_text(content);
+                let cleaned = talos_core::message::strip_tool_syntax(content);
 
-        lines.extend(render_history_message(stream_count, source, content));
+                if !cleaned.is_empty() {
+                    lines.extend(render_history_message(
+                        stream_count,
+                        MessageSource::Assistant,
+                        &cleaned,
+                    ));
+                }
+
+                // Render tool calls from struct field (live sessions) or from text (resume).
+                let calls: Vec<talos_conversation::ToolCallDisplay> = if !tool_calls.is_empty() {
+                    tool_calls
+                        .iter()
+                        .map(|tc| talos_conversation::ToolCallDisplay {
+                            tool_name: tc.name.clone(),
+                            arguments: tc.input.clone(),
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        })
+                        .collect()
+                } else if !tool_calls_in_text.is_empty() {
+                    tool_calls_in_text
+                        .iter()
+                        .map(|tc| talos_conversation::ToolCallDisplay {
+                            tool_name: tc.name.clone(),
+                            arguments: tc.input.clone(),
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                };
+
+                for call in &calls {
+                    lines.push(crate::tool_display::build_tool_call_scrollback_line(call));
+                }
+            }
+            _ => {
+                let Some((source, content)) = history_message_parts(message) else {
+                    continue;
+                };
+                if content.is_empty() {
+                    continue;
+                }
+                lines.extend(render_history_message(stream_count, source, content));
+            }
+        }
     }
     lines
 }
