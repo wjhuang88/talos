@@ -239,6 +239,12 @@ fn parse_tool_result(content: &str) -> (bool, String, String) {
     (false, "unknown".to_string(), content.to_string())
 }
 
+fn strip_llm_hints(content: &str) -> String {
+    content
+        .trim_end_matches("\n\n[Analyze the error above and try a different approach.]")
+        .to_string()
+}
+
 fn message_parts(message: &Message) -> (String, String) {
     match message {
         Message::User { content } => ("user".to_string(), content.clone()),
@@ -258,13 +264,13 @@ fn message_parts(message: &Message) -> (String, String) {
             ("assistant".to_string(), full)
         }
         Message::Tool { result } => {
-            // Prepend error marker and tool_use_id for round-trip.
             let prefix = if result.is_error {
                 format!("__ERROR__:{}__\n", result.tool_use_id)
             } else {
                 format!("__OK__:{}__\n", result.tool_use_id)
             };
-            ("system".to_string(), format!("{prefix}{}", result.content))
+            let content = strip_llm_hints(&result.content);
+            ("system".to_string(), format!("{prefix}{content}"))
         }
         Message::System { content, .. } => ("system".to_string(), content.clone()),
         Message::Context { content } => ("user".to_string(), content.clone()),
