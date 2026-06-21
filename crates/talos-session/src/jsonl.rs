@@ -68,23 +68,25 @@ impl Session {
                 "user" => Some(Message::User {
                     content: entry.content,
                 }),
-                "assistant" => Message::Assistant {
-                    content: entry.content,
-                    tool_calls: vec![],
+                "assistant" => {
+                    let tool_calls = talos_core::message::extract_tool_calls_from_text(&entry.content);
+                    let cleaned = talos_core::message::strip_tool_syntax(&entry.content);
+                    Message::Assistant {
+                        content: cleaned,
+                        tool_calls,
+                    }
+                    .into()
                 }
-                .into(),
                 "system" => {
-                    // Try to parse as AgentEvent first
                     if serde_json::from_str::<AgentEvent>(&entry.content).is_ok() {
-                        // System events are not messages, skip
                         None
                     } else {
-                        // Treat as tool result
+                        let (is_error, tool_use_id, content) = parse_tool_result(&entry.content);
                         Some(Message::Tool {
                             result: talos_core::message::MessageToolResult {
-                                tool_use_id: "unknown".to_string(),
-                                content: entry.content,
-                                is_error: false,
+                                tool_use_id,
+                                content,
+                                is_error,
                             },
                         })
                     }
@@ -223,11 +225,48 @@ fn read_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, SessionError
     Ok(entries)
 }
 
+fn parse_tool_result(content: &str) -> (bool, String, String) {
+    if let Some(rest) = content.strip_prefix("__ERROR__:") {
+        if let Some((id, body)) = rest.split_once("__\n") {
+            return (true, id.to_string(), body.to_string());
+        }
+    }
+    if let Some(rest) = content.strip_prefix("__OK__:") {
+        if let Some((id, body)) = rest.split_once("__\n") {
+            return (false, id.to_string(), body.to_string());
+        }
+    }
+    // Old format: no prefix. Treat as non-error with unknown ID.
+    (false, "unknown".to_string(), content.to_string())
+}
+
 fn message_parts(message: &Message) -> (String, String) {
     match message {
         Message::User { content } => ("user".to_string(), content.clone()),
-        Message::Assistant { content, .. } => ("assistant".to_string(), content.clone()),
-        Message::Tool { result } => ("system".to_string(), result.content.clone()),
+        Message::Assistant { content, tool_calls } => {
+            if tool_calls.is_empty() {
+                return ("assistant".to_string(), content.clone());
+            }
+            // Embed tool calls as json-tool blocks so they survive JSONL round-trip.
+            let mut full = content.clone();
+            for tc in tool_calls {
+                let block = serde_json::json!({
+                    "name": tc.name,
+                    "args": tc.input,
+                });
+                full.push_str(&format!("\n```json-tool\n{block}\n```"));
+            }
+            ("assistant".to_string(), full)
+        }
+        Message::Tool { result } => {
+            // Prepend error marker and tool_use_id for round-trip.
+            let prefix = if result.is_error {
+                format!("__ERROR__:{}__\n", result.tool_use_id)
+            } else {
+                format!("__OK__:{}__\n", result.tool_use_id)
+            };
+            ("system".to_string(), format!("{prefix}{}", result.content))
+        }
         Message::System { content, .. } => ("system".to_string(), content.clone()),
         Message::Context { content } => ("user".to_string(), content.clone()),
     }

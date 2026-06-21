@@ -279,10 +279,11 @@ pub fn extract_tool_calls_from_text(text: &str) -> Vec<ToolCall> {
 pub fn strip_tool_syntax(text: &str) -> String {
     let mut result = text.to_string();
     while let Some(start) = result.find("```json-tool") {
-        let end = result[start..]
-            .find("```")
-            .map(|e| start + "```json-tool".len() + e + 3)
-            .unwrap_or(result.len());
+        let inner_start = start + "```json-tool".len();
+        let inner = &result[inner_start..];
+        let end = inner_start
+            + inner.find("```").unwrap_or(inner.len())
+            + 3;
         result.replace_range(start..end, "");
     }
     result.trim().to_string()

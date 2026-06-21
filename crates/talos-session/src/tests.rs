@@ -281,14 +281,15 @@ fn session_with_tool_calls() {
 
     let messages = session.read_messages().unwrap();
     assert_eq!(messages.len(), 1);
-    // Content is preserved, tool_calls are not in the new format
-    assert_eq!(
-        messages[0],
-        Message::Assistant {
-            content: "Let me check that file.".into(),
-            tool_calls: vec![],
+    match &messages[0] {
+        Message::Assistant { content, tool_calls } => {
+            assert_eq!(content, "Let me check that file.");
+            assert_eq!(tool_calls.len(), 1);
+            assert_eq!(tool_calls[0].name, "read_file");
+            assert_eq!(tool_calls[0].input, serde_json::json!({"path": "src/main.rs"}));
         }
-    );
+        _ => panic!("expected Assistant message"),
+    }
 }
 
 #[test]
@@ -308,12 +309,11 @@ fn session_with_tool_result() {
 
     let messages = session.read_messages().unwrap();
     assert_eq!(messages.len(), 1);
-    // Tool messages are stored as system role with content
     assert_eq!(
         messages[0],
         Message::Tool {
             result: MessageToolResult {
-                tool_use_id: "unknown".into(),
+                tool_use_id: "call_1".into(),
                 content: "fn main() {}".into(),
                 is_error: false,
             },
