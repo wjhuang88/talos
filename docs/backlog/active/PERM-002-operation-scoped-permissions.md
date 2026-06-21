@@ -11,11 +11,12 @@
 
 ## Outcome
 
-**核心体验改进：已授权的操作对象不再重复要求授权。**
+**核心体验改进：已授权的权限类型+资源不再重复要求授权。**
 
-当用户批准过一次"写 `src/main.rs`"或"访问 `api.github.com`"后，
-后续相同工具操作同一资源时自动放行，无需反复确认。权限粒度从
-"工具级"升级为"工具+资源级"。
+当用户批准过一次"写 `src/main.rs`"后，后续**所有写操作工具**
+（write、edit、delete、save_url）操作同一资源时自动放行。
+权限以 `ToolNature`（Read/Write/Execute/Network）为粒度，
+而非具体工具名。
 
 ## Problem
 
@@ -39,48 +40,43 @@ you called.
 
 ## Scope
 
-### 1. Generalized Resource Pattern
+### 1. Nature-Based Rule Matching
 
-Extend `PermissionRule` to support a **resource** abstraction instead of
-just `path_pattern`:
+`PermissionRule` matches on `ToolNature` (Read/Write/Execute/Network),
+not on tool name. One "Write to src/" rule applies to ALL write-capable
+tools (write, edit, delete, save_url).
 
 ```rust
 pub struct PermissionRule {
-    pub tool_name: String,
-    /// Path pattern (file operations), domain pattern (network), or empty (any).
+    /// ToolNature this rule applies to.
+    pub nature: ToolNature,
+    /// Glob (file path) or domain/exact pattern for matching the resource.
     pub resource: Option<String>,
-    /// How to interpret the resource field.
-    pub resource_kind: ResourceKind,
+    /// How to interpret the resource field — inferred from nature if absent.
+    pub resource_kind: Option<ResourceKind>,
     pub decision: PermissionDecision,
 }
 
 pub enum ResourceKind {
-    /// Glob pattern matched against file path (existing behavior).
-    Path(String),
-    /// Exact or wildcard domain matched against URL host.
-    Domain(String),
-    /// Combination: path within a workspace directory.
-    WorkspacePath(String),
+    /// Glob matched against file path (Read, Write, Execute tools).
+    Path,
+    /// Exact or wildcard matched against URL host (Network tools).
+    Domain,
 }
 ```
 
-**Matching rules** (first-match-wins, same as today):
+**Matching rules** (first-match-wins via nature + resource):
 
-```
-Tool + Resource → Decision
-```
-
-| Rule | Resource Kind | Example Pattern | Matches |
-|---|---|---|---|
-| `read` + Allow | Path `src/**` | `src/main.rs` | ✅ Allow |
-| `read` + Ask | — (catch-all) | `Cargo.toml` | ⚠ Ask |
-| `write` + Deny | Path `Cargo.lock` | `Cargo.lock` | 🚫 Deny |
-| `write` + Ask | Path `src/**` | `src/lib.rs` | ⚠ Ask |
-| `http_request` + Allow | Domain `api.github.com` | `https://api.github.com/repos/...` | ✅ Allow |
-| `http_request` + Ask | — (catch-all) | `https://example.com` | ⚠ Ask |
-| `http_request` + Deny | Domain `*.internal.com` | `https://hr.internal.com` | 🚫 Deny |
-| `bash` + Ask | Path `scripts/**` | `scripts/deploy.sh` | ⚠ Ask |
-| `bash` + Deny | — (no resource, catch-all) | any command | 🚫 Deny |
+| Nature | Resource | Example Tool | Resource Extracted | Decision |
+|---|---|---|---|---|
+| `Write` + Allow | Path `src/**` | `write src/main.rs` | `src/main.rs` | ✅ Allow |
+| `Write` + Allow | Path `src/**` | `edit src/main.rs` | `src/main.rs` | ✅ Allow |
+| `Write` + Allow | Path `src/**` | `delete src/main.rs` | `src/main.rs` | ✅ Allow |
+| `Write` + Ask | — (catch-all) | `write Cargo.toml` | `Cargo.toml` | ⚠ Ask |
+| `Network` + Allow | Domain `api.github.com` | `http_request api.github.com` | `api.github.com` | ✅ Allow |
+| `Network` + Allow | Domain `api.github.com` | `web_search` | `api.github.com` | ✅ Allow |
+| `Network` + Deny | Domain `*.internal.com` | `http_request hr.internal.com` | `hr.internal.com` | 🚫 Deny |
+| `Execute` + Ask | Path `scripts/**` | `bash scripts/deploy.sh` | `scripts/deploy.sh` | ⚠ Ask |
 
 ### 2. Resource Extraction From Tool Input
 
@@ -104,52 +100,47 @@ to tool-level matching (resource = None).
 ```toml
 # ~/.talos/config.toml
 
-# Default: ask for all network access, but allow specific domains
+# Allow Network access to specific domains
 [[rules]]
-tool_name = "http_request"
+nature = "Network"
 resource = "api.github.com"
 resource_kind = "domain"
 decision = "Allow"
 
 [[rules]]
-tool_name = "web_search"
+nature = "Network"
 resource = "duckduckgo.com"
 resource_kind = "domain"
 decision = "Allow"
 
-# Deny internal services
+# Deny internal services (applies to ALL Network-nature tools)
 [[rules]]
-tool_name = "http_request"
+nature = "Network"
 resource = "*.internal.com"
 resource_kind = "domain"
 decision = "Deny"
 
-# Allow reads anywhere (default behavior, explicit)
+# Allow Write to src/ (write, edit, delete, save_url — all Write-nature tools)
 [[rules]]
-tool_name = "read"
-decision = "Allow"
-
-# Ask before writing to src/, deny everything else
-[[rules]]
-tool_name = "write"
+nature = "Write"
 resource = "src/**"
 resource_kind = "path"
 decision = "Ask"
 
 [[rules]]
-tool_name = "write"
+nature = "Write"
 decision = "Deny"   # catch-all: deny writes outside src/
 
 # Allow shell commands only in scripts/
 [[rules]]
-tool_name = "bash"
+nature = "Execute"
 resource = "scripts/**"
 resource_kind = "path"
 decision = "Ask"
 
 [[rules]]
-tool_name = "bash"
-decision = "Deny"   # deny all other shell access
+nature = "Execute"
+decision = "Deny"   # deny other shell access
 ```
 
 ### 4. Default Rules
