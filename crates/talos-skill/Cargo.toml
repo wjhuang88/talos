@@ -9,7 +9,7 @@ rust-version.workspace = true
 [dependencies]
 pulldown-cmark = "0.13.4"
 serde = { version = "1", features = ["derive"] }
-serde_yaml = "0.9"
+serde_yaml = { package = "yaml_serde", version = "0.10" }
 thiserror = "2"
 walkdir = "2"
 

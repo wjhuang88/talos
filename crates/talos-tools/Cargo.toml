@@ -22,7 +22,7 @@ similar = "3"
 gix = { version = "0.84", default-features = false, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"
 ] }
-arborium = { version = "2.16", default-features = false, features = [
+arborium = { version = "2.18", default-features = false, features = [
     "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
     "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",
     "lang-bash", "lang-sql", "lang-powershell", "lang-lua", "lang-dart",
@@ -31,7 +31,7 @@ arborium = { version = "2.16", default-features = false, features = [
 ] }
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json"] }
 rust-websearch = "0.1"
-scraper = "0.22"
+scraper = "0.27"
 
 [target.'cfg(unix)'.dependencies]
 libc = "1.0.0-alpha.3"
