@@ -222,3 +222,14 @@ Open risks or deviations: none yet
 Next task item: T1-T5 (PERM-002 foundation + extractor + config + always-approve scoping + closure) delegated to a deep agent; results verified at T5 boundary
 Recovery or resume instruction: re-read this record; current HEAD = 651f320 (main); next gate = T1 unit tests for nature+resource matching; if T1-T5 fail, fall back to forward-only + push at T5 boundary per amendment #1
 ```
+
+### Checkpoint 1 - T1-T5 delegated (2026-06-22)
+
+```text
+Completed task items: T1-T5 delegated to deep agent bg_10e06d59 (session ses_11134db13ffeEeU6m2qXm3gJN1)
+Current state and artifacts: HEAD = f139f01 (contract amendments committed + pushed); 3 contract amendments recorded; T1-T5 implementation in progress
+Commands/checks and actual results: pre-delegation governance validator passed; contract amendment commit f139f01 pushed
+Open risks or deviations: none yet; user away until next session boundary
+Next task item: await T1-T5 completion; verify with cargo test --workspace + cargo clippy --workspace -- -D warnings
+Recovery or resume instruction: re-read this record; current HEAD = f139f01; pending background task = bg_10e06d59; if task is still pending, retrieve via background_output; if task completed, verify the 5 commits exist and run cargo test/clippy
+```
