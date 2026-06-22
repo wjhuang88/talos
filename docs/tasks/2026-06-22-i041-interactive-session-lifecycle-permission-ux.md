@@ -266,3 +266,22 @@ Open risks or deviations: SessionTransition API change is breaking for direct ca
 Next task item: T8 — SESSION-001-C /fork BuiltinCommand
 Recovery or resume instruction: re-read this record; current HEAD = 40de299 (main); if T8 work is paused, the next agent should: 1) re-verify HEAD is 40de299; 2) read SESSION-001-C-fork.md acceptance criteria; 3) reuse the session_tx channel pattern from T6+T7; 4) the fork flow must clone durable history into a distinct child identity and preserve source bytes
 ```
+
+### Checkpoint 4 - T8 Complete (2026-06-22)
+
+```text
+Completed task items: T8 (/fork BuiltinCommand) — SESSION-001-C fully landed
+Current state and artifacts: HEAD = 6b9022e on main; 1 atomic commit ahead of 335bed2 (pushed)
+Commands/checks and actual results:
+- cargo test --workspace: 0 failures (all test suites pass)
+- cargo clippy --workspace -- -D warnings: clean (after 2 manual fixes)
+- README.md: Slash Commands table includes /fork
+- SESSION-001-C-fork backlog story: status Complete (I041), all 3 acceptance boxes ticked
+- PRODUCT-BACKLOG.md SESSION-001-C entry updated
+- I041 iteration doc: T8 verification evidence recorded
+- Source session JSONL file remains byte-for-byte unchanged after fork activation (test covers this)
+- Agent timeout recovery: deep agent bg_e0fcfdd2 timed out at 35m53s with most of T8 in working tree. Two final manual fixes applied: (1) captured child_session.id before transition.prepare() to avoid use-after-move on the success path; (2) collapsed nested if-let per clippy collapsible_if lint. Resulted in clean commit and full test pass.
+Open risks or deviations: Deep agent timeout on a non-trivial implementation. The salvage path worked because: (a) most logic was already in working tree, (b) remaining fixes were mechanical (move semantics + clippy lint). Future delegations should consider budget for ~30-40min on complex SESSION-001 work; or pre-stage test scaffolding for faster agent completion.
+Next task item: T9 — Real binary smoke (one binary proof per delivered command)
+Recovery or resume instruction: re-read this record; current HEAD = 6b9022e (main); for T9 the next agent should: 1) verify talos --mock or print mode works for /new, /resume, /fork smoke scenarios; 2) capture actual stdout/stderr in I041 verification evidence
+```
