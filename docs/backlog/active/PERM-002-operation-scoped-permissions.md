@@ -5,7 +5,7 @@
 | ID | PERM-002 |
 | Type | Technical Story |
 | Priority | P1 |
-| Status | Refinement |
+| Status | Complete |
 | Depends on | PERM-001 (existing rule engine), ToolNature enum (Read/Write/Execute/Network) |
 | Blocks | — |
 

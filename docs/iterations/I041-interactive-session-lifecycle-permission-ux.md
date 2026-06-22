@@ -166,6 +166,19 @@ Week 4 ── SESSION-001-C + iteration closure
 
 ## Verification Evidence
 
+### PERM-002 T1-T5 (2026-06-22)
+- `cargo check --workspace`: clean
+- `cargo clippy --workspace -- -D warnings`: clean
+- `cargo test --workspace`: all pass (51 talos-permission tests, 700+ workspace-wide)
+- `cargo test -p talos-permission`: 51 tests pass (nature matching, resource extraction, config migration, legacy compat)
+- Acceptance gate 1: `[Write Allow src/**, Write Deny]` → `write Cargo.toml` = Deny ✅
+- Acceptance gate 2: `[Network Allow api.github.com, Network Ask]` → `http_request https://api.github.com/repos` = Allow ✅
+- Acceptance gate 3: Always-approve creates scoped `Write` + Path rule; subsequent writes to same path auto-approved ✅
+- Acceptance gate 4: Old config `tool_name = "write" decision = "Ask"` loads unchanged ✅
+- Default ruleset migrated to nature form (4 rules: Read/Allow, Write/Ask, Execute/Ask, Network/Ask)
+- `ResourceExtractor` uses `url::Url` for proper host extraction (lowercase, no port)
+- `PermissionRule` backward-compatible: `tool_name` has `#[serde(default)]`, new fields have `#[serde(default)]`
+
 - `cargo check --workspace`:
 - `cargo clippy --workspace -- -D warnings`:
 - `cargo test --workspace`:
