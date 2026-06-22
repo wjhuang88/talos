@@ -4,7 +4,7 @@
 |---|---|
 | Type | State/Product Story |
 | Parent Epic | [SESSION-001](SESSION-001-interactive-session-lifecycle.md) |
-| Status | Proposed |
+| Status | Complete (I041 — 2026-06-22) |
 | Depends On | SESSION-001-A complete; CMD-001 registry foundation complete |
 | Unlocks | Interactive session continuity through `/new` and `/resume` |
 
@@ -35,7 +35,7 @@ they can change conversation context without carrying hidden state from the prev
   and the user receives a visible error.
 - Given a model/tool turn is active, when a lifecycle command is invoked, then the documented
   refusal or confirmed-cancellation policy is applied without racing state replacement.
-- [ ] README command documentation and all status owners are synchronized after runtime evidence.
+- [x] README command documentation and all status owners are synchronized after runtime evidence.
 
 ## Decision Constraints
 

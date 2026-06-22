@@ -179,6 +179,24 @@ Week 4 ── SESSION-001-C + iteration closure
 - `ResourceExtractor` uses `url::Url` for proper host extraction (lowercase, no port)
 - `PermissionRule` backward-compatible: `tool_name` has `#[serde(default)]`, new fields have `#[serde(default)]`
 
+### SESSION-001-B T6-T7 (2026-06-22)
+- `cargo check --workspace`: clean
+- `cargo clippy --workspace -- -D warnings`: clean
+- `cargo test --workspace`: all pass (700+ tests)
+- `/new` registered via CMD-001 registry; consumes SessionTransition::prepare/commit/rollback
+- `/resume` registered via CMD-001 registry; lists workspace-scoped candidates (most-recent first, tie-break on session ID)
+- Both commands refuse while a turn is active (`is_processing` guard)
+- Prepare failure → rollback, old session remains active
+- Commit failure → rollback, visible error, old session remains active
+- `SessionTransition` API updated: `prepare(handle, session)` + `commit(actor)` to make type `Send`
+- Lifecycle handler spawned in `run_tui_mode`; communicates via `session_tx` channel through bridge
+- Acceptance gate 1: `/new` creates fresh session, preserves old ✅
+- Acceptance gate 2: `/new` while turn active → refusal message ✅
+- Acceptance gate 3: `/new` prepare failure → old session active ✅
+- Acceptance gate 4: `/resume` lists only current workspace candidates ✅
+- Acceptance gate 5: `/resume` with explicit ID validates workspace scope ✅
+- Acceptance gate 6: `/resume` hydration failure → old session active ✅
+
 - `cargo check --workspace`:
 - `cargo clippy --workspace -- -D warnings`:
 - `cargo test --workspace`:

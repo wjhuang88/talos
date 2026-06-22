@@ -11,11 +11,12 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, UiOutput, UserInput};
-use talos_core::message::AgentEvent;
+use talos_conversation::{ConversationEngine, MessageSource, StreamMessage, UiOutput, UserInput};
+use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
+use talos_plugin::HookRegistry;
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -42,8 +43,9 @@ use crate::session_setup::{
 };
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::session_transition::SessionTransition;
-use crate::tui_bridge::run_conversation_loop;
+use crate::tui_bridge::{SessionLifecycleRequest, run_conversation_loop};
 use crate::{Cli, build_hook_registry, event_loop};
+use tokio::sync::Mutex;
 
 pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     // I009-S5 begin
@@ -73,7 +75,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     mcp_runtime.report_startup_failures();
     let mut registry = build_print_tool_registry();
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
     register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
@@ -129,7 +131,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
     register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
 
@@ -149,10 +151,10 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         provider,
         registry,
         Some(Arc::new(
-            talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+            talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
         )),
         None,
-        workspace_root.clone(),
+        workspace_root.to_path_buf(),
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
@@ -160,7 +162,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.clone())
+        let context = ContextLoader::new(workspace_root.to_path_buf())
             .load()
             .map_err(|e| anyhow!("{e}"))?;
         if !context.is_empty() {
@@ -181,7 +183,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let session_config = SessionConfig {
         print_mode: true,
-        workspace_root: workspace_root.clone(),
+        workspace_root: workspace_root.to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -258,7 +260,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
     let approval_handler = Arc::new(TuiApprovalHandler::new(
         ui_output_tx.clone(),
-        workspace_root.clone(),
+        workspace_root.to_path_buf(),
     ));
 
     let hooks = build_hook_registry(true);
@@ -266,7 +268,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.clone());
+    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -274,15 +276,15 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         registry,
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
-        workspace_root.clone(),
-        hooks,
+        workspace_root.to_path_buf(),
+        hooks.clone(),
     );
     agent.set_tool_protocol(config.tool_protocol());
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.clone())
+        let context = ContextLoader::new(workspace_root.to_path_buf())
             .load()
             .map_err(|e| anyhow!("{e}"))?;
         if !context.is_empty() {
@@ -311,7 +313,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let session_config = SessionConfig {
         print_mode: false,
-        workspace_root: workspace_root.clone(),
+        workspace_root: workspace_root.to_path_buf(),
         initial_history,
         model_context_limit: 128_000,
     };
@@ -319,11 +321,57 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_signal = handle.sq_tx.clone();
     tokio::spawn(async move { actor.run().await });
 
-    let _transition = SessionTransition::new(handle.sq_tx.clone(), session.clone());
+    let transition = Arc::new(Mutex::new(SessionTransition::new(handle.sq_tx.clone(), session.clone())));
     tokio::spawn(async move {
         loop {
             tokio::signal::ctrl_c().await.ok();
             let _ = sq_tx_signal.try_send(SessionOp::Interrupt);
+        }
+    });
+
+    // Session lifecycle handler: processes /new and /resume requests
+    let (session_tx, mut session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
+    let transition_for_handler = transition.clone();
+    let ui_tx_for_handler = ui_output_tx.clone();
+    let config_for_handler = config.clone();
+    let api_key_for_handler = api_key.clone();
+    let hooks_for_handler = hooks.clone();
+    let workspace_root_for_handler = workspace_root.to_path_buf();
+    let session_manager_for_handler = session_manager.clone();
+    let mcp_config_for_handler = config.mcp.clone();
+    tokio::spawn(async move {
+        while let Some(req) = session_rx.recv().await {
+            match req {
+                SessionLifecycleRequest::New(_) => {
+                    handle_session_new(
+                        &transition_for_handler,
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        &api_key_for_handler,
+                        &hooks_for_handler,
+                        &workspace_root_for_handler,
+                        &session_manager_for_handler,
+                        &mcp_config_for_handler,
+                        cli.mock,
+                    )
+                    .await;
+                }
+                SessionLifecycleRequest::Resume(req) => {
+                    handle_session_resume(
+                        &transition_for_handler,
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        &api_key_for_handler,
+                        &hooks_for_handler,
+                        &workspace_root_for_handler,
+                        &session_manager_for_handler,
+                        &mcp_config_for_handler,
+                        req.session_id,
+                        cli.mock,
+                    )
+                    .await;
+                }
+            }
         }
     });
 
@@ -344,7 +392,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 } => {
                     for msg in &new_messages {
                         if matches!(msg, talos_core::message::Message::User { .. }) {
-                            continue; // User message handled by separate persister
+                            continue;
                         }
                         if let Err(e) = session_for_persist.append(msg) {
                             eprintln!("Warning: failed to persist message: {e}");
@@ -409,6 +457,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             ui_output_tx,
             user_msg_tx,
             interrupt_tx,
+            session_tx,
         )
         .await;
     });
@@ -445,7 +494,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     mcp_runtime.report_startup_failures();
     let mut registry = build_print_tool_registry();
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
     register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
 
@@ -454,7 +503,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         registry,
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
-        workspace_root.clone(),
+        workspace_root.to_path_buf(),
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
@@ -462,7 +511,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.clone())
+        let context = ContextLoader::new(workspace_root.to_path_buf())
             .load()
             .map_err(|e| anyhow!("{e}"))?;
         if !context.is_empty() {
@@ -497,7 +546,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
     let session_config = SessionConfig {
         print_mode: true,
-        workspace_root: workspace_root.clone(),
+        workspace_root: workspace_root.to_path_buf(),
         initial_history,
         model_context_limit: 128_000,
     };
@@ -656,83 +705,83 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(BashTool::new(workspace_root.clone())),
+        inner: Arc::new(BashTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(workspace_root.clone())),
+        inner: Arc::new(ReadTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(workspace_root.clone())),
+        inner: Arc::new(WriteTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root.clone())),
+        inner: Arc::new(EditTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GrepTool::new(workspace_root.clone())),
+        inner: Arc::new(GrepTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GlobTool::new(workspace_root.clone())),
+        inner: Arc::new(GlobTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(LsTool::new(workspace_root.clone())),
+        inner: Arc::new(LsTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DeleteTool::new(workspace_root.clone())),
+        inner: Arc::new(DeleteTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DiffTool::new(workspace_root.clone())),
+        inner: Arc::new(DiffTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(StatTool::new(workspace_root.clone())),
+        inner: Arc::new(StatTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
-    registry.register(Arc::new(GitStatusTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitDiffTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitLogTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitShowTool::new(workspace_root.clone())));
-    registry.register(Arc::new(GitBranchListTool::new(workspace_root.clone())));
-    registry.register(Arc::new(TreeTool::new(workspace_root.clone())));
+    registry.register(Arc::new(GitStatusTool::new(workspace_root.to_path_buf())));
+    registry.register(Arc::new(GitDiffTool::new(workspace_root.to_path_buf())));
+    registry.register(Arc::new(GitLogTool::new(workspace_root.to_path_buf())));
+    registry.register(Arc::new(GitShowTool::new(workspace_root.to_path_buf())));
+    registry.register(Arc::new(GitBranchListTool::new(workspace_root.to_path_buf())));
+    registry.register(Arc::new(TreeTool::new(workspace_root.to_path_buf())));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitAddTool::new(workspace_root.clone())),
-        approval: approval.clone(),
-        print_mode: false,
-    }));
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCommitTool::new(workspace_root.clone())),
+        inner: Arc::new(GitAddTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPushTool::new(workspace_root.clone())),
+        inner: Arc::new(GitCommitTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitPullTool::new(workspace_root.clone())),
+        inner: Arc::new(GitPushTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(GitCheckoutTool::new(workspace_root.clone())),
+        inner: Arc::new(GitPullTool::new(workspace_root.to_path_buf())),
+        approval: approval.clone(),
+        print_mode: false,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(GitCheckoutTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
         print_mode: false,
     }));
@@ -748,7 +797,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         registry,
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
-        workspace_root.clone(),
+        workspace_root.to_path_buf(),
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
@@ -756,7 +805,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     apply_runtime_skills(&mut agent, &runtime_skills);
 
     if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.clone())
+        let context = ContextLoader::new(workspace_root.to_path_buf())
             .load()
             .map_err(|e| anyhow!("{e}"))?;
         if !context.is_empty() {
@@ -779,7 +828,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let session_config = SessionConfig {
         print_mode: false,
-        workspace_root: workspace_root.clone(),
+        workspace_root: workspace_root.to_path_buf(),
         initial_history,
         model_context_limit: 128_000,
     };
@@ -830,3 +879,262 @@ pub(crate) async fn run_mcp_server() -> Result<()> {
     Ok(())
 }
 // I009-S4 end
+
+/// Handle `/new` — create a fresh session and transition to it.
+#[allow(clippy::too_many_arguments)]
+async fn handle_session_new(
+    transition: &Arc<Mutex<SessionTransition>>,
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    api_key: &str,
+    hooks: &Arc<HookRegistry>,
+    workspace_root: &std::path::Path,
+    session_manager: &talos_session::SessionManager,
+    mcp_config: &talos_config::McpConfig,
+    mock: bool,
+) {
+    let mut transition = transition.lock().await;
+
+    let session_manager = session_manager.clone();
+    let workspace_root_str = canonical_workspace_root(workspace_root);
+    let new_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
+        Ok(s) => s,
+        Err(e) => {
+            let text = format!("[Error] Failed to create new session: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+
+    let new_history: Vec<Message> = vec![];
+    let session_config = SessionConfig {
+        print_mode: false,
+        workspace_root: workspace_root.to_path_buf(),
+        initial_history: new_history,
+        model_context_limit: 128_000,
+    };
+
+    let provider = build_provider(config, api_key, mock);
+    let approval_handler = Arc::new(TuiApprovalHandler::new(
+        ui_tx.clone(),
+        workspace_root.to_path_buf(),
+    ));
+    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
+
+    let mut agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.to_path_buf(),
+        hooks.clone(),
+    );
+    agent.set_tool_protocol(config.tool_protocol());
+    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+        apply_runtime_skills(&mut agent, &skills);
+    }
+
+    let (handle, actor) = AppServerSession::new(agent, session_config);
+
+    if let Err(e) = transition.prepare(handle, new_session) {
+        let text = format!("[Error] Failed to prepare new session: {e}\n");
+        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+            source: MessageSource::Error,
+            stream: Box::pin(futures::stream::once(async move { text })),
+        }));
+        return;
+    }
+
+    match transition.commit(actor) {
+        Ok(_old_session) => {
+            let text = "[System] New session started. Previous session preserved.\n".to_string();
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+        Err(e) => {
+            transition.rollback();
+            let text = format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+    }
+}
+
+/// Handle `/resume` — list candidates or resume a specific session.
+#[allow(clippy::too_many_arguments)]
+async fn handle_session_resume(
+    transition: &Arc<Mutex<SessionTransition>>,
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    api_key: &str,
+    hooks: &Arc<HookRegistry>,
+    workspace_root: &std::path::Path,
+    session_manager: &talos_session::SessionManager,
+    mcp_config: &talos_config::McpConfig,
+    session_id: Option<String>,
+    mock: bool,
+) {
+    let mut transition = transition.lock().await;
+
+    let workspace_root_str = canonical_workspace_root(workspace_root);
+
+    let target_session = match &session_id {
+        Some(id) => {
+            match session_manager.resume_session(id) {
+                Ok(s) => s,
+                Err(e) => {
+                    let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                    return;
+                }
+            }
+        }
+        None => {
+            let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+                Ok(s) => s,
+                Err(e) => {
+                    let text = format!("[Error] Failed to list sessions: {e}\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                    return;
+                }
+            };
+
+            if sessions.is_empty() {
+                let text = "[System] No sessions found for this workspace.\n".to_string();
+                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::System,
+                    stream: Box::pin(futures::stream::once(async move { text })),
+                }));
+                return;
+            }
+
+            let mut sessions = sessions;
+            sessions.sort_by(|a, b| {
+                b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id))
+            });
+
+            let mut text = String::from("[System] Available sessions (most recent first):\n");
+            for s in &sessions {
+                text.push_str(&format!(
+                    "[System]   {} — {} messages, last: {}\n",
+                    s.id,
+                    s.message_count,
+                    if s.last_message_preview.is_empty() { "(empty)" } else { &s.last_message_preview },
+                ));
+            }
+            text.push_str("[System] Use /resume <session-id> to select one.\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+
+    let resume_history = match target_session.read_messages() {
+        Ok(h) => h,
+        Err(e) => {
+            let text = format!("[Error] Failed to read session history: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+
+    let session_config = SessionConfig {
+        print_mode: false,
+        workspace_root: workspace_root.to_path_buf(),
+        initial_history: resume_history,
+        model_context_limit: 128_000,
+    };
+
+    let provider = build_provider(config, api_key, mock);
+    let approval_handler = Arc::new(TuiApprovalHandler::new(
+        ui_tx.clone(),
+        workspace_root.to_path_buf(),
+    ));
+    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
+
+    let mut agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.to_path_buf(),
+        hooks.clone(),
+    );
+    agent.set_tool_protocol(config.tool_protocol());
+    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+        apply_runtime_skills(&mut agent, &skills);
+    }
+
+    let (handle, actor) = AppServerSession::new(agent, session_config);
+
+    if let Err(e) = transition.prepare(handle, target_session) {
+        let text = format!("[Error] Failed to prepare resume: {e}\n");
+        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+            source: MessageSource::Error,
+            stream: Box::pin(futures::stream::once(async move { text })),
+        }));
+        return;
+    }
+
+    match transition.commit(actor) {
+        Ok(_old_session) => {
+            let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+        Err(e) => {
+            transition.rollback();
+            let text = format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+    }
+}
