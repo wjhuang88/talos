@@ -233,3 +233,18 @@ Open risks or deviations: none yet; user away until next session boundary
 Next task item: await T1-T5 completion; verify with cargo test --workspace + cargo clippy --workspace -- -D warnings
 Recovery or resume instruction: re-read this record; current HEAD = f139f01; pending background task = bg_10e06d59; if task is still pending, retrieve via background_output; if task completed, verify the 5 commits exist and run cargo test/clippy
 ```
+
+### Checkpoint 2 - T1-T5 Complete (2026-06-22)
+
+```text
+Completed task items: T1, T2, T3, T4, T5 — PERM-002 fully landed
+Current state and artifacts: HEAD = 6f4f647 on main; 5 atomic commits ahead of 35e7b66 (pushed); iteration I041 Verification Evidence section populated
+Commands/checks and actual results:
+- cargo test --workspace: 0 failures (workspace tests + 51 talos-permission tests)
+- cargo clippy --workspace -- -D warnings: clean
+- PERM-002 backlog: status Refinement -> Complete (I041), acceptance checkboxes ticked
+- iteration I041 doc: T1-T5 Verification Evidence recorded
+Open risks or deviations: none; all 5 atomic commits carry [model:MiniMax-M3] tag
+Next task item: T6 — SESSION-001-B /new BuiltinCommand
+Recovery or resume instruction: re-read this record; current HEAD = 6f4f647 (main); if T6/T7/T8 work is paused, the next agent should: 1) re-verify HEAD is 6f4f647; 2) read SESSION-001-A-runtime-transition-service.md for the transition API; 3) read SESSION-001-B-new-resume.md acceptance criteria; 4) consume SessionTransition::prepare(New) and prepare(Resume)
+```
