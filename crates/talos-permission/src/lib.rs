@@ -56,7 +56,9 @@ use glob::Pattern;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use talos_core::tool::ToolNature;
 use thiserror::Error;
+use url::Url;
 
 /// Errors that can occur during permission evaluation.
 #[derive(Debug, Error)]
@@ -114,24 +116,81 @@ impl<'de> Deserialize<'de> for PermissionDecision {
     }
 }
 
+/// How to interpret the `resource` field in a [`PermissionRule`].
+///
+/// Determines whether the resource string is treated as a file path glob
+/// or a URL host pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ResourceKind {
+    /// Glob matched against a file path (Read, Write, Execute tools).
+    Path,
+    /// Glob or exact match against a URL host (Network tools).
+    Domain,
+}
+
+/// Extracts resource strings from tool input based on [`ToolNature`].
+///
+/// Each nature maps to specific input fields:
+/// - Read/Write → `input["path"]` or `input["file"]`
+/// - Execute → `input["command"]`
+/// - Network → host from `input["url"]` (lowercase, no port)
+pub struct ResourceExtractor;
+
+impl ResourceExtractor {
+    /// Extracts the resource string from tool input based on the tool's nature.
+    ///
+    /// Returns `None` when the expected field is missing or (for Network)
+    /// when the URL cannot be parsed.
+    pub fn extract(nature: ToolNature, input: &Value) -> Option<String> {
+        match nature {
+            ToolNature::Read | ToolNature::Write => input
+                .get("path")
+                .or_else(|| input.get("file"))
+                .and_then(Value::as_str)
+                .map(String::from),
+            ToolNature::Execute => {
+                input.get("command").and_then(Value::as_str).map(String::from)
+            }
+            ToolNature::Network => input.get("url").and_then(Value::as_str).and_then(|url_str| {
+                Url::parse(url_str)
+                    .ok()
+                    .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
+            }),
+        }
+    }
+}
+
 /// A single permission rule that matches tool calls and produces a decision.
 ///
-/// Rules are evaluated in order. The first rule whose `tool_name` matches the
-/// invoked tool and whose `path_pattern` (if present) matches the path in the
-/// tool input determines the decision.
+/// Rules are evaluated in order. The first rule whose nature (or tool_name for
+/// legacy rules) matches the invoked tool and whose resource (or path_pattern
+/// for legacy rules) matches the resource in the tool input determines the decision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionRule {
     /// The tool name to match. Case-sensitive exact match.
+    /// Used for legacy tool_name-only rules when `nature` is not set.
+    #[serde(default)]
     pub tool_name: String,
     /// Optional glob pattern to match against the `path` field in tool input.
-    /// If `None`, the rule matches all invocations of the tool regardless of path.
+    /// Used for legacy rules when `nature` is not set.
     pub path_pattern: Option<String>,
     /// The decision to apply when this rule matches.
     pub decision: PermissionDecision,
+    /// The ToolNature this rule applies to. When set, matching is by nature
+    /// + resource instead of tool_name + path_pattern.
+    #[serde(default)]
+    pub nature: Option<ToolNature>,
+    /// The resource pattern to match (glob for Path, host pattern for Domain).
+    #[serde(default)]
+    pub resource: Option<String>,
+    /// How to interpret the `resource` field. Inferred from nature if absent.
+    #[serde(default)]
+    pub resource_kind: Option<ResourceKind>,
 }
 
 impl PermissionRule {
-    /// Creates a new permission rule.
+    /// Creates a new legacy permission rule (tool_name + path_pattern matching).
     pub fn new(
         tool_name: impl Into<String>,
         path_pattern: Option<String>,
@@ -141,21 +200,81 @@ impl PermissionRule {
             tool_name: tool_name.into(),
             path_pattern,
             decision,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         }
     }
 
-    /// Checks if this rule matches the given tool name and optional path.
-    fn matches(&self, tool_name: &str, path: Option<&str>) -> Result<bool, PermissionError> {
+    /// Creates a new nature-based permission rule.
+    ///
+    /// Matching is by `nature` + `resource` instead of `tool_name` + `path_pattern`.
+    pub fn new_nature(
+        nature: ToolNature,
+        resource: Option<String>,
+        resource_kind: Option<ResourceKind>,
+        decision: PermissionDecision,
+    ) -> Self {
+        Self {
+            tool_name: String::new(),
+            path_pattern: None,
+            decision,
+            nature: Some(nature),
+            resource,
+            resource_kind,
+        }
+    }
+
+    /// Checks if this rule matches the given tool invocation.
+    ///
+    /// If `nature` is set on the rule, matching is by nature + resource.
+    /// Otherwise falls back to legacy tool_name + path_pattern matching.
+    fn matches(
+        &self,
+        tool_name: &str,
+        nature: ToolNature,
+        input: &Value,
+    ) -> Result<bool, PermissionError> {
+        // Nature-based matching (new form)
+        if let Some(rule_nature) = self.nature {
+            if rule_nature != nature {
+                return Ok(false);
+            }
+
+            // If no resource is set, match all invocations of this nature
+            let Some(ref resource_pattern) = self.resource else {
+                return Ok(true);
+            };
+
+            // Extract the resource from input based on nature
+            let extracted = Self::extract_resource(nature, input);
+
+            let Some(extracted) = extracted else {
+                return Ok(false);
+            };
+
+            // Match the resource against the pattern using glob
+            let pattern = Pattern::new(resource_pattern)
+                .map_err(|e| PermissionError::InvalidGlobPattern(format!("{resource_pattern}: {e}")))?;
+
+            return Ok(pattern.matches(&extracted));
+        }
+
+        // Legacy tool_name-based matching
         if self.tool_name != tool_name {
             return Ok(false);
         }
 
         if let Some(ref pattern) = self.path_pattern {
-            let path = path.ok_or_else(|| {
-                PermissionError::InvalidRule(
-                    "rule has path_pattern but tool input has no path field".to_owned(),
-                )
-            })?;
+            let path = input
+                .get("path")
+                .or_else(|| input.get("file"))
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    PermissionError::InvalidRule(
+                        "rule has path_pattern but tool input has no path field".to_owned(),
+                    )
+                })?;
 
             let glob = Pattern::new(pattern)
                 .map_err(|e| PermissionError::InvalidGlobPattern(format!("{pattern}: {e}")))?;
@@ -164,6 +283,11 @@ impl PermissionRule {
         }
 
         Ok(true)
+    }
+
+    /// Extracts the resource string from tool input based on the tool's nature.
+    fn extract_resource(nature: ToolNature, input: &Value) -> Option<String> {
+        ResourceExtractor::extract(nature, input)
     }
 }
 
@@ -211,102 +335,37 @@ impl PermissionEngine {
     }
 
     /// Adds the default ruleset to the engine.
+    ///
+    /// Default rules use nature form (one rule per ToolNature):
+    /// - Read → Allow
+    /// - Write → Ask
+    /// - Execute → Ask
+    /// - Network → Ask
     fn add_default_rules(&mut self) {
-        self.rules.push(PermissionRule {
-            tool_name: "read".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "list".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "grep".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "glob".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "ls".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "diff".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "stat".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "find_symbol".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "find_references".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "list_symbols".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "list_imports".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Allow,
-        });
-
-        self.rules.push(PermissionRule {
-            tool_name: "write".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "edit".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-        self.rules.push(PermissionRule {
-            tool_name: "delete".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-
-        self.rules.push(PermissionRule {
-            tool_name: "bash".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-
-        self.rules.push(PermissionRule {
-            tool_name: "http_request".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-
-        self.rules.push(PermissionRule {
-            tool_name: "web_search".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
-
-        self.rules.push(PermissionRule {
-            tool_name: "web_search".to_owned(),
-            path_pattern: None,
-            decision: PermissionDecision::Ask,
-        });
+        self.rules.push(PermissionRule::new_nature(
+            ToolNature::Read,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+        self.rules.push(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
+        self.rules.push(PermissionRule::new_nature(
+            ToolNature::Execute,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
+        self.rules.push(PermissionRule::new_nature(
+            ToolNature::Network,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
     }
 
     /// Adds a custom rule to the engine.
@@ -351,10 +410,8 @@ impl PermissionEngine {
             return PermissionDecision::Allow;
         }
 
-        let path = input.get("path").and_then(Value::as_str);
-
         for rule in &self.rules {
-            match rule.matches(tool_name, path) {
+            match rule.matches(tool_name, nature, input) {
                 Ok(true) => return rule.decision.clone(),
                 Ok(false) => continue,
                 Err(_) => continue,
@@ -405,8 +462,19 @@ impl PermissionEngine {
 
         let mut custom_rules = Vec::new();
         for (i, rule_value) in rules_array.iter().enumerate() {
-            let rule: PermissionRule = serde_json::from_value(rule_value.clone())
+            let mut rule: PermissionRule = serde_json::from_value(rule_value.clone())
                 .map_err(|e| PermissionError::InvalidRule(format!("rule at index {i}: {e}")))?;
+
+            // For legacy rules (no nature set), infer nature from tool_name
+            // and migrate path_pattern → resource for nature-based matching
+            if rule.nature.is_none() && !rule.tool_name.is_empty() {
+                rule.nature = Some(infer_nature(&rule.tool_name));
+                if let Some(ref pattern) = rule.path_pattern {
+                    rule.resource = Some(pattern.clone());
+                    rule.resource_kind = Some(ResourceKind::Path);
+                }
+            }
+
             custom_rules.push(rule);
         }
 
@@ -607,6 +675,9 @@ mod tests {
             tool_name: "bash".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         // Custom rule is appended, so default bash rule still matches first
@@ -619,6 +690,9 @@ mod tests {
             tool_name: "bash".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine2.evaluate("bash", &serde_json::json!({"command": "ls"}));
@@ -635,6 +709,9 @@ mod tests {
             tool_name: "write".to_owned(),
             path_pattern: Some(".env".to_owned()),
             decision: PermissionDecision::Deny("sensitive file".to_owned()),
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine.evaluate("write", &serde_json::json!({"path": ".env"}));
@@ -656,6 +733,9 @@ mod tests {
             tool_name: "read".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine.evaluate("read", &serde_json::json!({"path": "src/main.rs"}));
@@ -672,6 +752,9 @@ mod tests {
             tool_name: "read".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision =
@@ -689,6 +772,9 @@ mod tests {
             tool_name: "read".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine.evaluate("read", &serde_json::json!({"path": "tests/main.rs"}));
@@ -706,11 +792,17 @@ mod tests {
             tool_name: "write".to_owned(),
             path_pattern: Some("src/**/*.rs".to_owned()),
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Deny("only src allowed".to_owned()),
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine.evaluate("write", &serde_json::json!({"path": "tests/main.rs"}));
@@ -735,11 +827,17 @@ mod tests {
             tool_name: "bash".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
         engine.add_rule(PermissionRule {
             tool_name: "bash".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Deny("blocked".to_owned()),
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine.evaluate("bash", &serde_json::json!({"command": "ls"}));
@@ -756,11 +854,17 @@ mod tests {
             tool_name: "write".to_owned(),
             path_pattern: Some("tmp/**".to_owned()),
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Deny("write not allowed".to_owned()),
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         let decision = engine.evaluate("write", &serde_json::json!({"path": "tmp/out.txt"}));
@@ -771,6 +875,218 @@ mod tests {
             decision,
             PermissionDecision::Deny("write not allowed".to_owned())
         );
+    }
+
+    // --- Nature-based rule tests (T1) ---
+
+    #[test]
+    fn test_nature_match_without_resource_matches_all() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("edit", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("delete", &serde_json::json!({"path": "tmp.txt"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_nature_path_resource_match() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            Some("src/**".to_owned()),
+            Some(ResourceKind::Path),
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Deny("write not allowed".to_owned()),
+        ));
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("edit", &serde_json::json!({"path": "src/lib.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("write not allowed".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_nature_domain_resource_match() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Network,
+            Some("api.github.com".to_owned()),
+            Some(ResourceKind::Domain),
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Network,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
+
+        let decision = engine.evaluate(
+            "http_request",
+            &serde_json::json!({"url": "https://api.github.com/repos"}),
+        );
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate(
+            "http_request",
+            &serde_json::json!({"url": "https://example.com/api"}),
+        );
+        assert_eq!(decision, PermissionDecision::Ask);
+    }
+
+    #[test]
+    fn test_legacy_tool_name_rule_still_works() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new(
+            "write",
+            Some("src/**".to_owned()),
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(PermissionRule::new(
+            "write",
+            None,
+            PermissionDecision::Deny("write not allowed".to_owned()),
+        ));
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("write not allowed".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_first_match_wins_nature_rules() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            Some("src/**".to_owned()),
+            Some(ResourceKind::Path),
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Deny("write not allowed".to_owned()),
+        ));
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("write not allowed".to_owned())
+        );
+    }
+
+    // --- ResourceExtractor tests (T2) ---
+
+    #[test]
+    fn test_extractor_read_from_path() {
+        let input = serde_json::json!({"path": "src/main.rs"});
+        let result = ResourceExtractor::extract(ToolNature::Read, &input);
+        assert_eq!(result, Some("src/main.rs".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_read_from_file_fallback() {
+        let input = serde_json::json!({"name": "Tool", "file": "src/lib.rs"});
+        let result = ResourceExtractor::extract(ToolNature::Read, &input);
+        assert_eq!(result, Some("src/lib.rs".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_write_from_path() {
+        let input = serde_json::json!({"path": "src/main.rs", "content": "hello"});
+        let result = ResourceExtractor::extract(ToolNature::Write, &input);
+        assert_eq!(result, Some("src/main.rs".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_execute_from_command() {
+        let input = serde_json::json!({"command": "cargo build"});
+        let result = ResourceExtractor::extract(ToolNature::Execute, &input);
+        assert_eq!(result, Some("cargo build".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_network_host_extraction() {
+        let input = serde_json::json!({"url": "https://api.github.com/repos"});
+        let result = ResourceExtractor::extract(ToolNature::Network, &input);
+        assert_eq!(result, Some("api.github.com".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_network_host_lowercase() {
+        let input = serde_json::json!({"url": "https://API.GITHUB.COM/repos"});
+        let result = ResourceExtractor::extract(ToolNature::Network, &input);
+        assert_eq!(result, Some("api.github.com".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_network_host_no_port() {
+        let input = serde_json::json!({"url": "https://api.github.com:443/repos"});
+        let result = ResourceExtractor::extract(ToolNature::Network, &input);
+        assert_eq!(result, Some("api.github.com".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_network_invalid_url() {
+        let input = serde_json::json!({"url": "not-a-url"});
+        let result = ResourceExtractor::extract(ToolNature::Network, &input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extractor_missing_field_returns_none() {
+        let input = serde_json::json!({});
+        assert_eq!(ResourceExtractor::extract(ToolNature::Read, &input), None);
+        assert_eq!(ResourceExtractor::extract(ToolNature::Write, &input), None);
+        assert_eq!(ResourceExtractor::extract(ToolNature::Execute, &input), None);
+        assert_eq!(ResourceExtractor::extract(ToolNature::Network, &input), None);
     }
 
     // --- Load from config tests ---
@@ -828,6 +1144,110 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn test_load_old_config_format_tool_name_only() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        let config = serde_json::json!({
+            "rules": [
+                {
+                    "tool_name": "write",
+                    "path_pattern": "src/**",
+                    "decision": "Allow"
+                },
+                {
+                    "tool_name": "write",
+                    "decision": "Ask"
+                }
+            ]
+        });
+
+        engine.load_from_config(&config).expect("config should load");
+
+        // Old format: tool_name-based matching with inferred nature
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
+        assert_eq!(decision, PermissionDecision::Ask);
+    }
+
+    #[test]
+    fn test_load_new_config_format_nature_form() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        let config = serde_json::json!({
+            "rules": [
+                {
+                    "nature": "Write",
+                    "resource": "src/**",
+                    "resource_kind": "path",
+                    "decision": "Allow"
+                },
+                {
+                    "nature": "Write",
+                    "decision": "Deny"
+                }
+            ]
+        });
+
+        engine.load_from_config(&config).expect("config should load");
+
+        // New format: nature-based matching
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("edit", &serde_json::json!({"path": "src/lib.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "Cargo.toml"}));
+        assert_eq!(decision, PermissionDecision::Deny("".to_owned()));
+    }
+
+    #[test]
+    fn test_default_ruleset_is_nature_form() {
+        let engine = PermissionEngine::new();
+        // Default ruleset should have exactly 4 rules (one per nature)
+        assert_eq!(engine.rules.len(), 4);
+        for rule in &engine.rules {
+            assert!(rule.nature.is_some(), "default rules should use nature form");
+        }
+    }
+
+    #[test]
+    fn test_config_with_both_tool_name_and_nature_prefers_nature() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        // Rule has both tool_name AND nature set — nature should take precedence
+        let config = serde_json::json!({
+            "rules": [
+                {
+                    "tool_name": "read",
+                    "nature": "Write",
+                    "resource": "src/**",
+                    "resource_kind": "path",
+                    "decision": "Allow"
+                }
+            ]
+        });
+
+        engine.load_from_config(&config).expect("config should load");
+
+        // Nature is Write, so it matches write tools, not read tools
+        let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow);
+
+        // Read tool doesn't match the Write nature rule
+        let decision = engine.evaluate("read", &serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(decision, PermissionDecision::Allow); // falls through to default Read Allow
+    }
+
     // --- Edge cases ---
 
     #[test]
@@ -851,6 +1271,9 @@ mod tests {
             tool_name: "read".to_owned(),
             path_pattern: None,
             decision: PermissionDecision::Allow,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         });
 
         // Rule matching is case-sensitive
@@ -905,6 +1328,9 @@ mod tests {
             tool_name: "write".to_owned(),
             path_pattern: Some("src/**".to_owned()),
             decision: PermissionDecision::Ask,
+            nature: None,
+            resource: None,
+            resource_kind: None,
         };
         let json = serde_json::to_string(&rule).expect("serialize");
         let parsed: PermissionRule = serde_json::from_str(&json).expect("deserialize");
