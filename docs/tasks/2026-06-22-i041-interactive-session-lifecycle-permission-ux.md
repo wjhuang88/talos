@@ -178,7 +178,7 @@ and cleaned up.
 
 Confirmed by the user on 2026-06-22 with: `确认合同并启动`.
 
-Approved contract:
+Approved contract (initial):
 
 - Deliver I041 MVP over 4 weeks: PERM-002 + SESSION-001-B + SESSION-001-C.
 - Use `main` branch; current workspace; on-demand worktree only if a blocking
@@ -195,15 +195,30 @@ Approved contract:
 - Read/edit/commit authority is granted; push authority requires per-phase
   confirmation.
 
+### Contract Amendments (2026-06-22, before user departure)
+
+Confirmed by the user on 2026-06-22 with answers to the three departure questions:
+
+1. **Push authority (one-time blanket)**: After phase boundary verification passes
+   (T5, T7, T8, T10), push to `origin/main` without per-phase confirmation. Failure
+   to pass verification still requires a stop-and-ask.
+2. **Force-push exception (this session)**: Forward-only fixes (e.g., missing model
+   tag, accidental commit content) are authorized for this session. Substantive
+   history rewrites still require per-incident special approval, per AGENTS.md
+   Git Rule 5.
+3. **Acceptance gate failure**: After two concrete repair attempts, move the failed
+   item to Residual Work and continue with the next item. Checkpoint documents
+   the exact failure and the next item to start.
+
 ## Checkpoints
 
 ### Checkpoint 0 - Start
 
 ```text
-Completed task items: T1-T10 inventoried; consolidated confirmation pending
-Current state and artifacts: I041 iteration doc published at docs/iterations/I041-interactive-session-lifecycle-permission-ux.md; this task record created at docs/tasks/2026-06-22-i041-interactive-session-lifecycle-permission-ux.md
-Commands/checks and actual results: governance validator passed (0 warnings) after I040 closure + I041 activation
+Completed task items: T1-T10 inventoried; consolidated confirmation recorded (initial + 3 contract amendments)
+Current state and artifacts: I041 iteration doc published at docs/iterations/I041-interactive-session-lifecycle-permission-ux.md; this task record created at docs/tasks/2026-06-22-i041-interactive-session-lifecycle-permission-ux.md; HEAD = 651f320 (force-pushed commit chain)
+Commands/checks and actual results: governance validator passed (0 warnings) after I040 closure + I041 activation + EVOLUTION.md lesson #22
 Open risks or deviations: none yet
-Next task item: T1 (PERM-002 matcher foundation) after consolidated confirmation
-Recovery or resume instruction: re-read this record; current HEAD = bf4dca4 (main); next gate = T1 unit tests for nature+resource matching
+Next task item: T1-T5 (PERM-002 foundation + extractor + config + always-approve scoping + closure) delegated to a deep agent; results verified at T5 boundary
+Recovery or resume instruction: re-read this record; current HEAD = 651f320 (main); next gate = T1 unit tests for nature+resource matching; if T1-T5 fail, fall back to forward-only + push at T5 boundary per amendment #1
 ```
