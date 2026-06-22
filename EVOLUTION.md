@@ -23,6 +23,7 @@ repeating known mistakes.
 | 12 | Storage | 自包含 SQLite 需要 ADR 明确例外与运行时边界 | I008 |
 | 13 | Testing | 自定义存储目录必须隔离派生索引文件 | I008 |
 | 14 | Process | 并行委派时 `git stash` 会吞掉兄弟任务的未提交改动 | R0 |
+| 22 | Git | Agent 提交的 commit 必须带 `[model:<model-id>]` 后缀 (AGENTS.md Git Rule 2); 缺失是 governance drift | I041 |
 | 15 | Delegation | 并行委派代理会"顺手"实现兄弟任务范围，需用 marker 协议隔离 | I009 |
 | 16 | Planning | `task()` 调用必须二选一：`category` 或 `subagent_type`，不可同时给 | I009 |
 | 17 | TUI | visual-engineering 任务在 R0 级别并行委派下 30 分钟不够（结构+消费两个 scope） | I009 |
@@ -413,5 +414,21 @@ repeating known mistakes.
   1. **任何调用外部 C/Native 依赖的边界必须包裹 `catch_unwind`**。包括但不限于：tree-sitter、SQLite、libc、子进程启动。
   2. **降级路径必须是同功能的无依赖纯 Rust 实现**。语法高亮失败 → 纯色字符渲染；SQLite 崩溃 → JSONL 文件直接读取。
   3. **此约束已写入 AGENTS.md Hard Constraint #9**。
+
+---
+
+### 26. 2026-06-22 - Agent 提交必须带 `[model:<id>]` 后缀；缺失是 governance drift，需要特批才能修
+
+- **Trigger**: 提交 `bf4dca4` (依赖升级) 和 `a1943c5` (I040 关闭 + I041 启动) 时漏掉了 `[model:MiniMax-M3]` 后缀，被用户提醒后用 force-push 修复。
+- **Symptom**: 两次 commit 的 subject line 末尾没有 `[model:<id>]`，与 AGENTS.md Git Rule 2 冲突。EVOLUTION.md lesson index 和 commit 历史都无法追溯到具体模型。
+- **Root cause**: 我（agent）在 commit 时只关注了 conventional commit type 和 scope，没有把 `[model:...]` 当作强制字段对待；提交后没有自检 commit message 格式。
+- **Fix**:
+  1. 修复：`GIT_EDITOR=/tmp/talos_add_model_tag.sh GIT_SEQUENCE_EDITOR="sed -i '' 's/^pick/reword/'" git rebase -i HEAD~2`，脚本在每条 commit message 第一行末尾追加 `[model:MiniMax-M3]`。
+  2. `git push --force-with-lease` 完成 force-push。
+- **Prevention**:
+  1. **Agent 提交的 commit message 必须包含 `[model:<id>]` 后缀**。提交前自检：subject 末尾是否带模型标记；不带则补上再 commit。
+  2. **把 `[model:...]` 当作 conventional commit 的一部分写进 commit 命令模板**。例如：`git commit -m "feat(scope): description [model:MiniMax-M3]"`。
+  3. **Force-push 修复历史是 governance exception**，需要用户明确特批（AGENTS.md Git Rule 5: "Never force-push to main"）。默认走 forward-only 路径：缺失的 tag 在后续 commit 中补上，不回头修。
+  4. **本条 lesson index 引用 #22**。未来任何 agent commit 自检脚本都应包含 model tag 检查。
 
 ---
