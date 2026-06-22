@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::ApprovalChoice;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
-use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule, ResourceKind, ResourceExtractor};
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -85,11 +85,22 @@ impl TuiApprovalHandler {
         }
     }
 
-    fn add_always_allow_rule(&self, tool_name: &str) {
+    fn add_always_allow_rule(
+        &self,
+        nature: talos_core::tool::ToolNature,
+        input: &serde_json::Value,
+    ) {
+        let resource = ResourceExtractor::extract(nature, input);
+        let resource_kind = match nature {
+            talos_core::tool::ToolNature::Network => Some(ResourceKind::Domain),
+            _ => Some(ResourceKind::Path),
+        };
+
         let mut engine = self.engine.lock().expect("engine lock poisoned");
-        engine.add_rule(PermissionRule::new(
-            tool_name,
-            None,
+        engine.add_rule(PermissionRule::new_nature(
+            nature,
+            resource,
+            resource_kind,
             PermissionDecision::Allow,
         ));
     }
@@ -134,7 +145,7 @@ impl AgentTool for TuiPermissionAwareTool {
         match choice {
             ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
             ApprovalChoice::AlwaysApprove => {
-                self.approval.add_always_allow_rule(&tool_name);
+                self.approval.add_always_allow_rule(self.inner.nature(), &input);
                 self.inner.execute(input).await
             }
             ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
@@ -199,7 +210,7 @@ impl AgentTool for PermissionAwareTool {
                             "Print mode: interactive approval unavailable".to_string(),
                         )
                     } else {
-                        match approval.prompt(&tool_name, &input) {
+                        match approval.prompt(&tool_name, self.inner.nature(), &input) {
                             Ok(decision) => decision,
                             Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
                         }

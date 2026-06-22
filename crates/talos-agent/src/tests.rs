@@ -1144,6 +1144,9 @@ async fn test_permission_check_blocks_denied_tool() {
         tool_name: "echo".into(),
         path_pattern: None,
         decision: PermissionDecision::Deny("not allowed".into()),
+        nature: None,
+        resource: None,
+        resource_kind: None,
     });
 
     let responses = vec![
@@ -1207,6 +1210,9 @@ async fn test_permission_check_allows_permitted_tool() {
         tool_name: "echo".into(),
         path_pattern: None,
         decision: PermissionDecision::Allow,
+        nature: None,
+        resource: None,
+        resource_kind: None,
     });
 
     let responses = vec![
@@ -1270,6 +1276,9 @@ async fn test_permission_ask_defaults_to_deny() {
         tool_name: "echo".into(),
         path_pattern: None,
         decision: PermissionDecision::Ask,
+        nature: None,
+        resource: None,
+        resource_kind: None,
     });
 
     let responses = vec![

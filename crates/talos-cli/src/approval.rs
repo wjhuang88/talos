@@ -13,7 +13,8 @@
 use std::io::{self, BufRead, Write};
 
 use anyhow::{Context, Result};
-use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+use talos_core::tool::ToolNature;
+use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind};
 
 /// Maximum length for formatted tool input before truncation.
 const MAX_INPUT_LENGTH: usize = 200;
@@ -63,6 +64,7 @@ impl ApprovalPrompt {
     pub fn prompt(
         &mut self,
         tool_name: &str,
+        nature: ToolNature,
         input: &serde_json::Value,
     ) -> Result<PermissionDecision> {
         let formatted = Self::format_input(input);
@@ -85,8 +87,17 @@ impl ApprovalPrompt {
             match line.trim() {
                 "y" => return Ok(PermissionDecision::Allow),
                 "a" => {
-                    // Add an always-allow rule for this tool
-                    let rule = PermissionRule::new(tool_name, None, PermissionDecision::Allow);
+                    let resource = ResourceExtractor::extract(nature, input);
+                    let resource_kind = match nature {
+                        ToolNature::Network => Some(ResourceKind::Domain),
+                        _ => Some(ResourceKind::Path),
+                    };
+                    let rule = PermissionRule::new_nature(
+                        nature,
+                        resource,
+                        resource_kind,
+                        PermissionDecision::Allow,
+                    );
                     self.engine.add_rule(rule);
                     return Ok(PermissionDecision::Allow);
                 }
@@ -132,9 +143,13 @@ impl ApprovalPrompt {
     /// This method simply returns the tool name and formatted arguments
     /// so the TUI can display them.
     #[allow(dead_code)]
-    pub fn prompt_tui(tool_name: &str, input: &serde_json::Value) -> (String, String) {
+    pub fn prompt_tui(
+        tool_name: &str,
+        nature: ToolNature,
+        input: &serde_json::Value,
+    ) -> (String, String, ToolNature) {
         let formatted = Self::format_input(input);
-        (tool_name.to_string(), formatted)
+        (tool_name.to_string(), formatted, nature)
     }
 }
 
