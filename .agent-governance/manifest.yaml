@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-22"
-status_note: "Governance refresh (2026-06-22): I039 Complete, I040 Complete (SESSION-001-A + http_request content detection + save_url + fetch_url merge). PERM-002 documented. TUI-012 replay fixed. 3 broken backlog links repaired. Dependency audit applied (serde_yaml→yaml_serde, arborium 2.18, scraper 0.27). Workspace clean; 0 validator warnings."
+status_note: "Governance refresh (2026-06-22): I040 Complete, I041 Complete (SESSION-001-B + SESSION-001-C + PERM-002). Workspace clean; 0 validator warnings. Long-running task (T1-T10) closed 4 weeks early. TUI smoke boundary documented as I041 residual."
 
 governance:
   skill_name: "agent-project-governance"

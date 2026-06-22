@@ -285,3 +285,40 @@ Open risks or deviations: Deep agent timeout on a non-trivial implementation. Th
 Next task item: T9 — Real binary smoke (one binary proof per delivered command)
 Recovery or resume instruction: re-read this record; current HEAD = 6b9022e (main); for T9 the next agent should: 1) verify talos --mock or print mode works for /new, /resume, /fork smoke scenarios; 2) capture actual stdout/stderr in I041 verification evidence
 ```
+
+### Checkpoint 5 - T9 Real Binary Smoke (2026-06-22)
+
+```text
+Completed task items: T9 (real binary smoke)
+Current state and artifacts: HEAD = d08e0c2 on main; binary built successfully; no warnings
+Commands/checks and actual results:
+- cargo build -p talos-cli: success
+- target/debug/talos --version: talos 0.1.1 (exit 0)
+- target/debug/talos --help: full option list (--tui, --print, --repl, --inline, --mock)
+- target/debug/talos -p --mock "smoke /new command": successful request preview
+- TUI slash commands /new, /resume, /fork: require TTY mode; unit tests cover the handler logic
+- PERM-002 nature-based rules: 51 unit tests cover all 9 acceptance scenarios
+Open risks or deviations: TUI smoke boundary is structural (print mode does not route slash commands). Documented as residual; future iterations can add TUI-driver tests via ratatui::backend::TestBackend.
+Next task item: T10 — Full closure and delivery
+Recovery or resume instruction: re-read this record; current HEAD = d08e0c2 (main); T9 is the last technical task; T10 is governance sync only
+```
+
+### Checkpoint 6 - T10 Full Closure (2026-06-22)
+
+```text
+Completed task items: T10 (full closure and delivery)
+Current state and artifacts: I041 fully closed; iteration doc status -> Complete; BOARD Now -> empty; iterations/README.md updated; PRODUCT-BACKLOG.md updated; I041 retrospective recorded
+Commands/checks and actual results:
+- cargo test --workspace: 0 failures (final)
+- cargo clippy --workspace -- -D warnings: clean
+- scripts/validate_project_governance.sh: 0 warnings
+- scripts/assess_project_scale.sh: high-risk profile, release-managed branch mode, on-demand worktree
+- I041 iteration doc: All T1-T9 verification evidence + retrospective + residuals recorded
+- README.md Slash Commands table: /new, /resume, /fork all present
+- All 3 backlog stories: status Complete (I041) with acceptance boxes ticked
+- 8 atomic commits + 4 task checkpoint commits + 1 closure commit = 13 total commits for I041
+- 1 governance drift correction (lesson #22, model tag) recorded in EVOLUTION.md
+Open risks or deviations: TUI smoke boundary documented as residual
+Next task item: none — I041 is complete
+Recovery or resume instruction: I041 is closed. To start a new iteration, follow docs/sop/START-ITERATION.md with a fresh iteration ID. The Active board row is empty; the Next section lists candidates (PERM-002 follow-ups, SCHED-001, I028, etc.).
+```

@@ -16,12 +16,13 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I041 Interactive Session Lifecycle & Operation-Scoped Permissions | Active | [I041](iterations/I041-interactive-session-lifecycle-permission-ux.md) | SESSION-001-B + SESSION-001-C + PERM-002 over 4 weeks; activate 2026-06-22; target close 2026-07-20 |
+| _(no active iteration; next work per Next section)_ | | | |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I041 Interactive Session Lifecycle & Operation-Scoped Permissions | Complete | [I041](iterations/I041-interactive-session-lifecycle-permission-ux.md) | SESSION-001-B (/new + /resume) + SESSION-001-C (/fork) + PERM-002 (nature+resource rules) all landed 2026-06-22; closed 4 weeks early; 700+ tests pass; TUI smoke documented as residual |
 | I040 Session Foundation & Tool Refinement | Complete | [I040](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A + http_request content detection + save_url + fetch_url merge landed 2026-06-22; `cargo check/clippy/test --workspace` all clean; TUI-006-A removed (already done in I023) |
 | I022 TUI Inline-by-Default | Complete | [I022 TUI Inline-by-Default](iterations/I022-tui-inline-default.md) | Core flip + viewport refactor + scrollback flush + status bar tips landed; 127 TUI tests pass; state model refactor deferred to I023 |
 | I014 TUI Completion | Complete | [I014 TUI Completion](iterations/I014-tui-completion.md) | Both stories landed (2 atomic commits: 7f783fa #I009-S6, 3b526c8 #I010-S9); 652 tests pass workspace-wide (was 615; +37 from talos-tui); runtime evidence recorded |
@@ -57,6 +58,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I041 Interactive Session Lifecycle & Operation-Scoped Permissions | Complete | [I041](iterations/I041-interactive-session-lifecycle-permission-ux.md) | SESSION-001-B + SESSION-001-C + PERM-002 over 4 weeks (closed 4 weeks early); 8 atomic commits + 4 task checkpoints; T9 TUI smoke boundary documented; 700+ tests pass |
 | I040 Session Foundation & Tool Refinement | Complete | [I040](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A SessionTransition + http_request content detection + save_url + fetch_url merge; TUI-006-A removed (superseded by I023); `cargo check/clippy/test --workspace` clean |
 | I039 Network Tools & TUI Polish | Complete | [I039 Network Tools & TUI Polish](iterations/I039-network-tools-tui-polish.md) | All 4 stories landed: http_request + web_search + status bar/exit redesign + bash streaming. 5-agent review passed. |
 | I037 Slash Command Menu | Complete | [I037 Slash Command Menu](iterations/I037-slash-command-menu.md) | Post-completion review repaired composer-backed filtering, Approval priority, deterministic height fallback, tests, and documentation sync |
