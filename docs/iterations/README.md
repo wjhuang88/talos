@@ -74,7 +74,8 @@ docs/iterations/
 | I037 | Slash Command Menu | **Complete** (2026-06-20) | TUI-010: `/` opens Codex-style command menu below composer using CMD-001 registry. See `I037-slash-command-menu.md`. |
 | I038 | Model Catalog Foundation | **Complete** (2026-06-20) | MODEL-001: built-in model dataset + models.dev import. Catalog-only (reasoning split to MODEL-003). See `I038-model-catalog-foundation.md`. |
 | I039 | Network Tools & TUI Polish | **Complete** (2026-06-21) | WEBFETCH-001 Phase 0 + TOOL-009 + TUI-011 + TOOL-005. See `I039-network-tools-tui-polish.md`. |
-| I040 | Session Foundation & Tool Refinement | **Active** (2026-06-21) | SESSION-001-A + http_request content detection + fetch_url merge. See `I040-session-foundation-tool-refinement.md`. |
+| I040 | Session Foundation & Tool Refinement | **Complete** (2026-06-22) | SESSION-001-A + http_request content detection + save_url + fetch_url merge. See `I040-session-foundation-tool-refinement.md`. |
+| I041 | Interactive Session Lifecycle & Operation-Scoped Permissions | **Active** (2026-06-22; target close 2026-07-20) | SESSION-001-B + SESSION-001-C + PERM-002. See `I041-interactive-session-lifecycle-permission-ux.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -93,7 +94,8 @@ rewrite published iteration baselines.
 | I028 | Planned | Deferred; scheduling is not the current priority. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
-| I040 | Active | Activated 2026-06-21; SESSION-001-A + http_request content detection implementation in progress. |
+| I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
+| I041 | Active (2026-06-22) | Activated 2026-06-22; SESSION-001-B + SESSION-001-C + PERM-002; 4-week target close 2026-07-20. |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.

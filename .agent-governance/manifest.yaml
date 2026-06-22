@@ -4,12 +4,12 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-22"
-status_note: "Governance refresh (2026-06-22): I039 Complete, I040 Active, PERM-002 added. TUI-012 replay fixed. Linked-fix 3 broken backlog links (../iterations -> ../../iterations). Workspace clean."
+status_note: "Governance refresh (2026-06-22): I039 Complete, I040 Complete (SESSION-001-A + http_request content detection + save_url + fetch_url merge). PERM-002 documented. TUI-012 replay fixed. 3 broken backlog links repaired. Dependency audit applied (serde_yaml→yaml_serde, arborium 2.18, scraper 0.27). Workspace clean; 0 validator warnings."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-06-19"
+  last_refresh: "2026-06-22"
 
 entrypoints:
   agent_guide: "AGENTS.md"

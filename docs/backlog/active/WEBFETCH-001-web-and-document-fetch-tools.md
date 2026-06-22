@@ -8,7 +8,7 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Complete (I039 Phase 0). I040 Phase 0+ remaining: content type detection, HTML text extraction, JSON formatting.
+Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) blocked on PLUGIN-001 WASM.
 
 ## Priority
 

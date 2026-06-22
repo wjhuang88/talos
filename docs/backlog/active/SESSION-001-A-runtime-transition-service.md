@@ -4,7 +4,7 @@
 |---|---|
 | Type | Technical Story |
 | Parent Epic | [SESSION-001](SESSION-001-interactive-session-lifecycle.md) |
-| Status | In Progress (I040) |
+| Status | Complete (I040 — 2026-06-22) |
 | Depends On | MEM-002 and MEM-004 complete; ADR-005; ADR-006 |
 | Unlocks | SESSION-001-B; SESSION-001-C |
 | Iteration | [I040 Session Foundation & Tool Refinement](../../iterations/I040-session-foundation-tool-refinement.md) |
@@ -36,14 +36,14 @@ visible history across different sessions.
 
 ## Acceptance
 
-- [ ] Tests prove failed preparation leaves the old runtime active and writable.
-- [ ] Tests prove successful commit updates Agent history, persistence target, conversation/status,
+- [x] Tests prove failed preparation leaves the old runtime active and writable.
+- [x] Tests prove successful commit updates Agent history, persistence target, conversation/status,
       visible history source, and session-owned resource handles as one transition.
-- [ ] Active-turn behavior is explicit and cancellation/refusal cannot race transition commit.
-- [ ] **Empty-session guard**: Session durable storage (JSONL/SQLite) is NOT created until the first
+- [x] Active-turn behavior is explicit and cancellation/refusal cannot race transition commit.
+- [x] **Empty-session guard**: Session durable storage (JSONL/SQLite) is NOT created until the first
       user message is submitted. Preparing a session handle without writing to disk is valid.
-- [ ] `cargo check --workspace`, clippy, and workspace tests pass.
-- [ ] Parent Epic, Product Backlog, iteration, and Board owners are synchronized.
+- [x] `cargo check --workspace`, clippy, and workspace tests pass.
+- [x] Parent Epic, Product Backlog, iteration, and Board owners are synchronized.
 
 ## Uncertainty
 

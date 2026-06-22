@@ -1,7 +1,8 @@
 # I040: Session Foundation & Web Fetch Pipeline
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-06-21
+> Closed date: 2026-06-22
 > Planned objective: Talos gains atomic session lifecycle transitions (prepare/commit/rollback)
 >   and a complete web fetch pipeline (http_request content detection + fetch_url content
 >   extraction + save_url file persistence).
@@ -129,20 +130,29 @@ Phase 1 deepens http_request with content detection. Phase 1b adds the file-save
 | Date | Type | Record |
 |---|---|---|
 | 2026-06-21 | Activation | I039 complete, no active iterations. SESSION-001-A Ready, WEBFETCH gap identified, TUI-006-A Planned. |
+| 2026-06-21 | Implementation | SESSION-001-A landed: `SessionTransition` service with prepare/commit/rollback in `crates/talos-cli/src/session_transition.rs`; wired into TUI mode runner; empty-session guard via `defer_create_session()` and `Session::new_deferred()`/`ensure_persisted()`. |
+| 2026-06-21 | Implementation | http_request content type detection: `mode = auto / raw`; HTML text extraction via `scraper`; JSON pretty-print; binary detection. 22 http_request tests pass. |
+| 2026-06-21 | Implementation | `fetch_url` merged into `http_request` (added `extract_links: bool`); `crates/talos-tools/src/fetch_url.rs` deleted; 18 web_search tests pass. |
+| 2026-06-21 | Implementation | `save_url` tool: write-capable URL-to-file download, 10MB limit, SSRF guard reused, `ToolNature::Write`. |
+| 2026-06-22 | Scope change | TUI-006-A removed from I040 (already implemented; see commit `402d30d`); TUI-006 closed entirely per commit `aea9ddc`. |
+| 2026-06-22 | Verification | Final `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace` all clean. |
 
 ## Verification Evidence
 
-- `cargo check --workspace`: 
-- `cargo clippy --workspace -- -D warnings`: 
-- `cargo test --workspace`: 
-- Runtime evidence: 
+- `cargo check --workspace`: ✅ clean (34.62s after dependency upgrade; 18 transitive crates added)
+- `cargo clippy --workspace -- -D warnings`: ✅ clean (20.06s)
+- `cargo test --workspace`: ✅ all tests pass (zero failures; only 1 pre-existing `#[ignore]`)
+- Runtime evidence: `http_request` and `save_url` exercised via mock tests; `SessionTransition` prepare/commit/rollback covered by unit tests; empty-session guard verified by `Session::new_deferred()` + `defer_create_session()` path
 
 ## Variance And Residuals
 
-- 
+- **TUI-006-A removed**: Rounded code-block borders were already implemented via I023 arborium syntax highlighting; commit `402d30d` removed TUI-006-A from I040 scope.
+- **fetch_url merged into http_request**: Original plan had fetch_url as a separate tool; orthogonality review merged it into http_request with `extract_links` parameter. No user-facing capability lost.
+- **SESSION-001-B / SESSION-001-C explicitly out of scope**: Per the I040 plan, these are deferred to a separate iteration (I041 or later).
+- **clippy --all-targets residual**: pre-existing ARCH-007 (`unwrap_used` lint in test code); not introduced by I040.
 
 ## Retrospective
 
-- Outcome: 
-- Documentation: 
-- Lessons: 
+- Outcome: All 3 stories landed (SESSION-001-A + http_request content detection + save_url). fetch_url merged for orthogonality. No capability lost. 4 atomic commits in the I040 window. Workspace verification clean.
+- Documentation: README updated with new tool names and capabilities. Backlog story SESSION-001-A marked complete (implicit via iteration closure); WEBFETCH-001 noted "I039/I040 Complete". PERM-002 documentation drafted in same window but implementation deferred to a follow-up.
+- Lessons: (1) Tool orthogonality check should happen at the planning stage, not after the first cut. (2) Pre-existing iteration docs are valuable — TUI-006-A's "not implemented" claim was already stale when I040 was activated, suggesting a governance doc-drift signal worth tracking. (3) Empty-session guard (`defer_create_session`) is a clean pattern worth reusing for any "session may not be created" path.
