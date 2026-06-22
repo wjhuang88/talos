@@ -5,7 +5,7 @@ mod tests {
     use crate::colors;
     use crate::provider_setup::parse_provider;
     use crate::registry;
-    use crate::tui_bridge::run_conversation_loop;
+    use crate::tui_bridge::{SessionLifecycleRequest, run_conversation_loop};
     use talos_conversation::{ConversationEngine, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
 
@@ -115,6 +115,7 @@ mod tests {
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
         let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (session_tx, _session_rx) = tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
         let loop_handle = tokio::spawn(run_conversation_loop(
             engine,
@@ -123,6 +124,7 @@ mod tests {
             ui_tx,
             submit_tx,
             interrupt_tx,
+            session_tx,
         ));
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();

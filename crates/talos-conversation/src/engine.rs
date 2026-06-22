@@ -8,8 +8,9 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    PluginObservation, ScrollbackState, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind,
-    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
+    PluginObservation, ScrollbackState, SessionNewRequest, SessionResumeRequest, SkillDiagnostic,
+    StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay,
+    UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -193,6 +194,24 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             usage: "/export <path>",
             description: "Export transcript to file",
             arg_hint: Some("<path>"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/new",
+            aliases: &[],
+            usage: "/new",
+            description: "Start a fresh session",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/resume",
+            aliases: &[],
+            usage: "/resume [session-id]",
+            description: "Resume a workspace session",
+            arg_hint: Some("[session-id]"),
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
@@ -476,6 +495,29 @@ impl ConversationEngine {
             }
             "/export" => {
                 outputs.extend(self.handle_export_command(arg));
+            }
+            "/new" => {
+                if self.is_processing {
+                    let text = "[System] Cannot start a new session while a turn is active. Wait for the current turn to finish.\n".to_string();
+                    outputs.push(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(stream::once(async move { text })),
+                    }));
+                } else {
+                    outputs.push(UiOutput::SessionNew(SessionNewRequest));
+                }
+            }
+            "/resume" => {
+                if self.is_processing {
+                    let text = "[System] Cannot resume a session while a turn is active. Wait for the current turn to finish.\n".to_string();
+                    outputs.push(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(stream::once(async move { text })),
+                    }));
+                } else {
+                    let session_id = if arg.is_empty() { None } else { Some(arg.to_string()) };
+                    outputs.push(UiOutput::SessionResume(SessionResumeRequest { session_id }));
+                }
             }
             _ => {
                 let text =

@@ -7,16 +7,17 @@
 //! This is SESSION-001-A: the infrastructure that SESSION-001-B (new/resume)
 //! and SESSION-001-C (fork) will consume.
 
-#![allow(dead_code)] // Foundation for SESSION-001-B/C, consumed in future iterations
-
 use talos_agent::session::AppServerSession;
 use talos_core::session::{SessionHandle, SessionOp};
 use talos_session::Session;
 
 /// A prepared but not-yet-active session replacement.
+///
+/// Does NOT store the actor (which is `!Send` due to its `Receiver`).
+/// The actor is passed to [`SessionTransition::commit`] directly.
+#[allow(dead_code)]
 struct PreparedSession {
     handle: SessionHandle,
-    actor: AppServerSession,
     session: Session,
 }
 
@@ -35,25 +36,26 @@ impl SessionTransition {
         }
     }
 
+    /// Prepare a session transition. Stores the handle and session; the actor
+    /// is passed to [`commit`] to avoid storing a `!Send` type.
     pub fn prepare(
         &mut self,
-        actor: AppServerSession,
         handle: SessionHandle,
         session: Session,
     ) -> Result<(), String> {
         if self.prepared.is_some() {
             return Err("a session transition is already prepared — commit or rollback first".to_string());
         }
-        self.prepared = Some(PreparedSession { handle, actor, session });
+        self.prepared = Some(PreparedSession { handle, session });
         Ok(())
     }
 
-    pub fn commit(&mut self) -> Result<Session, String> {
+    /// Commit the prepared transition, spawning the new actor and swapping sessions.
+    pub fn commit(&mut self, mut actor: AppServerSession) -> Result<Session, String> {
         let prepared = self.prepared.take()
             .ok_or_else(|| "no prepared transition to commit".to_string())?;
 
-        let mut new_actor = prepared.actor;
-        tokio::spawn(async move { new_actor.run().await });
+        tokio::spawn(async move { actor.run().await });
 
         let _ = self.active_sq_tx.try_send(SessionOp::Shutdown);
 
@@ -65,6 +67,7 @@ impl SessionTransition {
         self.prepared = None;
     }
 
+    #[allow(dead_code)]
     pub fn has_prepared(&self) -> bool {
         self.prepared.is_some()
     }

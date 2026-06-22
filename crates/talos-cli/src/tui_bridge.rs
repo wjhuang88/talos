@@ -3,7 +3,7 @@
 //! Contains the conversation loop that mediates between agent events,
 //! user input, and UI output channels.
 
-use talos_conversation::{ConversationEngine, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, SessionNewRequest, SessionResumeRequest, UiOutput, UserInput};
 use talos_core::message::AgentEvent;
 
 pub(crate) async fn run_conversation_loop(
@@ -13,6 +13,7 @@ pub(crate) async fn run_conversation_loop(
     ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
     submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
     interrupt_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
 ) {
     loop {
         tokio::select! {
@@ -51,6 +52,12 @@ pub(crate) async fn run_conversation_loop(
                                         let _ = ui_tx.send(UiOutput::Exit);
                                         return;
                                     }
+                                    UiOutput::SessionNew(req) => {
+                                        let _ = session_tx.send(SessionLifecycleRequest::New(req));
+                                    }
+                                    UiOutput::SessionResume(req) => {
+                                        let _ = session_tx.send(SessionLifecycleRequest::Resume(req));
+                                    }
                                     other => { let _ = ui_tx.send(other); }
                                 }
                             }
@@ -81,4 +88,10 @@ pub(crate) async fn run_conversation_loop(
             }
         }
     }
+}
+
+/// Session lifecycle request forwarded from the conversation loop to the mode runner.
+pub(crate) enum SessionLifecycleRequest {
+    New(SessionNewRequest),
+    Resume(SessionResumeRequest),
 }

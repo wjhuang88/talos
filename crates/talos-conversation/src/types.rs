@@ -131,6 +131,14 @@ pub enum UiOutput {
         path: std::path::PathBuf,
         content: String,
     },
+    /// Request a session transition to a fresh session (`/new`).
+    /// The mode runner creates the new session, swaps the agent context,
+    /// and reports success or failure back to the UI.
+    SessionNew(SessionNewRequest),
+    /// Request a session transition to an existing session (`/resume`).
+    /// The mode runner validates the target, hydrates history, and swaps
+    /// the agent context.
+    SessionResume(SessionResumeRequest),
     Exit,
 }
 
@@ -156,6 +164,21 @@ pub enum CopyScope {
     Last,
     /// Copy the full transcript as plain text.
     All,
+}
+
+/// Request to transition to a new session (created by `/new`).
+///
+/// The bridge forwards this to the mode runner, which creates a fresh
+/// [`talos_session::Session`] and swaps the active agent context.
+pub struct SessionNewRequest;
+
+/// Request to resume an existing session (created by `/resume`).
+///
+/// If `session_id` is `None`, the mode runner lists workspace-scoped candidates.
+/// If `Some`, the mode runner validates and loads the specified session.
+pub struct SessionResumeRequest {
+    /// Optional explicit session ID to resume.
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

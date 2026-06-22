@@ -427,7 +427,8 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/skills"));
     assert!(text.contains("/copy"));
     assert!(text.contains("/export"));
-    assert!(!text.contains("/new"));
+    assert!(text.contains("/new"));
+    assert!(text.contains("/resume"));
     assert!(!text.contains("/compact"));
     assert!(!text.contains("/mock-request"));
 }

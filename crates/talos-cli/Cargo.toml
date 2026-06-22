@@ -40,6 +40,7 @@ dirs = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 rmcp = "1.7.0"
+futures = "0.3"
 
 [lints]
 workspace = true
