@@ -248,3 +248,21 @@ Open risks or deviations: none; all 5 atomic commits carry [model:MiniMax-M3] ta
 Next task item: T6 — SESSION-001-B /new BuiltinCommand
 Recovery or resume instruction: re-read this record; current HEAD = 6f4f647 (main); if T6/T7/T8 work is paused, the next agent should: 1) re-verify HEAD is 6f4f647; 2) read SESSION-001-A-runtime-transition-service.md for the transition API; 3) read SESSION-001-B-new-resume.md acceptance criteria; 4) consume SessionTransition::prepare(New) and prepare(Resume)
 ```
+
+### Checkpoint 3 - T6+T7 Complete (2026-06-22)
+
+```text
+Completed task items: T6 (/new BuiltinCommand) and T7 (/resume BuiltinCommand) — SESSION-001-B fully landed
+Current state and artifacts: HEAD = 40de299 on main; 2 atomic commits ahead of 07792a8 (pushed)
+Commands/checks and actual results:
+- cargo test --workspace: 0 failures (all test suites pass)
+- cargo clippy --workspace -- -D warnings: clean
+- README.md: Slash Commands table includes /new and /resume
+- SESSION-001-B backlog: status Complete (I041), acceptance checkboxes ticked
+- I041 iteration doc: T6-T7 Verification Evidence recorded
+- SessionTransition API change: prepare(handle, session) + commit(actor) for Send compatibility; actor no longer stored in PreparedSession
+- Bridge wires session_tx channel for lifecycle requests from conversation loop to mode runner
+Open risks or deviations: SessionTransition API change is breaking for direct callers (only mode_runners is affected in workspace; handled atomically in T6 commit)
+Next task item: T8 — SESSION-001-C /fork BuiltinCommand
+Recovery or resume instruction: re-read this record; current HEAD = 40de299 (main); if T8 work is paused, the next agent should: 1) re-verify HEAD is 40de299; 2) read SESSION-001-C-fork.md acceptance criteria; 3) reuse the session_tx channel pattern from T6+T7; 4) the fork flow must clone durable history into a distinct child identity and preserve source bytes
+```
