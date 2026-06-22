@@ -1023,7 +1023,7 @@ impl Tui {
                 self.state.should_exit = true;
                 return true;
             }
-            UiOutput::SessionNew(_) | UiOutput::SessionResume(_) => {
+            UiOutput::SessionNew(_) | UiOutput::SessionResume(_) | UiOutput::SessionFork(_) => {
                 // Handled by the bridge → mode runner lifecycle handler.
                 // Should not reach the TUI directly.
             }

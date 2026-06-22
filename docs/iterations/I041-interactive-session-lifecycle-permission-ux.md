@@ -197,6 +197,23 @@ Week 4 ── SESSION-001-C + iteration closure
 - Acceptance gate 5: `/resume` with explicit ID validates workspace scope ✅
 - Acceptance gate 6: `/resume` hydration failure → old session active ✅
 
+### SESSION-001-C T8 (2026-06-22)
+- `cargo check --workspace`: clean
+- `cargo clippy --workspace -- -D warnings`: clean
+- `cargo test --workspace`: all pass (700+ tests)
+- `/fork` registered via CMD-001 registry; consumes SessionTransition::prepare/commit/rollback
+- Fork clones source JSONL to new path with fresh UUID; source bytes unchanged
+- Child session hydrated from cloned durable history
+- Refuses while a turn is active (`is_processing` guard)
+- Prepare failure → rollback, source session remains active
+- Commit failure → rollback, visible error, source session remains active
+- `SessionTransition::active_session()` added for fork source access
+- Lifecycle handler in `run_tui_mode` processes `SessionLifecycleRequest::Fork`
+- Acceptance gate 1: `/fork` creates distinct child id/path with source history ✅
+- Acceptance gate 2: child persistence target changes; source bytes unchanged ✅
+- Acceptance gate 3: `/fork` prepare failure → source remains active ✅
+- Acceptance gate 4: `/fork` while turn active → refusal message ✅
+
 - `cargo check --workspace`:
 - `cargo clippy --workspace -- -D warnings`:
 - `cargo test --workspace`:

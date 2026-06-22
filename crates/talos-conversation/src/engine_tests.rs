@@ -429,6 +429,7 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/export"));
     assert!(text.contains("/new"));
     assert!(text.contains("/resume"));
+    assert!(text.contains("/fork"));
     assert!(!text.contains("/compact"));
     assert!(!text.contains("/mock-request"));
 }
@@ -1269,4 +1270,36 @@ async fn unknown_command_stream_source_is_error() {
     let outputs = engine.handle_slash_command("/unknown");
     let (source, _) = collect_stream(outputs).await.unwrap();
     assert_eq!(source, MessageSource::Error);
+}
+
+// ---------------------------------------------------------------------------
+// handle_slash_command: /fork
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn slash_fork_produces_session_fork_output() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/fork");
+    assert_eq!(outputs.len(), 1);
+    assert!(matches!(outputs[0], UiOutput::SessionFork(_)));
+}
+
+#[tokio::test]
+async fn slash_fork_refuses_while_processing() {
+    let mut engine = new_engine();
+    engine.is_processing = true;
+    let outputs = engine.handle_slash_command("/fork");
+    assert_eq!(outputs.len(), 1);
+    let (source, text) = collect_stream(outputs).await.unwrap();
+    assert_eq!(source, MessageSource::System);
+    assert!(text.contains("Cannot fork a session while a turn is active"));
+}
+
+#[tokio::test]
+async fn slash_fork_stream_source_is_system() {
+    let mut engine = new_engine();
+    engine.is_processing = true;
+    let outputs = engine.handle_slash_command("/fork");
+    let (source, _) = collect_stream(outputs).await.unwrap();
+    assert_eq!(source, MessageSource::System);
 }

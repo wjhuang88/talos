@@ -371,6 +371,20 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     )
                     .await;
                 }
+                SessionLifecycleRequest::Fork(_) => {
+                    handle_session_fork(
+                        &transition_for_handler,
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        &api_key_for_handler,
+                        &hooks_for_handler,
+                        &workspace_root_for_handler,
+                        &session_manager_for_handler,
+                        &mcp_config_for_handler,
+                        cli.mock,
+                    )
+                    .await;
+                }
             }
         }
     });
@@ -1131,6 +1145,156 @@ async fn handle_session_resume(
         Err(e) => {
             transition.rollback();
             let text = format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+    }
+}
+
+/// Handle `/fork` — clone the active session's durable history into a child session.
+///
+/// Copies the source JSONL file to a new path with a fresh UUID, creates a new
+/// [`talos_session::Session`], and swaps the agent context. The source session
+/// remains byte-for-byte unchanged.
+#[allow(clippy::too_many_arguments)]
+async fn handle_session_fork(
+    transition: &Arc<Mutex<SessionTransition>>,
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    api_key: &str,
+    hooks: &Arc<HookRegistry>,
+    workspace_root: &std::path::Path,
+    session_manager: &talos_session::SessionManager,
+    mcp_config: &talos_config::McpConfig,
+    mock: bool,
+) {
+    let mut transition = transition.lock().await;
+
+    let source_session = transition.active_session();
+    let source_path = source_session.file_path.clone();
+
+    let source_bytes = match std::fs::read(&source_path) {
+        Ok(b) => b,
+        Err(e) => {
+            let text = format!("[Error] Failed to read source session file: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+
+    let fork_history = match source_session.read_messages() {
+        Ok(h) => h,
+        Err(e) => {
+            let text = format!("[Error] Failed to read source session history: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+
+    let workspace_root_str = canonical_workspace_root(workspace_root);
+    let child_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
+        Ok(s) => s,
+        Err(e) => {
+            let text = format!("[Error] Failed to create child session: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+
+    let child_path = child_session.file_path.clone();
+    if let Some(parent) = child_path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent) {
+            let text = format!("[Error] Failed to create child session directory: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+    }
+
+    if let Err(e) = std::fs::write(&child_path, &source_bytes) {
+        let text = format!("[Error] Failed to clone session history: {e}\n");
+        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+            source: MessageSource::Error,
+            stream: Box::pin(futures::stream::once(async move { text })),
+        }));
+        return;
+    }
+
+    let session_config = SessionConfig {
+        print_mode: false,
+        workspace_root: workspace_root.to_path_buf(),
+        initial_history: fork_history,
+        model_context_limit: 128_000,
+    };
+
+    let provider = build_provider(config, api_key, mock);
+    let approval_handler = Arc::new(TuiApprovalHandler::new(
+        ui_tx.clone(),
+        workspace_root.to_path_buf(),
+    ));
+    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+            return;
+        }
+    };
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
+
+    let mut agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.to_path_buf(),
+        hooks.clone(),
+    );
+    agent.set_tool_protocol(config.tool_protocol());
+    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+        apply_runtime_skills(&mut agent, &skills);
+    }
+
+    let (handle, actor) = AppServerSession::new(agent, session_config);
+
+    let child_session_id = child_session.id;
+    if let Err(e) = transition.prepare(handle, child_session) {
+        let text = format!("[Error] Failed to prepare fork: {e}\n");
+        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+            source: MessageSource::Error,
+            stream: Box::pin(futures::stream::once(async move { text })),
+        }));
+        return;
+    }
+
+    match transition.commit(actor) {
+        Ok(_old_session) => {
+            let text = format!("[System] Forked session to {child_session_id}.\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+        Err(e) => {
+            transition.rollback();
+            let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::Error,
                 stream: Box::pin(futures::stream::once(async move { text })),

@@ -909,3 +909,48 @@ fn make_session_with_two_entries() -> Session {
         .unwrap();
     session
 }
+
+#[test]
+fn fork_durable_history_clone_source_bytes_unchanged() {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(dir.path().to_path_buf());
+    let mut source = manager.create_session("fork-clone-test", "").unwrap();
+    source
+        .append(&Message::User {
+            content: "hello".into(),
+        })
+        .unwrap();
+    source
+        .append(&Message::Assistant {
+            content: "world".into(),
+            tool_calls: vec![],
+        })
+        .unwrap();
+
+    let source_bytes_before = std::fs::read(&source.file_path).unwrap();
+
+    let child_id = Uuid::new_v4();
+    let child_path = dir
+        .path()
+        .join("fork-clone-test")
+        .join(format!("{child_id}.jsonl"));
+    std::fs::create_dir_all(child_path.parent().unwrap()).unwrap();
+    std::fs::write(&child_path, &source_bytes_before).unwrap();
+
+    let source_bytes_after = std::fs::read(&source.file_path).unwrap();
+    assert_eq!(
+        source_bytes_before, source_bytes_after,
+        "source session file must be byte-for-byte unchanged after fork clone"
+    );
+
+    let child_bytes = std::fs::read(&child_path).unwrap();
+    assert_eq!(
+        source_bytes_before, child_bytes,
+        "child session file must be an exact copy of source"
+    );
+
+    let mut child = Session::new(child_id, "fork-clone-test".into(), "".into(), child_path);
+    let child_messages = child.read_messages().unwrap();
+    assert_eq!(child_messages.len(), 2, "child should have same message count");
+    assert_ne!(child.id, source.id, "child must have distinct session id");
+}

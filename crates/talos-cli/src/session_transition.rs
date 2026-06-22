@@ -71,4 +71,9 @@ impl SessionTransition {
     pub fn has_prepared(&self) -> bool {
         self.prepared.is_some()
     }
+
+    /// Return a reference to the currently active session.
+    pub fn active_session(&self) -> &Session {
+        &self.active_session
+    }
 }

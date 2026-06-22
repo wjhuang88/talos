@@ -139,6 +139,10 @@ pub enum UiOutput {
     /// The mode runner validates the target, hydrates history, and swaps
     /// the agent context.
     SessionResume(SessionResumeRequest),
+    /// Request a session fork — clone the active session's durable history
+    /// into a distinct child identity (`/fork`). The mode runner copies the
+    /// source JSONL, creates a new session, and swaps the agent context.
+    SessionFork(SessionForkRequest),
     Exit,
 }
 
@@ -180,6 +184,13 @@ pub struct SessionResumeRequest {
     /// Optional explicit session ID to resume.
     pub session_id: Option<String>,
 }
+
+/// Request to fork the active session (created by `/fork`).
+///
+/// The mode runner clones the source session's JSONL file to a new path
+/// with a fresh UUID, creates a new [`talos_session::Session`], and swaps
+/// the active agent context. The source session remains byte-for-byte unchanged.
+pub struct SessionForkRequest;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserInput {

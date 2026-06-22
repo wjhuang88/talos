@@ -8,9 +8,9 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    PluginObservation, ScrollbackState, SessionNewRequest, SessionResumeRequest, SkillDiagnostic,
-    StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay,
-    UiOutput,
+    PluginObservation, ScrollbackState, SessionForkRequest, SessionNewRequest, SessionResumeRequest,
+    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
+    ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -212,6 +212,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             usage: "/resume [session-id]",
             description: "Resume a workspace session",
             arg_hint: Some("[session-id]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/fork",
+            aliases: &[],
+            usage: "/fork",
+            description: "Fork the active session",
+            arg_hint: None,
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
@@ -517,6 +526,17 @@ impl ConversationEngine {
                 } else {
                     let session_id = if arg.is_empty() { None } else { Some(arg.to_string()) };
                     outputs.push(UiOutput::SessionResume(SessionResumeRequest { session_id }));
+                }
+            }
+            "/fork" => {
+                if self.is_processing {
+                    let text = "[System] Cannot fork a session while a turn is active. Wait for the current turn to finish.\n".to_string();
+                    outputs.push(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(stream::once(async move { text })),
+                    }));
+                } else {
+                    outputs.push(UiOutput::SessionFork(SessionForkRequest));
                 }
             }
             _ => {

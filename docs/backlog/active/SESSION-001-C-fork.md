@@ -4,7 +4,7 @@
 |---|---|
 | Type | State/Product Story |
 | Parent Epic | [SESSION-001](SESSION-001-interactive-session-lifecycle.md) |
-| Status | Proposed |
+| Status | Complete (I041 — 2026-06-22) |
 | Depends On | SESSION-001-A complete; CMD-001 registry foundation complete |
 | Unlocks | Independent branch exploration through `/fork` |
 
@@ -31,8 +31,8 @@ without modifying or appending to the source session.
 - Given the child is active, when subsequent turns complete, then only the child persistence target
   changes and the source session remains byte-for-byte unchanged.
 - Given fork preparation fails, when the operation returns, then the source remains active and usable.
-- [ ] Runtime tests cover identity, persistence routing, visible hydration, rollback, and resource cleanup.
-- [ ] README command documentation and all status owners are synchronized after runtime evidence.
+- [x] Runtime tests cover identity, persistence routing, visible hydration, rollback, and resource cleanup.
+- [x] README command documentation and all status owners are synchronized after runtime evidence.
 
 ## Decision Constraints
 
