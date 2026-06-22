@@ -1211,6 +1211,7 @@ async fn handle_session_fork(
             return;
         }
     };
+    let child_id = child_session.id;
 
     let child_path = child_session.file_path.clone();
     if let Some(parent) = child_path.parent()
@@ -1274,7 +1275,6 @@ async fn handle_session_fork(
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
-    let child_session_id = child_session.id;
     if let Err(e) = transition.prepare(handle, child_session) {
         let text = format!("[Error] Failed to prepare fork: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
@@ -1286,7 +1286,7 @@ async fn handle_session_fork(
 
     match transition.commit(actor) {
         Ok(_old_session) => {
-            let text = format!("[System] Forked session to {child_session_id}.\n");
+            let text = format!("[System] Forked session to {child_id}.\n");
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
                 stream: Box::pin(futures::stream::once(async move { text })),
