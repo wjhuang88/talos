@@ -16,8 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I043 Bottom Panel Generalization, Session Picker, Approval UX | Active | [I043](iterations/I043-bottom-panel-session-picker-approval-ux.md) | Bottom panel generalization + /resume session picker + R1/R2 tech debt + TUI-008 approval UX; activate 2026-06-23; target close 2026-07-05 |
-| I044 Session Integrity And Lifecycle Hardening | Active | [I044](iterations/I044-session-integrity-lifecycle-hardening.md) | Six consistency fixes (O(1) append, write safety, reconciliation, switch ordering, failure cleanup) + /delete; activate 2026-06-23; target close 2026-07-07 |
+| _(none active — see Done This Cycle for I043 + I044)_ | — | — | Next iteration selection requires inventorying non-terminal work per `docs/sop/START-ITERATION.md` |
 
 ## Review
 
@@ -59,6 +58,8 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I044 Session Integrity And Lifecycle Hardening | Complete | [I044](iterations/I044-session-integrity-lifecycle-hardening.md) | Six SESSION-002 consistency fixes (O(1) append, concurrent write safety, crash reconciliation, switch ordering, failure cleanup) + `/delete` via picker UX; pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race; 48 test groups pass; clippy clean; governance 0 warnings |
+| I043 Bottom Panel Generalization, Session Picker, Approval UX | Complete | [I043](iterations/I043-bottom-panel-session-picker-approval-ux.md) | BottomPanelState with PanelKind {SlashCommand, SessionPicker, Approval}; /resume picker; R1 interrupt_tx follows session switches; R2 model_context_limit from config; TUI-008 approval reuses bottom panel with nested-approval output queueing; IME guard and menu-close contract refined |
 | I042 I041 Hotfix — Persistence, /resume UX, Execute Semantics | Complete | [I042](iterations/I042-i041-hotfix-persistence-resume-ux.md) | P1-1 persistence continuity (watch channels); /resume ordinal selection; Execute first-token extraction; all tests pass |
 | I041 Interactive Session Lifecycle & Operation-Scoped Permissions | Complete | [I041](iterations/I041-interactive-session-lifecycle-permission-ux.md) | SESSION-001-B + SESSION-001-C + PERM-002 over 4 weeks (closed 4 weeks early); 8 atomic commits + 4 task checkpoints; T9 TUI smoke boundary documented; 700+ tests pass |
 | I040 Session Foundation & Tool Refinement | Complete | [I040](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A SessionTransition + http_request content detection + save_url + fetch_url merge; TUI-006-A removed (superseded by I023); `cargo check/clippy/test --workspace` clean |
