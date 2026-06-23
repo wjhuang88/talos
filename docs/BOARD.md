@@ -17,6 +17,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I043 Bottom Panel Generalization, Session Picker, Approval UX | Active | [I043](iterations/I043-bottom-panel-session-picker-approval-ux.md) | Bottom panel generalization + /resume session picker + R1/R2 tech debt + TUI-008 approval UX; activate 2026-06-23; target close 2026-07-05 |
+| I044 Session Integrity And Lifecycle Hardening | Active | [I044](iterations/I044-session-integrity-lifecycle-hardening.md) | Six consistency fixes (O(1) append, write safety, reconciliation, switch ordering, failure cleanup) + /delete; activate 2026-06-23; target close 2026-07-07 |
 
 ## Review
 

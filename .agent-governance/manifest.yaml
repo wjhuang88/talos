@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-06-23"
-status_note: "Governance refresh (2026-06-23): I042 Complete (persistence fix + /resume UX + Execute semantics). I043 Active (bottom panel generalization + session picker + R1/R2 + TUI-008). Workspace clean; 0 validator warnings."
+status_note: "Governance refresh (2026-06-23): I042 Complete. I043 Active (bottom panel + picker + approval). I044 Active (session integrity + deletion). mem0 comparative analysis added to ADR-016/MEM-001. Workspace clean; 0 validator warnings."
 
 governance:
   skill_name: "agent-project-governance"
