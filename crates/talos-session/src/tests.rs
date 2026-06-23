@@ -954,3 +954,66 @@ fn fork_durable_history_clone_source_bytes_unchanged() {
     assert_eq!(child_messages.len(), 2, "child should have same message count");
     assert_ne!(child.id, source.id, "child must have distinct session id");
 }
+
+#[test]
+fn delete_session_removes_file_and_index_entry() {
+    let manager = test_manager();
+    let session = manager
+        .create_session("delete-test", "delete-test")
+        .unwrap();
+    session
+        .append(&Message::User {
+            content: "hello".into(),
+        })
+        .unwrap();
+
+    let id = session.id;
+    assert!(session.file_path.exists(), "precondition: file exists");
+
+    manager.delete_session(&id).expect("delete should succeed");
+
+    assert!(
+        !session.file_path.exists(),
+        "session file must be removed from disk"
+    );
+    let sessions = manager.list_workspace_sessions("delete-test").unwrap();
+    assert!(
+        sessions.iter().all(|s| s.id != id),
+        "deleted session must not appear in workspace listing"
+    );
+}
+
+#[test]
+fn reconcile_index_repairs_stale_entries() {
+    let manager = test_manager();
+    let session = manager
+        .create_session("reconcile-test", "reconcile-test")
+        .unwrap();
+    session
+        .append(&Message::User {
+            content: "first".into(),
+        })
+        .unwrap();
+    session
+        .append(&Message::Assistant {
+            content: "hi".into(),
+            tool_calls: vec![],
+        })
+        .unwrap();
+
+    let fixed = manager
+        .reconcile_index()
+        .expect("reconcile should succeed");
+    assert!(fixed >= 1, "reconcile should reindex at least one entry");
+}
+
+#[test]
+fn find_session_file_missing_returns_error() {
+    use crate::SessionError;
+    let manager = test_manager();
+    let result = manager.delete_session(&Uuid::new_v4());
+    match result {
+        Err(SessionError::SessionNotFound(_)) => {}
+        other => panic!("expected SessionNotFound, got {other:?}"),
+    }
+}

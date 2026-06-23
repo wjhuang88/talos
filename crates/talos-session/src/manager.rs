@@ -21,10 +21,15 @@ impl SessionManager {
         let home =
             std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
         let dir = PathBuf::from(home).join(".talos").join("sessions");
-        Ok(Self {
+        let manager = Self {
             sessions_dir: dir,
             index: Arc::new(Mutex::new(None)),
-        })
+        };
+        // Repair any drift between on-disk JSONL and the SQLite index on
+        // startup. Errors are non-fatal: a future operation that needs the
+        // index will surface a precise cause.
+        let _ = manager.reconcile_index();
+        Ok(manager)
     }
 
     /// Create a new `SessionManager` with a custom sessions directory.
@@ -309,6 +314,112 @@ impl SessionManager {
         let mut guard = self.get_or_create_index()?;
         let index = guard.as_mut().expect("index just created");
         index.index_session(session)
+    }
+
+    #[allow(clippy::collapsible_if)]
+    pub fn reconcile_index(&self) -> Result<usize, IndexError> {
+        let mut guard = self.get_or_create_index()?;
+        let index = guard.as_mut().expect("index just created");
+
+        let mut fixed = 0usize;
+
+        let indexed_ids: std::collections::HashSet<String> =
+            index.list_all_session_ids()?.into_iter().collect();
+
+        let mut on_disk_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        if self.sessions_dir.exists() {
+            for ws_entry in fs::read_dir(&self.sessions_dir)? {
+                let ws_entry = ws_entry?;
+                if !ws_entry.file_type()?.is_dir() {
+                    continue;
+                }
+                let ws_dir = ws_entry.path();
+                let workspace_root = workspace_root_from_dir_name(
+                    &ws_dir.file_name().unwrap_or_default().to_string_lossy(),
+                );
+
+                for file_entry in fs::read_dir(&ws_dir)? {
+                    let file_entry = file_entry?;
+                    let path = file_entry.path();
+                    if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                        continue;
+                    }
+                    let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                        Some(s) => s.to_string(),
+                        None => continue,
+                    };
+                    on_disk_ids.insert(stem.clone());
+
+                    let existing = index.get_session_info(&stem)?;
+                    let (msg_count, _) = scan_file(&path).unwrap_or((0, String::new()));
+                    let needs_reindex = match &existing {
+                        None => true,
+                        Some(info) => info.message_count != msg_count,
+                    };
+                    if needs_reindex && Uuid::parse_str(&stem).is_ok() {
+                        if let Ok(id) = Uuid::parse_str(&stem) {
+                            let project = ws_dir
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("unknown")
+                                .to_string();
+                            let mut session = Session::new(
+                                id,
+                                project,
+                                workspace_root.to_string(),
+                                path.clone(),
+                            );
+                            if let Ok(entries) = session.read_entries() {
+                                if let Some(branch) = session.branches.get_mut(&session.current_branch) {
+                                    branch.entries = entries;
+                                }
+                            }
+                            index.index_session(&session)?;
+                            fixed += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        for orphan_id in indexed_ids.difference(&on_disk_ids) {
+            index.delete_session(orphan_id)?;
+            fixed += 1;
+        }
+
+        Ok(fixed)
+    }
+
+    #[allow(clippy::collapsible_if)]
+    pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
+        let file_path = self.find_session_file(id)?;
+        if file_path.exists() {
+            fs::remove_file(&file_path)?;
+        }
+        if let Ok(mut guard) = self.get_or_create_index() {
+            if let Some(index) = guard.as_mut() {
+                let _ = index.delete_session(&id.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::collapsible_if)]
+    fn find_session_file(&self, id: &Uuid) -> Result<PathBuf, SessionError> {
+        if self.sessions_dir.exists() {
+            for ws_entry in fs::read_dir(&self.sessions_dir)? {
+                let ws_entry = ws_entry?;
+                if !ws_entry.file_type()?.is_dir() {
+                    continue;
+                }
+                let candidate = ws_entry.path().join(format!("{id}.jsonl"));
+                if candidate.exists() {
+                    return Ok(candidate);
+                }
+            }
+        }
+        Err(SessionError::SessionNotFound(*id))
     }
 }
 

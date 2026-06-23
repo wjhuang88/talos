@@ -420,6 +420,28 @@ impl SessionIndex {
         &self.db_path
     }
 
+    pub fn list_all_session_ids(&self) -> Result<Vec<String>, IndexError> {
+        let mut stmt = self.conn.prepare("SELECT id FROM sessions")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut ids = Vec::new();
+        for row in rows {
+            ids.push(row?);
+        }
+        Ok(ids)
+    }
+
+    pub fn delete_session(&mut self, session_id: &str) -> Result<(), IndexError> {
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM messages_fts WHERE session_id = ?1", params![session_id])?;
+        tx.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])?;
+        tx.execute(
+            "DELETE FROM forks WHERE source_session_id = ?1 OR forked_session_id = ?1",
+            params![session_id],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Record a fork relationship in the index.
     ///
     /// Inserts a row into the `forks` table linking the source session to the
@@ -743,6 +765,38 @@ mod tests {
             info.is_none(),
             "Should return None for non-existent session"
         );
+    }
+
+    #[test]
+    fn test_list_all_session_ids() {
+        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let s1 = test_session(&manager);
+        let s2 = manager.create_session("test-project", "").unwrap();
+        let (mut index, _dir) = temp_index();
+        index.index_session(&s1).unwrap();
+        index.index_session(&s2).unwrap();
+
+        let mut ids = index.list_all_session_ids().unwrap();
+        ids.sort();
+        let mut expected = vec![s1.id.to_string(), s2.id.to_string()];
+        expected.sort();
+        assert_eq!(ids, expected);
+    }
+
+    #[test]
+    fn test_delete_session_removes_index_entries() {
+        let manager = SessionManager::with_dir(tempfile::tempdir().unwrap().path().to_path_buf());
+        let session = test_session(&manager);
+        let (mut index, _dir) = temp_index();
+        index.index_session(&session).unwrap();
+
+        index
+            .delete_session(&session.id.to_string())
+            .expect("delete should succeed");
+        let info = index.get_session_info(&session.id.to_string()).unwrap();
+        assert!(info.is_none(), "index entry should be removed");
+        let ids = index.list_all_session_ids().unwrap();
+        assert!(!ids.contains(&session.id.to_string()));
     }
 
     #[test]
