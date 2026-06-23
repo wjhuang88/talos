@@ -202,6 +202,11 @@ pub struct SessionDeleteRequest {
 /// A candidate session displayed in the interactive session picker.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionPickerItem {
+    /// Slash command the picker stands in for, e.g. `"/resume"` or `"/delete"`.
+    /// When the user accepts a row, the TUI submits `"{command} {ordinal}"`
+    /// back into the composer, letting the same picker UI serve any
+    /// session-list command.
+    pub command: String,
     /// 1-based ordinal for `/resume <N>` selection.
     pub ordinal: usize,
     /// Human-readable timestamp (e.g., "2026-06-22 19:20").

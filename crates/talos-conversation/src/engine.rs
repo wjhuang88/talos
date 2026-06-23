@@ -227,9 +227,9 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
         CommandDefinition {
             name: "/delete",
             aliases: &[],
-            usage: "/delete [number]",
-            description: "Delete a workspace session",
-            arg_hint: Some("[number]"),
+            usage: "/delete",
+            description: "Delete a workspace session via the picker",
+            arg_hint: None,
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
@@ -555,9 +555,11 @@ impl ConversationEngine {
                         source: MessageSource::System,
                         stream: Box::pin(stream::once(async move { text })),
                     }));
+                } else if arg.is_empty() {
+                    outputs.push(UiOutput::SessionDelete(SessionDeleteRequest { selection: None }));
                 } else {
                     outputs.push(UiOutput::SessionDelete(SessionDeleteRequest {
-                        selection: if arg.is_empty() { None } else { Some(arg.to_string()) },
+                        selection: Some(arg.to_string()),
                     }));
                 }
             }
