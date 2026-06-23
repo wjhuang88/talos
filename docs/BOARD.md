@@ -58,6 +58,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I042 I041 Hotfix — Persistence, /resume UX, Execute Semantics | Complete | [I042](iterations/I042-i041-hotfix-persistence-resume-ux.md) | P1-1 persistence continuity (watch channels); /resume ordinal selection; Execute first-token extraction; all tests pass |
 | I041 Interactive Session Lifecycle & Operation-Scoped Permissions | Complete | [I041](iterations/I041-interactive-session-lifecycle-permission-ux.md) | SESSION-001-B + SESSION-001-C + PERM-002 over 4 weeks (closed 4 weeks early); 8 atomic commits + 4 task checkpoints; T9 TUI smoke boundary documented; 700+ tests pass |
 | I040 Session Foundation & Tool Refinement | Complete | [I040](iterations/I040-session-foundation-tool-refinement.md) | SESSION-001-A SessionTransition + http_request content detection + save_url + fetch_url merge; TUI-006-A removed (superseded by I023); `cargo check/clippy/test --workspace` clean |
 | I039 Network Tools & TUI Polish | Complete | [I039 Network Tools & TUI Polish](iterations/I039-network-tools-tui-polish.md) | All 4 stories landed: http_request + web_search + status bar/exit redesign + bash streaming. 5-agent review passed. |

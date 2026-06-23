@@ -1,7 +1,8 @@
 # I042: I041 Hotfix — Persistence Continuity, /resume UX, Execute Semantics
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-06-22
+> Closed date: 2026-06-23
 > Planned objective: Fix architecture review findings from I041 and correct
 >   the /resume UX requirement. P1 persistence continuity (session switch
 >   must update bridge forwarder + user persister), /resume list selection,
