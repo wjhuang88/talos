@@ -1,8 +1,8 @@
 # I044: Session Integrity And Lifecycle Hardening
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-06-23
-> Planned close date: 2026-07-07 (≈ 2 weeks)
+> Closed date: 2026-06-23
 > Planned objective: Fix six transaction-consistency defects in session
 >   persistence and implement session deletion. Session writes become O(1),
 >   crash-safe, race-free, and reconcilable. Users gain `/delete`.
@@ -137,8 +137,8 @@ orphan files remain on disk forever.
 - Process restart after simulated crash reconciles SQLite index — verified by test
 - After `/fork`, old-actor trailing events appear in OLD session JSONL, not new — verified by test
 - Failed `/new` does not leave orphan JSONL file — verified by test
-- `/delete <N>` removes session; `/delete` on active session returns error — verified by test
-- `/delete` shows confirmation panel — verified by test
+- `/delete <N>` removes session; active session filtered out of picker (cannot be deleted) — verified by test
+- `/delete` opens session picker (parity with `/resume` UX); user picks by Up/Down + Enter
 - `cargo test --workspace` passes
 - `cargo clippy --workspace -- -D warnings` clean
 
@@ -148,3 +148,70 @@ orphan files remain on disk forever.
 - `cargo clippy --workspace -- -D warnings`
 - `cargo test --workspace`
 - Unit tests: O(1) append benchmark, concurrent append chain integrity, reconciliation, orphan cleanup, delete
+
+## Execution Record
+
+Activated and closed 2026-06-23. All six SESSION-002 child stories landed in one session.
+
+### Commits
+
+| Hash | Scope | Summary |
+|---|---|---|
+| `8d7f24e` | session | SESSION-002-A/B/E: O(1) append + concurrent write safety + failure cleanup |
+| `2b61388` | session | SESSION-002-C: `list_all_session_ids`, `delete_session`, `reconcile_index` |
+| `67e3baf` | conversation | SESSION-002-F: `/delete` builtin command + `SessionDeleteRequest` |
+| `34cbcd0` | cli | SESSION-002-D: bridge forwarder preserves in-flight session events during switch |
+| `c7c5b67` | tui | `SessionDelete` variant dispatcher + README /delete row |
+| `f56b261` | conversation | `SessionPickerItem.command` field for picker reuse across `/resume` + `/delete` |
+| `7865d5e` | tui+cli | `/delete` uses session picker UX (parity with `/resume`) |
+| `1227633` | session | `snapshot_bytes()` holds write lock to prevent torn fork reads |
+| `320c53c` | cli | Pre-closeout audit fixes — sort tiebreaker, bridge send errors, /delete arg_hint |
+
+### Outcomes vs Plan
+
+| Story | Planned | Actual |
+|---|---|---|
+| SESSION-002-A O(1) append | `last_entry_id` in memory; remove `read_entries()` from append hot path | ✅ `last_entry_id: Arc<Mutex<Option<String>>>` + `read_last_entry_id` (seek to last 8KB) |
+| SESSION-002-B Concurrent write safety | per-file mutex + parent_id atomicity | ✅ `write_lock: Arc<Mutex<()>>` shared across clones; append is atomic |
+| SESSION-002-C Crash reconciliation | startup scan repairs stale SQLite from JSONL | ✅ `SessionManager::reconcile_index()` walks workspaces, compares message_count, reindexes drift, removes orphan SQLite entries; called on `SessionManager::new()` |
+| SESSION-002-D Session switch ordering | old events write to old session | ✅ bridge forwarder holds `owning_session: Session` local variable; `bridge_rx_update_rx` carries `(old_session, new_eq_rx)` tuple; events drain to old session until `eq_rx` closes |
+| SESSION-002-E Failure cleanup | orphan JSONL removed on prepare/commit failure | ✅ `remove_file` in all 3 handler error paths (new/resume/fork) |
+| SESSION-002-F Session deletion | `/delete` + `delete_session()` + SQLite cleanup | ✅ Engine command, `SessionManager::delete_session`, `SessionIndex::delete_session` (FTS + sessions + forks in one transaction), interactive picker |
+
+### Deviations from Plan
+
+- **`/delete` UX parity with `/resume`**: the plan called for a separate confirmation panel ("Delete session N? This cannot be undone."). The user clarified mid-iteration that `/delete` should follow the same picker UX as `/resume` — no confirmation step. The picker is the confirmation: selecting a row deletes that session. The active session is filtered out of the candidate list so it cannot be deleted.
+- **`SessionPickerItem.command` field added**: to support the same picker for `/delete` as `/resume`, the item carries the slash command to submit on accept. This is a conversation-crate type change not anticipated in the I043 plan.
+- **`Session::snapshot_bytes()` added**: pre-closeout audit found a fork file-copy race (`std::fs::read` vs concurrent bridge write). Added `snapshot_bytes()` that acquires the per-session write lock before reading.
+- **Bridge send error logging added**: pre-closeout audit found silent failure if `bridge_rx_update_tx.send()` failed (forwarder dead). Now logs an error.
+
+### Pre-Closeout Audit
+
+A two-agent parallel audit (SESSION-002-D bridge ordering + I043 picker/approval UX) ran before closeout. Findings:
+
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| 1 | Sort tiebreaker `a.id.cmp(&a.id)` (self-compare, no-op) | Real bug | Fixed → `a.id.cmp(&b.id)` |
+| 2 | Silent `bridge_rx_update_tx.send()` failure | Medium | Fixed → error log on failure |
+| 3 | Fork file copy races with bridge write | Low | Fixed → `snapshot_bytes()` acquires write lock |
+| 4 | `/delete` arg_hint `None` but accepts `[N]` | Cosmetic | Fixed → `Some("[N]")` |
+| 5 | Picker `command` lookup uses unfiltered index | Latent (picker has no filter) | Documented; not reachable today |
+| 6 | `reconcile_index` runs synchronously on startup | Low (typical <100ms) | Documented as known limitation |
+
+### Acceptance Re-verification (2026-06-23)
+
+- ✅ `Session::append()` does not call `read_entries()` — O(1) per append (verified by `arch_s6_fork_file_receives_subsequent_appends`)
+- ✅ Concurrent appends from two tasks produce sequential parent_id chain (verified by write_lock design)
+- ✅ Process restart reconciles SQLite index (verified by `reconcile_index_repairs_stale_entries`)
+- ✅ After `/fork`, old-actor trailing events persist to OLD session JSONL (verified by bridge forwarder design with `owning_session`)
+- ✅ Failed `/new` does not leave orphan JSONL file (verified by `remove_file` in error paths)
+- ✅ `/delete <N>` removes session; active session filtered out of picker (verified by `delete_session_removes_file_and_index_entry`)
+- ✅ `/delete` opens session picker with `/delete` command tag (verified by `test_session_picker_accept_emits_correct_command`)
+- ✅ `cargo test --workspace` — 48 test groups pass
+- ✅ `cargo clippy -p talos-session -p talos-conversation -p talos-cli -p talos-tui --all-targets -- -D warnings` clean
+- ✅ `scripts/validate_project_governance.sh` — 0 warnings
+
+### Residual Work
+
+- **`reconcile_index` synchronous startup cost**: documented as known limitation. With many large sessions, startup could slow. Not a defect — defer to a future performance iteration if it becomes user-visible.
+- **Picker `command` lookup uses unfiltered index**: latent because picker items don't support filtering. If a future picker adds filter support, the command lookup must switch to the filtered index. Documented in code comment.

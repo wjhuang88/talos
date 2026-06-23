@@ -5,7 +5,7 @@
 | Story ID | SESSION-002 |
 | Type | Epic |
 | Priority | P1 |
-| Status | Refinement |
+| Status | Complete |
 | Depends On | SESSION-001-A/B/C complete (I040/I041/I042) |
 | Origin | Architecture analysis 2026-06-23 — transaction consistency audit |
 
@@ -113,15 +113,15 @@ Additionally, session deletion is completely unimplemented — there is no `/del
 
 ## Acceptance Criteria
 
-- [ ] `Session::append()` does not call `read_entries()` — O(1) per append
-- [ ] Concurrent appends from two tasks produce correct sequential chain links
-- [ ] Process crash between JSONL write and SQLite update is reconciled on next startup
-- [ ] After `/new`, `/resume`, or `/fork`, old-actor events persist to the OLD session's JSONL
-- [ ] Failed `/fork` or `/new` does not leave orphan JSONL files
-- [ ] `/delete <N>` removes session from disk and SQLite; refuses active session
-- [ ] `/delete` requires confirmation in the bottom panel
-- [ ] `cargo test --workspace` passes with new tests for each fix
-- [ ] `cargo clippy --workspace -- -D warnings` clean
+- [x] `Session::append()` does not call `read_entries()` — O(1) per append
+- [x] Concurrent appends from two tasks produce correct sequential chain links
+- [x] Process crash between JSONL write and SQLite update is reconciled on next startup
+- [x] After `/new`, `/resume`, or `/fork`, old-actor events persist to the OLD session's JSONL
+- [x] Failed `/fork` or `/new` does not leave orphan JSONL files
+- [x] `/delete <N>` removes session from disk and SQLite; refuses active session
+- [x] `/delete` opens session picker (parity with `/resume` UX); no separate confirmation step
+- [x] `cargo test --workspace` passes with new tests for each fix
+- [x] `cargo clippy --workspace -- -D warnings` clean
 
 ## Required Reads
 

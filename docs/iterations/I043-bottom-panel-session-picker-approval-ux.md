@@ -1,8 +1,8 @@
 # I043: Bottom Panel Generalization, Session Picker, Approval UX
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-06-23
-> Planned close date: 2026-07-05 (≈ 2 weeks)
+> Closed date: 2026-06-23
 > Planned objective: Generalize the TUI bottom panel from slash-command-only
 >   to a reusable overlay that hosts multiple picker types. Ship an interactive
 >   session picker for `/resume`. Resolve I042 technical debt (R1 interrupt_tx,
@@ -101,3 +101,51 @@ Week 2:
 - `cargo test --workspace`
 - Unit tests for `BottomPanelState` (slash command + session picker modes)
 - Unit tests for session picker rendering and navigation
+
+## Execution Record
+
+Activated and closed 2026-06-23. All selected stories landed in one session.
+
+### Commits
+
+| Hash | Scope | Summary |
+|---|---|---|
+| `362e869` | session | SESSION-002 epic + I044 iteration scaffold |
+| `8d7f24e` | session | O(1) append + concurrent write safety + failure cleanup (#I044 SESSION-002-A/B/E) |
+| `3c34f22` | tui | Slash menu stays open on Left/Right/Paste — only closes on select or Esc |
+| `0c091a7` | docs | mem0 V3 comparative analysis + design refinements for ADR-016 and MEM-001 |
+| `92be5e2` | tui | Implement session picker bottom panel (#I043) |
+| `40de299`, `dc83dae` | cli | /resume and /new via SessionTransition (carried from I040/I042) |
+
+### Outcomes vs Plan
+
+| Story | Planned | Actual |
+|---|---|---|
+| Bottom Panel Generalization | `BottomPanelState` with `PanelKind` enum | ✅ `PanelKind {SlashCommand, SessionPicker, Approval {tool_name, arguments}}` with shared placement/rows logic |
+| Session Picker | `/resume` (no arg) opens panel | ✅ `UiOutput::SessionPicker(Vec<SessionPickerItem>)` + `handle_session_resume` None branch |
+| R1: interrupt_tx continuity | follow session switches via watch | ✅ `run_conversation_loop` reads `sq_tx_watch_rx` |
+| R2: model_context_limit | from provider config | ✅ `config.context_limit()` with 128_000 fallback |
+| TUI-008: Approval Dialog UX | prominent overlay below input | ✅ `BottomPanelComponent::render_approval` reuses bottom panel infra; nested-approval output queueing with drain-break safety |
+| IME guard (added mid-iteration) | — | ✅ Enter on empty slash query is no-op (not "select first") |
+| Menu close contract (refined mid-iteration) | — | ✅ Closes only on select or Esc; Left/Right/Paste keep it open |
+
+### Deviations from Plan
+
+- **`SessionPickerItem` gained a `command: String` field** in I044 to support `/delete` parity with `/resume`. Originally `SessionPickerItem` was a resume-only type; the field generalizes the picker to carry the slash command that submitted it.
+- **TUI-008 spec said "Does NOT use the bottom panel state machine"** but the implementation reuses `BottomPanelState` for rendering consistency. The interaction model is still different (approval is modal with queueing; picker is navigable).
+
+### Acceptance Re-verification (2026-06-23)
+
+- ✅ `/resume` opens interactive bottom panel with workspace session list
+- ✅ Up/Down navigates, Enter resumes highlighted session, Esc closes
+- ✅ Bottom panel code shared between slash commands, session picker, and approval
+- ✅ Ctrl+C interrupts the current actor after session switch (R1)
+- ✅ `model_context_limit` reflects provider config (R2)
+- ✅ Approval renders in prominent bottom panel position
+- ✅ `cargo test --workspace` — 48 test groups pass
+- ✅ `cargo clippy -p talos-tui -p talos-cli -p talos-conversation -p talos-session --all-targets -- -D warnings` clean
+- ✅ `scripts/validate_project_governance.sh` — 0 warnings
+
+### Residual Work
+
+None. The approval-queueing drain-break behavior and IME guard are documented in code comments but no follow-up stories are needed.
