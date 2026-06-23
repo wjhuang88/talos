@@ -26,7 +26,7 @@ use talos_tools::{
     TreeTool, WriteTool,
 };
 use talos_tui::Tui;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
@@ -329,7 +329,21 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     });
 
-    // Session lifecycle handler: processes /new and /resume requests
+    // Shared state for persistence continuity across session switches.
+    // watch channels let the bridge forwarder and user persister read the
+    // CURRENTLY active session and sq_tx without owning a stale clone.
+    let (session_watch_tx, session_watch_rx) =
+        tokio::sync::watch::channel(session.clone());
+    let (sq_tx_watch_tx, sq_tx_watch_rx) =
+        tokio::sync::watch::channel(handle.sq_tx.clone());
+    // Dedicated channel for handing off the new eq_rx to the bridge forwarder
+    // after a session switch (eq_rx is a unique Receiver, cannot be in watch).
+    let (bridge_rx_update_tx, mut bridge_rx_update_rx) =
+        mpsc::unbounded_channel::<tokio::sync::mpsc::UnboundedReceiver<SessionEvent>>();
+
+    // Session lifecycle handler: processes /new, /resume, /fork requests.
+    // After commit, updates the shared watch channels and bridge_rx_update
+    // so persistence follows the new session.
     let (session_tx, mut session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
     let transition_for_handler = transition.clone();
     let ui_tx_for_handler = ui_output_tx.clone();
@@ -339,6 +353,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let workspace_root_for_handler = workspace_root.to_path_buf();
     let session_manager_for_handler = session_manager.clone();
     let mcp_config_for_handler = config.mcp.clone();
+    let session_watch_tx_for_handler = session_watch_tx.clone();
+    let sq_tx_watch_tx_for_handler = sq_tx_watch_tx.clone();
+    let bridge_rx_update_tx_for_handler = bridge_rx_update_tx.clone();
+    let session_watch_rx_for_handler = session_watch_rx.clone();
+    let model_context_limit = 128_000u32;
     tokio::spawn(async move {
         while let Some(req) = session_rx.recv().await {
             match req {
@@ -352,6 +371,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &workspace_root_for_handler,
                         &session_manager_for_handler,
                         &mcp_config_for_handler,
+                        &session_watch_tx_for_handler,
+                        &sq_tx_watch_tx_for_handler,
+                        &bridge_rx_update_tx_for_handler,
+                        model_context_limit,
                         cli.mock,
                     )
                     .await;
@@ -366,6 +389,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &workspace_root_for_handler,
                         &session_manager_for_handler,
                         &mcp_config_for_handler,
+                        &session_watch_tx_for_handler,
+                        &sq_tx_watch_tx_for_handler,
+                        &bridge_rx_update_tx_for_handler,
+                        model_context_limit,
                         req.session_id,
                         cli.mock,
                     )
@@ -381,6 +408,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &workspace_root_for_handler,
                         &session_manager_for_handler,
                         &mcp_config_for_handler,
+                        &session_watch_tx_for_handler,
+                        &sq_tx_watch_tx_for_handler,
+                        &bridge_rx_update_tx_for_handler,
+                        model_context_limit,
+                        &session_watch_rx_for_handler,
                         cli.mock,
                     )
                     .await;
@@ -390,63 +422,70 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     });
 
     let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
-    let session_for_persist = session.clone();
     let session_manager_for_persist = session_manager.clone();
+    let session_watch_rx_for_bridge = session_watch_rx.clone();
     let mut bridge_forwarder = handle.eq_rx;
     tokio::spawn(async move {
-        while let Some(session_event) = bridge_forwarder.recv().await {
-            match session_event {
-                SessionEvent::AgentEvent(ref agent_event) => {
-                    let _ = session_for_persist.append_event(agent_event);
-                    let _ = bridge_tx.send(agent_event.clone());
-                }
-                SessionEvent::TurnCompleted {
-                    status: talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages },
-                    ..
-                } => {
-                    for msg in &new_messages {
-                        if matches!(msg, talos_core::message::Message::User { .. }) {
-                            continue;
+        loop {
+            while let Some(session_event) = bridge_forwarder.recv().await {
+                let session = session_watch_rx_for_bridge.borrow().clone();
+                match session_event {
+                    SessionEvent::AgentEvent(ref agent_event) => {
+                        let _ = session.append_event(agent_event);
+                        let _ = bridge_tx.send(agent_event.clone());
+                    }
+                    SessionEvent::TurnCompleted {
+                        status: talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages },
+                        ..
+                    } => {
+                        for msg in &new_messages {
+                            if matches!(msg, Message::User { .. }) {
+                                continue;
+                            }
+                            if let Err(e) = session.append(msg) {
+                                eprintln!("Warning: failed to persist message: {e}");
+                            }
                         }
-                        if let Err(e) = session_for_persist.append(msg) {
-                            eprintln!("Warning: failed to persist message: {e}");
+                        if let Err(e) = session_manager_for_persist.update_index(&session) {
+                            eprintln!("Warning: failed to update session index: {e}");
                         }
                     }
-                    if let Err(e) = session_manager_for_persist.update_index(&session_for_persist) {
-                        eprintln!("Warning: failed to update session index: {e}");
+                    SessionEvent::TurnCompleted {
+                        status: talos_core::session::TurnCompletionStatus::Error { message },
+                        ..
+                    } => {
+                        let _ = bridge_tx.send(AgentEvent::Error { message });
                     }
+                    SessionEvent::Error { message } => {
+                        let _ = bridge_tx.send(AgentEvent::Error { message });
+                    }
+                    _ => {}
                 }
-                SessionEvent::TurnCompleted {
-                    status: talos_core::session::TurnCompletionStatus::Error { message },
-                    ..
-                } => {
-                    let _ = bridge_tx.send(AgentEvent::Error { message });
-                }
-                SessionEvent::Error { message } => {
-                    let _ = bridge_tx.send(AgentEvent::Error { message });
-                }
-                _ => {}
+            }
+            // Old actor's event stream exhausted — wait for new eq_rx
+            match bridge_rx_update_rx.recv().await {
+                Some(new_rx) => bridge_forwarder = new_rx,
+                None => break,
             }
         }
     });
 
-    let session_for_user_persist = session.clone();
     let session_manager_for_user_persist = session_manager.clone();
     let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
-    let sq_tx_inner = handle.sq_tx.clone();
+    let session_watch_rx_for_user = session_watch_rx.clone();
+    let sq_tx_watch_rx_for_user = sq_tx_watch_rx.clone();
     tokio::spawn(async move {
         while let Some(msg) = user_msg_rx.recv().await {
-            let user_msg = talos_core::message::Message::User {
-                content: msg.clone(),
-            };
-            if let Err(e) = session_for_user_persist.append(&user_msg) {
+            let user_msg = Message::User { content: msg.clone() };
+            let session = session_watch_rx_for_user.borrow().clone();
+            if let Err(e) = session.append(&user_msg) {
                 eprintln!("Warning: failed to persist user message: {e}");
             }
-            if let Err(e) = session_manager_for_user_persist.update_index(&session_for_user_persist)
-            {
+            if let Err(e) = session_manager_for_user_persist.update_index(&session) {
                 eprintln!("Warning: failed to update session index: {e}");
             }
-            let _ = sq_tx_inner.send(SessionOp::Submit { message: msg }).await;
+            let sq_tx = sq_tx_watch_rx_for_user.borrow().clone();
+            let _ = sq_tx.send(SessionOp::Submit { message: msg }).await;
         }
     });
 
@@ -905,6 +944,10 @@ async fn handle_session_new(
     workspace_root: &std::path::Path,
     session_manager: &talos_session::SessionManager,
     mcp_config: &talos_config::McpConfig,
+    session_watch_tx: &watch::Sender<talos_session::Session>,
+    sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<mpsc::UnboundedReceiver<SessionEvent>>,
+    model_context_limit: u32,
     mock: bool,
 ) {
     let mut transition = transition.lock().await;
@@ -928,7 +971,7 @@ async fn handle_session_new(
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
         initial_history: new_history,
-        model_context_limit: 128_000,
+        model_context_limit,
     };
 
     let provider = build_provider(config, api_key, mock);
@@ -966,6 +1009,8 @@ async fn handle_session_new(
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
+    // Clone for watch channel update after commit (new_session is moved into prepare).
+    let new_session_for_watch = new_session.clone();
     if let Err(e) = transition.prepare(handle, new_session) {
         let text = format!("[Error] Failed to prepare new session: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
@@ -976,7 +1021,10 @@ async fn handle_session_new(
     }
 
     match transition.commit(actor) {
-        Ok(_old_session) => {
+        Ok(result) => {
+            let _ = session_watch_tx.send(new_session_for_watch);
+            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
+            let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
             let text = "[System] New session started. Previous session preserved.\n".to_string();
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
@@ -1005,6 +1053,10 @@ async fn handle_session_resume(
     workspace_root: &std::path::Path,
     session_manager: &talos_session::SessionManager,
     mcp_config: &talos_config::McpConfig,
+    session_watch_tx: &watch::Sender<talos_session::Session>,
+    sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<mpsc::UnboundedReceiver<SessionEvent>>,
+    model_context_limit: u32,
     session_id: Option<String>,
     mock: bool,
 ) {
@@ -1014,15 +1066,64 @@ async fn handle_session_resume(
 
     let target_session = match &session_id {
         Some(id) => {
-            match session_manager.resume_session(id) {
-                Ok(s) => s,
-                Err(e) => {
-                    let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
+            // Try parsing as ordinal (1-based) first, then fall back to UUID.
+            if let Ok(n) = id.parse::<usize>() {
+                let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let text = format!("[Error] Failed to list sessions: {e}\n");
+                        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                            source: MessageSource::Error,
+                            stream: Box::pin(futures::stream::once(async move { text })),
+                        }));
+                        return;
+                    }
+                };
+                if sessions.is_empty() {
+                    let text = "[System] No sessions found for this workspace.\n".to_string();
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                    return;
+                }
+                let mut sessions = sessions;
+                sessions.sort_by(|a, b| {
+                    b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id))
+                });
+                if n == 0 || n > sessions.len() {
+                    let text = format!("[Error] Invalid session number {n}. Valid range: 1-{}.\n", sessions.len());
                     let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                         source: MessageSource::Error,
                         stream: Box::pin(futures::stream::once(async move { text })),
                     }));
                     return;
+                }
+                let selected = &sessions[n - 1];
+                let selected_id = selected.id.to_string();
+                match session_manager.resume_session(&selected_id) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
+                        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                            source: MessageSource::Error,
+                            stream: Box::pin(futures::stream::once(async move { text })),
+                        }));
+                        return;
+                    }
+                }
+            } else {
+                // Fall back to treating it as a UUID (backward compat).
+                match session_manager.resume_session(id) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
+                        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                            source: MessageSource::Error,
+                            stream: Box::pin(futures::stream::once(async move { text })),
+                        }));
+                        return;
+                    }
                 }
             }
         }
@@ -1053,16 +1154,17 @@ async fn handle_session_resume(
                 b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id))
             });
 
-            let mut text = String::from("[System] Available sessions (most recent first):\n");
-            for s in &sessions {
+            let mut text = String::from("[System] Resumable sessions for this workspace:\n");
+            for (i, s) in sessions.iter().enumerate() {
                 text.push_str(&format!(
-                    "[System]   {} — {} messages, last: {}\n",
-                    s.id,
+                    "[System]   {}. {} — {} messages — \"{}\"\n",
+                    i + 1,
+                    s.timestamp,
                     s.message_count,
                     if s.last_message_preview.is_empty() { "(empty)" } else { &s.last_message_preview },
                 ));
             }
-            text.push_str("[System] Use /resume <session-id> to select one.\n");
+            text.push_str("[System] Type /resume <number> to select.\n");
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
                 stream: Box::pin(futures::stream::once(async move { text })),
@@ -1087,7 +1189,7 @@ async fn handle_session_resume(
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
         initial_history: resume_history,
-        model_context_limit: 128_000,
+        model_context_limit,
     };
 
     let provider = build_provider(config, api_key, mock);
@@ -1125,6 +1227,8 @@ async fn handle_session_resume(
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
+    // Clone for watch channel update after commit (target_session is moved into prepare).
+    let target_session_for_watch = target_session.clone();
     if let Err(e) = transition.prepare(handle, target_session) {
         let text = format!("[Error] Failed to prepare resume: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
@@ -1135,7 +1239,10 @@ async fn handle_session_resume(
     }
 
     match transition.commit(actor) {
-        Ok(_old_session) => {
+        Ok(result) => {
+            let _ = session_watch_tx.send(target_session_for_watch);
+            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
+            let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
             let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
@@ -1168,11 +1275,16 @@ async fn handle_session_fork(
     workspace_root: &std::path::Path,
     session_manager: &talos_session::SessionManager,
     mcp_config: &talos_config::McpConfig,
+    session_watch_tx: &watch::Sender<talos_session::Session>,
+    sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<mpsc::UnboundedReceiver<SessionEvent>>,
+    model_context_limit: u32,
+    session_watch_rx: &watch::Receiver<talos_session::Session>,
     mock: bool,
 ) {
     let mut transition = transition.lock().await;
 
-    let source_session = transition.active_session();
+    let source_session = session_watch_rx.borrow().clone();
     let source_path = source_session.file_path.clone();
 
     let source_bytes = match std::fs::read(&source_path) {
@@ -1237,7 +1349,7 @@ async fn handle_session_fork(
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
         initial_history: fork_history,
-        model_context_limit: 128_000,
+        model_context_limit,
     };
 
     let provider = build_provider(config, api_key, mock);
@@ -1275,6 +1387,8 @@ async fn handle_session_fork(
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
+    // Clone for watch channel update after commit (child_session is moved into prepare).
+    let child_session_for_watch = child_session.clone();
     if let Err(e) = transition.prepare(handle, child_session) {
         let text = format!("[Error] Failed to prepare fork: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
@@ -1285,8 +1399,11 @@ async fn handle_session_fork(
     }
 
     match transition.commit(actor) {
-        Ok(_old_session) => {
-            let text = format!("[System] Forked session to {child_id}.\n");
+        Ok(result) => {
+            let _ = session_watch_tx.send(child_session_for_watch);
+            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
+            let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
+            let text = format!("[System] Forked session {child_id} (source: {}).\n", result.old_session.id);
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
                 stream: Box::pin(futures::stream::once(async move { text })),
