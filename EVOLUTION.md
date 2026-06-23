@@ -432,3 +432,21 @@ repeating known mistakes.
   4. **本条 lesson index 引用 #22**。未来任何 agent commit 自检脚本都应包含 model tag 检查。
 
 ---
+
+### 28. 2026-06-23 - 并行审计是 closeout 前的必要闸门；`a.id.cmp(&a.id)` 类自我比较 bug 能穿透单元测试
+
+- **Trigger**: I043/I044 关闭前启动了两个并行 explore agent 做最终逻辑审计。审计发现 4 个真实问题 + 2 个 cosmetic gap,其中 1 个是 sort tiebreaker `a.id.cmp(&a.id)` (与自身比较,永远是 Equal,no-op)。
+- **Symptom**: `/delete` picker 列表对相同 timestamp 的 session 排序不确定,会随 HashMap 迭代顺序变化。单元测试因为只有 1-2 个 session 没触发。
+- **Root cause**:
+  1. 写 sort tiebreaker 时手误,把 `b` 写成了 `a`。Rust 编译器不会报错 (`a.id` 在闭包里可见),clippy 也没抓到。
+  2. 单元测试用的数据集太小 (1-2 个 session),即使 tiebreaker 是 no-op,排序结果仍然"看起来正确"。
+- **Fix**:
+  1. `a.id.cmp(&a.id)` → `a.id.cmp(&b.id)`。
+  2. 同时审计发现的其他 3 个问题 (silent bridge send failure, fork file copy race, /delete arg_hint) 也一并修复。
+- **Prevention**:
+  1. **关闭任何迭代前,启动至少 2 个并行 explore/oracle agent 做最终逻辑审计**。审计 prompt 必须明确列出 acceptance criteria 让 agent 逐条核对。
+  2. **Sort tiebreaker 写完后,自检两个比较变量是否不同**。`a.id.cmp(&a.id)` 是典型的复制粘贴或手误 bug,编译器和 clippy 都不会抓。
+  3. **单元测试的排序测试至少覆盖 3+ 个元素 + 制造 tie 场景**。1-2 个元素的排序测试无法发现 tiebreaker bug。
+  4. **并行审计发现的每个 issue 都要 trace 回 acceptance criteria**:这个 bug 是否影响 acceptance?如果影响,必须在 closeout 前修;如果不影响,记录为 residual。
+
+---
