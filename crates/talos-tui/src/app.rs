@@ -1337,16 +1337,10 @@ impl Tui {
                     }
                     KeyCode::Left => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        if self.state.slash_menu.is_open {
-                            self.state.slash_menu.close();
-                        }
                         self.state.input_cursor_left();
                     }
                     KeyCode::Right => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        if self.state.slash_menu.is_open {
-                            self.state.slash_menu.close();
-                        }
                         self.state.input_cursor_right();
                     }
                     KeyCode::Enter => {
@@ -1366,8 +1360,12 @@ impl Tui {
             }
             Event::Paste(text) => {
                 self.state.ctrl_c_state = CtrlCState::Idle;
-                self.state.slash_menu.close();
-                self.state.input_append_str(text);
+                if self.state.slash_menu.is_open {
+                    self.state.input_append_str(text);
+                    self.state.slash_menu.selected_index = 0;
+                } else {
+                    self.state.input_append_str(text);
+                }
             }
             Event::Resize(_, _) => {}
             _ => {}
