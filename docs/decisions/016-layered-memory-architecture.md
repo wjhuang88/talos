@@ -63,9 +63,14 @@ Core design rules:
 - Every semantic/procedural memory item must link back to evidence.
 - Consolidation is an explicit background or end-of-session step, not an accidental side effect of
   retrieval.
-- Retrieval must rank by relevance, recency/freshness, confidence, provenance quality, and task
-  fit.
+- **ADD-only consolidation**: new semantic/procedural memories are always appended. When the same
+  `key` has conflicting entries, retrieval ranks by recency + confidence + evidence_count and
+  returns the best match. Old entries are preserved as fallback, not overwritten. (Refined
+  2026-06-23 based on mem0 V3 comparative analysis.)
+- Retrieval uses multi-signal fusion: FTS5 relevance + recency decay + evidence strength + entity
+  overlap (when available). Single-signal ranking is insufficient.
 - Contradictions must be first-class records, not overwritten facts.
+- Memory decay is a search-time ranking signal (`last_accessed` boost), never data deletion.
 - The first implementation uses existing SQLite/FTS5. Vector and graph indexes are optional
   accelerators behind interfaces and require separate Spike/ADR before dependency adoption.
 
@@ -77,6 +82,72 @@ Core design rules:
   episodic memory associated with context/time and semantic memory with generalized knowledge.
 - Soar is a practical precedent for separating working, semantic, episodic, and procedural memory
   in an agent architecture.
+
+## Comparative Analysis: mem0 (2026-06-23)
+
+A comparative study of [mem0ai/mem0](https://github.com/mem0ai/mem0) V3 architecture identified
+four design refinements for Talos. The analysis confirms ADR-016's four-layer direction while
+suggesting concrete changes to ingestion, retrieval, and lifecycle policies.
+
+### mem0 V3 Key Design Points
+
+| Dimension | mem0 V3 | Talos (current) |
+|---|---|---|
+| Ingestion | ADD-only: single LLM extraction pass, no UPDATE/DELETE | Consolidation with content_hash dedup + contradicting_count |
+| Conflict resolution | Deferred to retrieval time | During consolidation (Pattern contradicting_count) |
+| Retrieval | Three-signal fusion: vector + BM25 + entity boost | FTS5 + confidence |
+| Entity linking | spaCy NER → entity store → retrieval boost | None |
+| Decay | Search-time recency re-ranking (recent × 1.5, stale dampened) | None |
+| Audit trail | SQLite event log (ADD/UPDATE/DELETE with old/new text) | observations + patterns tables (no event log) |
+
+### Design Refinements Adopted
+
+1. **ADD-only ingestion**: Do not UPDATE or DELETE semantic/procedural memories during
+   consolidation. New patterns are always ADDed. When the same `key` has multiple entries,
+   retrieval ranks by `confidence × recency × evidence_count` and returns the best match. Old
+   entries remain as fallback. Rationale: mem0 V3 demonstrated +42% temporal reasoning gain by
+   preserving time-ordered facts instead of overwriting. Talos's `content_hash` dedup remains
+   for exact-duplicate prevention, but semantic duplicates with different evidence are preserved.
+
+2. **Multi-signal retrieval**: Even without vector search, retrieval should fuse multiple signals:
+   - FTS5 relevance score (existing)
+   - Recency: `exp(-days_since_last_reinforced / 30)`
+   - Evidence strength: `confidence × log(1 + evidence_count)`
+   - Entity overlap (if entity linking is implemented): `linked_entities ∩ query_entities`
+   
+   `final_score = fts × w1 + recency × w2 + evidence × w3 + entity × w4`
+
+3. **Memory decay**: Add `last_accessed` timestamp to Pattern. Search-time multiplier:
+   `decay = 1.0 + 0.5 × exp(-days_since_last_access / 7)`. Memories accessed within 7 days get
+   up to 1.5× boost. No data deletion — only ranking adjustment.
+
+4. **Entity linking without external NLP**: spaCy is Python-only and too heavy for Talos. Entity
+   extraction uses existing infrastructure:
+   - **Code entities**: tree-sitter (arborium) extracts function/type/file names from tool call
+     arguments
+   - **Concept entities**: the existing LLM extraction prompt (already called for fact extraction)
+     extracts proper nouns, library names, and API names in the same pass — zero additional cost
+   - **Pattern entities**: simple regex for file paths (`[\w/]+\.\w+`), URLs, and capitalized terms
+   - Entity store: `entities(id, name, kind)` + `memory_entities(memory_id, entity_id)` in SQLite
+   - Retrieval boost: `score += entity_overlap × 0.5`
+
+### Where Talos is Already Stronger Than mem0
+
+- **Contradiction handling**: Talos has first-class `Conflict` records. mem0 V3 has none (ADD-only
+  means contradictions accumulate unmanaged).
+- **Layer separation**: Working / Episodic / Semantic / Procedural vs mem0's flat model.
+- **Self-contained**: Pure Rust + SQLite/FTS5, no external services. mem0 requires vector DB +
+  LLM API for every operation.
+- **Provenance**: Every semantic/procedural item links to evidence. mem0 has weaker provenance.
+
+### What Talos Explicitly Rejects from mem0
+
+- **Graph memory**: mem0 V2 had graph memory; V3 replaced it with entity linking. Talos also
+  rejects graph DB (ADR-016 constraint). Entity linking in SQLite is the right level.
+- **External vector store as hard dependency**: mem0 requires a vector DB. Talos keeps vector
+  search optional behind an interface, gated by separate ADR.
+- **LLM call for every add()**: mem0 calls the LLM on every `add()`. Talos's consolidation is
+  batch (end-of-turn or end-of-session), not per-message, to control cost and latency.
 
 ## Reversal Trigger
 
@@ -91,4 +162,6 @@ less risk than maintaining our own hybrid schema.
   <https://arxiv.org/abs/2602.07261>
 - Soar semantic memory manual: <https://soar.eecs.umich.edu/soar_manual/06_SemanticMemory/>
 - Soar episodic memory manual: <https://soar.eecs.umich.edu/soar_manual/07_EpisodicMemory/>
+- mem0 V3 architecture (comparative analysis, 2026-06-23):
+  <https://github.com/mem0ai/mem0> — ADD-only ingestion, three-signal retrieval, entity linking
 
