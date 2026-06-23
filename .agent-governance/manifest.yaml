@@ -3,13 +3,13 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-22"
-status_note: "Governance refresh (2026-06-22): I040 Complete, I041 Complete (SESSION-001-B + SESSION-001-C + PERM-002). Workspace clean; 0 validator warnings. Long-running task (T1-T10) closed 4 weeks early. TUI smoke boundary documented as I041 residual."
+last_audited_at: "2026-06-23"
+status_note: "Governance refresh (2026-06-23): I042 Complete (persistence fix + /resume UX + Execute semantics). I043 Active (bottom panel generalization + session picker + R1/R2 + TUI-008). Workspace clean; 0 validator warnings."
 
 governance:
   skill_name: "agent-project-governance"
   skill_version: "2.0.0"
-  last_refresh: "2026-06-22"
+  last_refresh: "2026-06-23"
 
 entrypoints:
   agent_guide: "AGENTS.md"

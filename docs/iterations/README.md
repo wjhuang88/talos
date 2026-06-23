@@ -77,6 +77,7 @@ docs/iterations/
 | I040 | Session Foundation & Tool Refinement | **Complete** (2026-06-22) | SESSION-001-A + http_request content detection + save_url + fetch_url merge. See `I040-session-foundation-tool-refinement.md`. |
 | I041 | Interactive Session Lifecycle & Operation-Scoped Permissions | **Complete** (2026-06-22) | SESSION-001-B + SESSION-001-C + PERM-002. Closed 4 weeks early. See `I041-interactive-session-lifecycle-permission-ux.md`. |
 | I042 | I041 Hotfix — Persistence Continuity, /resume UX, Execute Semantics | **Complete** (2026-06-23) | P1 persistence fix (watch channels), /resume ordinal selection, Execute first-token extraction. See `I042-i041-hotfix-persistence-resume-ux.md`. |
+| I043 | Bottom Panel Generalization, Session Picker, Approval UX | **Active** (2026-06-23; target close 2026-07-05) | Bottom panel generalization + session picker for /resume + R1/R2 tech debt + TUI-008 approval UX. See `I043-bottom-panel-session-picker-approval-ux.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -97,6 +98,7 @@ rewrite published iteration baselines.
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
 | I041 | Active → Complete (2026-06-22) | Activated 2026-06-22; SESSION-001-B + SESSION-001-C + PERM-002 all landed; closed 4 weeks early; T9 TUI smoke boundary documented as residual. |
+| I043 | Active (2026-06-23) | Activated 2026-06-23; bottom panel generalization + session picker + R1/R2 + TUI-008; target close 2026-07-05. |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.
