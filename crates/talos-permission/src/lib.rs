@@ -1,16 +1,17 @@
 //! Permission rules engine for gating tool execution.
 //!
-//! This crate provides a [`PermissionEngine`] that evaluates tool calls against
-//! a set of configurable rules. Rules can be loaded from configuration or added
-//! programmatically. Each rule specifies a tool name, an optional path pattern,
-//! and a decision (allow, deny, or ask).
+//! Rules match on [`talos_core::tool::ToolNature`] (Read/Write/Execute/Network)
+//! plus an optional resource pattern (glob path or domain). Legacy rules that
+//! only specify `tool_name` are supported for backward compatibility — their
+//! nature is inferred from the tool name at config load time.
 //!
 //! # Default Behavior
 //!
-//! The engine ships with a default ruleset:
-//! - Read tools (name contains "read" or "list") → [`PermissionDecision::Allow`]
-//! - Write tools (name contains "write" or "edit") → [`PermissionDecision::Ask`]
-//! - Bash tool → [`PermissionDecision::Ask`]
+//! The engine ships with nature-based defaults:
+//! - Read → [`PermissionDecision::Allow`]
+//! - Write → [`PermissionDecision::Ask`]
+//! - Execute → [`PermissionDecision::Ask`]
+//! - Network → [`PermissionDecision::Ask`]
 //!
 //! # Rule Precedence
 //!
@@ -133,7 +134,8 @@ pub enum ResourceKind {
 ///
 /// Each nature maps to specific input fields:
 /// - Read/Write → `input["path"]` or `input["file"]`
-/// - Execute → `input["command"]`
+/// - Execute → first whitespace-delimited token of `input["command"]`
+///   (e.g., `scripts/deploy.sh --arg` → `scripts/deploy.sh`)
 /// - Network → host from `input["url"]` (lowercase, no port)
 pub struct ResourceExtractor;
 
@@ -149,9 +151,9 @@ impl ResourceExtractor {
                 .or_else(|| input.get("file"))
                 .and_then(Value::as_str)
                 .map(String::from),
-            ToolNature::Execute => {
-                input.get("command").and_then(Value::as_str).map(String::from)
-            }
+            ToolNature::Execute => input.get("command").and_then(Value::as_str).and_then(|cmd| {
+                cmd.split_whitespace().next().map(String::from)
+            }),
             ToolNature::Network => input.get("url").and_then(Value::as_str).and_then(|url_str| {
                 Url::parse(url_str)
                     .ok()
@@ -1046,10 +1048,17 @@ mod tests {
     }
 
     #[test]
-    fn test_extractor_execute_from_command() {
-        let input = serde_json::json!({"command": "cargo build"});
+    fn test_extractor_execute_first_token() {
+        let input = serde_json::json!({"command": "scripts/deploy.sh --arg1 --arg2"});
         let result = ResourceExtractor::extract(ToolNature::Execute, &input);
-        assert_eq!(result, Some("cargo build".to_owned()));
+        assert_eq!(result, Some("scripts/deploy.sh".to_owned()));
+    }
+
+    #[test]
+    fn test_extractor_execute_single_word() {
+        let input = serde_json::json!({"command": "cargo"});
+        let result = ResourceExtractor::extract(ToolNature::Execute, &input);
+        assert_eq!(result, Some("cargo".to_owned()));
     }
 
     #[test]

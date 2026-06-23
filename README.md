@@ -152,7 +152,7 @@ Type `/` in the TUI to access these commands:
 | `/copy all` | Copy the full transcript to clipboard |
 | `/export <path>` | Export transcript to a file (permission-gated) |
 | `/new` | Start a fresh session (preserves old session) |
-| `/resume [session-id]` | Resume a workspace session (lists candidates if no ID given) |
+| `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
 
 ## Skills
