@@ -28,6 +28,7 @@ pub(crate) struct PanelItem {
 pub(crate) enum PanelKind {
     SlashCommand,
     SessionPicker,
+    Approval { tool_name: String, arguments: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -84,6 +85,43 @@ impl BottomPanelState {
 
     pub(crate) fn is_picker(&self) -> bool {
         self.kind == Some(PanelKind::SessionPicker)
+    }
+
+    pub(crate) fn is_approval(&self) -> bool {
+        matches!(self.kind, Some(PanelKind::Approval { .. }))
+    }
+
+    pub(crate) fn open_approval(tool_name: &str, arguments: &str) -> Self {
+        let args_short = if arguments.len() > 72 {
+            format!("{}...", &arguments[..72])
+        } else {
+            arguments.to_string()
+        };
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::Approval {
+                tool_name: tool_name.to_string(),
+                arguments: args_short,
+            }),
+            items: vec![
+                PanelItem {
+                    label: "[y] approve".to_string(),
+                    description: String::new(),
+                    value: "approve".to_string(),
+                },
+                PanelItem {
+                    label: "[a] always approve".to_string(),
+                    description: String::new(),
+                    value: "always".to_string(),
+                },
+                PanelItem {
+                    label: "[n] deny".to_string(),
+                    description: String::new(),
+                    value: "deny".to_string(),
+                },
+            ],
+            selected_index: 0,
+        }
     }
 
     pub(crate) fn filtered_items(&self, query: &str) -> Vec<&PanelItem> {

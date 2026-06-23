@@ -416,6 +416,7 @@ pub struct Tui {
     ui_output_rx: Option<mpsc::UnboundedReceiver<UiOutput>>,
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
     pending_scrollback: Vec<ScrollbackLine>,
+    queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     stream_render: StreamRenderState,
     stream_opening_pending: bool,
@@ -453,6 +454,7 @@ impl Tui {
             ui_output_rx: None,
             user_input_tx: None,
             pending_scrollback: Vec::new(),
+            queued_outputs: Vec::new(),
             active_stream: None,
             stream_render: StreamRenderState::default(),
             stream_opening_pending: false,
@@ -622,28 +624,7 @@ impl Tui {
 
     pub fn show_approval(&mut self, tool_name: &str, arguments: &str) {
         self.state.activate_approval(tool_name, arguments);
-        let warn = to_crossterm_color(semantic::TEXT_WARNING);
-        let accent = to_crossterm_color(semantic::TEXT_ACCENT);
-        let args_short = crate::tool_display::truncate_single_line(arguments, 80);
-        self.pending_scrollback.push(ScrollbackLine::styled(
-            vec![HistorySegment::styled(
-                format!("   ⚠ {tool_name}: {args_short}"),
-                warn,
-                HistoryAttrs {
-                    bold: true,
-                    ..HistoryAttrs::default()
-                },
-            )],
-            None,
-        ));
-        self.pending_scrollback.push(ScrollbackLine::styled(
-            vec![HistorySegment::styled(
-                "   [y] approve  [a] always  [n] deny",
-                accent,
-                HistoryAttrs::default(),
-            )],
-            None,
-        ));
+        self.state.slash_menu = crate::state::BottomPanelState::open_approval(tool_name, arguments);
     }
 
     pub fn hide_approval(&mut self) {
@@ -651,22 +632,42 @@ impl Tui {
     }
 
     fn handle_pending_approval_input(&mut self, key: KeyCode) {
-        let KeyCode::Char(c) = key else {
-            return;
-        };
-        let Some(choice) = self.handle_approval_key(c) else {
-            return;
-        };
+        match key {
+            KeyCode::Up => {
+                self.state.slash_menu.select_prev("");
+            }
+            KeyCode::Down => {
+                self.state.slash_menu.select_next("");
+            }
+            KeyCode::Enter => {
+                let idx = self.state.slash_menu.selected_index;
+                let choice = match idx {
+                    0 => ApprovalChoice::ApproveOnce,
+                    1 => ApprovalChoice::AlwaysApprove,
+                    _ => ApprovalChoice::Deny,
+                };
+                self.resolve_approval(choice);
+            }
+            KeyCode::Char(c) => {
+                if let Some(choice) = self.handle_approval_key(c) {
+                    self.resolve_approval(choice);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn resolve_approval(&mut self, choice: ApprovalChoice) {
         let (icon, color, msg) = match &choice {
             ApprovalChoice::ApproveOnce => {
-                ("✓", to_crossterm_color(semantic::TEXT_SUCCESS), "approved")
+                ("\u{2713}", to_crossterm_color(semantic::TEXT_SUCCESS), "approved")
             }
             ApprovalChoice::AlwaysApprove => (
-                "✓",
+                "\u{2713}",
                 to_crossterm_color(semantic::TEXT_SUCCESS),
                 "always approved",
             ),
-            ApprovalChoice::Deny => ("✗", to_crossterm_color(semantic::TEXT_ERROR), "denied"),
+            ApprovalChoice::Deny => ("\u{2717}", to_crossterm_color(semantic::TEXT_ERROR), "denied"),
         };
         self.pending_scrollback.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
@@ -682,6 +683,7 @@ impl Tui {
             let _ = response_tx.send(choice);
         }
         self.hide_approval();
+        self.state.slash_menu.close();
         self.state.tip = Some(Tip {
             kind: TipKind::ApprovalResult,
             text: format!("Tool call {msg}"),
@@ -709,15 +711,35 @@ impl Tui {
                     if self.handle_input_event(&event) {
                         break;
                     }
+                    if matches!(self.state.approval_state, ApprovalState::Hidden) && !self.queued_outputs.is_empty() {
+                        while !self.queued_outputs.is_empty()
+                            && matches!(self.state.approval_state, ApprovalState::Hidden)
+                        {
+                            let output = self.queued_outputs.remove(0);
+                            let is_tool = matches!(&output, UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. });
+                            if self.handle_ui_output(output) {
+                                self.state.should_exit = true;
+                                break;
+                            }
+                            if is_tool {
+                                self.flush_pending_scrollback()?;
+                                self.draw_frame()?;
+                            }
+                        }
+                    }
                 }
                 Some(output) = ui_output_rx.recv() => {
-                    let is_tool = matches!(&output, UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. });
-                    if self.handle_ui_output(output) {
-                        break;
-                    }
-                    if is_tool {
-                        self.flush_pending_scrollback()?;
-                        self.draw_frame()?;
+                    if !matches!(self.state.approval_state, ApprovalState::Hidden) {
+                        self.queued_outputs.push(output);
+                    } else {
+                        let is_tool = matches!(&output, UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. });
+                        if self.handle_ui_output(output) {
+                            break;
+                        }
+                        if is_tool {
+                            self.flush_pending_scrollback()?;
+                            self.draw_frame()?;
+                        }
                     }
                 }
                 Some(chunk) = self.next_stream_chunk() => {

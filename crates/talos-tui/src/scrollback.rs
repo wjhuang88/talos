@@ -277,6 +277,9 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         if !self.menu.is_open {
             return 0;
         }
+        if self.menu.is_approval() {
+            return 5u16.min(self.max_height);
+        }
         let filtered = self.menu.filtered_items(self.query).len();
         let natural_height = if filtered == 0 {
             1
@@ -289,11 +292,12 @@ impl ViewportComponent for BottomPanelComponent<'_> {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        if !self.menu.is_open {
+        if !self.menu.is_open || area.height == 0 {
             return;
         }
 
-        if area.height == 0 {
+        if self.menu.is_approval() {
+            self.render_approval(frame, area);
             return;
         }
 
@@ -353,7 +357,6 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 let desc = format!("  —  {}", item.description);
                 (name, desc)
             } else {
-                // SessionPicker mode
                 let name = format!("  {}", item.label);
                 let desc = format!("  —  {}", item.description);
                 (name, desc)
@@ -378,6 +381,49 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         let text = Text::from(lines);
         frame.render_widget(
             Paragraph::new(text).style(Style::default().bg(semantic::INPUT_BG)),
+            area,
+        );
+    }
+}
+
+impl BottomPanelComponent<'_> {
+    fn render_approval(&self, frame: &mut InlineFrame, area: Rect) {
+        let Some(crate::state::PanelKind::Approval { tool_name, arguments }) = &self.menu.kind
+        else {
+            return;
+        };
+
+        let warn = semantic::TEXT_WARNING;
+        let accent = semantic::TEXT_ACCENT;
+        let dim = semantic::DIM_TEXT;
+        let bg = semantic::NORD2;
+        let input_bg = semantic::INPUT_BG;
+        let selected_style = Style::default().fg(accent).bg(bg);
+        let unselected_style = Style::default().fg(dim).bg(input_bg);
+
+        let mut lines: Vec<Line<'static>> = Vec::with_capacity(5);
+
+        let separator = format!(" {}", "─".repeat(area.width.saturating_sub(1) as usize));
+        lines.push(Line::from(Span::styled(separator, Style::default().fg(dim))));
+
+        lines.push(Line::from(Span::styled(
+            format!("  \u{26a0} {tool_name}: {arguments}"),
+            Style::default().fg(warn).bg(bg).bold(),
+        )));
+
+        for (i, item) in self.menu.items.iter().enumerate() {
+            let is_selected = i == self.menu.selected_index;
+            let style = if is_selected { selected_style } else { unselected_style };
+            lines.push(Line::from(Span::styled(format!("  {}", item.label), style)));
+        }
+
+        lines.push(Line::from(Span::styled(
+            "  Up/Down to navigate, Enter to confirm",
+            Style::default().fg(dim).bg(input_bg),
+        )));
+
+        frame.render_widget(
+            Paragraph::new(Text::from(lines)).style(Style::default().bg(input_bg)),
             area,
         );
     }
