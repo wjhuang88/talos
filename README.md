@@ -154,7 +154,7 @@ Type `/` in the TUI to access these commands:
 | `/new` | Start a fresh session (preserves old session) |
 | `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
-| `/delete` | List deletable workspace sessions; `/delete <N>` removes by number |
+| `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
 
 ## Skills
 

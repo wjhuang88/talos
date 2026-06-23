@@ -244,10 +244,11 @@ async fn handle_session_delete(
     selection: Option<String>,
 ) {
     let workspace_root_str = canonical_workspace_root(workspace_root);
+    let active_id = session_watch_rx.borrow().id;
 
     match &selection {
         None => {
-            let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+            let mut sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
                 Ok(s) => s,
                 Err(e) => {
                     let text = format!("[Error] Failed to list sessions: {e}\n");
@@ -266,26 +267,37 @@ async fn handle_session_delete(
                 }));
                 return;
             }
-            let mut sessions = sessions;
-            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
-            let mut text = String::from("[System] Deletable sessions for this workspace:\n");
-            for (i, s) in sessions.iter().enumerate() {
-                text.push_str(&format!(
-                    "[System]   {}. {} — {} messages — \"{}\"\n",
-                    i + 1,
-                    s.timestamp,
-                    s.message_count,
-                    if s.last_message_preview.is_empty() { "(empty)" } else { &s.last_message_preview },
-                ));
+            sessions.retain(|s| s.id != active_id);
+            if sessions.is_empty() {
+                let text = "[System] No other sessions in this workspace to delete. The active session cannot be deleted.\n".to_string();
+                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::System,
+                    stream: Box::pin(futures::stream::once(async move { text })),
+                }));
+                return;
             }
-            text.push_str("[System] Type /delete <number> to delete. Active session cannot be deleted.\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&a.id)));
+
+            let items: Vec<SessionPickerItem> = sessions
+                .iter()
+                .enumerate()
+                .map(|(i, s)| SessionPickerItem {
+                    command: "/delete".to_string(),
+                    ordinal: i + 1,
+                    timestamp: s.timestamp.to_string(),
+                    message_count: s.message_count,
+                    preview: if s.last_message_preview.is_empty() {
+                        "(empty)".to_string()
+                    } else {
+                        s.last_message_preview.clone()
+                    },
+                })
+                .collect();
+
+            let _ = ui_tx.send(UiOutput::SessionPicker(items));
         }
         Some(arg) => {
-            let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+            let mut sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
                 Ok(s) => s,
                 Err(e) => {
                     let text = format!("[Error] Failed to list sessions: {e}\n");
@@ -296,13 +308,13 @@ async fn handle_session_delete(
                     return;
                 }
             };
-            let mut sessions = sessions;
+            sessions.retain(|s| s.id != active_id);
             sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
 
             let target = match arg.parse::<usize>() {
                 Ok(n) if n >= 1 && n <= sessions.len() => &sessions[n - 1],
                 _ => {
-                    let text = format!("[Error] Invalid selection '{arg}'. Use /delete to list sessions.\n");
+                    let text = format!("[Error] Invalid selection '{arg}'. Use /delete to pick a session.\n");
                     let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                         source: MessageSource::Error,
                         stream: Box::pin(futures::stream::once(async move { text })),
@@ -310,16 +322,6 @@ async fn handle_session_delete(
                     return;
                 }
             };
-
-            let active_id = session_watch_rx.borrow().id;
-            if target.id == active_id {
-                let text = "[Error] Cannot delete the active session. Use /new or /resume first.\n".to_string();
-                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Error,
-                    stream: Box::pin(futures::stream::once(async move { text })),
-                }));
-                return;
-            }
 
             let target_id = target.id;
             match session_manager.delete_session(&target_id) {
@@ -1296,6 +1298,7 @@ async fn handle_session_resume(
                 .iter()
                 .enumerate()
                 .map(|(i, s)| SessionPickerItem {
+                    command: "/resume".to_string(),
                     ordinal: i + 1,
                     timestamp: s.timestamp.to_string(),
                     message_count: s.message_count,

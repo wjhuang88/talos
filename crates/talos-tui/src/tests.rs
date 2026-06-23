@@ -3,7 +3,7 @@
 #[allow(warnings)]
 mod tests {
     use std::time::{Duration, Instant};
-    use talos_conversation::{MessageSource, StatusSnapshot, TipKind};
+    use talos_conversation::{MessageSource, SessionPickerItem, StatusSnapshot, TipKind};
     use talos_core::ApprovalChoice;
     use talos_core::message::Usage;
 
@@ -455,9 +455,66 @@ mod tests {
             label: "/export".to_string(),
             description: "Export transcript [path]".to_string(),
             value: "/export".to_string(),
+            command: String::new(),
         };
         assert_eq!(item.label, "/export");
         assert!(item.description.contains('['));
+    }
+
+    #[test]
+    fn test_session_picker_accept_emits_correct_command() {
+        let items = vec![
+            SessionPickerItem {
+                command: "/resume".to_string(),
+                ordinal: 1,
+                timestamp: "2026-06-22 19:20".to_string(),
+                message_count: 5,
+                preview: "hello".to_string(),
+            },
+            SessionPickerItem {
+                command: "/delete".to_string(),
+                ordinal: 1,
+                timestamp: "2026-06-22 19:00".to_string(),
+                message_count: 3,
+                preview: "older".to_string(),
+            },
+        ];
+        let panel = BottomPanelState::open_session_picker(&items);
+        assert!(panel.is_picker());
+        let mut state = TuiState::new();
+        state.slash_menu = panel;
+
+        state.slash_menu.selected_index = 1;
+        let action = state.accept_selected_panel_item();
+        match action {
+            crate::state::PanelAction::SendMessage(msg) => {
+                assert_eq!(msg, "/delete 1", "picker must echo item's command");
+            }
+            other => panic!("expected SendMessage, got {other:?}"),
+        }
+        assert!(!state.slash_menu.is_open, "picker closes on accept");
+    }
+
+    #[test]
+    fn test_session_picker_accept_resume_default_command() {
+        // When an item's command is empty (legacy callers), fall back to /resume.
+        let items = vec![SessionPickerItem {
+            command: String::new(),
+            ordinal: 1,
+            timestamp: "2026-06-22 19:20".to_string(),
+            message_count: 5,
+            preview: "hello".to_string(),
+        }];
+        let panel = BottomPanelState::open_session_picker(&items);
+        let mut state = TuiState::new();
+        state.slash_menu = panel;
+        let action = state.accept_selected_panel_item();
+        match action {
+            crate::state::PanelAction::SendMessage(msg) => {
+                assert_eq!(msg, "/resume 1");
+            }
+            other => panic!("expected SendMessage, got {other:?}"),
+        }
     }
 
     #[test]

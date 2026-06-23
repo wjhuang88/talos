@@ -22,6 +22,10 @@ pub(crate) struct PanelItem {
     pub(crate) label: String,
     pub(crate) description: String,
     pub(crate) value: String,
+    /// Slash command to submit when the row is accepted. Empty for slash
+    /// commands (the value itself is the full command) and for approval rows.
+    #[allow(dead_code)]
+    pub(crate) command: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +52,7 @@ impl BottomPanelState {
                 label: cmd.name.to_string(),
                 description: cmd.description.to_string(),
                 value: cmd.name.to_string(),
+                command: String::new(),
             })
             .collect();
         Self {
@@ -69,6 +74,7 @@ impl BottomPanelState {
                     format!("\"{}\"", s.preview)
                 },
                 value: s.ordinal.to_string(),
+                command: s.command.clone(),
             })
             .collect();
         Self {
@@ -108,16 +114,19 @@ impl BottomPanelState {
                     label: "[y] approve".to_string(),
                     description: String::new(),
                     value: "approve".to_string(),
+                    command: String::new(),
                 },
                 PanelItem {
                     label: "[a] always approve".to_string(),
                     description: String::new(),
                     value: "always".to_string(),
+                    command: String::new(),
                 },
                 PanelItem {
                     label: "[n] deny".to_string(),
                     description: String::new(),
                     value: "deny".to_string(),
+                    command: String::new(),
                 },
             ],
             selected_index: 0,
@@ -315,8 +324,16 @@ impl TuiState {
     pub(crate) fn accept_selected_panel_item(&mut self) -> PanelAction {
         let completion = self.slash_menu.selected_completion(self.slash_query());
         if self.slash_menu.is_picker() {
+            let value = completion.unwrap_or_default();
+            let command = self
+                .slash_menu
+                .items
+                .get(self.slash_menu.selected_index)
+                .map(|i| i.command.clone())
+                .filter(|c| !c.is_empty())
+                .unwrap_or_else(|| "/resume".to_string());
             self.slash_menu.close();
-            return PanelAction::SendMessage(format!("/resume {}", completion.unwrap_or_default()));
+            return PanelAction::SendMessage(format!("{command} {value}"));
         }
         if let Some(command) = completion {
             self.input_insert_command(&command);
