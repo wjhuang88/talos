@@ -232,7 +232,114 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
             _ => {}
         }
     }
-    bail!("session event channel closed unexpectedly");
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn handle_session_delete(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    workspace_root: &std::path::Path,
+    session_manager: &talos_session::SessionManager,
+    session_watch_rx: &watch::Receiver<talos_session::Session>,
+    selection: Option<String>,
+) {
+    let workspace_root_str = canonical_workspace_root(workspace_root);
+
+    match &selection {
+        None => {
+            let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+                Ok(s) => s,
+                Err(e) => {
+                    let text = format!("[Error] Failed to list sessions: {e}\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                    return;
+                }
+            };
+            if sessions.is_empty() {
+                let text = "[System] No sessions found for this workspace.\n".to_string();
+                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::System,
+                    stream: Box::pin(futures::stream::once(async move { text })),
+                }));
+                return;
+            }
+            let mut sessions = sessions;
+            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
+            let mut text = String::from("[System] Deletable sessions for this workspace:\n");
+            for (i, s) in sessions.iter().enumerate() {
+                text.push_str(&format!(
+                    "[System]   {}. {} — {} messages — \"{}\"\n",
+                    i + 1,
+                    s.timestamp,
+                    s.message_count,
+                    if s.last_message_preview.is_empty() { "(empty)" } else { &s.last_message_preview },
+                ));
+            }
+            text.push_str("[System] Type /delete <number> to delete. Active session cannot be deleted.\n");
+            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(futures::stream::once(async move { text })),
+            }));
+        }
+        Some(arg) => {
+            let sessions = match session_manager.list_workspace_sessions(&workspace_root_str) {
+                Ok(s) => s,
+                Err(e) => {
+                    let text = format!("[Error] Failed to list sessions: {e}\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                    return;
+                }
+            };
+            let mut sessions = sessions;
+            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
+
+            let target = match arg.parse::<usize>() {
+                Ok(n) if n >= 1 && n <= sessions.len() => &sessions[n - 1],
+                _ => {
+                    let text = format!("[Error] Invalid selection '{arg}'. Use /delete to list sessions.\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                    return;
+                }
+            };
+
+            let active_id = session_watch_rx.borrow().id;
+            if target.id == active_id {
+                let text = "[Error] Cannot delete the active session. Use /new or /resume first.\n".to_string();
+                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::Error,
+                    stream: Box::pin(futures::stream::once(async move { text })),
+                }));
+                return;
+            }
+
+            let target_id = target.id;
+            match session_manager.delete_session(&target_id) {
+                Ok(()) => {
+                    let text = format!("[System] Deleted session {target_id}.\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                }
+                Err(e) => {
+                    let text = format!("[Error] Failed to delete session {target_id}: {e}\n");
+                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(futures::stream::once(async move { text })),
+                    }));
+                }
+            }
+        }
+    }
 }
 
 pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
@@ -336,10 +443,14 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         tokio::sync::watch::channel(session.clone());
     let (sq_tx_watch_tx, sq_tx_watch_rx) =
         tokio::sync::watch::channel(handle.sq_tx.clone());
-    // Dedicated channel for handing off the new eq_rx to the bridge forwarder
-    // after a session switch (eq_rx is a unique Receiver, cannot be in watch).
-    let (bridge_rx_update_tx, mut bridge_rx_update_rx) =
-        mpsc::unbounded_channel::<tokio::sync::mpsc::UnboundedReceiver<SessionEvent>>();
+    // Dedicated channel for handing off the new eq_rx + old_session to the
+    // bridge forwarder after a session switch. The bridge must keep persisting
+    // any in-flight events for the previous session until that actor's eq_rx
+    // is exhausted (SESSION-002-D).
+    let (bridge_rx_update_tx, mut bridge_rx_update_rx) = mpsc::unbounded_channel::<(
+        talos_session::Session,
+        tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+    )>();
 
     // Session lifecycle handler: processes /new, /resume, /fork requests.
     // After commit, updates the shared watch channels and bridge_rx_update
@@ -417,21 +528,36 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     )
                     .await;
                 }
+                SessionLifecycleRequest::Delete(req) => {
+                    handle_session_delete(
+                        &ui_tx_for_handler,
+                        &workspace_root_for_handler,
+                        &session_manager_for_handler,
+                        &session_watch_rx_for_handler,
+                        req.selection,
+                    )
+                    .await;
+                }
             }
         }
     });
 
     let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
     let session_manager_for_persist = session_manager.clone();
-    let session_watch_rx_for_bridge = session_watch_rx.clone();
     let mut bridge_forwarder = handle.eq_rx;
+    // Cached snapshot of the session that owns the *current* eq_rx stream.
+    // Until the inner `while let` exhausts, every event arriving on
+    // `bridge_forwarder` belongs to this session, even if the watch channel
+    // has already been updated to the next session. This is the SESSION-002-D
+    // ordering invariant: in-flight events for the old actor must persist to
+    // the old actor's session.
+    let mut owning_session: talos_session::Session = session.clone();
     tokio::spawn(async move {
         loop {
             while let Some(session_event) = bridge_forwarder.recv().await {
-                let session = session_watch_rx_for_bridge.borrow().clone();
                 match session_event {
                     SessionEvent::AgentEvent(ref agent_event) => {
-                        let _ = session.append_event(agent_event);
+                        let _ = owning_session.append_event(agent_event);
                         let _ = bridge_tx.send(agent_event.clone());
                     }
                     SessionEvent::TurnCompleted {
@@ -442,11 +568,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                             if matches!(msg, Message::User { .. }) {
                                 continue;
                             }
-                            if let Err(e) = session.append(msg) {
+                            if let Err(e) = owning_session.append(msg) {
                                 eprintln!("Warning: failed to persist message: {e}");
                             }
                         }
-                        if let Err(e) = session_manager_for_persist.update_index(&session) {
+                        if let Err(e) = session_manager_for_persist.update_index(&owning_session) {
                             eprintln!("Warning: failed to update session index: {e}");
                         }
                     }
@@ -462,9 +588,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     _ => {}
                 }
             }
-            // Old actor's event stream exhausted — wait for new eq_rx
+            // Old actor's event stream exhausted — switch to the new session.
             match bridge_rx_update_rx.recv().await {
-                Some(new_rx) => bridge_forwarder = new_rx,
+                Some((old_session, new_rx)) => {
+                    owning_session = old_session;
+                    bridge_forwarder = new_rx;
+                }
                 None => break,
             }
         }
@@ -946,7 +1075,10 @@ async fn handle_session_new(
     mcp_config: &talos_config::McpConfig,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
-    bridge_rx_update_tx: &mpsc::UnboundedSender<mpsc::UnboundedReceiver<SessionEvent>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<SessionEvent>,
+    )>,
     model_context_limit: u32,
     mock: bool,
 ) {
@@ -1025,7 +1157,8 @@ async fn handle_session_new(
         Ok(result) => {
             let _ = session_watch_tx.send(new_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
+            let _ = bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx));
             let text = "[System] New session started. Previous session preserved.\n".to_string();
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
@@ -1057,7 +1190,10 @@ async fn handle_session_resume(
     mcp_config: &talos_config::McpConfig,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
-    bridge_rx_update_tx: &mpsc::UnboundedSender<mpsc::UnboundedReceiver<SessionEvent>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<SessionEvent>,
+    )>,
     model_context_limit: u32,
     session_id: Option<String>,
     mock: bool,
@@ -1247,7 +1383,8 @@ async fn handle_session_resume(
         Ok(result) => {
             let _ = session_watch_tx.send(target_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
+            let _ = bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx));
             let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
             let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
@@ -1284,7 +1421,10 @@ async fn handle_session_fork(
     mcp_config: &talos_config::McpConfig,
     session_watch_tx: &watch::Sender<talos_session::Session>,
     sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
-    bridge_rx_update_tx: &mpsc::UnboundedSender<mpsc::UnboundedReceiver<SessionEvent>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<SessionEvent>,
+    )>,
     model_context_limit: u32,
     session_watch_rx: &watch::Receiver<talos_session::Session>,
     mock: bool,
@@ -1410,7 +1550,8 @@ async fn handle_session_fork(
         Ok(result) => {
             let _ = session_watch_tx.send(child_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
+            let _ = bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx));
             let text = format!("[System] Forked session {child_id} (source: {}).\n", result.old_session.id);
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
