@@ -12,7 +12,7 @@ pub(crate) async fn run_conversation_loop(
     mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
     ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
     submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
-    interrupt_tx: tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    sq_tx_watch: tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<talos_core::session::SessionOp>>,
     session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
 ) {
     loop {
@@ -78,7 +78,8 @@ pub(crate) async fn run_conversation_loop(
                         }
                     }
                     UserInput::Cancel => {
-                        let _ = interrupt_tx.send(talos_core::session::SessionOp::Interrupt).await;
+                        let sq_tx = sq_tx_watch.borrow().clone();
+                        let _ = sq_tx.send(talos_core::session::SessionOp::Interrupt).await;
                         for output in engine.cancel_turn() {
                             let _ = ui_tx.send(output);
                         }

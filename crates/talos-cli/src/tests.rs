@@ -115,6 +115,7 @@ mod tests {
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
         let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (session_tx, _session_rx) = tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
         let loop_handle = tokio::spawn(run_conversation_loop(
@@ -123,7 +124,7 @@ mod tests {
             user_rx,
             ui_tx,
             submit_tx,
-            interrupt_tx,
+            sq_rx,
             session_tx,
         ));
 

@@ -357,7 +357,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_watch_tx_for_handler = sq_tx_watch_tx.clone();
     let bridge_rx_update_tx_for_handler = bridge_rx_update_tx.clone();
     let session_watch_rx_for_handler = session_watch_rx.clone();
-    let model_context_limit = 128_000u32;
+    let model_context_limit = config.context_limit().unwrap_or(128_000);
     tokio::spawn(async move {
         while let Some(req) = session_rx.recv().await {
             match req {
@@ -501,7 +501,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let engine = ConversationEngine::new(config.model.clone())
         .with_skills(runtime_skills.diagnostics())
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
-    let interrupt_tx = handle.sq_tx.clone();
+    let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
             engine,
@@ -509,7 +509,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             user_input_rx,
             ui_output_tx,
             user_msg_tx,
-            interrupt_tx,
+            sq_tx_watch_for_loop,
             session_tx,
         )
         .await;
