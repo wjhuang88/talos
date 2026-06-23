@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 /// Metadata associated with a session entry.
@@ -99,30 +100,16 @@ pub struct SessionInfo {
 /// The `current_branch` field tracks which branch is active for appending new entries.
 #[derive(Debug, Clone)]
 pub struct Session {
-    /// Unique session identifier.
     pub id: Uuid,
-
-    /// Human-readable project display name (basename).
     pub project: String,
-
-    /// Stable workspace identity (canonical absolute path).
     pub workspace_root: String,
-
-    /// When the session was created.
     pub created_at: DateTime<Utc>,
-
-    /// Path to the JSONL file backing this session.
     pub file_path: PathBuf,
-
-    /// ID of the currently active branch.
     pub current_branch: String,
-
-    /// All branches in this session.
     pub branches: HashMap<String, SessionBranch>,
-
-    /// Whether the session file has been persisted to disk.
-    /// Set to true after the first `ensure_persisted()` call.
     pub persisted: bool,
+    pub(crate) last_entry_id: Arc<Mutex<Option<String>>>,
+    pub(crate) write_lock: Arc<Mutex<()>>,
 }
 
 impl Session {
@@ -148,6 +135,8 @@ impl Session {
             current_branch: root_id,
             branches,
             persisted: true,
+            last_entry_id: Arc::new(Mutex::new(None)),
+            write_lock: Arc::new(Mutex::new(())),
         }
     }
 

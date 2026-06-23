@@ -1012,6 +1012,7 @@ async fn handle_session_new(
     // Clone for watch channel update after commit (new_session is moved into prepare).
     let new_session_for_watch = new_session.clone();
     if let Err(e) = transition.prepare(handle, new_session) {
+        let _ = std::fs::remove_file(&new_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare new session: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
             source: MessageSource::Error,
@@ -1033,6 +1034,7 @@ async fn handle_session_new(
         }
         Err(e) => {
             transition.rollback();
+            let _ = std::fs::remove_file(&new_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::Error,
@@ -1232,6 +1234,7 @@ async fn handle_session_resume(
     // Clone for watch channel update after commit (target_session is moved into prepare).
     let target_session_for_watch = target_session.clone();
     if let Err(e) = transition.prepare(handle, target_session) {
+        let _ = std::fs::remove_file(&target_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare resume: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
             source: MessageSource::Error,
@@ -1254,6 +1257,7 @@ async fn handle_session_resume(
         }
         Err(e) => {
             transition.rollback();
+            let _ = std::fs::remove_file(&target_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::Error,
@@ -1393,6 +1397,7 @@ async fn handle_session_fork(
     // Clone for watch channel update after commit (child_session is moved into prepare).
     let child_session_for_watch = child_session.clone();
     if let Err(e) = transition.prepare(handle, child_session) {
+        let _ = std::fs::remove_file(&child_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare fork: {e}\n");
         let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
             source: MessageSource::Error,
@@ -1414,6 +1419,7 @@ async fn handle_session_fork(
         }
         Err(e) => {
             transition.rollback();
+            let _ = std::fs::remove_file(&child_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::Error,

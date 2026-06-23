@@ -1,49 +1,70 @@
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 use chrono::Utc;
 use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use talos_core::message::{AgentEvent, Message};
 use uuid::Uuid;
 
 impl Session {
-    /// Append a message to the current branch and persist it to the JSONL file.
     pub fn append(&self, message: &Message) -> Result<(), SessionError> {
         let (role, content) = message_parts(message);
-        let entries = self.read_entries()?;
-        let parent_id = entries.last().map(|e| e.id.clone());
-
-        let entry = SessionEntry {
-            id: Uuid::new_v4().to_string(),
-            parent_id,
-            timestamp: Utc::now(),
-            role,
-            content,
-            metadata: SessionMetadata::default(),
-        };
-
-        self.append_entry(&entry)
+        let entry = self.build_entry(&role, &content)?;
+        self.append_entry_locked(&entry)
     }
 
-    /// Append an agent event to the current branch and persist it to the JSONL file.
     pub fn append_event(&self, event: &AgentEvent) -> Result<(), SessionError> {
         let content =
             serde_json::to_string(event).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
-        let role = "system".to_string();
+        let entry = self.build_entry("system", &content)?;
+        self.append_entry_locked(&entry)
+    }
 
-        let entries = self.read_entries()?;
-        let parent_id = entries.last().map(|e| e.id.clone());
+    fn build_entry(&self, role: &str, content: &str) -> Result<SessionEntry, SessionError> {
+        let parent_id = {
+            let guard = self
+                .last_entry_id
+                .lock()
+                .expect("last_entry_id mutex poisoned");
+            if guard.is_none() {
+                drop(guard);
+                let id = read_last_entry_id(&self.file_path);
+                *self.last_entry_id.lock().expect("last_entry_id mutex poisoned") = id.clone();
+                id
+            } else {
+                guard.clone()
+            }
+        };
 
-        let entry = SessionEntry {
+        Ok(SessionEntry {
             id: Uuid::new_v4().to_string(),
             parent_id,
             timestamp: Utc::now(),
-            role,
-            content,
+            role: role.to_string(),
+            content: content.to_string(),
             metadata: SessionMetadata::default(),
-        };
+        })
+    }
 
-        self.append_entry(&entry)
+    fn append_entry_locked(&self, entry: &SessionEntry) -> Result<(), SessionError> {
+        let _lock = self.write_lock.lock().expect("write_lock mutex poisoned");
+        let line =
+            serde_json::to_string(entry).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
+
+        if !self.file_path.exists()
+            && let Some(parent) = self.file_path.parent()
+        {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.file_path)?;
+        writeln!(file, "{line}")?;
+
+        *self.last_entry_id.lock().expect("last_entry_id mutex poisoned") = Some(entry.id.clone());
+        Ok(())
     }
 
     /// Read all entries from the session's JSONL file.
@@ -117,28 +138,23 @@ impl Session {
 
         Ok(events)
     }
+}
 
-    /// Append a raw [`SessionEntry`] to the JSONL file.
-    /// Creates the parent directory and file if this is the first append
-    /// (supports deferred session creation).
-    fn append_entry(&self, entry: &SessionEntry) -> Result<(), SessionError> {
-        let line =
-            serde_json::to_string(entry).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
-
-        // Ensure file and parent directory exist (lazy creation for deferred sessions).
-        if !self.file_path.exists()
-            && let Some(parent) = self.file_path.parent()
-        {
-            fs::create_dir_all(parent)?;
-        }
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.file_path)?;
-        writeln!(file, "{line}")?;
-        Ok(())
+fn read_last_entry_id(path: &Path) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
+    let file_size = file.metadata().ok()?.len();
+    if file_size == 0 {
+        return None;
     }
+    let read_size = std::cmp::min(file_size, 8192) as usize;
+    let seek_pos = file_size.saturating_sub(read_size as u64);
+    file.seek(SeekFrom::Start(seek_pos)).ok()?;
+    let mut buf = vec![0u8; read_size];
+    file.read_exact(&mut buf).ok()?;
+    let text = String::from_utf8_lossy(&buf);
+    let last_line = text.lines().rev().find(|l| !l.is_empty())?;
+    let entry: SessionEntry = serde_json::from_str(last_line).ok()?;
+    Some(entry.id)
 }
 
 pub(crate) fn scan_file(path: &Path) -> Result<(usize, String), SessionError> {

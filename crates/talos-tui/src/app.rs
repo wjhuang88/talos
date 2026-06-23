@@ -1295,14 +1295,9 @@ impl Tui {
                         }
                     }
                     KeyCode::Enter if self.state.slash_menu.is_open => {
-                        if self.state.slash_menu.is_picker() {
-                            let action = self.state.accept_selected_panel_item();
-                            if let PanelAction::SendMessage(msg) = action
-                                && let Some(ref tx) = self.user_input_tx
-                            {
-                                let _ = tx.send(UserInput::Message(msg));
-                            }
-                        } else if !self.state.slash_query().is_empty() {
+                        let should_accept = self.state.slash_menu.is_picker()
+                            || !self.state.slash_query().is_empty();
+                        if should_accept {
                             let action = self.state.accept_selected_panel_item();
                             if let PanelAction::SendMessage(msg) = action
                                 && let Some(ref tx) = self.user_input_tx
