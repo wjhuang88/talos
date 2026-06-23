@@ -227,9 +227,9 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
         CommandDefinition {
             name: "/delete",
             aliases: &[],
-            usage: "/delete",
+            usage: "/delete [N]",
             description: "Delete a workspace session via the picker",
-            arg_hint: None,
+            arg_hint: Some("[N]"),
             origin: CommandOrigin::Builtin,
             available: always_available,
         },

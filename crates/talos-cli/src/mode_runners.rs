@@ -276,7 +276,7 @@ async fn handle_session_delete(
                 }));
                 return;
             }
-            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&a.id)));
+            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
 
             let items: Vec<SessionPickerItem> = sessions
                 .iter()
@@ -1159,8 +1159,12 @@ async fn handle_session_new(
         Ok(result) => {
             let _ = session_watch_tx.send(new_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            let _ = bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx));
+            if bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .is_err()
+            {
+                eprintln!("[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed.");
+            }
             let text = "[System] New session started. Previous session preserved.\n".to_string();
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
@@ -1386,8 +1390,12 @@ async fn handle_session_resume(
         Ok(result) => {
             let _ = session_watch_tx.send(target_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            let _ = bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx));
+            if bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .is_err()
+            {
+                eprintln!("[Error] Bridge forwarder unavailable; resumed session events will not be persisted or displayed.");
+            }
             let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
             let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
@@ -1435,9 +1443,8 @@ async fn handle_session_fork(
     let mut transition = transition.lock().await;
 
     let source_session = session_watch_rx.borrow().clone();
-    let source_path = source_session.file_path.clone();
 
-    let source_bytes = match std::fs::read(&source_path) {
+    let source_bytes = match source_session.snapshot_bytes() {
         Ok(b) => b,
         Err(e) => {
             let text = format!("[Error] Failed to read source session file: {e}\n");
@@ -1553,8 +1560,12 @@ async fn handle_session_fork(
         Ok(result) => {
             let _ = session_watch_tx.send(child_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            let _ = bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx));
+            if bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .is_err()
+            {
+                eprintln!("[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed.");
+            }
             let text = format!("[System] Forked session {child_id} (source: {}).\n", result.old_session.id);
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
