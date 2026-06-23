@@ -235,31 +235,31 @@ impl ViewportComponent for StatusComponent<'_> {
     }
 }
 
-pub(crate) struct SlashMenuComponent<'a> {
-    pub(crate) menu: &'a crate::state::SlashMenuState,
+pub(crate) struct BottomPanelComponent<'a> {
+    pub(crate) menu: &'a crate::state::BottomPanelState,
     pub(crate) query: &'a str,
     pub(crate) max_height: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SlashMenuPlacement {
+pub(crate) enum BottomPanelPlacement {
     AboveInput,
     BelowInput,
 }
 
-pub(crate) const fn slash_menu_placement(
+pub(crate) const fn bottom_panel_placement(
     screen_height: u16,
     base_height: u16,
     menu_height: u16,
-) -> SlashMenuPlacement {
+) -> BottomPanelPlacement {
     if base_height.saturating_add(menu_height) <= screen_height {
-        SlashMenuPlacement::BelowInput
+        BottomPanelPlacement::BelowInput
     } else {
-        SlashMenuPlacement::AboveInput
+        BottomPanelPlacement::AboveInput
     }
 }
 
-pub(crate) fn slash_menu_rows(total: usize, area_height: u16) -> (usize, bool, bool) {
+pub(crate) fn bottom_panel_rows(total: usize, area_height: u16) -> (usize, bool, bool) {
     let show_separator = area_height >= 2;
     let row_capacity = area_height.saturating_sub(u16::from(show_separator)) as usize;
     let initial_visible = total
@@ -272,7 +272,7 @@ pub(crate) fn slash_menu_rows(total: usize, area_height: u16) -> (usize, bool, b
     (visible, show_separator, show_indicator)
 }
 
-impl ViewportComponent for SlashMenuComponent<'_> {
+impl ViewportComponent for BottomPanelComponent<'_> {
     fn height_hint(&self, _w: u16) -> u16 {
         if !self.menu.is_open {
             return 0;
@@ -300,7 +300,11 @@ impl ViewportComponent for SlashMenuComponent<'_> {
         let filtered = self.menu.filtered_items(self.query);
         if filtered.is_empty() {
             let dim = Style::default().fg(semantic::DIM_TEXT);
-            let text = Line::from(Span::styled(" No matching commands", dim));
+            let text = if self.menu.is_slash() {
+                Line::from(Span::styled(" No matching commands", dim))
+            } else {
+                Line::from(Span::styled(" No sessions found", dim))
+            };
             frame.render_widget(
                 Paragraph::new(text).style(Style::default().bg(semantic::INPUT_BG)),
                 area,
@@ -309,7 +313,7 @@ impl ViewportComponent for SlashMenuComponent<'_> {
         }
 
         let total = filtered.len();
-        let (visible, show_separator, show_indicator) = slash_menu_rows(total, area.height);
+        let (visible, show_separator, show_indicator) = bottom_panel_rows(total, area.height);
 
         let scroll_offset = if self.menu.selected_index >= visible {
             self.menu.selected_index - visible + 1
@@ -338,14 +342,22 @@ impl ViewportComponent for SlashMenuComponent<'_> {
             let item = filtered[idx];
             let is_selected = idx == self.menu.selected_index;
 
-            let command_name = item.name.strip_prefix('/').unwrap_or(&item.name);
-            let name = if let Some(ref hint) = item.arg_hint {
-                format!("  /{command_name} {hint}")
+            let (name, desc) = if self.menu.is_slash() {
+                let command_name = item.label.strip_prefix('/').unwrap_or(&item.label);
+                let has_arg = item.description.contains('[') || item.description.contains('<');
+                let name = if has_arg {
+                    format!("  /{command_name} {}", item.description.split_once('[').or_else(|| item.description.split_once('<')).map(|(_, b)| format!("[{b}")).unwrap_or_default())
+                } else {
+                    format!("  /{command_name}")
+                };
+                let desc = format!("  —  {}", item.description);
+                (name, desc)
             } else {
-                format!("  /{command_name}")
+                // SessionPicker mode
+                let name = format!("  {}", item.label);
+                let desc = format!("  —  {}", item.description);
+                (name, desc)
             };
-
-            let desc = format!("  —  {}", item.description);
 
             if is_selected {
                 let name_span = Span::styled(name, selected_style);

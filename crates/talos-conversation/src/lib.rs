@@ -14,7 +14,7 @@ pub use engine::{
 };
 pub use types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    PluginObservation, ScrollbackState, SessionForkRequest, SessionNewRequest, SessionResumeRequest,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, UiOutput, UserInput,
+    PluginObservation, ScrollbackState, SessionForkRequest, SessionNewRequest, SessionPickerItem,
+    SessionResumeRequest, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
+    ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };

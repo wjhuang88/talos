@@ -20,7 +20,7 @@ use crate::inline_terminal::{
     ComponentStack, HistoryAttrs, HistorySegment, InlineTerminal, ViewportComponent,
 };
 use crate::sidebar::{SkillInfo, SkillSidebar};
-use crate::state::{ApprovalState, CtrlCState, Tip, TuiState};
+use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
 use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
 use crate::theme::{semantic, to_crossterm_color};
 
@@ -1027,6 +1027,9 @@ impl Tui {
                 // Handled by the bridge → mode runner lifecycle handler.
                 // Should not reach the TUI directly.
             }
+            UiOutput::SessionPicker(sessions) => {
+                self.state.open_session_picker(&sessions);
+            }
         }
         false
     }
@@ -1105,9 +1108,10 @@ impl Tui {
         let input_pad_top = crate::scrollback::InputPadComponent;
         let input = crate::scrollback::InputComponent { state };
         let query = state.slash_query();
-        let mut slash_menu = crate::scrollback::SlashMenuComponent {
+        let query_for_panel = if state.slash_menu.is_picker() { "" } else { query };
+        let mut bottom_panel = crate::scrollback::BottomPanelComponent {
             menu: &state.slash_menu,
-            query,
+            query: query_for_panel,
             max_height: u16::MAX,
         };
         let input_pad_bot = crate::scrollback::InputPadComponent;
@@ -1123,37 +1127,37 @@ impl Tui {
             + input.height_hint(width)
             + input_pad_bot.height_hint(width)
             + status_comp.height_hint(width);
-        let natural_menu_height = slash_menu.height_hint(width);
-        let menu_placement = crate::scrollback::slash_menu_placement(
+        let natural_menu_height = bottom_panel.height_hint(width);
+        let menu_placement = crate::scrollback::bottom_panel_placement(
             screen_size.height,
             base_height,
             natural_menu_height,
         );
         if matches!(
             menu_placement,
-            crate::scrollback::SlashMenuPlacement::AboveInput
+            crate::scrollback::BottomPanelPlacement::AboveInput
         ) {
-            slash_menu.max_height = screen_size.height.saturating_sub(base_height);
+            bottom_panel.max_height = screen_size.height.saturating_sub(base_height);
         }
 
         let stack = match menu_placement {
-            crate::scrollback::SlashMenuPlacement::AboveInput => ComponentStack::new(vec![
+            crate::scrollback::BottomPanelPlacement::AboveInput => ComponentStack::new(vec![
                 &preview,
                 &queue,
                 &tips,
-                &slash_menu,
+                &bottom_panel,
                 &input_pad_top,
                 &input,
                 &input_pad_bot,
                 &status_comp,
             ]),
-            crate::scrollback::SlashMenuPlacement::BelowInput => ComponentStack::new(vec![
+            crate::scrollback::BottomPanelPlacement::BelowInput => ComponentStack::new(vec![
                 &preview,
                 &queue,
                 &tips,
                 &input_pad_top,
                 &input,
-                &slash_menu,
+                &bottom_panel,
                 &input_pad_bot,
                 &status_comp,
             ]),
@@ -1186,9 +1190,9 @@ impl Tui {
                 + input_pad_top.height_hint(screen_w);
             if matches!(
                 menu_placement,
-                crate::scrollback::SlashMenuPlacement::AboveInput
+                crate::scrollback::BottomPanelPlacement::AboveInput
             ) {
-                input_y_offset += slash_menu.height_hint(screen_w);
+                input_y_offset += bottom_panel.height_hint(screen_w);
             }
             let input_top = viewport.bottom().saturating_sub(total_height) + input_y_offset;
             let byte_pos = self.state.cursor_byte_pos();
@@ -1239,18 +1243,36 @@ impl Tui {
                         self.toggle_evolution_panel();
                     }
                     KeyCode::Up if self.state.slash_menu.is_open => {
-                        let query = self.state.slash_query().to_string();
+                        let query = if self.state.slash_menu.is_picker() {
+                            String::new()
+                        } else {
+                            self.state.slash_query().to_string()
+                        };
                         self.state.slash_menu.select_prev(&query);
                     }
                     KeyCode::Down if self.state.slash_menu.is_open => {
-                        let query = self.state.slash_query().to_string();
+                        let query = if self.state.slash_menu.is_picker() {
+                            String::new()
+                        } else {
+                            self.state.slash_query().to_string()
+                        };
                         self.state.slash_menu.select_next(&query);
                     }
                     KeyCode::Tab if self.state.slash_menu.is_open => {
-                        self.state.accept_selected_slash_command();
+                        let action = self.state.accept_selected_panel_item();
+                        if let PanelAction::SendMessage(msg) = action
+                            && let Some(ref tx) = self.user_input_tx
+                        {
+                            let _ = tx.send(UserInput::Message(msg));
+                        }
                     }
                     KeyCode::Enter if self.state.slash_menu.is_open => {
-                        self.state.accept_selected_slash_command();
+                        let action = self.state.accept_selected_panel_item();
+                        if let PanelAction::SendMessage(msg) = action
+                            && let Some(ref tx) = self.user_input_tx
+                        {
+                            let _ = tx.send(UserInput::Message(msg));
+                        }
                     }
                     KeyCode::Esc if self.state.slash_menu.is_open => {
                         self.state.slash_menu.close();

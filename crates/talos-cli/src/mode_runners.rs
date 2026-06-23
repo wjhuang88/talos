@@ -11,7 +11,7 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, MessageSource, StreamMessage, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
@@ -1154,21 +1154,22 @@ async fn handle_session_resume(
                 b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id))
             });
 
-            let mut text = String::from("[System] Resumable sessions for this workspace:\n");
-            for (i, s) in sessions.iter().enumerate() {
-                text.push_str(&format!(
-                    "[System]   {}. {} — {} messages — \"{}\"\n",
-                    i + 1,
-                    s.timestamp,
-                    s.message_count,
-                    if s.last_message_preview.is_empty() { "(empty)" } else { &s.last_message_preview },
-                ));
-            }
-            text.push_str("[System] Type /resume <number> to select.\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            let items: Vec<SessionPickerItem> = sessions
+                .iter()
+                .enumerate()
+                .map(|(i, s)| SessionPickerItem {
+                    ordinal: i + 1,
+                    timestamp: s.timestamp.to_string(),
+                    message_count: s.message_count,
+                    preview: if s.last_message_preview.is_empty() {
+                        "(empty)".to_string()
+                    } else {
+                        s.last_message_preview.clone()
+                    },
+                })
+                .collect();
+
+            let _ = ui_tx.send(UiOutput::SessionPicker(items));
             return;
         }
     };

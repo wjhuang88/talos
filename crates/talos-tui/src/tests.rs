@@ -9,12 +9,12 @@ mod tests {
 
     use crate::inline_terminal::ViewportComponent;
     use crate::scrollback::{
-        SlashMenuComponent, SlashMenuPlacement, build_input_text, build_status_text,
-        calculate_cost, cursor_line_col, input_line_count, slash_menu_placement, slash_menu_rows,
+        BottomPanelComponent, BottomPanelPlacement, build_input_text, build_status_text,
+        calculate_cost, cursor_line_col, input_line_count, bottom_panel_placement, bottom_panel_rows,
         stream_padding_for, truncate_str,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
-    use crate::state::{ApprovalState, CtrlCState, SlashMenuItem, SlashMenuState, Tip, TuiState};
+    use crate::state::{ApprovalState, BottomPanelState, CtrlCState, PanelItem, Tip, TuiState};
     use crate::{contrast_ratio, rgb_components};
 
     // ── TuiState (pure UI) ─────────────────────────────────────────────
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_slash_menu_default_is_closed() {
-        let menu = SlashMenuState::default();
+        let menu = BottomPanelState::default();
         assert!(!menu.is_open);
         assert!(menu.items.is_empty());
         assert_eq!(menu.selected_index, 0);
@@ -378,7 +378,7 @@ mod tests {
     #[test]
     fn test_slash_menu_opens_with_commands() {
         let registry = talos_conversation::command_registry();
-        let menu = SlashMenuState::open(registry);
+        let menu = BottomPanelState::open_slash(registry);
         assert!(menu.is_open);
         assert!(!menu.items.is_empty());
         assert_eq!(menu.selected_index, 0);
@@ -387,29 +387,29 @@ mod tests {
     #[test]
     fn test_slash_menu_filters_by_name() {
         let registry = talos_conversation::command_registry();
-        let mut menu = SlashMenuState::open(registry);
+        let mut menu = BottomPanelState::open_slash(registry);
         let filtered = menu.filtered_items("help");
         assert!(!filtered.is_empty());
-        assert!(filtered.iter().any(|item| item.name == "/help"));
+        assert!(filtered.iter().any(|item| item.label == "/help"));
     }
 
     #[test]
     fn test_slash_menu_filters_by_description() {
         let registry = talos_conversation::command_registry();
-        let mut menu = SlashMenuState::open(registry);
+        let mut menu = BottomPanelState::open_slash(registry);
         let filtered = menu.filtered_items("exit");
         assert!(!filtered.is_empty());
         assert!(
             filtered
                 .iter()
-                .any(|item| item.name == "/quit" || item.name == "/exit")
+                .any(|item| item.label == "/quit" || item.label == "/exit")
         );
     }
 
     #[test]
     fn test_slash_menu_selection_wraps() {
         let registry = talos_conversation::command_registry();
-        let mut menu = SlashMenuState::open(registry);
+        let mut menu = BottomPanelState::open_slash(registry);
         let len = menu.filtered_items("").len();
         assert!(len > 0);
 
@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn test_slash_menu_selected_command_returns_name() {
         let registry = talos_conversation::command_registry();
-        let mut menu = SlashMenuState::open(registry);
+        let mut menu = BottomPanelState::open_slash(registry);
         let cmd = menu.selected_completion("");
         assert!(cmd.is_some());
         assert!(cmd.unwrap().starts_with('/'));
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_slash_menu_close_clears_state() {
         let registry = talos_conversation::command_registry();
-        let mut menu = SlashMenuState::open(registry);
+        let mut menu = BottomPanelState::open_slash(registry);
         menu.select_next("");
         menu.close();
         assert!(!menu.is_open);
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn test_slash_menu_no_match_returns_empty() {
         let registry = talos_conversation::command_registry();
-        let menu = SlashMenuState::open(registry);
+        let menu = BottomPanelState::open_slash(registry);
         let filtered = menu.filtered_items("zzzznonexistent");
         assert!(filtered.is_empty());
         assert!(menu.selected_completion("zzzznonexistent").is_none());
@@ -451,13 +451,13 @@ mod tests {
 
     #[test]
     fn test_slash_menu_item_with_arg_hint() {
-        let item = SlashMenuItem {
-            name: "/export".to_string(),
-            description: "Export transcript".to_string(),
-            arg_hint: Some("<path>".to_string()),
+        let item = PanelItem {
+            label: "/export".to_string(),
+            description: "Export transcript [path]".to_string(),
+            value: "/export".to_string(),
         };
-        assert_eq!(item.name, "/export");
-        assert_eq!(item.arg_hint, Some("<path>".to_string()));
+        assert_eq!(item.label, "/export");
+        assert!(item.description.contains('['));
     }
 
     #[test]
@@ -480,15 +480,15 @@ mod tests {
     }
 
     #[test]
-    fn test_slash_menu_accepts_argument_command_with_space() {
+    fn test_slash_menu_accept_inserts_command_and_closes() {
         let registry = talos_conversation::command_registry();
         let mut state = TuiState::new();
         state.open_slash_menu(registry);
         for ch in "export".chars() {
             state.append_slash_query_char(ch);
         }
-        state.accept_selected_slash_command();
-        assert_eq!(state.input_buffer, "/export ");
+        state.accept_selected_panel_item();
+        assert_eq!(state.input_buffer, "/export");
         assert!(!state.slash_menu.is_open);
     }
 
@@ -508,25 +508,25 @@ mod tests {
     #[test]
     fn test_slash_menu_placement_prefers_below_and_falls_back_above() {
         assert_eq!(
-            slash_menu_placement(24, 8, 10),
-            SlashMenuPlacement::BelowInput
+            bottom_panel_placement(24, 8, 10),
+            BottomPanelPlacement::BelowInput
         );
         assert_eq!(
-            slash_menu_placement(12, 8, 10),
-            SlashMenuPlacement::AboveInput
+            bottom_panel_placement(12, 8, 10),
+            BottomPanelPlacement::AboveInput
         );
     }
 
     #[test]
     fn test_slash_menu_height_is_exact_and_capped() {
         let registry = talos_conversation::command_registry();
-        let menu = SlashMenuState::open(registry);
-        let full = SlashMenuComponent {
+        let menu = BottomPanelState::open_slash(registry);
+        let full = BottomPanelComponent {
             menu: &menu,
             query: "",
             max_height: u16::MAX,
         };
-        let capped = SlashMenuComponent {
+        let capped = BottomPanelComponent {
             menu: &menu,
             query: "",
             max_height: 3,
@@ -537,9 +537,9 @@ mod tests {
 
     #[test]
     fn test_slash_menu_capped_rows_reserve_overflow_indicator() {
-        assert_eq!(slash_menu_rows(5, 3), (1, true, true));
-        assert_eq!(slash_menu_rows(5, 6), (5, true, false));
-        assert_eq!(slash_menu_rows(10, 10), (8, true, true));
+        assert_eq!(bottom_panel_rows(5, 3), (1, true, true));
+        assert_eq!(bottom_panel_rows(5, 6), (5, true, false));
+        assert_eq!(bottom_panel_rows(10, 10), (8, true, true));
     }
 
     // ── Status bar redesign ────────────────────────────────────────────

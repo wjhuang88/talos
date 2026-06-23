@@ -143,6 +143,9 @@ pub enum UiOutput {
     /// into a distinct child identity (`/fork`). The mode runner copies the
     /// source JSONL, creates a new session, and swaps the agent context.
     SessionFork(SessionForkRequest),
+    /// Open the bottom panel as a session picker with the given candidates.
+    /// The TUI renders an interactive list; user selects with Up/Down + Enter.
+    SessionPicker(Vec<SessionPickerItem>),
     Exit,
 }
 
@@ -191,6 +194,19 @@ pub struct SessionResumeRequest {
 /// with a fresh UUID, creates a new [`talos_session::Session`], and swaps
 /// the active agent context. The source session remains byte-for-byte unchanged.
 pub struct SessionForkRequest;
+
+/// A candidate session displayed in the interactive session picker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionPickerItem {
+    /// 1-based ordinal for `/resume <N>` selection.
+    pub ordinal: usize,
+    /// Human-readable timestamp (e.g., "2026-06-22 19:20").
+    pub timestamp: String,
+    /// Number of messages in the session.
+    pub message_count: usize,
+    /// Truncated preview of the last message.
+    pub preview: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserInput {

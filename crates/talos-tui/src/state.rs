@@ -5,45 +5,91 @@
 
 use std::time::{Duration, Instant};
 
-use talos_conversation::{StatusSnapshot, TipKind};
+use talos_conversation::{SessionPickerItem, StatusSnapshot, TipKind};
 use talos_core::ApprovalChoice;
 
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 pub(crate) const SLASH_MENU_MAX_VISIBLE: usize = 8;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PanelAction {
+    None,
+    SendMessage(String),
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct SlashMenuItem {
-    pub(crate) name: String,
+pub(crate) struct PanelItem {
+    pub(crate) label: String,
     pub(crate) description: String,
-    pub(crate) arg_hint: Option<String>,
+    pub(crate) value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PanelKind {
+    SlashCommand,
+    SessionPicker,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(crate) struct SlashMenuState {
+pub(crate) struct BottomPanelState {
     pub(crate) is_open: bool,
-    pub(crate) items: Vec<SlashMenuItem>,
+    pub(crate) kind: Option<PanelKind>,
+    pub(crate) items: Vec<PanelItem>,
     pub(crate) selected_index: usize,
 }
 
-impl SlashMenuState {
-    pub(crate) fn open(registry: &talos_conversation::CommandRegistry) -> Self {
+impl BottomPanelState {
+    pub(crate) fn open_slash(registry: &talos_conversation::CommandRegistry) -> Self {
         let items = registry
             .available_commands()
             .into_iter()
-            .map(|cmd| SlashMenuItem {
-                name: cmd.name.to_string(),
+            .map(|cmd| PanelItem {
+                label: cmd.name.to_string(),
                 description: cmd.description.to_string(),
-                arg_hint: cmd.arg_hint.map(|h| h.to_string()),
+                value: cmd.name.to_string(),
             })
             .collect();
         Self {
             is_open: true,
+            kind: Some(PanelKind::SlashCommand),
             items,
             selected_index: 0,
         }
     }
 
-    pub(crate) fn filtered_items(&self, query: &str) -> Vec<&SlashMenuItem> {
+    pub(crate) fn open_session_picker(sessions: &[SessionPickerItem]) -> Self {
+        let items = sessions
+            .iter()
+            .map(|s| PanelItem {
+                label: format!("{}. {} — {} messages", s.ordinal, s.timestamp, s.message_count),
+                description: if s.preview.is_empty() {
+                    "(empty)".to_string()
+                } else {
+                    format!("\"{}\"", s.preview)
+                },
+                value: s.ordinal.to_string(),
+            })
+            .collect();
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::SessionPicker),
+            items,
+            selected_index: 0,
+        }
+    }
+
+    pub(crate) fn is_slash(&self) -> bool {
+        self.kind == Some(PanelKind::SlashCommand)
+    }
+
+    pub(crate) fn is_picker(&self) -> bool {
+        self.kind == Some(PanelKind::SessionPicker)
+    }
+
+    pub(crate) fn filtered_items(&self, query: &str) -> Vec<&PanelItem> {
+        if !self.is_slash() {
+            return self.items.iter().collect();
+        }
         if query.is_empty() {
             return self.items.iter().collect();
         }
@@ -51,9 +97,9 @@ impl SlashMenuState {
         self.items
             .iter()
             .filter(|item| {
-                item.name
+                item.label
                     .strip_prefix('/')
-                    .unwrap_or(&item.name)
+                    .unwrap_or(&item.label)
                     .to_lowercase()
                     .contains(&lower)
                     || item.description.to_lowercase().contains(&lower)
@@ -68,12 +114,18 @@ impl SlashMenuState {
         }
         let idx = self.selected_index.min(filtered.len() - 1);
         let item = filtered[idx];
-        let suffix = if item.arg_hint.is_some() { " " } else { "" };
-        Some(format!("{}{suffix}", item.name))
+        if self.is_slash() {
+            let has_arg = item.description.contains("[") || item.description.contains("<");
+            let suffix = if has_arg { " " } else { "" };
+            Some(format!("{}{suffix}", item.value))
+        } else {
+            Some(item.value.clone())
+        }
     }
 
     pub(crate) fn close(&mut self) {
         self.is_open = false;
+        self.kind = None;
         self.items.clear();
         self.selected_index = 0;
     }
@@ -135,7 +187,7 @@ pub(crate) struct TuiState {
     pub pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
     pub tip: Option<Tip>,
     pub status: StatusSnapshot,
-    pub slash_menu: SlashMenuState,
+    pub slash_menu: BottomPanelState,
 }
 
 impl TuiState {
@@ -198,7 +250,11 @@ impl TuiState {
 
     pub(crate) fn open_slash_menu(&mut self, registry: &talos_conversation::CommandRegistry) {
         self.input_append_char('/');
-        self.slash_menu = SlashMenuState::open(registry);
+        self.slash_menu = BottomPanelState::open_slash(registry);
+    }
+
+    pub(crate) fn open_session_picker(&mut self, sessions: &[SessionPickerItem]) {
+        self.slash_menu = BottomPanelState::open_session_picker(sessions);
     }
 
     pub(crate) fn slash_query(&self) -> &str {
@@ -218,12 +274,17 @@ impl TuiState {
         }
     }
 
-    pub(crate) fn accept_selected_slash_command(&mut self) {
+    pub(crate) fn accept_selected_panel_item(&mut self) -> PanelAction {
         let completion = self.slash_menu.selected_completion(self.slash_query());
+        if self.slash_menu.is_picker() {
+            self.slash_menu.close();
+            return PanelAction::SendMessage(format!("/resume {}", completion.unwrap_or_default()));
+        }
         if let Some(command) = completion {
             self.input_insert_command(&command);
         }
         self.slash_menu.close();
+        PanelAction::None
     }
 
     pub(crate) fn activate_approval(&mut self, tool_name: &str, arguments: &str) {
