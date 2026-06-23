@@ -1052,6 +1052,12 @@ impl Tui {
             UiOutput::SessionPicker(sessions) => {
                 self.state.open_session_picker(&sessions);
             }
+            UiOutput::HydrateHistory(messages) => {
+                self.finalize_active_stream();
+                self.flush_pending_scrollback().ok();
+                self.hydrate_history(&messages);
+                self.flush_pending_scrollback().ok();
+            }
         }
         false
     }

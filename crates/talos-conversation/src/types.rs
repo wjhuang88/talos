@@ -146,6 +146,7 @@ pub enum UiOutput {
     /// Open the bottom panel as a session picker with the given candidates.
     /// The TUI renders an interactive list; user selects with Up/Down + Enter.
     SessionPicker(Vec<SessionPickerItem>),
+    HydrateHistory(Vec<talos_core::message::Message>),
     Exit,
 }
 

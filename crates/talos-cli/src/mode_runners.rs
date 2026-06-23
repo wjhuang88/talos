@@ -1186,6 +1186,7 @@ async fn handle_session_resume(
         }
     };
 
+    let resume_history_for_hydrate = resume_history.clone();
     let session_config = SessionConfig {
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
@@ -1244,6 +1245,7 @@ async fn handle_session_resume(
             let _ = session_watch_tx.send(target_session_for_watch);
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             let _ = bridge_rx_update_tx.send(result.new_handle.eq_rx);
+            let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
             let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
             let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
                 source: MessageSource::System,
