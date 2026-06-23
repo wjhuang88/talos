@@ -1017,3 +1017,46 @@ fn find_session_file_missing_returns_error() {
         other => panic!("expected SessionNotFound, got {other:?}"),
     }
 }
+
+#[test]
+fn snapshot_bytes_returns_file_contents() {
+    let manager = test_manager();
+    let session = manager
+        .create_session("snapshot-test", "snapshot-test")
+        .unwrap();
+    session
+        .append(&Message::User {
+            content: "first".into(),
+        })
+        .unwrap();
+    session
+        .append(&Message::Assistant {
+            content: "second".into(),
+            tool_calls: vec![],
+        })
+        .unwrap();
+
+    let bytes = session.snapshot_bytes().expect("snapshot should succeed");
+    let on_disk = std::fs::read(&session.file_path).unwrap();
+    assert_eq!(bytes, on_disk, "snapshot must match disk bytes exactly");
+    assert!(
+        bytes.windows(b"first".len()).any(|w| w == b"first"),
+        "snapshot must contain first message"
+    );
+    assert!(
+        bytes.windows(b"second".len()).any(|w| w == b"second"),
+        "snapshot must contain second message"
+    );
+}
+
+#[test]
+fn snapshot_bytes_missing_file_returns_error() {
+    let manager = test_manager();
+    let session = manager
+        .create_session("snapshot-missing", "snapshot-missing")
+        .unwrap();
+    std::fs::remove_file(&session.file_path).unwrap();
+
+    let result = session.snapshot_bytes();
+    assert!(result.is_err(), "missing file must error, not panic");
+}

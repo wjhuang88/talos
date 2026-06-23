@@ -27,4 +27,8 @@ pub enum SessionError {
     /// Failed to parse a session file.
     #[error("failed to parse session file: {0}")]
     ParseError(String),
+
+    /// A per-session internal mutex was poisoned by a panicking thread.
+    #[error("session lock poisoned")]
+    LockPoisoned,
 }

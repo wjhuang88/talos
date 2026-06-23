@@ -227,6 +227,19 @@ impl Session {
         self.branches.get(branch_id)
     }
 
+    /// Read the session JSONL file as raw bytes, holding the per-session write
+    /// lock so concurrent `append` calls cannot produce a torn read.
+    ///
+    /// Used by fork-style operations that need to copy the source file
+    /// byte-for-byte without racing with in-flight event persistence.
+    pub fn snapshot_bytes(&self) -> Result<Vec<u8>, SessionError> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        std::fs::read(&self.file_path).map_err(SessionError::IoError)
+    }
+
     /// List all branch IDs in this session.
     pub fn list_branches(&self) -> Vec<String> {
         let mut ids: Vec<String> = self.branches.keys().cloned().collect();
