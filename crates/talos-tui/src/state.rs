@@ -5,7 +5,7 @@
 
 use std::time::{Duration, Instant};
 
-use talos_conversation::{SessionPickerItem, StatusSnapshot, TipKind};
+use talos_conversation::{ModelPickerItem, SessionPickerItem, StatusSnapshot, TipKind};
 use talos_core::ApprovalChoice;
 
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
@@ -32,6 +32,7 @@ pub(crate) struct PanelItem {
 pub(crate) enum PanelKind {
     SlashCommand,
     SessionPicker,
+    ModelPicker,
     Approval { tool_name: String, arguments: String },
 }
 
@@ -85,12 +86,45 @@ impl BottomPanelState {
         }
     }
 
+    pub(crate) fn open_model_picker(items: &[ModelPickerItem]) -> Self {
+        let mut panel_items: Vec<PanelItem> = items
+            .iter()
+            .filter(|m| m.authenticated)
+            .map(|m| PanelItem {
+                label: m.label.clone(),
+                description: m.provider.clone(),
+                value: m.model_id.clone(),
+                command: m.command.clone(),
+            })
+            .collect();
+        let setup_items: Vec<PanelItem> = items
+            .iter()
+            .filter(|m| !m.authenticated)
+            .map(|m| PanelItem {
+                label: m.label.clone(),
+                description: format!("{} (setup required)", m.provider),
+                value: m.model_id.clone(),
+                command: m.command.clone(),
+            })
+            .collect();
+        panel_items.extend(setup_items);
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::ModelPicker),
+            items: panel_items,
+            selected_index: 0,
+        }
+    }
+
     pub(crate) fn is_slash(&self) -> bool {
         self.kind == Some(PanelKind::SlashCommand)
     }
 
     pub(crate) fn is_picker(&self) -> bool {
-        self.kind == Some(PanelKind::SessionPicker)
+        matches!(
+            self.kind,
+            Some(PanelKind::SessionPicker) | Some(PanelKind::ModelPicker)
+        )
     }
 
     pub(crate) fn is_approval(&self) -> bool {
@@ -302,6 +336,10 @@ impl TuiState {
 
     pub(crate) fn open_session_picker(&mut self, sessions: &[SessionPickerItem]) {
         self.slash_menu = BottomPanelState::open_session_picker(sessions);
+    }
+
+    pub(crate) fn open_model_picker(&mut self, items: &[ModelPickerItem]) {
+        self.slash_menu = BottomPanelState::open_model_picker(items);
     }
 
     pub(crate) fn slash_query(&self) -> &str {

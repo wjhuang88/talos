@@ -1046,12 +1046,15 @@ impl Tui {
                 return true;
             }
             UiOutput::SessionNew(_) | UiOutput::SessionResume(_) | UiOutput::SessionFork(_)
-            | UiOutput::SessionDelete(_) => {
+            | UiOutput::SessionDelete(_) | UiOutput::ModelSwitchRequest(_) => {
                 // Handled by the bridge → mode runner lifecycle handler.
                 // Should not reach the TUI directly.
             }
             UiOutput::SessionPicker(sessions) => {
                 self.state.open_session_picker(&sessions);
+            }
+            UiOutput::ModelPicker(items) => {
+                self.state.open_model_picker(&items);
             }
             UiOutput::HydrateHistory(messages) => {
                 self.finalize_active_stream();
