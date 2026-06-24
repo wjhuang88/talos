@@ -3,7 +3,7 @@
 //! Contains the conversation loop that mediates between agent events,
 //! user input, and UI output channels.
 
-use talos_conversation::{ConversationEngine, ModelSwitchRequest, SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, CredentialResponseData, ModelSwitchRequest, SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest, UiOutput, UserInput};
 use talos_core::message::AgentEvent;
 
 pub(crate) async fn run_conversation_loop(
@@ -83,6 +83,9 @@ pub(crate) async fn run_conversation_loop(
                             let _ = submit_tx.send(msg);
                         }
                     }
+                    UserInput::Credential(resp) => {
+                        let _ = session_tx.send(SessionLifecycleRequest::ModelSwitchWithCredential(resp));
+                    }
                     UserInput::Cancel => {
                         let sq_tx = sq_tx_watch.borrow().clone();
                         let _ = sq_tx.send(talos_core::session::SessionOp::Interrupt).await;
@@ -107,4 +110,5 @@ pub(crate) enum SessionLifecycleRequest {
     Fork(SessionForkRequest),
     Delete(SessionDeleteRequest),
     ModelSwitch(ModelSwitchRequest),
+    ModelSwitchWithCredential(CredentialResponseData),
 }
