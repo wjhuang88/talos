@@ -415,7 +415,12 @@ async fn handle_session_model(
 
     let model_context_limit = model_config.resolve_model_limits().0;
 
-    let current_session = session_watch_rx.borrow().clone();
+    let mut current_session = session_watch_rx.borrow().clone();
+    if let Err(e) = current_session.ensure_persisted() {
+        let text = format!("[Error] Failed to create session file: {e}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
     let history = current_session.read_messages().unwrap_or_default();
 
     let session_config = SessionConfig {
@@ -518,7 +523,12 @@ async fn handle_session_model_with_credential(
 
     let api_key = cred.api_key.clone();
     let model_context_limit = model_config.resolve_model_limits().0;
-    let current_session = session_watch_rx.borrow().clone();
+    let mut current_session = session_watch_rx.borrow().clone();
+    if let Err(e) = current_session.ensure_persisted() {
+        let text = format!("[Error] Failed to create session file: {e}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
     let history = current_session.read_messages().unwrap_or_default();
 
     let session_config = SessionConfig {
