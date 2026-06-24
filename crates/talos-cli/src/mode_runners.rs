@@ -95,6 +95,17 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     // I009-S5 end
 }
 
+fn send_stream(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    source: MessageSource,
+    text: String,
+) {
+    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+        source,
+        stream: Box::pin(futures::stream::once(async move { text })),
+    }));
+}
+
 pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -253,28 +264,19 @@ async fn handle_session_delete(
                 Ok(s) => s,
                 Err(e) => {
                     let text = format!("[Error] Failed to list sessions: {e}\n");
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
             };
             if sessions.is_empty() {
                 let text = "[System] No sessions found for this workspace.\n".to_string();
-                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(futures::stream::once(async move { text })),
-                }));
+                send_stream(ui_tx, MessageSource::System, text);
                 return;
             }
             sessions.retain(|s| s.id != active_id);
             if sessions.is_empty() {
                 let text = "[System] No other sessions in this workspace to delete. The active session cannot be deleted.\n".to_string();
-                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(futures::stream::once(async move { text })),
-                }));
+                send_stream(ui_tx, MessageSource::System, text);
                 return;
             }
             sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
@@ -302,10 +304,7 @@ async fn handle_session_delete(
                 Ok(s) => s,
                 Err(e) => {
                     let text = format!("[Error] Failed to list sessions: {e}\n");
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
             };
@@ -316,10 +315,7 @@ async fn handle_session_delete(
                 Ok(n) if n >= 1 && n <= sessions.len() => &sessions[n - 1],
                 _ => {
                     let text = format!("[Error] Invalid selection '{arg}'. Use /delete to pick a session.\n");
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
             };
@@ -328,17 +324,11 @@ async fn handle_session_delete(
             match session_manager.delete_session(&target_id) {
                 Ok(()) => {
                     let text = format!("[System] Deleted session {target_id}.\n");
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::System, text);
                 }
                 Err(e) => {
                     let text = format!("[Error] Failed to delete session {target_id}: {e}\n");
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::Error, text);
                 }
             }
         }
@@ -1096,10 +1086,7 @@ async fn handle_session_new(
         Ok(s) => s,
         Err(e) => {
             let text = format!("[Error] Failed to create new session: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1121,10 +1108,7 @@ async fn handle_session_new(
         Ok(r) => r,
         Err(e) => {
             let text = format!("[Error] Failed to start MCP runtime: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1152,10 +1136,7 @@ async fn handle_session_new(
     if let Err(e) = transition.prepare(handle, new_session) {
         let _ = std::fs::remove_file(&new_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare new session: {e}\n");
-        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-            source: MessageSource::Error,
-            stream: Box::pin(futures::stream::once(async move { text })),
-        }));
+        send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
@@ -1170,19 +1151,13 @@ async fn handle_session_new(
                 eprintln!("[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed.");
             }
             let text = "[System] New session started. Previous session preserved.\n".to_string();
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::System, text);
         }
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&new_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
         }
     }
 }
@@ -1220,19 +1195,13 @@ async fn handle_session_resume(
                     Ok(s) => s,
                     Err(e) => {
                         let text = format!("[Error] Failed to list sessions: {e}\n");
-                        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                            source: MessageSource::Error,
-                            stream: Box::pin(futures::stream::once(async move { text })),
-                        }));
+                        send_stream(ui_tx, MessageSource::Error, text);
                         return;
                     }
                 };
                 if sessions.is_empty() {
                     let text = "[System] No sessions found for this workspace.\n".to_string();
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::System, text);
                     return;
                 }
                 let mut sessions = sessions;
@@ -1241,10 +1210,7 @@ async fn handle_session_resume(
                 });
                 if n == 0 || n > sessions.len() {
                     let text = format!("[Error] Invalid session number {n}. Valid range: 1-{}.\n", sessions.len());
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
                 let selected = &sessions[n - 1];
@@ -1253,10 +1219,7 @@ async fn handle_session_resume(
                     Ok(s) => s,
                     Err(e) => {
                         let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
-                        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                            source: MessageSource::Error,
-                            stream: Box::pin(futures::stream::once(async move { text })),
-                        }));
+                        send_stream(ui_tx, MessageSource::Error, text);
                         return;
                     }
                 }
@@ -1266,10 +1229,7 @@ async fn handle_session_resume(
                     Ok(s) => s,
                     Err(e) => {
                         let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
-                        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                            source: MessageSource::Error,
-                            stream: Box::pin(futures::stream::once(async move { text })),
-                        }));
+                        send_stream(ui_tx, MessageSource::Error, text);
                         return;
                     }
                 }
@@ -1280,20 +1240,14 @@ async fn handle_session_resume(
                 Ok(s) => s,
                 Err(e) => {
                     let text = format!("[Error] Failed to list sessions: {e}\n");
-                    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(futures::stream::once(async move { text })),
-                    }));
+                    send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
             };
 
             if sessions.is_empty() {
                 let text = "[System] No sessions found for this workspace.\n".to_string();
-                let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(futures::stream::once(async move { text })),
-                }));
+                send_stream(ui_tx, MessageSource::System, text);
                 return;
             }
 
@@ -1327,10 +1281,7 @@ async fn handle_session_resume(
         Ok(h) => h,
         Err(e) => {
             let text = format!("[Error] Failed to read session history: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1352,10 +1303,7 @@ async fn handle_session_resume(
         Ok(r) => r,
         Err(e) => {
             let text = format!("[Error] Failed to start MCP runtime: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1383,10 +1331,7 @@ async fn handle_session_resume(
     if let Err(e) = transition.prepare(handle, target_session) {
         let _ = std::fs::remove_file(&target_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare resume: {e}\n");
-        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-            source: MessageSource::Error,
-            stream: Box::pin(futures::stream::once(async move { text })),
-        }));
+        send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
@@ -1402,19 +1347,13 @@ async fn handle_session_resume(
             }
             let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
             let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::System, text);
         }
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&target_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
         }
     }
 }
@@ -1452,10 +1391,7 @@ async fn handle_session_fork(
         Ok(b) => b,
         Err(e) => {
             let text = format!("[Error] Failed to read source session file: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1464,10 +1400,7 @@ async fn handle_session_fork(
         Ok(h) => h,
         Err(e) => {
             let text = format!("[Error] Failed to read source session history: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1477,10 +1410,7 @@ async fn handle_session_fork(
         Ok(s) => s,
         Err(e) => {
             let text = format!("[Error] Failed to create child session: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1490,19 +1420,13 @@ async fn handle_session_fork(
     if let Some(parent) = child_path.parent()
         && let Err(e) = std::fs::create_dir_all(parent) {
             let text = format!("[Error] Failed to create child session directory: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
     }
 
     if let Err(e) = std::fs::write(&child_path, &source_bytes) {
         let text = format!("[Error] Failed to clone session history: {e}\n");
-        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-            source: MessageSource::Error,
-            stream: Box::pin(futures::stream::once(async move { text })),
-        }));
+        send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
@@ -1522,10 +1446,7 @@ async fn handle_session_fork(
         Ok(r) => r,
         Err(e) => {
             let text = format!("[Error] Failed to start MCP runtime: {e}\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
             return;
         }
     };
@@ -1553,10 +1474,7 @@ async fn handle_session_fork(
     if let Err(e) = transition.prepare(handle, child_session) {
         let _ = std::fs::remove_file(&child_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare fork: {e}\n");
-        let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-            source: MessageSource::Error,
-            stream: Box::pin(futures::stream::once(async move { text })),
-        }));
+        send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
 
@@ -1571,19 +1489,13 @@ async fn handle_session_fork(
                 eprintln!("[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed.");
             }
             let text = format!("[System] Forked session {child_id} (source: {}).\n", result.old_session.id);
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::System, text);
         }
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&child_session_for_watch.file_path);
             let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
-            let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(futures::stream::once(async move { text })),
-            }));
+            send_stream(ui_tx, MessageSource::Error, text);
         }
     }
 }
