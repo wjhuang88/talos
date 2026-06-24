@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-23"
-status_note: "Governance refresh (2026-06-23): I043 + I044 Complete. Bottom panel generalization + session picker + approval UX + six SESSION-002 integrity fixes (O(1) append, write safety, reconciliation, switch ordering, failure cleanup, deletion) all landed. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. 48 test groups pass; clippy clean; 0 validator warnings."
+last_audited_at: "2026-06-24"
+status_note: "Governance refresh (2026-06-24): I043 + I044 Complete. I045 Active (model lifecycle + config + observability; target close 2026-07-24). 48 test groups pass; clippy clean; 0 validator warnings."
 
 governance:
   skill_name: "agent-project-governance"

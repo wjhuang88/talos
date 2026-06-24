@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| _(none active — see Done This Cycle for I043 + I044)_ | — | — | Next iteration selection requires inventorying non-terminal work per `docs/sop/START-ITERATION.md` |
+| I045 Product Readiness — Model Lifecycle, Config, Observability | Active | [I045](iterations/I045-product-readiness-model-lifecycle-observability.md) | Model-centric `/model` picker with inline provider onboarding + first-run wizard (MODEL-004-R + MODEL-005-R); CLI config editing (CONF-001-S); bounded log retention + embedded prompts (OBS-001); activate 2026-06-24; target close 2026-07-24 |
 
 ## Review
 
