@@ -35,6 +35,29 @@ chmod +x talos
 
 Windows releases are published as `.zip` archives. macOS and Linux releases are published as `.tar.gz` archives.
 
+### First-Run Setup
+
+When you start Talos without a model configured, the TUI opens with a model
+picker instead of failing. Choose a model to get started. If the provider
+needs credentials, Talos shows instructions for setting the API key.
+
+To skip the wizard in CI or non-interactive environments:
+
+```bash
+talos --no-init -p "summarize this repo"
+```
+
+### Configuration Management
+
+View and edit configuration without hand-editing TOML:
+
+```bash
+talos --config-list                          # print all settings (secrets masked)
+talos --config-get model                     # get a single value
+talos --config-set model=claude-sonnet-4-20250514  # set and persist
+talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
+```
+
 ### Build From Source
 
 Requirements:
@@ -155,6 +178,7 @@ Type `/` in the TUI to access these commands:
 | `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
+| `/model` | Open the model picker to browse and switch models at runtime |
 
 ## Skills
 

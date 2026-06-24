@@ -30,7 +30,7 @@ use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use clap::ValueEnum;
 use talos_config::Config;
@@ -152,6 +152,29 @@ pub(crate) struct Cli {
     )]
     no_init: bool,
 
+    #[arg(
+        long,
+        conflicts_with_all = ["config_get", "config_set"],
+        help = "List all configuration values."
+    )]
+    config_list: bool,
+
+    #[arg(
+        long,
+        value_name = "KEY",
+        conflicts_with_all = ["config_list", "config_set"],
+        help = "Get a single configuration value by dotted key (e.g. 'model', 'providers.anthropic.api_key_env')."
+    )]
+    config_get: Option<String>,
+
+    #[arg(
+        long,
+        value_name = "KEY=VALUE",
+        conflicts_with_all = ["config_list", "config_get"],
+        help = "Set a configuration value (e.g. 'model=claude-sonnet-4-20250514')."
+    )]
+    config_set: Option<String>,
+
     #[arg(long, help = "Display learned patterns from the evolution engine.")]
     learned: bool,
 
@@ -182,6 +205,16 @@ async fn main() -> Result<()> {
 
     if let Some(path) = &cli.import_models {
         return run_import_models(path);
+    }
+
+    if cli.config_list {
+        return run_config_list();
+    }
+    if let Some(key) = &cli.config_get {
+        return run_config_get(key);
+    }
+    if let Some(kv) = &cli.config_set {
+        return run_config_set(kv);
     }
 
     if matches!(cli.mode, Some(Mode::McpServer)) {
@@ -288,6 +321,133 @@ fn run_import_models(path: &PathBuf) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn run_config_list() -> Result<()> {
+    let config = Config::load().context("failed to load configuration")?;
+    let toml_str = toml::to_string_pretty(&config)
+        .map_err(|e| anyhow::anyhow!("failed to serialize config: {e}"))?;
+    let masked = mask_secrets(&toml_str, &config);
+    println!("{masked}");
+    Ok(())
+}
+
+fn run_config_get(key: &str) -> Result<()> {
+    let config = Config::load().context("failed to load configuration")?;
+    let value = config_get_dotted(&config, key)?;
+    if is_secret_key(key) {
+        println!("***");
+    } else {
+        println!("{value}");
+    }
+    Ok(())
+}
+
+fn run_config_set(kv: &str) -> Result<()> {
+    let (key, value) = kv
+        .split_once('=')
+        .ok_or_else(|| anyhow::anyhow!("invalid format: expected KEY=VALUE (got '{kv}')"))?;
+    let mut config = Config::load().context("failed to load configuration")?;
+    config_set_dotted(&mut config, key.trim(), value.trim())?;
+    config.save().context("failed to save configuration")?;
+    println!("Set {key} = {}", if is_secret_key(key) { "***".to_string() } else { value.trim().to_string() });
+    Ok(())
+}
+
+fn mask_secrets(toml_str: &str, _config: &Config) -> String {
+    toml_str
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("api_key") && let Some(eq) = line.find('=') {
+                return format!("{} = ***", &line[..eq].trim_end());
+            }
+            line.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn is_secret_key(key: &str) -> bool {
+    let lower = key.to_lowercase();
+    lower.ends_with("api_key") || lower.ends_with("secret") || lower.ends_with("token")
+}
+
+fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
+    let parts: Vec<&str> = key.split('.').collect();
+    match parts.as_slice() {
+        ["provider"] => Ok(config.provider.clone()),
+        ["model"] => Ok(config.model.clone()),
+        ["providers", name, "protocol"] => config
+            .providers
+            .get(*name)
+            .map(|p| format!("{:?}", p.protocol))
+            .ok_or_else(|| anyhow::anyhow!("provider '{name}' not found")),
+        ["providers", name, "base_url"] => Ok(config
+            .providers
+            .get(*name)
+            .and_then(|p| p.base_url.clone())
+            .unwrap_or_default()),
+        ["providers", name, "api_key_env"] => Ok(config
+            .providers
+            .get(*name)
+            .and_then(|p| p.api_key_env.clone())
+            .unwrap_or_default()),
+        ["providers", name, "models", model, "context_limit"] => config
+            .providers
+            .get(*name)
+            .and_then(|p| p.models.get(*model))
+            .and_then(|m| m.context_limit)
+            .map(|v| v.to_string())
+            .ok_or_else(|| anyhow::anyhow!("not found")),
+        ["providers", name, "models", model, "output_limit"] => config
+            .providers
+            .get(*name)
+            .and_then(|p| p.models.get(*model))
+            .and_then(|m| m.output_limit)
+            .map(|v| v.to_string())
+            .ok_or_else(|| anyhow::anyhow!("not found")),
+        _ => anyhow::bail!("unsupported config key: '{key}'"),
+    }
+}
+
+fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> Result<()> {
+    let parts: Vec<&str> = key.split('.').collect();
+    match parts.as_slice() {
+        ["model"] => {
+            config.model = value.to_string();
+            Ok(())
+        }
+        ["provider"] => {
+            config.provider = value.to_string();
+            Ok(())
+        }
+        ["providers", name, "api_key_env"] => {
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_insert_with(|| talos_config::ProviderConfig {
+                    ..Default::default()
+                })
+                .api_key_env = Some(value.to_string());
+            Ok(())
+        }
+        ["providers", name, "base_url"] => {
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_insert_with(|| talos_config::ProviderConfig {
+                    ..Default::default()
+                })
+                .base_url = if value.is_empty() { None } else { Some(value.to_string()) };
+            Ok(())
+        }
+        ["providers", name, "api_key"] => {
+            config.set_provider_credential(name, value);
+            Ok(())
+        }
+        _ => anyhow::bail!("unsupported config key for set: '{key}'"),
+    }
 }
 
 #[cfg(test)]
