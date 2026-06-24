@@ -35,6 +35,28 @@ chmod +x talos
 
 Windows 发布包是 `.zip`，macOS 和 Linux 发布包是 `.tar.gz`。
 
+### 首次启动设置
+
+未配置模型时启动 Talos，TUI 会打开模型选择器而不是直接报错。选择一个模型即可开始。
+如果该模型的提供商需要凭据，Talos 会提示设置 API key。
+
+在 CI 或非交互环境中跳过向导：
+
+```bash
+talos --no-init -p "summarize this repo"
+```
+
+### 配置管理
+
+无需手动编辑 TOML 即可查看和修改配置：
+
+```bash
+talos --config-list                          # 打印所有设置（密钥已脱敏）
+talos --config-get model                     # 查询单个值
+talos --config-set model=claude-sonnet-4-20250514  # 设置并持久化
+talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
+```
+
 ### 从源码构建
 
 环境要求：
@@ -122,6 +144,24 @@ talos -p --mock "/mock-request summarize this repository"
 在交互式 TUI 中，于输入区开头键入 `/` 即可打开命令菜单。继续输入可筛选命令，使用
 `Up`/`Down` 移动选项，按 `Enter` 或 `Tab` 完成命令。`Backspace` 编辑筛选内容，`Esc`
 关闭菜单但保留输入区文本。使用 `/help` 可以查看当前会话可用的命令。
+
+TUI 中可用的斜杠命令：
+
+| 命令 | 说明 |
+|---|---|
+| `/help` | 显示可用命令 |
+| `/quit`、`/exit` | 退出 Talos |
+| `/status` | 显示会话信息（模型、token 用量） |
+| `/plugins` | 列出已观察的工具来源和 MCP 服务状态 |
+| `/skills` | 列出运行时发现的技能（Level 0 元数据） |
+| `/copy last` | 复制上一条助手消息到剪贴板 |
+| `/copy all` | 复制完整对话记录到剪贴板 |
+| `/export <path>` | 导出对话记录到文件（需权限批准） |
+| `/new` | 开始新会话（保留旧会话） |
+| `/resume` | 列出可恢复的工作区会话；`/resume <N>` 按序号选择 |
+| `/fork` | 分叉当前会话（将历史记录克隆到子会话） |
+| `/delete` | 打开会话选择器（排除当前会话）；选择一行进行删除 |
+| `/model` | 打开模型选择器，在运行时浏览和切换模型 |
 
 ## 内置能力
 
