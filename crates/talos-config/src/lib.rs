@@ -35,6 +35,10 @@ pub enum ConfigError {
     /// The configuration file contains invalid TOML.
     #[error("failed to parse config file: {0}")]
     ParseError(String),
+
+    /// Failed to serialize configuration to TOML.
+    #[error("failed to serialize config: {0}")]
+    SerializeError(String),
 }
 
 /// Wire protocol used to talk to a provider.
@@ -85,6 +89,53 @@ pub struct ProviderConfig {
     /// Provider-specific model configuration keyed by model name.
     #[serde(default)]
     pub models: HashMap<String, ModelConfig>,
+}
+
+/// Credentials store — maps provider names to API keys.
+///
+/// Stored separately from the main config (`~/.talos/credentials.toml`) to
+/// keep secrets out of `config.toml`, which may be shared or committed.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Credentials {
+    /// Provider name → API key mapping.
+    #[serde(flatten)]
+    pub keys: HashMap<String, String>,
+}
+
+impl Credentials {
+    /// Returns the default path for the credentials file: `~/.talos/credentials.toml`.
+    pub fn default_path() -> PathBuf {
+        let mut path = home_dir();
+        path.push(".talos");
+        path.push("credentials.toml");
+        path
+    }
+
+    /// Loads credentials from the default path.
+    ///
+    /// Returns an empty credentials store if the file does not exist.
+    pub fn load() -> Result<Self, ConfigError> {
+        let path = Self::default_path();
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+        let raw = fs::read_to_string(&path)?;
+        let creds: Credentials =
+            toml::from_str(&raw).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        Ok(creds)
+    }
+
+    /// Persists credentials to the default path.
+    pub fn save(&self) -> Result<(), ConfigError> {
+        let path = Self::default_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let toml_str =
+            toml::to_string_pretty(self).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
+        fs::write(&path, toml_str)?;
+        Ok(())
+    }
 }
 
 /// Talos configuration.
@@ -322,8 +373,12 @@ impl Config {
 
         let raw = fs::read_to_string(&path)?;
         let substituted = substitute_env_vars(&raw);
-        let config: Config =
+        let mut config: Config =
             toml::from_str(&substituted).map_err(|e| ConfigError::ParseError(e.to_string()))?;
+
+        if let Ok(creds) = Credentials::load() {
+            config.merge_credentials(&creds);
+        }
 
         config.validate()?;
         Ok(config)
@@ -529,6 +584,160 @@ impl Config {
         let imported = opencode::import_opencode_providers(json)?;
         self.providers.extend(imported);
         Ok(())
+    }
+
+    /// Persists the current configuration to `~/.talos/config.toml` and
+    /// credentials to `~/.talos/credentials.toml`.
+    ///
+    /// The main config file never contains raw API keys (the `api_key` field
+    /// is `skip_serializing`). Keys are extracted from in-memory provider
+    /// configs and written to the separate credentials store.
+    pub fn save(&self) -> Result<(), ConfigError> {
+        let path = Self::default_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let toml_str =
+            toml::to_string_pretty(self).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
+        fs::write(&path, toml_str)?;
+
+        let creds = self.extract_credentials();
+        creds.save()?;
+        Ok(())
+    }
+
+    /// Checks whether the named provider has a usable API key.
+    ///
+    /// Returns `true` if the provider's inline `api_key` is set, or if its
+    /// `api_key_env` resolves to a non-empty environment variable.
+    pub fn provider_authenticated(&self, name: &str) -> bool {
+        let provider = match self.providers.get(name) {
+            Some(p) => p.clone(),
+            None => match builtin_provider_config(name) {
+                Some(p) => p,
+                None => return false,
+            },
+        };
+
+        if let Some(key) = provider.api_key.as_deref()
+            && !key.is_empty()
+        {
+            return true;
+        }
+
+        let env_var = provider.api_key_env.as_deref().unwrap_or(match name {
+            "anthropic" => "ANTHROPIC_API_KEY",
+            "openai" => "OPENAI_API_KEY",
+            _ => "",
+        });
+
+        if !env_var.is_empty()
+            && let Ok(key) = env::var(env_var)
+            && !key.is_empty()
+        {
+            return true;
+        }
+
+        if name == "openai"
+            && let Ok(key) = env::var("OPENAI_COMPAT_API_KEY")
+            && !key.is_empty()
+        {
+            return true;
+        }
+
+        false
+    }
+
+    /// Sets the active model by resolving it against the builtin catalog.
+    ///
+    /// Looks up `model_id` in `builtin_models()` to find the owning provider,
+    /// then sets `self.model` and `self.provider` accordingly. Ensures the
+    /// provider has an entry in `self.providers` (creates a default if missing).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::InvalidConfig`] if the model ID is not found in
+    /// the builtin catalog.
+    pub fn set_active_model(&mut self, model_id: &str) -> Result<(), ConfigError> {
+        let builtins = model::builtin_models();
+        let meta = model::find_model(&builtins, model_id).ok_or_else(|| {
+            ConfigError::InvalidConfig(format!("model '{model_id}' not found in builtin catalog"))
+        })?;
+
+        self.model = model_id.to_string();
+        self.provider = meta.provider.clone();
+
+        if !self.providers.contains_key(&meta.provider) {
+            if let Some(builtin) = builtin_provider_config(&meta.provider) {
+                self.providers.insert(meta.provider.clone(), builtin);
+            } else {
+                self.providers.insert(
+                    meta.provider.clone(),
+                    ProviderConfig {
+                        protocol: ProviderProtocol::OpenAIChat,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Sets the API key for the named provider.
+    ///
+    /// Creates a default `ProviderConfig` entry if the provider does not yet
+    /// exist in `self.providers`. The key is stored in the in-memory
+    /// `api_key` field for immediate runtime use.
+    pub fn set_provider_credential(&mut self, name: &str, api_key: &str) {
+        let entry = self.providers.entry(name.to_string()).or_insert_with(|| {
+            if let Some(builtin) = builtin_provider_config(name) {
+                builtin
+            } else {
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    ..Default::default()
+                }
+            }
+        });
+        entry.api_key = Some(api_key.to_string());
+    }
+
+    /// Extracts all in-memory API keys into a [`Credentials`] store.
+    ///
+    /// Only providers with a non-empty `api_key` are included.
+    fn extract_credentials(&self) -> Credentials {
+        let mut creds = Credentials::default();
+        for (name, provider) in &self.providers {
+            if let Some(key) = &provider.api_key
+                && !key.is_empty()
+            {
+                creds.keys.insert(name.clone(), key.clone());
+            }
+        }
+        creds
+    }
+
+    /// Merges credentials into this config's provider `api_key` fields.
+    ///
+    /// For each provider that has a stored credential but no inline key,
+    /// the credential is injected into `api_key`.
+    fn merge_credentials(&mut self, creds: &Credentials) {
+        for (name, key) in &creds.keys {
+            if let Some(provider) = self.providers.get_mut(name) {
+                if provider.api_key.is_none() {
+                    provider.api_key = Some(key.clone());
+                }
+            } else {
+                let mut provider =
+                    builtin_provider_config(name).unwrap_or_else(|| ProviderConfig {
+                        protocol: ProviderProtocol::OpenAIChat,
+                        ..Default::default()
+                    });
+                provider.api_key = Some(key.clone());
+                self.providers.insert(name.clone(), provider);
+            }
+        }
     }
 }
 
@@ -1234,5 +1443,183 @@ mod tests {
         let (ctx, out) = config.resolve_model_limits();
         assert_eq!(ctx, 100_000);
         assert_eq!(out, None);
+    }
+
+    #[test]
+    fn test_credentials_default_path() {
+        let path = Credentials::default_path();
+        assert!(path.to_string_lossy().contains(".talos"));
+        assert!(path.to_string_lossy().contains("credentials.toml"));
+    }
+
+    #[test]
+    fn test_credentials_load_nonexistent_returns_empty() {
+        let creds = Credentials::load().unwrap();
+        assert!(creds.keys.is_empty());
+    }
+
+    #[test]
+    fn test_credentials_save_and_load_roundtrip() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let tmp_dir = env::temp_dir().join("talos_test_creds");
+        let _ = fs::remove_dir_all(&tmp_dir);
+        fs::create_dir_all(&tmp_dir).unwrap();
+
+        let creds_path = tmp_dir.join("credentials.toml");
+        unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
+
+        let mut creds = Credentials::default();
+        creds
+            .keys
+            .insert("anthropic".to_string(), "sk-test-key".to_string());
+        creds
+            .keys
+            .insert("openai".to_string(), "sk-openai-key".to_string());
+        creds.save().unwrap();
+
+        let loaded = Credentials::load().unwrap();
+        assert_eq!(
+            loaded.keys.get("anthropic"),
+            Some(&"sk-test-key".to_string())
+        );
+        assert_eq!(
+            loaded.keys.get("openai"),
+            Some(&"sk-openai-key".to_string())
+        );
+
+        unsafe { env::remove_var("HOME") };
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_provider_authenticated_with_inline_key() {
+        let mut config = Config::default();
+        config.set_provider_credential("anthropic", "sk-inline-key");
+        assert!(config.provider_authenticated("anthropic"));
+    }
+
+    #[test]
+    fn test_provider_authenticated_with_env_var() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key") };
+        let config = Config::default();
+        assert!(config.provider_authenticated("anthropic"));
+        unsafe { env::remove_var("ANTHROPIC_API_KEY") };
+    }
+
+    #[test]
+    fn test_provider_authenticated_returns_false_when_no_key() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        unsafe { env::remove_var("ANTHROPIC_API_KEY") };
+        let config = Config {
+            providers: HashMap::from([(
+                "custom".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(!config.provider_authenticated("custom"));
+        assert!(!config.provider_authenticated("nonexistent"));
+    }
+
+    #[test]
+    fn test_set_active_model_sets_provider_from_catalog() {
+        let mut config = Config::default();
+        config.set_active_model("claude-sonnet-4-20250514").unwrap();
+        assert_eq!(config.model, "claude-sonnet-4-20250514");
+        assert_eq!(config.provider, "anthropic");
+        assert!(config.providers.contains_key("anthropic"));
+    }
+
+    #[test]
+    fn test_set_active_model_openai() {
+        let mut config = Config::default();
+        config.set_active_model("gpt-4o-2024-11-20").unwrap();
+        assert_eq!(config.model, "gpt-4o-2024-11-20");
+        assert_eq!(config.provider, "openai");
+        assert!(config.providers.contains_key("openai"));
+    }
+
+    #[test]
+    fn test_set_active_model_unknown_model_errors() {
+        let mut config = Config::default();
+        let err = config
+            .set_active_model("nonexistent-model-xyz")
+            .unwrap_err();
+        assert!(err.to_string().contains("nonexistent-model-xyz"));
+        assert!(err.to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_set_provider_credential_creates_new_provider() {
+        let mut config = Config::default();
+        config.set_provider_credential("custom-provider", "sk-custom-key");
+        assert!(config.providers.contains_key("custom-provider"));
+        let provider = config.providers.get("custom-provider").unwrap();
+        assert_eq!(provider.api_key.as_deref(), Some("sk-custom-key"));
+    }
+
+    #[test]
+    fn test_set_provider_credential_overwrites_existing() {
+        let mut config = Config::default();
+        config.set_provider_credential("anthropic", "old-key");
+        config.set_provider_credential("anthropic", "new-key");
+        let provider = config.providers.get("anthropic").unwrap();
+        assert_eq!(provider.api_key.as_deref(), Some("new-key"));
+    }
+
+    #[test]
+    fn test_save_extracts_credentials() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let tmp_dir = env::temp_dir().join("talos_test_save");
+        let _ = fs::remove_dir_all(&tmp_dir);
+        fs::create_dir_all(&tmp_dir.join(".talos")).unwrap();
+        unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
+
+        let mut config = Config::default();
+        config.model = "claude-sonnet-4-20250514".to_string();
+        config.set_provider_credential("anthropic", "sk-secret-key");
+        config.save().unwrap();
+
+        let config_path = Config::default_path();
+        let config_content = fs::read_to_string(&config_path).unwrap();
+        assert!(!config_content.contains("sk-secret-key"));
+
+        let creds_path = Credentials::default_path();
+        let creds_content = fs::read_to_string(&creds_path).unwrap();
+        assert!(creds_content.contains("sk-secret-key"));
+
+        unsafe { env::remove_var("HOME") };
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_load_merges_credentials() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let tmp_dir = env::temp_dir().join("talos_test_load_merge");
+        let _ = fs::remove_dir_all(&tmp_dir);
+        fs::create_dir_all(tmp_dir.join(".talos")).unwrap();
+        unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
+
+        let config_toml = r#"
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+"#;
+        fs::write(Config::default_path(), config_toml).unwrap();
+
+        let creds_toml = r#"
+anthropic = "sk-merged-key"
+"#;
+        fs::write(Credentials::default_path(), creds_toml).unwrap();
+
+        let config = Config::load().unwrap();
+        let provider = config.providers.get("anthropic").unwrap();
+        assert_eq!(provider.api_key.as_deref(), Some("sk-merged-key"));
+
+        unsafe { env::remove_var("HOME") };
+        let _ = fs::remove_dir_all(&tmp_dir);
     }
 }
