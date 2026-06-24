@@ -181,11 +181,12 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         agent.set_append_prompt(append_prompt.clone());
     }
 
+    let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
         print_mode: true,
         workspace_root: workspace_root.to_path_buf(),
         initial_history: vec![],
-        model_context_limit: 128_000,
+        model_context_limit,
     };
     let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -420,11 +421,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let initial_history = session.read_messages().unwrap_or_default();
     let visible_history = initial_history.clone();
 
+    let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
         initial_history,
-        model_context_limit: 128_000,
+        model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     let sq_tx_signal = handle.sq_tx.clone();
@@ -470,7 +472,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_watch_tx_for_handler = sq_tx_watch_tx.clone();
     let bridge_rx_update_tx_for_handler = bridge_rx_update_tx.clone();
     let session_watch_rx_for_handler = session_watch_rx.clone();
-    let model_context_limit = config.context_limit().unwrap_or(128_000);
+    let model_context_limit = config.resolve_model_limits().0;
     tokio::spawn(async move {
         while let Some(req) = session_rx.recv().await {
             match req {
@@ -728,11 +730,12 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
     let initial_history = session.read_messages().unwrap_or_default();
 
+    let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
         print_mode: true,
         workspace_root: workspace_root.to_path_buf(),
         initial_history,
-        model_context_limit: 128_000,
+        model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });
@@ -1010,11 +1013,12 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let initial_history = session.read_messages().unwrap_or_default();
 
+    let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
         initial_history,
-        model_context_limit: 128_000,
+        model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
     tokio::spawn(async move { actor.run().await });

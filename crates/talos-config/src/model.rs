@@ -279,6 +279,7 @@ fn is_leap(year: u64) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
