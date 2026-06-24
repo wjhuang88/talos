@@ -154,6 +154,12 @@ pub struct LogConfig {
     /// Full tracing filter expression. Overrides `level` when set.
     #[serde(default)]
     pub filter: Option<String>,
+
+    /// File-based logging with rotation and retention.
+    /// `None` means no file logging by default (backward compatible).
+    /// TUI mode auto-enables file logging when this is `None`.
+    #[serde(default)]
+    pub file: Option<LogFileConfig>,
 }
 
 /// Supported log output formats for the R1 logging baseline.
@@ -165,6 +171,68 @@ pub enum LogFormat {
     Pretty,
     /// Compact single-line tracing output.
     Compact,
+}
+
+/// Log rotation strategy for file-based logging.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogRotation {
+    /// Rotate when the current file exceeds `max_size_mb`.
+    #[default]
+    Size,
+    /// Rotate once per calendar day.
+    Daily,
+}
+
+/// Configuration for file-based log output with rotation and retention.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct LogFileConfig {
+    /// Whether file logging is enabled.
+    #[serde(default = "LogFileConfig::default_enabled")]
+    pub enabled: bool,
+
+    /// Path to the log file. Supports `~` expansion.
+    /// Defaults to `~/.talos/logs/talos.log` when `None`.
+    #[serde(default)]
+    pub path: Option<PathBuf>,
+
+    /// Maximum size of a single log file in megabytes before rotation.
+    #[serde(default = "LogFileConfig::default_max_size_mb")]
+    pub max_size_mb: u64,
+
+    /// Maximum number of retained log files (including the active one).
+    #[serde(default = "LogFileConfig::default_max_files")]
+    pub max_files: usize,
+
+    /// Rotation strategy.
+    #[serde(default)]
+    pub rotation: LogRotation,
+}
+
+impl Default for LogFileConfig {
+    fn default() -> Self {
+        Self {
+            enabled: Self::default_enabled(),
+            path: None,
+            max_size_mb: Self::default_max_size_mb(),
+            max_files: Self::default_max_files(),
+            rotation: LogRotation::default(),
+        }
+    }
+}
+
+impl LogFileConfig {
+    fn default_enabled() -> bool {
+        true
+    }
+
+    fn default_max_size_mb() -> u64 {
+        16
+    }
+
+    fn default_max_files() -> usize {
+        5
+    }
 }
 
 /// Hook-system configuration placeholder for I009-S2.
@@ -350,6 +418,35 @@ impl Config {
     pub fn output_limit(&self) -> Option<u32> {
         self.active_model_config()
             .and_then(|model| model.output_limit)
+    }
+
+    /// Resolves model limits using the full precedence chain:
+    /// 1. User-configured limits in `~/.talos/config.toml` for the active model.
+    /// 2. Built-in catalog from `builtin_models()` matched by model ID.
+    /// 3. Conservative fallback `(128_000, None)`.
+    ///
+    /// Returns `(context_limit, output_limit)`.
+    #[must_use]
+    pub fn resolve_model_limits(&self) -> (u32, Option<u32>) {
+        const CONSERVATIVE_FALLBACK: u32 = 128_000;
+
+        // Step 1: Check user config
+        if let Some(model_config) = self.active_model_config()
+            && let Some(ctx) = model_config.context_limit
+        {
+            return (ctx, model_config.output_limit);
+        }
+
+        // Step 2: Look up in builtin catalog
+        let builtins = model::builtin_models();
+        if let Some(meta) = model::find_model(&builtins, &self.model)
+            && let Some(ctx) = meta.context_limit
+        {
+            return (ctx, meta.output_limit);
+        }
+
+        // Step 3: Conservative fallback
+        (CONSERVATIVE_FALLBACK, None)
     }
 
     /// Returns the active provider config with built-in defaults applied.
@@ -1036,5 +1133,106 @@ mod tests {
         let serialized = toml::to_string(&config).unwrap();
         assert!(!serialized.contains("sk-very-secret"));
         assert!(!serialized.contains("api_key ="));
+    }
+
+    #[test]
+    fn test_resolve_model_limits_returns_user_config_when_set() {
+        let config = Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
+            providers: HashMap::from([(
+                "anthropic".to_string(),
+                ProviderConfig {
+                    models: HashMap::from([(
+                        "claude-sonnet-4-20250514".to_string(),
+                        ModelConfig {
+                            context_limit: Some(150_000),
+                            output_limit: Some(8000),
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let (ctx, out) = config.resolve_model_limits();
+        assert_eq!(ctx, 150_000);
+        assert_eq!(out, Some(8000));
+    }
+
+    #[test]
+    fn test_resolve_model_limits_falls_back_to_builtin_catalog() {
+        let config = Config {
+            provider: "google".to_string(),
+            model: "gemini-2.5-pro".to_string(),
+            providers: HashMap::from([(
+                "google".to_string(),
+                ProviderConfig {
+                    api_key_env: Some("GOOGLE_API_KEY".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let (ctx, out) = config.resolve_model_limits();
+        assert_eq!(ctx, 1_048_576);
+        assert_eq!(out, Some(65536));
+    }
+
+    #[test]
+    fn test_resolve_model_limits_falls_back_to_conservative_when_not_in_catalog() {
+        let config = Config {
+            provider: "custom-provider".to_string(),
+            model: "unknown-model-xyz".to_string(),
+            providers: HashMap::from([(
+                "custom-provider".to_string(),
+                ProviderConfig {
+                    api_key_env: Some("CUSTOM_KEY".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let (ctx, out) = config.resolve_model_limits();
+        assert_eq!(ctx, 128_000);
+        assert_eq!(out, None);
+    }
+
+    #[test]
+    fn test_resolve_model_limits_output_limit_from_catalog() {
+        let config = Config {
+            provider: "openai".to_string(),
+            model: "gpt-4.1-2025-04-14".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        let (ctx, out) = config.resolve_model_limits();
+        assert_eq!(ctx, 1_047_576);
+        assert_eq!(out, Some(32768));
+    }
+
+    #[test]
+    fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
+        let config = Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
+            providers: HashMap::from([(
+                "anthropic".to_string(),
+                ProviderConfig {
+                    models: HashMap::from([(
+                        "claude-sonnet-4-20250514".to_string(),
+                        ModelConfig {
+                            context_limit: Some(100_000),
+                            output_limit: None,
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let (ctx, out) = config.resolve_model_limits();
+        assert_eq!(ctx, 100_000);
+        assert_eq!(out, None);
     }
 }
