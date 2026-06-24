@@ -919,6 +919,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let engine = ConversationEngine::new(config.model.clone())
         .with_skills(runtime_skills.diagnostics())
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
+    let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
@@ -934,7 +935,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     });
 
     if needs_model_setup || needs_api_key {
-        let _ = user_input_tx.send(UserInput::Message("/model".to_string()));
+        let _ = session_tx_for_wizard.send(SessionLifecycleRequest::ModelSwitch(
+            talos_conversation::ModelSwitchRequest {
+                model_id: String::new(),
+                provider_needs_credential: false,
+            },
+        ));
         if needs_api_key {
             send_stream(
                 &ui_tx_for_wizard,
