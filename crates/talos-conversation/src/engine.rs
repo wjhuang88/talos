@@ -257,6 +257,7 @@ pub struct ConversationEngine {
     pub(crate) followup_queue: Vec<String>,
     pub(crate) usage: Usage,
     pub(crate) model_name: String,
+    pub(crate) provider_name: String,
     pub(crate) branch_id: Option<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
     pub(crate) mcp_servers: Vec<McpServerDiagnostic>,
@@ -276,7 +277,7 @@ impl ConversationEngine {
         COMMAND_REGISTRY.available_names()
     }
 
-    pub fn new(model_name: String) -> Self {
+    pub fn new(model_name: String, provider_name: String) -> Self {
         Self {
             messages: Vec::new(),
             current_turn_text: String::new(),
@@ -284,6 +285,7 @@ impl ConversationEngine {
             followup_queue: Vec::new(),
             usage: Usage::default(),
             model_name,
+            provider_name,
             branch_id: None,
             plugin_observations: Vec::new(),
             mcp_servers: Vec::new(),
@@ -308,12 +310,21 @@ impl ConversationEngine {
     pub fn status_snapshot(&self) -> StatusSnapshot {
         StatusSnapshot {
             model_name: self.model_name.clone(),
+            provider: self.provider_name.clone(),
             usage: self.usage.clone(),
             branch_id: self.branch_id.clone(),
             steering_count: self.steering_queue.len(),
             followup_count: self.followup_queue.len(),
             is_processing: self.is_processing,
         }
+    }
+
+    /// Update model and provider info after a runtime model switch.
+    ///
+    /// Called by the bridge when the lifecycle handler completes a model switch.
+    pub fn set_model_info(&mut self, model_name: &str, provider: &str) {
+        self.model_name = model_name.to_string();
+        self.provider_name = provider.to_string();
     }
 
     pub fn is_processing(&self) -> bool {

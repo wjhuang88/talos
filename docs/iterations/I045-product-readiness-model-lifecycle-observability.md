@@ -1,8 +1,8 @@
 # I045: Product Readiness — Model Lifecycle, Config, Observability
 
-> Document status: Active
+> Document status: Complete (2026-06-24)
 > Published plan date: 2026-06-24
-> Planned close date: 2026-07-24 (≈ 1 month)
+> Closed date: 2026-06-24
 > Planned objective: Turn Talos from "hand-edit TOML to configure" into "guided
 >   model setup, runtime model switching, and bounded observability." Three
 >   themes: (1) model-centric lifecycle with inline provider onboarding, (2) CLI
@@ -355,3 +355,90 @@ CONF-001-S ───────────────────────
 - `crates/talos-conversation/src/engine.rs` — BuiltinCommand, command registry
 - `docs/decisions/014-log-retention-and-rotation.md` — ADR-014 (log bounds)
 - `docs/decisions/015-embedded-prompt-assets.md` — ADR-015 (prompt embedding)
+
+## Execution Record
+
+### Implementation Summary
+
+| Story | Status | Commits | Notes |
+|---|---|---|---|
+| OBS-001 (log rotation) | ✅ Complete | `7115cb7` | `RotatingWriter` + `LogFileConfig` with size-based rotation + retention |
+| MODEL-004-R (catalog wiring) | ✅ Complete | `4a422e4`, `8700f3f` | `Config::resolve_model_limits()` with builtin fallback; `send_stream()` helper eliminated 33 duplications |
+| MODEL-005-R (/model picker + onboarding) | ✅ Complete | `f2f2f2d`, `81ab83f`, `6452b2e`, `bdbac5a`, `98c61ba`, `9aaef21`, `aa7212b` | `/model` command, `PanelKind::ModelPicker` with Ready/Setup-required groups; inline credential input via `PanelKind::CredentialInput`; first-run wizard replacing `bail!`; `--no-init` flag |
+| CONF-001-S (CLI config) | ✅ Complete | `2dfc595` | `talos config get/set/list` with env var support; secrets masked |
+| `--available-models` CLI | ✅ Complete | (this iteration) | Lists builtin catalog grouped by provider with auth status |
+| `--use-model` CLI | ✅ Complete | (this iteration) | Sets active model from CLI, persists to config.toml |
+| `--init` CLI | ✅ Complete | (this iteration) | Clears model, falls through to TUI wizard |
+| Group headers | ✅ Complete | (this iteration) | Non-navigable "Ready"/"Setup required" headers with bold styling |
+
+### Key Fixes During Execution
+
+| Issue | Resolution |
+|---|---|
+| Model switch depends on session (first-run) | `ensure_persisted()` on deferred session before transition |
+| `api_key` silently erased on save | Reverted `#[serde(skip_serializing)]` — api_key now serializes in config.toml; display masking handled by CLI |
+| `credentials.toml` data loss | Removed `Credentials::save()` from `Config::save()`; backward-compat `Credentials::load()` still merges legacy file |
+| `protocol` reset to `openai-chat` on `set_active_model` | Pre-existing: builtin provider takes precedence at runtime via `active_provider_config()` |
+
+### Acceptance Verification
+
+**MODEL-004-R:**
+- ✅ `Config::resolve_model_limits()` returns catalog-sourced limits
+- ✅ `SessionConfig::default()` uses catalog lookup
+- ✅ Fallback to 128_000 works when model not in catalog
+- ✅ `cargo test -p talos-config -p talos-agent` passes
+
+**MODEL-005-R:**
+- ✅ `/model` opens bottom panel with catalog models, grouped by Ready / Setup required
+- ✅ Up/Down skips headers; Enter selects; Esc cancels
+- ✅ Ready group: instant switch on select
+- ✅ Setup required group: inline credential input → validate → switch
+- ✅ First run: TUI opens with model picker auto-shown
+- ✅ `--no-init` flag skips wizard in CI/non-interactive
+- ✅ `--init` clears model, falls through to TUI wizard
+- ✅ `--available-models` prints catalog with auth status
+- ✅ `--use-model` sets active model from CLI
+- ✅ Model switch preserves session ID and history
+- ✅ Config persists correctly to `~/.talos/config.toml`
+- ✅ `cargo test --workspace` passes
+
+**CONF-001-S:**
+- ✅ `--config-list`, `--config-get`, `--config-set` read/write through talos-config API
+- ✅ JSON Schema validation rejects invalid values
+- ✅ `${ENV_VAR}` substitution survives set/get round-trip
+- ✅ Secret fields masked in display
+- ✅ No regression for env-var-driven config
+- ✅ `cargo test -p talos-config -p talos-cli` passes
+
+**OBS-001:**
+- ✅ `[log.file]` config section controls path, max size, max files, rotation
+- ✅ TUI mode defaults to file logging; non-TUI defaults to stderr
+- ✅ Rotation in-process; no host dependency
+- ✅ Total retained bytes bounded by `max_size_mb × max_files`
+- ✅ `cargo test --workspace` passes
+
+### Commits
+
+```
+7115cb7 feat(cli): log rotation with RotatingWriter + retention config
+8700f3f refactor(cli): extract send_stream helper, eliminate 33 duplicated blocks
+4a422e4 feat(config): resolve_model_limits with builtin catalog fallback
+f2f2f2d feat(conversation): /model command + ModelPicker+ModelSwitchRequest types
+81ab83f feat(tui): PanelKind::ModelPicker with auth-grouped items
+b7ae5cd feat(config): Config::save, provider_authenticated, set_active_model, credential store
+6452b2e feat(cli): handle_session_model + handle_session_model_with_credential lifecycle handlers
+bdbac5a feat(tui): credential input panel (masked) with CredentialRequest/Response wiring
+4962b5b feat(cli): first-run wizard replaces bail! with TUI auto-opening /model picker
+2dfc595 feat(cli): talos config get/set/list with env var + --available-models + --use-model
+98c61ba feat(tui): PanelKind::CredentialInput + UserInput::Credential routing
+9aaef21 fix(cli): first-run /model bypasses engine — direct lifecycle dispatch
+aa7212b fix(cli): ensure_persisted() on model switch for deferred session
+c8d6c33 docs: README sync (en + zh-CN) with /model, first-run wizard, config CLI
+(plus ~5 commits in this continuation for --init, group headers, closeout)
+```
+
+### Lessons (EVOLUTION.md)
+
+- #28: Pre-closeout parallel audit catches self-comparison sort bug in session listing
+- #29: `serde(skip_serializing)` on api_key causes silent data loss — display masking must be at the CLI layer, not the serializer
+- #30: Model switch needs `ensure_persisted()` — session may not exist on first turn

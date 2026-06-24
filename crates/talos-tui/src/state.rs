@@ -28,6 +28,10 @@ pub(crate) struct PanelItem {
     /// commands (the value itself is the full command) and for approval rows.
     #[allow(dead_code)]
     pub(crate) command: String,
+    /// If true, this item is a non-navigable group header (used in model picker).
+    /// Headers are skipped by Up/Down navigation and cannot be selected.
+    #[allow(dead_code)]
+    pub(crate) is_header: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +65,7 @@ impl BottomPanelState {
                 description: cmd.description.to_string(),
                 value: cmd.name.to_string(),
                 command: String::new(),
+                is_header: false,
             })
             .collect();
         Self {
@@ -84,6 +89,7 @@ impl BottomPanelState {
                 },
                 value: s.ordinal.to_string(),
                 command: s.command.clone(),
+                is_header: false,
             })
             .collect();
         Self {
@@ -96,32 +102,46 @@ impl BottomPanelState {
     }
 
     pub(crate) fn open_model_picker(items: &[ModelPickerItem]) -> Self {
-        let mut panel_items: Vec<PanelItem> = items
+        let mut panel_items: Vec<PanelItem> = Vec::new();
+        let ready_header = PanelItem {
+            is_header: true,
+            label: "Ready".into(),
+            description: String::new(),
+            value: String::new(),
+            command: String::new(),
+        };
+        panel_items.push(ready_header);
+        panel_items.extend(items.iter().filter(|m| m.authenticated).map(|m| PanelItem {
+            label: m.label.clone(),
+            description: m.provider.clone(),
+            value: m.model_id.clone(),
+            command: m.command.clone(),
+            is_header: false,
+        }));
+        let setup_header = PanelItem {
+            is_header: true,
+            label: "Setup required".into(),
+            description: String::new(),
+            value: String::new(),
+            command: String::new(),
+        };
+        panel_items.push(setup_header);
+        panel_items.extend(items.iter().filter(|m| !m.authenticated).map(|m| PanelItem {
+            label: m.label.clone(),
+            description: format!("{} (setup required)", m.provider),
+            value: m.model_id.clone(),
+            command: m.command.clone(),
+            is_header: false,
+        }));
+        let initial_index = panel_items
             .iter()
-            .filter(|m| m.authenticated)
-            .map(|m| PanelItem {
-                label: m.label.clone(),
-                description: m.provider.clone(),
-                value: m.model_id.clone(),
-                command: m.command.clone(),
-            })
-            .collect();
-        let setup_items: Vec<PanelItem> = items
-            .iter()
-            .filter(|m| !m.authenticated)
-            .map(|m| PanelItem {
-                label: m.label.clone(),
-                description: format!("{} (setup required)", m.provider),
-                value: m.model_id.clone(),
-                command: m.command.clone(),
-            })
-            .collect();
-        panel_items.extend(setup_items);
+            .position(|i| !i.is_header)
+            .unwrap_or(0);
         Self {
             is_open: true,
             kind: Some(PanelKind::ModelPicker),
             items: panel_items,
-            selected_index: 0,
+            selected_index: initial_index,
             credential_buffer: String::new(),
         }
     }
@@ -176,18 +196,21 @@ impl BottomPanelState {
                     description: String::new(),
                     value: "approve".to_string(),
                     command: String::new(),
+                    is_header: false,
                 },
                 PanelItem {
                     label: "[a] always approve".to_string(),
                     description: String::new(),
                     value: "always".to_string(),
                     command: String::new(),
+                    is_header: false,
                 },
                 PanelItem {
                     label: "[n] deny".to_string(),
                     description: String::new(),
                     value: "deny".to_string(),
                     command: String::new(),
+                    is_header: false,
                 },
             ],
             selected_index: 0,
@@ -244,7 +267,13 @@ impl BottomPanelState {
         if len == 0 {
             return;
         }
-        self.selected_index = (self.selected_index + 1) % len;
+        for _ in 0..len {
+            self.selected_index = (self.selected_index + 1) % len;
+            // Use raw items to check header status (avoids borrow conflict with selected_index)
+            if self.items.get(self.selected_index).is_none_or(|i| !i.is_header) {
+                return;
+            }
+        }
     }
 
     pub(crate) fn select_prev(&mut self, query: &str) {
@@ -252,10 +281,15 @@ impl BottomPanelState {
         if len == 0 {
             return;
         }
-        if self.selected_index == 0 {
-            self.selected_index = len - 1;
-        } else {
-            self.selected_index -= 1;
+        for _ in 0..len {
+            if self.selected_index == 0 {
+                self.selected_index = len - 1;
+            } else {
+                self.selected_index -= 1;
+            }
+            if self.items.get(self.selected_index).is_none_or(|i| !i.is_header) {
+                return;
+            }
         }
     }
 }
@@ -432,6 +466,15 @@ impl TuiState {
     }
 
     pub(crate) fn accept_selected_panel_item(&mut self) -> PanelAction {
+        // Guard: skip header items (non-navigable group headers)
+        if self
+            .slash_menu
+            .items
+            .get(self.slash_menu.selected_index)
+            .is_some_and(|i| i.is_header)
+        {
+            return PanelAction::None;
+        }
         let completion = self.slash_menu.selected_completion(self.slash_query());
         if self.slash_menu.is_picker() {
             let value = completion.unwrap_or_default();

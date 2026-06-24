@@ -80,6 +80,7 @@ pub enum TipKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StatusSnapshot {
     pub model_name: String,
+    pub provider: String,
     pub usage: Usage,
     pub branch_id: Option<String>,
     pub steering_count: usize,

@@ -76,11 +76,13 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
     /// Inline API key written directly in the config file.
     ///
-    /// When set, takes precedence over the env-var lookup. The field is
-    /// `skip_serializing`, so calling `toml::to_string(&config)` on a
-    /// deserialized config will not echo the key back into the output.
-    /// Set `chmod 600` on the config file if you use this field.
-    #[serde(default, skip_serializing)]
+    /// Inline API key. When set, takes precedence over the env-var lookup.
+    /// Stored directly in `config.toml` — the file lives in your home
+    /// directory (chmod 600 recommended). Use `api_key_env` for shared shells
+    /// or containerised environments. `talos config list`/`get` masks this
+    /// field on display, but it is present in the file for tooling that
+    /// reads config directly.
+    #[serde(default)]
     pub api_key: Option<String>,
     /// Environment variable containing the API key. Used as a fallback when
     /// `api_key` is not set.
@@ -586,12 +588,11 @@ impl Config {
         Ok(())
     }
 
-    /// Persists the current configuration to `~/.talos/config.toml` and
-    /// credentials to `~/.talos/credentials.toml`.
+    /// Persists the current configuration to `~/.talos/config.toml`.
     ///
-    /// The main config file never contains raw API keys (the `api_key` field
-    /// is `skip_serializing`). Keys are extracted from in-memory provider
-    /// configs and written to the separate credentials store.
+    /// `api_key` values are serialized in the main config file. Run
+    /// `talos config list` or `talos config get` to view config without
+    /// leaking keys.
     pub fn save(&self) -> Result<(), ConfigError> {
         let path = Self::default_path();
         if let Some(parent) = path.parent() {
@@ -600,9 +601,6 @@ impl Config {
         let toml_str =
             toml::to_string_pretty(self).map_err(|e| ConfigError::SerializeError(e.to_string()))?;
         fs::write(&path, toml_str)?;
-
-        let creds = self.extract_credentials();
-        creds.save()?;
         Ok(())
     }
 
@@ -648,20 +646,52 @@ impl Config {
         false
     }
 
-    /// Sets the active model by resolving it against the builtin catalog.
+    /// Returns all available models: built-in catalog merged with user-configured
+    /// models from `providers.*.models`. Configured models override builtin entries
+    /// with the same model ID.
+    pub fn all_models(&self) -> Vec<model::ModelMetadata> {
+        let mut models = model::builtin_models();
+        for (provider_name, provider) in &self.providers {
+            for (model_id, cfg) in &provider.models {
+                if let Some(existing) = models.iter_mut().find(|m| m.id == *model_id) {
+                    if cfg.context_limit.is_some() {
+                        existing.context_limit = cfg.context_limit;
+                    }
+                    if cfg.output_limit.is_some() {
+                        existing.output_limit = cfg.output_limit;
+                    }
+                    existing.source = model::ModelSource::Manual;
+                } else {
+                    models.push(model::ModelMetadata {
+                        id: model_id.clone(),
+                        provider: provider_name.clone(),
+                        context_limit: cfg.context_limit,
+                        output_limit: cfg.output_limit,
+                        pricing: None,
+                        capabilities: model::ModelCapabilities::default(),
+                        release_date: None,
+                        source: model::ModelSource::Manual,
+                    });
+                }
+            }
+        }
+        models
+    }
+
+    /// Sets the active model by resolving it against all known models.
     ///
-    /// Looks up `model_id` in `builtin_models()` to find the owning provider,
-    /// then sets `self.model` and `self.provider` accordingly. Ensures the
-    /// provider has an entry in `self.providers` (creates a default if missing).
+    /// Looks up `model_id` in [`Config::all_models`] to find the owning
+    /// provider, then sets `self.model` and `self.provider` accordingly.
+    /// Ensures the provider has an entry in `self.providers` (creates a
+    /// default if missing).
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigError::InvalidConfig`] if the model ID is not found in
-    /// the builtin catalog.
+    /// Returns [`ConfigError::InvalidConfig`] if the model ID is not found.
     pub fn set_active_model(&mut self, model_id: &str) -> Result<(), ConfigError> {
-        let builtins = model::builtin_models();
-        let meta = model::find_model(&builtins, model_id).ok_or_else(|| {
-            ConfigError::InvalidConfig(format!("model '{model_id}' not found in builtin catalog"))
+        let all = self.all_models();
+        let meta = model::find_model(&all, model_id).ok_or_else(|| {
+            ConfigError::InvalidConfig(format!("model '{model_id}' not found"))
         })?;
 
         self.model = model_id.to_string();
@@ -704,20 +734,6 @@ impl Config {
     }
 
     /// Extracts all in-memory API keys into a [`Credentials`] store.
-    ///
-    /// Only providers with a non-empty `api_key` are included.
-    fn extract_credentials(&self) -> Credentials {
-        let mut creds = Credentials::default();
-        for (name, provider) in &self.providers {
-            if let Some(key) = &provider.api_key
-                && !key.is_empty()
-            {
-                creds.keys.insert(name.clone(), key.clone());
-            }
-        }
-        creds
-    }
-
     /// Merges credentials into this config's provider `api_key` fields.
     ///
     /// For each provider that has a stored credential but no inline key,
@@ -1326,7 +1342,11 @@ mod tests {
     }
 
     #[test]
-    fn test_inline_api_key_not_serialized_back() {
+    fn test_inline_api_key_is_serialized_in_config_toml() {
+        // I045 reverted skip_serializing: api_key is now stored directly in
+        // config.toml (the file lives in the user's home directory, chmod 600
+        // recommended). Display masking is the responsibility of
+        // `talos config list`/`get`, not the serializer.
         let config: Config = toml::from_str(
             r#"
             provider = "dashscope"
@@ -1340,8 +1360,8 @@ mod tests {
         )
         .unwrap();
         let serialized = toml::to_string(&config).unwrap();
-        assert!(!serialized.contains("sk-very-secret"));
-        assert!(!serialized.contains("api_key ="));
+        assert!(serialized.contains("sk-very-secret"));
+        assert!(serialized.contains("api_key ="));
     }
 
     #[test]
@@ -1489,6 +1509,7 @@ mod tests {
 
         unsafe { env::remove_var("HOME") };
         let _ = fs::remove_dir_all(&tmp_dir);
+        let _ = fs::remove_dir_all(&tmp_dir);
     }
 
     #[test]
@@ -1572,11 +1593,16 @@ mod tests {
     }
 
     #[test]
-    fn test_save_extracts_credentials() {
+    fn test_save_writes_api_key_in_config_toml() {
+        // I045 fix: api_key is now serialized in config.toml. This avoids
+        // the silent data-loss bug where keys were moved to a separate
+        // credentials.toml without the user knowing. Display masking
+        // remains the responsibility of `talos config list`/`get`.
         let _lock = ENV_MUTEX.lock().unwrap();
         let tmp_dir = env::temp_dir().join("talos_test_save");
         let _ = fs::remove_dir_all(&tmp_dir);
         fs::create_dir_all(&tmp_dir.join(".talos")).unwrap();
+        let prev_home = std::env::var_os("HOME");
         unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
         let mut config = Config::default();
@@ -1586,13 +1612,16 @@ mod tests {
 
         let config_path = Config::default_path();
         let config_content = fs::read_to_string(&config_path).unwrap();
-        assert!(!config_content.contains("sk-secret-key"));
+        assert!(config_content.contains("sk-secret-key"));
 
+        // No credentials.toml should be written anymore.
         let creds_path = Credentials::default_path();
-        let creds_content = fs::read_to_string(&creds_path).unwrap();
-        assert!(creds_content.contains("sk-secret-key"));
+        assert!(!creds_path.exists(), "credentials.toml should not be created");
 
-        unsafe { env::remove_var("HOME") };
+        match prev_home {
+            Some(v) => unsafe { env::set_var("HOME", v) },
+            None => unsafe { env::remove_var("HOME") },
+        }
         let _ = fs::remove_dir_all(&tmp_dir);
     }
 
@@ -1621,5 +1650,87 @@ anthropic = "sk-merged-key"
 
         unsafe { env::remove_var("HOME") };
         let _ = fs::remove_dir_all(&tmp_dir);
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    /// Regression test for the I045 data-loss bug: inline api_key in
+    /// config.toml must be preserved across load+save round-trips and
+    /// visible to anyone reading the file. The fix was to drop the
+    /// `skip_serializing` attribute (which was quietly moving keys to
+    /// a separate credentials.toml). Display masking is handled by
+    /// `talos config list`/`get`, not the serializer.
+    #[test]
+    fn test_save_preserves_inline_api_key_from_config_toml() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let tmp_dir = env::temp_dir().join("talos_test_roundtrip");
+        let _ = fs::remove_dir_all(&tmp_dir);
+        fs::create_dir_all(&tmp_dir).unwrap();
+        let talos_dir = &tmp_dir.join(".talos");
+        fs::create_dir_all(&talos_dir).unwrap();
+        let prev_home = std::env::var_os("HOME");
+        unsafe { env::set_var("HOME", &tmp_dir.to_string_lossy().as_ref()) };
+
+        let config_toml = r#"
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[providers.anthropic]
+protocol = "anthropic-messages"
+api_key = "sk-inline-secret-from-config"
+"#;
+        fs::write(Config::default_path(), config_toml).unwrap();
+
+        let config = Config::load().unwrap();
+        let provider = config.providers.get("anthropic").unwrap();
+        assert_eq!(
+            provider.api_key.as_deref(),
+            Some("sk-inline-secret-from-config"),
+            "api_key must be loaded from config.toml during deserialization"
+        );
+
+        config.save().unwrap();
+
+        let saved_config = fs::read_to_string(Config::default_path()).unwrap();
+        assert!(
+            saved_config.contains("sk-inline-secret-from-config"),
+            "api_key must be present in saved config.toml (regression for I045 data-loss bug)"
+        );
+
+        // No credentials.toml should be written.
+        assert!(
+            !Credentials::default_path().exists(),
+            "credentials.toml should not be written anymore"
+        );
+
+        let config2 = Config::load().unwrap();
+        let provider2 = config2.providers.get("anthropic").unwrap();
+        assert_eq!(
+            provider2.api_key.as_deref(),
+            Some("sk-inline-secret-from-config"),
+            "api_key must survive a second load round-trip"
+        );
+
+        match prev_home {
+            Some(v) => unsafe { env::set_var("HOME", v) },
+            None => unsafe { env::remove_var("HOME") },
+        }
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    /// When the I045 fix is applied (no skip_serializing), api_key is
+    /// serialized in config.toml and survives a load+save round-trip
+    /// in the main config file alone — no credentials.toml needed.
+    #[test]
+    fn test_skip_serializing_does_not_skip_deserialization() {
+        let toml_str = r#"
+            provider = "test"
+            model = "test-model"
+
+            [providers.test]
+            api_key = "hello-from-toml"
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        let provider = config.providers.get("test").unwrap();
+        assert_eq!(provider.api_key.as_deref(), Some("hello-from-toml"));
     }
 }

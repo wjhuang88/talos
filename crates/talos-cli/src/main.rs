@@ -175,6 +175,23 @@ pub(crate) struct Cli {
     )]
     config_set: Option<String>,
 
+    #[arg(long = "available-models", help = "List available models from the builtin model catalog, grouped by provider with authentication status.")]
+    available_models: bool,
+
+    #[arg(
+        long = "use-model",
+        value_name = "MODEL_ID",
+        help = "Set the active model (e.g. 'claude-sonnet-4-20250514'). Persists to config.toml."
+    )]
+    use_model: Option<String>,
+
+    #[arg(
+        long,
+        conflicts_with_all = ["tui", "repl", "inline", "print"],
+        help = "Re-run the first-run setup wizard: enter TUI with the model picker auto-opened."
+    )]
+    init: bool,
+
     #[arg(long, help = "Display learned patterns from the evolution engine.")]
     learned: bool,
 
@@ -215,6 +232,19 @@ async fn main() -> Result<()> {
     }
     if let Some(kv) = &cli.config_set {
         return run_config_set(kv);
+    }
+
+    if cli.available_models {
+        return run_models();
+    }
+    if let Some(model_id) = &cli.use_model {
+        return run_use_model(model_id);
+    }
+    if cli.init {
+        let mut config = Config::load().context("failed to load configuration")?;
+        config.model.clear();
+        config.save().context("failed to save configuration")?;
+        // Falls through to the TUI path which will auto-open the model picker
     }
 
     if matches!(cli.mode, Some(Mode::McpServer)) {
@@ -351,6 +381,66 @@ fn run_config_set(kv: &str) -> Result<()> {
     config_set_dotted(&mut config, key.trim(), value.trim())?;
     config.save().context("failed to save configuration")?;
     println!("Set {key} = {}", if is_secret_key(key) { "***".to_string() } else { value.trim().to_string() });
+    Ok(())
+}
+
+fn run_models() -> Result<()> {
+    let config = Config::load().context("failed to load configuration")?;
+    let catalog = talos_config::model::builtin_models();
+
+    let mut by_provider: std::collections::BTreeMap<String, Vec<&talos_config::model::ModelMetadata>> =
+        std::collections::BTreeMap::new();
+    for m in &catalog {
+        by_provider.entry(m.provider.clone()).or_default().push(m);
+    }
+
+    for (provider, models) in &by_provider {
+        let authed = config.provider_authenticated(provider);
+        let status = if authed { "Ready" } else { "Setup required" };
+        println!("\n{provider}  —  {status}");
+
+        let mut sorted = models.clone();
+        sorted.sort_by(|a, b| a.id.cmp(&b.id));
+        for m in sorted {
+            let ctx = m
+                .context_limit
+                .map(|c| format!("{}K", c / 1000))
+                .unwrap_or_else(|| "?".to_string());
+            let pricing = m
+                .pricing
+                .as_ref()
+                .map(|p| {
+                    let inp = p.input_per_1m.unwrap_or(0.0);
+                    let out = p.output_per_1m.unwrap_or(0.0);
+                    format!("  ${inp:.2}/${out:.2}/1M tok")
+                })
+                .unwrap_or_default();
+            println!("  {}  (ctx: {ctx}){pricing}", m.id);
+        }
+    }
+
+    Ok(())
+}
+
+fn run_use_model(model_id: &str) -> Result<()> {
+    let mut config = Config::load().context("failed to load configuration")?;
+    config
+        .set_active_model(model_id)
+        .with_context(|| format!("unknown model '{model_id}'"))?;
+
+    if !config.provider_authenticated(&config.provider) {
+        eprintln!(
+            "Note: provider '{}' needs credentials. Set with:",
+            config.provider
+        );
+        eprintln!(
+            "  talos --config-set providers.{}.api_key=YOUR_KEY",
+            config.provider
+        );
+    }
+
+    config.save().context("failed to save configuration")?;
+    println!("Active model set to {model_id}.");
     Ok(())
 }
 

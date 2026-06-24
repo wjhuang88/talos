@@ -282,6 +282,7 @@ mod tests {
     fn test_queue_indicator_absent_when_no_queues() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
+            provider: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -299,6 +300,7 @@ mod tests {
     fn test_queue_indicator_in_status_when_steering_queued() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
+            provider: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 3,
@@ -456,6 +458,7 @@ mod tests {
             description: "Export transcript [path]".to_string(),
             value: "/export".to_string(),
             command: String::new(),
+            is_header: false,
         };
         assert_eq!(item.label, "/export");
         assert!(item.description.contains('['));
@@ -605,6 +608,7 @@ mod tests {
     fn test_status_bar_uses_accent_for_model() {
         let status = StatusSnapshot {
             model_name: "claude-sonnet-4".to_string(),
+            provider: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -620,6 +624,7 @@ mod tests {
     fn test_status_bar_shows_processing_spinner() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
+            provider: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -636,6 +641,7 @@ mod tests {
     fn test_status_bar_no_spinner_when_idle() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
+            provider: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -651,6 +657,7 @@ mod tests {
     fn test_status_bar_uses_human_readable_tokens() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
+            provider: String::new(),
             usage: Usage {
                 input_tokens: 12_345,
                 output_tokens: 8_900,
@@ -671,6 +678,7 @@ mod tests {
     fn test_status_bar_compact_mode_at_narrow_width() {
         let status = StatusSnapshot {
             model_name: "claude-sonnet-4-20250514".to_string(),
+            provider: String::new(),
             usage: Usage {
                 input_tokens: 5_000,
                 output_tokens: 3_000,

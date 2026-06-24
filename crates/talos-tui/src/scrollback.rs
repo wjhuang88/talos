@@ -280,6 +280,9 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         if self.menu.is_approval() {
             return 5u16.min(self.max_height);
         }
+        if self.menu.is_credential_input() {
+            return 3u16.min(self.max_height);
+        }
         let filtered = self.menu.filtered_items(self.query).len();
         let natural_height = if filtered == 0 {
             1
@@ -298,6 +301,45 @@ impl ViewportComponent for BottomPanelComponent<'_> {
 
         if self.menu.is_approval() {
             self.render_approval(frame, area);
+            return;
+        }
+
+        if self.menu.is_credential_input() {
+            let (provider, model_id) = match &self.menu.kind {
+                Some(crate::state::PanelKind::CredentialInput { provider, model_id }) => {
+                    (provider.as_str(), model_id.as_str())
+                }
+                _ => ("?", "?"),
+            };
+            let buffer = self.menu.credential_buffer.as_str();
+            let display: std::borrow::Cow<'_, str> = if buffer.is_empty() {
+                "Enter API key…".into()
+            } else {
+                // Show last 4 chars unmasked, rest masked
+                let visible = buffer.len().saturating_sub(4);
+                let masked = "•".repeat(visible.min(buffer.len()));
+                let last_four = &buffer[visible..];
+                format!("{masked}{last_four}").into()
+            };
+            let style = Style::default().bg(semantic::INPUT_BG);
+            let dim = Style::default().fg(semantic::DIM_TEXT);
+            let text_color = if buffer.is_empty() {
+                dim
+            } else {
+                Style::default().fg(semantic::TEXT_PRIMARY)
+            };
+            let lines = vec![
+                Line::from(Span::styled(
+                    format!(" Provider: {provider}  Model: {model_id}"),
+                    Style::default().fg(crate::nord::NORD8).bold(),
+                )),
+                Line::from(Span::styled(
+                    " Enter the API key for this provider and press Enter (Esc to cancel).",
+                    dim,
+                )),
+                Line::from(Span::styled(format!(" ▸ {display}"), text_color)),
+            ];
+            frame.render_widget(Paragraph::new(lines).style(style), area);
             return;
         }
 
@@ -330,6 +372,14 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         let selected_style = Style::default()
             .fg(semantic::TEXT_ACCENT)
             .bg(semantic::NORD2);
+        let header_style = Style::default()
+            .fg(semantic::DIM_TEXT)
+            .bg(semantic::NORD2)
+            .bold();
+        let header_selected = Style::default()
+            .fg(semantic::TEXT_ACCENT)
+            .bg(semantic::NORD2)
+            .bold();
 
         let mut lines: Vec<Line<'static>> = Vec::with_capacity(area.height as usize);
 
@@ -345,6 +395,15 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             }
             let item = filtered[idx];
             let is_selected = idx == self.menu.selected_index;
+
+            if item.is_header {
+                let style = if is_selected { header_selected } else { header_style };
+                lines.push(Line::from(Span::styled(
+                    format!("  {} ───", item.label),
+                    style,
+                )));
+                continue;
+            }
 
             let (name, desc) = if self.menu.is_slash() {
                 let command_name = item.label.strip_prefix('/').unwrap_or(&item.label);
@@ -1335,18 +1394,20 @@ pub(crate) fn build_status_text(
     let compact = width < 80;
 
     let model_name = &status.model_name;
+    let provider = &status.provider;
     let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
     let queue_total = status.steering_count + status.followup_count;
 
     if compact {
-        return build_compact_status(model_name, status.is_processing, total_tokens, queue_total);
+        return build_compact_status(model_name, provider, status.is_processing, total_tokens, queue_total);
     }
 
-    build_expanded_status(model_name, status.is_processing, total_tokens, queue_total)
+    build_expanded_status(model_name, provider, status.is_processing, total_tokens, queue_total)
 }
 
 fn build_compact_status(
     model_name: &str,
+    provider: &str,
     is_processing: bool,
     total_tokens: u64,
     queue_total: usize,
@@ -1356,6 +1417,11 @@ fn build_compact_status(
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
     let model_part = format!("⬡ {}", truncate_str(model_name, 20));
+    let provider_part = if provider.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", truncate_str(provider, 12))
+    };
     let spinner_part = if is_processing { " ◷" } else { "" };
     let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
     let queue_part = if queue_total > 0 {
@@ -1366,7 +1432,7 @@ fn build_compact_status(
 
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
-        Span::styled(model_part.clone(), accent),
+        Span::styled(format!("{model_part}{provider_part}"), accent),
         Span::styled(spinner_part, dim),
         Span::styled(tokens_part, val),
         Span::styled(queue_part, dim),
@@ -1375,6 +1441,7 @@ fn build_compact_status(
 
 fn build_expanded_status(
     model_name: &str,
+    provider: &str,
     is_processing: bool,
     total_tokens: u64,
     queue_total: usize,
@@ -1384,6 +1451,11 @@ fn build_expanded_status(
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
     let model_part = format!("⬡ {}", truncate_str(model_name, 24));
+    let provider_part = if provider.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", truncate_str(provider, 16))
+    };
     let spinner_part = if is_processing {
         " ◷ processing…"
     } else {
@@ -1400,7 +1472,7 @@ fn build_expanded_status(
 
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
-        Span::styled(model_part, accent),
+        Span::styled(format!("{model_part}{provider_part}"), accent),
         Span::styled(spinner_part, dim),
         Span::styled("     ", dim),
         Span::styled(right_part, val),

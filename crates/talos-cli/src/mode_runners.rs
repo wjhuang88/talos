@@ -11,7 +11,7 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, MessageSource, ModelPickerItem, SessionPickerItem, StreamMessage, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, MessageSource, ModelPickerItem, SessionPickerItem, StatusSnapshot, StreamMessage, UiOutput, UserInput};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
@@ -354,7 +354,7 @@ async fn handle_session_model(
     mock: bool,
 ) {
     if model_id.is_empty() {
-        let catalog = talos_config::model::builtin_models();
+        let catalog = config.all_models();
         let items: Vec<ModelPickerItem> = catalog
             .iter()
             .map(|m| {
@@ -481,6 +481,11 @@ async fn handle_session_model(
             }
             let text = format!("[System] Switched to model {model_id}.\n");
             send_stream(ui_tx, MessageSource::System, text);
+            let _ = ui_tx.send(UiOutput::Status(StatusSnapshot {
+                model_name: model_id.clone(),
+                provider: provider_name.clone(),
+                ..Default::default()
+            }));
         }
         Err(e) => {
             transition_guard.rollback();
@@ -592,6 +597,11 @@ async fn handle_session_model_with_credential(
                 cred.model_id
             );
             send_stream(ui_tx, MessageSource::System, text);
+            let _ = ui_tx.send(UiOutput::Status(StatusSnapshot {
+                model_name: cred.model_id.clone(),
+                provider: model_config.provider.clone(),
+                ..Default::default()
+            }));
         }
         Err(e) => {
             transition_guard.rollback();
@@ -925,8 +935,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_ui_output_rx(ui_output_rx);
     tui.set_user_input_tx(user_input_tx.clone());
     tui.set_model_name(config.model.clone());
+    tui.set_provider(config.provider.clone());
 
-    let engine = ConversationEngine::new(config.model.clone())
+    let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(runtime_skills.diagnostics())
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
     let session_tx_for_wizard = session_tx.clone();

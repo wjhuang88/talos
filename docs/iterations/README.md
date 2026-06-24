@@ -79,7 +79,7 @@ docs/iterations/
 | I042 | I041 Hotfix — Persistence Continuity, /resume UX, Execute Semantics | **Complete** (2026-06-23) | P1 persistence fix (watch channels), /resume ordinal selection, Execute first-token extraction. See `I042-i041-hotfix-persistence-resume-ux.md`. |
 | I043 | Bottom Panel Generalization, Session Picker, Approval UX | **Complete** (2026-06-23) | BottomPanelState + PanelKind {SlashCommand, SessionPicker, Approval}; /resume picker; R1/R2 tech debt; TUI-008 approval reuses bottom panel with nested-approval queueing; IME guard and menu-close contract refined. Pre-closeout audit run. See `I043-bottom-panel-session-picker-approval-ux.md`. |
 | I044 | Session Integrity And Lifecycle Hardening | **Complete** (2026-06-23) | Six SESSION-002 consistency fixes (O(1) append, concurrent write safety, crash reconciliation, switch ordering, failure cleanup) + `/delete` via picker UX. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. See `I044-session-integrity-lifecycle-hardening.md`. |
-| I045 | Product Readiness — Model Lifecycle, Config, Observability | **Active** (2026-06-24; target close 2026-07-24) | Model-centric `/model` picker with inline provider onboarding + first-run wizard (MODEL-004-R + MODEL-005-R); CLI config editing (CONF-001-S); bounded log retention + embedded prompts (OBS-001). See `I045-product-readiness-model-lifecycle-observability.md`. |
+| I045 | Product Readiness — Model Lifecycle, Config, Observability | **Complete (2026-06-24)** | All 4 stories complete: MODEL-004-R (catalog integration), MODEL-005-R (/model picker + credential input + first-run wizard + --init/--available-models/--use-model), CONF-001-S (config CLI), OBS-001 (log rotation). api_key data-loss bug fixed (skip_serializing reverted). Non-navigable group headers in model picker. Closed in ~4 hours, not 1 month. See `I045-product-readiness-model-lifecycle-observability.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -102,7 +102,7 @@ rewrite published iteration baselines.
 | I041 | Active → Complete (2026-06-22) | Activated 2026-06-22; SESSION-001-B + SESSION-001-C + PERM-002 all landed; closed 4 weeks early; T9 TUI smoke boundary documented as residual. |
 | I043 | Active → Complete (2026-06-23) | Closed 2026-06-23. Bottom panel generalization + session picker + R1/R2 + TUI-008 all landed. Pre-closeout audit run. |
 | I044 | Active → Complete (2026-06-23) | Closed 2026-06-23. Six SESSION-002 consistency fixes + deletion all landed. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. |
-| I045 | Active (2026-06-24) | Activated 2026-06-24; model lifecycle + config + observability; target close 2026-07-24. |
+| I045 | Complete (2026-06-24) | Removed from non-terminal inventory (Complete record in I045 doc). |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.

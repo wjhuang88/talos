@@ -109,7 +109,7 @@ mod tests {
 
     #[tokio::test]
     async fn conversation_loop_displays_drained_queued_input() {
-        let engine = ConversationEngine::new("test-model".to_string());
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();

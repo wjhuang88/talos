@@ -10,7 +10,7 @@ use crate::types::{
 };
 
 fn new_engine() -> ConversationEngine {
-    ConversationEngine::new("claude-sonnet-4".to_string())
+    ConversationEngine::new("claude-sonnet-4".to_string(), "anthropic".to_string())
 }
 
 fn make_tool_call(name: &str, _provenance: ToolProvenance) -> ToolCall {

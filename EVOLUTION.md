@@ -37,6 +37,9 @@ repeating known mistakes.
 | 25 | Safety | 外部 C/Native 依赖的 panic 必须 `catch_unwind` 捕获 + 降级，不能静默崩溃 | TUI-006/CODE-001 |
 | 26 | Governance | Partial 状态不能成为静默扩展已发布迭代基线的理由 | I033 |
 | 27 | Safety | 工具装饰器必须透传安全与来源元数据，权限判断不能退化为名称推断 | I034 |
+| 28 | Process | 并行审计是 closeout 前的必要闸门；自我比较 bug 能穿透单元测试 | I043/I044 |
+| 29 | Config | 机密字段必须显示层屏蔽，不得在持久化层 skip_serializing；否则用户写进文件的 key 会被静默擦除 | I045 |
+| 30 | Session | 生命周期操作必须从全新启动路径追溯——Model switch 需要 ensure_persisted() 处理首轮无 session 的边界情况 | I045 |
 
 ## Lessons
 
@@ -444,9 +447,33 @@ repeating known mistakes.
   1. `a.id.cmp(&a.id)` → `a.id.cmp(&b.id)`。
   2. 同时审计发现的其他 3 个问题 (silent bridge send failure, fork file copy race, /delete arg_hint) 也一并修复。
 - **Prevention**:
-  1. **关闭任何迭代前,启动至少 2 个并行 explore/oracle agent 做最终逻辑审计**。审计 prompt 必须明确列出 acceptance criteria 让 agent 逐条核对。
-  2. **Sort tiebreaker 写完后,自检两个比较变量是否不同**。`a.id.cmp(&a.id)` 是典型的复制粘贴或手误 bug,编译器和 clippy 都不会抓。
-  3. **单元测试的排序测试至少覆盖 3+ 个元素 + 制造 tie 场景**。1-2 个元素的排序测试无法发现 tiebreaker bug。
-  4. **并行审计发现的每个 issue 都要 trace 回 acceptance criteria**:这个 bug 是否影响 acceptance?如果影响,必须在 closeout 前修;如果不影响,记录为 residual。
+   1. **关闭任何迭代前,启动至少 2 个并行 explore/oracle agent 做最终逻辑审计**。审计 prompt 必须明确列出 acceptance criteria 让 agent 逐条核对。
+   2. **Sort tiebreaker 写完后,自检两个比较变量是否不同**。`a.id.cmp(&a.id)` 是典型的复制粘贴或手误 bug,编译器和 clippy 都不会抓。
+   3. **单元测试的排序测试至少覆盖 3+ 个元素 + 制造 tie 场景**。1-2 个元素的排序测试无法发现 tiebreaker bug。
+   4. **并行审计发现的每个 issue 都要 trace 回 acceptance criteria**:这个 bug 是否影响 acceptance?如果影响,必须在 closeout 前修;如果不影响,记录为 residual。
 
 ---
+
+## #29: `#[serde(skip_serializing)]` on `api_key` causes silent data loss
+
+- **Area**: Config
+- **Added**: I045 (2026-06-24)
+- **Symptom**: User manually added `api_key` to `~/.talos/config.toml`, ran talos, and the key was silently erased on the next `Config::save()`.
+- **Root cause**: `#[serde(skip_serializing)]` on `ProviderConfig::api_key` means serde never serializes the field back to TOML. The key is loaded correctly from the file (deserialization works fine), but on save, the key disappears because it was never written back. The design intention was to redirect keys to a separate `credentials.toml`, but the redirect was implemented as "shred and forget" rather than "extract on load, write to separate file."
+- **Fix**: Reverted `#[serde(skip_serializing)]`. `api_key` is now serialized in `config.toml` like any other field. Display masking is handled at the CLI layer (`--config-list` replaces `api_key = "..."` with `api_key = ***`), not the serializer.
+- **Prevention**:
+  1. **Never use `#[serde(skip_serializing)]` on data that the user wrote to a file.** The field round-trips well in memory, but `save()` → `load()` silently loses the original value.
+  2. **Secrets masking must be at the display boundary, not the persistence boundary.** The serializer should faithfully write what's in memory. The CLI (display) is responsible for masking.
+  3. **test that save → read-back preserves the field.** Our regression test `test_save_writes_api_key_in_config_toml` now verifies that the key is present in the file after save.
+
+## #30: Model switch needs `ensure_persisted()` — session may not exist on first turn
+
+- **Area**: Session / Model Lifecycle
+- **Added**: I045 (2026-06-24)
+- **Symptom**: Running `/model` on a fresh TUI (no session yet) panicked with "session file not found."
+- **Root cause**: `handle_session_model` calls `session_watch_rx.borrow().clone()` to get the current session, then tries to read its messages. But on the very first turn before any user input, the session hasn't been persisted to disk yet — `ensure_persisted()` was never called. The session exists in-memory (created by the engine startup) but has no backing file.
+- **Fix**: Added `current_session.ensure_persisted()` at the start of the model switch handler, before any message reads. This creates the backing file if it doesn't exist, matching the same pattern used by `/new`, `/resume`, and `/fork`.
+- **Prevention**:
+  1. **Any code that reads session messages from disk must call `ensure_persisted()` first.** The session may only exist in-memory at engine startup.
+  2. **File-backed state requires explicit creation.** In-memory-only sessions are valid until the first persistence operation.
+  3. **When adding lifecycle operations, trace the complete execution path from fresh startup.** The first-turn edge case is easy to miss if you only test on existing sessions.

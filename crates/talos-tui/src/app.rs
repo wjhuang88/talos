@@ -479,6 +479,10 @@ impl Tui {
         self.state.status.model_name = name;
     }
 
+    pub fn set_provider(&mut self, provider: String) {
+        self.state.status.provider = provider;
+    }
+
     pub fn hydrate_history(&mut self, history: &[Message]) {
         use talos_conversation::ToolCallDisplay;
         use talos_core::tool::ToolProvenance;
