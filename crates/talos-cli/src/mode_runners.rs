@@ -11,7 +11,7 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, MessageSource, ModelPickerItem, SessionPickerItem, StreamMessage, UiOutput, UserInput};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
@@ -335,6 +335,155 @@ async fn handle_session_delete(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+async fn handle_session_model(
+    transition: &Arc<Mutex<SessionTransition>>,
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    hooks: &Arc<HookRegistry>,
+    workspace_root: &std::path::Path,
+    mcp_config: &talos_config::McpConfig,
+    session_watch_tx: &watch::Sender<talos_session::Session>,
+    sq_tx_watch_tx: &watch::Sender<mpsc::Sender<SessionOp>>,
+    bridge_rx_update_tx: &mpsc::UnboundedSender<(
+        talos_session::Session,
+        mpsc::UnboundedReceiver<SessionEvent>,
+    )>,
+    session_watch_rx: &watch::Receiver<talos_session::Session>,
+    model_id: String,
+    mock: bool,
+) {
+    if model_id.is_empty() {
+        let catalog = talos_config::model::builtin_models();
+        let items: Vec<ModelPickerItem> = catalog
+            .iter()
+            .map(|m| {
+                let provider_authed = config.provider_authenticated(&m.provider);
+                let pricing_str = m.pricing.as_ref().map(|p| {
+                    let input = p.input_per_1m.map(|v| format!("${v}")).unwrap_or_default();
+                    let output = p.output_per_1m.map(|v| format!("${v}")).unwrap_or_default();
+                    if input.is_empty() && output.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{input}/{output}")
+                    }
+                });
+                let ctx_str = m.context_limit
+                    .map(|c| format!("{}K", c / 1000))
+                    .unwrap_or_else(|| "?".to_string());
+                ModelPickerItem {
+                    command: "/model".to_string(),
+                    model_id: m.id.clone(),
+                    provider: m.provider.clone(),
+                    label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
+                    context_limit: m.context_limit,
+                    pricing: pricing_str,
+                    authenticated: provider_authed,
+                }
+            })
+            .collect();
+        let _ = ui_tx.send(UiOutput::ModelPicker(items));
+        return;
+    }
+
+    let mut model_config = config.clone();
+    if let Err(e) = model_config.set_active_model(&model_id) {
+        let text = format!("[Error] Unknown model '{model_id}': {e}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
+
+    let provider_name = model_config.provider.clone();
+    if !model_config.provider_authenticated(&provider_name) {
+        send_stream(
+            ui_tx,
+            MessageSource::System,
+            format!("[System] Provider '{provider_name}' is not authenticated. Use `talos config set providers.{provider_name}.api_key_env VAR_NAME` to configure credentials, then switch again.\n"),
+        );
+        return;
+    }
+
+    let api_key = match model_config.api_key() {
+        Ok(k) => k,
+        Err(e) => {
+            let text = format!("[Error] Failed to resolve API key for {provider_name}: {e}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            return;
+        }
+    };
+
+    let model_context_limit = model_config.resolve_model_limits().0;
+
+    let current_session = session_watch_rx.borrow().clone();
+    let history = current_session.read_messages().unwrap_or_default();
+
+    let session_config = SessionConfig {
+        print_mode: false,
+        workspace_root: workspace_root.to_path_buf(),
+        initial_history: history,
+        model_context_limit,
+    };
+
+    let provider = build_provider(&model_config, &api_key, mock);
+    let approval_handler = Arc::new(TuiApprovalHandler::new(
+        ui_tx.clone(),
+        workspace_root.to_path_buf(),
+    ));
+    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            return;
+        }
+    };
+    mcp_runtime.report_startup_failures();
+    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
+
+    let mut agent = Agent::with_security_and_hooks(
+        provider,
+        registry,
+        Some(Arc::new(talos_permission::PermissionEngine::new())),
+        None,
+        workspace_root.to_path_buf(),
+        hooks.clone(),
+    );
+    agent.set_tool_protocol(model_config.tool_protocol());
+    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+        apply_runtime_skills(&mut agent, &skills);
+    }
+
+    let (handle, actor) = AppServerSession::new(agent, session_config);
+    let session_for_prepare = current_session.clone();
+    if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
+        let text = format!("[Error] Failed to prepare model switch: {e}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
+
+    let mut transition_guard = transition.lock().await;
+    match transition_guard.commit(actor) {
+        Ok(result) => {
+            let _ = session_watch_tx.send(current_session.clone());
+            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
+            if bridge_rx_update_tx
+                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .is_err()
+            {
+                eprintln!("[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed.");
+            }
+            let text = format!("[System] Switched to model {model_id}.\n");
+            send_stream(ui_tx, MessageSource::System, text);
+        }
+        Err(e) => {
+            transition_guard.rollback();
+            let text = format!("[Error] Failed to commit model switch: {e}. Previous model remains active.\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+        }
+    }
+}
+
 pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -529,6 +678,23 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &session_manager_for_handler,
                         &session_watch_rx_for_handler,
                         req.selection,
+                    )
+                    .await;
+                }
+                SessionLifecycleRequest::ModelSwitch(req) => {
+                    handle_session_model(
+                        &transition_for_handler,
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        &hooks_for_handler,
+                        &workspace_root_for_handler,
+                        &mcp_config_for_handler,
+                        &session_watch_tx_for_handler,
+                        &sq_tx_watch_tx_for_handler,
+                        &bridge_rx_update_tx_for_handler,
+                        &session_watch_rx_for_handler,
+                        req.model_id,
+                        cli.mock,
                     )
                     .await;
                 }
