@@ -149,8 +149,27 @@ pub enum UiOutput {
     ModelPicker(Vec<ModelPickerItem>),
     /// Request to switch the active model.
     ModelSwitchRequest(ModelSwitchRequest),
+    /// Ask the TUI to collect an API key for the named provider.
+    CredentialRequest(CredentialRequestData),
+    /// TUI returns a collected API key to the lifecycle handler.
+    CredentialResponse(CredentialResponseData),
     HydrateHistory(Vec<talos_core::message::Message>),
     Exit,
+}
+
+/// Provider + model context for a credential collection prompt.
+#[derive(Debug, Clone)]
+pub struct CredentialRequestData {
+    pub provider: String,
+    pub model_id: String,
+}
+
+/// User-entered credential returned from the TUI credential input panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CredentialResponseData {
+    pub provider: String,
+    pub api_key: String,
+    pub model_id: String,
 }
 
 #[derive(Debug, Clone)]
@@ -256,6 +275,7 @@ pub struct SessionPickerItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserInput {
     Message(String),
+    Credential(CredentialResponseData),
     Cancel,
     Exit,
 }

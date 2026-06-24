@@ -1046,7 +1046,8 @@ impl Tui {
                 return true;
             }
             UiOutput::SessionNew(_) | UiOutput::SessionResume(_) | UiOutput::SessionFork(_)
-            | UiOutput::SessionDelete(_) | UiOutput::ModelSwitchRequest(_) => {
+            | UiOutput::SessionDelete(_) | UiOutput::ModelSwitchRequest(_)
+            | UiOutput::CredentialResponse(_) => {
                 // Handled by the bridge → mode runner lifecycle handler.
                 // Should not reach the TUI directly.
             }
@@ -1055,6 +1056,9 @@ impl Tui {
             }
             UiOutput::ModelPicker(items) => {
                 self.state.open_model_picker(&items);
+            }
+            UiOutput::CredentialRequest(req) => {
+                self.state.open_credential_input(&req.provider, &req.model_id);
             }
             UiOutput::HydrateHistory(messages) => {
                 self.finalize_active_stream();
@@ -1246,6 +1250,28 @@ impl Tui {
                 }
                 if !matches!(self.state.approval_state, ApprovalState::Hidden) {
                     self.handle_pending_approval_input(key.code);
+                    return false;
+                }
+                if self.state.slash_menu.is_credential_input() {
+                    match key.code {
+                        KeyCode::Enter => {
+                            if let Some(resp) = self.state.credential_submit()
+                                && let Some(ref tx) = self.user_input_tx
+                            {
+                                let _ = tx.send(UserInput::Credential(resp));
+                            }
+                        }
+                        KeyCode::Esc => {
+                            self.state.credential_cancel();
+                        }
+                        KeyCode::Backspace => {
+                            self.state.credential_backspace();
+                        }
+                        KeyCode::Char(c) => {
+                            self.state.credential_append_char(c);
+                        }
+                        _ => {}
+                    }
                     return false;
                 }
                 match key.code {

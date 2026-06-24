@@ -5,7 +5,9 @@
 
 use std::time::{Duration, Instant};
 
-use talos_conversation::{ModelPickerItem, SessionPickerItem, StatusSnapshot, TipKind};
+use talos_conversation::{
+    CredentialResponseData, ModelPickerItem, SessionPickerItem, StatusSnapshot, TipKind,
+};
 use talos_core::ApprovalChoice;
 
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
@@ -33,6 +35,10 @@ pub(crate) enum PanelKind {
     SlashCommand,
     SessionPicker,
     ModelPicker,
+    CredentialInput {
+        provider: String,
+        model_id: String,
+    },
     Approval { tool_name: String, arguments: String },
 }
 
@@ -42,6 +48,7 @@ pub(crate) struct BottomPanelState {
     pub(crate) kind: Option<PanelKind>,
     pub(crate) items: Vec<PanelItem>,
     pub(crate) selected_index: usize,
+    pub(crate) credential_buffer: String,
 }
 
 impl BottomPanelState {
@@ -61,6 +68,7 @@ impl BottomPanelState {
             kind: Some(PanelKind::SlashCommand),
             items,
             selected_index: 0,
+            credential_buffer: String::new(),
         }
     }
 
@@ -83,6 +91,7 @@ impl BottomPanelState {
             kind: Some(PanelKind::SessionPicker),
             items,
             selected_index: 0,
+            credential_buffer: String::new(),
         }
     }
 
@@ -113,6 +122,20 @@ impl BottomPanelState {
             kind: Some(PanelKind::ModelPicker),
             items: panel_items,
             selected_index: 0,
+            credential_buffer: String::new(),
+        }
+    }
+
+    pub(crate) fn open_credential_input(provider: &str, model_id: &str) -> Self {
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::CredentialInput {
+                provider: provider.to_string(),
+                model_id: model_id.to_string(),
+            }),
+            items: vec![],
+            selected_index: 0,
+            credential_buffer: String::new(),
         }
     }
 
@@ -129,6 +152,10 @@ impl BottomPanelState {
 
     pub(crate) fn is_approval(&self) -> bool {
         matches!(self.kind, Some(PanelKind::Approval { .. }))
+    }
+
+    pub(crate) fn is_credential_input(&self) -> bool {
+        matches!(self.kind, Some(PanelKind::CredentialInput { .. }))
     }
 
     pub(crate) fn open_approval(tool_name: &str, arguments: &str) -> Self {
@@ -164,6 +191,7 @@ impl BottomPanelState {
                 },
             ],
             selected_index: 0,
+            credential_buffer: String::new(),
         }
     }
 
@@ -340,6 +368,50 @@ impl TuiState {
 
     pub(crate) fn open_model_picker(&mut self, items: &[ModelPickerItem]) {
         self.slash_menu = BottomPanelState::open_model_picker(items);
+    }
+
+    pub(crate) fn open_credential_input(&mut self, provider: &str, model_id: &str) {
+        self.slash_menu = BottomPanelState::open_credential_input(provider, model_id);
+    }
+
+    pub(crate) fn credential_append_char(&mut self, ch: char) {
+        if self.slash_menu.is_credential_input() {
+            self.slash_menu.credential_buffer.push(ch);
+        }
+    }
+
+    pub(crate) fn credential_backspace(&mut self) {
+        if self.slash_menu.is_credential_input() {
+            self.slash_menu.credential_buffer.pop();
+        }
+    }
+
+    pub(crate) fn credential_submit(&mut self) -> Option<CredentialResponseData> {
+        if !self.slash_menu.is_credential_input() {
+            return None;
+        }
+        let (provider, model_id) = match &self.slash_menu.kind {
+            Some(PanelKind::CredentialInput { provider, model_id }) => {
+                (provider.clone(), model_id.clone())
+            }
+            _ => return None,
+        };
+        let key = std::mem::take(&mut self.slash_menu.credential_buffer);
+        self.slash_menu.close();
+        if key.is_empty() {
+            None
+        } else {
+            Some(CredentialResponseData {
+                provider,
+                api_key: key,
+                model_id,
+            })
+        }
+    }
+
+    pub(crate) fn credential_cancel(&mut self) {
+        self.slash_menu.credential_buffer.clear();
+        self.slash_menu.close();
     }
 
     pub(crate) fn slash_query(&self) -> &str {

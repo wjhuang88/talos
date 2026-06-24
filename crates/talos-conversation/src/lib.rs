@@ -13,9 +13,9 @@ pub use engine::{
     always_available, command_registry,
 };
 pub use types::{
-    ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    ModelPickerItem, ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
-    SessionForkRequest, SessionNewRequest, SessionPickerItem, SessionResumeRequest,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, UiOutput, UserInput,
+    ChatMessage, CopyScope, CredentialRequestData, CredentialResponseData, McpServerDiagnostic,
+    MessageRole, MessageSource, MessageStatus, ModelPickerItem, ModelSwitchRequest,
+    PluginObservation, ScrollbackState, SessionDeleteRequest, SessionForkRequest,
+    SessionNewRequest, SessionPickerItem, SessionResumeRequest, SkillDiagnostic, StatusSnapshot,
+    StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };
