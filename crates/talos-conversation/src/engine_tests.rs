@@ -5,8 +5,8 @@ use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
 use crate::types::{
-    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, PluginObservation,
-    SkillDiagnostic, TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput,
+    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, ModelPickerItem,
+    PluginObservation, SkillDiagnostic, TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -1302,4 +1302,90 @@ async fn slash_fork_stream_source_is_system() {
     let outputs = engine.handle_slash_command("/fork");
     let (source, _) = collect_stream(outputs).await.unwrap();
     assert_eq!(source, MessageSource::System);
+}
+
+// ---------------------------------------------------------------------------
+// handle_slash_command: /model
+// ---------------------------------------------------------------------------
+
+#[test]
+fn slash_model_no_arg_emits_switch_request_with_empty_id() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/model");
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::ModelSwitchRequest(req) => {
+            assert_eq!(req.model_id, "");
+            assert!(!req.provider_needs_credential);
+        }
+        _ => panic!("expected ModelSwitchRequest"),
+    }
+}
+
+#[test]
+fn slash_model_with_id_emits_switch_request_with_model_id() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/model gpt-4o");
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::ModelSwitchRequest(req) => {
+            assert_eq!(req.model_id, "gpt-4o");
+            assert!(!req.provider_needs_credential);
+        }
+        _ => panic!("expected ModelSwitchRequest"),
+    }
+}
+
+#[tokio::test]
+async fn slash_model_refuses_while_processing() {
+    let mut engine = new_engine();
+    engine.is_processing = true;
+    let outputs = engine.handle_slash_command("/model");
+    assert_eq!(outputs.len(), 1);
+    let (source, text) = collect_stream(outputs).await.unwrap();
+    assert_eq!(source, MessageSource::System);
+    assert!(text.contains("Cannot switch models while a turn is active"));
+}
+
+#[tokio::test]
+async fn slash_model_stream_source_is_system_when_processing() {
+    let mut engine = new_engine();
+    engine.is_processing = true;
+    let outputs = engine.handle_slash_command("/model claude-sonnet-4");
+    let (source, _) = collect_stream(outputs).await.unwrap();
+    assert_eq!(source, MessageSource::System);
+}
+
+#[test]
+fn model_picker_item_fields_accessible() {
+    let item = ModelPickerItem {
+        command: "/model".to_string(),
+        model_id: "claude-sonnet-4-20250514".to_string(),
+        provider: "anthropic".to_string(),
+        label: "claude-sonnet-4-20250514   Anthropic  200K  $3/$15".to_string(),
+        context_limit: Some(200_000),
+        pricing: Some("$3/$15 per 1M".to_string()),
+        authenticated: true,
+    };
+    assert_eq!(item.command, "/model");
+    assert_eq!(item.model_id, "claude-sonnet-4-20250514");
+    assert_eq!(item.provider, "anthropic");
+    assert_eq!(item.context_limit, Some(200_000));
+    assert_eq!(item.pricing.as_deref(), Some("$3/$15 per 1M"));
+    assert!(item.authenticated);
+}
+
+#[test]
+fn model_picker_item_unauthenticated_flag() {
+    let item = ModelPickerItem {
+        command: "/model".to_string(),
+        model_id: "gpt-4o".to_string(),
+        provider: "openai".to_string(),
+        label: "gpt-4o   OpenAI  128K".to_string(),
+        context_limit: Some(128_000),
+        pricing: None,
+        authenticated: false,
+    };
+    assert!(!item.authenticated);
+    assert!(item.pricing.is_none());
 }

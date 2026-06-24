@@ -145,6 +145,10 @@ pub enum UiOutput {
     SessionFork(SessionForkRequest),
     SessionDelete(SessionDeleteRequest),
     SessionPicker(Vec<SessionPickerItem>),
+    /// Open the bottom panel as a model picker with the given candidates.
+    ModelPicker(Vec<ModelPickerItem>),
+    /// Request to switch the active model.
+    ModelSwitchRequest(ModelSwitchRequest),
     HydrateHistory(Vec<talos_core::message::Message>),
     Exit,
 }
@@ -197,6 +201,38 @@ pub struct SessionForkRequest;
 
 pub struct SessionDeleteRequest {
     pub selection: Option<String>,
+}
+
+/// A candidate model displayed in the interactive model picker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelPickerItem {
+    /// Slash command the picker stands in for, always `"/model"`.
+    pub command: String,
+    /// Model identifier, e.g. `"claude-sonnet-4-20250514"`.
+    pub model_id: String,
+    /// Provider name, e.g. `"anthropic"`.
+    pub provider: String,
+    /// Display line shown in the picker, e.g.
+    /// `"claude-sonnet-4-20250514   Anthropic  200K  $3/$15"`.
+    pub label: String,
+    /// Context window limit in tokens, if known.
+    pub context_limit: Option<u32>,
+    /// Pre-formatted pricing string, e.g. `"$3/$15 per 1M"` or `None`.
+    pub pricing: Option<String>,
+    /// `true` → Ready group; `false` → Setup required group.
+    pub authenticated: bool,
+}
+
+/// Request to switch the active model (created by `/model`).
+///
+/// If `model_id` is empty, the mode runner should list available models
+/// and open the model picker. If `Some`, the mode runner should attempt
+/// to switch to the specified model directly.
+pub struct ModelSwitchRequest {
+    /// Target model ID. Empty string signals "show picker".
+    pub model_id: String,
+    /// Whether the provider needs credential setup before this model can be used.
+    pub provider_needs_credential: bool,
 }
 
 /// A candidate session displayed in the interactive session picker.

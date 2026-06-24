@@ -8,9 +8,9 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    PluginObservation, ScrollbackState, SessionDeleteRequest, SessionForkRequest, SessionNewRequest,
-    SessionResumeRequest, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
-    ToolCallInfo, ToolResultDisplay, UiOutput,
+    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest, SessionForkRequest,
+    SessionNewRequest, SessionResumeRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,
+    TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -230,6 +230,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             usage: "/delete [N]",
             description: "Delete a workspace session via the picker",
             arg_hint: Some("[N]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/model",
+            aliases: &[],
+            usage: "/model [model-id]",
+            description: "Switch or browse models",
+            arg_hint: Some("[model-id]"),
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
@@ -560,6 +569,20 @@ impl ConversationEngine {
                 } else {
                     outputs.push(UiOutput::SessionDelete(SessionDeleteRequest {
                         selection: Some(arg.to_string()),
+                    }));
+                }
+            }
+            "/model" => {
+                if self.is_processing {
+                    let text = "[System] Cannot switch models while a turn is active. Wait for the current turn to finish.\n".to_string();
+                    outputs.push(UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(stream::once(async move { text })),
+                    }));
+                } else {
+                    outputs.push(UiOutput::ModelSwitchRequest(ModelSwitchRequest {
+                        model_id: arg.to_string(),
+                        provider_needs_credential: false,
                     }));
                 }
             }
