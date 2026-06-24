@@ -146,6 +146,12 @@ pub(crate) struct Cli {
     )]
     mock: bool,
 
+    #[arg(
+        long,
+        help = "Skip the first-run model setup wizard (for CI / non-interactive use)."
+    )]
+    no_init: bool,
+
     #[arg(long, help = "Display learned patterns from the evolution engine.")]
     learned: bool,
 

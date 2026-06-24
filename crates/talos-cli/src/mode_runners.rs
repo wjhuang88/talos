@@ -494,11 +494,15 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         config.provider = parse_provider(provider_str)?;
     }
 
-    if config.model.is_empty() && !cli.mock {
-        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
+    let needs_model_setup = config.model.is_empty() && !cli.mock;
+    let needs_api_key = !cli.mock && !needs_model_setup && config.api_key().is_err();
+
+    if (needs_model_setup || needs_api_key) && !cli.mock && cli.no_init {
+        bail!("no model configured and --no-init was given. Set 'model' in ~/.talos/config.toml, pass --model, or remove --no-init to run the setup wizard.");
     }
 
-    let api_key = if cli.mock {
+    let mock_for_startup = cli.mock || needs_model_setup || needs_api_key;
+    let api_key = if mock_for_startup {
         config.api_key().unwrap_or_default()
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
@@ -612,6 +616,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let bridge_rx_update_tx_for_handler = bridge_rx_update_tx.clone();
     let session_watch_rx_for_handler = session_watch_rx.clone();
     let model_context_limit = config.resolve_model_limits().0;
+    let ui_tx_for_wizard = ui_tx_for_handler.clone();
     tokio::spawn(async move {
         while let Some(req) = session_rx.recv().await {
             match req {
@@ -784,7 +789,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (user_input_tx, user_input_rx) = mpsc::unbounded_channel::<UserInput>();
 
     tui.set_ui_output_rx(ui_output_rx);
-    tui.set_user_input_tx(user_input_tx);
+    tui.set_user_input_tx(user_input_tx.clone());
     tui.set_model_name(config.model.clone());
 
     let engine = ConversationEngine::new(config.model.clone())
@@ -803,6 +808,20 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         )
         .await;
     });
+
+    if needs_model_setup || needs_api_key {
+        let _ = user_input_tx.send(UserInput::Message("/model".to_string()));
+        if needs_api_key {
+            send_stream(
+                &ui_tx_for_wizard,
+                MessageSource::System,
+                format!(
+                    "[System] Model '{}' is configured but the API key is missing. Select a model to configure credentials.\n",
+                    config.model
+                ),
+            );
+        }
+    }
 
     tui.run().await?;
     Ok(())
@@ -1033,7 +1052,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }
 
     if config.model.is_empty() && !cli.mock {
-        bail!("no model configured");
+        bail!("no model configured. Set 'model' in ~/.talos/config.toml, pass --model, or run `talos` in TUI mode for the setup wizard.");
     }
 
     let api_key = if cli.mock {
