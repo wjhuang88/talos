@@ -60,8 +60,8 @@ The intended sequence is:
 | T3 | REL-001 release/install readiness | Supported target matrix, artifact names, installers, checksum behavior, and `v0.1.2` strategy are validated | T2 | Packaging smoke or documented target subset; installer dry-run; no tag mutation | Defer tag; record blocking target or installer defect | ✅ Done (static audit) |
 | T4 | CONF-002 first-run onboarding | Empty-config users get guided setup; `talos init` re-runs setup; non-interactive mode does not hang | T2 | Temp-home runtime tests; masked credential display; config round-trip | Provide actionable error path and keep wizard partial | Planned |
 | T5 | OBS-001/I018 prerequisite closure | Bounded file logs and compile-time embedded prompt assets land; I019 no longer blocked on I018 | T2 | ADR-014/015 tests; I018/MEM-001/I019/Board status synchronized | If OBS-001 expands, deliver only bounded logs + embedded prompts and defer R3 logging | ✅ Done |
-| T6 | MEM-001-A memory starter | Memory boundary, SQLite schema, ADD-only writes, evidence links, and bounded retrieval API | T5 | Migration/schema/retrieval tests; no vector/graph dependency; provenance returned | Stop at schema + API; defer prompt injection/consolidation to I019 | In Progress |
-| T7 | MEM-005-A compaction policy | Threshold policy, safe-boundary compaction, manual command/status, failure fallback | T6 | Unit/mock session/TUI command tests; hidden output never printed | Keep policy library-only if command integration risks the timebox | Planned |
+| T6 | MEM-001-A memory starter | Memory boundary, SQLite schema, ADD-only writes, evidence links, and bounded retrieval API | T5 | Migration/schema/retrieval tests; no vector/graph dependency; provenance returned | Stop at schema + API; defer prompt injection/consolidation to I019 | ✅ Done |
+| T7 | MEM-005-A compaction policy | Threshold policy, safe-boundary compaction, manual command/status, failure fallback | T6 | Unit/mock session/TUI command tests; hidden output never printed | Keep policy library-only if command integration risks the timebox | ✅ Done |
 | T8 | GOV-003-A read-only governance status | Governance status command reads iteration/backlog/board/validation state without writing docs | T2 | Empty/partial/full workspace tests; dirty-worktree guard | Keep as library/status report only; defer prompt injection | ✅ Done |
 | T9 | I047 closeout and release rehearsal | I047 evidence, docs, release checklist, and residuals are synchronized; release decision ready | T3-T8 | check/clippy/test/governance pass; release rehearsal recorded | Mark I047 Review/Partial if any required gate fails | Planned |
 | T10 | I019 activation decision | I019 can activate, be replanned, or remain deferred with explicit reason | T9 | I019 prerequisites recorded as satisfied; Board/iterations index agree | Create a new I048/I019 activation plan if full I019 scope changes | Planned |
@@ -246,3 +246,23 @@ Added `--governance-status` CLI flag (early-exit, like `--config-list`). New
 `scripts/validate_project_governance.sh`, and checks git dirty state. Strictly read-only —
 never writes files. 4 tests: empty workspace, missing board, missing iterations, full workspace.
 All pass. Clippy clean.
+
+### T6 — MEM-001-A Memory Starter (2026-06-25)
+
+New `talos-memory` crate implementing semantic/procedural layers of ADR-016. SQLite-backed with
+FTS5 search, ADD-only writes (exact dedup via content_hash), bounded retrieval
+(FTS5 + recency + evidence scoring), and evidence provenance links. 12 tests covering schema
+migration, insert/retrieve, ADD-only conflict preservation, exact dedup, bounded retrieval limit,
+evidence links, deterministic scoring, empty query handling, and ID lookup. No vector/graph
+dependency. No automatic prompt injection.
+
+### T7 — MEM-005-A Compaction Policy Phase 1 (2026-06-25)
+
+Added `CompactionPolicy` struct documenting threshold math and limit sources (trigger_threshold,
+max_tool_result_chars, preserved_turns, trim/collapse thresholds, circuit_breaker_threshold,
+output_reserve). Added `CompactionStatus` enum (Applied/Skipped/Failed) with hidden-output guard
+— status fields contain only token counts and layer names, never raw tool result content. Added
+`compact_deterministic()` applying layers 1-3 without LLM (safe at any boundary). Added
+`manual_compact()` returning status. 7 new tests: policy defaults, trigger calculation, saturation,
+deterministic compaction (applied + insufficient), manual compact (skipped + applied + failed),
+hidden-output verification. All 32 compaction tests pass.

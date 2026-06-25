@@ -16,6 +16,7 @@ mod approval;
 mod colors;
 mod event_loop;
 mod governance;
+mod init_wizard;
 mod logging;
 mod mcp_runtime;
 mod mode_runners;
@@ -34,6 +35,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use clap::Subcommand;
 use clap::ValueEnum;
 use talos_config::Config;
 use talos_plugin::{HookRegistry, LoggingHandler};
@@ -60,11 +62,25 @@ pub enum Mode {
     Rpc,
 }
 
+/// Top-level subcommands for talos.
+#[derive(Subcommand, Clone)]
+pub(crate) enum TalosCommand {
+    /// Run first-run setup wizard for model configuration.
+    Init {
+        /// Print setup instructions without launching interactive wizard.
+        #[arg(long)]
+        non_interactive: bool,
+    },
+}
+
 #[derive(Parser, Clone)]
 #[command(name = "talos", version, about = "Next-generation agent runtime")]
 pub(crate) struct Cli {
     #[arg(help = "The prompt to send to the agent.")]
     prompt: Option<String>,
+
+    #[command(subcommand)]
+    command: Option<TalosCommand>,
 
     #[arg(
         short,
@@ -230,6 +246,11 @@ pub(crate) struct Cli {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Subcommand dispatch (takes priority over flat flags)
+    if let Some(TalosCommand::Init { non_interactive }) = &cli.command {
+        return init_wizard::run_init_wizard(*non_interactive).await;
+    }
 
     if let Some(path) = &cli.import_models {
         return run_import_models(path);
