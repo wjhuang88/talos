@@ -104,8 +104,35 @@ pub fn builtin_models() -> Vec<ModelMetadata> {
 }
 
 /// Look up a model by id in a dataset.
+///
+/// Returns the first model whose `id` matches. When multiple providers share
+/// the same model id (e.g. `glm-5.2` under `zhipu`, `zai`, etc.), this returns
+/// an arbitrary first match. Use [`find_model_by_provider`] for unambiguous
+/// resolution in those cases.
 pub fn find_model<'a>(models: &'a [ModelMetadata], id: &str) -> Option<&'a ModelMetadata> {
     models.iter().find(|m| m.id == id)
+}
+
+/// Look up a model by `(provider, id)` in a dataset.
+///
+/// Use this instead of [`find_model`] whenever the active provider is known,
+/// so that duplicate model ids across providers resolve unambiguously.
+pub fn find_model_by_provider<'a>(
+    models: &'a [ModelMetadata],
+    provider: &str,
+    id: &str,
+) -> Option<&'a ModelMetadata> {
+    models
+        .iter()
+        .find(|m| m.provider == provider && m.id == id)
+}
+
+/// Collects all models whose `id` matches, regardless of provider.
+///
+/// Returns an empty vector when the id is unique or absent. Use this to detect
+/// ambiguity before resolving a bare model id.
+pub fn models_with_id<'a>(models: &'a [ModelMetadata], id: &str) -> Vec<&'a ModelMetadata> {
+    models.iter().filter(|m| m.id == id).collect()
 }
 
 /// Internal TOML dataset wrapper.
@@ -476,5 +503,41 @@ mod tests {
     fn test_import_models_dev_empty_array() {
         let models = import_models_dev("[]").expect("should parse empty array");
         assert!(models.is_empty());
+    }
+
+    #[test]
+    fn test_find_model_by_provider_resolves_duplicates() {
+        let models = builtin_models();
+        // glm-5.2 exists under zhipu, zai, zhipu-coding-plan, zai-coding-plan.
+        let zhipu = find_model_by_provider(&models, "zhipu", "glm-5.2");
+        let zai = find_model_by_provider(&models, "zai", "glm-5.2");
+        assert!(zhipu.is_some());
+        assert!(zai.is_some());
+        assert_eq!(zhipu.unwrap().provider, "zhipu");
+        assert_eq!(zai.unwrap().provider, "zai");
+    }
+
+    #[test]
+    fn test_find_model_by_provider_returns_none_for_wrong_provider() {
+        let models = builtin_models();
+        // claude-sonnet-4-5 is anthropic-only.
+        assert!(find_model_by_provider(&models, "openai", "claude-sonnet-4-5").is_none());
+        assert!(find_model_by_provider(&models, "anthropic", "claude-sonnet-4-5").is_some());
+    }
+
+    #[test]
+    fn test_models_with_id_detects_ambiguity() {
+        let models = builtin_models();
+        let unique = models_with_id(&models, "claude-sonnet-4-5-20250929");
+        assert_eq!(unique.len(), 1);
+
+        let ambiguous = models_with_id(&models, "glm-5.2");
+        assert!(
+            ambiguous.len() >= 2,
+            "glm-5.2 should appear under multiple providers"
+        );
+
+        let missing = models_with_id(&models, "nonexistent-model");
+        assert!(missing.is_empty());
     }
 }

@@ -66,7 +66,7 @@ pub struct ModelConfig {
 }
 
 /// Named provider configuration.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
     #[serde(default)]
     pub protocol: ProviderProtocol,
@@ -93,15 +93,36 @@ pub struct ProviderConfig {
     pub models: HashMap<String, ModelConfig>,
 }
 
+impl std::fmt::Debug for ProviderConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProviderConfig")
+            .field("protocol", &self.protocol)
+            .field("tool_protocol", &self.tool_protocol)
+            .field("base_url", &self.base_url)
+            .field("api_key", &self.api_key.as_deref().map(|_| "***"))
+            .field("api_key_env", &self.api_key_env)
+            .field("models", &self.models)
+            .finish()
+    }
+}
+
 /// Credentials store — maps provider names to API keys.
 ///
 /// Stored separately from the main config (`~/.talos/credentials.toml`) to
 /// keep secrets out of `config.toml`, which may be shared or committed.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Credentials {
     /// Provider name → API key mapping.
     #[serde(flatten)]
     pub keys: HashMap<String, String>,
+}
+
+impl std::fmt::Debug for Credentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credentials")
+            .field("keys", &format!("{} key(s) [redacted]", self.keys.len()))
+            .finish()
+    }
 }
 
 impl Credentials {
@@ -494,9 +515,11 @@ impl Config {
             return (ctx, model_config.output_limit);
         }
 
-        // Step 2: Look up in builtin catalog
+        // Step 2: Look up in builtin catalog, qualified by active provider so
+        // that duplicate model ids (e.g. glm-5.2 under zhipu/zai) resolve to
+        // the intended provider's metadata.
         let builtins = model::builtin_models();
-        if let Some(meta) = model::find_model(&builtins, &self.model)
+        if let Some(meta) = model::find_model_by_provider(&builtins, &self.provider, &self.model)
             && let Some(ctx) = meta.context_limit
         {
             return (ctx, meta.output_limit);
@@ -648,12 +671,15 @@ impl Config {
 
     /// Returns all available models: built-in catalog merged with user-configured
     /// models from `providers.*.models`. Configured models override builtin entries
-    /// with the same model ID.
+    /// with the same `(provider, model_id)` pair.
     pub fn all_models(&self) -> Vec<model::ModelMetadata> {
         let mut models = model::builtin_models();
         for (provider_name, provider) in &self.providers {
             for (model_id, cfg) in &provider.models {
-                if let Some(existing) = models.iter_mut().find(|m| m.id == *model_id) {
+                if let Some(existing) = models
+                    .iter_mut()
+                    .find(|m| m.provider == *provider_name && m.id == *model_id)
+                {
                     if cfg.context_limit.is_some() {
                         existing.context_limit = cfg.context_limit;
                     }
@@ -687,7 +713,9 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigError::InvalidConfig`] if the model ID is not found.
+    /// Returns [`ConfigError::InvalidConfig`] if the model ID is not found, or
+    /// if a bare (unqualified) model ID matches multiple providers and the
+    /// caller must disambiguate with `provider/model_id`.
     pub fn set_active_model(&mut self, model_id: &str) -> Result<(), ConfigError> {
         let all = self.all_models();
 
@@ -714,9 +742,29 @@ impl Config {
                         "model '{resolved_id}' not found for provider '{provider}'"
                     ))
                 })?,
-            None => model::find_model(&all, resolved_id).ok_or_else(|| {
-                ConfigError::InvalidConfig(format!("model '{resolved_id}' not found"))
-            })?,
+            None => {
+                let matches: Vec<_> = all.iter().filter(|m| m.id == resolved_id).collect();
+                match matches.len() {
+                    0 => {
+                        return Err(ConfigError::InvalidConfig(format!(
+                            "model '{resolved_id}' not found"
+                        )))
+                    }
+                    1 => matches[0],
+                    _ => {
+                        let providers = matches
+                            .iter()
+                            .map(|m| m.provider.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        return Err(ConfigError::InvalidConfig(format!(
+                            "model '{resolved_id}' is available from multiple providers: {providers}. \
+                             Qualify with 'provider/{resolved_id}', e.g. '{}/{resolved_id}'",
+                            matches[0].provider
+                        )));
+                    }
+                }
+            }
         };
 
         self.model = meta.id.clone();
@@ -1192,16 +1240,20 @@ mod tests {
 
     #[test]
     fn test_model_limits_from_builtin_and_custom_providers() {
+        // Builtin limits resolve via resolve_model_limits() (catalog lookup),
+        // not context_limit() (user-config only).
         let builtin = Config {
             provider: "openai".to_string(),
-            model: "gpt-4.1".to_string(),
+            model: "gpt-4.1-2025-04-14".to_string(),
             providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
         };
-        assert_eq!(builtin.context_limit(), Some(1_047_576));
+        let (builtin_ctx, builtin_out) = builtin.resolve_model_limits();
+        assert_eq!(builtin_ctx, 1_047_576);
+        assert_eq!(builtin_out, Some(32_768));
 
         let custom = Config {
             provider: "dashscope".to_string(),
@@ -1807,5 +1859,183 @@ api_key = "sk-inline-secret-from-config"
         let config: Config = toml::from_str(toml_str).unwrap();
         let provider = config.providers.get("test").unwrap();
         assert_eq!(provider.api_key.as_deref(), Some("hello-from-toml"));
+    }
+
+    #[test]
+    fn test_resolve_model_limits_provider_aware_for_duplicate_ids() {
+        // glm-5.2 exists under zhipu and zai (among others). The lookup must
+        // succeed for the specified provider, not fall back to the conservative
+        // default or silently resolve to a different provider's entry.
+        let zhipu = Config {
+            provider: "zhipu".to_string(),
+            model: "glm-5.2".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        let (ctx, _) = zhipu.resolve_model_limits();
+        assert_eq!(ctx, 1_000_000);
+
+        let zai = Config {
+            provider: "zai".to_string(),
+            model: "glm-5.2".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        let (ctx2, _) = zai.resolve_model_limits();
+        assert_eq!(ctx2, 1_000_000);
+
+        // A wrong provider+model combo must NOT resolve via a different
+        // provider's catalog entry — it falls to the conservative default.
+        let wrong = Config {
+            provider: "openai".to_string(),
+            model: "glm-5.2".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        let (ctx3, out3) = wrong.resolve_model_limits();
+        assert_eq!(ctx3, 128_000);
+        assert_eq!(out3, None);
+    }
+
+    #[test]
+    fn test_set_active_model_errors_on_ambiguous_bare_id() {
+        let mut config = Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5-20250929".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        let err = config.set_active_model("glm-5.2").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("multiple providers"),
+            "expected ambiguity error, got: {msg}"
+        );
+        assert!(msg.contains("zhipu"));
+        assert!(msg.contains("zai"));
+    }
+
+    #[test]
+    fn test_set_active_model_provider_qualified_resolves_correctly() {
+        let mut config = Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-5-20250929".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        config.set_active_model("zai/glm-5.2").unwrap();
+        assert_eq!(config.model, "glm-5.2");
+        assert_eq!(config.provider, "zai");
+        assert!(config.providers.contains_key("zai"));
+    }
+
+    #[test]
+    fn test_set_active_model_unique_bare_id_still_works() {
+        let mut config = Config {
+            provider: "zai".to_string(),
+            model: "glm-5.2".to_string(),
+            providers: HashMap::new(),
+            ..Default::default()
+        };
+        // claude-sonnet-4-5 is unique to anthropic — bare ID should resolve.
+        config.set_active_model("claude-sonnet-4-5").unwrap();
+        assert_eq!(config.model, "claude-sonnet-4-5");
+        assert_eq!(config.provider, "anthropic");
+    }
+
+    #[test]
+    fn test_all_models_preserves_duplicates_across_providers() {
+        let config = Config::default();
+        let all = config.all_models();
+        let glm52: Vec<_> = all.iter().filter(|m| m.id == "glm-5.2").collect();
+        assert!(
+            glm52.len() >= 2,
+            "glm-5.2 should appear under multiple providers, got {}",
+            glm52.len()
+        );
+        let providers: Vec<_> = glm52.iter().map(|m| m.provider.as_str()).collect();
+        assert!(providers.contains(&"zhipu"));
+        assert!(providers.contains(&"zai"));
+    }
+
+    #[test]
+    fn test_all_models_user_override_matches_by_provider_and_id() {
+        let config = Config {
+            provider: "zai".to_string(),
+            model: "glm-5.2".to_string(),
+            providers: HashMap::from([(
+                "zai".to_string(),
+                ProviderConfig {
+                    models: HashMap::from([(
+                        "glm-5.2".to_string(),
+                        ModelConfig {
+                            context_limit: Some(50_000),
+                            output_limit: Some(1000),
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let all = config.all_models();
+        // The zai entry should be overridden, NOT the zhipu entry.
+        let zai = all
+            .iter()
+            .find(|m| m.id == "glm-5.2" && m.provider == "zai")
+            .unwrap();
+        assert_eq!(zai.context_limit, Some(50_000));
+        assert_eq!(zai.output_limit, Some(1000));
+        // The zhipu entry should be untouched.
+        let zhipu = all
+            .iter()
+            .find(|m| m.id == "glm-5.2" && m.provider == "zhipu")
+            .unwrap();
+        assert_eq!(zhipu.context_limit, Some(1_000_000));
+    }
+
+    #[test]
+    fn test_provider_config_debug_masks_api_key() {
+        let provider = ProviderConfig {
+            api_key: Some("sk-super-secret".to_string()),
+            api_key_env: Some("MY_KEY".to_string()),
+            ..Default::default()
+        };
+        let debug = format!("{provider:?}");
+        assert!(!debug.contains("sk-super-secret"));
+        assert!(debug.contains("***"));
+    }
+
+    #[test]
+    fn test_credentials_debug_masks_keys() {
+        let mut creds = Credentials::default();
+        creds
+            .keys
+            .insert("anthropic".to_string(), "sk-secret-key".to_string());
+        let debug = format!("{creds:?}");
+        assert!(!debug.contains("sk-secret-key"));
+        assert!(debug.contains("redacted"));
+    }
+
+    #[test]
+    fn test_config_debug_masks_provider_api_keys() {
+        let config = Config {
+            provider: "custom".to_string(),
+            model: "test".to_string(),
+            providers: HashMap::from([(
+                "custom".to_string(),
+                ProviderConfig {
+                    api_key: Some("sk-leak-test".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let debug = format!("{config:?}");
+        assert!(
+            !debug.contains("sk-leak-test"),
+            "Config Debug must not leak api_key"
+        );
+        assert!(debug.contains("***"));
     }
 }
