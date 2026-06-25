@@ -3,7 +3,10 @@
 //! Contains the conversation loop that mediates between agent events,
 //! user input, and UI output channels.
 
-use talos_conversation::{ConversationEngine, CredentialResponseData, ModelSwitchRequest, SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest, UiOutput, UserInput};
+use talos_conversation::{
+    ConversationEngine, CredentialResponseData, ModelSwitchRequest, SessionDeleteRequest,
+    SessionForkRequest, SessionNewRequest, SessionResumeRequest, UiOutput, UserInput,
+};
 use talos_core::message::AgentEvent;
 
 pub(crate) async fn run_conversation_loop(
@@ -12,7 +15,9 @@ pub(crate) async fn run_conversation_loop(
     mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
     ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
     submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
-    sq_tx_watch: tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<talos_core::session::SessionOp>>,
+    sq_tx_watch: tokio::sync::watch::Receiver<
+        tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    >,
     session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
 ) {
     loop {

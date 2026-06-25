@@ -281,9 +281,7 @@ pub fn strip_tool_syntax(text: &str) -> String {
     while let Some(start) = result.find("```json-tool") {
         let inner_start = start + "```json-tool".len();
         let inner = &result[inner_start..];
-        let end = inner_start
-            + inner.find("```").unwrap_or(inner.len())
-            + 3;
+        let end = inner_start + inner.find("```").unwrap_or(inner.len()) + 3;
         result.replace_range(start..end, "");
     }
     result.trim().to_string()

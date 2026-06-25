@@ -18,8 +18,8 @@ mod event_loop;
 mod governance;
 mod logging;
 mod mcp_runtime;
-mod model_lifecycle;
 mod mode_runners;
+mod model_lifecycle;
 mod provider_setup;
 mod registry;
 mod runtime_adapter;
@@ -177,7 +177,10 @@ pub(crate) struct Cli {
     )]
     config_set: Option<String>,
 
-    #[arg(long = "available-models", help = "List available models from the builtin model catalog, grouped by provider with authentication status.")]
+    #[arg(
+        long = "available-models",
+        help = "List available models from the builtin model catalog, grouped by provider with authentication status."
+    )]
     available_models: bool,
 
     #[arg(
@@ -393,7 +396,14 @@ fn run_config_set(kv: &str) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
     config_set_dotted(&mut config, key.trim(), value.trim())?;
     config.save().context("failed to save configuration")?;
-    println!("Set {key} = {}", if is_secret_key(key) { "***".to_string() } else { value.trim().to_string() });
+    println!(
+        "Set {key} = {}",
+        if is_secret_key(key) {
+            "***".to_string()
+        } else {
+            value.trim().to_string()
+        }
+    );
     Ok(())
 }
 
@@ -401,8 +411,10 @@ fn run_models() -> Result<()> {
     let config = Config::load().context("failed to load configuration")?;
     let catalog = talos_config::model::builtin_models();
 
-    let mut by_provider: std::collections::BTreeMap<String, Vec<&talos_config::model::ModelMetadata>> =
-        std::collections::BTreeMap::new();
+    let mut by_provider: std::collections::BTreeMap<
+        String,
+        Vec<&talos_config::model::ModelMetadata>,
+    > = std::collections::BTreeMap::new();
     for m in &catalog {
         by_provider.entry(m.provider.clone()).or_default().push(m);
     }
@@ -549,7 +561,11 @@ fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> Result<()> 
                 .or_insert_with(|| talos_config::ProviderConfig {
                     ..Default::default()
                 })
-                .base_url = if value.is_empty() { None } else { Some(value.to_string()) };
+                .base_url = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
             Ok(())
         }
         ["providers", name, "api_key"] => {

@@ -249,7 +249,8 @@ impl AgentTool for BashTool {
             .map(|s| Duration::from_secs(s.clamp(1, MAX_TIMEOUT_SECS)))
             .unwrap_or(self.timeout);
 
-        self.run_command(&bash_input.command, timeout_duration).await
+        self.run_command(&bash_input.command, timeout_duration)
+            .await
     }
 }
 
@@ -302,7 +303,11 @@ mod tests {
             .await;
 
         assert!(result.is_error);
-        assert!(result.content.starts_with("$ nonexistent_command_xyz_123\n"));
+        assert!(
+            result
+                .content
+                .starts_with("$ nonexistent_command_xyz_123\n")
+        );
     }
 
     #[tokio::test]
@@ -427,9 +432,7 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_exit_code_success() {
         let tool = BashTool::new(test_dir());
-        let result = tool
-            .execute(serde_json::json!({ "command": "true" }))
-            .await;
+        let result = tool.execute(serde_json::json!({ "command": "true" })).await;
 
         assert!(!result.is_error);
         assert!(result.content.ends_with("[exit 0]"));
@@ -487,9 +490,7 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_empty_output() {
         let tool = BashTool::new(test_dir());
-        let result = tool
-            .execute(serde_json::json!({ "command": "true" }))
-            .await;
+        let result = tool.execute(serde_json::json!({ "command": "true" })).await;
 
         assert!(!result.is_error);
         assert!(result.content.starts_with("$ true\n"));

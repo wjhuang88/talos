@@ -8,9 +8,9 @@ use tokio::sync::mpsc;
 
 use crate::types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest, SessionForkRequest,
-    SessionNewRequest, SessionResumeRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,
-    TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
+    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
+    SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillDiagnostic, StatusSnapshot,
+    StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -554,7 +554,11 @@ impl ConversationEngine {
                         stream: Box::pin(stream::once(async move { text })),
                     }));
                 } else {
-                    let session_id = if arg.is_empty() { None } else { Some(arg.to_string()) };
+                    let session_id = if arg.is_empty() {
+                        None
+                    } else {
+                        Some(arg.to_string())
+                    };
                     outputs.push(UiOutput::SessionResume(SessionResumeRequest { session_id }));
                 }
             }
@@ -577,7 +581,9 @@ impl ConversationEngine {
                         stream: Box::pin(stream::once(async move { text })),
                     }));
                 } else if arg.is_empty() {
-                    outputs.push(UiOutput::SessionDelete(SessionDeleteRequest { selection: None }));
+                    outputs.push(UiOutput::SessionDelete(SessionDeleteRequest {
+                        selection: None,
+                    }));
                 } else {
                     outputs.push(UiOutput::SessionDelete(SessionDeleteRequest {
                         selection: Some(arg.to_string()),

@@ -51,7 +51,10 @@ pub(crate) enum PanelKind {
         provider: String,
         model_id: Option<String>,
     },
-    Approval { tool_name: String, arguments: String },
+    Approval {
+        tool_name: String,
+        arguments: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -96,20 +99,23 @@ impl BottomPanelState {
         let items = sessions
             .iter()
             .map(|s| PanelItem {
-                label: format!("{}. {} — {} messages", s.ordinal, s.timestamp, s.message_count),
+                label: format!(
+                    "{}. {} — {} messages",
+                    s.ordinal, s.timestamp, s.message_count
+                ),
                 description: if s.preview.is_empty() {
                     "(empty)".to_string()
                 } else {
                     format!("\"{}\"", s.preview)
                 },
-            action: PanelItemAction::Select {
-                command: if s.command.is_empty() {
-                    "/resume".to_string()
-                } else {
-                    s.command.clone()
+                action: PanelItemAction::Select {
+                    command: if s.command.is_empty() {
+                        "/resume".to_string()
+                    } else {
+                        s.command.clone()
+                    },
+                    value: s.ordinal.to_string(),
                 },
-                value: s.ordinal.to_string(),
-            },
                 is_current: false,
             })
             .collect();

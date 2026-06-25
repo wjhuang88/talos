@@ -197,10 +197,7 @@ impl WebSearchTool {
             results.push(WebResult {
                 title: item["title"].as_str().unwrap_or("Untitled").to_string(),
                 url: item["url"].as_str().unwrap_or("").to_string(),
-                snippet: item["content"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string(),
+                snippet: item["content"].as_str().unwrap_or("").to_string(),
             });
         }
 

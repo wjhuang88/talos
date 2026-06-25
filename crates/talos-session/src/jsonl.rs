@@ -29,7 +29,10 @@ impl Session {
             if guard.is_none() {
                 drop(guard);
                 let id = read_last_entry_id(&self.file_path);
-                *self.last_entry_id.lock().expect("last_entry_id mutex poisoned") = id.clone();
+                *self
+                    .last_entry_id
+                    .lock()
+                    .expect("last_entry_id mutex poisoned") = id.clone();
                 id
             } else {
                 guard.clone()
@@ -63,7 +66,10 @@ impl Session {
             .open(&self.file_path)?;
         writeln!(file, "{line}")?;
 
-        *self.last_entry_id.lock().expect("last_entry_id mutex poisoned") = Some(entry.id.clone());
+        *self
+            .last_entry_id
+            .lock()
+            .expect("last_entry_id mutex poisoned") = Some(entry.id.clone());
         Ok(())
     }
 
@@ -90,7 +96,8 @@ impl Session {
                     content: entry.content,
                 }),
                 "assistant" => {
-                    let tool_calls = talos_core::message::extract_tool_calls_from_text(&entry.content);
+                    let tool_calls =
+                        talos_core::message::extract_tool_calls_from_text(&entry.content);
                     let cleaned = talos_core::message::strip_tool_syntax(&entry.content);
                     Message::Assistant {
                         content: cleaned,
@@ -258,7 +265,10 @@ fn parse_tool_result(content: &str) -> (bool, String, String) {
 fn message_parts(message: &Message) -> (String, String) {
     match message {
         Message::User { content } => ("user".to_string(), content.clone()),
-        Message::Assistant { content, tool_calls } => {
+        Message::Assistant {
+            content,
+            tool_calls,
+        } => {
             if tool_calls.is_empty() {
                 return ("assistant".to_string(), content.clone());
             }

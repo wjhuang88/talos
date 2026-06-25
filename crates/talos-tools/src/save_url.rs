@@ -93,7 +93,10 @@ async fn check_ssrf(host: &str) -> Result<(), String> {
 
     for sock_addr in addrs {
         if is_private_ip(sock_addr.ip()) {
-            return Err(format!("{host} resolves to private IP ({})", sock_addr.ip()));
+            return Err(format!(
+                "{host} resolves to private IP ({})",
+                sock_addr.ip()
+            ));
         }
     }
     Ok(())
@@ -131,9 +134,7 @@ impl AgentTool for SaveUrlTool {
         let parsed: SaveUrlInput = match serde_json::from_value(input) {
             Ok(v) => v,
             Err(e) => {
-                return ToolResult::error(
-                    SaveUrlError::InvalidInput(e.to_string()).to_string(),
-                );
+                return ToolResult::error(SaveUrlError::InvalidInput(e.to_string()).to_string());
             }
         };
 
@@ -168,9 +169,7 @@ impl AgentTool for SaveUrlTool {
         let response = match self.client.get(parsed.url.as_str()).send().await {
             Ok(resp) => resp,
             Err(e) => {
-                return ToolResult::error(
-                    SaveUrlError::DownloadFailed(e.to_string()).to_string(),
-                );
+                return ToolResult::error(SaveUrlError::DownloadFailed(e.to_string()).to_string());
             }
         };
 

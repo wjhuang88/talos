@@ -142,7 +142,12 @@ impl Session {
 
     /// Create a deferred session — metadata only, no file on disk.
     /// The file is created lazily on the first `ensure_persisted()` call.
-    pub fn new_deferred(id: Uuid, project: String, workspace_root: String, file_path: PathBuf) -> Self {
+    pub fn new_deferred(
+        id: Uuid,
+        project: String,
+        workspace_root: String,
+        file_path: PathBuf,
+    ) -> Self {
         let mut session = Self::new(id, project, workspace_root, file_path);
         session.persisted = false;
         session

@@ -11,7 +11,9 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput};
+use talos_conversation::{
+    ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput,
+};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
@@ -31,7 +33,9 @@ use tokio::sync::{mpsc, watch};
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
-use crate::model_lifecycle::{RebuildSessionParams, build_model_picker_data, rebuild_session_for_model};
+use crate::model_lifecycle::{
+    RebuildSessionParams, build_model_picker_data, rebuild_session_for_model,
+};
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
@@ -42,8 +46,8 @@ use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_prompt, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name, workspace_path_display,
 };
-use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::session_transition::SessionTransition;
+use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::tui_bridge::{SessionLifecycleRequest, run_conversation_loop};
 use crate::{Cli, build_hook_registry, event_loop};
 use tokio::sync::Mutex;
@@ -96,11 +100,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     // I009-S5 end
 }
 
-fn send_stream(
-    ui_tx: &mpsc::UnboundedSender<UiOutput>,
-    source: MessageSource,
-    text: String,
-) {
+fn send_stream(ui_tx: &mpsc::UnboundedSender<UiOutput>, source: MessageSource, text: String) {
     let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
         source,
         stream: Box::pin(futures::stream::once(async move { text })),
@@ -315,7 +315,9 @@ async fn handle_session_delete(
             let target = match arg.parse::<usize>() {
                 Ok(n) if n >= 1 && n <= sessions.len() => &sessions[n - 1],
                 _ => {
-                    let text = format!("[Error] Invalid selection '{arg}'. Use /delete to pick a session.\n");
+                    let text = format!(
+                        "[Error] Invalid selection '{arg}'. Use /delete to pick a session.\n"
+                    );
                     send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
@@ -512,7 +514,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let needs_api_key = !cli.mock && !needs_model_setup && config.api_key().is_err();
 
     if (needs_model_setup || needs_api_key) && !cli.mock && cli.no_init {
-        bail!("no model configured and --no-init was given. Set 'model' in ~/.talos/config.toml, pass --model, or remove --no-init to run the setup wizard.");
+        bail!(
+            "no model configured and --no-init was given. Set 'model' in ~/.talos/config.toml, pass --model, or remove --no-init to run the setup wizard."
+        );
     }
 
     let mock_for_startup = cli.mock || needs_model_setup || needs_api_key;
@@ -535,7 +539,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry =
+        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -589,7 +594,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_signal = handle.sq_tx.clone();
     tokio::spawn(async move { actor.run().await });
 
-    let transition = Arc::new(Mutex::new(SessionTransition::new(handle.sq_tx.clone(), session.clone())));
+    let transition = Arc::new(Mutex::new(SessionTransition::new(
+        handle.sq_tx.clone(),
+        session.clone(),
+    )));
     tokio::spawn(async move {
         loop {
             tokio::signal::ctrl_c().await.ok();
@@ -600,10 +608,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     // Shared state for persistence continuity across session switches.
     // watch channels let the bridge forwarder and user persister read the
     // CURRENTLY active session and sq_tx without owning a stale clone.
-    let (session_watch_tx, session_watch_rx) =
-        tokio::sync::watch::channel(session.clone());
-    let (sq_tx_watch_tx, sq_tx_watch_rx) =
-        tokio::sync::watch::channel(handle.sq_tx.clone());
+    let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
+    let (sq_tx_watch_tx, sq_tx_watch_rx) = tokio::sync::watch::channel(handle.sq_tx.clone());
     // Dedicated channel for handing off the new eq_rx + old_session to the
     // bridge forwarder after a session switch. The bridge must keep persisting
     // any in-flight events for the previous session until that actor's eq_rx
@@ -760,7 +766,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         let _ = bridge_tx.send(agent_event.clone());
                     }
                     SessionEvent::TurnCompleted {
-                        status: talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages },
+                        status:
+                            talos_core::session::TurnCompletionStatus::Success {
+                                final_text: _,
+                                new_messages,
+                            },
                         ..
                     } => {
                         for msg in &new_messages {
@@ -804,7 +814,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_watch_rx_for_user = sq_tx_watch_rx.clone();
     tokio::spawn(async move {
         while let Some(msg) = user_msg_rx.recv().await {
-            let user_msg = Message::User { content: msg.clone() };
+            let user_msg = Message::User {
+                content: msg.clone(),
+            };
             let session = session_watch_rx_for_user.borrow().clone();
             if let Err(e) = session.append(&user_msg) {
                 eprintln!("Warning: failed to persist user message: {e}");
@@ -1027,9 +1039,12 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
                 },
                 SessionEvent::TurnCompleted { status, .. } => {
                     match status {
-                        talos_core::session::TurnCompletionStatus::Success { final_text: _, new_messages } => {
+                        talos_core::session::TurnCompletionStatus::Success {
+                            final_text: _,
+                            new_messages,
+                        } => {
                             for msg in &new_messages {
-                        if matches!(msg, talos_core::message::Message::User { .. }) {
+                                if matches!(msg, talos_core::message::Message::User { .. }) {
                                     continue;
                                 }
                                 if let Err(e) = session.append(msg) {
@@ -1094,7 +1109,9 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     }
 
     if config.model.is_empty() && !cli.mock {
-        bail!("no model configured. Set 'model' in ~/.talos/config.toml, pass --model, or run `talos` in TUI mode for the setup wizard.");
+        bail!(
+            "no model configured. Set 'model' in ~/.talos/config.toml, pass --model, or run `talos` in TUI mode for the setup wizard."
+        );
     }
 
     let api_key = if cli.mock {
@@ -1162,7 +1179,9 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     registry.register(Arc::new(GitDiffTool::new(workspace_root.to_path_buf())));
     registry.register(Arc::new(GitLogTool::new(workspace_root.to_path_buf())));
     registry.register(Arc::new(GitShowTool::new(workspace_root.to_path_buf())));
-    registry.register(Arc::new(GitBranchListTool::new(workspace_root.to_path_buf())));
+    registry.register(Arc::new(GitBranchListTool::new(
+        workspace_root.to_path_buf(),
+    )));
     registry.register(Arc::new(TreeTool::new(workspace_root.to_path_buf())));
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(GitAddTool::new(workspace_root.to_path_buf())),
@@ -1340,7 +1359,8 @@ async fn handle_session_new(
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry =
+        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -1375,7 +1395,9 @@ async fn handle_session_new(
                 .send((result.old_session.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
-                eprintln!("[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed.");
+                eprintln!(
+                    "[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed."
+                );
             }
             let text = "[System] New session started. Previous session preserved.\n".to_string();
             send_stream(ui_tx, MessageSource::System, text);
@@ -1383,7 +1405,8 @@ async fn handle_session_new(
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&new_session_for_watch.file_path);
-            let text = format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
+            let text =
+                format!("[Error] Failed to commit new session: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
         }
     }
@@ -1432,11 +1455,13 @@ async fn handle_session_resume(
                     return;
                 }
                 let mut sessions = sessions;
-                sessions.sort_by(|a, b| {
-                    b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id))
-                });
+                sessions
+                    .sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
                 if n == 0 || n > sessions.len() {
-                    let text = format!("[Error] Invalid session number {n}. Valid range: 1-{}.\n", sessions.len());
+                    let text = format!(
+                        "[Error] Invalid session number {n}. Valid range: 1-{}.\n",
+                        sessions.len()
+                    );
                     send_stream(ui_tx, MessageSource::Error, text);
                     return;
                 }
@@ -1479,9 +1504,7 @@ async fn handle_session_resume(
             }
 
             let mut sessions = sessions;
-            sessions.sort_by(|a, b| {
-                b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id))
-            });
+            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
 
             let items: Vec<SessionPickerItem> = sessions
                 .iter()
@@ -1535,7 +1558,8 @@ async fn handle_session_resume(
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry =
+        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -1570,16 +1594,22 @@ async fn handle_session_resume(
                 .send((result.old_session.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
-                eprintln!("[Error] Bridge forwarder unavailable; resumed session events will not be persisted or displayed.");
+                eprintln!(
+                    "[Error] Bridge forwarder unavailable; resumed session events will not be persisted or displayed."
+                );
             }
             let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
-            let text = format!("[System] Resumed session {}.\n", session_id.unwrap_or_default());
+            let text = format!(
+                "[System] Resumed session {}.\n",
+                session_id.unwrap_or_default()
+            );
             send_stream(ui_tx, MessageSource::System, text);
         }
         Err(e) => {
             transition.rollback();
             let _ = std::fs::remove_file(&target_session_for_watch.file_path);
-            let text = format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
+            let text =
+                format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
         }
     }
@@ -1645,10 +1675,11 @@ async fn handle_session_fork(
 
     let child_path = child_session.file_path.clone();
     if let Some(parent) = child_path.parent()
-        && let Err(e) = std::fs::create_dir_all(parent) {
-            let text = format!("[Error] Failed to create child session directory: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-            return;
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        let text = format!("[Error] Failed to create child session directory: {e}\n");
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
     }
 
     if let Err(e) = std::fs::write(&child_path, &source_bytes) {
@@ -1678,7 +1709,8 @@ async fn handle_session_fork(
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry =
+        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -1713,9 +1745,14 @@ async fn handle_session_fork(
                 .send((result.old_session.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
-                eprintln!("[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed.");
+                eprintln!(
+                    "[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed."
+                );
             }
-            let text = format!("[System] Forked session {child_id} (source: {}).\n", result.old_session.id);
+            let text = format!(
+                "[System] Forked session {child_id} (source: {}).\n",
+                result.old_session.id
+            );
             send_stream(ui_tx, MessageSource::System, text);
         }
         Err(e) => {

@@ -432,7 +432,10 @@ impl SessionIndex {
 
     pub fn delete_session(&mut self, session_id: &str) -> Result<(), IndexError> {
         let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM messages_fts WHERE session_id = ?1", params![session_id])?;
+        tx.execute(
+            "DELETE FROM messages_fts WHERE session_id = ?1",
+            params![session_id],
+        )?;
         tx.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])?;
         tx.execute(
             "DELETE FROM forks WHERE source_session_id = ?1 OR forked_session_id = ?1",

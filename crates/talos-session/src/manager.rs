@@ -364,14 +364,12 @@ impl SessionManager {
                                 .and_then(|n| n.to_str())
                                 .unwrap_or("unknown")
                                 .to_string();
-                            let mut session = Session::new(
-                                id,
-                                project,
-                                workspace_root.to_string(),
-                                path.clone(),
-                            );
+                            let mut session =
+                                Session::new(id, project, workspace_root.to_string(), path.clone());
                             if let Ok(entries) = session.read_entries() {
-                                if let Some(branch) = session.branches.get_mut(&session.current_branch) {
+                                if let Some(branch) =
+                                    session.branches.get_mut(&session.current_branch)
+                                {
                                     branch.entries = entries;
                                 }
                             }

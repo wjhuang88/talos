@@ -332,7 +332,10 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 None => format!(" Provider: {provider}"),
             };
             let lines = vec![
-                Line::from(Span::styled(header, Style::default().fg(crate::nord::NORD8).bold())),
+                Line::from(Span::styled(
+                    header,
+                    Style::default().fg(crate::nord::NORD8).bold(),
+                )),
                 Line::from(Span::styled(
                     " Enter the API key for this provider and press Enter (Esc to cancel).",
                     dim,
@@ -397,7 +400,11 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             let is_selected = idx == self.menu.selected_index;
 
             if item.action == crate::state::PanelItemAction::Header {
-                let style = if is_selected { header_selected } else { header_style };
+                let style = if is_selected {
+                    header_selected
+                } else {
+                    header_style
+                };
                 lines.push(Line::from(Span::styled(
                     format!("  {} ───", item.label),
                     style,
@@ -409,7 +416,14 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 let command_name = item.label.strip_prefix('/').unwrap_or(&item.label);
                 let has_arg = item.description.contains('[') || item.description.contains('<');
                 let name = if has_arg {
-                    format!("  /{command_name} {}", item.description.split_once('[').or_else(|| item.description.split_once('<')).map(|(_, b)| format!("[{b}")).unwrap_or_default())
+                    format!(
+                        "  /{command_name} {}",
+                        item.description
+                            .split_once('[')
+                            .or_else(|| item.description.split_once('<'))
+                            .map(|(_, b)| format!("[{b}"))
+                            .unwrap_or_default()
+                    )
                 } else {
                     format!("  /{command_name}")
                 };
@@ -448,7 +462,10 @@ impl ViewportComponent for BottomPanelComponent<'_> {
 
 impl BottomPanelComponent<'_> {
     fn render_approval(&self, frame: &mut InlineFrame, area: Rect) {
-        let Some(crate::state::PanelKind::Approval { tool_name, arguments }) = &self.menu.kind
+        let Some(crate::state::PanelKind::Approval {
+            tool_name,
+            arguments,
+        }) = &self.menu.kind
         else {
             return;
         };
@@ -464,7 +481,10 @@ impl BottomPanelComponent<'_> {
         let mut lines: Vec<Line<'static>> = Vec::with_capacity(5);
 
         let separator = format!(" {}", "─".repeat(area.width.saturating_sub(1) as usize));
-        lines.push(Line::from(Span::styled(separator, Style::default().fg(dim))));
+        lines.push(Line::from(Span::styled(
+            separator,
+            Style::default().fg(dim),
+        )));
 
         lines.push(Line::from(Span::styled(
             format!("  \u{26a0} {tool_name}: {arguments}"),
@@ -473,7 +493,11 @@ impl BottomPanelComponent<'_> {
 
         for (i, item) in self.menu.items.iter().enumerate() {
             let is_selected = i == self.menu.selected_index;
-            let style = if is_selected { selected_style } else { unselected_style };
+            let style = if is_selected {
+                selected_style
+            } else {
+                unselected_style
+            };
             lines.push(Line::from(Span::styled(format!("  {}", item.label), style)));
         }
 
@@ -613,13 +637,15 @@ pub(crate) fn render_history_messages(
                     is_error: result.is_error,
                     content,
                 };
-                lines.extend(
-                    crate::tool_display::build_tool_result_scrollback_lines(&display, icon, color),
-                );
+                lines.extend(crate::tool_display::build_tool_result_scrollback_lines(
+                    &display, icon, color,
+                ));
             }
-            Message::Assistant { content, tool_calls } => {
-                let tool_calls_in_text =
-                    talos_core::message::extract_tool_calls_from_text(content);
+            Message::Assistant {
+                content,
+                tool_calls,
+            } => {
+                let tool_calls_in_text = talos_core::message::extract_tool_calls_from_text(content);
                 let cleaned = talos_core::message::strip_tool_syntax(content);
                 let has_tool_calls = !tool_calls.is_empty() || !tool_calls_in_text.is_empty();
 
@@ -1401,10 +1427,24 @@ pub(crate) fn build_status_text(
     let queue_total = status.steering_count + status.followup_count;
 
     if compact {
-        return build_compact_status(model_name, provider, workspace, status.is_processing, total_tokens, queue_total);
+        return build_compact_status(
+            model_name,
+            provider,
+            workspace,
+            status.is_processing,
+            total_tokens,
+            queue_total,
+        );
     }
 
-    build_expanded_status(model_name, provider, workspace, status.is_processing, total_tokens, queue_total)
+    build_expanded_status(
+        model_name,
+        provider,
+        workspace,
+        status.is_processing,
+        total_tokens,
+        queue_total,
+    )
 }
 
 fn build_compact_status(

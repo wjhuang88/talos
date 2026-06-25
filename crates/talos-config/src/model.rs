@@ -122,9 +122,7 @@ pub fn find_model_by_provider<'a>(
     provider: &str,
     id: &str,
 ) -> Option<&'a ModelMetadata> {
-    models
-        .iter()
-        .find(|m| m.provider == provider && m.id == id)
+    models.iter().find(|m| m.provider == provider && m.id == id)
 }
 
 /// Collects all models whose `id` matches, regardless of provider.

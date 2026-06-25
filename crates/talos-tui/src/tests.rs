@@ -9,8 +9,8 @@ mod tests {
 
     use crate::inline_terminal::ViewportComponent;
     use crate::scrollback::{
-        BottomPanelComponent, BottomPanelPlacement, build_input_text, build_status_text,
-        calculate_cost, cursor_line_col, input_line_count, bottom_panel_placement, bottom_panel_rows,
+        BottomPanelComponent, BottomPanelPlacement, bottom_panel_placement, bottom_panel_rows,
+        build_input_text, build_status_text, calculate_cost, cursor_line_col, input_line_count,
         stream_padding_for, truncate_str,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
@@ -740,7 +740,10 @@ mod tests {
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
-        assert!(content.contains("talos"), "status bar must include workspace path");
+        assert!(
+            content.contains("talos"),
+            "status bar must include workspace path"
+        );
     }
 
     #[test]

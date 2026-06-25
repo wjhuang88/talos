@@ -76,8 +76,12 @@ pub(crate) fn should_suppress_tool_result_content(display: &ToolResultDisplay) -
         return false;
     };
     const ALWAYS_SUMMARIZE: &[&str] = &[
-        "read", "list_symbols", "find_symbol", "find_references",
-        "http_request", "web_search",
+        "read",
+        "list_symbols",
+        "find_symbol",
+        "find_references",
+        "http_request",
+        "web_search",
     ];
     if ALWAYS_SUMMARIZE.contains(&name) {
         return true;
@@ -133,7 +137,13 @@ fn summarize_http_request(content: &str) -> String {
     let size = content
         .lines()
         .find(|l| l.starts_with("Content ("))
-        .map(|l| l.split('(').nth(1).and_then(|s| s.split(')').next()).unwrap_or("?").to_string())
+        .map(|l| {
+            l.split('(')
+                .nth(1)
+                .and_then(|s| s.split(')').next())
+                .unwrap_or("?")
+                .to_string()
+        })
         .unwrap_or_else(|| "? bytes".to_string());
     format!("http_request: {status}, {size}, {content_type}")
 }
@@ -142,7 +152,11 @@ fn summarize_web_search(content: &str) -> String {
     let query = content
         .lines()
         .find(|l| l.starts_with("Searched: "))
-        .map(|l| l.trim_start_matches("Searched: ").trim_matches('"').to_string())
+        .map(|l| {
+            l.trim_start_matches("Searched: ")
+                .trim_matches('"')
+                .to_string()
+        })
         .unwrap_or_else(|| "?".to_string());
     let source = content
         .lines()

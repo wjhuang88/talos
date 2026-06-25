@@ -1110,21 +1110,27 @@ mod tests {
 
     #[test]
     fn test_required_prompt_assets_are_non_empty() {
-    // ADR-015 requires tests proving required embedded prompt assets are non-empty.
-    assert!(!DEFAULT_IDENTITY.trim().is_empty(), "identity.txt must be non-empty");
-    assert!(
-        !TOOL_CALLING_FORMAT.trim().is_empty(),
-        "tool_calling_format.txt must be non-empty"
-    );
-    assert!(
-        !TOOL_CALLING_STRICT.trim().is_empty(),
-        "tool_calling_strict.txt must be non-empty"
-    );
-    assert!(!MEMORY_PROMPT.trim().is_empty(), "memory.md must be non-empty");
+        // ADR-015 requires tests proving required embedded prompt assets are non-empty.
+        assert!(
+            !DEFAULT_IDENTITY.trim().is_empty(),
+            "identity.txt must be non-empty"
+        );
+        assert!(
+            !TOOL_CALLING_FORMAT.trim().is_empty(),
+            "tool_calling_format.txt must be non-empty"
+        );
+        assert!(
+            !TOOL_CALLING_STRICT.trim().is_empty(),
+            "tool_calling_strict.txt must be non-empty"
+        );
+        assert!(
+            !MEMORY_PROMPT.trim().is_empty(),
+            "memory.md must be non-empty"
+        );
     }
 
     #[test]
     fn test_identity_prompt_contains_talos_identity() {
-    assert!(DEFAULT_IDENTITY.contains("Talos"));
+        assert!(DEFAULT_IDENTITY.contains("Talos"));
     }
 }

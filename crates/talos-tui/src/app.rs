@@ -526,7 +526,10 @@ impl Tui {
                         },
                     ));
                 }
-                Message::Assistant { content, tool_calls } => {
+                Message::Assistant {
+                    content,
+                    tool_calls,
+                } => {
                     let tool_calls_in_text =
                         talos_core::message::extract_tool_calls_from_text(content);
                     let cleaned = talos_core::message::strip_tool_syntax(content);
@@ -549,21 +552,31 @@ impl Tui {
                     }
 
                     let calls: Vec<ToolCallDisplay> = if !tool_calls.is_empty() {
-                        tool_calls.iter().map(|tc| ToolCallDisplay {
-                            tool_name: tc.name.clone(), arguments: tc.input.clone(),
-                            provenance: ToolProvenance::Native,
-                            summary_fields: crate::scrollback::summary_fields_for(&tc.name),
-                        }).collect()
+                        tool_calls
+                            .iter()
+                            .map(|tc| ToolCallDisplay {
+                                tool_name: tc.name.clone(),
+                                arguments: tc.input.clone(),
+                                provenance: ToolProvenance::Native,
+                                summary_fields: crate::scrollback::summary_fields_for(&tc.name),
+                            })
+                            .collect()
                     } else if !tool_calls_in_text.is_empty() {
                         for tc in &tool_calls_in_text {
                             pending_tool_names.push(tc.name.clone());
                         }
-                        tool_calls_in_text.iter().map(|tc| ToolCallDisplay {
-                            tool_name: tc.name.clone(), arguments: tc.input.clone(),
-                            provenance: ToolProvenance::Native,
-                            summary_fields: crate::scrollback::summary_fields_for(&tc.name),
-                        }).collect()
-                    } else { vec![] };
+                        tool_calls_in_text
+                            .iter()
+                            .map(|tc| ToolCallDisplay {
+                                tool_name: tc.name.clone(),
+                                arguments: tc.input.clone(),
+                                provenance: ToolProvenance::Native,
+                                summary_fields: crate::scrollback::summary_fields_for(&tc.name),
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    };
 
                     for call in &calls {
                         self.handle_ui_output(UiOutput::ToolCall(call.clone()));
@@ -586,9 +599,11 @@ impl Tui {
 
     fn consume_stream_completely(&mut self) {
         while let Some(ref mut stream) = self.active_stream {
-            match stream.as_mut().poll_next(&mut std::task::Context::from_waker(
-                futures::task::noop_waker_ref(),
-            )) {
+            match stream
+                .as_mut()
+                .poll_next(&mut std::task::Context::from_waker(
+                    futures::task::noop_waker_ref(),
+                )) {
                 std::task::Poll::Ready(Some(chunk)) => {
                     self.consume_stream_chunk(&chunk);
                 }
@@ -683,15 +698,21 @@ impl Tui {
 
     fn resolve_approval(&mut self, choice: ApprovalChoice) {
         let (icon, color, msg) = match &choice {
-            ApprovalChoice::ApproveOnce => {
-                ("\u{2713}", to_crossterm_color(semantic::TEXT_SUCCESS), "approved")
-            }
+            ApprovalChoice::ApproveOnce => (
+                "\u{2713}",
+                to_crossterm_color(semantic::TEXT_SUCCESS),
+                "approved",
+            ),
             ApprovalChoice::AlwaysApprove => (
                 "\u{2713}",
                 to_crossterm_color(semantic::TEXT_SUCCESS),
                 "always approved",
             ),
-            ApprovalChoice::Deny => ("\u{2717}", to_crossterm_color(semantic::TEXT_ERROR), "denied"),
+            ApprovalChoice::Deny => (
+                "\u{2717}",
+                to_crossterm_color(semantic::TEXT_ERROR),
+                "denied",
+            ),
         };
         self.pending_scrollback.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
@@ -812,10 +833,7 @@ impl Tui {
                         HistoryAttrs::default(),
                     ),
                     HistorySegment::styled(
-                        format!(
-                            "{}  ",
-                            crate::formatting::format_duration(elapsed_secs)
-                        ),
+                        format!("{}  ", crate::formatting::format_duration(elapsed_secs)),
                         to_crossterm_color(semantic::STATUS_VALUE),
                         HistoryAttrs::default(),
                     ),
@@ -831,10 +849,7 @@ impl Tui {
             lines.push(ScrollbackLine::styled(
                 vec![
                     HistorySegment::styled(
-                        format!(
-                            "{}  ",
-                            crate::formatting::format_duration(elapsed_secs)
-                        ),
+                        format!("{}  ", crate::formatting::format_duration(elapsed_secs)),
                         to_crossterm_color(semantic::STATUS_VALUE),
                         HistoryAttrs::default(),
                     ),
@@ -873,7 +888,10 @@ impl Tui {
             ));
             lines.push(ScrollbackLine::styled(
                 vec![HistorySegment::styled(
-                    format!("  {} tokens total", crate::formatting::format_tokens(total_tokens)),
+                    format!(
+                        "  {} tokens total",
+                        crate::formatting::format_tokens(total_tokens)
+                    ),
                     to_crossterm_color(semantic::DIM_TEXT),
                     HistoryAttrs::default(),
                 )],
@@ -1073,8 +1091,11 @@ impl Tui {
                 self.state.should_exit = true;
                 return true;
             }
-            UiOutput::SessionNew(_) | UiOutput::SessionResume(_) | UiOutput::SessionFork(_)
-            | UiOutput::SessionDelete(_) | UiOutput::ModelSwitchRequest(_)
+            UiOutput::SessionNew(_)
+            | UiOutput::SessionResume(_)
+            | UiOutput::SessionFork(_)
+            | UiOutput::SessionDelete(_)
+            | UiOutput::ModelSwitchRequest(_)
             | UiOutput::CredentialResponse(_) => {
                 // Handled by the bridge → mode runner lifecycle handler.
                 // Should not reach the TUI directly.
@@ -1173,7 +1194,11 @@ impl Tui {
         let input_pad_top = crate::scrollback::InputPadComponent;
         let input = crate::scrollback::InputComponent { state };
         let query = state.slash_query();
-        let query_for_panel = if state.slash_menu.is_picker() { "" } else { query };
+        let query_for_panel = if state.slash_menu.is_picker() {
+            ""
+        } else {
+            query
+        };
         let mut bottom_panel = crate::scrollback::BottomPanelComponent {
             menu: &state.slash_menu,
             query: query_for_panel,

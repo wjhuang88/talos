@@ -141,8 +141,7 @@ fn extract_html_text(html: &str) -> String {
     let document = scraper::Html::parse_document(html);
 
     // Select the body or fall back to the root element.
-    let body_selector =
-        scraper::Selector::parse("body").expect("'body' is a valid CSS selector");
+    let body_selector = scraper::Selector::parse("body").expect("'body' is a valid CSS selector");
     let root = document
         .root_element()
         .select(&body_selector)
@@ -182,9 +181,7 @@ fn extract_links(html: &str, base_url: &str) -> Vec<String> {
     for element in document.select(&selector) {
         if let Some(href) = element.attr("href") {
             let trimmed = href.trim();
-            if trimmed.is_empty()
-                || trimmed.starts_with('#')
-                || trimmed.starts_with("javascript:")
+            if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with("javascript:")
             {
                 continue;
             }
@@ -258,7 +255,9 @@ impl HttpRequestTool {
         // Try to parse as a bare IP address first.
         if let Ok(ip) = host.parse::<IpAddr>() {
             if is_private_ip(ip) {
-                return Err(format!("URL resolves to a private IP address ({ip}); blocked by SSRF guard"));
+                return Err(format!(
+                    "URL resolves to a private IP address ({ip}); blocked by SSRF guard"
+                ));
             }
             return Ok(());
         }
@@ -407,10 +406,7 @@ impl AgentTool for HttpRequestTool {
         let parsed_url = match reqwest::Url::parse(&parsed.url) {
             Ok(url) => url,
             Err(e) => {
-                return ToolResult::error(format!(
-                    "invalid URL '{}': {e}",
-                    parsed.url
-                ));
+                return ToolResult::error(format!("invalid URL '{}': {e}", parsed.url));
             }
         };
 
@@ -430,9 +426,7 @@ impl AgentTool for HttpRequestTool {
         };
 
         if let Err(e) = self.check_ssrf(&host).await {
-            return ToolResult::error(format!(
-                "SSRF guard blocked request to {host}: {e}"
-            ));
+            return ToolResult::error(format!("SSRF guard blocked request to {host}: {e}"));
         }
 
         // Override timeout if specified.
@@ -451,9 +445,7 @@ impl AgentTool for HttpRequestTool {
         let request = match self.build_request(&client, &parsed) {
             Ok(req) => req,
             Err(e) => {
-                return ToolResult::error(format!(
-                    "failed to build request: {e}"
-                ));
+                return ToolResult::error(format!("failed to build request: {e}"));
             }
         };
 
@@ -474,9 +466,7 @@ impl AgentTool for HttpRequestTool {
         let body_bytes = match response.bytes().await {
             Ok(b) => b,
             Err(e) => {
-                return ToolResult::error(format!(
-                    "failed to read response body: {e}"
-                ));
+                return ToolResult::error(format!("failed to read response body: {e}"));
             }
         };
 
@@ -508,7 +498,11 @@ impl AgentTool for HttpRequestTool {
         }
 
         let size_label = if truncated {
-            format!("first {} of {} bytes", self.max_body_bytes, body_bytes.len())
+            format!(
+                "first {} of {} bytes",
+                self.max_body_bytes,
+                body_bytes.len()
+            )
         } else {
             format!("{} bytes", body_bytes.len())
         };
@@ -529,7 +523,9 @@ impl AgentTool for HttpRequestTool {
                 if !links.is_empty() {
                     let count = links.len();
                     let show = count.min(20);
-                    output.push_str(&format!("\n\n── Links ({count} total, showing {show}) ──\n"));
+                    output.push_str(&format!(
+                        "\n\n── Links ({count} total, showing {show}) ──\n"
+                    ));
                     for link in links.iter().take(show) {
                         output.push_str(&format!("  {link}\n"));
                     }
@@ -554,24 +550,20 @@ impl AgentTool for HttpRequestTool {
             }
         } else if content_type.starts_with("text/") {
             // Text: return as-is.
-            output.push_str(&format!(
-                "\nContent ({size_label}, {content_type}):\n",
-            ));
+            output.push_str(&format!("\nContent ({size_label}, {content_type}):\n",));
             output.push_str(&String::from_utf8_lossy(body_display));
         } else if content_type.is_empty() || content_type.contains("octet-stream") {
             // Binary or unknown content type: show info only.
-            output.push_str(&format!(
-                "\nContent: binary/unknown ({size_label})\n",
-            ));
+            output.push_str(&format!("\nContent: binary/unknown ({size_label})\n",));
             if !content_type.is_empty() {
                 output.push_str(&format!("Content-Type: {content_type}\n"));
             }
-            output.push_str("[Binary or unrecognized content — use mode: \"raw\" to view raw bytes]\n");
+            output.push_str(
+                "[Binary or unrecognized content — use mode: \"raw\" to view raw bytes]\n",
+            );
         } else {
             // Other structured content: return as text.
-            output.push_str(&format!(
-                "\nContent ({size_label}, {content_type}):\n",
-            ));
+            output.push_str(&format!("\nContent ({size_label}, {content_type}):\n",));
             output.push_str(&String::from_utf8_lossy(body_display));
         }
 

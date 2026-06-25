@@ -12,7 +12,7 @@ use talos_conversation::{ModelPickerData, ModelPickerItem, ProviderSetupItem};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
 use talos_session::Session;
-use tokio::sync::{mpsc, watch, Mutex};
+use tokio::sync::{Mutex, mpsc, watch};
 
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::registry::{
@@ -111,7 +111,8 @@ pub(crate) struct RebuildSessionParams<'a> {
     pub mcp_config: &'a talos_config::McpConfig,
     pub session_watch_tx: &'a watch::Sender<Session>,
     pub sq_tx_watch_tx: &'a watch::Sender<mpsc::Sender<SessionOp>>,
-    pub bridge_rx_update_tx: &'a mpsc::UnboundedSender<(Session, mpsc::UnboundedReceiver<SessionEvent>)>,
+    pub bridge_rx_update_tx:
+        &'a mpsc::UnboundedSender<(Session, mpsc::UnboundedReceiver<SessionEvent>)>,
     pub session_watch_rx: &'a watch::Receiver<Session>,
     pub api_key: String,
     pub model_id: String,
@@ -181,7 +182,8 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry =
+        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -214,9 +216,15 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                 .send((result.old_session.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
-                eprintln!("[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed.");
+                eprintln!(
+                    "[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed."
+                );
             }
-            send_stream(ui_tx, talos_conversation::MessageSource::System, success_message);
+            send_stream(
+                ui_tx,
+                talos_conversation::MessageSource::System,
+                success_message,
+            );
             let _ = ui_tx.send(talos_conversation::UiOutput::Status(
                 talos_conversation::StatusSnapshot {
                     model_name: model_id.clone(),
@@ -227,7 +235,9 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
         Err(e) => {
             transition_guard.rollback();
-            let text = format!("[Error] Failed to commit model switch: {e}. Previous model remains active.\n");
+            let text = format!(
+                "[Error] Failed to commit model switch: {e}. Previous model remains active.\n"
+            );
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
         }
     }
@@ -278,7 +288,11 @@ mod tests {
         );
 
         for m in &data.ready_models {
-            assert!(m.authenticated, "Model {} should be authenticated", m.model_id);
+            assert!(
+                m.authenticated,
+                "Model {} should be authenticated",
+                m.model_id
+            );
         }
     }
 
@@ -383,11 +397,7 @@ mod tests {
 
         let data = build_model_picker_data(&config);
 
-        let current_models: Vec<_> = data
-            .ready_models
-            .iter()
-            .filter(|m| m.is_current)
-            .collect();
+        let current_models: Vec<_> = data.ready_models.iter().filter(|m| m.is_current).collect();
         assert_eq!(
             current_models.len(),
             1,
@@ -408,8 +418,7 @@ mod tests {
                 assert!(
                     !m.is_current,
                     "Model {} ({}) should not be current",
-                    m.model_id,
-                    m.provider
+                    m.model_id, m.provider
                 );
             }
         }

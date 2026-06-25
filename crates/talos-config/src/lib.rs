@@ -725,9 +725,7 @@ impl Config {
         let known_providers: std::collections::HashSet<&str> =
             all.iter().map(|m| m.provider.as_str()).collect();
         let (resolved_provider, resolved_id) = match model_id.split_once('/') {
-            Some((prefix, rest))
-                if known_providers.contains(prefix) && !rest.is_empty() =>
-            {
+            Some((prefix, rest)) if known_providers.contains(prefix) && !rest.is_empty() => {
                 (Some(prefix), rest)
             }
             _ => (None, model_id),
@@ -748,7 +746,7 @@ impl Config {
                     0 => {
                         return Err(ConfigError::InvalidConfig(format!(
                             "model '{resolved_id}' not found"
-                        )))
+                        )));
                     }
                     1 => matches[0],
                     _ => {
@@ -1676,7 +1674,9 @@ mod tests {
     #[test]
     fn test_set_active_model_sets_provider_from_catalog() {
         let mut config = Config::default();
-        config.set_active_model("claude-sonnet-4-5-20250929").unwrap();
+        config
+            .set_active_model("claude-sonnet-4-5-20250929")
+            .unwrap();
         assert_eq!(config.model, "claude-sonnet-4-5-20250929");
         assert_eq!(config.provider, "anthropic");
         assert!(config.providers.contains_key("anthropic"));
@@ -1743,7 +1743,10 @@ mod tests {
 
         // No credentials.toml should be written anymore.
         let creds_path = Credentials::default_path();
-        assert!(!creds_path.exists(), "credentials.toml should not be created");
+        assert!(
+            !creds_path.exists(),
+            "credentials.toml should not be created"
+        );
 
         match prev_home {
             Some(v) => unsafe { env::set_var("HOME", v) },

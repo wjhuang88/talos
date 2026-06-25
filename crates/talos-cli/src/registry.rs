@@ -10,7 +10,9 @@ use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::ApprovalChoice;
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
-use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule, ResourceKind, ResourceExtractor};
+use talos_permission::{
+    PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
+};
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -145,7 +147,8 @@ impl AgentTool for TuiPermissionAwareTool {
         match choice {
             ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
             ApprovalChoice::AlwaysApprove => {
-                self.approval.add_always_allow_rule(self.inner.nature(), &input);
+                self.approval
+                    .add_always_allow_rule(self.inner.nature(), &input);
                 self.inner.execute(input).await
             }
             ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),

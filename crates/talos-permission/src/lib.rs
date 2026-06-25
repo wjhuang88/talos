@@ -151,14 +151,18 @@ impl ResourceExtractor {
                 .or_else(|| input.get("file"))
                 .and_then(Value::as_str)
                 .map(String::from),
-            ToolNature::Execute => input.get("command").and_then(Value::as_str).and_then(|cmd| {
-                cmd.split_whitespace().next().map(String::from)
-            }),
-            ToolNature::Network => input.get("url").and_then(Value::as_str).and_then(|url_str| {
-                Url::parse(url_str)
-                    .ok()
-                    .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
-            }),
+            ToolNature::Execute => input
+                .get("command")
+                .and_then(Value::as_str)
+                .and_then(|cmd| cmd.split_whitespace().next().map(String::from)),
+            ToolNature::Network => input
+                .get("url")
+                .and_then(Value::as_str)
+                .and_then(|url_str| {
+                    Url::parse(url_str)
+                        .ok()
+                        .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
+                }),
         }
     }
 }
@@ -256,8 +260,9 @@ impl PermissionRule {
             };
 
             // Match the resource against the pattern using glob
-            let pattern = Pattern::new(resource_pattern)
-                .map_err(|e| PermissionError::InvalidGlobPattern(format!("{resource_pattern}: {e}")))?;
+            let pattern = Pattern::new(resource_pattern).map_err(|e| {
+                PermissionError::InvalidGlobPattern(format!("{resource_pattern}: {e}"))
+            })?;
 
             return Ok(pattern.matches(&extracted));
         }
@@ -1094,8 +1099,14 @@ mod tests {
         let input = serde_json::json!({});
         assert_eq!(ResourceExtractor::extract(ToolNature::Read, &input), None);
         assert_eq!(ResourceExtractor::extract(ToolNature::Write, &input), None);
-        assert_eq!(ResourceExtractor::extract(ToolNature::Execute, &input), None);
-        assert_eq!(ResourceExtractor::extract(ToolNature::Network, &input), None);
+        assert_eq!(
+            ResourceExtractor::extract(ToolNature::Execute, &input),
+            None
+        );
+        assert_eq!(
+            ResourceExtractor::extract(ToolNature::Network, &input),
+            None
+        );
     }
 
     // --- Load from config tests ---
@@ -1173,7 +1184,9 @@ mod tests {
             ]
         });
 
-        engine.load_from_config(&config).expect("config should load");
+        engine
+            .load_from_config(&config)
+            .expect("config should load");
 
         // Old format: tool_name-based matching with inferred nature
         let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
@@ -1204,7 +1217,9 @@ mod tests {
             ]
         });
 
-        engine.load_from_config(&config).expect("config should load");
+        engine
+            .load_from_config(&config)
+            .expect("config should load");
 
         // New format: nature-based matching
         let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));
@@ -1223,7 +1238,10 @@ mod tests {
         // Default ruleset should have exactly 4 rules (one per nature)
         assert_eq!(engine.rules.len(), 4);
         for rule in &engine.rules {
-            assert!(rule.nature.is_some(), "default rules should use nature form");
+            assert!(
+                rule.nature.is_some(),
+                "default rules should use nature form"
+            );
         }
     }
 
@@ -1246,7 +1264,9 @@ mod tests {
             ]
         });
 
-        engine.load_from_config(&config).expect("config should load");
+        engine
+            .load_from_config(&config)
+            .expect("config should load");
 
         // Nature is Write, so it matches write tools, not read tools
         let decision = engine.evaluate("write", &serde_json::json!({"path": "src/main.rs"}));

@@ -131,10 +131,7 @@ impl RotatingWriter {
         }
 
         let current_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
 
         Ok(Self {
             file: Mutex::new(file),

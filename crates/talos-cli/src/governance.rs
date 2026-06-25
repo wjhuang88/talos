@@ -58,7 +58,11 @@ fn print_board_summary(workspace: &Path) {
             in_now = line.starts_with("## Now");
             continue;
         }
-        if !in_now || !line.starts_with("| ") || line.starts_with("|---") || line.starts_with("| Item") {
+        if !in_now
+            || !line.starts_with("| ")
+            || line.starts_with("|---")
+            || line.starts_with("| Item")
+        {
             continue;
         }
         let cols: Vec<&str> = line.split('|').collect();
@@ -116,7 +120,9 @@ fn print_iteration_summary(workspace: &Path) {
 }
 
 fn print_validation_status(workspace: &Path) {
-    let script = workspace.join("scripts").join("validate_project_governance.sh");
+    let script = workspace
+        .join("scripts")
+        .join("validate_project_governance.sh");
     if !script.exists() {
         return;
     }

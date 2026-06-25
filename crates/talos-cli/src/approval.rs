@@ -14,7 +14,9 @@ use std::io::{self, BufRead, Write};
 
 use anyhow::{Context, Result};
 use talos_core::tool::ToolNature;
-use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind};
+use talos_permission::{
+    PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
+};
 
 /// Maximum length for formatted tool input before truncation.
 const MAX_INPUT_LENGTH: usize = 200;

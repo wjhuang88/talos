@@ -282,11 +282,17 @@ fn session_with_tool_calls() {
     let messages = session.read_messages().unwrap();
     assert_eq!(messages.len(), 1);
     match &messages[0] {
-        Message::Assistant { content, tool_calls } => {
+        Message::Assistant {
+            content,
+            tool_calls,
+        } => {
             assert_eq!(content, "Let me check that file.");
             assert_eq!(tool_calls.len(), 1);
             assert_eq!(tool_calls[0].name, "read_file");
-            assert_eq!(tool_calls[0].input, serde_json::json!({"path": "src/main.rs"}));
+            assert_eq!(
+                tool_calls[0].input,
+                serde_json::json!({"path": "src/main.rs"})
+            );
         }
         _ => panic!("expected Assistant message"),
     }
@@ -951,7 +957,11 @@ fn fork_durable_history_clone_source_bytes_unchanged() {
 
     let mut child = Session::new(child_id, "fork-clone-test".into(), "".into(), child_path);
     let child_messages = child.read_messages().unwrap();
-    assert_eq!(child_messages.len(), 2, "child should have same message count");
+    assert_eq!(
+        child_messages.len(),
+        2,
+        "child should have same message count"
+    );
     assert_ne!(child.id, source.id, "child must have distinct session id");
 }
 
@@ -1001,9 +1011,7 @@ fn reconcile_index_repairs_stale_entries() {
         })
         .unwrap();
 
-    let fixed = manager
-        .reconcile_index()
-        .expect("reconcile should succeed");
+    let fixed = manager.reconcile_index().expect("reconcile should succeed");
     assert!(fixed >= 1, "reconcile should reindex at least one entry");
 }
 
