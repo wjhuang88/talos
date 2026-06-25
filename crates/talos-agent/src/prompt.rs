@@ -58,10 +58,21 @@ use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
 use talos_skill::SkillIndex;
 
 /// Default identity text for the Talos agent.
-pub const DEFAULT_IDENTITY: &str = include_str!("../../../prompts/identity.txt");
+///
+/// Prompt assets live under `crates/talos-agent/prompts/` and are embedded at
+/// compile time via `include_str!` per ADR-015. This keeps the binary
+/// self-contained while making prompt text reviewable as standalone files.
+pub const DEFAULT_IDENTITY: &str = include_str!("../prompts/identity.txt");
 
-pub const TOOL_CALLING_FORMAT: &str = include_str!("../../../prompts/tool_calling_format.txt");
-pub const TOOL_CALLING_STRICT: &str = include_str!("../../../prompts/tool_calling_strict.txt");
+pub const TOOL_CALLING_FORMAT: &str = include_str!("../prompts/tool_calling_format.txt");
+pub const TOOL_CALLING_STRICT: &str = include_str!("../prompts/tool_calling_strict.txt");
+
+/// Memory system prompt section placeholder.
+///
+/// This asset will be populated as the memory foundation (MEM-001 / I019)
+/// matures. It is embedded now so prompt assembly can reference it without
+/// runtime file reads.
+pub const MEMORY_PROMPT: &str = include_str!("../prompts/memory.md");
 
 /// A description of a tool for inclusion in the system prompt.
 ///
@@ -1093,5 +1104,27 @@ mod tests {
         let prompt2 = cloned.build();
 
         assert_eq!(prompt1, prompt2);
+    }
+
+    // --- ADR-015 required-asset tests ---
+
+    #[test]
+    fn test_required_prompt_assets_are_non_empty() {
+    // ADR-015 requires tests proving required embedded prompt assets are non-empty.
+    assert!(!DEFAULT_IDENTITY.trim().is_empty(), "identity.txt must be non-empty");
+    assert!(
+        !TOOL_CALLING_FORMAT.trim().is_empty(),
+        "tool_calling_format.txt must be non-empty"
+    );
+    assert!(
+        !TOOL_CALLING_STRICT.trim().is_empty(),
+        "tool_calling_strict.txt must be non-empty"
+    );
+    assert!(!MEMORY_PROMPT.trim().is_empty(), "memory.md must be non-empty");
+    }
+
+    #[test]
+    fn test_identity_prompt_contains_talos_identity() {
+    assert!(DEFAULT_IDENTITY.contains("Talos"));
     }
 }
