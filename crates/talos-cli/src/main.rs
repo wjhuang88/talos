@@ -15,6 +15,7 @@
 mod approval;
 mod colors;
 mod event_loop;
+mod governance;
 mod logging;
 mod mcp_runtime;
 mod model_lifecycle;
@@ -196,6 +197,12 @@ pub(crate) struct Cli {
     #[arg(long, help = "Display learned patterns from the evolution engine.")]
     learned: bool,
 
+    #[arg(
+        long,
+        help = "Print read-only governance status: manifest, active iteration, open iterations, validation result."
+    )]
+    governance_status: bool,
+
     #[arg(long, value_enum, help = "Explicit runtime mode.")]
     mode: Option<Mode>,
 
@@ -241,6 +248,11 @@ async fn main() -> Result<()> {
     if let Some(model_id) = &cli.use_model {
         return run_use_model(model_id);
     }
+
+    if cli.governance_status {
+        return crate::governance::run_governance_status();
+    }
+
     if cli.init {
         let mut config = Config::load().context("failed to load configuration")?;
         config.model.clear();
