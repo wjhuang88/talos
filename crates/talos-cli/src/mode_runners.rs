@@ -40,7 +40,7 @@ use crate::registry::{
 use crate::runtime_adapter;
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_prompt, resolve_session_for_workspace,
-    resolve_workspace_root, workspace_display_name,
+    resolve_workspace_root, workspace_display_name, workspace_path_display,
 };
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::session_transition::SessionTransition;
@@ -826,7 +826,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_user_input_tx(user_input_tx.clone());
     tui.set_model_name(config.model.clone());
     tui.set_provider(config.provider.clone());
-    tui.set_workspace_path(workspace_display_name(&workspace_root));
+    tui.set_workspace_path(workspace_path_display(&workspace_root));
 
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(runtime_skills.diagnostics())

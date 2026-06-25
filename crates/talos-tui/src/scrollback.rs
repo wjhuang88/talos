@@ -1469,7 +1469,7 @@ fn build_expanded_status(
     let workspace_part = if workspace.is_empty() {
         String::new()
     } else {
-        format!(" ▸ {}", truncate_str(workspace, 24))
+        format!(" ▸ {}", truncate_str(workspace, 40))
     };
     let spinner_part = if is_processing {
         " ◷ processing…"

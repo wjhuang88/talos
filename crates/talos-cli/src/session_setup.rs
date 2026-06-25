@@ -40,6 +40,17 @@ pub(crate) fn workspace_display_name(workspace_root: &Path) -> String {
         .to_string()
 }
 
+pub(crate) fn workspace_path_display(workspace_root: &Path) -> String {
+    let full = workspace_root.to_string_lossy().to_string();
+    if let Ok(home) = std::env::var("HOME")
+        && !home.is_empty()
+        && full.starts_with(&home)
+    {
+        return format!("~{}", &full[home.len()..]);
+    }
+    full
+}
+
 pub(crate) fn canonical_workspace_root(workspace_root: &Path) -> String {
     workspace_root
         .canonicalize()
