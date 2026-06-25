@@ -8,8 +8,8 @@ DIST_DIR="$SCRIPT_DIR/dist"
 mkdir -p "$DIST_DIR"
 
 XWIN_PLATFORMS=(
-  "x86_64-pc-windows-msvc"
   "aarch64-pc-windows-msvc"
+  "x86_64-pc-windows-msvc"
 )
 
 ZIG_PLATFORMS=(
