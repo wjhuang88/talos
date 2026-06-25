@@ -79,9 +79,9 @@ cargo build --release -p talos-cli
 
 ## 配置模型提供商
 
-Talos 从 `~/.talos/config.toml` 读取配置。密钥建议放在环境变量中。
+Talos 从 `~/.talos/config.toml` 读取配置。密钥可以直接写在配置文件中（`api_key`），也可以通过环境变量引用（`api_key_env`）。内联密钥会保存在配置文件中（建议 chmod 600），并在所有显示输出（`talos config list`、`talos config get`、debug 日志）中自动脱敏。详见 [ADR-023](docs/decisions/023-inline-api-key-boundary.md)。
 
-Anthropic 示例：
+Anthropic 示例（环境变量模式）：
 
 ```toml
 provider = "anthropic"
@@ -89,6 +89,16 @@ model = "claude-sonnet-4-20250514"
 
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
+```
+
+Anthropic 示例（内联密钥）：
+
+```toml
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[providers.anthropic]
+api_key = "sk-ant-..."
 ```
 
 OpenAI 兼容网关示例：
