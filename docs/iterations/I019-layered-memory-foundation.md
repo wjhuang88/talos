@@ -5,6 +5,14 @@ ad-hoc vector store or prompt-stuffing mechanism.
 
 ## Status: Planned
 
+I047 is planned to satisfy all known prerequisites for this baseline before starting the memory
+starter slice:
+
+- I024/MEM-002 working + episodic memory wiring is complete.
+- I018/OBS-001 bounded logs and embedded prompt assets are selected into I047.
+- `MEM-001-A` in I047 starts the executable memory foundation but does not claim full I019
+  completion.
+
 ## Scope
 
 This iteration turns ADR-016 into the first executable storage and retrieval foundation.
@@ -30,4 +38,3 @@ This iteration turns ADR-016 into the first executable storage and retrieval fou
 - Neural/biological fidelity claims.
 - Vector ANN index adoption.
 - Full autonomous research library.
-

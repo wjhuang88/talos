@@ -42,6 +42,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I047 v0.1.2 Release Readiness And Runtime Polish | Planned | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | First phase of [long task](tasks/2026-06-25-i047-i019-memory-release-sequence.md); exit requires `v0.1.2` release readiness, first-run setup, I019 prerequisite closure, memory starter, compaction policy, read-only governance status, docs sync, and full workspace/governance checks. |
 | I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype import + config precedence specified |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
@@ -52,7 +53,7 @@ acceptance criteria, verification evidence, or iteration state.
 | CMD-001 Interactive Command Runtime Contract | Complete | [CMD-001](backlog/active/CMD-001-interactive-command-runtime-contract.md) | Shared registry, tool-backed infrastructure, availability predicates, copy/export restored, README synced |
 | SESSION-001 Interactive Session Lifecycle | Refinement | [SESSION-001](backlog/active/SESSION-001-interactive-session-lifecycle.md) | Select ready child SESSION-001-A first; expose `/new`, `/resume`, and `/fork` only through later verified children |
 | I016 Portable File And Search Tools | Planned | [TOOL-001 Portable File/Search](backlog/active/TOOL-001-portable-file-search.md) | Residual scope beyond TOOL-003 (persistent indexes, extra native deps) |
-| I018 Observability and Prompt Assets | Planned | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | Start before memory/exploration prompt expansion; follow ADR-014/ADR-015 |
+| I018 Observability and Prompt Assets | Planned (selected into I047) | [OBS-001 Observability and Prompt Assets](backlog/active/OBS-001-observability-prompt-assets.md) | I047 must close bounded logs + embedded prompt assets before MEM-001-A starts; follow ADR-014/ADR-015 |
 
 ## Done This Cycle
 
@@ -100,7 +101,7 @@ acceptance criteria, verification evidence, or iteration state.
 | REMOTE-001 Remote Session Protocol | Research | [REMOTE-001 Remote Session Protocol](backlog/active/REMOTE-001-remote-session-protocol.md) | Research transport, auth, and minimum viable slice before any implementation |
 | PLUGIN-001 WASM Runtime Plugin Protocol | Research (→ P2) | [PLUGIN-001 WASM Runtime Plugin Protocol](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Elevated P2: unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM loading |
 | I017 Embedded Git Tools | P0-P2 Complete | [GIT-001 Embedded Git Tools](backlog/active/GIT-001-embedded-git-tools.md) | Read/write Git tools delivered in I026; future scope starts from P3 advanced tools |
-| I019 Layered Memory Foundation | Planned | [MEM-001 Layered Memory Foundation](backlog/active/MEM-001-layered-memory-foundation.md) | Start after I018 or explicit memory priority; follow ADR-016 |
+| I019 Layered Memory Foundation | Planned (prerequisites targeted by I047) | [MEM-001 Layered Memory Foundation](backlog/active/MEM-001-layered-memory-foundation.md) | I047 must satisfy all known prerequisites and deliver MEM-001-A starter; full I019 activation decision follows the long-running task |
 | MODEL-001 Model Catalog Foundation | Planned | [MODEL-001 Model Catalog](backlog/active/MODEL-001-model-catalog-and-reasoning.md) | Built-in model dataset + models.dev import; catalog-only (reasoning split to MODEL-003) |
 | MODEL-002 Local Micro-Model Decision Layer | Research | [MODEL-002 Local Micro-Model](backlog/active/MODEL-002-local-micro-model-decision-layer.md) | Evaluate local small-model hints; no permission authority before ADR |
 | MODEL-003 Reasoning / Thinking Support | ADR-needed | [MODEL-003 Reasoning/Thinking](backlog/active/MODEL-003-reasoning-thinking-support.md) | Per-provider reasoning fields + stream + persistence + TUI; ADR gate |
@@ -112,9 +113,9 @@ acceptance criteria, verification evidence, or iteration state.
 | TOOL-006 Bash → Sh Rename + Cross-OS CLI | Planned | [TOOL-005 §Future](backlog/active/TOOL-005-bash-streaming-output.md) | Rename `bash` → `sh`; Windows `cmd`/`powershell` support; backward-compat alias |
 | TOOL-007 Tool Set Design Audit | Research | [TOOL-007 Tool Set Design Audit](backlog/active/TOOL-007-tool-set-design-audit.md) | Audit 22 tools: orthogonality, coverage, granularity, agent logic, permissions, naming |
 | TOOL-008 Tree-sitter On-Demand Loading | Planned | [TOOL-008 Tree-sitter On-Demand](backlog/active/TOOL-008-tree-sitter-on-demand.md) | Phase 1: LazyLock, Phase 2: feature-gated (~8 default langs, 25-30 MB), Phase 3: WASM runtime loading |
-| MEM-005 Context Compaction Policy | Planned | [MEM-005 Context Compaction Policy](backlog/active/MEM-005-context-compaction-policy.md) | Define automatic/manual compaction triggers, pre-turn ordering, status visibility, and failure fallback |
+| MEM-005 Context Compaction Policy | Planned (Phase 1 selected into I047) | [MEM-005 Context Compaction Policy](backlog/active/MEM-005-context-compaction-policy.md) | I047 selects boundary-aware layers 1-3 policy, manual control, status visibility, and failure fallback; MEM-003 LLM layers remain separate |
 | I020 Exploration Library | Planned | [RES-001 Exploration Library](backlog/active/RES-001-exploration-library.md) | Start after I019 or explicit research priority; follow ADR-017 |
 | AGENT-002 dotagentsprotocol Shared Config | Research | [AGENT-002 dotagentsprotocol.com Support](backlog/active/AGENT-002-dotagents-protocol-support.md) | Three sub-areas: A) `models.json` import, B) `skills/` discovery (needs SKILL-002 gate), C) `mcp.json` import (needs server opt-in ADR) |
-| WEB-001 Embedded Web Control | Research (→ P3) | [WEB-001](backlog/active/WEB-001-embedded-web-control-surface.md) | Loopback HTTP + status/SSE + project management UI (GOV-003)
-| GOV-003 Built-in Project Governance | Planned | [GOV-003](backlog/active/GOV-003-builtin-project-governance.md) | Phase 1: context injection; Phase 2: gate enforcement; Phase 3: PM web UI
+| WEB-001 Embedded Web Control | Research (→ P3) | [WEB-001](backlog/active/WEB-001-embedded-web-control-surface.md) | Loopback HTTP + status/SSE + project management UI (GOV-003) |
+| GOV-003 Built-in Project Governance | Planned (Phase 1 selected into I047) | [GOV-003](backlog/active/GOV-003-builtin-project-governance.md) | I047 selects read-only status/context only; gate enforcement and PM web UI remain later phases |
 | TOOL-009 Internet Search Tool | I039 Complete | [TOOL-009](backlog/active/TOOL-009-internet-search-tool.md) | web_search with DDG/Tavily/SearXNG/Wikipedia landed in I039 |

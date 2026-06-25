@@ -5,6 +5,10 @@ standalone embedded assets.
 
 ## Status: Planned
 
+I047 selects the same bounded log + embedded prompt asset acceptance as prerequisite closure for
+I019. Preserve this I018 baseline; if I047 completes the acceptance, record I018 as
+fulfilled/superseded by I047 during closeout rather than rewriting this plan.
+
 ## Scope
 
 This iteration handles two small but boundary-sensitive infrastructure changes that should land
@@ -29,4 +33,3 @@ before memory and exploration make logs and prompts more important.
 - JSON log contracts and shared tracing spans (#ARCH-S8 R3).
 - Runtime user-editable prompt packs.
 - Memory or exploration prompt behavior beyond creating asset boundaries.
-

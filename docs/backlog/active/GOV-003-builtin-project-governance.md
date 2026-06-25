@@ -3,7 +3,8 @@
 **Status**: Planned
 **Priority**: P2
 **Source**: User request 2026-06-20
-**Depends on**: WEB-001 (for management UI surface); I035 (shared config for governance policy)
+**Depends on**: I035 and CMD-001 for Phase 1 read-only runtime status; WEB-001 only for Phase 3
+management UI surface
 
 ## Problem
 
@@ -30,6 +31,9 @@ The goal is to implement the full `agent-project-governance` methodology as a
 built-in Talos subsystem. When active, the agent can discover, initialize,
 maintain, and validate a project's governance structure — guiding the user
 through precise task management without relying on an external SKILL.md file.
+
+I047 selects only the Phase 1 read-only status/context slice. Initialization, auto-repair, gate
+enforcement, and WEB-001 UI remain later phases.
 
 ### Capability 0: Entry Point — `/agile` Command
 

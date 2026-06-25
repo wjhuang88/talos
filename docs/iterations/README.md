@@ -81,11 +81,12 @@ docs/iterations/
 | I044 | Session Integrity And Lifecycle Hardening | **Complete** (2026-06-23) | Six SESSION-002 consistency fixes (O(1) append, concurrent write safety, crash reconciliation, switch ordering, failure cleanup) + `/delete` via picker UX. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. See `I044-session-integrity-lifecycle-hardening.md`. |
 | I045 | Product Readiness — Model Lifecycle, Config, Observability | **Complete (2026-06-24)** | All 4 stories complete: MODEL-004-R (catalog integration), MODEL-005-R (/model picker + credential input + first-run wizard + --init/--available-models/--use-model), CONF-001-S (config CLI), OBS-001 (log rotation). api_key data-loss bug fixed (skip_serializing reverted). Non-navigable group headers in model picker. Closed in ~4 hours, not 1 month. Post-closeout correction (I046): two workspace tests were actually failing at closeout (stale `gpt-4.1` + lost `/resume` fallback). See `I045-product-readiness-model-lifecycle-observability.md`. |
 | I046 | Architecture, Structure, And Governance Repair | **Complete (2026-06-25)** | All 5 stories: S1 (test baseline restored), S2 (provider-aware model identity — `find_model_by_provider`, `(provider, model_id)` semantics), S3 (inline api_key boundary — custom Debug masking, config_get_dotted api_key case, ADR-023), S4 (model_lifecycle.rs extracted from mode_runners.rs), S5 (docs sync — config.reference.toml, AGENTS.md, README, I045 correction). `cargo test/clippy/governance` all pass. See `I046-architecture-structure-governance-repair.md`. |
+| I047 | v0.1.2 Release Readiness And Runtime Polish | **Planned (2026-06-25)** | One-month planned slice: REL-001 release/install readiness, CONF-002 first-run setup, OBS-001/I018 prerequisite closure for I019, MEM-001-A memory starter, MEM-005 Phase 1 compaction policy, GOV-003 Phase 1 read-only governance status, and release closeout/docs sync. Long-running sequence owner: `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md`. See `I047-v012-release-readiness-and-runtime-polish.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
 
-## Non-Terminal Inventory (2026-06-19 Refresh)
+## Non-Terminal Inventory (2026-06-25 Refresh)
 
 This inventory is the required disposition before selecting or activating more work. It does not
 rewrite published iteration baselines.
@@ -97,6 +98,7 @@ rewrite published iteration baselines.
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Planned | Deferred; scheduling is not the current priority. |
+| I047 | Planned | New one-month release-readiness/runtime-polish baseline and first phase of `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md`. Activation requires an explicit start record; do not silently narrow this baseline if only a subset is selected. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
@@ -104,6 +106,7 @@ rewrite published iteration baselines.
 | I043 | Active → Complete (2026-06-23) | Closed 2026-06-23. Bottom panel generalization + session picker + R1/R2 + TUI-008 all landed. Pre-closeout audit run. |
 | I044 | Active → Complete (2026-06-23) | Closed 2026-06-23. Six SESSION-002 consistency fixes + deletion all landed. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. |
 | I045 | Complete (2026-06-24) | Removed from non-terminal inventory (Complete record in I045 doc). |
+| I046 | Complete (2026-06-25) | Removed from non-terminal inventory (Complete record in I046 doc). |
 
 I010/I012/I016/I017 were removed from this non-terminal inventory after GOV-002 appended explicit
 Complete/Superseded dispositions without erasing their published objectives.

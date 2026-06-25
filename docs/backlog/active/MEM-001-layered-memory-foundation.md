@@ -7,8 +7,11 @@ consolidation and provenance. Retrieval uses multi-signal fusion; ingestion is A
 
 ## Status
 
-Planned. Selected into I019. **I024 (Working Memory + Episodic Memory wiring) is a prerequisite** —
-Semantic Memory consolidation builds on top of persisted episode history.
+Planned. Full baseline selected into I019. I047 selects a starter slice (`MEM-001-A`) and must
+satisfy every known I019 prerequisite first. **I024 (Working Memory + Episodic Memory wiring) is
+already complete; OBS-001/I018 bounded logs and embedded prompt assets are the remaining known
+prerequisite and are selected into I047.** Semantic Memory consolidation builds on top of persisted
+episode history.
 
 ## Priority
 
@@ -17,6 +20,8 @@ P2. I024 (MEM-002) is P0 and must land first.
 ## Required Reads
 
 - `docs/iterations/I019-layered-memory-foundation.md`
+- `docs/iterations/I047-v012-release-readiness-and-runtime-polish.md`
+- `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md`
 - `docs/decisions/016-layered-memory-architecture.md` (including Comparative Analysis section)
 - `docs/decisions/002-local-storage-architecture.md`
 - `docs/decisions/008-sqlite-bundled-storage.md`
@@ -97,4 +102,3 @@ Retrieval boost: `entity_score = |query_entities ∩ memory_entities| × 0.5`.
 ## Residual Work Destination
 
 Vector/graph acceleration and exploration library integration stay in RES-001/I020.
-
