@@ -1428,7 +1428,7 @@ fn build_compact_status(
     let workspace_part = if workspace.is_empty() {
         String::new()
     } else {
-        format!("  {}", truncate_str(workspace, 16))
+        format!(" ▸ {}", truncate_str(workspace, 16))
     };
     let spinner_part = if is_processing { " ◷" } else { "" };
     let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
@@ -1441,7 +1441,7 @@ fn build_compact_status(
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
         Span::styled(format!("{model_part}{provider_part}"), accent),
-        Span::styled(workspace_part, dim),
+        Span::styled(workspace_part, val),
         Span::styled(spinner_part, dim),
         Span::styled(tokens_part, val),
         Span::styled(queue_part, dim),
@@ -1469,7 +1469,7 @@ fn build_expanded_status(
     let workspace_part = if workspace.is_empty() {
         String::new()
     } else {
-        format!("  {}", truncate_str(workspace, 24))
+        format!(" ▸ {}", truncate_str(workspace, 24))
     };
     let spinner_part = if is_processing {
         " ◷ processing…"
@@ -1488,7 +1488,7 @@ fn build_expanded_status(
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
         Span::styled(format!("{model_part}{provider_part}"), accent),
-        Span::styled(workspace_part, dim),
+        Span::styled(workspace_part, val),
         Span::styled(spinner_part, dim),
         Span::styled("     ", dim),
         Span::styled(right_part, val),
