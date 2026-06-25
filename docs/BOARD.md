@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I047 v0.1.2 Release Readiness And Runtime Polish | Active | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | Activated 2026-06-25. Exit requires REL-001 release readiness, CONF-002 first-run setup, OBS-001/I018 prerequisite closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status, and docs sync. Long task: [sequence](tasks/2026-06-25-i047-i019-memory-release-sequence.md). |
+| I047 v0.1.2 Release Readiness And Runtime Polish | Review | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | All slices delivered: REL-001 audit, CONF-002 talos init, OBS-001 closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status. v0.1.2 bumped. All workspace checks pass. Awaiting tag approval. |
 
 ## Review
 

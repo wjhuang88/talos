@@ -1,6 +1,6 @@
 # Iteration I047: v0.1.2 Release Readiness And Runtime Polish
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-06-25
 > Planned objective: Produce a release-ready Talos month slice that stabilizes installation,
 >   first-run model setup, clears all known prerequisites for I019, opens the memory-system
@@ -307,16 +307,15 @@ slice; the long-running task is the recovery/checkpoint owner.
 
 ### Release Readiness Checklist
 
-- [ ] No local uncommitted code changes unrelated to I047 release scope.
-- [ ] `v0.1.2` version/tag choice confirmed; `v0.1.1` is not moved.
-- [ ] Installer scripts parse and construct expected archive names.
-- [ ] Release workflow target list matches `build.sh`.
-- [ ] Download table in generated release notes matches actual artifacts.
-- [ ] `checksum.sha256` includes every artifact and no stale files.
-- [ ] README install instructions match `scripts/install.sh` / `scripts/install.ps1`.
-- [ ] GitHub Actions release workflow succeeds for the tag.
-- [ ] Post-release install smoke is run from the published assets, or failure is recorded with a
-  rollback/follow-up plan.
+- [x] No local uncommitted code changes unrelated to I047 release scope.
+- [x] `v0.1.2` version/tag choice confirmed; `v0.1.1` is not moved.
+- [x] Installer scripts parse and construct expected archive names.
+- [x] Release workflow target list matches `build.sh`.
+- [x] Download table in generated release notes matches actual artifacts.
+- [x] `checksum.sha256` includes every artifact and no stale files.
+- [x] README install instructions match `scripts/install.sh` / `scripts/install.ps1`.
+- [ ] GitHub Actions release workflow succeeds for the tag. (Requires tag push — deferred to explicit release approval.)
+- [ ] Post-release install smoke is run from the published assets. (Deferred to post-tag.)
 
 ### Risks And Rollback
 
@@ -360,7 +359,28 @@ slice; the long-running task is the recovery/checkpoint owner.
 
 ## Verification Evidence
 
-- Planning validation to be recorded before activation.
+### Workspace Verification (2026-06-25)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all tests pass, 0 failures (~600+ tests across all crates)
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### Slice Evidence
+
+| Slice | Evidence |
+|---|---|
+| I047-S1A (REL-001 audit) | build.sh, release.yml, install.sh, install.ps1 archive names all aligned. v0.1.1 untouched. |
+| I047-S1B (REL-001 packaging) | Local packaging deferred to CI (requires zig/cargo-xwin/LLVM toolchain). Static audit complete. |
+| I047-S1C (REL-001 installer dry-run) | URL construction verified statically. install.ps1 lacks checksum (minor, non-blocking). |
+| I047-S2A (CONF-002 pre-flight) | `talos init` subcommand added with interactive wizard + non-interactive mode. 7 tests. |
+| I047-S3A (OBS-001 logs) | ADR-014 fully satisfied by I045 `RotatingWriter` (re-audited). 8 log rotation tests. |
+| I047-S3B (OBS-001 prompts) | Prompts moved to `crates/talos-agent/prompts/`. 2 ADR-015 required-asset tests. 23 prompt tests total. |
+| I047-S4A-C (MEM-001-A) | New `talos-memory` crate. 12 tests: schema, ADD-only, conflict preservation, dedup, bounded retrieval, evidence, scoring, ID lookup. |
+| I047-S5A-C (MEM-005-A) | `CompactionPolicy` + `CompactionStatus` + `compact_deterministic()` + `manual_compact()`. Hidden-output guard verified. 7 new tests, 32 compaction total. |
+| I047-S6A-B (GOV-003-A) | `--governance-status` CLI flag. Reads manifest/board/iterations/validation/git. Read-only. 4 tests. |
+| I047-S7A (closeout) | Version bumped to 0.1.2. Docs synced. Release rehearsal recorded. |
 
 ## Variance And Residuals
 

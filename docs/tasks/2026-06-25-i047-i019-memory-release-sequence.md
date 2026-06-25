@@ -58,12 +58,12 @@ The intended sequence is:
 | T1 | Close pre-I047 repair leftovers | `.gitignore`, installers, I045/CONF-001 doc drift, and I046 post-handoff notes are committed or intentionally carried into I047 | T0 | `scripts/validate_project_governance.sh .`; installer parse checks | Leave as pre-I047 residual and do not activate I047 until resolved | ✅ Done |
 | T2 | Activate I047 baseline | I047 gains activation record; Board Now points to I047; selected story statuses are synchronized | T1 | Owner docs and Board agree; governance validation passes | Keep I047 Planned and stop if inventory conflicts remain | ✅ Done |
 | T3 | REL-001 release/install readiness | Supported target matrix, artifact names, installers, checksum behavior, and `v0.1.2` strategy are validated | T2 | Packaging smoke or documented target subset; installer dry-run; no tag mutation | Defer tag; record blocking target or installer defect | ✅ Done (static audit) |
-| T4 | CONF-002 first-run onboarding | Empty-config users get guided setup; `talos init` re-runs setup; non-interactive mode does not hang | T2 | Temp-home runtime tests; masked credential display; config round-trip | Provide actionable error path and keep wizard partial | Planned |
+| T4 | CONF-002 first-run onboarding | Empty-config users get guided setup; `talos init` re-runs setup; non-interactive mode does not hang | T2 | Temp-home runtime tests; masked credential display; config round-trip | Provide actionable error path and keep wizard partial | ✅ Done |
 | T5 | OBS-001/I018 prerequisite closure | Bounded file logs and compile-time embedded prompt assets land; I019 no longer blocked on I018 | T2 | ADR-014/015 tests; I018/MEM-001/I019/Board status synchronized | If OBS-001 expands, deliver only bounded logs + embedded prompts and defer R3 logging | ✅ Done |
 | T6 | MEM-001-A memory starter | Memory boundary, SQLite schema, ADD-only writes, evidence links, and bounded retrieval API | T5 | Migration/schema/retrieval tests; no vector/graph dependency; provenance returned | Stop at schema + API; defer prompt injection/consolidation to I019 | ✅ Done |
 | T7 | MEM-005-A compaction policy | Threshold policy, safe-boundary compaction, manual command/status, failure fallback | T6 | Unit/mock session/TUI command tests; hidden output never printed | Keep policy library-only if command integration risks the timebox | ✅ Done |
 | T8 | GOV-003-A read-only governance status | Governance status command reads iteration/backlog/board/validation state without writing docs | T2 | Empty/partial/full workspace tests; dirty-worktree guard | Keep as library/status report only; defer prompt injection | ✅ Done |
-| T9 | I047 closeout and release rehearsal | I047 evidence, docs, release checklist, and residuals are synchronized; release decision ready | T3-T8 | check/clippy/test/governance pass; release rehearsal recorded | Mark I047 Review/Partial if any required gate fails | Planned |
+| T9 | I047 closeout and release rehearsal | I047 evidence, docs, release checklist, and residuals are synchronized; release decision ready | T3-T8 | check/clippy/test/governance pass; release rehearsal recorded | Mark I047 Review/Partial if any required gate fails | ✅ Done |
 | T10 | I019 activation decision | I019 can activate, be replanned, or remain deferred with explicit reason | T9 | I019 prerequisites recorded as satisfied; Board/iterations index agree | Create a new I048/I019 activation plan if full I019 scope changes | Planned |
 | T11 | I020 dependency disposition | I020 remains blocked/deferred until I019 or explicit research-priority replan | T10 | Board and iterations index state dependency clearly | Leave I020 unchanged if no research activation is requested | Planned |
 
@@ -266,3 +266,25 @@ output_reserve). Added `CompactionStatus` enum (Applied/Skipped/Failed) with hid
 `manual_compact()` returning status. 7 new tests: policy defaults, trigger calculation, saturation,
 deterministic compaction (applied + insufficient), manual compact (skipped + applied + failed),
 hidden-output verification. All 32 compaction tests pass.
+
+### T4 — CONF-002 First-Run Onboarding (2026-06-25)
+
+Added `TalosCommand::Init` subcommand to the CLI with `--non-interactive` flag. Interactive wizard
+guides provider selection, credential entry (env var or inline key with masking), model selection,
+and config save confirmation. Non-interactive mode prints step-by-step instructions. Existing
+`--init` flag preserved as backward-compatible alias. 7 new tests. All 55 talos-cli unit tests pass.
+
+### T9 — I047 Closeout (2026-06-25)
+
+Full workspace verification: fmt/check/clippy/test/governance all pass (0 failures, ~600+ tests).
+Version bumped from `0.1.1` to `0.1.2`. Release readiness checklist completed (CI workflow and
+post-release smoke deferred to explicit tag approval). I018 recorded as fulfilled/superseded.
+
+### T10 — I019 Activation Decision (2026-06-25)
+
+I019 prerequisites cleared. Full I019 activation deferred — I047 delivered MEM-001-A starter.
+Activate I019 in a future iteration when ready to build autonomous consolidation and prompt injection.
+
+### T11 — I020 Dependency Disposition (2026-06-25)
+
+I020 remains blocked/deferred until I019 is activated or explicit research-priority replan.
