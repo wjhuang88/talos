@@ -174,11 +174,21 @@ pub struct CredentialRequestData {
 ///
 /// Mirrors [`CredentialRequestData`]: `model_id` is `Some` for a direct
 /// model switch, `None` for provider-level setup.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct CredentialResponseData {
     pub provider: String,
     pub api_key: String,
     pub model_id: Option<String>,
+}
+
+impl std::fmt::Debug for CredentialResponseData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CredentialResponseData")
+            .field("provider", &self.provider)
+            .field("api_key", &"***")
+            .field("model_id", &self.model_id)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone)]

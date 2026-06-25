@@ -6,6 +6,7 @@ mod tests {
     use crate::provider_setup::parse_provider;
     use crate::registry;
     use crate::tui_bridge::{SessionLifecycleRequest, run_conversation_loop};
+    use crate::{config_get_dotted, is_secret_key, mask_secrets};
     use talos_conversation::{ConversationEngine, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
 
@@ -215,5 +216,49 @@ mod tests {
         let results = manager.list_recent(10);
         assert!(results.is_ok());
         assert!(results.unwrap().is_empty());
+    }
+
+    // === Config Display Masking Tests (I046-S3) ===
+
+    #[test]
+    fn config_get_dotted_returns_api_key_value() {
+        let config = talos_config::Config {
+            provider: "custom".to_string(),
+            model: "test".to_string(),
+            providers: std::collections::HashMap::from([(
+                "custom".to_string(),
+                talos_config::ProviderConfig {
+                    api_key: Some("sk-test-secret".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let value = config_get_dotted(&config, "providers.custom.api_key").unwrap();
+        assert_eq!(value, "sk-test-secret");
+    }
+
+    #[test]
+    fn is_secret_key_detects_api_key_paths() {
+        assert!(is_secret_key("providers.anthropic.api_key"));
+        assert!(is_secret_key("api_key"));
+        assert!(!is_secret_key("providers.anthropic.api_key_env"));
+        assert!(!is_secret_key("model"));
+    }
+
+    #[test]
+    fn mask_secrets_masks_api_key_lines() {
+        let toml = r#"provider = "anthropic"
+
+[providers.anthropic]
+api_key = "sk-super-secret-12345"
+api_key_env = "ANTHROPIC_API_KEY"
+"#;
+        let config = talos_config::Config::default();
+        let masked = mask_secrets(toml, &config);
+        assert!(!masked.contains("sk-super-secret-12345"));
+        assert!(masked.contains("api_key = ***"));
+        // api_key_env is a variable name, not a secret — must not be masked.
+        assert!(masked.contains("ANTHROPIC_API_KEY"));
     }
 }

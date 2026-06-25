@@ -444,13 +444,15 @@ fn run_use_model(model_id: &str) -> Result<()> {
     Ok(())
 }
 
-fn mask_secrets(toml_str: &str, _config: &Config) -> String {
+pub(crate) fn mask_secrets(toml_str: &str, _config: &Config) -> String {
     toml_str
         .lines()
         .map(|line| {
-            let trimmed = line.trim_start();
-            if trimmed.starts_with("api_key") && let Some(eq) = line.find('=') {
-                return format!("{} = ***", &line[..eq].trim_end());
+            if let Some(eq) = line.find('=') {
+                let key = line[..eq].trim();
+                if key == "api_key" {
+                    return format!("{key} = ***");
+                }
             }
             line.to_string()
         })
@@ -458,12 +460,12 @@ fn mask_secrets(toml_str: &str, _config: &Config) -> String {
         .join("\n")
 }
 
-fn is_secret_key(key: &str) -> bool {
+pub(crate) fn is_secret_key(key: &str) -> bool {
     let lower = key.to_lowercase();
     lower.ends_with("api_key") || lower.ends_with("secret") || lower.ends_with("token")
 }
 
-fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
+pub(crate) fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
     let parts: Vec<&str> = key.split('.').collect();
     match parts.as_slice() {
         ["provider"] => Ok(config.provider.clone()),
@@ -482,6 +484,11 @@ fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
             .providers
             .get(*name)
             .and_then(|p| p.api_key_env.clone())
+            .unwrap_or_default()),
+        ["providers", name, "api_key"] => Ok(config
+            .providers
+            .get(*name)
+            .and_then(|p| p.api_key.clone())
             .unwrap_or_default()),
         ["providers", name, "models", model, "context_limit"] => config
             .providers
