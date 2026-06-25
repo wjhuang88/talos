@@ -1,6 +1,6 @@
 # Long-Running Task: I047 -> I019 Memory And Release Readiness Sequence
 
-> Status: Planned
+> Status: In Progress (T0 confirmed 2026-06-25)
 > Created: 2026-06-25
 > Owner iteration: [I047 v0.1.2 Release Readiness And Runtime Polish](../iterations/I047-v012-release-readiness-and-runtime-polish.md)
 > Baseline rule: this task inventory is preserved; changed objectives use a new task record or
@@ -54,9 +54,9 @@ The intended sequence is:
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| T0 | Confirm execution contract | User-approved scope, permissions, release/tag boundary, and stop conditions recorded | This Planned task | Task status can move from Planned to In Progress | If approval is partial, split unauthorised work into residuals | Planned |
-| T1 | Close pre-I047 repair leftovers | `.gitignore`, installers, I045/CONF-001 doc drift, and I046 post-handoff notes are committed or intentionally carried into I047 | T0 | `scripts/validate_project_governance.sh .`; installer parse checks | Leave as pre-I047 residual and do not activate I047 until resolved | Planned |
-| T2 | Activate I047 baseline | I047 gains activation record; Board Now points to I047; selected story statuses are synchronized | T1 | Owner docs and Board agree; governance validation passes | Keep I047 Planned and stop if inventory conflicts remain | Planned |
+| T0 | Confirm execution contract | User-approved scope, permissions, release/tag boundary, and stop conditions recorded | This Planned task | Task status can move from Planned to In Progress | If approval is partial, split unauthorised work into residuals | ✅ Done |
+| T1 | Close pre-I047 repair leftovers | `.gitignore`, installers, I045/CONF-001 doc drift, and I046 post-handoff notes are committed or intentionally carried into I047 | T0 | `scripts/validate_project_governance.sh .`; installer parse checks | Leave as pre-I047 residual and do not activate I047 until resolved | ✅ Done |
+| T2 | Activate I047 baseline | I047 gains activation record; Board Now points to I047; selected story statuses are synchronized | T1 | Owner docs and Board agree; governance validation passes | Keep I047 Planned and stop if inventory conflicts remain | ✅ Done |
 | T3 | REL-001 release/install readiness | Supported target matrix, artifact names, installers, checksum behavior, and `v0.1.2` strategy are validated | T2 | Packaging smoke or documented target subset; installer dry-run; no tag mutation | Defer tag; record blocking target or installer defect | Planned |
 | T4 | CONF-002 first-run onboarding | Empty-config users get guided setup; `talos init` re-runs setup; non-interactive mode does not hang | T2 | Temp-home runtime tests; masked credential display; config round-trip | Provide actionable error path and keep wizard partial | Planned |
 | T5 | OBS-001/I018 prerequisite closure | Bounded file logs and compile-time embedded prompt assets land; I019 no longer blocked on I018 | T2 | ADR-014/015 tests; I018/MEM-001/I019/Board status synchronized | If OBS-001 expands, deliver only bounded logs + embedded prompts and defer R3 logging | Planned |
@@ -125,13 +125,15 @@ Planned authorization for later confirmation:
 
 Not authorized without explicit later approval:
 
-- Push commits.
 - Create, move, or delete tags.
 - Create, delete, or overwrite GitHub Releases.
 - Publish `v0.1.2`.
 - Add new runtime dependencies.
 - Perform destructive filesystem or git operations.
 - Spend money or use paid provider credentials for validation.
+
+Note: push commits is now authorized after each phase's staged gate passes (T0 confirmation,
+2026-06-25).
 
 ### Destructive Or Irreversible Operations
 
@@ -169,4 +171,39 @@ None authorized. Release/tag operations are deliberately excluded until an expli
 
 ## Checkpoints
 
-No execution checkpoint yet. This task is Planned and awaits explicit activation/confirmation.
+### T0 — Execution Contract Confirmed (2026-06-25)
+
+User confirmed the following execution decisions before activation:
+
+| Decision | Resolution |
+|---|---|
+| Execution boundary | Start execution immediately |
+| Git strategy | Work on `main`; auto-commit after each phase gate passes |
+| Push authorization | Push allowed after each phase's staged result is confirmed (gate passes) |
+| Pace | Run continuously through closeout; stop only on failure or blocker |
+| CONF-002 implementation | New `talos init` subcommand (clap subcommand structure); retain `--init` flag as alias |
+| Version bump timing | Bump workspace version to `0.1.2` at T9 closeout, not at activation |
+| OBS-001 scope | Re-audit I045 log rotation against ADR-014 acceptance before declaring OBS-001 complete |
+
+Git state at confirmation: working tree clean; HEAD `c616940`; planning artifacts and installer
+fixes already committed in `c616940` and `1b9a9e4`. T1 git-level repair is effectively complete.
+
+Allowed permissions updated: push commits after staged gate confirmation; all other release/tag
+operations remain excluded.
+
+**Discovery: handoff drift.** The handoff context listed planning/installer changes as
+"uncommitted" but they were already committed before this session. T1's git-repair scope is
+already satisfied. Additional finding: `CONF-002-model-onboarding.md` backlog file referenced by
+I047 already exists — no creation needed.
+
+### T1 — Pre-I047 Repair Leftovers Closed (2026-06-25)
+
+Confirmed: working tree clean; HEAD `c616940`. Planning artifacts committed in `c616940`; installer
+fixes committed in `1b9a9e4`. Governance validation: 0 warnings. `install.sh` syntax: OK.
+`install.ps1` parse: OK. No outstanding repair work.
+
+### T2 — I047 Activated (2026-06-25)
+
+I047 iteration doc status moved to Active. Activation record appended. BOARD.md Now section moved
+to I047 (removed from Next). Iterations README I047 row updated to Active. Non-terminal inventory
+updated. All selected story backlog files confirmed present. Ready for implementation slices.

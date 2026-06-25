@@ -1,6 +1,6 @@
 # Iteration I047: v0.1.2 Release Readiness And Runtime Polish
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-06-25
 > Planned objective: Produce a release-ready Talos month slice that stabilizes installation,
 >   first-run model setup, clears all known prerequisites for I019, opens the memory-system
@@ -356,6 +356,7 @@ slice; the long-running task is the recovery/checkpoint owner.
 | 2026-06-25 | Planning update | User requested that memory-system implementation start this month. Added `MEM-001-A` as a starter slice while preserving the full I019 baseline for later memory work. |
 | 2026-06-25 | Planning update | User clarified that I047 must satisfy every known I019 prerequisite. Added OBS-001/I018 prerequisite closure before `MEM-001-A`; I019 itself remains a preserved future baseline. |
 | 2026-06-25 | Planning update | Created long-running task record `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md` to track I047 prerequisite closure, later I019 activation decision, and I020 dependency disposition. |
+| 2026-06-25 | **Activation** | I047 activated. Execution contract confirmed (T0): work on `main`, auto-commit + push after phase gates, continuous pace through closeout, `talos init` subcommand for CONF-002, version bump at closeout, OBS-001 log rotation re-audit before declaring complete. T1 confirmed: planning/installer changes already committed (`c616940`, `1b9a9e4`), governance validation 0 warnings, working tree clean. Board Now moved to I047. Selected stories synchronized. |
 
 ## Verification Evidence
 

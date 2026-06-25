@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| _(no active iteration — next iteration TBD)_ | | | |
+| I047 v0.1.2 Release Readiness And Runtime Polish | Active | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | Activated 2026-06-25. Exit requires REL-001 release readiness, CONF-002 first-run setup, OBS-001/I018 prerequisite closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status, and docs sync. Long task: [sequence](tasks/2026-06-25-i047-i019-memory-release-sequence.md). |
 
 ## Review
 
@@ -42,7 +42,6 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I047 v0.1.2 Release Readiness And Runtime Polish | Planned | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | First phase of [long task](tasks/2026-06-25-i047-i019-memory-release-sequence.md); exit requires `v0.1.2` release readiness, first-run setup, I019 prerequisite closure, memory starter, compaction policy, read-only governance status, docs sync, and full workspace/governance checks. |
 | I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype import + config precedence specified |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
