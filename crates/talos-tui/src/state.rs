@@ -102,10 +102,14 @@ impl BottomPanelState {
                 } else {
                     format!("\"{}\"", s.preview)
                 },
-                action: PanelItemAction::Select {
-                    command: s.command.clone(),
-                    value: s.ordinal.to_string(),
+            action: PanelItemAction::Select {
+                command: if s.command.is_empty() {
+                    "/resume".to_string()
+                } else {
+                    s.command.clone()
                 },
+                value: s.ordinal.to_string(),
+            },
                 is_current: false,
             })
             .collect();
