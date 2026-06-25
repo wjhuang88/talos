@@ -108,11 +108,11 @@ jobs:
             echo
             echo "| Platform | Architecture | File |"
             echo "|----------|-------------|------|"
-            echo "| Linux | x86_64 | \`talos-x86_64-unknown-linux-musl.tar.gz\` |"
-            echo "| Linux | ARM64 | \`talos-aarch64-unknown-linux-musl.tar.gz\` |"
-            echo "| macOS | Apple Silicon | \`talos-aarch64-apple-darwin.tar.gz\` |"
-            echo "| macOS | Intel | \`talos-x86_64-apple-darwin.tar.gz\` |"
-            echo "| Windows | x86_64 | \`talos-x86_64-pc-windows-msvc.zip\` |"
+            echo "| Linux | x86_64 | \`talos-x86_64-linux.tar.gz\` |"
+            echo "| Linux | ARM64 | \`talos-aarch64-linux.tar.gz\` |"
+            echo "| macOS | Apple Silicon | \`talos-aarch64-darwin.tar.gz\` |"
+            echo "| macOS | Intel | \`talos-x86_64-darwin.tar.gz\` |"
+            echo "| Windows | x86_64 | \`talos-x86_64-windows.zip\` |"
             echo
             echo "Checksums: [\`checksum.sha256\`](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/checksum.sha256)"
             echo

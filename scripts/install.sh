@@ -16,8 +16,8 @@ version="${TALOS_VERSION:-latest}"
 os="$(uname -s)"
 arch="$(uname -m)"
 case "$os" in
-  Darwin) os_part="apple-darwin" ;;
-  Linux)  os_part="unknown-linux-gnu" ;;
+  Darwin) os_part="darwin" ;;
+  Linux)  os_part="linux" ;;
   *) printf 'error: unsupported OS: %s\n' "$os" >&2; exit 1 ;;
 esac
 case "$arch" in
@@ -26,8 +26,7 @@ case "$arch" in
   *) printf 'error: unsupported architecture: %s\n' "$arch" >&2; exit 1 ;;
 esac
 
-target="${arch_part}-${os_part}"
-archive="talos-${target}.tar.gz"
+archive="talos-${arch_part}-${os_part}.tar.gz"
 
 # GitHub's /releases/latest excludes prereleases, so for a prerelease-only
 # project the "latest/download" shortcut 404s. Resolve the newest release tag

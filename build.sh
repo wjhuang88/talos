@@ -52,16 +52,31 @@ build_xwin() {
 package_binary() {
   local target="$1"
   local release_dir="$SCRIPT_DIR/target/${target}/release"
-  local archive
 
   case "$target" in
     *-windows-*)
-      archive="$DIST_DIR/talos-${target}.zip"
+      archive="$DIST_DIR/talos-x86_64-windows.zip"
       ( cd "$release_dir" && zip -q "$archive" talos.exe )
       ;;
-    *)
-      archive="$DIST_DIR/talos-${target}.tar.gz"
+    *aarch64*linux*)
+      archive="$DIST_DIR/talos-aarch64-linux.tar.gz"
       tar -czf "$archive" -C "$release_dir" talos
+      ;;
+    *x86_64*linux*)
+      archive="$DIST_DIR/talos-x86_64-linux.tar.gz"
+      tar -czf "$archive" -C "$release_dir" talos
+      ;;
+    *aarch64*darwin*)
+      archive="$DIST_DIR/talos-aarch64-darwin.tar.gz"
+      tar -czf "$archive" -C "$release_dir" talos
+      ;;
+    *x86_64*darwin*)
+      archive="$DIST_DIR/talos-x86_64-darwin.tar.gz"
+      tar -czf "$archive" -C "$release_dir" talos
+      ;;
+    *)
+      echo "Unknown target: $target" >&2
+      return 1
       ;;
   esac
 
