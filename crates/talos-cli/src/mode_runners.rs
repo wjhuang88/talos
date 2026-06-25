@@ -11,7 +11,7 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, MessageSource, ModelPickerItem, SessionPickerItem, StatusSnapshot, StreamMessage, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, MessageSource, SessionPickerItem, StatusSnapshot, StreamMessage, UiOutput, UserInput};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
@@ -335,6 +335,96 @@ async fn handle_session_delete(
     }
 }
 
+fn build_model_picker_data(config: &Config) -> talos_conversation::ModelPickerData {
+    use std::collections::BTreeMap;
+    use talos_conversation::{ModelPickerItem, ProviderSetupItem};
+
+    let catalog = config.all_models();
+
+    // Detect model IDs that appear under multiple providers (e.g., glm-5.2
+    // under zhipu, zai, zai-coding-plan). These need provider-qualified values
+    // in the picker so the correct provider is selected.
+    let mut id_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for m in &catalog {
+        *id_counts.entry(m.id.as_str()).or_default() += 1;
+    }
+
+    let mut ready_models: Vec<ModelPickerItem> = Vec::new();
+    let mut unauthed_by_provider: BTreeMap<String, usize> = BTreeMap::new();
+
+    for m in &catalog {
+        let provider_authed = config.provider_authenticated(&m.provider);
+        let pricing_str = m.pricing.as_ref().map(|p| {
+            let input = p.input_per_1m.map(|v| format!("${v}")).unwrap_or_default();
+            let output = p.output_per_1m.map(|v| format!("${v}")).unwrap_or_default();
+            if input.is_empty() && output.is_empty() {
+                String::new()
+            } else {
+                format!("{input}/{output}")
+            }
+        });
+        let ctx_str = m
+            .context_limit
+            .map(|c| format!("{}K", c / 1000))
+            .unwrap_or_else(|| "?".to_string());
+
+        // Provider-qualify the model ID for the picker value when duplicates exist.
+        let picker_value = if id_counts.get(m.id.as_str()).copied().unwrap_or(0) > 1 {
+            format!("{}/{}", m.provider, m.id)
+        } else {
+            m.id.clone()
+        };
+
+        if provider_authed {
+            ready_models.push(ModelPickerItem {
+                command: "/model".to_string(),
+                model_id: picker_value,
+                provider: m.provider.clone(),
+                label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
+                context_limit: m.context_limit,
+                pricing: pricing_str,
+                authenticated: true,
+                is_current: m.id == config.model && m.provider == config.provider,
+            });
+        } else {
+            *unauthed_by_provider.entry(m.provider.clone()).or_default() += 1;
+        }
+    }
+
+    let setup_providers: Vec<ProviderSetupItem> = unauthed_by_provider
+        .into_iter()
+        .map(|(provider, count)| ProviderSetupItem {
+            provider,
+            model_count: count,
+        })
+        .collect();
+
+    talos_conversation::ModelPickerData {
+        ready_models,
+        setup_providers,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn handle_provider_setup(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    provider: &str,
+) {
+    if config.provider_authenticated(provider) {
+        let data = build_model_picker_data(config);
+        let _ = ui_tx.send(UiOutput::ModelPicker(data));
+        return;
+    }
+
+    let _ = ui_tx.send(UiOutput::CredentialRequest(
+        talos_conversation::CredentialRequestData {
+            provider: provider.to_string(),
+            model_id: None,
+        },
+    ));
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn handle_session_model(
     transition: &Arc<Mutex<SessionTransition>>,
@@ -354,35 +444,8 @@ async fn handle_session_model(
     mock: bool,
 ) {
     if model_id.is_empty() {
-        let catalog = config.all_models();
-        let items: Vec<ModelPickerItem> = catalog
-            .iter()
-            .map(|m| {
-                let provider_authed = config.provider_authenticated(&m.provider);
-                let pricing_str = m.pricing.as_ref().map(|p| {
-                    let input = p.input_per_1m.map(|v| format!("${v}")).unwrap_or_default();
-                    let output = p.output_per_1m.map(|v| format!("${v}")).unwrap_or_default();
-                    if input.is_empty() && output.is_empty() {
-                        String::new()
-                    } else {
-                        format!("{input}/{output}")
-                    }
-                });
-                let ctx_str = m.context_limit
-                    .map(|c| format!("{}K", c / 1000))
-                    .unwrap_or_else(|| "?".to_string());
-                ModelPickerItem {
-                    command: "/model".to_string(),
-                    model_id: m.id.clone(),
-                    provider: m.provider.clone(),
-                    label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
-                    context_limit: m.context_limit,
-                    pricing: pricing_str,
-                    authenticated: provider_authed,
-                }
-            })
-            .collect();
-        let _ = ui_tx.send(UiOutput::ModelPicker(items));
+        let data = build_model_picker_data(config);
+        let _ = ui_tx.send(UiOutput::ModelPicker(data));
         return;
     }
 
@@ -394,11 +457,17 @@ async fn handle_session_model(
     }
 
     let provider_name = model_config.provider.clone();
+
+    // No-op if the selected model+provider is already active.
+    if config.model == model_id && config.provider == provider_name {
+        return;
+    }
+
     if !model_config.provider_authenticated(&provider_name) {
         let _ = ui_tx.send(UiOutput::CredentialRequest(
             talos_conversation::CredentialRequestData {
                 provider: provider_name,
-                model_id: model_id.clone(),
+                model_id: Some(model_id.clone()),
             },
         ));
         return;
@@ -520,8 +589,19 @@ async fn handle_session_model_with_credential(
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
-    if let Err(e) = model_config.set_active_model(&cred.model_id) {
-        let text = format!("[Error] Unknown model '{}': {e}\n", cred.model_id);
+
+    // Provider-level setup (no specific model): re-open the picker.
+    let model_id = match &cred.model_id {
+        Some(id) => id.clone(),
+        None => {
+            let data = build_model_picker_data(&model_config);
+            let _ = ui_tx.send(UiOutput::ModelPicker(data));
+            return;
+        }
+    };
+
+    if let Err(e) = model_config.set_active_model(&model_id) {
+        let text = format!("[Error] Unknown model '{model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
@@ -593,12 +673,11 @@ async fn handle_session_model_with_credential(
                 eprintln!("[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed.");
             }
             let text = format!(
-                "[System] Credentials saved. Switched to model {}.\n",
-                cred.model_id
+                "[System] Credentials saved. Switched to model {model_id}.\n",
             );
             send_stream(ui_tx, MessageSource::System, text);
             let _ = ui_tx.send(UiOutput::Status(StatusSnapshot {
-                model_name: cred.model_id.clone(),
+                model_name: model_id.clone(),
                 provider: model_config.provider.clone(),
                 ..Default::default()
             }));
@@ -846,6 +925,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         cli.mock,
                     )
                     .await;
+                }
+                SessionLifecycleRequest::ProviderSetup(provider) => {
+                    handle_provider_setup(&ui_tx_for_handler, &config_for_handler, &provider).await;
                 }
             }
         }

@@ -67,7 +67,7 @@ pub struct ModelCapabilities {
 /// model properties without hardcoded fallbacks.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ModelMetadata {
-    /// Unique model identifier (e.g., "claude-sonnet-4-20250514").
+    /// Unique model identifier (e.g., "claude-sonnet-4-5-20250929").
     pub id: String,
     /// Provider name (e.g., "anthropic", "openai", "google").
     pub provider: String,
@@ -301,7 +301,7 @@ mod tests {
     fn test_find_model_by_id() {
         let models = builtin_models();
         // Should find a known model
-        let found = find_model(&models, "claude-sonnet-4-20250514");
+        let found = find_model(&models, "claude-sonnet-4-5-20250929");
         assert!(found.is_some());
         let m = found.unwrap();
         assert_eq!(m.provider, "anthropic");
@@ -316,7 +316,7 @@ mod tests {
     fn test_import_models_dev_parses() {
         let json = r#"[
             {
-                "id": "claude-sonnet-4-20250514",
+                "id": "claude-sonnet-4-5-20250929",
                 "provider": "anthropic",
                 "context_length": 200000,
                 "max_tokens": 8192,
@@ -338,7 +338,7 @@ mod tests {
         let models = import_models_dev(json).expect("should parse");
         assert_eq!(models.len(), 1);
         let m = &models[0];
-        assert_eq!(m.id, "claude-sonnet-4-20250514");
+        assert_eq!(m.id, "claude-sonnet-4-5-20250929");
         assert_eq!(m.provider, "anthropic");
         assert_eq!(m.context_limit, Some(200_000));
         assert_eq!(m.output_limit, Some(8192));
@@ -439,7 +439,7 @@ mod tests {
     fn test_find_model_case_sensitive() {
         let models = builtin_models();
         // Exact match required
-        assert!(find_model(&models, "claude-sonnet-4-20250514").is_some());
+        assert!(find_model(&models, "claude-sonnet-4-5-20250929").is_some());
         assert!(find_model(&models, "Claude-Sonnet-4-20250514").is_none());
     }
 

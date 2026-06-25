@@ -1,58 +1,28 @@
 # Built-in model dataset for Talos.
-# Covers ~20 mainstream models with context limits, pricing, and capabilities.
-# Pricing is per 1M tokens in USD.
-
-[[models]]
-id = "claude-sonnet-4-20250514"
-provider = "anthropic"
-context_limit = 200000
-output_limit = 8192
-release_date = "2025-05-14"
-
-[models.pricing]
-input_per_1m = 3.0
-output_per_1m = 15.0
-cache_read_per_1m = 0.30
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = true
-image_input = true
-
-[[models]]
-id = "claude-opus-4-20250514"
-provider = "anthropic"
-context_limit = 200000
-output_limit = 8192
-release_date = "2025-05-14"
-
-[models.pricing]
-input_per_1m = 15.0
-output_per_1m = 75.0
-cache_read_per_1m = 1.50
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = true
-image_input = true
+# Curated from models.dev + provider documentation.
+# Only models with tool calling support are included.
 
 [[models]]
 id = "claude-sonnet-4-5-20250929"
 provider = "anthropic"
 context_limit = 200000
-output_limit = 32000
+output_limit = 64000
 release_date = "2025-09-29"
-
-[models.pricing]
-input_per_1m = 3.0
-output_per_1m = 15.0
-cache_read_per_1m = 0.30
 
 [models.capabilities]
 tools = true
-structured_output = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "claude-sonnet-4-5"
+provider = "anthropic"
+context_limit = 200000
+output_limit = 64000
+release_date = "2025-09-29"
+
+[models.capabilities]
+tools = true
 reasoning = true
 image_input = true
 
@@ -63,69 +33,33 @@ context_limit = 200000
 output_limit = 32000
 release_date = "2025-08-05"
 
-[models.pricing]
-input_per_1m = 15.0
-output_per_1m = 75.0
-cache_read_per_1m = 1.50
-
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = true
 image_input = true
 
 [[models]]
-id = "claude-haiku-3-5-20241022"
+id = "claude-opus-4-1"
 provider = "anthropic"
 context_limit = 200000
-output_limit = 8192
-release_date = "2024-10-22"
-
-[models.pricing]
-input_per_1m = 0.80
-output_per_1m = 4.0
-cache_read_per_1m = 0.08
+output_limit = 32000
+release_date = "2025-08-05"
 
 [models.capabilities]
 tools = true
-structured_output = true
-reasoning = false
+reasoning = true
 image_input = true
 
 [[models]]
-id = "gpt-4o-2024-11-20"
-provider = "openai"
-context_limit = 128000
-output_limit = 16384
-release_date = "2024-11-20"
-
-[models.pricing]
-input_per_1m = 2.50
-output_per_1m = 10.0
-cache_read_per_1m = 1.25
+id = "claude-haiku-4-5"
+provider = "anthropic"
+context_limit = 200000
+output_limit = 64000
+release_date = "2025-10-15"
 
 [models.capabilities]
 tools = true
-structured_output = true
-reasoning = false
-image_input = true
-
-[[models]]
-id = "gpt-4o-mini-2024-07-18"
-provider = "openai"
-context_limit = 128000
-output_limit = 16384
-release_date = "2024-07-18"
-
-[models.pricing]
-input_per_1m = 0.15
-output_per_1m = 0.60
-cache_read_per_1m = 0.075
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = false
+reasoning = true
 image_input = true
 
 [[models]]
@@ -135,51 +69,9 @@ context_limit = 1047576
 output_limit = 32768
 release_date = "2025-04-14"
 
-[models.pricing]
-input_per_1m = 2.0
-output_per_1m = 8.0
-cache_read_per_1m = 0.50
-
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = false
-image_input = true
-
-[[models]]
-id = "gpt-4.1-mini-2025-04-14"
-provider = "openai"
-context_limit = 1047576
-output_limit = 32768
-release_date = "2025-04-14"
-
-[models.pricing]
-input_per_1m = 0.40
-output_per_1m = 1.60
-cache_read_per_1m = 0.10
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = false
-image_input = true
-
-[[models]]
-id = "o1-2024-12-17"
-provider = "openai"
-context_limit = 200000
-output_limit = 100000
-release_date = "2024-12-17"
-
-[models.pricing]
-input_per_1m = 15.0
-output_per_1m = 60.0
-cache_read_per_1m = 7.50
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = true
 image_input = true
 
 [[models]]
@@ -189,16 +81,10 @@ context_limit = 200000
 output_limit = 100000
 release_date = "2025-04-16"
 
-[models.pricing]
-input_per_1m = 10.0
-output_per_1m = 40.0
-cache_read_per_1m = 2.50
-
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = true
-image_input = true
+image_input = false
 
 [[models]]
 id = "o4-mini-2025-04-16"
@@ -207,14 +93,8 @@ context_limit = 200000
 output_limit = 100000
 release_date = "2025-04-16"
 
-[models.pricing]
-input_per_1m = 1.10
-output_per_1m = 4.40
-cache_read_per_1m = 0.275
-
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = true
 image_input = false
 
@@ -225,14 +105,8 @@ context_limit = 1048576
 output_limit = 65536
 release_date = "2025-03-24"
 
-[models.pricing]
-input_per_1m = 1.25
-output_per_1m = 10.0
-cache_read_per_1m = 0.31
-
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = true
 image_input = true
 
@@ -243,193 +117,439 @@ context_limit = 1048576
 output_limit = 65536
 release_date = "2025-05-20"
 
-[models.pricing]
-input_per_1m = 0.15
-output_per_1m = 0.60
-cache_read_per_1m = 0.0375
-
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = true
 image_input = true
 
 [[models]]
-id = "gemini-2.5-flash-lite"
-provider = "google"
+id = "deepseek-v4-pro"
+provider = "deepseek"
+context_limit = 1000000
+output_limit = 384000
+release_date = "2026-04-24"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "deepseek-v4-flash"
+provider = "deepseek"
+context_limit = 1000000
+output_limit = 384000
+release_date = "2026-04-24"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "deepseek-chat"
+provider = "deepseek"
+context_limit = 1000000
+output_limit = 384000
+release_date = "2025-12-01"
+
+[models.capabilities]
+tools = true
+reasoning = false
+image_input = true
+
+[[models]]
+id = "deepseek-reasoner"
+provider = "deepseek"
+context_limit = 1000000
+output_limit = 384000
+release_date = "2025-12-01"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "glm-5.2"
+provider = "zhipu"
+context_limit = 1000000
+output_limit = 131072
+release_date = "2026-06-13"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-5.1"
+provider = "zhipu"
+context_limit = 200000
+output_limit = 131072
+release_date = "2026-04-07"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.7"
+provider = "zhipu"
+context_limit = 204800
+output_limit = 131072
+release_date = "2025-12-22"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.7-flash"
+provider = "zhipu"
+context_limit = 200000
+output_limit = 131072
+release_date = "2026-01-19"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.6"
+provider = "zhipu"
+context_limit = 204800
+output_limit = 131072
+release_date = "2025-09-30"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.5"
+provider = "zhipu"
+context_limit = 131072
+output_limit = 98304
+release_date = "2025-07-28"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.5-air"
+provider = "zhipu"
+context_limit = 131072
+output_limit = 98304
+release_date = "2025-07-28"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.5-flash"
+provider = "zhipu"
+context_limit = 131072
+output_limit = 98304
+release_date = "2025-07-28"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-5.2"
+provider = "zai"
+context_limit = 1000000
+output_limit = 131072
+release_date = "2026-06-13"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.7"
+provider = "zai"
+context_limit = 204800
+output_limit = 131072
+release_date = "2025-12-22"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.6"
+provider = "zai"
+context_limit = 204800
+output_limit = 131072
+release_date = "2025-09-30"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.5-air"
+provider = "zai"
+context_limit = 131072
+output_limit = 98304
+release_date = "2025-07-28"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-5.2"
+provider = "zhipu-coding-plan"
+context_limit = 1000000
+output_limit = 131072
+release_date = "2026-06-13"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-5-turbo"
+provider = "zhipu-coding-plan"
+context_limit = 200000
+output_limit = 131072
+release_date = "2026-03-16"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.7"
+provider = "zhipu-coding-plan"
+context_limit = 204800
+output_limit = 131072
+release_date = "2025-12-22"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.5-air"
+provider = "zhipu-coding-plan"
+context_limit = 131072
+output_limit = 98304
+release_date = "2025-07-28"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-5.2"
+provider = "zai-coding-plan"
+context_limit = 1000000
+output_limit = 131072
+release_date = "2026-06-13"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-5-turbo"
+provider = "zai-coding-plan"
+context_limit = 200000
+output_limit = 131072
+release_date = "2026-03-16"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.7"
+provider = "zai-coding-plan"
+context_limit = 204800
+output_limit = 131072
+release_date = "2025-12-22"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "glm-4.5-air"
+provider = "zai-coding-plan"
+context_limit = 131072
+output_limit = 98304
+release_date = "2025-07-28"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "MiniMax-M3"
+provider = "minimax"
+context_limit = 512000
+output_limit = 128000
+release_date = "2026-06-01"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "MiniMax-M2.7"
+provider = "minimax"
+context_limit = 204800
+output_limit = 131072
+release_date = "2026-03-18"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "MiniMax-M2.5"
+provider = "minimax"
+context_limit = 204800
+output_limit = 131072
+release_date = "2026-02-12"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "MiniMax-M2"
+provider = "minimax"
+context_limit = 196608
+output_limit = 128000
+release_date = "2025-10-27"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "kimi-k2.6"
+provider = "moonshot"
+context_limit = 262144
+output_limit = 262144
+release_date = "2026-04-21"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "kimi-k2.5"
+provider = "moonshot"
+context_limit = 262144
+output_limit = 262144
+release_date = "2026-01-15"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "qwen3-coder-plus"
+provider = "qwen"
 context_limit = 1048576
 output_limit = 65536
-release_date = "2025-06-12"
-
-[models.pricing]
-input_per_1m = 0.10
-output_per_1m = 0.40
-cache_read_per_1m = 0.025
+release_date = "2025-07-23"
 
 [models.capabilities]
 tools = true
-structured_output = true
-reasoning = false
-image_input = true
-
-[[models]]
-id = "deepseek-v3"
-provider = "deepseek"
-context_limit = 64000
-output_limit = 8192
-release_date = "2024-12-26"
-
-[models.pricing]
-input_per_1m = 0.27
-output_per_1m = 1.10
-cache_read_per_1m = 0.07
-
-[models.capabilities]
-tools = true
-structured_output = true
 reasoning = false
 image_input = false
 
 [[models]]
-id = "deepseek-r1"
-provider = "deepseek"
-context_limit = 64000
-output_limit = 32768
-release_date = "2025-01-20"
-
-[models.pricing]
-input_per_1m = 0.55
-output_per_1m = 2.19
-cache_read_per_1m = 0.14
-
-[models.capabilities]
-tools = false
-structured_output = false
-reasoning = true
-image_input = false
-
-[[models]]
-id = "deepseek-v3.1"
-provider = "deepseek"
-context_limit = 128000
-output_limit = 16384
-release_date = "2025-06-01"
-
-[models.pricing]
-input_per_1m = 0.27
-output_per_1m = 1.10
-cache_read_per_1m = 0.07
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = true
-image_input = false
-
-[[models]]
-id = "qwen3-coder"
+id = "qwen3-max"
 provider = "qwen"
-context_limit = 256000
+context_limit = 262144
 output_limit = 65536
-release_date = "2025-06-15"
-
-[models.pricing]
-input_per_1m = 0.50
-output_per_1m = 2.0
-cache_read_per_1m = 0.125
+release_date = "2025-09-23"
 
 [models.capabilities]
 tools = true
-structured_output = true
-reasoning = true
+reasoning = false
 image_input = false
 
 [[models]]
 id = "qwen3-235b-a22b"
 provider = "qwen"
-context_limit = 128000
-output_limit = 32768
+context_limit = 131072
+output_limit = 16384
 release_date = "2025-04-28"
-
-[models.pricing]
-input_per_1m = 0.50
-output_per_1m = 2.0
-cache_read_per_1m = 0.125
 
 [models.capabilities]
 tools = true
-structured_output = true
 reasoning = true
 image_input = false
 
 [[models]]
-id = "mistral-large-2411"
-provider = "mistral"
-context_limit = 128000
-output_limit = 32768
-release_date = "2024-11-01"
-
-[models.pricing]
-input_per_1m = 2.0
-output_per_1m = 6.0
-cache_read_per_1m = 0.50
+id = "anthropic/claude-sonnet-4-5"
+provider = "openrouter"
+context_limit = 200000
+output_limit = 64000
+release_date = "2025-09-29"
 
 [models.capabilities]
 tools = true
-structured_output = true
-reasoning = false
-image_input = false
-
-[[models]]
-id = "mistral-small-3.1"
-provider = "mistral"
-context_limit = 128000
-output_limit = 32768
-release_date = "2025-03-01"
-
-[models.pricing]
-input_per_1m = 0.10
-output_per_1m = 0.30
-cache_read_per_1m = 0.025
-
-[models.capabilities]
-tools = true
-structured_output = true
-reasoning = false
-image_input = false
-
-[[models]]
-id = "grok-3"
-provider = "xai"
-context_limit = 131072
-output_limit = 32768
-release_date = "2025-02-17"
-
-[models.pricing]
-input_per_1m = 3.0
-output_per_1m = 15.0
-cache_read_per_1m = 0.75
-
-[models.capabilities]
-tools = true
-structured_output = true
 reasoning = true
 image_input = true
 
 [[models]]
-id = "grok-3-mini"
-provider = "xai"
-context_limit = 131072
+id = "openai/gpt-4.1"
+provider = "openrouter"
+context_limit = 1047576
 output_limit = 32768
-release_date = "2025-02-17"
-
-[models.pricing]
-input_per_1m = 0.30
-output_per_1m = 0.50
-cache_read_per_1m = 0.075
+release_date = "2025-04-14"
 
 [models.capabilities]
 tools = true
-structured_output = true
+reasoning = false
+image_input = true
+
+[[models]]
+id = "deepseek/deepseek-v4-pro"
+provider = "openrouter"
+context_limit = 1000000
+output_limit = 384000
+release_date = "2026-04-24"
+
+[models.capabilities]
+tools = true
 reasoning = true
 image_input = false

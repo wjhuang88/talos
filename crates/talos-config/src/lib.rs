@@ -150,7 +150,7 @@ pub struct Config {
     #[serde(default = "default_provider_name")]
     pub provider: String,
 
-    /// The model name to use (e.g., `claude-sonnet-4-20250514`).
+    /// The model name to use (e.g., `claude-sonnet-4-5-20250929`).
     #[serde(default)]
     pub model: String,
 
@@ -690,11 +690,36 @@ impl Config {
     /// Returns [`ConfigError::InvalidConfig`] if the model ID is not found.
     pub fn set_active_model(&mut self, model_id: &str) -> Result<(), ConfigError> {
         let all = self.all_models();
-        let meta = model::find_model(&all, model_id).ok_or_else(|| {
-            ConfigError::InvalidConfig(format!("model '{model_id}' not found"))
-        })?;
 
-        self.model = model_id.to_string();
+        // Handle provider-qualified IDs (e.g. "zhipu/glm-5.2") for models
+        // that exist under multiple providers. The prefix is only treated as
+        // a provider qualifier if it matches a known provider name.
+        let known_providers: std::collections::HashSet<&str> =
+            all.iter().map(|m| m.provider.as_str()).collect();
+        let (resolved_provider, resolved_id) = match model_id.split_once('/') {
+            Some((prefix, rest))
+                if known_providers.contains(prefix) && !rest.is_empty() =>
+            {
+                (Some(prefix), rest)
+            }
+            _ => (None, model_id),
+        };
+
+        let meta = match resolved_provider {
+            Some(provider) => all
+                .iter()
+                .find(|m| m.id == resolved_id && m.provider == provider)
+                .ok_or_else(|| {
+                    ConfigError::InvalidConfig(format!(
+                        "model '{resolved_id}' not found for provider '{provider}'"
+                    ))
+                })?,
+            None => model::find_model(&all, resolved_id).ok_or_else(|| {
+                ConfigError::InvalidConfig(format!("model '{resolved_id}' not found"))
+            })?,
+        };
+
+        self.model = meta.id.clone();
         self.provider = meta.provider.clone();
 
         if !self.providers.contains_key(&meta.provider) {
@@ -765,22 +790,7 @@ fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             base_url: None,
             api_key: None,
             api_key_env: Some("ANTHROPIC_API_KEY".to_string()),
-            models: HashMap::from([
-                (
-                    "claude-sonnet-4-20250514".to_string(),
-                    ModelConfig {
-                        context_limit: Some(200_000),
-                        output_limit: Some(4096),
-                    },
-                ),
-                (
-                    "claude-opus-4-20250514".to_string(),
-                    ModelConfig {
-                        context_limit: Some(200_000),
-                        output_limit: Some(4096),
-                    },
-                ),
-            ]),
+            models: HashMap::new(),
         }),
         "openai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -788,22 +798,87 @@ fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             base_url: None,
             api_key: None,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
-            models: HashMap::from([
-                (
-                    "gpt-4o".to_string(),
-                    ModelConfig {
-                        context_limit: Some(128_000),
-                        output_limit: Some(4096),
-                    },
-                ),
-                (
-                    "gpt-4o-mini".to_string(),
-                    ModelConfig {
-                        context_limit: Some(128_000),
-                        output_limit: Some(4096),
-                    },
-                ),
-            ]),
+            models: HashMap::new(),
+        }),
+        "google" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://generativelanguage.googleapis.com/v1beta".to_string()),
+            api_key: None,
+            api_key_env: Some("GOOGLE_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "deepseek" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://api.deepseek.com".to_string()),
+            api_key: None,
+            api_key_env: Some("DEEPSEEK_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "qwen" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://dashscope.aliyuncs.com/compatible-mode/v1".to_string()),
+            api_key: None,
+            api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "zhipu" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://open.bigmodel.cn/api/paas/v4".to_string()),
+            api_key: None,
+            api_key_env: Some("ZHIPU_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "zai" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://api.z.ai/api/paas/v4".to_string()),
+            api_key: None,
+            api_key_env: Some("ZAI_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "zhipu-coding-plan" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://open.bigmodel.cn/api/coding/paas/v4".to_string()),
+            api_key: None,
+            api_key_env: Some("ZHIPU_CODING_PLAN_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "zai-coding-plan" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://api.z.ai/api/coding/paas/v4".to_string()),
+            api_key: None,
+            api_key_env: Some("ZAI_CODING_PLAN_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "minimax" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://api.minimaxi.com/v1".to_string()),
+            api_key: None,
+            api_key_env: Some("MINIMAX_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "moonshot" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://api.moonshot.cn/v1".to_string()),
+            api_key: None,
+            api_key_env: Some("MOONSHOT_API_KEY".to_string()),
+            models: HashMap::new(),
+        }),
+        "openrouter" => Some(ProviderConfig {
+            protocol: ProviderProtocol::OpenAIChat,
+            tool_protocol: Default::default(),
+            base_url: Some("https://openrouter.ai/api/v1".to_string()),
+            api_key: None,
+            api_key_env: Some("OPENROUTER_API_KEY".to_string()),
+            models: HashMap::new(),
         }),
         _ => None,
     }
@@ -988,7 +1063,7 @@ mod tests {
         unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-key") };
         let config = Config {
             provider: "openai".to_string(),
-            model: "gpt-4o".to_string(),
+            model: "gpt-4.1".to_string(),
             providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
@@ -1119,14 +1194,14 @@ mod tests {
     fn test_model_limits_from_builtin_and_custom_providers() {
         let builtin = Config {
             provider: "openai".to_string(),
-            model: "gpt-4o".to_string(),
+            model: "gpt-4.1".to_string(),
             providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
         };
-        assert_eq!(builtin.context_limit(), Some(128_000));
+        assert_eq!(builtin.context_limit(), Some(1_047_576));
 
         let custom = Config {
             provider: "dashscope".to_string(),
@@ -1368,12 +1443,12 @@ mod tests {
     fn test_resolve_model_limits_returns_user_config_when_set() {
         let config = Config {
             provider: "anthropic".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-sonnet-4-5-20250929".to_string(),
             providers: HashMap::from([(
                 "anthropic".to_string(),
                 ProviderConfig {
                     models: HashMap::from([(
-                        "claude-sonnet-4-20250514".to_string(),
+                        "claude-sonnet-4-5-20250929".to_string(),
                         ModelConfig {
                             context_limit: Some(150_000),
                             output_limit: Some(8000),
@@ -1444,12 +1519,12 @@ mod tests {
     fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
         let config = Config {
             provider: "anthropic".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-sonnet-4-5-20250929".to_string(),
             providers: HashMap::from([(
                 "anthropic".to_string(),
                 ProviderConfig {
                     models: HashMap::from([(
-                        "claude-sonnet-4-20250514".to_string(),
+                        "claude-sonnet-4-5-20250929".to_string(),
                         ModelConfig {
                             context_limit: Some(100_000),
                             output_limit: None,
@@ -1549,8 +1624,8 @@ mod tests {
     #[test]
     fn test_set_active_model_sets_provider_from_catalog() {
         let mut config = Config::default();
-        config.set_active_model("claude-sonnet-4-20250514").unwrap();
-        assert_eq!(config.model, "claude-sonnet-4-20250514");
+        config.set_active_model("claude-sonnet-4-5-20250929").unwrap();
+        assert_eq!(config.model, "claude-sonnet-4-5-20250929");
         assert_eq!(config.provider, "anthropic");
         assert!(config.providers.contains_key("anthropic"));
     }
@@ -1558,8 +1633,8 @@ mod tests {
     #[test]
     fn test_set_active_model_openai() {
         let mut config = Config::default();
-        config.set_active_model("gpt-4o-2024-11-20").unwrap();
-        assert_eq!(config.model, "gpt-4o-2024-11-20");
+        config.set_active_model("gpt-4.1-2025-04-14").unwrap();
+        assert_eq!(config.model, "gpt-4.1-2025-04-14");
         assert_eq!(config.provider, "openai");
         assert!(config.providers.contains_key("openai"));
     }
@@ -1606,7 +1681,7 @@ mod tests {
         unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-20250514".to_string();
+        config.model = "claude-sonnet-4-5-20250929".to_string();
         config.set_provider_credential("anthropic", "sk-secret-key");
         config.save().unwrap();
 
@@ -1635,7 +1710,7 @@ mod tests {
 
         let config_toml = r#"
 provider = "anthropic"
-model = "claude-sonnet-4-20250514"
+model = "claude-sonnet-4-5-20250929"
 "#;
         fs::write(Config::default_path(), config_toml).unwrap();
 
@@ -1672,7 +1747,7 @@ anthropic = "sk-merged-key"
 
         let config_toml = r#"
 provider = "anthropic"
-model = "claude-sonnet-4-20250514"
+model = "claude-sonnet-4-5-20250929"
 
 [providers.anthropic]
 protocol = "anthropic-messages"

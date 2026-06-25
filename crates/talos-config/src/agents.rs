@@ -16,7 +16,7 @@
 //! protocol = "anthropic-messages"
 //! api_key_env = "ANTHROPIC_API_KEY"
 //!
-//! [providers.anthropic.models.claude-sonnet-4-20250514]
+//! [providers.anthropic.models.claude-sonnet-4-5-20250929]
 //! context_limit = 200000
 //! output_limit = 8192
 //! ```
@@ -131,7 +131,7 @@ mod tests {
 protocol = "anthropic-messages"
 api_key_env = "ANTHROPIC_API_KEY"
 
-[providers.anthropic.models.claude-sonnet-4-20250514]
+[providers.anthropic.models.claude-sonnet-4-5-20250929]
 context_limit = 200000
 output_limit = 8192
 "#;
@@ -147,7 +147,7 @@ output_limit = 8192
         assert_eq!(provider.api_key_env.as_deref(), Some("ANTHROPIC_API_KEY"));
         let model = provider
             .models
-            .get("claude-sonnet-4-20250514")
+            .get("claude-sonnet-4-5-20250929")
             .expect("model");
         assert_eq!(model.context_limit, Some(200_000));
         assert_eq!(model.output_limit, Some(8192));
