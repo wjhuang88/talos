@@ -17,6 +17,7 @@ mod colors;
 mod event_loop;
 mod logging;
 mod mcp_runtime;
+mod model_lifecycle;
 mod mode_runners;
 mod provider_setup;
 mod registry;

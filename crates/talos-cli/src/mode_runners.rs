@@ -11,7 +11,7 @@ use talos_agent::context::ContextLoader;
 use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ConversationEngine, MessageSource, SessionPickerItem, StatusSnapshot, StreamMessage, UiOutput, UserInput};
+use talos_conversation::{ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
@@ -31,6 +31,7 @@ use tokio::sync::{mpsc, watch};
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
+use crate::model_lifecycle::{RebuildSessionParams, build_model_picker_data, rebuild_session_for_model};
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
@@ -335,76 +336,6 @@ async fn handle_session_delete(
     }
 }
 
-fn build_model_picker_data(config: &Config) -> talos_conversation::ModelPickerData {
-    use std::collections::BTreeMap;
-    use talos_conversation::{ModelPickerItem, ProviderSetupItem};
-
-    let catalog = config.all_models();
-
-    // Detect model IDs that appear under multiple providers (e.g., glm-5.2
-    // under zhipu, zai, zai-coding-plan). These need provider-qualified values
-    // in the picker so the correct provider is selected.
-    let mut id_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-    for m in &catalog {
-        *id_counts.entry(m.id.as_str()).or_default() += 1;
-    }
-
-    let mut ready_models: Vec<ModelPickerItem> = Vec::new();
-    let mut unauthed_by_provider: BTreeMap<String, usize> = BTreeMap::new();
-
-    for m in &catalog {
-        let provider_authed = config.provider_authenticated(&m.provider);
-        let pricing_str = m.pricing.as_ref().map(|p| {
-            let input = p.input_per_1m.map(|v| format!("${v}")).unwrap_or_default();
-            let output = p.output_per_1m.map(|v| format!("${v}")).unwrap_or_default();
-            if input.is_empty() && output.is_empty() {
-                String::new()
-            } else {
-                format!("{input}/{output}")
-            }
-        });
-        let ctx_str = m
-            .context_limit
-            .map(|c| format!("{}K", c / 1000))
-            .unwrap_or_else(|| "?".to_string());
-
-        // Provider-qualify the model ID for the picker value when duplicates exist.
-        let picker_value = if id_counts.get(m.id.as_str()).copied().unwrap_or(0) > 1 {
-            format!("{}/{}", m.provider, m.id)
-        } else {
-            m.id.clone()
-        };
-
-        if provider_authed {
-            ready_models.push(ModelPickerItem {
-                command: "/model".to_string(),
-                model_id: picker_value,
-                provider: m.provider.clone(),
-                label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
-                context_limit: m.context_limit,
-                pricing: pricing_str,
-                authenticated: true,
-                is_current: m.id == config.model && m.provider == config.provider,
-            });
-        } else {
-            *unauthed_by_provider.entry(m.provider.clone()).or_default() += 1;
-        }
-    }
-
-    let setup_providers: Vec<ProviderSetupItem> = unauthed_by_provider
-        .into_iter()
-        .map(|(provider, count)| ProviderSetupItem {
-            provider,
-            model_count: count,
-        })
-        .collect();
-
-    talos_conversation::ModelPickerData {
-        ready_models,
-        setup_providers,
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn handle_provider_setup(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
@@ -482,86 +413,24 @@ async fn handle_session_model(
         }
     };
 
-    let model_context_limit = model_config.resolve_model_limits().0;
-
-    let mut current_session = session_watch_rx.borrow().clone();
-    if let Err(e) = current_session.ensure_persisted() {
-        let text = format!("[Error] Failed to create session file: {e}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
-        return;
-    }
-    let history = current_session.read_messages().unwrap_or_default();
-
-    let session_config = SessionConfig {
-        print_mode: false,
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: history,
-        model_context_limit,
-    };
-
-    let provider = build_provider(&model_config, &api_key, mock);
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
-        ui_tx.clone(),
-        workspace_root.to_path_buf(),
-    ));
-    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
-        Ok(r) => r,
-        Err(e) => {
-            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-            return;
-        }
-    };
-    mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks.clone(),
-    );
-    agent.set_tool_protocol(model_config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root) {
-        apply_runtime_skills(&mut agent, &skills);
-    }
-
-    let (handle, actor) = AppServerSession::new(agent, session_config);
-    let session_for_prepare = current_session.clone();
-    if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
-        let text = format!("[Error] Failed to prepare model switch: {e}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
-        return;
-    }
-
-    let mut transition_guard = transition.lock().await;
-    match transition_guard.commit(actor) {
-        Ok(result) => {
-            let _ = session_watch_tx.send(current_session.clone());
-            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            if bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx))
-                .is_err()
-            {
-                eprintln!("[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed.");
-            }
-            let text = format!("[System] Switched to model {model_id}.\n");
-            send_stream(ui_tx, MessageSource::System, text);
-            let _ = ui_tx.send(UiOutput::Status(StatusSnapshot {
-                model_name: model_id.clone(),
-                provider: provider_name.clone(),
-                ..Default::default()
-            }));
-        }
-        Err(e) => {
-            transition_guard.rollback();
-            let text = format!("[Error] Failed to commit model switch: {e}. Previous model remains active.\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-        }
-    }
+    rebuild_session_for_model(RebuildSessionParams {
+        transition,
+        ui_tx,
+        model_config: &model_config,
+        hooks,
+        workspace_root,
+        mcp_config,
+        session_watch_tx,
+        sq_tx_watch_tx,
+        bridge_rx_update_tx,
+        session_watch_rx,
+        api_key,
+        model_id: model_id.clone(),
+        provider_for_status: provider_name,
+        success_message: format!("[System] Switched to model {model_id}.\n"),
+        mock,
+    })
+    .await;
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -607,87 +476,26 @@ async fn handle_session_model_with_credential(
     }
 
     let api_key = cred.api_key.clone();
-    let model_context_limit = model_config.resolve_model_limits().0;
-    let mut current_session = session_watch_rx.borrow().clone();
-    if let Err(e) = current_session.ensure_persisted() {
-        let text = format!("[Error] Failed to create session file: {e}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
-        return;
-    }
-    let history = current_session.read_messages().unwrap_or_default();
+    let provider_for_status = model_config.provider.clone();
 
-    let session_config = SessionConfig {
-        print_mode: false,
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: history,
-        model_context_limit,
-    };
-
-    let provider = build_provider(&model_config, &api_key, mock);
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
-        ui_tx.clone(),
-        workspace_root.to_path_buf(),
-    ));
-    let mcp_runtime = match McpSessionRuntime::start(mcp_config, hooks.clone()).await {
-        Ok(r) => r,
-        Err(e) => {
-            let text = format!("[Error] Failed to start MCP runtime: {e}\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-            return;
-        }
-    };
-    mcp_runtime.report_startup_failures();
-    let mut registry = build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks.clone(),
-    );
-    agent.set_tool_protocol(model_config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root) {
-        apply_runtime_skills(&mut agent, &skills);
-    }
-
-    let (handle, actor) = AppServerSession::new(agent, session_config);
-    let session_for_prepare = current_session.clone();
-    if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
-        let text = format!("[Error] Failed to prepare model switch: {e}\n");
-        send_stream(ui_tx, MessageSource::Error, text);
-        return;
-    }
-
-    let mut transition_guard = transition.lock().await;
-    match transition_guard.commit(actor) {
-        Ok(result) => {
-            let _ = session_watch_tx.send(current_session.clone());
-            let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
-            if bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx))
-                .is_err()
-            {
-                eprintln!("[Error] Bridge forwarder unavailable; model switch events will not be persisted or displayed.");
-            }
-            let text = format!(
-                "[System] Credentials saved. Switched to model {model_id}.\n",
-            );
-            send_stream(ui_tx, MessageSource::System, text);
-            let _ = ui_tx.send(UiOutput::Status(StatusSnapshot {
-                model_name: model_id.clone(),
-                provider: model_config.provider.clone(),
-                ..Default::default()
-            }));
-        }
-        Err(e) => {
-            transition_guard.rollback();
-            let text = format!("[Error] Failed to commit model switch: {e}. Previous model remains active.\n");
-            send_stream(ui_tx, MessageSource::Error, text);
-        }
-    }
+    rebuild_session_for_model(RebuildSessionParams {
+        transition,
+        ui_tx,
+        model_config: &model_config,
+        hooks,
+        workspace_root,
+        mcp_config,
+        session_watch_tx,
+        sq_tx_watch_tx,
+        bridge_rx_update_tx,
+        session_watch_rx,
+        api_key,
+        model_id: model_id.clone(),
+        provider_for_status,
+        success_message: format!("[System] Credentials saved. Switched to model {model_id}.\n"),
+        mock,
+    })
+    .await;
 }
 
 pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
