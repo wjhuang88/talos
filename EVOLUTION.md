@@ -477,3 +477,29 @@ repeating known mistakes.
   1. **Any code that reads session messages from disk must call `ensure_persisted()` first.** The session may only exist in-memory at engine startup.
   2. **File-backed state requires explicit creation.** In-memory-only sessions are valid until the first persistence operation.
   3. **When adding lifecycle operations, trace the complete execution path from fresh startup.** The first-turn edge case is easy to miss if you only test on existing sessions.
+
+## #31: `ring` + `cargo-xwin` cross-compilation fails for Windows ARM64
+
+- **Area**: Build / Release
+- **Added**: I046 (2026-06-25)
+- **Trigger**: v0.1.1 release build for `aarch64-pc-windows-msvc`
+- **Symptom**: `ring` crate assembly compilation fails: `clang: error: no such file or directory: '/imsvc'`
+- **Root cause**: `cargo-xwin` injects MSVC-style `/imsvc` include flags via `CFLAGS_<target>`. `ring`'s build script resolves `CC_<target>=clang-cl` through cc-rs but still invokes `clang` (GCC driver) for the actual assembly/C compilation — `clang` (GCC mode) doesn't understand `/imsvc` (MSVC mode only). Setting bare `CC=clang-cl` also doesn't help because `ring` doesn't propagate it to its internal compiler invocation. `aws-lc-rs` is not a viable alternative — it uses CMake + NASM and has even worse cargo-xwin compatibility (static CRT `dllimport` linkage conflicts).
+- **Fix**: Skipped `aarch64-pc-windows-msvc` in `build.sh`. Switched Linux targets from `gnu` to `musl` for fully static binaries (tested both arches locally, zero issues). Windows ARM64 users can use the x86_64 build via emulation.
+- **Prevention**:
+  1. **Don't attempt `aarch64-pc-windows-msvc` cross-builds until `ring` is replaced or the TLS backend switches to `native-tls`.** Documented in `build.sh`.
+  2. **For static Linux binaries, prefer `musl` targets via `cargo-zigbuild`.** They compile cleanly and avoid glibc version dependencies.
+  3. **Future: migrate `reqwest` to `native-tls`** (uses OS TLS — Schannel on Windows, no C compilation). Requires replacing or feature-gating `rust-websearch` which pulls `reqwest 0.12` with its own `rustls`+`ring`.
+
+## #32: Stale validation evidence after shared-dataset changes
+
+- **Area**: Governance / Validation
+- **Added**: I046 (2026-06-25)
+- **Trigger**: I046 pre-planning discovered `cargo test --workspace` was failing at I045 closeout
+- **Symptom**: I045 iteration doc claimed "✅ `cargo test --workspace` passes" but two tests were actually broken: `test_model_limits_from_builtin_and_custom_providers` (stale `gpt-4.1` after catalog commit `0734eae`) and `test_session_picker_accept_resume_default_command` (lost `/resume` fallback in I045 `PanelItemAction` refactor `a8cd614`).
+- **Root cause**: The catalog expansion commit (`0734eae`) and the `PanelItemAction` refactor (`a8cd614`) landed AFTER I045's closeout verification. The closeout check passed at an intermediate commit but the subsequent commits broke tests without re-verification.
+- **Fix**: I046-S1 fixed both tests. I045 evidence corrected with a post-closeout correction note appended (not rewritten) per baseline-preservation rules.
+- **Prevention**:
+  1. **Re-run `cargo test --workspace` after ANY commit that touches shared datasets** (`models.toml`, protocol types, public API signatures) — not just after the feature commit.
+  2. **Closeout verification must reflect the final committed state.** If commits land after the verification run, re-verify before marking Complete.
+  3. **Prefer `cargo test --workspace` over `cargo test -p <crate>` for closeout.** The targeted test hid the cross-crate breakage.
