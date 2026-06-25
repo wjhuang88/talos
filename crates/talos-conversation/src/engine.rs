@@ -311,6 +311,7 @@ impl ConversationEngine {
         StatusSnapshot {
             model_name: self.model_name.clone(),
             provider: self.provider_name.clone(),
+            workspace_path: String::new(),
             usage: self.usage.clone(),
             branch_id: self.branch_id.clone(),
             steering_count: self.steering_queue.len(),

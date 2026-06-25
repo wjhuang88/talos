@@ -826,6 +826,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_user_input_tx(user_input_tx.clone());
     tui.set_model_name(config.model.clone());
     tui.set_provider(config.provider.clone());
+    tui.set_workspace_path(workspace_display_name(&workspace_root));
 
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(runtime_skills.diagnostics())

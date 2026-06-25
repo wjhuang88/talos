@@ -81,6 +81,7 @@ pub enum TipKind {
 pub struct StatusSnapshot {
     pub model_name: String,
     pub provider: String,
+    pub workspace_path: String,
     pub usage: Usage,
     pub branch_id: Option<String>,
     pub steering_count: usize,

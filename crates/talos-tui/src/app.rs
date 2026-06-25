@@ -483,6 +483,10 @@ impl Tui {
         self.state.status.provider = provider;
     }
 
+    pub fn set_workspace_path(&mut self, path: String) {
+        self.state.status.workspace_path = path;
+    }
+
     fn dispatch_panel_action(&mut self, action: PanelAction) {
         match action {
             PanelAction::SendMessage(msg) => {
@@ -998,7 +1002,11 @@ impl Tui {
                 self.show_approval(&tool_name, &summary);
             }
             UiOutput::Status(snapshot) => {
+                let workspace_path = std::mem::take(&mut self.state.status.workspace_path);
                 self.state.status = snapshot;
+                if self.state.status.workspace_path.is_empty() {
+                    self.state.status.workspace_path = workspace_path;
+                }
             }
             UiOutput::Tip { text, kind } => {
                 self.state.tip = Some(Tip {

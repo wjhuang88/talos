@@ -1396,19 +1396,21 @@ pub(crate) fn build_status_text(
 
     let model_name = &status.model_name;
     let provider = &status.provider;
+    let workspace = &status.workspace_path;
     let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
     let queue_total = status.steering_count + status.followup_count;
 
     if compact {
-        return build_compact_status(model_name, provider, status.is_processing, total_tokens, queue_total);
+        return build_compact_status(model_name, provider, workspace, status.is_processing, total_tokens, queue_total);
     }
 
-    build_expanded_status(model_name, provider, status.is_processing, total_tokens, queue_total)
+    build_expanded_status(model_name, provider, workspace, status.is_processing, total_tokens, queue_total)
 }
 
 fn build_compact_status(
     model_name: &str,
     provider: &str,
+    workspace: &str,
     is_processing: bool,
     total_tokens: u64,
     queue_total: usize,
@@ -1423,6 +1425,11 @@ fn build_compact_status(
     } else {
         format!(" ({})", truncate_str(provider, 12))
     };
+    let workspace_part = if workspace.is_empty() {
+        String::new()
+    } else {
+        format!("  {}", truncate_str(workspace, 16))
+    };
     let spinner_part = if is_processing { " ◷" } else { "" };
     let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
     let queue_part = if queue_total > 0 {
@@ -1434,6 +1441,7 @@ fn build_compact_status(
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
         Span::styled(format!("{model_part}{provider_part}"), accent),
+        Span::styled(workspace_part, dim),
         Span::styled(spinner_part, dim),
         Span::styled(tokens_part, val),
         Span::styled(queue_part, dim),
@@ -1443,6 +1451,7 @@ fn build_compact_status(
 fn build_expanded_status(
     model_name: &str,
     provider: &str,
+    workspace: &str,
     is_processing: bool,
     total_tokens: u64,
     queue_total: usize,
@@ -1456,6 +1465,11 @@ fn build_expanded_status(
         String::new()
     } else {
         format!(" ({})", truncate_str(provider, 16))
+    };
+    let workspace_part = if workspace.is_empty() {
+        String::new()
+    } else {
+        format!("  {}", truncate_str(workspace, 24))
     };
     let spinner_part = if is_processing {
         " ◷ processing…"
@@ -1474,6 +1488,7 @@ fn build_expanded_status(
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
         Span::styled(format!("{model_part}{provider_part}"), accent),
+        Span::styled(workspace_part, dim),
         Span::styled(spinner_part, dim),
         Span::styled("     ", dim),
         Span::styled(right_part, val),

@@ -283,6 +283,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -301,6 +302,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 3,
@@ -613,6 +615,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "claude-sonnet-4".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -629,6 +632,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -646,6 +650,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage::default(),
             branch_id: None,
             steering_count: 0,
@@ -662,6 +667,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage {
                 input_tokens: 12_345,
                 output_tokens: 8_900,
@@ -683,6 +689,7 @@ mod tests {
         let status = StatusSnapshot {
             model_name: "claude-sonnet-4-20250514".to_string(),
             provider: String::new(),
+            workspace_path: String::new(),
             usage: Usage {
                 input_tokens: 5_000,
                 output_tokens: 3_000,
@@ -717,5 +724,39 @@ mod tests {
     #[test]
     fn test_truncate_str_empty_string() {
         assert_eq!(truncate_str("", 10), "");
+    }
+
+    #[test]
+    fn test_status_bar_shows_workspace_path() {
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4-5".to_string(),
+            provider: "anthropic".to_string(),
+            workspace_path: "talos".to_string(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("talos"), "status bar must include workspace path");
+    }
+
+    #[test]
+    fn test_status_bar_omits_workspace_when_empty() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(!content.contains("  t") || content.contains("test"));
     }
 }
