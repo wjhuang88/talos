@@ -76,6 +76,82 @@ pub enum CompactionError {
 /// Result alias for compaction operations.
 pub type CompactionResult<T> = Result<T, CompactionError>;
 
+/// Configurable compaction policy documenting threshold math and limit sources.
+///
+/// All thresholds have documented defaults and source precedence. This struct
+/// makes the compaction decision boundary explicit and testable (MEM-005-A).
+#[derive(Debug, Clone)]
+pub struct CompactionPolicy {
+    /// Fraction of model_limit that triggers compaction (default: 0.8).
+    pub trigger_threshold: f32,
+    /// Maximum characters per tool result before budget truncation (default: 4000).
+    pub max_tool_result_chars: usize,
+    /// Number of recent turns preserved verbatim, never compacted by layers 4/5 (default: 10).
+    pub preserved_turns: usize,
+    /// Turn threshold for trim layer — tool results older than this are emptied (default: 20).
+    pub trim_turn_threshold: usize,
+    /// Turn threshold for collapse layer — turns older than this are summarized (default: 10).
+    pub collapse_turn_threshold: usize,
+    /// Maximum consecutive failures before circuit breaker trips (default: 3).
+    pub circuit_breaker_threshold: usize,
+    /// Tokens reserved for model output, reducing effective context budget (placeholder, default: 0).
+    pub output_reserve: u32,
+}
+
+impl Default for CompactionPolicy {
+    fn default() -> Self {
+        Self {
+            trigger_threshold: 0.8,
+            max_tool_result_chars: MAX_TOOL_RESULT_CHARS,
+            preserved_turns: PRESERVED_TURNS,
+            trim_turn_threshold: TRIM_TURN_THRESHOLD,
+            collapse_turn_threshold: COLLAPSE_TURN_THRESHOLD,
+            circuit_breaker_threshold: CIRCUIT_BREAKER_THRESHOLD,
+            output_reserve: 0,
+        }
+    }
+}
+
+impl CompactionPolicy {
+    /// Returns the token threshold at which compaction triggers.
+    ///
+    /// Source precedence: `model_limit * trigger_threshold - output_reserve`.
+    #[must_use]
+    pub fn trigger_tokens(&self, model_limit: u32) -> u32 {
+        let raw = (model_limit as f32 * self.trigger_threshold) as u32;
+        raw.saturating_sub(self.output_reserve)
+    }
+}
+
+/// Outcome of a compaction attempt, reported without exposing hidden tool output.
+///
+/// Status fields contain only counts and token estimates — never raw message
+/// content or tool result text. This is the hidden-output guard (MEM-005-A).
+#[derive(Debug, Clone, PartialEq)]
+pub enum CompactionStatus {
+    /// Compaction was applied successfully.
+    Applied {
+        /// Names of layers applied, in order (e.g., `["budget", "trim"]`).
+        layers_applied: Vec<&'static str>,
+        /// Estimated token count before compaction.
+        tokens_before: u32,
+        /// Estimated token count after compaction.
+        tokens_after: u32,
+    },
+    /// Compaction was skipped (context already fits or below threshold).
+    Skipped {
+        /// Why compaction was skipped.
+        reason: &'static str,
+        /// Current estimated token count.
+        tokens_current: u32,
+    },
+    /// Compaction failed.
+    Failed {
+        /// Error message (never includes tool result content).
+        error: String,
+    },
+}
+
 /// Applies 5-layer context compaction when context nears the model token limit.
 ///
 /// The compactor is stateless except for the circuit breaker counter, which
@@ -463,6 +539,117 @@ impl Compactor {
     fn fits(&self, messages: &[Message]) -> bool {
         let estimated = self.token_estimator.estimate(messages);
         estimated <= self.model_limit
+    }
+
+    /// Apply deterministic layers 1-3 (budget, trim, microcompact) and return status.
+    ///
+    /// Safe at any boundary (pre-turn, manual) because it does not invoke the
+    /// LLM. If deterministic layers are insufficient, the status reports
+    /// `Skipped` with the reason — the caller can then decide whether to
+    /// escalate to [`compact`](Self::compact) (which uses LLM layers 4-5).
+    #[must_use]
+    pub fn compact_deterministic(
+        &self,
+        messages: Vec<Message>,
+    ) -> (Vec<Message>, CompactionStatus) {
+        let tokens_before = self.token_estimator.estimate(&messages);
+        let mut current = messages;
+        let mut layers = Vec::new();
+
+        current = self.apply_budget(current);
+        layers.push("budget");
+        if self.fits(&current) {
+            let tokens_after = self.token_estimator.estimate(&current);
+            return (
+                current,
+                CompactionStatus::Applied {
+                    layers_applied: layers,
+                    tokens_before,
+                    tokens_after,
+                },
+            );
+        }
+
+        current = self.apply_trim(current);
+        layers.push("trim");
+        if self.fits(&current) {
+            let tokens_after = self.token_estimator.estimate(&current);
+            return (
+                current,
+                CompactionStatus::Applied {
+                    layers_applied: layers,
+                    tokens_before,
+                    tokens_after,
+                },
+            );
+        }
+
+        current = self.apply_microcompact(current);
+        layers.push("microcompact");
+        let tokens_after = self.token_estimator.estimate(&current);
+
+        if self.fits(&current) {
+            (
+                current,
+                CompactionStatus::Applied {
+                    layers_applied: layers,
+                    tokens_before,
+                    tokens_after,
+                },
+            )
+        } else {
+            (
+                current,
+                CompactionStatus::Skipped {
+                    reason: "deterministic layers insufficient; LLM layers required",
+                    tokens_current: tokens_after,
+                },
+            )
+        }
+    }
+
+    /// Manual compaction trigger that returns status without exposing hidden output.
+    ///
+    /// Checks the trigger threshold first. If the context fits, returns
+    /// `Skipped`. If the circuit breaker is tripped, returns `Failed`.
+    /// Otherwise delegates to [`compact`](Self::compact) and wraps the result.
+    pub async fn manual_compact(
+        &mut self,
+        messages: Vec<Message>,
+        provider: &dyn LanguageModel,
+    ) -> (Vec<Message>, CompactionStatus) {
+        if !self.should_compact(&messages) {
+            let tokens = self.token_estimator.estimate(&messages);
+            return (
+                messages,
+                CompactionStatus::Skipped {
+                    reason: "below trigger threshold",
+                    tokens_current: tokens,
+                },
+            );
+        }
+
+        let tokens_before = self.token_estimator.estimate(&messages);
+
+        match self.compact(messages, provider).await {
+            Ok(compacted) => {
+                let tokens_after = self.token_estimator.estimate(&compacted);
+                (
+                    compacted,
+                    CompactionStatus::Applied {
+                        layers_applied: vec!["manual"],
+                        tokens_before,
+                        tokens_after,
+                    },
+                )
+            }
+            Err(e) => (
+                Vec::new(),
+                CompactionStatus::Failed {
+                    error: e.to_string(),
+                },
+            ),
+        }
     }
 
     /// Records a compaction failure for the circuit breaker.
@@ -1113,5 +1300,143 @@ mod tests {
 
         // Failure count should be reset to 0
         assert_eq!(compactor.failure_count(), 0);
+    }
+
+    // ========== MEM-005-A: CompactionPolicy ==========
+
+    #[test]
+    fn test_policy_defaults_match_constants() {
+        let policy = CompactionPolicy::default();
+        assert_eq!(policy.trigger_threshold, 0.8);
+        assert_eq!(policy.max_tool_result_chars, MAX_TOOL_RESULT_CHARS);
+        assert_eq!(policy.preserved_turns, PRESERVED_TURNS);
+        assert_eq!(policy.trim_turn_threshold, TRIM_TURN_THRESHOLD);
+        assert_eq!(policy.collapse_turn_threshold, COLLAPSE_TURN_THRESHOLD);
+        assert_eq!(policy.circuit_breaker_threshold, CIRCUIT_BREAKER_THRESHOLD);
+        assert_eq!(policy.output_reserve, 0);
+    }
+
+    #[test]
+    fn test_policy_trigger_tokens_calculation() {
+        let policy = CompactionPolicy::default();
+        assert_eq!(policy.trigger_tokens(128_000), 102_400);
+        assert_eq!(policy.trigger_tokens(100_000), 80_000);
+
+        let policy_with_reserve = CompactionPolicy {
+            output_reserve: 4096,
+            ..Default::default()
+        };
+        assert_eq!(policy_with_reserve.trigger_tokens(100_000), 80_000 - 4096);
+    }
+
+    #[test]
+    fn test_policy_trigger_tokens_saturates_on_small_limit() {
+        let policy = CompactionPolicy {
+            output_reserve: 100_000,
+            ..Default::default()
+        };
+        assert_eq!(policy.trigger_tokens(1000), 0);
+    }
+
+    // ========== MEM-005-A: compact_deterministic ==========
+
+    #[test]
+    fn test_compact_deterministic_applies_budget_when_sufficient() {
+        let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+        let long_content = "x".repeat(5000);
+        let messages = vec![tool_msg("call_1", &long_content)];
+
+        let (result, status) = compactor.compact_deterministic(messages);
+
+        assert!(matches!(status, CompactionStatus::Applied { .. }));
+        if let CompactionStatus::Applied { layers_applied, .. } = &status {
+            assert_eq!(layers_applied, &vec!["budget"]);
+        }
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_compact_deterministic_returns_skipped_when_insufficient() {
+        let compactor = Compactor::new(TokenEstimator::new(), 1);
+        let mut messages = Vec::new();
+        for i in 0..5 {
+            messages.extend(make_turn(
+                &format!("q{i}"),
+                &format!("r{i}"),
+                vec![(&format!("c{i}"), &format!("d{i}"))],
+            ));
+        }
+
+        let (_result, status) = compactor.compact_deterministic(messages);
+
+        assert!(matches!(
+            status,
+            CompactionStatus::Skipped {
+                reason: "deterministic layers insufficient; LLM layers required",
+                ..
+            }
+        ));
+    }
+
+    // ========== MEM-005-A: manual_compact ==========
+
+    #[tokio::test]
+    async fn test_manual_compact_skipped_below_threshold() {
+        let mut compactor = Compactor::new(TokenEstimator::new(), 100_000);
+        let messages = vec![user_msg("Hello")];
+
+        let (_result, status) = compactor.manual_compact(messages, &FailingProvider).await;
+
+        assert!(matches!(
+            status,
+            CompactionStatus::Skipped {
+                reason: "below trigger threshold",
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_manual_compact_applied_when_over_threshold() {
+        let mut compactor = Compactor::new(TokenEstimator::new(), 1100);
+        let long_content = "x".repeat(5000);
+        let messages = vec![tool_msg("call_1", &long_content)];
+
+        let (_result, status) = compactor.manual_compact(messages, &FailingProvider).await;
+
+        assert!(matches!(status, CompactionStatus::Applied { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_manual_compact_failed_on_provider_error() {
+        let mut compactor = Compactor::new(TokenEstimator::new(), 1);
+        let mut messages = Vec::new();
+        for i in 0..15 {
+            messages.extend(make_turn(
+                &format!("q{i}"),
+                &format!("r{i}"),
+                vec![(&format!("c{i}"), &format!("d{i}"))],
+            ));
+        }
+
+        let (_result, status) = compactor.manual_compact(messages, &FailingProvider).await;
+
+        assert!(matches!(status, CompactionStatus::Failed { .. }));
+    }
+
+    // ========== MEM-005-A: hidden-output guard ==========
+
+    #[test]
+    fn test_compaction_status_never_contains_tool_content() {
+        let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+        let messages = vec![tool_msg("call_1", "SECRET_TOOL_OUTPUT_12345")];
+
+        let (_result, status) = compactor.compact_deterministic(messages);
+
+        let status_str = format!("{status:?}");
+        assert!(
+            !status_str.contains("SECRET_TOOL_OUTPUT_12345"),
+            "CompactionStatus must never expose tool result content"
+        );
     }
 }
