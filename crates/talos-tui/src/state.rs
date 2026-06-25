@@ -6,7 +6,7 @@
 use std::time::{Duration, Instant};
 
 use talos_conversation::{
-    CredentialResponseData, ModelPickerItem, SessionPickerItem, StatusSnapshot, TipKind,
+    CredentialResponseData, ModelPickerData, SessionPickerItem, StatusSnapshot, TipKind,
 };
 use talos_core::ApprovalChoice;
 
@@ -17,21 +17,29 @@ pub(crate) const SLASH_MENU_MAX_VISIBLE: usize = 8;
 pub(crate) enum PanelAction {
     None,
     SendMessage(String),
+    ProviderSetup(String),
+}
+
+/// What happens when a [`PanelItem`] is accepted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PanelItemAction {
+    /// Slash command — inserted into the input buffer on accept.
+    /// `command` includes a trailing space when the command takes an argument.
+    SlashCommand { command: String },
+    /// Picker selection — sends `"{command} {value}"` as a message.
+    Select { command: String, value: String },
+    /// Unauthenticated provider — triggers provider-level credential entry.
+    ProviderSetup { provider: String },
+    /// Non-navigable group header.
+    Header,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PanelItem {
     pub(crate) label: String,
     pub(crate) description: String,
-    pub(crate) value: String,
-    /// Slash command to submit when the row is accepted. Empty for slash
-    /// commands (the value itself is the full command) and for approval rows.
-    #[allow(dead_code)]
-    pub(crate) command: String,
-    /// If true, this item is a non-navigable group header (used in model picker).
-    /// Headers are skipped by Up/Down navigation and cannot be selected.
-    #[allow(dead_code)]
-    pub(crate) is_header: bool,
+    pub(crate) action: PanelItemAction,
+    pub(crate) is_current: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +49,7 @@ pub(crate) enum PanelKind {
     ModelPicker,
     CredentialInput {
         provider: String,
-        model_id: String,
+        model_id: Option<String>,
     },
     Approval { tool_name: String, arguments: String },
 }
@@ -60,12 +68,19 @@ impl BottomPanelState {
         let items = registry
             .available_commands()
             .into_iter()
-            .map(|cmd| PanelItem {
-                label: cmd.name.to_string(),
-                description: cmd.description.to_string(),
-                value: cmd.name.to_string(),
-                command: String::new(),
-                is_header: false,
+            .map(|cmd| {
+                let has_arg = cmd.description.contains('[') || cmd.description.contains('<');
+                let command = if has_arg {
+                    format!("{} ", cmd.name)
+                } else {
+                    cmd.name.to_string()
+                };
+                PanelItem {
+                    label: cmd.name.to_string(),
+                    description: cmd.description.to_string(),
+                    action: PanelItemAction::SlashCommand { command },
+                    is_current: false,
+                }
             })
             .collect();
         Self {
@@ -87,9 +102,11 @@ impl BottomPanelState {
                 } else {
                     format!("\"{}\"", s.preview)
                 },
-                value: s.ordinal.to_string(),
-                command: s.command.clone(),
-                is_header: false,
+                action: PanelItemAction::Select {
+                    command: s.command.clone(),
+                    value: s.ordinal.to_string(),
+                },
+                is_current: false,
             })
             .collect();
         Self {
@@ -101,41 +118,52 @@ impl BottomPanelState {
         }
     }
 
-    pub(crate) fn open_model_picker(items: &[ModelPickerItem]) -> Self {
+    pub(crate) fn open_model_picker(data: &ModelPickerData) -> Self {
         let mut panel_items: Vec<PanelItem> = Vec::new();
-        let ready_header = PanelItem {
-            is_header: true,
-            label: "Ready".into(),
-            description: String::new(),
-            value: String::new(),
-            command: String::new(),
-        };
-        panel_items.push(ready_header);
-        panel_items.extend(items.iter().filter(|m| m.authenticated).map(|m| PanelItem {
-            label: m.label.clone(),
-            description: m.provider.clone(),
-            value: m.model_id.clone(),
-            command: m.command.clone(),
-            is_header: false,
-        }));
-        let setup_header = PanelItem {
-            is_header: true,
-            label: "Setup required".into(),
-            description: String::new(),
-            value: String::new(),
-            command: String::new(),
-        };
-        panel_items.push(setup_header);
-        panel_items.extend(items.iter().filter(|m| !m.authenticated).map(|m| PanelItem {
-            label: m.label.clone(),
-            description: format!("{} (setup required)", m.provider),
-            value: m.model_id.clone(),
-            command: m.command.clone(),
-            is_header: false,
-        }));
+
+        if !data.ready_models.is_empty() {
+            panel_items.push(PanelItem {
+                label: "Ready".into(),
+                description: String::new(),
+                action: PanelItemAction::Header,
+                is_current: false,
+            });
+            panel_items.extend(data.ready_models.iter().map(|m| PanelItem {
+                label: m.label.clone(),
+                description: m.provider.clone(),
+                action: PanelItemAction::Select {
+                    command: m.command.clone(),
+                    value: m.model_id.clone(),
+                },
+                is_current: m.is_current,
+            }));
+        }
+
+        if !data.setup_providers.is_empty() {
+            panel_items.push(PanelItem {
+                label: "Setup required".into(),
+                description: String::new(),
+                action: PanelItemAction::Header,
+                is_current: false,
+            });
+            panel_items.extend(data.setup_providers.iter().map(|p| PanelItem {
+                label: format!(
+                    "{}   ({} model{})",
+                    p.provider,
+                    p.model_count,
+                    if p.model_count == 1 { "" } else { "s" }
+                ),
+                description: "Setup required".to_string(),
+                action: PanelItemAction::ProviderSetup {
+                    provider: p.provider.clone(),
+                },
+                is_current: false,
+            }));
+        }
+
         let initial_index = panel_items
             .iter()
-            .position(|i| !i.is_header)
+            .position(|i| i.action != PanelItemAction::Header)
             .unwrap_or(0);
         Self {
             is_open: true,
@@ -146,12 +174,12 @@ impl BottomPanelState {
         }
     }
 
-    pub(crate) fn open_credential_input(provider: &str, model_id: &str) -> Self {
+    pub(crate) fn open_credential_input(provider: &str, model_id: Option<&str>) -> Self {
         Self {
             is_open: true,
             kind: Some(PanelKind::CredentialInput {
                 provider: provider.to_string(),
-                model_id: model_id.to_string(),
+                model_id: model_id.map(|s| s.to_string()),
             }),
             items: vec![],
             selected_index: 0,
@@ -194,23 +222,29 @@ impl BottomPanelState {
                 PanelItem {
                     label: "[y] approve".to_string(),
                     description: String::new(),
-                    value: "approve".to_string(),
-                    command: String::new(),
-                    is_header: false,
+                    action: PanelItemAction::Select {
+                        command: String::new(),
+                        value: "approve".to_string(),
+                    },
+                    is_current: false,
                 },
                 PanelItem {
                     label: "[a] always approve".to_string(),
                     description: String::new(),
-                    value: "always".to_string(),
-                    command: String::new(),
-                    is_header: false,
+                    action: PanelItemAction::Select {
+                        command: String::new(),
+                        value: "always".to_string(),
+                    },
+                    is_current: false,
                 },
                 PanelItem {
                     label: "[n] deny".to_string(),
                     description: String::new(),
-                    value: "deny".to_string(),
-                    command: String::new(),
-                    is_header: false,
+                    action: PanelItemAction::Select {
+                        command: String::new(),
+                        value: "deny".to_string(),
+                    },
+                    is_current: false,
                 },
             ],
             selected_index: 0,
@@ -239,22 +273,6 @@ impl BottomPanelState {
             .collect()
     }
 
-    pub(crate) fn selected_completion(&self, query: &str) -> Option<String> {
-        let filtered = self.filtered_items(query);
-        if filtered.is_empty() {
-            return None;
-        }
-        let idx = self.selected_index.min(filtered.len() - 1);
-        let item = filtered[idx];
-        if self.is_slash() {
-            let has_arg = item.description.contains("[") || item.description.contains("<");
-            let suffix = if has_arg { " " } else { "" };
-            Some(format!("{}{suffix}", item.value))
-        } else {
-            Some(item.value.clone())
-        }
-    }
-
     pub(crate) fn close(&mut self) {
         self.is_open = false;
         self.kind = None;
@@ -269,8 +287,11 @@ impl BottomPanelState {
         }
         for _ in 0..len {
             self.selected_index = (self.selected_index + 1) % len;
-            // Use raw items to check header status (avoids borrow conflict with selected_index)
-            if self.items.get(self.selected_index).is_none_or(|i| !i.is_header) {
+            if self
+                .items
+                .get(self.selected_index)
+                .is_none_or(|i| i.action != PanelItemAction::Header)
+            {
                 return;
             }
         }
@@ -287,7 +308,11 @@ impl BottomPanelState {
             } else {
                 self.selected_index -= 1;
             }
-            if self.items.get(self.selected_index).is_none_or(|i| !i.is_header) {
+            if self
+                .items
+                .get(self.selected_index)
+                .is_none_or(|i| i.action != PanelItemAction::Header)
+            {
                 return;
             }
         }
@@ -400,11 +425,11 @@ impl TuiState {
         self.slash_menu = BottomPanelState::open_session_picker(sessions);
     }
 
-    pub(crate) fn open_model_picker(&mut self, items: &[ModelPickerItem]) {
-        self.slash_menu = BottomPanelState::open_model_picker(items);
+    pub(crate) fn open_model_picker(&mut self, data: &ModelPickerData) {
+        self.slash_menu = BottomPanelState::open_model_picker(data);
     }
 
-    pub(crate) fn open_credential_input(&mut self, provider: &str, model_id: &str) {
+    pub(crate) fn open_credential_input(&mut self, provider: &str, model_id: Option<&str>) {
         self.slash_menu = BottomPanelState::open_credential_input(provider, model_id);
     }
 
@@ -466,33 +491,30 @@ impl TuiState {
     }
 
     pub(crate) fn accept_selected_panel_item(&mut self) -> PanelAction {
-        // Guard: skip header items (non-navigable group headers)
-        if self
-            .slash_menu
-            .items
-            .get(self.slash_menu.selected_index)
-            .is_some_and(|i| i.is_header)
-        {
+        let query = self.slash_query().to_string();
+        let filtered = self.slash_menu.filtered_items(&query);
+        if filtered.is_empty() {
             return PanelAction::None;
         }
-        let completion = self.slash_menu.selected_completion(self.slash_query());
-        if self.slash_menu.is_picker() {
-            let value = completion.unwrap_or_default();
-            let command = self
-                .slash_menu
-                .items
-                .get(self.slash_menu.selected_index)
-                .map(|i| i.command.clone())
-                .filter(|c| !c.is_empty())
-                .unwrap_or_else(|| "/resume".to_string());
-            self.slash_menu.close();
-            return PanelAction::SendMessage(format!("{command} {value}"));
+        let idx = self.slash_menu.selected_index.min(filtered.len() - 1);
+        let action = filtered[idx].action.clone();
+
+        match action {
+            PanelItemAction::Header => PanelAction::None,
+            PanelItemAction::SlashCommand { command } => {
+                self.input_insert_command(&command);
+                self.slash_menu.close();
+                PanelAction::None
+            }
+            PanelItemAction::Select { command, value } => {
+                self.slash_menu.close();
+                PanelAction::SendMessage(format!("{command} {value}"))
+            }
+            PanelItemAction::ProviderSetup { provider } => {
+                self.slash_menu.close();
+                PanelAction::ProviderSetup(provider)
+            }
         }
-        if let Some(command) = completion {
-            self.input_insert_command(&command);
-        }
-        self.slash_menu.close();
-        PanelAction::None
     }
 
     pub(crate) fn activate_approval(&mut self, tool_name: &str, arguments: &str) {

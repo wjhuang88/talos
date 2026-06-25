@@ -14,8 +14,9 @@ pub use engine::{
 };
 pub use types::{
     ChatMessage, CopyScope, CredentialRequestData, CredentialResponseData, McpServerDiagnostic,
-    MessageRole, MessageSource, MessageStatus, ModelPickerItem, ModelSwitchRequest,
-    PluginObservation, ScrollbackState, SessionDeleteRequest, SessionForkRequest,
-    SessionNewRequest, SessionPickerItem, SessionResumeRequest, SkillDiagnostic, StatusSnapshot,
-    StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
+    MessageRole, MessageSource, MessageStatus, ModelPickerData, ModelPickerItem,
+    ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
+    SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
+    SessionResumeRequest, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
+    ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };

@@ -1366,6 +1366,7 @@ fn model_picker_item_fields_accessible() {
         context_limit: Some(200_000),
         pricing: Some("$3/$15 per 1M".to_string()),
         authenticated: true,
+        is_current: false,
     };
     assert_eq!(item.command, "/model");
     assert_eq!(item.model_id, "claude-sonnet-4-20250514");
@@ -1385,6 +1386,7 @@ fn model_picker_item_unauthenticated_flag() {
         context_limit: Some(128_000),
         pricing: None,
         authenticated: false,
+        is_current: false,
     };
     assert!(!item.authenticated);
     assert!(item.pricing.is_none());

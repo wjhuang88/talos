@@ -146,8 +146,8 @@ pub enum UiOutput {
     SessionFork(SessionForkRequest),
     SessionDelete(SessionDeleteRequest),
     SessionPicker(Vec<SessionPickerItem>),
-    /// Open the bottom panel as a model picker with the given candidates.
-    ModelPicker(Vec<ModelPickerItem>),
+    /// Open the bottom panel as a two-layer model picker.
+    ModelPicker(ModelPickerData),
     /// Request to switch the active model.
     ModelSwitchRequest(ModelSwitchRequest),
     /// Ask the TUI to collect an API key for the named provider.
@@ -158,19 +158,27 @@ pub enum UiOutput {
     Exit,
 }
 
-/// Provider + model context for a credential collection prompt.
+/// Provider + optional model context for a credential collection prompt.
+///
+/// When `model_id` is `Some`, the credential is collected for a specific
+/// model switch. When `None`, the credential is collected at the provider
+/// level (e.g. from the two-layer picker's "Setup required" group) and the
+/// picker should re-open after the key is saved.
 #[derive(Debug, Clone)]
 pub struct CredentialRequestData {
     pub provider: String,
-    pub model_id: String,
+    pub model_id: Option<String>,
 }
 
 /// User-entered credential returned from the TUI credential input panel.
+///
+/// Mirrors [`CredentialRequestData`]: `model_id` is `Some` for a direct
+/// model switch, `None` for provider-level setup.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CredentialResponseData {
     pub provider: String,
     pub api_key: String,
-    pub model_id: String,
+    pub model_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -241,6 +249,26 @@ pub struct ModelPickerItem {
     pub pricing: Option<String>,
     /// `true` → Ready group; `false` → Setup required group.
     pub authenticated: bool,
+    /// `true` → this is the currently active model+provider.
+    pub is_current: bool,
+}
+
+/// Payload for [`UiOutput::ModelPicker`] — drives the two-layer picker.
+///
+/// `ready_models` are authenticated and listed individually. `setup_providers`
+/// are unauthenticated and shown as a single row per provider; selecting one
+/// triggers provider-level credential entry, after which the picker re-opens.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelPickerData {
+    pub ready_models: Vec<ModelPickerItem>,
+    pub setup_providers: Vec<ProviderSetupItem>,
+}
+
+/// An unauthenticated provider shown in the picker's "Setup required" section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderSetupItem {
+    pub provider: String,
+    pub model_count: usize,
 }
 
 /// Request to switch the active model (created by `/model`).
@@ -277,6 +305,10 @@ pub struct SessionPickerItem {
 pub enum UserInput {
     Message(String),
     Credential(CredentialResponseData),
+    /// User selected an unauthenticated provider from the picker's
+    /// "Setup required" group. The bridge routes this to provider-level
+    /// credential entry.
+    ProviderSetup(String),
     Cancel,
     Exit,
 }

@@ -86,6 +86,9 @@ pub(crate) async fn run_conversation_loop(
                     UserInput::Credential(resp) => {
                         let _ = session_tx.send(SessionLifecycleRequest::ModelSwitchWithCredential(resp));
                     }
+                    UserInput::ProviderSetup(provider) => {
+                        let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider));
+                    }
                     UserInput::Cancel => {
                         let sq_tx = sq_tx_watch.borrow().clone();
                         let _ = sq_tx.send(talos_core::session::SessionOp::Interrupt).await;
@@ -111,4 +114,5 @@ pub(crate) enum SessionLifecycleRequest {
     Delete(SessionDeleteRequest),
     ModelSwitch(ModelSwitchRequest),
     ModelSwitchWithCredential(CredentialResponseData),
+    ProviderSetup(String),
 }

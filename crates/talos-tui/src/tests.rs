@@ -425,10 +425,14 @@ mod tests {
     #[test]
     fn test_slash_menu_selected_command_returns_name() {
         let registry = talos_conversation::command_registry();
-        let mut menu = BottomPanelState::open_slash(registry);
-        let cmd = menu.selected_completion("");
-        assert!(cmd.is_some());
-        assert!(cmd.unwrap().starts_with('/'));
+        let menu = BottomPanelState::open_slash(registry);
+        let item = &menu.items[menu.selected_index];
+        match &item.action {
+            crate::state::PanelItemAction::SlashCommand { command } => {
+                assert!(command.starts_with('/'));
+            }
+            _ => panic!("expected SlashCommand action"),
+        }
     }
 
     #[test]
@@ -448,7 +452,6 @@ mod tests {
         let menu = BottomPanelState::open_slash(registry);
         let filtered = menu.filtered_items("zzzznonexistent");
         assert!(filtered.is_empty());
-        assert!(menu.selected_completion("zzzznonexistent").is_none());
     }
 
     #[test]
@@ -456,9 +459,10 @@ mod tests {
         let item = PanelItem {
             label: "/export".to_string(),
             description: "Export transcript [path]".to_string(),
-            value: "/export".to_string(),
-            command: String::new(),
-            is_header: false,
+            action: crate::state::PanelItemAction::SlashCommand {
+                command: "/export ".to_string(),
+            },
+            is_current: false,
         };
         assert_eq!(item.label, "/export");
         assert!(item.description.contains('['));

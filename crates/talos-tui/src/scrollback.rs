@@ -307,15 +307,14 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         if self.menu.is_credential_input() {
             let (provider, model_id) = match &self.menu.kind {
                 Some(crate::state::PanelKind::CredentialInput { provider, model_id }) => {
-                    (provider.as_str(), model_id.as_str())
+                    (provider.as_str(), model_id.as_deref())
                 }
-                _ => ("?", "?"),
+                _ => ("?", None),
             };
             let buffer = self.menu.credential_buffer.as_str();
             let display: std::borrow::Cow<'_, str> = if buffer.is_empty() {
                 "Enter API key…".into()
             } else {
-                // Show last 4 chars unmasked, rest masked
                 let visible = buffer.len().saturating_sub(4);
                 let masked = "•".repeat(visible.min(buffer.len()));
                 let last_four = &buffer[visible..];
@@ -328,11 +327,12 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             } else {
                 Style::default().fg(semantic::TEXT_PRIMARY)
             };
+            let header = match model_id {
+                Some(id) => format!(" Provider: {provider}  Model: {id}"),
+                None => format!(" Provider: {provider}"),
+            };
             let lines = vec![
-                Line::from(Span::styled(
-                    format!(" Provider: {provider}  Model: {model_id}"),
-                    Style::default().fg(crate::nord::NORD8).bold(),
-                )),
+                Line::from(Span::styled(header, Style::default().fg(crate::nord::NORD8).bold())),
                 Line::from(Span::styled(
                     " Enter the API key for this provider and press Enter (Esc to cancel).",
                     dim,
@@ -396,7 +396,7 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             let item = filtered[idx];
             let is_selected = idx == self.menu.selected_index;
 
-            if item.is_header {
+            if item.action == crate::state::PanelItemAction::Header {
                 let style = if is_selected { header_selected } else { header_style };
                 lines.push(Line::from(Span::styled(
                     format!("  {} ───", item.label),
@@ -416,7 +416,8 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 let desc = format!("  —  {}", item.description);
                 (name, desc)
             } else {
-                let name = format!("  {}", item.label);
+                let marker = if item.is_current { "▶ " } else { "  " };
+                let name = format!("{marker}{}", item.label);
                 let desc = format!("  —  {}", item.description);
                 (name, desc)
             };

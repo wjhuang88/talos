@@ -483,6 +483,22 @@ impl Tui {
         self.state.status.provider = provider;
     }
 
+    fn dispatch_panel_action(&mut self, action: PanelAction) {
+        match action {
+            PanelAction::SendMessage(msg) => {
+                if let Some(ref tx) = self.user_input_tx {
+                    let _ = tx.send(UserInput::Message(msg));
+                }
+            }
+            PanelAction::ProviderSetup(provider) => {
+                if let Some(ref tx) = self.user_input_tx {
+                    let _ = tx.send(UserInput::ProviderSetup(provider));
+                }
+            }
+            PanelAction::None => {}
+        }
+    }
+
     pub fn hydrate_history(&mut self, history: &[Message]) {
         use talos_conversation::ToolCallDisplay;
         use talos_core::tool::ToolProvenance;
@@ -1058,11 +1074,12 @@ impl Tui {
             UiOutput::SessionPicker(sessions) => {
                 self.state.open_session_picker(&sessions);
             }
-            UiOutput::ModelPicker(items) => {
-                self.state.open_model_picker(&items);
+            UiOutput::ModelPicker(data) => {
+                self.state.open_model_picker(&data);
             }
             UiOutput::CredentialRequest(req) => {
-                self.state.open_credential_input(&req.provider, &req.model_id);
+                self.state
+                    .open_credential_input(&req.provider, req.model_id.as_deref());
             }
             UiOutput::HydrateHistory(messages) => {
                 self.finalize_active_stream();
@@ -1322,23 +1339,11 @@ impl Tui {
                     }
                     KeyCode::Tab if self.state.slash_menu.is_open => {
                         let action = self.state.accept_selected_panel_item();
-                        if let PanelAction::SendMessage(msg) = action
-                            && let Some(ref tx) = self.user_input_tx
-                        {
-                            let _ = tx.send(UserInput::Message(msg));
-                        }
+                        self.dispatch_panel_action(action);
                     }
                     KeyCode::Enter if self.state.slash_menu.is_open => {
-                        let should_accept = self.state.slash_menu.is_picker()
-                            || !self.state.slash_query().is_empty();
-                        if should_accept {
-                            let action = self.state.accept_selected_panel_item();
-                            if let PanelAction::SendMessage(msg) = action
-                                && let Some(ref tx) = self.user_input_tx
-                            {
-                                let _ = tx.send(UserInput::Message(msg));
-                            }
-                        }
+                        let action = self.state.accept_selected_panel_item();
+                        self.dispatch_panel_action(action);
                     }
                     KeyCode::Esc if self.state.slash_menu.is_open => {
                         self.state.slash_menu.close();
