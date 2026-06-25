@@ -3,15 +3,15 @@
 **User can**: Trust that future memory work follows a four-layer architecture rather than an
 ad-hoc vector store or prompt-stuffing mechanism.
 
-## Status: Planned
+## Status: Planned (prerequisites cleared 2026-06-25)
 
-I047 is planned to satisfy all known prerequisites for this baseline before starting the memory
-starter slice:
+All known prerequisites are now satisfied as of I047:
 
 - I024/MEM-002 working + episodic memory wiring is complete.
-- I018/OBS-001 bounded logs and embedded prompt assets are selected into I047.
+- I018/OBS-001 bounded logs and embedded prompt assets completed in I047 (log rotation by I045,
+  prompt assets by I047).
 - `MEM-001-A` in I047 starts the executable memory foundation but does not claim full I019
-  completion.
+  completion. Full I019 activation remains a later decision (T10 in the long-running task).
 
 ## Scope
 

@@ -57,12 +57,12 @@ The intended sequence is:
 | T0 | Confirm execution contract | User-approved scope, permissions, release/tag boundary, and stop conditions recorded | This Planned task | Task status can move from Planned to In Progress | If approval is partial, split unauthorised work into residuals | ✅ Done |
 | T1 | Close pre-I047 repair leftovers | `.gitignore`, installers, I045/CONF-001 doc drift, and I046 post-handoff notes are committed or intentionally carried into I047 | T0 | `scripts/validate_project_governance.sh .`; installer parse checks | Leave as pre-I047 residual and do not activate I047 until resolved | ✅ Done |
 | T2 | Activate I047 baseline | I047 gains activation record; Board Now points to I047; selected story statuses are synchronized | T1 | Owner docs and Board agree; governance validation passes | Keep I047 Planned and stop if inventory conflicts remain | ✅ Done |
-| T3 | REL-001 release/install readiness | Supported target matrix, artifact names, installers, checksum behavior, and `v0.1.2` strategy are validated | T2 | Packaging smoke or documented target subset; installer dry-run; no tag mutation | Defer tag; record blocking target or installer defect | Planned |
+| T3 | REL-001 release/install readiness | Supported target matrix, artifact names, installers, checksum behavior, and `v0.1.2` strategy are validated | T2 | Packaging smoke or documented target subset; installer dry-run; no tag mutation | Defer tag; record blocking target or installer defect | ✅ Done (static audit) |
 | T4 | CONF-002 first-run onboarding | Empty-config users get guided setup; `talos init` re-runs setup; non-interactive mode does not hang | T2 | Temp-home runtime tests; masked credential display; config round-trip | Provide actionable error path and keep wizard partial | Planned |
-| T5 | OBS-001/I018 prerequisite closure | Bounded file logs and compile-time embedded prompt assets land; I019 no longer blocked on I018 | T2 | ADR-014/015 tests; I018/MEM-001/I019/Board status synchronized | If OBS-001 expands, deliver only bounded logs + embedded prompts and defer R3 logging | Planned |
-| T6 | MEM-001-A memory starter | Memory boundary, SQLite schema, ADD-only writes, evidence links, and bounded retrieval API | T5 | Migration/schema/retrieval tests; no vector/graph dependency; provenance returned | Stop at schema + API; defer prompt injection/consolidation to I019 | Planned |
+| T5 | OBS-001/I018 prerequisite closure | Bounded file logs and compile-time embedded prompt assets land; I019 no longer blocked on I018 | T2 | ADR-014/015 tests; I018/MEM-001/I019/Board status synchronized | If OBS-001 expands, deliver only bounded logs + embedded prompts and defer R3 logging | ✅ Done |
+| T6 | MEM-001-A memory starter | Memory boundary, SQLite schema, ADD-only writes, evidence links, and bounded retrieval API | T5 | Migration/schema/retrieval tests; no vector/graph dependency; provenance returned | Stop at schema + API; defer prompt injection/consolidation to I019 | In Progress |
 | T7 | MEM-005-A compaction policy | Threshold policy, safe-boundary compaction, manual command/status, failure fallback | T6 | Unit/mock session/TUI command tests; hidden output never printed | Keep policy library-only if command integration risks the timebox | Planned |
-| T8 | GOV-003-A read-only governance status | Governance status command reads iteration/backlog/board/validation state without writing docs | T2 | Empty/partial/full workspace tests; dirty-worktree guard | Keep as library/status report only; defer prompt injection | Planned |
+| T8 | GOV-003-A read-only governance status | Governance status command reads iteration/backlog/board/validation state without writing docs | T2 | Empty/partial/full workspace tests; dirty-worktree guard | Keep as library/status report only; defer prompt injection | ✅ Done |
 | T9 | I047 closeout and release rehearsal | I047 evidence, docs, release checklist, and residuals are synchronized; release decision ready | T3-T8 | check/clippy/test/governance pass; release rehearsal recorded | Mark I047 Review/Partial if any required gate fails | Planned |
 | T10 | I019 activation decision | I019 can activate, be replanned, or remain deferred with explicit reason | T9 | I019 prerequisites recorded as satisfied; Board/iterations index agree | Create a new I048/I019 activation plan if full I019 scope changes | Planned |
 | T11 | I020 dependency disposition | I020 remains blocked/deferred until I019 or explicit research-priority replan | T10 | Board and iterations index state dependency clearly | Leave I020 unchanged if no research activation is requested | Planned |
@@ -207,3 +207,42 @@ fixes committed in `1b9a9e4`. Governance validation: 0 warnings. `install.sh` sy
 I047 iteration doc status moved to Active. Activation record appended. BOARD.md Now section moved
 to I047 (removed from Next). Iterations README I047 row updated to Active. Non-terminal inventory
 updated. All selected story backlog files confirmed present. Ready for implementation slices.
+
+### T3 — REL-001 Release Readiness Audit (2026-06-25)
+
+Static audit complete. Archive name construction verified across all four surfaces:
+- `build.sh`: 5 targets → `talos-{arch}-{os}.{tar.gz|zip}` — matches REL-001 matrix.
+- `release.yml`: 5 targets, download table, checksum — matches build.sh.
+- `install.sh`: `talos-${arch_part}-${os_part}.tar.gz` — matches.
+- `install.ps1`: `talos-x86_64-windows.zip`, ARM64 explicit error — matches.
+
+URL construction uses GitHub Releases API for latest tag (prereleases included). Checksum
+verification present in install.sh (best-effort). install.ps1 lacks checksum verification (minor
+gap, non-blocking). v0.1.1 tag/release untouched. Local packaging smoke deferred to CI (requires
+zig/cargo-xwin/LLVM toolchain for cross-compilation).
+
+### T5 — OBS-001/I018 Prerequisite Closure (2026-06-25)
+
+**T5a — ADR-014 log rotation audit.** Re-audited I045's `RotatingWriter` against ADR-014 acceptance.
+Result: fully satisfied. Size-based rotation (`max_size_mb * 1_000_000`), retention
+(`max_files` with excess deletion), in-process (no daemon/host logrotate), TUI defaults to file
+logging, non-TUI defaults to stderr. 8 tests cover rotation, retention, config resolution.
+
+**T5b — ADR-015 embedded prompt assets.** Moved prompt files from repo-root `prompts/` to
+`crates/talos-agent/prompts/` matching ADR-015 target layout. Updated `include_str!` paths in
+`prompt.rs`. Added `memory.md` placeholder for upcoming MEM-001-A. Added 2 required-asset
+non-empty tests (`test_required_prompt_assets_are_non_empty`,
+`test_identity_prompt_contains_talos_identity`). All 23 prompt tests pass.
+
+**T5c — I019 prerequisite gate recorded.** I024/MEM-002 (working/episodic session wiring)
+confirmed complete. OBS-001 (bounded logs + embedded prompt assets) completed in I047.
+I019 is no longer blocked on I018.
+
+### T8 — GOV-003-A Read-Only Governance Status (2026-06-25)
+
+Added `--governance-status` CLI flag (early-exit, like `--config-list`). New
+`crates/talos-cli/src/governance.rs` module parses `.agent-governance/manifest.yaml`,
+`docs/BOARD.md` (Now section), `docs/iterations/README.md` (open iterations), runs
+`scripts/validate_project_governance.sh`, and checks git dirty state. Strictly read-only —
+never writes files. 4 tests: empty workspace, missing board, missing iterations, full workspace.
+All pass. Clippy clean.
