@@ -64,7 +64,7 @@ compute_hash() {
   esac
 }
 
-printf '-> downloading talos %s (%s)\n' "$version" "$target"
+printf '%s\n' "-> downloading talos ${version} (${archive})"
 curl -fsSL "${base}/${archive}" -o "${tmpdir}/${archive}"
 
 # best-effort checksum verification
@@ -77,7 +77,7 @@ if [ -n "$hash_tool" ] \
       printf 'error: checksum mismatch (expected %s, got %s)\n' "$expected" "$actual" >&2
       exit 1
     fi
-    printf '-> checksum verified\n'
+    printf '%s\n' '-> checksum verified'
   fi
 fi
 
@@ -86,7 +86,7 @@ mkdir -p "$install_dir"
 chmod +x "${tmpdir}/talos"
 mv -f "${tmpdir}/talos" "${install_dir}/talos"
 
-printf '-> installed talos to %s/talos\n' "$install_dir"
+printf '%s\n' "-> installed talos to ${install_dir}/talos"
 
 case ":${PATH}:" in
   *":${install_dir}:"*) ;;

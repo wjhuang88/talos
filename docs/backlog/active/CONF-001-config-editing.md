@@ -35,13 +35,13 @@ Provide two complementary configuration surfaces that both round-trip through `t
       validation rejects invalid values with a clear error.
 - [ ] Changes persist to `~/.talos/config.toml` and `${ENV_VAR}` substitution semantics survive a
       set/get round-trip.
-- [ ] Secret fields (e.g. `api_key`, which is `skip_serializing`) are never echoed in plaintext by
+- [ ] Secret fields (e.g. persisted inline `api_key`) are never echoed in plaintext by
       `get`/`list`; `set` accepts them but masks on redisplay.
 - [ ] TUI `/config` can view and edit model + provider settings inline.
 - [ ] No regression for env-var-driven config or for existing config files on load.
 
 ## Required Reads
 
-- `crates/talos-config/src/lib.rs` (config struct, `skip_serializing` api_key, `${ENV}` substitution)
+- `crates/talos-config/src/lib.rs` (config struct, persisted inline api_key, `${ENV}` substitution)
 - `crates/talos-cli/` (CLI subcommand surface)
 - `crates/talos-tui/` (slash-command framework, gated by TUI-002 sub-slice D)

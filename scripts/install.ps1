@@ -14,10 +14,10 @@ $Version = if ($env:TALOS_VERSION) { $env:TALOS_VERSION } else { 'latest' }
 
 $Arch = switch ($env:PROCESSOR_ARCHITECTURE) {
   'AMD64' { 'x86_64' }
-  'ARM64' { 'aarch64' }
+  'ARM64' { throw 'Windows ARM64 release artifacts are not published yet. Use the x86_64 installer from an x64 PowerShell session or install manually.' }
   default { throw "unsupported architecture: $env:PROCESSOR_ARCHITECTURE" }
 }
-$Target = "$Arch-pc-windows-msvc"
+$Target = "$Arch-windows"
 $Archive = "talos-$Target.zip"
 
 # GitHub's /releases/latest excludes prereleases, so for a prerelease-only

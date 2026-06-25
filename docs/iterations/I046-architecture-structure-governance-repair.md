@@ -132,6 +132,7 @@
 |---|---|---|
 | 2026-06-25 | Planning | Created from post-I045 review. Current workspace is ahead of `origin/main` by two commits (`a8cd614`, `0734eae`) and has no active iteration on `docs/BOARD.md`. |
 | 2026-06-25 | Activation | I046 activated. S1: fixed two failing tests — `test_model_limits_from_builtin_and_custom_providers` (stale `gpt-4.1` → `gpt-4.1-2025-04-14`, switched to `resolve_model_limits()`) and `test_session_picker_accept_resume_default_command` (I045 `PanelItemAction` refactor lost `/resume` fallback for empty command). `cargo test --workspace` passes. S2: made model identity provider-aware — added `find_model_by_provider`/`models_with_id`, fixed `resolve_model_limits`/`all_models`/`set_active_model` fallback, added 9 tests for duplicate model IDs. S3: custom `Debug` impls masking `api_key` on `ProviderConfig`/`Credentials`/`CredentialResponseData`, added `api_key` case to `config_get_dotted`, masking tests, ADR-023. S4: extracted model lifecycle module. S5: fixed stale `config.reference.toml` (`skip_serializing` → persisted), updated AGENTS.md constraint #3 and task router, updated decisions README. |
+| 2026-06-25 | Post-handoff repair | Audit found release follow-up drift: local `dist/` artifacts were unignored, Unix installer referenced an undefined `target`, Windows installer still used old `pc-windows-msvc` archive names, I045/CONF-001 still had stale `skip_serializing` wording, and remote `v0.1.1` tag still existed. Fixed the installer/docs drift and recorded that the next stable release should be `v0.1.2`. |
 
 ## Verification Evidence
 
@@ -146,6 +147,8 @@
   - `mask_secrets_masks_api_key_lines` / `is_secret_key_detects_api_key_paths` / `config_get_dotted_returns_api_key_value`
   - `model_lifecycle::tests::*` — 4 tests for extracted picker data construction
 - `scripts/validate_project_governance.sh .` — 0 warnings (2026-06-25)
+- Post-handoff repair checks (2026-06-25): `sh -n scripts/install.sh`, PowerShell scriptblock
+  parse for `scripts/install.ps1`, `scripts/validate_project_governance.sh .` — all pass.
 
 ## Variance And Residuals
 
@@ -153,6 +156,9 @@
   structure, and governance corrections because they share the same I045 model/config boundary.
 - Residual watchlist outside this iteration: broader decomposition of `talos-tui/src/scrollback.rs`,
   `talos-tui/src/app.rs`, large test files, and future provider plugin architecture.
+- Release follow-up: keep the existing `v0.1.1` GitHub Release as-is. The remote `v0.1.1` tag
+  points at the old release build, so the next stable release should use `v0.1.2` instead of
+  moving or recreating `v0.1.1`.
 
 ## Retrospective
 

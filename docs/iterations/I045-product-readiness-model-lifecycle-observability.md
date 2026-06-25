@@ -179,8 +179,8 @@ tight.
 - `talos config set <key> <value>` — validate + persist via `talos-config`
 - All operations round-trip through `Config::load()` / `Config::save()`
 - `${ENV_VAR}` substitution survives set/get round-trip
-- Secret fields (`api_key`, which is `skip_serializing`) are never echoed in
-  plaintext by `get`/`list`; `set` accepts them but masks on redisplay
+- Secret fields (`api_key`, persisted in local config per ADR-023) are never
+  echoed in plaintext by `get`/`list`; `set` accepts them but masks on redisplay
 
 ### OBS-001: Bounded Log Retention + Embedded Prompts
 
