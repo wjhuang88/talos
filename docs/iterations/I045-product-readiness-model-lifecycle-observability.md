@@ -442,3 +442,19 @@ c8d6c33 docs: README sync (en + zh-CN) with /model, first-run wizard, config CLI
 - #28: Pre-closeout parallel audit catches self-comparison sort bug in session listing
 - #29: `serde(skip_serializing)` on api_key causes silent data loss — display masking must be at the CLI layer, not the serializer
 - #30: Model switch needs `ensure_persisted()` — session may not exist on first turn
+
+### Post-Closeout Correction (I046, 2026-06-25)
+
+Two validation claims in this iteration were stale:
+
+1. **`cargo test --workspace` passes** (lines 403, 418) — was false. Two tests were failing:
+   - `talos-config::tests::test_model_limits_from_builtin_and_custom_providers` still used `gpt-4.1`
+     after commit `0734eae` updated the catalog to `gpt-4.1-2025-04-14`.
+   - `talos-tui::tests::test_session_picker_accept_resume_default_command` broke when commit
+     `a8cd614` (PanelItemAction refactor) lost the `/resume` fallback for empty session-picker
+     commands.
+   Both fixed in I046-S1.
+
+2. **Model identity was not provider-aware** — `resolve_model_limits()` and `all_models()` resolved
+   models by bare ID, silently picking the first provider for duplicates (e.g. `glm-5.2` under
+   zhipu/zai). Fixed in I046-S2 with `find_model_by_provider` and `(provider, model_id)` semantics.

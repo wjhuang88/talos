@@ -80,9 +80,13 @@ The multi-platform build writes archives and checksums to `dist/`.
 
 ## Configure A Provider
 
-Talos reads configuration from `~/.talos/config.toml`. Prefer environment variables for secrets.
+Talos reads configuration from `~/.talos/config.toml`. Secrets can be stored
+inline (`api_key`) or via environment variables (`api_key_env`). Inline keys
+are persisted in the config file (chmod 600 recommended) and masked in all
+display output (`talos config list`, `talos config get`, debug logs). See
+[ADR-023](docs/decisions/023-inline-api-key-boundary.md) for the full boundary.
 
-Anthropic example:
+Anthropic example (env-var mode):
 
 ```toml
 provider = "anthropic"
@@ -90,6 +94,16 @@ model = "claude-sonnet-4-20250514"
 
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
+```
+
+Anthropic example (inline key):
+
+```toml
+provider = "anthropic"
+model = "claude-sonnet-4-20250514"
+
+[providers.anthropic]
+api_key = "sk-ant-..."
 ```
 
 OpenAI-compatible gateway example:

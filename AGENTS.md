@@ -21,9 +21,11 @@ These are immutable facts that every change must respect:
 3. **No secrets in build, source, or distribution.** Hardcoded credentials must never be
    committed, baked into the binary, or shipped in default/sample config files. The user's
    local `~/.talos/config.toml` is their own file — they may put an `api_key` (or any
-   other credential) there for their own use, and `talos-config` exposes `api_key` as a
-   `skip_serializing` field so keys are not echoed back on round-trip. Config also
-   supports `${ENV_VAR}` substitution for users who prefer env-var-based credentials.
+   other credential) there for their own use. `api_key` is persisted normally (not
+   `skip_serializing`) so it survives load+save round-trips; display surfaces (CLI
+   `config list`/`get`, `Debug` impls) mask it as `***`. See ADR-023 for the full
+   boundary. Config also supports `${ENV_VAR}` substitution for users who prefer
+   env-var-based credentials.
 4. **All write-capable tools gated by permissions.** No tool can modify files without going through the permission pipeline.
 5. **Sandbox code requires security review.** All changes to `talos-sandbox`, `talos-permission`, or process-hardening code must be reviewed against escape vectors.
 6. **Crate public APIs are semver-bound.** Breaking changes require a decision record and a migration plan.
@@ -121,6 +123,7 @@ These are immutable facts that every change must respect:
 | "Should the splash/logo render inside the viewport / as an overlay?" | `docs/decisions/019-tui-splash-scrollback-boundary.md` (decided: scrollback-only, no viewport overlay) |
 | "Where is `unsafe` allowed and why?" | `docs/decisions/007-process-hardening-unsafe.md` |
 | "Why is bundled SQLite allowed?" | `docs/decisions/008-sqlite-bundled-storage.md` |
+| "What is the inline api_key security boundary?" | `docs/decisions/023-inline-api-key-boundary.md` (persisted in TOML, masked in all display surfaces) |
 | "How do I keep docs in sync with code?" | `docs/sop/DOC-CHECK.md` |
 | "Governance drift, repair, or skill upgrade" | `docs/sop/DOC-CHECK.md` → refresh audit against current `agent-project-governance` skill, then run `scripts/validate_project_governance.sh .` and `scripts/assess_project_scale.sh .` |
 | "A session exposed a reusable lesson, failed validation, or user correction" | `docs/sop/EVOLUTION-FEEDBACK.md` → `EVOLUTION.md` |

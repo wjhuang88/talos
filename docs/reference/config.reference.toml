@@ -44,7 +44,8 @@ model = "claude-sonnet-4-20250514"
 #   protocol   "anthropic-messages" | "openai-chat" (default: "openai-chat")
 #   base_url   Full endpoint URL for anthropic-messages; gateway root for openai-chat
 #              (openai-chat auto-appends /chat/completions; anthropic-messages POSTs as-is)
-#   api_key    Inline key (skip_serializing — never echoed back on re-serialize)
+#   api_key    Inline key persisted in this file (chmod 600 recommended).
+#              Masked in `talos config list`/`get` output; see ADR-023.
 #   api_key_env  Environment variable name to read the key from
 #
 # API key resolution order:
@@ -126,8 +127,9 @@ model = "claude-sonnet-4-20250514"
 # base_url = "https://gateway.example.com/v1"
 # api_key = "${GATEWAY_SECRET}"
 
-# ── Built-in Model Defaults ───────────────────────────────────────────────────
-# provider = "anthropic"    → claude-sonnet-4-20250514 (200k/4096)
-#                             claude-opus-4-20250514  (200k/4096)
-# provider = "openai"       → gpt-4o      (128k/4096)
-#                             gpt-4o-mini (128k/4096)
+# ── Built-in Model Catalog ────────────────────────────────────────────────────
+# Run `talos --models` to list all 40+ built-in models across 11 providers.
+# Models with tool-calling support include Anthropic Claude, OpenAI GPT/o-series,
+# Google Gemini, DeepSeek, Zhipu GLM, MiniMax, Moonshot Kimi, Qwen, and OpenRouter.
+# When a model ID exists under multiple providers (e.g. glm-5.2 under zhipu/zai),
+# qualify with "provider/model_id" to disambiguate.

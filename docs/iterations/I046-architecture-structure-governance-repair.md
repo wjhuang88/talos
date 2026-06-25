@@ -131,11 +131,21 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-06-25 | Planning | Created from post-I045 review. Current workspace is ahead of `origin/main` by two commits (`a8cd614`, `0734eae`) and has no active iteration on `docs/BOARD.md`. |
+| 2026-06-25 | Activation | I046 activated. S1: fixed two failing tests — `test_model_limits_from_builtin_and_custom_providers` (stale `gpt-4.1` → `gpt-4.1-2025-04-14`, switched to `resolve_model_limits()`) and `test_session_picker_accept_resume_default_command` (I045 `PanelItemAction` refactor lost `/resume` fallback for empty command). `cargo test --workspace` passes. S2: made model identity provider-aware — added `find_model_by_provider`/`models_with_id`, fixed `resolve_model_limits`/`all_models`/`set_active_model` fallback, added 9 tests for duplicate model IDs. S3: custom `Debug` impls masking `api_key` on `ProviderConfig`/`Credentials`/`CredentialResponseData`, added `api_key` case to `config_get_dotted`, masking tests, ADR-023. S4: extracted model lifecycle module. S5: fixed stale `config.reference.toml` (`skip_serializing` → persisted), updated AGENTS.md constraint #3 and task router, updated decisions README. |
 
 ## Verification Evidence
 
-- Not yet run for this iteration.
-- Pre-planning evidence: `cargo test --workspace` failed in `talos-config::tests::test_model_limits_from_builtin_and_custom_providers` because the test still expected `gpt-4.1` to resolve from the updated catalog.
+- `cargo check --workspace` — clean (2026-06-25)
+- `cargo clippy --workspace -- -D warnings` — clean (2026-06-25)
+- `cargo test --workspace` — all pass, 0 failures (2026-06-25). Notable new tests:
+  - `test_resolve_model_limits_provider_aware_for_duplicate_ids` — zhipu/zai glm-5.2 resolves correctly
+  - `test_set_active_model_errors_on_ambiguous_bare_id` — bare `glm-5.2` errors with provider list
+  - `test_set_active_model_provider_qualified_resolves_correctly` — `zai/glm-5.2` → zai provider
+  - `test_all_models_user_override_matches_by_provider_and_id` — override hits zai, not zhipu
+  - `test_provider_config_debug_masks_api_key` / `test_config_debug_masks_provider_api_keys` / `test_credentials_debug_masks_keys`
+  - `mask_secrets_masks_api_key_lines` / `is_secret_key_detects_api_key_paths` / `config_get_dotted_returns_api_key_value`
+  - `model_lifecycle::tests::*` — 4 tests for extracted picker data construction
+- `scripts/validate_project_governance.sh .` — 0 warnings (2026-06-25)
 
 ## Variance And Residuals
 
@@ -146,7 +156,6 @@
 
 ## Retrospective
 
-- Outcome: Pending.
-- Documentation: Pending.
-- Lessons: Pending; add an EVOLUTION entry if the repair exposes a recurring failure mode beyond
-  stale closeout evidence and ambiguous model identity.
+- Outcome: Complete. All 5 stories (S1-S5) delivered. `cargo test/clippy/governance` all pass.
+- Documentation: ADR-023 created, AGENTS.md/README/config.reference.toml updated, I045 stale evidence corrected.
+- Lessons: I045 closed with stale `cargo test --workspace` claims because the catalog-update commit (`0734eae`) landed AFTER the I045 closeout check. Future iterations that update shared datasets (models.toml) must re-run workspace tests after the dataset change, not just after the feature commit.
