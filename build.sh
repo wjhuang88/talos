@@ -39,11 +39,12 @@ build_xwin() {
   local target_env
   target_env="$(echo "$target" | tr '-' '_')"
   echo ">>> Building ${target} (cargo-xwin) ..."
-  # Set CC to clang-cl (MSVC-compatible driver) so that cc-rs sub-crate builds
-  # (e.g. ring) handle /imsvc flags set by cargo-xwin correctly.  Without this,
-  # cc-rs falls back to plain clang (GCC driver) which treats /imsvc as a file
-  # path and fails.  Also set AR to llvm-lib which is required for MSVC targets.
+  # ring's build script reads bare CC/AR (not CC_<target>), so set both.
+  # clang-cl is the MSVC-compatible driver that understands /imsvc flags
+  # set by cargo-xwin; plain clang treats them as file paths and fails.
   env \
+    CC=clang-cl \
+    AR=llvm-lib \
     "CC_${target_env}=clang-cl" \
     "AR_${target_env}=llvm-lib" \
     cargo xwin build --release --target "$target" -p talos-cli
