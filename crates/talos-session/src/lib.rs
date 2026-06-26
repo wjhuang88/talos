@@ -36,7 +36,9 @@ mod topology;
 mod types;
 
 pub use error::SessionError;
-pub use manager::SessionManager;
+pub use manager::{
+    SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
+};
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 

@@ -34,6 +34,21 @@ automatic semantic/procedural memory writes to the runtime.
 | I048-S4 | SQLite maintenance API performs explicit checkpoint/vacuum for session index and memory DB. | Tests prove commands run and errors are propagated without data loss. |
 | I048-S5 | Memory lifecycle gate enables foreign keys, prevents orphan evidence, and exposes retention dry-run policy shape. | `talos-memory` tests for foreign-key enforcement and retention candidate reporting. |
 
+## Pre-Activation Foundation
+
+2026-06-26: Before activating this planned iteration, a bounded library-level foundation landed
+for the highest-risk storage correctness concerns:
+
+- session cleanup candidate/apply APIs now remove JSONL and index rows together while honoring
+  protected session IDs;
+- session index and memory DB explicit checkpoint/truncate and vacuum APIs exist;
+- memory DB connections enable foreign keys, and orphan evidence links are rejected;
+- manual compaction failure preserves the original message list.
+
+This is intentionally recorded as foundation evidence, not I048 completion. I048 remains Planned
+until the storage status command, CLI cleanup workflow, active-session command protection, fork
+visibility, and memory retention dry-run are implemented and validated.
+
 ## Scope
 
 - Add read-only storage visibility before adding destructive cleanup behavior.

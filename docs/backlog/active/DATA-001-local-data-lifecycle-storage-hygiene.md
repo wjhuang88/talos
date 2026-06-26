@@ -95,6 +95,24 @@ Required capabilities:
 | DATA-001-D | SQLite checkpoint/vacuum maintenance | Explicit command/API only. |
 | DATA-001-E | Memory lifecycle gate | Foreign keys, orphan prevention, retention dry-run. |
 
+## Pre-Activation Foundation Evidence
+
+2026-06-26 foundation work landed the storage-crate safety primitives needed before the full I048
+CLI/user-facing slice activates:
+
+- `talos-session` exposes explicit cleanup candidate/apply APIs with workspace scoping,
+  protected session IDs, JSONL deletion, and index-row cleanup.
+- `talos-session` exposes explicit session-index checkpoint/truncate and vacuum APIs.
+- `talos-memory` enables SQLite foreign-key enforcement at connection open time and rejects
+  evidence links for nonexistent memory rows.
+- `talos-memory` exposes explicit checkpoint/truncate and vacuum APIs.
+- `talos-agent` manual compaction failure now preserves the original message list instead of
+  returning an empty continuation payload.
+
+This does not close DATA-001. The user-facing storage status command, active-session protection
+at command invocation, fork visibility, and memory retention dry-run remain in the planned I048
+acceptance boundary.
+
 ## Required Reads
 
 - `docs/iterations/I048-local-data-lifecycle-storage-hygiene.md`

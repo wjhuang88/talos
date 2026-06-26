@@ -994,6 +994,131 @@ fn delete_session_removes_file_and_index_entry() {
 }
 
 #[test]
+fn cleanup_candidates_respect_max_sessions_and_protected_ids() {
+    let manager = test_manager();
+    let workspace = "cleanup-protect";
+    let old = manager.create_session("cleanup", workspace).unwrap();
+    old.append(&Message::User {
+        content: "old".into(),
+    })
+    .unwrap();
+    let protected = manager.create_session("cleanup", workspace).unwrap();
+    protected
+        .append(&Message::User {
+            content: "protected".into(),
+        })
+        .unwrap();
+    let newest = manager.create_session("cleanup", workspace).unwrap();
+    newest
+        .append(&Message::User {
+            content: "newest".into(),
+        })
+        .unwrap();
+
+    let policy = crate::SessionCleanupPolicy {
+        workspace_root: Some(workspace.to_string()),
+        max_sessions_per_workspace: Some(1),
+        max_age_days: None,
+        protected_session_ids: vec![protected.id],
+    };
+
+    let candidates = manager.cleanup_candidates(&policy).unwrap();
+    assert_eq!(
+        candidates.len(),
+        1,
+        "one unprotected session should exceed the per-workspace retention limit"
+    );
+    assert!(
+        candidates
+            .iter()
+            .all(|candidate| candidate.workspace_root == workspace),
+        "cleanup should stay scoped to the requested workspace"
+    );
+    assert!(
+        candidates
+            .iter()
+            .all(|candidate| candidate.id == old.id || candidate.id == newest.id),
+        "only unprotected sessions may be selected"
+    );
+    assert!(
+        !candidates
+            .iter()
+            .any(|candidate| candidate.id == protected.id),
+        "protected session must never be selected"
+    );
+}
+
+#[test]
+fn apply_cleanup_removes_file_and_index_entry() {
+    let manager = test_manager();
+    let workspace = "cleanup-apply";
+    let stale = manager.create_session("cleanup", workspace).unwrap();
+    stale
+        .append(&Message::User {
+            content: "stale indexed content".into(),
+        })
+        .unwrap();
+    let keep = manager.create_session("cleanup", workspace).unwrap();
+    keep.append(&Message::User {
+        content: "keep indexed content".into(),
+    })
+    .unwrap();
+    manager.update_index(&stale).unwrap();
+    manager.update_index(&keep).unwrap();
+
+    let policy = crate::SessionCleanupPolicy {
+        workspace_root: Some(workspace.to_string()),
+        max_sessions_per_workspace: Some(0),
+        max_age_days: None,
+        protected_session_ids: vec![keep.id],
+    };
+
+    let report = manager.apply_cleanup(&policy).unwrap();
+    assert_eq!(report.removed, 1);
+    assert!(report.bytes_removed > 0);
+    assert!(
+        !stale.file_path.exists(),
+        "cleanup must remove selected JSONL file"
+    );
+    assert!(
+        keep.file_path.exists(),
+        "protected retained file must remain"
+    );
+    assert!(
+        manager
+            .search("stale", 10)
+            .unwrap()
+            .iter()
+            .all(|result| result.session_id != stale.id.to_string()),
+        "cleanup must remove deleted session rows from the index"
+    );
+}
+
+#[test]
+fn session_index_maintenance_operations_run() {
+    let manager = test_manager();
+    let session = manager
+        .create_session("maintenance", "maintenance-workspace")
+        .unwrap();
+    session
+        .append(&Message::User {
+            content: "maintenance indexed content".into(),
+        })
+        .unwrap();
+    manager.update_index(&session).unwrap();
+
+    manager.checkpoint_index().unwrap();
+    manager.vacuum_index().unwrap();
+    let results = manager.search("maintenance", 10).unwrap();
+    assert!(
+        results
+            .iter()
+            .any(|result| result.session_id == session.id.to_string()),
+        "maintenance must not remove indexed data"
+    );
+}
+
+#[test]
 fn reconcile_index_repairs_stale_entries() {
     let manager = test_manager();
     let session = manager

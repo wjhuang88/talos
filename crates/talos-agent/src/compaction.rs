@@ -631,7 +631,7 @@ impl Compactor {
 
         let tokens_before = self.token_estimator.estimate(&messages);
 
-        match self.compact(messages, provider).await {
+        match self.compact(messages.clone(), provider).await {
             Ok(compacted) => {
                 let tokens_after = self.token_estimator.estimate(&compacted);
                 (
@@ -644,7 +644,7 @@ impl Compactor {
                 )
             }
             Err(e) => (
-                Vec::new(),
+                messages,
                 CompactionStatus::Failed {
                     error: e.to_string(),
                 },
@@ -1419,9 +1419,14 @@ mod tests {
             ));
         }
 
-        let (_result, status) = compactor.manual_compact(messages, &FailingProvider).await;
+        let original = messages.clone();
+        let (result, status) = compactor.manual_compact(messages, &FailingProvider).await;
 
         assert!(matches!(status, CompactionStatus::Failed { .. }));
+        assert_eq!(
+            result, original,
+            "manual compaction failure must preserve original context"
+        );
     }
 
     // ========== MEM-005-A: hidden-output guard ==========

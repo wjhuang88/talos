@@ -2,11 +2,52 @@ use crate::jsonl::scan_file;
 use crate::sqlite::{IndexError, SearchResult, SessionIndex};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
 use crate::{Session, SessionError, SessionInfo};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
+
+/// Policy for selecting session cleanup candidates.
+#[derive(Debug, Clone, Default)]
+pub struct SessionCleanupPolicy {
+    /// Workspace root to limit cleanup to. `None` scans all workspaces.
+    pub workspace_root: Option<String>,
+    /// Keep at most this many newest sessions after excluding protected IDs.
+    pub max_sessions_per_workspace: Option<usize>,
+    /// Delete sessions older than this many days after excluding protected IDs.
+    pub max_age_days: Option<i64>,
+    /// Session IDs that must never be selected for cleanup.
+    pub protected_session_ids: Vec<Uuid>,
+}
+
+/// A session selected by a cleanup policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionCleanupCandidate {
+    /// Session identifier.
+    pub id: Uuid,
+    /// Workspace root associated with the session.
+    pub workspace_root: String,
+    /// JSONL file path to remove if cleanup is applied.
+    pub file_path: PathBuf,
+    /// File size in bytes at selection time.
+    pub size_bytes: u64,
+    /// Last modified timestamp used for retention decisions.
+    pub timestamp: DateTime<Utc>,
+    /// Human-readable reason this session was selected.
+    pub reason: String,
+}
+
+/// Result of applying a session cleanup policy.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SessionCleanupReport {
+    /// Candidates selected by the policy.
+    pub candidates: Vec<SessionCleanupCandidate>,
+    /// Number of candidates actually removed.
+    pub removed: usize,
+    /// Total bytes removed from JSONL files.
+    pub bytes_removed: u64,
+}
 
 /// Manages sessions on disk.
 #[derive(Debug, Clone)]
@@ -316,6 +357,20 @@ impl SessionManager {
         index.index_session(session)
     }
 
+    /// Checkpoint the session index WAL and truncate it where possible.
+    pub fn checkpoint_index(&self) -> Result<(), IndexError> {
+        let guard = self.get_or_create_index()?;
+        let index = guard.as_ref().expect("index just created");
+        index.checkpoint_truncate()
+    }
+
+    /// Vacuum the session index database.
+    pub fn vacuum_index(&self) -> Result<(), IndexError> {
+        let guard = self.get_or_create_index()?;
+        let index = guard.as_ref().expect("index just created");
+        index.vacuum()
+    }
+
     #[allow(clippy::collapsible_if)]
     pub fn reconcile_index(&self) -> Result<usize, IndexError> {
         let mut guard = self.get_or_create_index()?;
@@ -403,6 +458,106 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Return sessions that would be removed by `policy` without deleting files.
+    pub fn cleanup_candidates(
+        &self,
+        policy: &SessionCleanupPolicy,
+    ) -> Result<Vec<SessionCleanupCandidate>, SessionError> {
+        let mut by_workspace = self.collect_cleanup_sessions(policy)?;
+        let protected: std::collections::HashSet<Uuid> =
+            policy.protected_session_ids.iter().copied().collect();
+        let cutoff = policy
+            .max_age_days
+            .map(|days| Utc::now() - Duration::days(days.max(0)));
+
+        let mut candidates = Vec::new();
+        for (workspace_root, sessions) in by_workspace.iter_mut() {
+            sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
+
+            for session in sessions.iter() {
+                if protected.contains(&session.id) {
+                    continue;
+                }
+                if let Some(cutoff) = cutoff
+                    && session.timestamp < cutoff
+                {
+                    candidates.push(SessionCleanupCandidate {
+                        id: session.id,
+                        workspace_root: workspace_root.clone(),
+                        file_path: session.file_path.clone(),
+                        size_bytes: session.size_bytes,
+                        timestamp: session.timestamp,
+                        reason: format!(
+                            "older than {} day(s)",
+                            policy.max_age_days.unwrap_or_default().max(0)
+                        ),
+                    });
+                }
+            }
+
+            if let Some(max_sessions) = policy.max_sessions_per_workspace {
+                let mut unprotected: Vec<_> = sessions
+                    .iter()
+                    .filter(|session| !protected.contains(&session.id))
+                    .collect();
+                unprotected
+                    .sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| a.id.cmp(&b.id)));
+                for session in unprotected.into_iter().skip(max_sessions) {
+                    if candidates
+                        .iter()
+                        .any(|candidate| candidate.id == session.id)
+                    {
+                        continue;
+                    }
+                    candidates.push(SessionCleanupCandidate {
+                        id: session.id,
+                        workspace_root: workspace_root.clone(),
+                        file_path: session.file_path.clone(),
+                        size_bytes: session.size_bytes,
+                        timestamp: session.timestamp,
+                        reason: format!("exceeds max_sessions_per_workspace={max_sessions}"),
+                    });
+                }
+            }
+        }
+
+        candidates.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then_with(|| a.id.cmp(&b.id)));
+        Ok(candidates)
+    }
+
+    /// Apply a cleanup policy by deleting selected sessions and index rows.
+    ///
+    /// This is an explicit maintenance operation. It never removes IDs listed in
+    /// `protected_session_ids`, even if callers accidentally include an active
+    /// session in an otherwise matching policy.
+    pub fn apply_cleanup(
+        &self,
+        policy: &SessionCleanupPolicy,
+    ) -> Result<SessionCleanupReport, SessionError> {
+        let candidates = self.cleanup_candidates(policy)?;
+        let mut report = SessionCleanupReport {
+            candidates,
+            removed: 0,
+            bytes_removed: 0,
+        };
+
+        for candidate in &report.candidates {
+            if candidate.file_path.exists() {
+                fs::remove_file(&candidate.file_path)?;
+                report.removed += 1;
+                report.bytes_removed += candidate.size_bytes;
+            }
+
+            if let Ok(mut guard) = self.get_or_create_index()
+                && let Some(index) = guard.as_mut()
+            {
+                let _ = index.delete_session(&candidate.id.to_string());
+            }
+        }
+
+        Ok(report)
+    }
+
     #[allow(clippy::collapsible_if)]
     fn find_session_file(&self, id: &Uuid) -> Result<PathBuf, SessionError> {
         if self.sessions_dir.exists() {
@@ -419,6 +574,86 @@ impl SessionManager {
         }
         Err(SessionError::SessionNotFound(*id))
     }
+
+    fn collect_cleanup_sessions(
+        &self,
+        policy: &SessionCleanupPolicy,
+    ) -> Result<std::collections::HashMap<String, Vec<CleanupSession>>, SessionError> {
+        let mut by_workspace: std::collections::HashMap<String, Vec<CleanupSession>> =
+            std::collections::HashMap::new();
+
+        if !self.sessions_dir.exists() {
+            return Ok(by_workspace);
+        }
+
+        if let Some(target) = &policy.workspace_root {
+            let workspace_dir = self.sessions_dir.join(workspace_dir_name(target));
+            if workspace_dir.exists() {
+                Self::collect_cleanup_workspace(target, &workspace_dir, &mut by_workspace)?;
+            }
+            return Ok(by_workspace);
+        }
+
+        for ws_entry in fs::read_dir(&self.sessions_dir)? {
+            let ws_entry = ws_entry?;
+            if !ws_entry.file_type()?.is_dir() {
+                continue;
+            }
+            let ws_dir = ws_entry.path();
+            let workspace_root = workspace_root_from_dir_name(
+                &ws_dir.file_name().unwrap_or_default().to_string_lossy(),
+            );
+            Self::collect_cleanup_workspace(&workspace_root, &ws_dir, &mut by_workspace)?;
+        }
+
+        Ok(by_workspace)
+    }
+
+    fn collect_cleanup_workspace(
+        workspace_root: &str,
+        workspace_dir: &Path,
+        by_workspace: &mut std::collections::HashMap<String, Vec<CleanupSession>>,
+    ) -> Result<(), SessionError> {
+        for file_entry in fs::read_dir(workspace_dir)? {
+            let file_entry = file_entry?;
+            let path = file_entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let Some(id) = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| Uuid::parse_str(s).ok())
+            else {
+                continue;
+            };
+            let metadata = fs::metadata(&path)?;
+            let timestamp = metadata
+                .modified()
+                .ok()
+                .map(DateTime::<Utc>::from)
+                .unwrap_or_else(Utc::now);
+            by_workspace
+                .entry(workspace_root.to_string())
+                .or_default()
+                .push(CleanupSession {
+                    id,
+                    file_path: path,
+                    size_bytes: metadata.len(),
+                    timestamp,
+                });
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CleanupSession {
+    id: Uuid,
+    file_path: PathBuf,
+    size_bytes: u64,
+    timestamp: DateTime<Utc>,
 }
 
 impl Default for SessionManager {

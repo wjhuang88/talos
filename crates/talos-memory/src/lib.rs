@@ -106,6 +106,9 @@ pub enum MemoryStoreError {
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+    /// SQLite maintenance failed.
+    #[error("maintenance failed: {0}")]
+    Maintenance(String),
 }
 
 /// SQLite-backed store for semantic and procedural memory.
@@ -126,6 +129,7 @@ impl MemoryStore {
             std::fs::create_dir_all(parent)?;
         }
         let conn = Connection::open(path)?;
+        configure_connection(&conn)?;
         let store = Self { conn };
         store.migrate()?;
         Ok(store)
@@ -134,6 +138,7 @@ impl MemoryStore {
     /// Open an in-memory store for testing.
     pub fn open_memory() -> Result<Self, MemoryStoreError> {
         let conn = Connection::open_in_memory()?;
+        configure_connection(&conn)?;
         let store = Self { conn };
         store.migrate()?;
         Ok(store)
@@ -413,6 +418,26 @@ impl MemoryStore {
         Ok(count as usize)
     }
 
+    /// Checkpoint the SQLite write-ahead log, truncating it when possible.
+    ///
+    /// This is an explicit maintenance operation for storage lifecycle workflows;
+    /// normal memory reads and writes do not invoke it.
+    pub fn checkpoint_truncate(&self) -> Result<(), MemoryStoreError> {
+        self.conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .map_err(|e| MemoryStoreError::Maintenance(e.to_string()))
+    }
+
+    /// Rebuild the SQLite database file to reclaim free pages.
+    ///
+    /// This should only be called by explicit maintenance commands, never inside
+    /// the agent turn loop.
+    pub fn vacuum(&self) -> Result<(), MemoryStoreError> {
+        self.conn
+            .execute_batch("VACUUM;")
+            .map_err(|e| MemoryStoreError::Maintenance(e.to_string()))
+    }
+
     /// Load evidence links for a memory item.
     fn load_evidence(&self, memory_id: &str) -> Result<Vec<EvidenceLink>, MemoryStoreError> {
         let mut stmt = self.conn.prepare(
@@ -445,6 +470,13 @@ impl MemoryStore {
             })
             .collect()
     }
+}
+
+fn configure_connection(conn: &Connection) -> Result<(), MemoryStoreError> {
+    conn.execute_batch(
+        "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
+    )?;
+    Ok(())
 }
 
 /// Compute SHA-256 hash of `key|content` for exact-duplicate detection.
@@ -713,6 +745,44 @@ mod tests {
         assert!(!results.is_empty());
         assert_eq!(results[0].evidence.len(), 1);
         assert_eq!(results[0].evidence[0].source_type, "tool_call");
+    }
+
+    #[test]
+    fn test_evidence_requires_existing_memory() {
+        let store = MemoryStore::open_memory().unwrap();
+
+        let link = EvidenceLink {
+            id: "ev-orphan".to_string(),
+            memory_id: "missing-memory".to_string(),
+            source_type: "session".to_string(),
+            source_ref: "session-missing".to_string(),
+            created_at: Utc::now(),
+        };
+
+        let err = store
+            .insert_evidence(link)
+            .expect_err("foreign-key enforcement must reject orphan evidence");
+        assert!(
+            err.to_string().contains("FOREIGN KEY")
+                || err.to_string().contains("constraint failed"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_memory_maintenance_operations_run() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        store
+            .insert(make_item(
+                "mem-1",
+                "maintenance",
+                "maintenance test content",
+            ))
+            .unwrap();
+
+        store.checkpoint_truncate().unwrap();
+        store.vacuum().unwrap();
+        assert_eq!(store.count().unwrap(), 1);
     }
 
     #[test]

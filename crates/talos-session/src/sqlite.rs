@@ -445,6 +445,19 @@ impl SessionIndex {
         Ok(())
     }
 
+    /// Checkpoint the write-ahead log and truncate it where SQLite can do so safely.
+    pub fn checkpoint_truncate(&self) -> Result<(), IndexError> {
+        self.conn
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
+        Ok(())
+    }
+
+    /// Rebuild the database file to reclaim free pages after explicit cleanup.
+    pub fn vacuum(&self) -> Result<(), IndexError> {
+        self.conn.execute_batch("VACUUM;")?;
+        Ok(())
+    }
+
     /// Record a fork relationship in the index.
     ///
     /// Inserts a row into the `forks` table linking the source session to the
