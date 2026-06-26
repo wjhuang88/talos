@@ -28,6 +28,7 @@ talos-memory = { path = "../talos-memory" }
 talos-permission = { path = "../talos-permission" }
 talos-evolution = { path = "../talos-evolution" }
 talos-skill = { path = "../talos-skill" }
+talos-exploration = { path = "../talos-exploration" }
 serde_json = "1"
 toml = "1.1.2"
 async-trait = "0.1"

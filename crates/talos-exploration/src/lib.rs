@@ -12,6 +12,8 @@
 //! - **No network**: this crate is storage-only; no fetching or web access.
 //! - **No vector/graph**: pure relational storage with FTS5.
 
+pub mod ingestion;
+
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};

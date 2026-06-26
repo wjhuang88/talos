@@ -90,7 +90,7 @@ docs/iterations/
 | I053 | Memory Quality And Release Hardening | **Review (2026-06-26)** | I019 quality gate closed: memory status, retention dry-run, corruption tolerance, I019 acceptance criteria all verified. 7 tests. See `I053-memory-quality-and-release-hardening.md`. |
 | I019 | Layered Memory Foundation | **Review (2026-06-26)** | All 6 acceptance criteria closed via I050-I053. Four-layer memory, ADD-only consolidation, bounded retrieval, entity linking, procedural memory, contradiction handling. No vector/graph dep. See `I019-layered-memory-foundation.md`. |
 | I054 | Exploration Library Storage Foundation | **Review (2026-06-26)** | New `talos-exploration` crate with SQLite/FTS5 schema: research_runs, sources, chunks, claims, edges, syntheses. Citation integrity enforced. FTS5 search. 8 tests. See `I054-exploration-library-storage-foundation.md`. |
-| I055 | Exploration Ingestion And Citation Workflow | **Planned (2026-06-26)** | Permission-aware ingestion and citation-preserving synthesis workflow on top of I054. See `I055-exploration-ingestion-and-citation-workflow.md`. |
+| I055 | Exploration Ingestion And Citation Workflow | **Review (2026-06-26)** | Ingestion pipeline + claim extraction + citation-preserving synthesis + CLI explore ingest/search delivered. 8 tests + runtime verified. See `I055-exploration-ingestion-and-citation-workflow.md`. |
 | I056 | Two-Month Closeout And v0.2.0 Readiness | **Planned (2026-06-26)** | Two-month closeout, regression sweep, docs, residual mapping, and release-readiness decision. See `I056-two-month-closeout-and-v020-readiness.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime

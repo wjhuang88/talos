@@ -67,3 +67,30 @@ synthesis that cites stored source IDs.
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-06-26 | **Activation** | I055 activated. Dependencies met: I054 in Review (exploration storage foundation, commit `7e15706`). Scope: local text ingestion (chunking + FTS), mock fetch ingestion with provenance, deterministic claim extraction, citation-preserving synthesis assembly with evidence/inference distinction. No crawler, no paid APIs, no network in tests. |
+| 2026-06-26 | **Implementation** | All acceptance criteria delivered. `ingest_text()` with paragraph-based chunking + overlap + SHA-256 hash. `ingest_fetched()` with URL/timestamp provenance. `extract_claims()` deterministic sentence-based extraction. `create_synthesis()` with citation validation. CLI `talos explore ingest/search`. 8 tests including full offline pipeline. Runtime verified: ingested README.md (92 chunks), FTS search returns snippets. |
+
+## Verification Evidence
+
+### Workspace Gates (2026-06-26)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all pass, 0 failures
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### End-to-End Runtime Evidence (ITERATION-WORKFLOW §3a)
+
+- `talos explore ingest --file README.md`: 92 chunks created, source + run persisted.
+- `talos explore search --query "session" --limit 3`: 3 results with snippets from ingested content.
+
+### Changed Files
+
+| File | Change |
+|---|---|
+| `crates/talos-exploration/src/ingestion.rs` | NEW: ChunkingConfig, IngestionReport, FetchedContent, ingest_text/fetched, extract_claims, create_synthesis, 8 tests |
+| `crates/talos-exploration/src/lib.rs` | Added `pub mod ingestion;` |
+| `crates/talos-cli/src/exploration_cli.rs` | NEW: ExploreCommand::Ingest/Search CLI handlers |
+| `crates/talos-cli/src/main.rs` | Added `mod exploration_cli`, `Explore` variant, dispatch |
+| `crates/talos-cli/Cargo.toml` | Added `talos-exploration` dependency |

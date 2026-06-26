@@ -15,6 +15,7 @@
 mod approval;
 mod colors;
 mod event_loop;
+mod exploration_cli;
 mod governance;
 mod init_wizard;
 mod logging;
@@ -82,6 +83,11 @@ pub(crate) enum TalosCommand {
     Memory {
         #[command(subcommand)]
         command: memory_cli::MemoryCommand,
+    },
+    /// Exploration operations.
+    Explore {
+        #[command(subcommand)]
+        command: exploration_cli::ExploreCommand,
     },
 }
 
@@ -270,6 +276,10 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Memory { command }) = &cli.command {
         return crate::memory_cli::run_memory_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Explore { command }) = &cli.command {
+        return crate::exploration_cli::run_explore_command(command.clone());
     }
 
     if let Some(path) = &cli.import_models {
