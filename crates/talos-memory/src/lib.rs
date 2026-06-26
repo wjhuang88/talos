@@ -502,6 +502,128 @@ fn parse_datetime(s: &str) -> Result<DateTime<Utc>, MemoryStoreError> {
         .map_err(|e| MemoryStoreError::InvalidTimestamp(e.to_string()))
 }
 
+// ---------------------------------------------------------------------------
+// Memory prompt injection — bounded, disable-able, safety-filtered.
+// ---------------------------------------------------------------------------
+
+/// Configuration for memory prompt injection.
+#[derive(Debug, Clone)]
+pub struct MemoryPromptConfig {
+    /// Whether memory injection is enabled.
+    pub enabled: bool,
+    /// Maximum number of memory items to include.
+    pub max_items: usize,
+    /// Maximum character budget for the formatted section.
+    pub max_chars: usize,
+}
+
+impl Default for MemoryPromptConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_items: 5,
+            max_chars: 2000,
+        }
+    }
+}
+
+/// Patterns that indicate content originated from hidden tool/system output.
+/// If any of these appear in a memory item's content, the item is filtered
+/// out as a defense-in-depth measure.
+const HIDDEN_OUTPUT_PATTERNS: &[&str] = &[
+    "<tool_result>",
+    "</tool_result>",
+    "Tool output:",
+    "is_error:",
+    "tool_call",
+    "tool_result",
+];
+
+/// Returns `true` if `content` appears to contain hidden tool or system output.
+fn is_hidden_output(content: &str) -> bool {
+    let lower = content.to_lowercase();
+    HIDDEN_OUTPUT_PATTERNS.iter().any(|pat| lower.contains(pat))
+}
+
+/// Format retrieved memory into a bounded prompt section.
+///
+/// Returns `None` if: disabled, no query, no results, or all results are filtered.
+/// The output includes provenance (source session/turn), confidence, freshness,
+/// and contradiction markers. Hidden tool output is filtered out.
+pub fn format_memory_prompt(
+    store: &MemoryStore,
+    query: &str,
+    config: &MemoryPromptConfig,
+) -> Option<String> {
+    if !config.enabled || query.trim().is_empty() {
+        return None;
+    }
+
+    let results = store.retrieve(query, config.max_items).ok()?;
+    if results.is_empty() {
+        return None;
+    }
+
+    let mut items = Vec::new();
+    let header = "## Relevant Memory\n";
+    let mut total_len = header.len();
+
+    for result in &results {
+        // Defense-in-depth: skip items that look like hidden tool output.
+        if is_hidden_output(&result.item.content) {
+            continue;
+        }
+
+        let source_ref = result
+            .evidence
+            .first()
+            .map(|e| e.source_ref.as_str())
+            .unwrap_or("unknown");
+
+        let reinforced = result.item.last_reinforced.format("%Y-%m-%d");
+
+        let line = if result.item.contradiction_ref.is_some() {
+            format!(
+                "- ⚠ CONTRADICTION: [confidence={:.1}] {} (source: {}, reinforced: {})\n",
+                result.item.confidence, result.item.content, source_ref, reinforced,
+            )
+        } else {
+            format!(
+                "- [confidence={:.1}] {} (source: {}, reinforced: {})\n",
+                result.item.confidence, result.item.content, source_ref, reinforced,
+            )
+        };
+
+        // Check if adding this line would exceed the budget.
+        let line_len = line.len();
+        if total_len + line_len > config.max_chars {
+            // Truncate: append the truncation notice and stop.
+            let truncation_notice = "... (memory section truncated)";
+            // Ensure we have room for the notice.
+            if total_len + truncation_notice.len() <= config.max_chars {
+                items.push(truncation_notice.to_string());
+            }
+            break;
+        }
+
+        items.push(line);
+        total_len += line_len;
+    }
+
+    if items.is_empty() {
+        // All results were filtered out.
+        return None;
+    }
+
+    let mut output = String::with_capacity(config.max_chars);
+    output.push_str(header);
+    for item in &items {
+        output.push_str(item);
+    }
+
+    Some(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -806,5 +928,203 @@ mod tests {
         // Exact dup should not increase count.
         store.insert(make_item("m3", "k", "c1")).unwrap();
         assert_eq!(store.count().unwrap(), 2);
+    }
+
+    // --- format_memory_prompt tests ---
+
+    #[test]
+    fn format_memory_prompt_disabled_returns_none() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        store
+            .insert(make_item("mem-1", "test", "some content"))
+            .unwrap();
+
+        let config = MemoryPromptConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(format_memory_prompt(&store, "test", &config).is_none());
+    }
+
+    #[test]
+    fn format_memory_prompt_no_results_returns_none() {
+        let store = MemoryStore::open_memory().unwrap();
+
+        let config = MemoryPromptConfig {
+            enabled: true,
+            ..Default::default()
+        };
+        assert!(format_memory_prompt(&store, "nonexistent query xyz", &config).is_none());
+    }
+
+    #[test]
+    fn format_memory_prompt_produces_bounded_section() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        store
+            .insert(make_item(
+                "mem-1",
+                "rust",
+                "Rust is a systems language focused on safety",
+            ))
+            .unwrap();
+        store
+            .insert(make_item(
+                "mem-2",
+                "rust",
+                "Rust has zero-cost abstractions and no garbage collector",
+            ))
+            .unwrap();
+        store
+            .insert(make_item(
+                "mem-3",
+                "testing",
+                "Testing is important for software quality",
+            ))
+            .unwrap();
+
+        // Add evidence for provenance.
+        store
+            .insert_evidence(EvidenceLink {
+                id: "ev-1".to_string(),
+                memory_id: "mem-1".to_string(),
+                source_type: "session".to_string(),
+                source_ref: "session-abc:entry-1:0".to_string(),
+                created_at: Utc::now(),
+            })
+            .unwrap();
+
+        let config = MemoryPromptConfig {
+            enabled: true,
+            max_items: 5,
+            max_chars: 2000,
+        };
+        let result = format_memory_prompt(&store, "Rust safety", &config);
+
+        assert!(result.is_some(), "Should produce output");
+        let text = result.unwrap();
+        assert!(text.contains("## Relevant Memory"), "Should contain header");
+        assert!(text.contains("confidence="), "Should contain confidence");
+        assert!(text.contains("source:"), "Should contain source reference");
+        assert!(text.len() <= config.max_chars, "Should respect max_chars");
+    }
+
+    #[test]
+    fn format_memory_prompt_truncates_on_budget() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        let long_content = "This is a very long memory item that contains a lot of text to test the truncation behavior of the format_memory_prompt function when the character budget is exceeded by the accumulated output length of multiple memory items combined together in the final formatted string".repeat(3);
+        store
+            .insert(make_item("mem-1", "long", &long_content))
+            .unwrap();
+
+        let config = MemoryPromptConfig {
+            enabled: true,
+            max_items: 5,
+            max_chars: 100,
+        };
+        let result = format_memory_prompt(&store, "long memory", &config);
+
+        assert!(result.is_some(), "Should produce some output");
+        let text = result.unwrap();
+        assert!(
+            text.contains("truncated"),
+            "Should contain truncation notice, got: {text}"
+        );
+        assert!(text.len() <= config.max_chars, "Should respect max_chars");
+    }
+
+    #[test]
+    fn format_memory_prompt_filters_hidden_output() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        // Insert a clean memory item.
+        store
+            .insert(make_item(
+                "mem-1",
+                "clean",
+                "Rust is a safe systems language",
+            ))
+            .unwrap();
+
+        // Insert items that look like hidden tool output.
+        store
+            .insert(make_item(
+                "mem-2",
+                "tool-like",
+                "<tool_result>file read successfully</tool_result>",
+            ))
+            .unwrap();
+        store
+            .insert(make_item(
+                "mem-3",
+                "tool-like-2",
+                "Tool output: the file contains 42 lines",
+            ))
+            .unwrap();
+        store
+            .insert(make_item(
+                "mem-4",
+                "tool-like-3",
+                "is_error: true, message: something failed",
+            ))
+            .unwrap();
+
+        let config = MemoryPromptConfig {
+            enabled: true,
+            max_items: 10,
+            max_chars: 4000,
+        };
+        let result = format_memory_prompt(&store, "tool result error", &config);
+
+        // The clean item may or may not appear depending on FTS scoring.
+        // But the hidden-output items must NOT appear.
+        if let Some(text) = result {
+            assert!(
+                !text.contains("<tool_result>"),
+                "Should not contain tool result tags"
+            );
+            assert!(
+                !text.contains("Tool output:"),
+                "Should not contain tool output prefix"
+            );
+            assert!(
+                !text.contains("is_error:"),
+                "Should not contain error markers"
+            );
+        }
+    }
+
+    #[test]
+    fn format_memory_prompt_marks_contradictions() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        let now = Utc::now();
+        let item = MemoryItem {
+            id: "mem-contradict".to_string(),
+            kind: MemoryKind::Semantic,
+            key: "conflict".to_string(),
+            content: "Python is dynamically typed".to_string(),
+            confidence: 0.7,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: Some("ref-123".to_string()),
+        };
+        store.insert(item).unwrap();
+
+        let config = MemoryPromptConfig {
+            enabled: true,
+            max_items: 5,
+            max_chars: 2000,
+        };
+        let result = format_memory_prompt(&store, "Python typed", &config);
+
+        assert!(result.is_some(), "Should produce output");
+        let text = result.unwrap();
+        assert!(
+            text.contains("CONTRADICTION"),
+            "Should mark contradiction, got: {text}"
+        );
     }
 }

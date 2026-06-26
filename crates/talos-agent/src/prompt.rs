@@ -187,6 +187,8 @@ pub struct SystemPromptBuilder {
     custom_prompt: Option<String>,
     /// Appended to the end of the prompt when provided.
     append_prompt: Option<String>,
+    /// Bounded memory injection section (advisory, never authoritative).
+    memory_section: Option<String>,
     tool_call_format: &'static str,
     /// Runtime template values used for `{{slot}}` substitution.
     template_vars: HashMap<String, String>,
@@ -217,6 +219,7 @@ impl SystemPromptBuilder {
             user_preferences: String::new(),
             custom_prompt: None,
             append_prompt: None,
+            memory_section: None,
             tool_call_format: "",
             template_vars,
         }
@@ -286,6 +289,16 @@ impl SystemPromptBuilder {
     #[must_use]
     pub fn with_user_preferences(mut self, prefs: String) -> Self {
         self.user_preferences = prefs;
+        self
+    }
+
+    /// Sets a bounded memory section for inclusion in the system prompt.
+    ///
+    /// Memory is advisory only — never authoritative over session context.
+    /// When `None`, no memory section is injected.
+    #[must_use]
+    pub fn with_memory_section(mut self, section: Option<String>) -> Self {
+        self.memory_section = section;
         self
     }
 
@@ -441,6 +454,13 @@ impl SystemPromptBuilder {
             }
             sections.push(PromptSection {
                 text: context_section,
+                kind: PromptSectionKind::Dynamic,
+            });
+        }
+
+        if let Some(ref memory) = self.memory_section {
+            sections.push(PromptSection {
+                text: format!("# Memory\n{memory}\n"),
                 kind: PromptSectionKind::Dynamic,
             });
         }
@@ -1132,5 +1152,32 @@ mod tests {
     #[test]
     fn test_identity_prompt_contains_talos_identity() {
         assert!(DEFAULT_IDENTITY.contains("Talos"));
+    }
+
+    // --- Memory section tests ---
+
+    #[test]
+    fn prompt_builder_with_memory_section() {
+        let builder =
+            SystemPromptBuilder::new().with_memory_section(Some("test memory".to_string()));
+
+        let prompt = builder.build();
+
+        assert!(prompt.contains("# Memory"), "Should contain Memory header");
+        assert!(
+            prompt.contains("test memory"),
+            "Should contain memory content"
+        );
+    }
+
+    #[test]
+    fn prompt_builder_without_memory_section() {
+        let builder = SystemPromptBuilder::new();
+        let prompt = builder.build();
+
+        assert!(
+            !prompt.contains("# Memory\n"),
+            "Should not contain Memory header when no section set"
+        );
     }
 }

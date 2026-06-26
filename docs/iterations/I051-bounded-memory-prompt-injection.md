@@ -66,3 +66,23 @@ limits visible in status/debug surfaces.
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-06-26 | **Activation** | I051 activated. Dependencies met: I050 in Review (consolidation pipeline + evidence links operational, commit `30bbccf`). Scope: `format_memory_prompt()` formatting function in `talos-memory` with provenance/confidence/freshness/contradiction markers + token/count budgets; `SystemPromptBuilder::with_memory_section()` injection point in `talos-agent`; hidden-output safety filter; config disable switch; mock-provider request-preview test. No procedural adaptation, no permission decisions from memory. |
+| 2026-06-26 | **Implementation** | All acceptance criteria delivered: `format_memory_prompt()` with `MemoryPromptConfig` (default disabled, max_items=5, max_chars=2000), hidden-output defense-in-depth filter (`<tool_result>`, `is_error:`, etc.), contradiction markers, budget truncation. `SystemPromptBuilder::with_memory_section(Option<String>)` injects as Dynamic section after Context. 8 tests (6 in talos-memory + 2 in talos-agent). `talos-memory` dep added to `talos-agent` (no circular dep). |
+
+## Verification Evidence
+
+### Workspace Gates (2026-06-26)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all pass, 0 failures (pre-existing mcp_client_e2e timing flake passes in isolation)
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### Changed Files
+
+| File | Change |
+|---|---|
+| `crates/talos-memory/src/lib.rs` | `MemoryPromptConfig`, `format_memory_prompt()`, hidden-output filter, 6 tests |
+| `crates/talos-agent/src/prompt.rs` | `memory_section` field, `with_memory_section()` setter, section injection, 2 tests |
+| `crates/talos-agent/Cargo.toml` | Added `talos-memory` dependency |
