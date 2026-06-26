@@ -94,3 +94,18 @@ synthesis that cites stored source IDs.
 | `crates/talos-cli/src/exploration_cli.rs` | NEW: ExploreCommand::Ingest/Search CLI handlers |
 | `crates/talos-cli/src/main.rs` | Added `mod exploration_cli`, `Explore` variant, dispatch |
 | `crates/talos-cli/Cargo.toml` | Added `talos-exploration` dependency |
+
+### I057 Acceptance Remediation (2026-06-26)
+
+I057-S3a fixed a UTF-8 panic: search snippet truncation at `lib.rs:472` used `&text[..197]`
+(byte slice) which panics when byte 197 falls inside a multibyte character. Replaced with
+`text.chars().take(197).collect::<String>()` (character-safe). Regression test covers Chinese
+(3-byte) and emoji (4-byte) text through FTS search.
+
+I057-S3b added resource budget: `ChunkingConfig` now has `max_file_bytes` (default 10 MB) and
+`max_chunks_per_source` (default 10,000). `ingest_text()` rejects oversized input with
+`FileTooLarge` error. CLI checks file metadata before `read_to_string`. 3 regression tests
+cover budget exceeded, within budget, and chunk cap exceeded.
+
+Changed files: `crates/talos-exploration/src/lib.rs`, `crates/talos-exploration/src/ingestion.rs`,
+`crates/talos-cli/src/exploration_cli.rs`.

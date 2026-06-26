@@ -102,3 +102,11 @@ operational before I019 automatic memory writes.
 | `crates/talos-cli/Cargo.toml` | Added `talos-memory` dependency |
 | `crates/talos-cli/src/tests.rs` | 7 new tests covering all acceptance criteria |
 | `crates/talos-cli/src/init_wizard.rs` | Fixed pre-existing HOME env var race with `ENV_MUTEX` |
+
+### I057 Acceptance Remediation (2026-06-26)
+
+I057-S1 closed the permission-boundary gap: `storage cleanup --apply` now routes through
+`PermissionEngine::evaluate_with_nature("storage_cleanup", ToolNature::Write, &input)` before
+any file/index deletion. The `--apply` flag serves as the user's explicit authorization that
+resolves `Ask` to `Allow`. Explicit deny rules block cleanup even with `--apply`. 7 regression
+tests cover deny/allow/dry-run paths. Changed file: `crates/talos-cli/src/storage.rs`.

@@ -86,3 +86,21 @@ limits visible in status/debug surfaces.
 | `crates/talos-memory/src/lib.rs` | `MemoryPromptConfig`, `format_memory_prompt()`, hidden-output filter, 6 tests |
 | `crates/talos-agent/src/prompt.rs` | `memory_section` field, `with_memory_section()` setter, section injection, 2 tests |
 | `crates/talos-agent/Cargo.toml` | Added `talos-memory` dependency |
+
+### I057 Acceptance Remediation (2026-06-26)
+
+I057-S2 closed the runtime-wiring gap: `with_memory_section()` is now called from `run_inner()`
+via a `memory_provider` callback on the `Agent` struct (keeps `talos-agent` decoupled from
+`talos-memory`). `MemoryPromptConfig` has serde derives and is loaded from `[memory_prompt]`
+config section (default disabled). `maybe_set_memory_provider()` in mode_runners wires all 5
+mode runners. Mock-provider request-preview regression: 2 tests prove memory section appears
+when enabled and is absent when disabled.
+
+I057-S4 hardened the hidden-output filter: expanded `HIDDEN_OUTPUT_PATTERNS` with JSON-style
+markers (`"type":"tool_result"`, `"role":"tool"`), Anthropic-style (`tool_use`, `function_call`),
+whitespace variants, and system markers (`<system-reminder>`). Added normalization pass
+(trim + collapse whitespace). 7 new tests cover all bypass vectors.
+
+Changed files: `crates/talos-memory/src/lib.rs`, `crates/talos-agent/src/lib.rs`,
+`crates/talos-config/src/lib.rs`, `crates/talos-config/Cargo.toml`,
+`crates/talos-cli/src/mode_runners.rs`, `crates/talos-cli/tests/memory_prompt_injection.rs`.

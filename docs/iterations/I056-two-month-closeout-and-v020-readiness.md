@@ -112,5 +112,5 @@ are green, user docs are current, and the architect has a concrete release/no-re
 | LLM-based consolidation extraction | MEM-001 follow-up | When provider integration is desired |
 | Memory retention apply path | DATA-001-E / future iteration | When destructive retention is approved |
 | Automatic consolidation trigger | MEM-001 follow-up | Conservative and disable-able when added |
-| Memory prompt injection in live agent loop | I051 follow-up | `with_memory_section()` exists; wiring into `run_inner()` is next |
+| Memory prompt injection in live agent loop | **Closed by I057-S2** (2026-06-26) | Runtime wiring via `memory_provider` callback on Agent; mock-provider request-preview regression proves enabled/disabled behavior |
 | Network ingestion (fetch → exploration) | WEBFETCH-001 follow-up | Permission-aware path exists; real fetch wiring is next |
