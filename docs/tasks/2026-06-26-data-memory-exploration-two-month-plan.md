@@ -65,7 +65,7 @@ The sequence intentionally treats storage lifecycle as the gate before autonomou
 | T6 | I053 | Memory quality gates and release hardening | T5 | Contradiction, decay, retention dry-run, observability, and docs verified | Defer non-blocking ranking polish | Review (2026-06-26) |
 | T7 | I054 | Exploration library storage foundation | T6 | SQLite schema + FTS source/chunk/claim/synthesis tests | Keep exploration storage library-only | Review (2026-06-26) |
 | T8 | I055 | Exploration ingestion and citation workflow | T7 | Permission-aware ingestion, claim citation, and synthesis tests | Keep network ingestion disabled by default | Review (2026-06-26) |
-| T9 | I056 | Two-month closeout and `v0.2.0` readiness decision | T8 | Workspace gates, governance, release checklist, residuals, and docs complete | Mark Review with exact blockers | Planned |
+| T9 | I056 | Two-month closeout and `v0.2.0` readiness decision | T8 | Workspace gates, governance, release checklist, residuals, and docs complete | Mark Review with exact blockers | Review (2026-06-26) |
 
 ### Dependencies And Prerequisites
 
@@ -220,3 +220,37 @@ evidence links; second run deduped all (ADD-only verified).
 Recovery/resume instruction: I050 is in Review. Next assignment A3 (I051 Bounded Memory Prompt
 Injection) may start after I050 is committed — consolidation evidence exists. Read I051 iteration
 doc and MEM-005 backlog before activation.
+
+### T4-T8 — I051-I055 Complete (2026-06-26)
+
+All remaining implementation iterations delivered in one unattended session:
+
+| Task | Iteration | Commit | Key Deliverable |
+|---|---|---|---|
+| T4 | I051 | `7d0e8ee` | Bounded memory prompt injection with hidden-output guard |
+| T5 | I052 | `951afda` | Entity linking + procedural memory + retrieval boost |
+| T6 | I053 | `e745e2c` | Memory status + retention dry-run + I019 quality closure |
+| T7 | I054 | `7e15706` | Exploration library storage foundation (new talos-exploration crate) |
+| T8 | I055 | `933af10` | Exploration ingestion + citation workflow + CLI explore commands |
+
+All gates pass (fmt, clippy -D warnings, test 0 failures, governance 0 warnings). Runtime verified
+across storage, memory, and exploration paths.
+
+### T9 — I056 Two-Month Closeout Complete (2026-06-26)
+
+I056 (Assignment A8) closeout delivered. All task items T2-T9 in Review with evidence.
+
+**Delivered across the two-month sequence:**
+- DATA-001: Storage lifecycle controls (status, cleanup, maintenance) — 9/10 acceptance checked.
+- I019: Layered memory foundation (consolidation, prompt injection, entity linking, procedural memory, quality hardening) — 6/6 acceptance checked.
+- I020: Exploration library (storage schema, FTS5 search, ingestion, citation workflow) — 5/5 acceptance checked (S4 vector/graph deferred per ADR-017).
+
+**Release decision:** v0.2.0 is ready for tag upon architect approval. NOT tagged without explicit
+approval per handoff escalation rules. Supported targets same as v0.1.2.
+
+**Known residuals:** Vector/graph Spike (RES-001), LLM-based extraction (MEM-001), memory retention
+apply path (DATA-001-E), automatic consolidation trigger, live agent memory wiring, network
+ingestion (WEBFETCH-001).
+
+Recovery/resume instruction: All work is committed on `main` through `933af10`. I056 closeout commit
+follows. To release v0.2.0: review I056 release checklist, get architect approval, tag, push.

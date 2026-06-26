@@ -176,6 +176,41 @@ talos storage cleanup --apply --max-age-days 90 --protect-session <active-uuid>
 talos storage maintenance --checkpoint --vacuum --reconcile
 ```
 
+### 记忆
+
+将会话情景记忆固化为语义记忆：
+
+```bash
+talos memory consolidate --session <session-uuid>
+talos memory consolidate                  # 最近的工作区会话
+```
+
+查看记忆库状态（仅计数和大小，不暴露内容）：
+
+```bash
+talos memory status
+```
+
+预览记忆保留候选（dry-run，不删除）：
+
+```bash
+talos memory retention --min-confidence 0.5
+```
+
+### 探索库
+
+将本地文件导入可搜索的研究库：
+
+```bash
+talos explore ingest --file README.md --title "项目说明"
+```
+
+搜索已导入的来源：
+
+```bash
+talos explore search --query "会话管理" --limit 10
+```
+
 ### 交互命令
 
 在交互式 TUI 中，于输入区开头键入 `/` 即可打开命令菜单。继续输入可筛选命令，使用

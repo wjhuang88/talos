@@ -181,6 +181,42 @@ Run SQLite maintenance:
 talos storage maintenance --checkpoint --vacuum --reconcile
 ```
 
+### Memory
+
+Consolidate session episodes into semantic memory:
+
+```bash
+talos memory consolidate --session <session-uuid>
+talos memory consolidate                  # latest workspace session
+```
+
+Check memory store status (counts and sizes, no content exposed):
+
+```bash
+talos memory status
+```
+
+Preview memory retention candidates (dry-run, no deletion):
+
+```bash
+talos memory retention --min-confidence 0.5
+talos memory retention --max-age-days 90 --unreinforced-only
+```
+
+### Exploration Library
+
+Ingest local files into a searchable research library:
+
+```bash
+talos explore ingest --file README.md --title "Project README"
+```
+
+Search ingested sources:
+
+```bash
+talos explore search --query "session management" --limit 10
+```
+
 ### Interactive Commands
 
 In the interactive TUI, type `/` at the start of the composer to open the command menu. Continue
