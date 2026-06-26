@@ -83,6 +83,9 @@ jobs:
           PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n 1 || true)"
 
           {
+            RELEASE_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+            RAW_URL_BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TAG}"
+
             if [ "$IS_PRERELEASE" = "true" ]; then
               echo "⚠️ **This is a pre-release build. Expect bugs and breaking changes.**"
               echo
@@ -108,22 +111,22 @@ jobs:
             echo
             echo "| Platform | Architecture | File |"
             echo "|----------|-------------|------|"
-            echo "| Linux | x86_64 | \`talos-x86_64-linux.tar.gz\` |"
-            echo "| Linux | ARM64 | \`talos-aarch64-linux.tar.gz\` |"
-            echo "| macOS | Apple Silicon | \`talos-aarch64-darwin.tar.gz\` |"
-            echo "| macOS | Intel | \`talos-x86_64-darwin.tar.gz\` |"
-            echo "| Windows | x86_64 | \`talos-x86_64-windows.zip\` |"
+            echo "| Linux | x86_64 | [\`talos-x86_64-linux.tar.gz\`](${RELEASE_URL_BASE}/talos-x86_64-linux.tar.gz) |"
+            echo "| Linux | ARM64 | [\`talos-aarch64-linux.tar.gz\`](${RELEASE_URL_BASE}/talos-aarch64-linux.tar.gz) |"
+            echo "| macOS | Apple Silicon | [\`talos-aarch64-darwin.tar.gz\`](${RELEASE_URL_BASE}/talos-aarch64-darwin.tar.gz) |"
+            echo "| macOS | Intel | [\`talos-x86_64-darwin.tar.gz\`](${RELEASE_URL_BASE}/talos-x86_64-darwin.tar.gz) |"
+            echo "| Windows | x86_64 | [\`talos-x86_64-windows.zip\`](${RELEASE_URL_BASE}/talos-x86_64-windows.zip) |"
             echo
-            echo "Checksums: [\`checksum.sha256\`](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/checksum.sha256)"
+            echo "Checksums: [\`checksum.sha256\`](${RELEASE_URL_BASE}/checksum.sha256)"
             echo
             echo "### Install"
             echo
             echo '```bash'
             echo "# macOS / Linux"
-            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/scripts/install.sh | sh"
+            echo "curl -fsSL ${RAW_URL_BASE}/scripts/install.sh | sh"
             echo
             echo '# Windows (PowerShell)'
-            echo "irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/scripts/install.ps1 | iex"
+            echo "irm ${RAW_URL_BASE}/scripts/install.ps1 | iex"
             echo '```'
             echo
             echo "Each archive contains a single \`talos\` (or \`talos.exe\`) binary."
