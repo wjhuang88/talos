@@ -367,6 +367,13 @@ slice; the long-running task is the recovery/checkpoint owner.
 - `cargo test --workspace` — all tests pass, 0 failures (~600+ tests across all crates)
 - `scripts/validate_project_governance.sh .` — 0 warnings
 
+### Release Publication Checkpoint (2026-06-26)
+
+- `git push origin main` — pushed closeout sync through `5b63ad6`.
+- `git tag v0.1.2` — created local release tag at `5b63ad6`.
+- `git push origin v0.1.2` — pushed remote tag; release workflow evidence remains to be recorded
+  before moving I047 from Review to Complete.
+
 ### Slice Evidence
 
 | Slice | Evidence |
@@ -389,8 +396,8 @@ slice; the long-running task is the recovery/checkpoint owner.
 
 ## Retrospective
 
-- Outcome: All selected I047 slices delivered and verified. The iteration is in Review while the
-  final release tag approval remains outside the task authorization boundary.
+- Outcome: All selected I047 slices delivered and verified. The `v0.1.2` tag has been pushed; the
+  iteration remains in Review until release workflow evidence is recorded.
 - Documentation: Backlog, Board, iteration evidence, release readiness notes, README files, and
   long-running task checkpoints were synchronized for the `v0.1.2` handoff.
 - Lessons: No new reusable project lesson was recorded; known residuals are tracked as deferred

@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I047 v0.1.2 Release Readiness And Runtime Polish | Review | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | All slices delivered: REL-001 audit, CONF-002 talos init, OBS-001 closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status. v0.1.2 bumped. All workspace checks pass. Awaiting tag approval. |
+| I047 v0.1.2 Release Readiness And Runtime Polish | Review | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | `v0.1.2` tag pushed; record release workflow evidence before moving I047 to Complete. |
 
 ## Review
 
@@ -45,6 +45,7 @@ acceptance criteria, verification evidence, or iteration state.
 | I035 Agent Protocol Compatibility Foundation | Complete | [I035 Agent Protocol Compatibility Foundation](iterations/I035-agent-protocol-compatibility-foundation.md) | Survey + ADR-022 + DTOs + prototype import + config precedence specified |
 | I036 Research Consolidation | Planned | [I036 Research Consolidation](iterations/I036-research-consolidation.md) | End-of-plan research-only pass turns REMOTE/WEB/WEBFETCH/PLUGIN/OKF/MEM/MODEL/STORE items into decisions or follow-up stories |
 | I028 SCHED-001 Delayed and Scheduled Tasks | Planned | [SCHED-001 Delayed/Scheduled Tasks](backlog/active/SCHED-001-delayed-scheduled-tasks.md) | 4 tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`); session-scoped message injection; start after I029 architecture cleanup |
+| I048 Local Data Lifecycle And Storage Hygiene | Planned | [I048](iterations/I048-local-data-lifecycle-storage-hygiene.md) | Storage status, session cleanup, SQLite maintenance, and memory lifecycle gate must land before I019 automatic memory writes |
 | SKILL-002 Explicit Runtime Skill Activation | Refinement | [SKILL-002](backlog/active/SKILL-002-explicit-runtime-activation.md) | Resolve context/cache ownership and complete CMD-001 before selecting into a new iteration |
 | ARCH-011 Architecture Watchlist | Tracking | [ARCH-011](backlog/active/ARCH-011-architecture-watchlist.md) | Promote only if future work creates concrete file growth, change-frequency, or boundary evidence |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |

@@ -81,7 +81,8 @@ docs/iterations/
 | I044 | Session Integrity And Lifecycle Hardening | **Complete** (2026-06-23) | Six SESSION-002 consistency fixes (O(1) append, concurrent write safety, crash reconciliation, switch ordering, failure cleanup) + `/delete` via picker UX. Pre-closeout audit fixed sort tiebreaker, bridge send errors, fork snapshot race. See `I044-session-integrity-lifecycle-hardening.md`. |
 | I045 | Product Readiness — Model Lifecycle, Config, Observability | **Complete (2026-06-24)** | All 4 stories complete: MODEL-004-R (catalog integration), MODEL-005-R (/model picker + credential input + first-run wizard + --init/--available-models/--use-model), CONF-001-S (config CLI), OBS-001 (log rotation). api_key data-loss bug fixed (skip_serializing reverted). Non-navigable group headers in model picker. Closed in ~4 hours, not 1 month. Post-closeout correction (I046): two workspace tests were actually failing at closeout (stale `gpt-4.1` + lost `/resume` fallback). See `I045-product-readiness-model-lifecycle-observability.md`. |
 | I046 | Architecture, Structure, And Governance Repair | **Complete (2026-06-25)** | All 5 stories: S1 (test baseline restored), S2 (provider-aware model identity — `find_model_by_provider`, `(provider, model_id)` semantics), S3 (inline api_key boundary — custom Debug masking, config_get_dotted api_key case, ADR-023), S4 (model_lifecycle.rs extracted from mode_runners.rs), S5 (docs sync — config.reference.toml, AGENTS.md, README, I045 correction). `cargo test/clippy/governance` all pass. See `I046-architecture-structure-governance-repair.md`. |
-| I047 | v0.1.2 Release Readiness And Runtime Polish | **Review (2026-06-25)** | All slices delivered: REL-001 audit, CONF-002 talos init, OBS-001 closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status. v0.1.2 bumped. All workspace checks pass. Awaiting tag approval. See `I047-v012-release-readiness-and-runtime-polish.md`. |
+| I047 | v0.1.2 Release Readiness And Runtime Polish | **Review (2026-06-25)** | All slices delivered: REL-001 audit, CONF-002 talos init, OBS-001 closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status. v0.1.2 tag pushed 2026-06-26. Awaiting release workflow evidence before Complete. See `I047-v012-release-readiness-and-runtime-polish.md`. |
+| I048 | Local Data Lifecycle And Storage Hygiene | **Planned (2026-06-26)** | DATA-001: storage status, session cleanup, fork visibility, SQLite maintenance, and memory lifecycle gate before I019 automatic memory writes. See `I048-local-data-lifecycle-storage-hygiene.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -98,7 +99,8 @@ rewrite published iteration baselines.
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Planned | Deferred; scheduling is not the current priority. |
-| I047 | Review | All slices delivered 2026-06-25. v0.1.2 bumped. Awaiting tag approval. First phase of long-running task `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md`. |
+| I047 | Review | All slices delivered 2026-06-25. `v0.1.2` tag pushed 2026-06-26. Awaiting CI/release evidence before Complete. |
+| I048 | Planned | Candidate next iteration for DATA-001. Do not activate until I047 release evidence is reviewed or explicitly deferred. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
