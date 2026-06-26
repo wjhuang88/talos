@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
-use talos_session::{SessionCleanupPolicy, SessionManager};
+use talos_core::tool::ToolNature;
+use talos_permission::{PermissionDecision, PermissionEngine};
+use talos_session::{SessionCleanupCandidate, SessionCleanupPolicy, SessionManager};
 
 /// CLI subcommands for local storage visibility and maintenance.
 #[derive(Subcommand, Clone)]
@@ -93,6 +95,29 @@ fn run_storage_status() -> Result<()> {
     Ok(())
 }
 
+/// Evaluate storage cleanup through the permission engine.
+///
+/// Returns `Allow` when the engine permits the operation, `Deny(reason)` when
+/// a rule blocks it, or `Ask` when user approval would be required (the caller
+/// should resolve `Ask` based on whether `--apply` was passed).
+pub(crate) fn authorize_cleanup(
+    engine: &PermissionEngine,
+    candidates: &[SessionCleanupCandidate],
+) -> PermissionDecision {
+    let session_ids: Vec<serde_json::Value> = candidates
+        .iter()
+        .map(|c| serde_json::Value::String(c.id.to_string()))
+        .collect();
+
+    let input = serde_json::json!({
+        "operation": "storage_cleanup",
+        "candidate_count": candidates.len(),
+        "sessions": session_ids,
+    });
+
+    engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input)
+}
+
 fn run_storage_cleanup(args: &CleanupArgs) -> Result<()> {
     let manager = SessionManager::new().context("failed to create session manager")?;
 
@@ -117,12 +142,31 @@ fn run_storage_cleanup(args: &CleanupArgs) -> Result<()> {
         return Ok(());
     }
 
+    // Collect candidates first (needed for both dry-run and permission check).
+    let candidates = manager
+        .cleanup_candidates(&policy)
+        .context("failed to collect cleanup candidates")?;
+
     if !args.apply {
-        let candidates = manager
-            .cleanup_candidates(&policy)
-            .context("failed to collect cleanup candidates")?;
+        // Dry-run: no writes occur, so no authorization needed.
         print_cleanup_dry_run(&candidates);
         return Ok(());
+    }
+
+    // --apply path: evaluate through the permission boundary.
+    let engine = PermissionEngine::new();
+    match authorize_cleanup(&engine, &candidates) {
+        PermissionDecision::Allow => {
+            // Proceed with deletion.
+        }
+        PermissionDecision::Deny(reason) => {
+            println!("Storage cleanup denied by permission rules: {reason}");
+            return Ok(());
+        }
+        PermissionDecision::Ask => {
+            // --apply serves as explicit user authorization.
+            println!("Authorized by --apply (local maintenance boundary).");
+        }
     }
 
     let report = manager
@@ -474,5 +518,141 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     } else {
         format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_permission::PermissionRule;
+
+    #[test]
+    fn storage_cleanup_denied_by_permission_rule() {
+        let mut engine = PermissionEngine::new();
+        let config = serde_json::json!({
+            "rules": [{
+                "tool_name": "storage_cleanup",
+                "path_pattern": null,
+                "decision": "Deny"
+            }]
+        });
+        engine.load_from_config(&config).unwrap();
+
+        let input = serde_json::json!({
+            "operation": "storage_cleanup",
+            "candidate_count": 1,
+            "sessions": ["00000000-0000-0000-0000-000000000000"],
+        });
+        let decision = engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input);
+
+        assert!(matches!(decision, PermissionDecision::Deny(_)));
+    }
+
+    #[test]
+    fn storage_cleanup_default_engine_returns_ask() {
+        let engine = PermissionEngine::new();
+        let input = serde_json::json!({
+            "operation": "storage_cleanup",
+            "candidate_count": 1,
+            "sessions": ["00000000-0000-0000-0000-000000000000"],
+        });
+        let decision = engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input);
+
+        assert!(matches!(decision, PermissionDecision::Ask));
+    }
+
+    #[test]
+    fn storage_cleanup_explicit_allow_rule() {
+        let mut engine = PermissionEngine::new();
+        let config = serde_json::json!({
+            "rules": [{
+                "tool_name": "storage_cleanup",
+                "path_pattern": null,
+                "decision": "Allow"
+            }]
+        });
+        engine.load_from_config(&config).unwrap();
+
+        let input = serde_json::json!({
+            "operation": "storage_cleanup",
+            "candidate_count": 1,
+            "sessions": ["00000000-0000-0000-0000-000000000000"],
+        });
+        let decision = engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input);
+
+        assert!(matches!(decision, PermissionDecision::Allow));
+    }
+
+    #[test]
+    fn storage_cleanup_authorize_helper_denies_with_rule() {
+        let mut engine = PermissionEngine::new();
+        let config = serde_json::json!({
+            "rules": [{
+                "tool_name": "storage_cleanup",
+                "path_pattern": null,
+                "decision": "Deny"
+            }]
+        });
+        engine.load_from_config(&config).unwrap();
+
+        let empty: &[talos_session::SessionCleanupCandidate] = &[];
+        let decision = authorize_cleanup(&engine, empty);
+
+        assert!(matches!(decision, PermissionDecision::Deny(_)));
+    }
+
+    #[test]
+    fn storage_cleanup_authorize_helper_ask_with_defaults() {
+        let engine = PermissionEngine::new();
+        let empty: &[talos_session::SessionCleanupCandidate] = &[];
+        let decision = authorize_cleanup(&engine, empty);
+
+        assert!(matches!(decision, PermissionDecision::Ask));
+    }
+
+    #[test]
+    fn storage_cleanup_nature_deny_rule() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Deny("all writes blocked".to_owned()),
+        ));
+
+        let input = serde_json::json!({
+            "operation": "storage_cleanup",
+            "candidate_count": 1,
+            "sessions": ["00000000-0000-0000-0000-000000000000"],
+        });
+        let decision = engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input);
+
+        assert!(matches!(decision, PermissionDecision::Deny(_)));
+    }
+
+    #[test]
+    fn storage_cleanup_nature_allow_rule_precedes_default_ask() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+
+        let input = serde_json::json!({
+            "operation": "storage_cleanup",
+            "candidate_count": 1,
+            "sessions": ["00000000-0000-0000-0000-000000000000"],
+        });
+        let decision = engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input);
+
+        assert!(matches!(decision, PermissionDecision::Allow));
     }
 }
