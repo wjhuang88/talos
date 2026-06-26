@@ -154,6 +154,33 @@ Use the mock provider for deterministic local smoke tests:
 talos -p --mock "/mock-request summarize this repository"
 ```
 
+### Manage Local Storage
+
+Check local storage usage (read-only):
+
+```bash
+talos storage status
+```
+
+Preview sessions that would be cleaned up (dry-run, no deletion):
+
+```bash
+talos storage cleanup --max-sessions 20
+talos storage cleanup --max-age-days 30 --workspace /path/to/project
+```
+
+Delete old sessions with explicit apply and active-session protection:
+
+```bash
+talos storage cleanup --apply --max-age-days 90 --protect-session <active-uuid>
+```
+
+Run SQLite maintenance:
+
+```bash
+talos storage maintenance --checkpoint --vacuum --reconcile
+```
+
 ### Interactive Commands
 
 In the interactive TUI, type `/` at the start of the composer to open the command menu. Continue

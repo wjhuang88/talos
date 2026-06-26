@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | DATA-001 |
 | Priority | P1 |
-| Status | Planned |
+| Status | Active (I049 user-facing CLI complete; memory retention dry-run deferred to I053) |
 | Depends On | I047 release closeout; MEM-001-A starter; SESSION-002 delete/reconcile support |
 | Origin | Post-I047 storage review, 2026-06-26 |
 
@@ -72,18 +72,18 @@ Required capabilities:
 
 ## Acceptance Criteria
 
-- [ ] A read-only storage status command reports Talos-owned local storage sizes and tolerates
+- [x] A read-only storage status command reports Talos-owned local storage sizes and tolerates
       missing directories.
-- [ ] Session cleanup supports dry-run and apply modes.
-- [ ] Cleanup refuses to delete the active session.
-- [ ] Cleanup removes both session JSONL and associated SQLite index/fork rows.
-- [ ] Forked sessions are visible in storage status.
-- [ ] Session SQLite maintenance can checkpoint WAL and vacuum through an explicit command/API.
-- [ ] `talos-memory` enables SQLite foreign-key enforcement.
-- [ ] Evidence insertion for a nonexistent memory ID fails.
+- [x] Session cleanup supports dry-run and apply modes.
+- [x] Cleanup refuses to delete the active session.
+- [x] Cleanup removes both session JSONL and associated SQLite index/fork rows.
+- [x] Forked sessions are visible in storage status.
+- [x] Session SQLite maintenance can checkpoint WAL and vacuum through an explicit command/API.
+- [x] `talos-memory` enables SQLite foreign-key enforcement.
+- [x] Evidence insertion for a nonexistent memory ID fails.
 - [ ] Memory cleanup policy supports dry-run and is documented as maintenance, not semantic
-      overwrite.
-- [ ] I019 activation docs explicitly depend on DATA-001 or record a change-control exception.
+      overwrite. *(Deferred to I053 — retention dry-run is scoped to I053 memory quality gate)*
+- [x] I019 activation docs explicitly depend on DATA-001 or record a change-control exception.
 
 ## Suggested Slices
 
@@ -112,6 +112,22 @@ CLI/user-facing slice activates:
 This does not close DATA-001. The user-facing storage status command, active-session protection
 at command invocation, fork visibility, and memory retention dry-run remain in the planned I048
 acceptance boundary.
+
+## I049 Progress (2026-06-26)
+
+I049 delivered the user-facing CLI for DATA-001-A through D:
+
+- `talos storage status`: read-only report of sessions, index DB (+WAL/SHM), fork counts, logs,
+  model cache, and memory DB surfaces. Tolerates missing `~/.talos` (exits 0).
+- `talos storage cleanup`: dry-run by default; `--apply` requires explicit `--max-sessions` or
+  `--max-age-days`; `--protect-session` protects the active session from deletion.
+- `talos storage maintenance --checkpoint/--vacuum/--reconcile`: explicit SQLite maintenance on
+  session index and memory DB.
+- `SessionManager::get_forks()` public API added for fork visibility.
+- 7 CLI tests + end-to-end runtime smoke test with real binary verified.
+
+Deferred to I053: memory retention dry-run (DATA-001-E memory cleanup policy). The memory store
+remains library-only per I047 boundary; no memory DB file is created by the runtime yet.
 
 ## Required Reads
 

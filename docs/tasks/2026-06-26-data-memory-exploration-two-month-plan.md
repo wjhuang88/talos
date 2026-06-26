@@ -58,7 +58,7 @@ The sequence intentionally treats storage lifecycle as the gate before autonomou
 |---|---|---|---|---|---|---|
 | T0 | Planning | Two-month task record and iteration sequence committed | Current clean `main` | Governance validation passes | Keep as planning-only draft | Planned |
 | T1 | I048 | Library-level DATA-001 foundation validated and planned CLI scope preserved | T0; `v0.1.2` tag published | Session/memory maintenance APIs tested; I048 still honest about remaining CLI work | Leave I048 Planned if release workflow evidence blocks activation | Planned |
-| T2 | I049 | Storage status and cleanup CLI commands | T1 | Missing-data, dry-run, apply, active-session protection, fork visibility tests pass | Keep cleanup library-only and ship status first | Planned |
+| T2 | I049 | Storage status and cleanup CLI commands | T1 | Missing-data, dry-run, apply, active-session protection, fork visibility tests pass | Keep cleanup library-only and ship status first | Review (2026-06-26) |
 | T3 | I050 | Episodic-to-semantic consolidation pipeline | T2 | Batch/end-of-session consolidation tests with ADD-only evidence links | Keep consolidation manual-only if automatic trigger is risky | Planned |
 | T4 | I051 | Bounded memory retrieval prompt injection | T3 | Token-budgeted prompt section tests; hidden tool outputs never injected | Keep retrieval API exposed but injection disabled by config | Planned |
 | T5 | I052 | Procedural memory extraction and entity linking | T4 | Entity extraction and procedural adaptation tests; no permission authority | Limit procedural memory to advisory prompt text | Planned |
@@ -180,3 +180,24 @@ format for I049-I056.
 
 Recovery/resume instruction: distribute the handoff before assigning I049; require each programmer
 to append activation/evidence records to the owning iteration before implementation.
+
+### T2 — I049 Storage Status And Cleanup CLI Complete (2026-06-26)
+
+I049 (Assignment A1) implemented and verified. All four DATA-001 user-facing CLI slices delivered:
+
+- `talos storage status`: read-only report of sessions, index DB (+WAL/SHM), fork counts, logs,
+  cache, and memory DB. Tolerates missing `~/.talos`.
+- `talos storage cleanup`: dry-run default; `--apply` requires explicit criteria; active-session
+  protection via `--protect-session`.
+- `talos storage maintenance --checkpoint/--vacuum/--reconcile`: explicit SQLite maintenance.
+- `SessionManager::get_forks()` public API added for fork visibility.
+
+Gates: fmt, check, clippy (`-D warnings`), test (all pass), governance (0 warnings).
+Runtime smoke: verified with real `talos` binary on real user data.
+Pre-existing init_wizard HOME env var race fixed with `ENV_MUTEX`.
+
+Deferred to I053: memory retention dry-run (DATA-001-E). Memory store remains library-only.
+
+Recovery/resume instruction: I049 is in Review. Next assignment A2 (I050 Memory Consolidation
+Pipeline) may start after I049 is committed — DATA-001 user-facing lifecycle controls are
+operational. Read I050 iteration doc and MEM-001 backlog before activation.

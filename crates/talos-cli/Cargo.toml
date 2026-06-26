@@ -24,6 +24,7 @@ talos-rpc = { path = "../talos-rpc" }
 # I009-S5 end
 talos-tools = { path = "../talos-tools" }
 talos-session = { path = "../talos-session" }
+talos-memory = { path = "../talos-memory" }
 talos-permission = { path = "../talos-permission" }
 talos-evolution = { path = "../talos-evolution" }
 talos-skill = { path = "../talos-skill" }

@@ -27,6 +27,7 @@ mod runtime_adapter;
 mod session_setup;
 mod session_transition;
 mod skill_runtime;
+mod storage;
 mod tui_bridge;
 
 use std::io::{self, IsTerminal};
@@ -70,6 +71,11 @@ pub(crate) enum TalosCommand {
         /// Print setup instructions without launching interactive wizard.
         #[arg(long)]
         non_interactive: bool,
+    },
+    /// Local storage visibility and maintenance.
+    Storage {
+        #[command(subcommand)]
+        command: storage::StorageCommand,
     },
 }
 
@@ -250,6 +256,10 @@ async fn main() -> Result<()> {
     // Subcommand dispatch (takes priority over flat flags)
     if let Some(TalosCommand::Init { non_interactive }) = &cli.command {
         return init_wizard::run_init_wizard(*non_interactive).await;
+    }
+
+    if let Some(TalosCommand::Storage { command }) = &cli.command {
+        return crate::storage::run_storage_command(command.clone());
     }
 
     if let Some(path) = &cli.import_models {

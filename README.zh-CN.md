@@ -149,6 +149,33 @@ talos --workspace /path/to/project "analyze the current architecture"
 talos -p --mock "/mock-request summarize this repository"
 ```
 
+### 管理本地存储
+
+查看本地存储用量（只读）：
+
+```bash
+talos storage status
+```
+
+预览会被清理的会话（dry-run，不删除文件）：
+
+```bash
+talos storage cleanup --max-sessions 20
+talos storage cleanup --max-age-days 30 --workspace /path/to/project
+```
+
+删除旧会话（需显式 apply 并保护当前活动会话）：
+
+```bash
+talos storage cleanup --apply --max-age-days 90 --protect-session <active-uuid>
+```
+
+运行 SQLite 维护操作：
+
+```bash
+talos storage maintenance --checkpoint --vacuum --reconcile
+```
+
 ### 交互命令
 
 在交互式 TUI 中，于输入区开头键入 `/` 即可打开命令菜单。继续输入可筛选命令，使用

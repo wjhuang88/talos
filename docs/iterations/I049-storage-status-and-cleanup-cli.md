@@ -70,3 +70,35 @@ operational before I019 automatic memory writes.
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-06-26 | **Activation** | I049 activated. Gate verification: (1) I047 release workflow evidence confirmed — `v0.1.2` GitHub Actions release workflow completed successfully with all 6 assets uploaded (checksum + darwin/linux/windows binaries); (2) I048 pre-activation foundation APIs verified present in `71b0392` (SessionManager cleanup_candidates/apply_cleanup/checkpoint_index/vacuum_index/reconcile_index, MemoryStore checkpoint_truncate/vacuum/count). Working tree clean at `04d5e01`. Scope: `talos storage status` (read-only), `talos storage cleanup --dry-run/--apply` (active-session protected), `talos storage maintenance --checkpoint/--vacuum/--reconcile`. No memory DB file-path wiring changes beyond status reporting; MemoryStore remains library-only per I047 boundary. |
+| 2026-06-26 | **Implementation** | All four slices delivered: DATA-001-A (`storage status` read-only report with sessions/index/WAL/forks/logs/cache/memory surfaces), DATA-001-B (`storage cleanup` dry-run default + `--apply` requiring explicit criteria + `--protect-session` active-session protection), DATA-001-C (fork count visibility in status via new `SessionManager::get_forks()` wrapper), DATA-001-D (`storage maintenance --checkpoint/--vacuum/--reconcile` on session index + memory DB). New module `crates/talos-cli/src/storage.rs` (~478 lines). 7 new CLI tests. Pre-existing flaky `init_wizard` test race fixed with `ENV_MUTEX` serialization. |
+
+## Verification Evidence
+
+### Workspace Gates (2026-06-26)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all pass, 0 failures
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### End-to-End Runtime Evidence (ITERATION-WORKFLOW §3a)
+
+- `talos storage status` on real user data: reports 95 sessions across 3 workspaces, 246.9 KB JSONL, 3.7 MB index.db, 1.2 MB logs, memory DB not initialized. Exits 0.
+- `talos storage cleanup --apply` (no criteria): correctly rejected with "requires at least one selection criterion".
+- `talos storage cleanup --max-sessions 99` (dry-run): reports no candidates, confirms "no files deleted".
+- `talos storage maintenance --vacuum`: "Session index: vacuum completed."
+- `talos storage status` with missing HOME: "Talos root (~/.talos): not found", exits 0.
+- `talos storage --help`: shows Status/Cleanup/Maintenance subcommands.
+
+### Changed Files
+
+| File | Change |
+|---|---|
+| `crates/talos-session/src/manager.rs` | Added `ForkInfo` import + `get_forks()` public method |
+| `crates/talos-cli/src/storage.rs` | NEW: StorageCommand enum, status/cleanup/maintenance functions |
+| `crates/talos-cli/src/main.rs` | Added `mod storage;`, `Storage` variant to `TalosCommand`, dispatch |
+| `crates/talos-cli/Cargo.toml` | Added `talos-memory` dependency |
+| `crates/talos-cli/src/tests.rs` | 7 new tests covering all acceptance criteria |
+| `crates/talos-cli/src/init_wizard.rs` | Fixed pre-existing HOME env var race with `ENV_MUTEX` |

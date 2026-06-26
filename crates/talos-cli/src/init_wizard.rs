@@ -387,6 +387,10 @@ fn builtin_provider_config(name: &str) -> Option<talos_config::ProviderConfig> {
 mod tests {
     use super::*;
     use std::io::Cursor;
+    use std::sync::Mutex;
+
+    /// Serializes tests that manipulate the HOME environment variable.
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_non_interactive_prints_instructions() {
@@ -415,6 +419,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wizard_cancel_on_reconfigure() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         let input = b"n\n";
         let mut reader = Cursor::new(input.as_slice());
         let mut writer = Vec::new();
@@ -450,6 +455,7 @@ model = "claude-sonnet-4-20250514"
 
     #[tokio::test]
     async fn test_wizard_saves_on_confirm() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         // Simulate: y (reconfigure), 1 (first provider = anthropic),
         // ANTHROPIC_API_KEY (env var), 1 (first model), n (skip test), y (save)
         let input = b"y\n1\nANTHROPIC_API_KEY\n1\nn\ny\n";
@@ -478,6 +484,7 @@ model = "claude-sonnet-4-20250514"
 
     #[tokio::test]
     async fn test_wizard_cancel_on_save() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         // Simulate: y (reconfigure), 1 (anthropic), ANTHROPIC_API_KEY, 1 (model), n (skip test), n (cancel save)
         let input = b"y\n1\nANTHROPIC_API_KEY\n1\nn\nn\n";
         let mut reader = Cursor::new(input.as_slice());

@@ -1,5 +1,5 @@
 use crate::jsonl::scan_file;
-use crate::sqlite::{IndexError, SearchResult, SessionIndex};
+use crate::sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
 use crate::{Session, SessionError, SessionInfo};
 use chrono::{DateTime, Duration, Utc};
@@ -369,6 +369,13 @@ impl SessionManager {
         let guard = self.get_or_create_index()?;
         let index = guard.as_ref().expect("index just created");
         index.vacuum()
+    }
+
+    /// Return forks originating from the given session ID.
+    pub fn get_forks(&self, session_id: &str) -> Result<Vec<ForkInfo>, IndexError> {
+        let guard = self.get_or_create_index()?;
+        let index = guard.as_ref().expect("index just created");
+        index.get_forks(session_id)
     }
 
     #[allow(clippy::collapsible_if)]

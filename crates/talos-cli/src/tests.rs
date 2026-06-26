@@ -256,4 +256,241 @@ api_key_env = "ANTHROPIC_API_KEY"
         // api_key_env is a variable name, not a secret — must not be masked.
         assert!(masked.contains("ANTHROPIC_API_KEY"));
     }
+
+    use crate::storage::{
+        CleanupArgs, MaintenanceArgs, collect_storage_status, print_cleanup_dry_run,
+        print_cleanup_report, print_storage_status, resolve_talos_root,
+    };
+    use std::io::Write;
+    use talos_core::message::Message;
+
+    #[test]
+    fn storage_status_missing_home() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let status = collect_storage_status(&talos_root);
+        assert!(!status.talos_root_exists);
+        assert_eq!(status.session_count, 0);
+        assert_eq!(status.session_total_bytes, 0);
+        assert_eq!(status.total_forks, 0);
+        assert_eq!(status.index_db_bytes, 0);
+        assert_eq!(status.logs_bytes, 0);
+        assert_eq!(status.cache_bytes, 0);
+        assert!(!status.memory_db_exists);
+    }
+
+    #[test]
+    fn storage_status_populated() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let sessions_dir = talos_root.join("sessions");
+        let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
+
+        let ws = "test-workspace";
+        let s1 = manager.create_session("proj-a", ws).unwrap();
+        s1.append(&Message::User {
+            content: "hello".into(),
+        })
+        .unwrap();
+        let s2 = manager.create_session("proj-b", ws).unwrap();
+        s2.append(&Message::User {
+            content: "world".into(),
+        })
+        .unwrap();
+
+        let status = collect_storage_status(&talos_root);
+        assert!(status.talos_root_exists);
+        assert_eq!(status.session_count, 2);
+        assert!(status.session_total_bytes > 0);
+        assert_eq!(status.top_sessions.len(), 2);
+    }
+
+    #[test]
+    fn cleanup_dry_run_no_deletion() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let sessions_dir = talos_root.join("sessions");
+        let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
+
+        let ws = "dry-run-ws";
+        for i in 0..3 {
+            let s = manager.create_session("proj", ws).unwrap();
+            s.append(&Message::User {
+                content: format!("msg-{i}"),
+            })
+            .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        let policy = talos_session::SessionCleanupPolicy {
+            workspace_root: Some(ws.to_string()),
+            max_sessions_per_workspace: Some(1),
+            max_age_days: None,
+            protected_session_ids: vec![],
+        };
+        let candidates = manager.cleanup_candidates(&policy).unwrap();
+        assert!(!candidates.is_empty());
+
+        let before_files: Vec<_> = std::fs::read_dir(&sessions_dir)
+            .unwrap()
+            .flat_map(|e| e.ok())
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+            .flat_map(|ws_dir| std::fs::read_dir(ws_dir.path()).unwrap())
+            .flat_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+            .collect();
+
+        print_cleanup_dry_run(&candidates);
+
+        let after_files: Vec<_> = std::fs::read_dir(&sessions_dir)
+            .unwrap()
+            .flat_map(|e| e.ok())
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+            .flat_map(|ws_dir| std::fs::read_dir(ws_dir.path()).unwrap())
+            .flat_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+            .collect();
+
+        assert_eq!(
+            before_files.len(),
+            after_files.len(),
+            "dry-run must not delete any files"
+        );
+    }
+
+    #[test]
+    fn cleanup_apply_deletes_jsonl_and_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let sessions_dir = talos_root.join("sessions");
+        let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
+
+        let ws = "apply-ws";
+        let stale = manager.create_session("proj", ws).unwrap();
+        stale
+            .append(&Message::User {
+                content: "stale content".into(),
+            })
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let keep = manager.create_session("proj", ws).unwrap();
+        keep.append(&Message::User {
+            content: "keep content".into(),
+        })
+        .unwrap();
+
+        manager.update_index(&stale).unwrap();
+        manager.update_index(&keep).unwrap();
+
+        let policy = talos_session::SessionCleanupPolicy {
+            workspace_root: Some(ws.to_string()),
+            max_sessions_per_workspace: Some(0),
+            max_age_days: None,
+            protected_session_ids: vec![keep.id],
+        };
+
+        let report = manager.apply_cleanup(&policy).unwrap();
+        assert_eq!(report.removed, 1);
+        assert!(!stale.file_path.exists(), "stale JSONL must be deleted");
+        assert!(keep.file_path.exists(), "protected JSONL must remain");
+
+        let search_results = manager.search("stale", 10).unwrap();
+        assert!(
+            !search_results
+                .iter()
+                .any(|r| r.session_id == stale.id.to_string()),
+            "stale session must not appear in search"
+        );
+    }
+
+    #[test]
+    fn cleanup_protects_active_session() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let sessions_dir = talos_root.join("sessions");
+        let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
+
+        let ws = "protect-ws";
+        let active = manager.create_session("proj", ws).unwrap();
+        active
+            .append(&Message::User {
+                content: "active".into(),
+            })
+            .unwrap();
+        let other = manager.create_session("proj", ws).unwrap();
+        other
+            .append(&Message::User {
+                content: "other".into(),
+            })
+            .unwrap();
+
+        let policy = talos_session::SessionCleanupPolicy {
+            workspace_root: Some(ws.to_string()),
+            max_sessions_per_workspace: Some(0),
+            max_age_days: None,
+            protected_session_ids: vec![active.id],
+        };
+
+        let candidates = manager.cleanup_candidates(&policy).unwrap();
+        assert!(
+            !candidates.iter().any(|c| c.id == active.id),
+            "active session must never be a cleanup candidate"
+        );
+    }
+
+    #[test]
+    fn cleanup_apply_requires_criteria() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let sessions_dir = talos_root.join("sessions");
+        let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
+
+        let ws = "criteria-ws";
+        let s = manager.create_session("proj", ws).unwrap();
+        s.append(&Message::User {
+            content: "test".into(),
+        })
+        .unwrap();
+
+        let policy = talos_session::SessionCleanupPolicy {
+            workspace_root: None,
+            max_sessions_per_workspace: None,
+            max_age_days: None,
+            protected_session_ids: vec![],
+        };
+
+        let candidates = manager.cleanup_candidates(&policy).unwrap();
+        assert!(
+            candidates.is_empty(),
+            "no criteria should yield zero candidates"
+        );
+    }
+
+    #[test]
+    fn maintenance_operations_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let talos_root = dir.path().join(".talos");
+        let sessions_dir = talos_root.join("sessions");
+        let manager = talos_session::SessionManager::with_dir(sessions_dir.clone());
+
+        let ws = "maint-ws";
+        let s = manager.create_session("proj", ws).unwrap();
+        s.append(&Message::User {
+            content: "maintenance test".into(),
+        })
+        .unwrap();
+        manager.update_index(&s).unwrap();
+
+        manager.checkpoint_index().unwrap();
+        manager.vacuum_index().unwrap();
+        let fixed = manager.reconcile_index().unwrap();
+
+        let results = manager.search("maintenance", 10).unwrap();
+        assert!(
+            results.iter().any(|r| r.session_id == s.id.to_string()),
+            "sessions must survive maintenance operations"
+        );
+    }
 }
