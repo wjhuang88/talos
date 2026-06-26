@@ -17,6 +17,13 @@
 //! - **Provenance**: every memory item links to evidence through the `evidence_links` table.
 //! - **No automatic prompt injection**: retrieval returns results; injection is caller's responsibility.
 
+pub mod consolidation;
+
+pub use consolidation::{
+    ConsolidationConfig, ConsolidationReport, EpisodeExtractor, MemoryCandidate,
+    RuleBasedExtractor, SessionEpisode, consolidate_episodes,
+};
+
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};

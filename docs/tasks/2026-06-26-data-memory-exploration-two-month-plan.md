@@ -59,7 +59,7 @@ The sequence intentionally treats storage lifecycle as the gate before autonomou
 | T0 | Planning | Two-month task record and iteration sequence committed | Current clean `main` | Governance validation passes | Keep as planning-only draft | Planned |
 | T1 | I048 | Library-level DATA-001 foundation validated and planned CLI scope preserved | T0; `v0.1.2` tag published | Session/memory maintenance APIs tested; I048 still honest about remaining CLI work | Leave I048 Planned if release workflow evidence blocks activation | Planned |
 | T2 | I049 | Storage status and cleanup CLI commands | T1 | Missing-data, dry-run, apply, active-session protection, fork visibility tests pass | Keep cleanup library-only and ship status first | Review (2026-06-26) |
-| T3 | I050 | Episodic-to-semantic consolidation pipeline | T2 | Batch/end-of-session consolidation tests with ADD-only evidence links | Keep consolidation manual-only if automatic trigger is risky | Planned |
+| T3 | I050 | Episodic-to-semantic consolidation pipeline | T2 | Batch/end-of-session consolidation tests with ADD-only evidence links | Keep consolidation manual-only if automatic trigger is risky | Review (2026-06-26) |
 | T4 | I051 | Bounded memory retrieval prompt injection | T3 | Token-budgeted prompt section tests; hidden tool outputs never injected | Keep retrieval API exposed but injection disabled by config | Planned |
 | T5 | I052 | Procedural memory extraction and entity linking | T4 | Entity extraction and procedural adaptation tests; no permission authority | Limit procedural memory to advisory prompt text | Planned |
 | T6 | I053 | Memory quality gates and release hardening | T5 | Contradiction, decay, retention dry-run, observability, and docs verified | Defer non-blocking ranking polish | Planned |
@@ -201,3 +201,22 @@ Deferred to I053: memory retention dry-run (DATA-001-E). Memory store remains li
 Recovery/resume instruction: I049 is in Review. Next assignment A2 (I050 Memory Consolidation
 Pipeline) may start after I049 is committed — DATA-001 user-facing lifecycle controls are
 operational. Read I050 iteration doc and MEM-001 backlog before activation.
+
+### T3 — I050 Memory Consolidation Pipeline Complete (2026-06-26)
+
+I050 (Assignment A2) implemented and verified. Episodic-to-semantic consolidation pipeline:
+
+- `EpisodeExtractor` trait with deterministic `RuleBasedExtractor` (no provider dependency).
+- `consolidate_episodes()` ADD-only pipeline: extract → insert (content-hash dedup) → evidence links.
+- `ConsolidationConfig` default `enabled: false` (opt-in safety).
+- CLI `talos memory consolidate [--session <UUID>]` reads session JSONL and runs pipeline.
+- 6 unit tests covering all acceptance criteria (evidence creation, dedup, conflict preservation,
+  malformed sessions, disabled config, determinism).
+
+Gates: fmt, check, clippy (`-D warnings`), test (all pass), governance (0 warnings).
+Runtime smoke: `talos memory consolidate --session <UUID>` extracted 2 candidates, inserted 2 with
+evidence links; second run deduped all (ADD-only verified).
+
+Recovery/resume instruction: I050 is in Review. Next assignment A3 (I051 Bounded Memory Prompt
+Injection) may start after I050 is committed — consolidation evidence exists. Read I051 iteration
+doc and MEM-005 backlog before activation.

@@ -19,6 +19,7 @@ mod governance;
 mod init_wizard;
 mod logging;
 mod mcp_runtime;
+mod memory_cli;
 mod mode_runners;
 mod model_lifecycle;
 mod provider_setup;
@@ -76,6 +77,11 @@ pub(crate) enum TalosCommand {
     Storage {
         #[command(subcommand)]
         command: storage::StorageCommand,
+    },
+    /// Memory operations.
+    Memory {
+        #[command(subcommand)]
+        command: memory_cli::MemoryCommand,
     },
 }
 
@@ -260,6 +266,10 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Storage { command }) = &cli.command {
         return crate::storage::run_storage_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Memory { command }) = &cli.command {
+        return crate::memory_cli::run_memory_command(command.clone());
     }
 
     if let Some(path) = &cli.import_models {
