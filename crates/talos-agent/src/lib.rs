@@ -97,6 +97,9 @@ pub enum AgentError {
 /// Result alias for agent operations.
 pub type AgentResult<T> = Result<T, AgentError>;
 
+// Callback type for memory prompt injection.
+type MemoryProviderCallback = dyn Fn(&str) -> Option<String> + Send + Sync;
+
 /// The agent orchestrates a conversation turn: takes a user message, calls the
 /// LLM provider, streams events, executes tool calls when requested, and feeds
 /// results back until a final text response is produced.
@@ -153,6 +156,8 @@ pub struct Agent {
     /// Cached stable prefix (Identity + Tools + Skills) computed once and
     /// reused across turns. Invalidated when tools, skills, or identity change.
     cached_stable_prefix: std::sync::Mutex<Option<String>>,
+    /// Optional memory provider callback for injecting memory into prompts.
+    memory_provider: Option<Arc<MemoryProviderCallback>>,
 }
 
 impl Agent {
@@ -185,6 +190,7 @@ impl Agent {
             workspace_context: None,
             tool_definitions: Vec::new(),
             cached_stable_prefix: std::sync::Mutex::new(None),
+            memory_provider: None,
         }
     }
 
@@ -293,7 +299,16 @@ impl Agent {
             workspace_context: None,
             tool_definitions,
             cached_stable_prefix: std::sync::Mutex::new(None),
+            memory_provider: None,
         }
+    }
+
+    /// Sets a memory provider callback for injecting memory into the system prompt.
+    ///
+    /// The callback receives the user's query and returns an optional formatted
+    /// memory section string. When `None` is returned, no memory is injected.
+    pub fn set_memory_provider(&mut self, provider: Arc<MemoryProviderCallback>) {
+        self.memory_provider = Some(provider);
     }
 
     /// Sets the tool descriptions for the system prompt builder.
@@ -440,6 +455,27 @@ impl Agent {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
+        const DEBUG_CMD: &str = "/mock-request";
+        let is_debug = user_message.trim_start().starts_with(DEBUG_CMD);
+
+        let actual_user_message = if is_debug {
+            user_message.trim_start()[DEBUG_CMD.len()..]
+                .trim()
+                .to_string()
+        } else {
+            user_message
+        };
+
+        // Resolve the prompt builder: clone with memory section if provider is set.
+        let prompt_builder = if let Some(ref mem_provider) = self.memory_provider {
+            let memory_section = mem_provider(&actual_user_message);
+            self.prompt_builder
+                .clone()
+                .with_memory_section(memory_section)
+        } else {
+            self.prompt_builder.clone()
+        };
+
         let stable_prefix = {
             let mut cache = self
                 .cached_stable_prefix
@@ -448,14 +484,14 @@ impl Agent {
             match cache.as_ref() {
                 Some(cached) => cached.clone(),
                 None => {
-                    let prefix = self.prompt_builder.build_stable_prefix();
+                    let prefix = prompt_builder.build_stable_prefix();
                     *cache = Some(prefix.clone());
                     prefix
                 }
             }
         };
         let stable_prefix_len = stable_prefix.len();
-        let dynamic_suffix = self.prompt_builder.build_dynamic_suffix();
+        let dynamic_suffix = prompt_builder.build_dynamic_suffix();
         let combined = if stable_prefix.is_empty() {
             dynamic_suffix
         } else if dynamic_suffix.is_empty() {
@@ -464,8 +500,7 @@ impl Agent {
             format!("{stable_prefix}\n{dynamic_suffix}")
         };
 
-        let (system_prompt, cache_markers) = match self
-            .prompt_builder
+        let (system_prompt, cache_markers) = match prompt_builder
             .build_with_hooks_from_prompt(
                 self.hook_registry.as_ref(),
                 &hook_ctx,
@@ -483,17 +518,6 @@ impl Agent {
         };
 
         let mut messages = history;
-
-        const DEBUG_CMD: &str = "/mock-request";
-        let is_debug = user_message.trim_start().starts_with(DEBUG_CMD);
-
-        let actual_user_message = if is_debug {
-            user_message.trim_start()[DEBUG_CMD.len()..]
-                .trim()
-                .to_string()
-        } else {
-            user_message
-        };
 
         if !system_prompt.is_empty() {
             messages.push(Message::System {
