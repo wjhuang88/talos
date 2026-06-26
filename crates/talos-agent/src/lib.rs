@@ -754,8 +754,15 @@ impl Agent {
                         },
                     )
                     .await;
+                let persisted = messages[persist_start..].to_vec();
                 break 'turn_loop (
-                    Err(AgentError::TurnBudgetExceeded),
+                    Ok((
+                        format!(
+                            "Reached the per-turn tool call limit ({MAX_TOOL_CALLS_PER_TURN}). \
+                             All results so far are preserved above — reply \"continue\" to resume."
+                        ),
+                        persisted,
+                    )),
                     TurnStatus::BudgetExceeded,
                 );
             }
@@ -778,7 +785,14 @@ impl Agent {
                         )
                         .await;
                     break 'turn_loop (
-                        Err(AgentError::DoomLoopDetected(signature)),
+                        Ok((
+                            format!(
+                                "Detected a repeated call pattern ({signature}). Paused for \
+                                 review — all results are preserved above. Adjust your approach \
+                                 and reply \"continue\" to resume."
+                            ),
+                            messages[persist_start..].to_vec(),
+                        )),
                         TurnStatus::DoomLoopDetected,
                     );
                 }

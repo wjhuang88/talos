@@ -575,11 +575,15 @@ async fn test_turn_budget_enforcement() {
 
     let agent = Agent::new(Arc::new(MockModel::new(vec![events])), registry);
     let result = agent.run("Many tools".into()).await;
-    assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        AgentError::TurnBudgetExceeded
-    ));
+    assert!(
+        result.is_ok(),
+        "budget exceeded should return Ok with messages, not Err"
+    );
+    let text = result.unwrap();
+    assert!(
+        text.contains("limit") || text.contains("preserved"),
+        "final text should mention tool call limit: got {text}"
+    );
 }
 
 #[tokio::test]
@@ -682,11 +686,15 @@ async fn test_doom_loop_detection() {
 
     let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
     let result = agent.run("Loop".into()).await;
-    assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        AgentError::DoomLoopDetected(_)
-    ));
+    assert!(
+        result.is_ok(),
+        "doom loop should return Ok with messages, not Err"
+    );
+    let text = result.unwrap();
+    assert!(
+        text.contains("repeated") || text.contains("paused"),
+        "final text should mention repeat pattern: got {text}"
+    );
 }
 
 #[tokio::test]
