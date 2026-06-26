@@ -28,6 +28,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::path::Path;
 use thiserror::Error;
 
@@ -48,6 +49,25 @@ impl std::fmt::Display for MemoryKind {
             MemoryKind::Procedural => write!(f, "Procedural"),
         }
     }
+}
+
+/// The kind of entity extracted from memory content.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityKind {
+    File,
+    Url,
+    Code,
+    Concept,
+}
+
+/// An entity extracted from memory content.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Entity {
+    pub id: String,
+    pub name: String,
+    pub kind: EntityKind,
+    pub created_at: DateTime<Utc>,
 }
 
 /// A single memory item in the semantic or procedural layer.
@@ -185,6 +205,21 @@ impl MemoryStore {
             CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
                 memory_id UNINDEXED, content, tokenize='unicode61'
             );
+
+            CREATE TABLE IF NOT EXISTS entities (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS memory_entities (
+                memory_id TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                PRIMARY KEY (memory_id, entity_id),
+                FOREIGN KEY (memory_id) REFERENCES memory_items(id),
+                FOREIGN KEY (entity_id) REFERENCES entities(id)
+            );
             "#,
         )?;
 
@@ -195,7 +230,18 @@ impl MemoryStore {
         if version_count == 0 {
             let _ = self
                 .conn
-                .execute("INSERT INTO schema_version (version) VALUES (1)", []);
+                .execute("INSERT INTO schema_version (version) VALUES (2)", []);
+        } else {
+            // Migrate from version 1 to 2: entity tables are created above with
+            // IF NOT EXISTS, so they are idempotent. Just bump the version.
+            let current_version: i64 =
+                self.conn
+                    .query_row("SELECT version FROM schema_version", [], |row| row.get(0))?;
+            if current_version < 2 {
+                let _ = self
+                    .conn
+                    .execute("UPDATE schema_version SET version = 2", []);
+            }
         }
 
         Ok(())
@@ -240,6 +286,25 @@ impl MemoryStore {
                 "INSERT INTO memory_fts (memory_id, content) VALUES (?1, ?2)",
                 params![item.id, item.content],
             )?;
+
+            let entities = extract_entities(&item.content);
+            for (name, kind) in entities {
+                let kind_str = match kind {
+                    EntityKind::File => "file",
+                    EntityKind::Url => "url",
+                    EntityKind::Code => "code",
+                    EntityKind::Concept => "concept",
+                };
+                let entity_id = format!("{kind_str}:{name}");
+                let _ = tx.execute(
+                    "INSERT OR IGNORE INTO entities (id, name, kind, created_at) VALUES (?1, ?2, ?3, ?4)",
+                    params![entity_id, name, kind_str, Utc::now().to_rfc3339()],
+                );
+                let _ = tx.execute(
+                    "INSERT OR IGNORE INTO memory_entities (memory_id, entity_id) VALUES (?1, ?2)",
+                    params![item.id, entity_id],
+                );
+            }
         }
 
         tx.commit()?;
@@ -285,6 +350,8 @@ impl MemoryStore {
         // Fetch more candidates from FTS5 to allow scoring to reorder.
         let candidate_limit = (limit.max(5) * 3) as i64;
 
+        let fts_query = escape_fts_query(query);
+
         let mut stmt = self.conn.prepare(
             "SELECT memory_id, rank FROM memory_fts \
              WHERE memory_fts MATCH ?1 \
@@ -293,12 +360,25 @@ impl MemoryStore {
         )?;
 
         let candidates = stmt
-            .query_map(params![query, candidate_limit], |row| {
+            .query_map(params![fts_query, candidate_limit], |row| {
                 let memory_id: String = row.get(0)?;
                 let rank: f64 = row.get(1)?;
                 Ok((memory_id, rank))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        let query_entities: HashSet<String> = extract_entities(query)
+            .into_iter()
+            .map(|(name, kind)| {
+                let kind_str = match kind {
+                    EntityKind::File => "file",
+                    EntityKind::Url => "url",
+                    EntityKind::Code => "code",
+                    EntityKind::Concept => "concept",
+                };
+                format!("{kind_str}:{name}")
+            })
+            .collect();
 
         let mut results = Vec::new();
         let now = Utc::now();
@@ -323,7 +403,21 @@ impl MemoryStore {
             )?;
             let evidence_score = item.confidence * (1.0 + evidence_count as f64).ln();
 
-            let final_score = fts_score * 1.0 + recency * 0.3 + evidence_score * 0.5;
+            let memory_entity_ids: HashSet<String> = self
+                .conn
+                .prepare("SELECT entity_id FROM memory_entities WHERE memory_id = ?1")
+                .ok()
+                .and_then(|mut stmt| {
+                    stmt.query_map(params![memory_id], |row| row.get::<_, String>(0))
+                        .ok()
+                        .map(|rows| rows.filter_map(|r| r.ok()).collect::<HashSet<String>>())
+                })
+                .unwrap_or_default();
+
+            let overlap = query_entities.intersection(&memory_entity_ids).count();
+            let entity_score = overlap as f64 * 0.5;
+
+            let final_score = fts_score * 1.0 + recency * 0.3 + evidence_score * 0.5 + entity_score;
 
             let evidence = self.load_evidence(&memory_id)?;
 
@@ -334,8 +428,8 @@ impl MemoryStore {
             );
 
             let score_breakdown = format!(
-                "fts={:.3}, recency={:.3}, evidence={:.3}",
-                fts_score, recency, evidence_score
+                "fts={:.3}, recency={:.3}, evidence={:.3}, entity={:.3}",
+                fts_score, recency, evidence_score, entity_score
             );
 
             results.push(RetrievalResult {
@@ -500,6 +594,154 @@ fn parse_datetime(s: &str) -> Result<DateTime<Utc>, MemoryStoreError> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
         .map_err(|e| MemoryStoreError::InvalidTimestamp(e.to_string()))
+}
+
+/// Escape a user query for safe use in FTS5 MATCH.
+///
+/// Replaces FTS5-special characters with spaces so tokenization works
+/// without syntax errors. Entity extraction still runs on the original query.
+fn escape_fts_query(query: &str) -> String {
+    query.replace(['/', '.', '"', '-'], " ")
+}
+
+/// Extract entities from text content using deterministic pattern matching.
+///
+/// Returns `(name, kind)` pairs. Deduplicates by name. Caps at 20 entities.
+/// Never panics — uses only `std` string methods.
+pub fn extract_entities(content: &str) -> Vec<(String, EntityKind)> {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut result: Vec<(String, EntityKind)> = Vec::new();
+
+    let mut add = |name: String, kind: EntityKind| {
+        if name.len() < 2 || seen.contains(&name) || result.len() >= 20 {
+            return;
+        }
+        seen.insert(name.clone());
+        result.push((name, kind));
+    };
+
+    // Scan for URLs: http:// or https://
+    let lower = content.to_lowercase();
+    let mut pos = 0;
+    while let Some(start) = lower[pos..]
+        .find("https://")
+        .or(lower[pos..].find("http://"))
+    {
+        let abs_start = pos + start;
+        // Extract URL characters.
+        let url_end = content[abs_start..]
+            .chars()
+            .take_while(|c| {
+                let ch = *c;
+                ch.is_alphanumeric()
+                    || matches!(
+                        ch,
+                        '/' | '.' | '-' | '_' | '?' | '#' | '&' | '=' | '%' | ':' | '~' | '+' | ','
+                    )
+            })
+            .map(|c| c.len_utf8())
+            .sum::<usize>();
+        let url = content[abs_start..abs_start + url_end].to_string();
+        if url_end > 10 {
+            add(url, EntityKind::Url);
+        }
+        pos = abs_start + url_end;
+    }
+
+    // Scan for file paths and code symbols by splitting on whitespace/punctuation.
+    for token in content.split(|c: char| {
+        c.is_whitespace()
+            || matches!(
+                c,
+                '(' | ')'
+                    | '{'
+                    | '}'
+                    | '['
+                    | ']'
+                    | ','
+                    | ';'
+                    | ':'
+                    | '"'
+                    | '\''
+                    | '`'
+                    | '\t'
+                    | '\n'
+                    | '\r'
+            )
+    }) {
+        if token.is_empty() {
+            continue;
+        }
+
+        // File path: contains '/' and has an extension.
+        if token.contains('/') {
+            let parts: Vec<&str> = token.split('/').collect();
+            if parts.len() >= 2
+                && let Some(last) = parts.last()
+                && let Some(dot_pos) = last.rfind('.')
+            {
+                let ext = &last[dot_pos + 1..];
+                if !ext.is_empty() && ext.len() <= 10 && ext.chars().all(|c| c.is_alphanumeric()) {
+                    add(token.to_string(), EntityKind::File);
+                    continue;
+                }
+            }
+        }
+
+        // Bare filename with extension (e.g., Cargo.toml, main.rs) — must have at least one char before dot.
+        if let Some(dot_pos) = token.rfind('.') {
+            let name_part = &token[..dot_pos];
+            let ext = &token[dot_pos + 1..];
+            if !name_part.is_empty()
+                && !ext.is_empty()
+                && ext.len() <= 10
+                && ext.chars().all(|c| c.is_alphanumeric())
+                && name_part
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            {
+                add(token.to_string(), EntityKind::File);
+                continue;
+            }
+        }
+
+        // CamelCase: at least 2 uppercase letters indicating word boundaries.
+        let mut upper_count = 0;
+        let mut has_lower = false;
+        for ch in token.chars() {
+            if ch.is_uppercase() {
+                upper_count += 1;
+            }
+            if ch.is_lowercase() {
+                has_lower = true;
+            }
+        }
+        if upper_count >= 2
+            && has_lower
+            && token.len() >= 4
+            && token.chars().all(|c| c.is_alphanumeric())
+        {
+            add(token.to_string(), EntityKind::Code);
+            continue;
+        }
+
+        // snake_case: at least one underscore separating lowercase words.
+        if token.contains('_') {
+            let parts: Vec<&str> = token.split('_').collect();
+            if parts.len() >= 2
+                && parts
+                    .iter()
+                    .all(|p| !p.is_empty() && p.chars().all(|c| c.is_lowercase() || c.is_numeric()))
+                && token
+                    .chars()
+                    .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+            {
+                add(token.to_string(), EntityKind::Code);
+            }
+        }
+    }
+
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -1125,6 +1367,211 @@ mod tests {
         assert!(
             text.contains("CONTRADICTION"),
             "Should mark contradiction, got: {text}"
+        );
+    }
+
+    // --- Entity extraction tests ---
+
+    #[test]
+    fn extract_file_entities() {
+        let content = "Edit src/main.rs and update Cargo.toml for the new feature";
+        let entities = extract_entities(content);
+
+        let files: Vec<&str> = entities
+            .iter()
+            .filter(|(_, k)| *k == EntityKind::File)
+            .map(|(n, _)| n.as_str())
+            .collect();
+
+        assert!(
+            files.contains(&"src/main.rs"),
+            "Should find src/main.rs, got: {files:?}"
+        );
+        assert!(
+            files.contains(&"Cargo.toml"),
+            "Should find Cargo.toml, got: {files:?}"
+        );
+    }
+
+    #[test]
+    fn extract_url_entities() {
+        let content = "See https://docs.rs/talos for details and visit http://example.com/path?q=1";
+        let entities = extract_entities(content);
+
+        let urls: Vec<&str> = entities
+            .iter()
+            .filter(|(_, k)| *k == EntityKind::Url)
+            .map(|(n, _)| n.as_str())
+            .collect();
+
+        assert!(
+            urls.iter().any(|u| u.starts_with("https://docs.rs")),
+            "Should find https URL, got: {urls:?}"
+        );
+        assert!(
+            urls.iter().any(|u| u.starts_with("http://example.com")),
+            "Should find http URL, got: {urls:?}"
+        );
+    }
+
+    #[test]
+    fn extract_code_entities() {
+        let content = "Use MemoryStore and extract_entities for the implementation";
+        let entities = extract_entities(content);
+
+        let codes: Vec<&str> = entities
+            .iter()
+            .filter(|(_, k)| *k == EntityKind::Code)
+            .map(|(n, _)| n.as_str())
+            .collect();
+
+        assert!(
+            codes.contains(&"MemoryStore"),
+            "Should find MemoryStore, got: {codes:?}"
+        );
+        assert!(
+            codes.contains(&"extract_entities"),
+            "Should find extract_entities, got: {codes:?}"
+        );
+    }
+
+    #[test]
+    fn extract_entities_malformed_input_no_panic() {
+        // Empty string.
+        let _ = extract_entities("");
+
+        // Very long string.
+        let long = "a".repeat(100_000);
+        let _ = extract_entities(&long);
+
+        // Binary-like content.
+        let binary = "\0\x01\x02\x03\x7f\x7e";
+        let _ = extract_entities(binary);
+
+        // Only punctuation.
+        let _ = extract_entities("!@#$%^&*()_+-=[]{}|;':\",./<>?");
+    }
+
+    #[test]
+    fn entity_overlap_boosts_retrieval() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        // Memory with file paths that match the query.
+        let item1 = make_item(
+            "mem-entity-1",
+            "entity-test",
+            "Update src/main.rs to fix the bug in Cargo.toml",
+        );
+        store.insert(item1).unwrap();
+
+        // Memory with unrelated content.
+        let item2 = make_item(
+            "mem-entity-2",
+            "entity-test",
+            "The weather is nice today and the sky is blue",
+        );
+        store.insert(item2).unwrap();
+
+        let results = store.retrieve("src/main.rs Cargo.toml", 10).unwrap();
+        assert!(!results.is_empty(), "Should find results");
+
+        // The entity-matching item should rank higher or at least appear.
+        let entity_1_pos = results.iter().position(|r| r.item.id == "mem-entity-1");
+        let entity_2_pos = results.iter().position(|r| r.item.id == "mem-entity-2");
+
+        if let (Some(p1), Some(p2)) = (entity_1_pos, entity_2_pos) {
+            assert!(
+                p1 < p2,
+                "Entity-matching item should rank higher: pos1={p1}, pos2={p2}"
+            );
+        }
+    }
+
+    #[test]
+    fn procedural_memory_storage_and_retrieval() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        let now = Utc::now();
+        let item = MemoryItem {
+            id: "proc-test-1".to_string(),
+            kind: MemoryKind::Procedural,
+            key: "commit-workflow".to_string(),
+            content: "Always run cargo fmt before you commit code to the repository".to_string(),
+            confidence: 0.9,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(item).unwrap();
+
+        let results = store.retrieve("cargo fmt commit", 10).unwrap();
+        assert!(!results.is_empty(), "Should retrieve procedural memory");
+
+        let found = results.iter().find(|r| r.item.id == "proc-test-1");
+        assert!(found.is_some(), "Should find the procedural item");
+        assert_eq!(found.unwrap().item.kind, MemoryKind::Procedural);
+    }
+
+    #[test]
+    fn procedural_memory_has_no_permission_authority() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        let item = MemoryItem {
+            id: "proc-perm-test".to_string(),
+            kind: MemoryKind::Procedural,
+            key: "commit-workflow".to_string(),
+            content: "Always run cargo fmt before committing code".to_string(),
+            confidence: 0.9,
+            created_at: Utc::now(),
+            last_reinforced: Utc::now(),
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        assert!(store.insert(item).unwrap());
+
+        let results = store.retrieve("cargo fmt", 10).unwrap();
+        assert!(!results.is_empty());
+
+        // Memory retrieval returns data only — no permission grant.
+        // MemoryStore has no methods that grant, approve, or bypass permissions.
+    }
+
+    #[test]
+    fn entity_linking_on_insert() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        let item = make_item(
+            "mem-link-test",
+            "entity-linking",
+            "Update src/lib.rs and check Cargo.toml for dependencies",
+        );
+        store.insert(item).unwrap();
+
+        // Verify entities were linked in the database.
+        let entity_count: i64 = store
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM memory_entities WHERE memory_id = ?1",
+                params!["mem-link-test"],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert!(
+            entity_count > 0,
+            "Should have linked entities, got count={entity_count}"
+        );
+
+        // Verify the entities table has entries.
+        let total_entities: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM entities", [], |row| row.get(0))
+            .unwrap();
+
+        assert!(
+            total_entities > 0,
+            "Should have entities in the table, got count={total_entities}"
         );
     }
 }

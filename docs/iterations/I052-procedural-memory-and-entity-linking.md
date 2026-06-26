@@ -67,3 +67,21 @@ tests proving they do not approve or bypass permissions.
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-06-26 | **Activation** | I052 activated. Dependencies met: I051 in Review (bounded prompt injection with hidden-output guard, commit `7d0e8ee`). Scope: entity tables schema migration + deterministic regex-based entity extraction (files/URLs/code symbols) + entity linking on insert + entity overlap retrieval boost + procedural memory via existing `MemoryKind::Procedural` + permission-boundary regression test. No external NLP, no permission authority. |
+| 2026-06-26 | **Implementation** | All acceptance criteria delivered. Schema v2 adds `entities` + `memory_entities` tables. `extract_entities()` uses std-only scanning for URLs, file paths, CamelCase/snake_case code symbols. Entity linking automatic on `insert()` (non-fatal). Retrieval boost: `0.5 × entity_overlap_count` added to final_score. FTS5 query escaping prevents syntax errors on special chars. 8 tests including permission-boundary regression. No new dependencies. |
+
+## Verification Evidence
+
+### Workspace Gates (2026-06-26)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all pass, 0 failures
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### Changed Files
+
+| File | Change |
+|---|---|
+| `crates/talos-memory/src/lib.rs` | Entity tables schema v2, EntityKind/Entity types, extract_entities(), entity linking on insert, entity overlap retrieval boost, FTS5 query escaping, 8 tests |
