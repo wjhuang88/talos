@@ -117,11 +117,13 @@ mod tests {
         let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
+        let (_model_tx, model_rx) =
+            tokio::sync::watch::channel(("test-model".to_string(), "test-provider".to_string()));
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
         let loop_handle = tokio::spawn(run_conversation_loop(
-            engine, agent_rx, user_rx, ui_tx, submit_tx, sq_rx, session_tx,
+            engine, agent_rx, user_rx, ui_tx, submit_tx, sq_rx, model_rx, session_tx,
         ));
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
@@ -165,6 +167,90 @@ mod tests {
         drop(agent_tx);
         drop(user_tx);
         loop_handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn conversation_loop_updates_status_from_model_watch() {
+        let engine = ConversationEngine::new("old-model".to_string(), "old-provider".to_string());
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (_user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
+        let (model_tx, model_rx) =
+            tokio::sync::watch::channel(("old-model".to_string(), "old-provider".to_string()));
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine, agent_rx, user_rx, ui_tx, submit_tx, sq_rx, model_rx, session_tx,
+        ));
+
+        model_tx
+            .send(("new-model".to_string(), "new-provider".to_string()))
+            .unwrap();
+
+        let status = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            loop {
+                if let Some(UiOutput::Status(status)) = ui_rx.recv().await {
+                    break status;
+                }
+            }
+        })
+        .await
+        .expect("status update");
+
+        assert_eq!(status.model_name, "new-model");
+        assert_eq!(status.provider, "new-provider");
+
+        loop_handle.abort();
+    }
+
+    #[test]
+    fn model_metadata_context_includes_model_info_without_secret() {
+        let mut config = talos_config::Config::default();
+        config.provider = "anthropic".to_string();
+        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.set_provider_credential("anthropic", "sk-secret-value");
+
+        let file = crate::mode_runners::model_metadata_context_file(&config);
+
+        assert_eq!(file.path, "TALOS_MODEL.md");
+        assert!(file.content.contains("Provider: anthropic"));
+        assert!(file.content.contains("Model: claude-sonnet-4-5-20250929"));
+        assert!(file.content.contains("Context limit:"));
+        assert!(!file.content.contains("sk-secret-value"));
+    }
+
+    #[test]
+    fn session_model_metadata_overrides_config_on_resume() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = talos_session::SessionManager::with_dir(dir.path().to_path_buf());
+        let session = manager
+            .create_session("test-project", "test-workspace")
+            .unwrap();
+        session
+            .append_with_metadata(
+                &talos_core::message::Message::User {
+                    content: "hello".into(),
+                },
+                talos_session::SessionMetadata {
+                    provider: Some("zhipu-coding-plan".into()),
+                    model: Some("glm-5.2".into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let mut config = talos_config::Config::default();
+        config.provider = "anthropic".to_string();
+        config.model = "claude-sonnet-4-5-20250929".to_string();
+
+        crate::mode_runners::apply_session_model_to_config(&mut config, &session);
+
+        assert_eq!(config.provider, "zhipu-coding-plan");
+        assert_eq!(config.model, "glm-5.2");
     }
 
     // === Error Handling Tests ===

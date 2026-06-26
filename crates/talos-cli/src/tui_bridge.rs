@@ -18,10 +18,18 @@ pub(crate) async fn run_conversation_loop(
     sq_tx_watch: tokio::sync::watch::Receiver<
         tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
     >,
+    mut model_info_watch: tokio::sync::watch::Receiver<(String, String)>,
     session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
 ) {
     loop {
         tokio::select! {
+            changed = model_info_watch.changed() => {
+                if changed.is_ok() {
+                    let (model, provider) = model_info_watch.borrow().clone();
+                    engine.set_model_info(&model, &provider);
+                    let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                }
+            }
             event = agent_rx.recv() => {
                 match event {
                     Some(agent_event) => {

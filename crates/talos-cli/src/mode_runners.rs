@@ -20,6 +20,7 @@ use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_memory::{MemoryStore, format_memory_prompt};
 use talos_plugin::HookRegistry;
+use talos_session::SessionMetadata;
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -35,7 +36,8 @@ use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::model_lifecycle::{
-    RebuildSessionParams, build_model_picker_data, rebuild_session_for_model,
+    RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
+    rebuild_session_for_model,
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
@@ -109,6 +111,50 @@ fn send_stream(ui_tx: &mpsc::UnboundedSender<UiOutput>, source: MessageSource, t
     }));
 }
 
+fn session_metadata_for_model(model: &str, provider: &str) -> SessionMetadata {
+    SessionMetadata {
+        provider: (!provider.is_empty()).then(|| provider.to_string()),
+        model: (!model.is_empty()).then(|| model.to_string()),
+        token_count: None,
+        working_directory: std::env::current_dir()
+            .ok()
+            .map(|path| path.to_string_lossy().to_string()),
+    }
+}
+
+fn latest_session_model_info(session: &talos_session::Session) -> Option<(String, String)> {
+    session
+        .read_entries()
+        .ok()?
+        .into_iter()
+        .rev()
+        .find_map(
+            |entry| match (entry.metadata.model, entry.metadata.provider) {
+                (Some(model), Some(provider)) => Some((model, provider)),
+                (Some(model), None) => Some((model, String::new())),
+                _ => None,
+            },
+        )
+}
+
+pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
+    let Some((model, provider)) = latest_session_model_info(session) else {
+        return;
+    };
+    let model_ref = if provider.is_empty() || model.starts_with(&format!("{provider}/")) {
+        model
+    } else {
+        format!("{provider}/{model}")
+    };
+    if let Err(e) = config.set_active_model(&model_ref) {
+        tracing::warn!(
+            session_id = %session.id,
+            model = %model_ref,
+            "failed to restore session model metadata: {e}"
+        );
+    }
+}
+
 pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
@@ -176,17 +222,11 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
 
-    if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.to_path_buf())
-            .load()
-            .map_err(|e| anyhow!("{e}"))?;
-        if !context.is_empty() {
-            agent.set_context_files(vec![ContextFile {
-                path: "AGENTS.md".into(),
-                content: context,
-            }]);
-        }
-    }
+    agent.set_context_files(context_files_for_agent(
+        &config,
+        &workspace_root,
+        !cli.no_context,
+    )?);
 
     if let Some(ref system_prompt) = cli.system_prompt {
         agent.set_custom_prompt(system_prompt.clone());
@@ -378,25 +418,25 @@ async fn handle_session_model(
     session_watch_rx: &watch::Receiver<talos_session::Session>,
     model_id: String,
     mock: bool,
-) {
+) -> Option<Config> {
     if model_id.is_empty() {
         let data = build_model_picker_data(config);
         let _ = ui_tx.send(UiOutput::ModelPicker(data));
-        return;
+        return None;
     }
 
     let mut model_config = config.clone();
     if let Err(e) = model_config.set_active_model(&model_id) {
         let text = format!("[Error] Unknown model '{model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
-        return;
+        return None;
     }
 
     let provider_name = model_config.provider.clone();
 
     // No-op if the selected model+provider is already active.
     if config.model == model_id && config.provider == provider_name {
-        return;
+        return None;
     }
 
     if !model_config.provider_authenticated(&provider_name) {
@@ -406,7 +446,7 @@ async fn handle_session_model(
                 model_id: Some(model_id.clone()),
             },
         ));
-        return;
+        return None;
     }
 
     let api_key = match model_config.api_key() {
@@ -414,11 +454,11 @@ async fn handle_session_model(
         Err(e) => {
             let text = format!("[Error] Failed to resolve API key for {provider_name}: {e}\n");
             send_stream(ui_tx, MessageSource::Error, text);
-            return;
+            return None;
         }
     };
 
-    rebuild_session_for_model(RebuildSessionParams {
+    if rebuild_session_for_model(RebuildSessionParams {
         transition,
         ui_tx,
         model_config: &model_config,
@@ -435,7 +475,16 @@ async fn handle_session_model(
         success_message: format!("[System] Switched to model {model_id}.\n"),
         mock,
     })
-    .await;
+    .await
+    {
+        if let Err(e) = model_config.save() {
+            let text = format!("[Error] Model switched, but failed to persist config: {e}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+        }
+        Some(model_config)
+    } else {
+        None
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -455,35 +504,40 @@ async fn handle_session_model_with_credential(
     session_watch_rx: &watch::Receiver<talos_session::Session>,
     cred: talos_conversation::CredentialResponseData,
     mock: bool,
-) {
+) -> Option<Config> {
     let mut model_config = config.clone();
     model_config.set_provider_credential(&cred.provider, &cred.api_key);
     if let Err(e) = model_config.save() {
         let text = format!("[Error] Failed to persist credentials: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
-        return;
+        return None;
     }
 
-    // Provider-level setup (no specific model): re-open the picker.
     let model_id = match &cred.model_id {
         Some(id) => id.clone(),
-        None => {
-            let data = build_model_picker_data(&model_config);
-            let _ = ui_tx.send(UiOutput::ModelPicker(data));
-            return;
-        }
+        None => match provider_setup_target_model(&model_config, &cred.provider) {
+            Some(id) => id,
+            None => {
+                let text = format!(
+                    "[Error] Credentials saved, but no models are configured for provider '{}'.\n",
+                    cred.provider
+                );
+                send_stream(ui_tx, MessageSource::Error, text);
+                return None;
+            }
+        },
     };
 
     if let Err(e) = model_config.set_active_model(&model_id) {
         let text = format!("[Error] Unknown model '{model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
-        return;
+        return None;
     }
 
     let api_key = cred.api_key.clone();
     let provider_for_status = model_config.provider.clone();
 
-    rebuild_session_for_model(RebuildSessionParams {
+    if rebuild_session_for_model(RebuildSessionParams {
         transition,
         ui_tx,
         model_config: &model_config,
@@ -500,7 +554,16 @@ async fn handle_session_model_with_credential(
         success_message: format!("[System] Credentials saved. Switched to model {model_id}.\n"),
         mock,
     })
-    .await;
+    .await
+    {
+        if let Err(e) = model_config.save() {
+            let text = format!("[Error] Model switched, but failed to persist config: {e}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+        }
+        Some(model_config)
+    } else {
+        None
+    }
 }
 
 pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
@@ -512,6 +575,21 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     if let Some(ref provider_str) = cli.provider {
         config.provider = parse_provider(provider_str)?;
     }
+
+    let workspace_root = resolve_workspace_root(&cli)?;
+    let session_manager =
+        talos_session::SessionManager::new().context("failed to initialize session manager")?;
+    let display_name = workspace_display_name(&workspace_root);
+    let workspace_root_str = canonical_workspace_root(&workspace_root);
+    let session = resolve_session_for_workspace(
+        &session_manager,
+        &workspace_root_str,
+        &display_name,
+        &cli,
+        ResumeSelection::Latest,
+        false,
+    )?;
+    apply_session_model_to_config(&mut config, &session);
 
     let needs_model_setup = config.model.is_empty() && !cli.mock;
     let needs_api_key = !cli.mock && !needs_model_setup && config.api_key().is_err();
@@ -528,8 +606,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     } else {
         config.api_key().map_err(|e| anyhow!("{e}"))?
     };
-
-    let workspace_root = resolve_workspace_root(&cli)?;
 
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
     let approval_handler = Arc::new(TuiApprovalHandler::new(
@@ -559,30 +635,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
 
-    if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.to_path_buf())
-            .load()
-            .map_err(|e| anyhow!("{e}"))?;
-        if !context.is_empty() {
-            agent.set_context_files(vec![ContextFile {
-                path: "AGENTS.md".into(),
-                content: context,
-            }]);
-        }
-    }
-
-    let session_manager =
-        talos_session::SessionManager::new().context("failed to initialize session manager")?;
-    let display_name = workspace_display_name(&workspace_root);
-    let workspace_root_str = canonical_workspace_root(&workspace_root);
-    let session = resolve_session_for_workspace(
-        &session_manager,
-        &workspace_root_str,
-        &display_name,
-        &cli,
-        ResumeSelection::Latest,
-        false,
-    )?;
+    agent.set_context_files(context_files_for_agent(
+        &config,
+        &workspace_root,
+        !cli.no_context,
+    )?);
 
     let initial_history = session.read_messages().unwrap_or_default();
     let visible_history = initial_history.clone();
@@ -614,6 +671,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     // CURRENTLY active session and sq_tx without owning a stale clone.
     let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
     let (sq_tx_watch_tx, sq_tx_watch_rx) = tokio::sync::watch::channel(handle.sq_tx.clone());
+    let (model_info_tx, model_info_rx) =
+        tokio::sync::watch::channel((config.model.clone(), config.provider.clone()));
     // Dedicated channel for handing off the new eq_rx + old_session to the
     // bridge forwarder after a session switch. The bridge must keep persisting
     // any in-flight events for the previous session until that actor's eq_rx
@@ -639,9 +698,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let sq_tx_watch_tx_for_handler = sq_tx_watch_tx.clone();
     let bridge_rx_update_tx_for_handler = bridge_rx_update_tx.clone();
     let session_watch_rx_for_handler = session_watch_rx.clone();
+    let model_info_tx_for_handler = model_info_tx.clone();
     let model_context_limit = config.resolve_model_limits().0;
     let ui_tx_for_wizard = ui_tx_for_handler.clone();
     tokio::spawn(async move {
+        let mut config_for_handler = config_for_handler;
         while let Some(req) = session_rx.recv().await {
             match req {
                 SessionLifecycleRequest::New(_) => {
@@ -663,7 +724,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     .await;
                 }
                 SessionLifecycleRequest::Resume(req) => {
-                    handle_session_resume(
+                    if let Some(new_config) = handle_session_resume(
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
@@ -679,7 +740,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         req.session_id,
                         cli.mock,
                     )
-                    .await;
+                    .await
+                    {
+                        let _ = model_info_tx_for_handler
+                            .send((new_config.model.clone(), new_config.provider.clone()));
+                        config_for_handler = new_config;
+                    }
                 }
                 SessionLifecycleRequest::Fork(_) => {
                     handle_session_fork(
@@ -711,7 +777,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     .await;
                 }
                 SessionLifecycleRequest::ModelSwitch(req) => {
-                    handle_session_model(
+                    if let Some(new_config) = handle_session_model(
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
@@ -725,10 +791,15 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         req.model_id,
                         cli.mock,
                     )
-                    .await;
+                    .await
+                    {
+                        let _ = model_info_tx_for_handler
+                            .send((new_config.model.clone(), new_config.provider.clone()));
+                        config_for_handler = new_config;
+                    }
                 }
                 SessionLifecycleRequest::ModelSwitchWithCredential(resp) => {
-                    handle_session_model_with_credential(
+                    if let Some(new_config) = handle_session_model_with_credential(
                         &transition_for_handler,
                         &ui_tx_for_handler,
                         &config_for_handler,
@@ -742,7 +813,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         resp,
                         cli.mock,
                     )
-                    .await;
+                    .await
+                    {
+                        let _ = model_info_tx_for_handler
+                            .send((new_config.model.clone(), new_config.provider.clone()));
+                        config_for_handler = new_config;
+                    }
                 }
                 SessionLifecycleRequest::ProviderSetup(provider) => {
                     handle_provider_setup(&ui_tx_for_handler, &config_for_handler, &provider).await;
@@ -754,6 +830,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
     let session_manager_for_persist = session_manager.clone();
     let mut bridge_forwarder = handle.eq_rx;
+    let model_info_rx_for_bridge = model_info_rx.clone();
     // Cached snapshot of the session that owns the *current* eq_rx stream.
     // Until the inner `while let` exhausts, every event arriving on
     // `bridge_forwarder` belongs to this session, even if the watch channel
@@ -781,7 +858,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                             if matches!(msg, Message::User { .. }) {
                                 continue;
                             }
-                            if let Err(e) = owning_session.append(msg) {
+                            let (model, provider) = model_info_rx_for_bridge.borrow().clone();
+                            let metadata = session_metadata_for_model(&model, &provider);
+                            if let Err(e) = owning_session.append_with_metadata(msg, metadata) {
                                 eprintln!("Warning: failed to persist message: {e}");
                             }
                         }
@@ -801,7 +880,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     _ => {}
                 }
             }
-            // Old actor's event stream exhausted — switch to the new session.
+            // Old actor's event stream exhausted — switch persistence to the new session.
             match bridge_rx_update_rx.recv().await {
                 Some((old_session, new_rx)) => {
                     owning_session = old_session;
@@ -816,13 +895,16 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
     let session_watch_rx_for_user = session_watch_rx.clone();
     let sq_tx_watch_rx_for_user = sq_tx_watch_rx.clone();
+    let model_info_rx_for_user = model_info_rx.clone();
     tokio::spawn(async move {
         while let Some(msg) = user_msg_rx.recv().await {
             let user_msg = Message::User {
                 content: msg.clone(),
             };
             let session = session_watch_rx_for_user.borrow().clone();
-            if let Err(e) = session.append(&user_msg) {
+            let (model, provider) = model_info_rx_for_user.borrow().clone();
+            let metadata = session_metadata_for_model(&model, &provider);
+            if let Err(e) = session.append_with_metadata(&user_msg, metadata) {
                 eprintln!("Warning: failed to persist user message: {e}");
             }
             if let Err(e) = session_manager_for_user_persist.update_index(&session) {
@@ -864,6 +946,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             ui_output_tx,
             user_msg_tx,
             sq_tx_watch_for_loop,
+            model_info_rx,
             session_tx,
         )
         .await;
@@ -1320,6 +1403,51 @@ fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
     agent.set_memory_provider(provider);
 }
 
+pub(crate) fn model_metadata_context_file(config: &Config) -> ContextFile {
+    let (context_limit, output_limit) = config.resolve_model_limits();
+    let output_limit = output_limit
+        .map(|limit| limit.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    ContextFile {
+        path: "TALOS_MODEL.md".into(),
+        content: format!(
+            "# Current Model\n\
+             Provider: {}\n\
+             Model: {}\n\
+             Provider protocol: {:?}\n\
+             Tool protocol: {:?}\n\
+             Context limit: {} tokens\n\
+             Output limit: {} tokens\n",
+            config.provider,
+            config.model,
+            config.provider_protocol(),
+            config.tool_protocol(),
+            context_limit,
+            output_limit
+        ),
+    }
+}
+
+pub(crate) fn context_files_for_agent(
+    config: &Config,
+    workspace_root: &std::path::Path,
+    include_workspace_context: bool,
+) -> Result<Vec<ContextFile>> {
+    let mut files = vec![model_metadata_context_file(config)];
+    if include_workspace_context {
+        let context = ContextLoader::new(workspace_root.to_path_buf())
+            .load()
+            .map_err(|e| anyhow!("{e}"))?;
+        if !context.is_empty() {
+            files.push(ContextFile {
+                path: "AGENTS.md".into(),
+                content: context,
+            });
+        }
+    }
+    Ok(files)
+}
+
 fn apply_mcp_fixture_config(config: &mut Config, cli: &Cli) {
     #[cfg(debug_assertions)]
     if let Some(path) = cli.mcp_server_fixture.clone() {
@@ -1447,10 +1575,10 @@ async fn handle_session_new(
 
     match transition.commit(actor) {
         Ok(result) => {
-            let _ = session_watch_tx.send(new_session_for_watch);
+            let _ = session_watch_tx.send(new_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .send((new_session_for_watch.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
                 eprintln!(
@@ -1487,10 +1615,10 @@ async fn handle_session_resume(
         talos_session::Session,
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
-    model_context_limit: u32,
+    _model_context_limit: u32,
     session_id: Option<String>,
     mock: bool,
-) {
+) -> Option<Config> {
     let mut transition = transition.lock().await;
 
     let workspace_root_str = canonical_workspace_root(workspace_root);
@@ -1504,13 +1632,13 @@ async fn handle_session_resume(
                     Err(e) => {
                         let text = format!("[Error] Failed to list sessions: {e}\n");
                         send_stream(ui_tx, MessageSource::Error, text);
-                        return;
+                        return None;
                     }
                 };
                 if sessions.is_empty() {
                     let text = "[System] No sessions found for this workspace.\n".to_string();
                     send_stream(ui_tx, MessageSource::System, text);
-                    return;
+                    return None;
                 }
                 let mut sessions = sessions;
                 sessions
@@ -1521,7 +1649,7 @@ async fn handle_session_resume(
                         sessions.len()
                     );
                     send_stream(ui_tx, MessageSource::Error, text);
-                    return;
+                    return None;
                 }
                 let selected = &sessions[n - 1];
                 let selected_id = selected.id.to_string();
@@ -1530,7 +1658,7 @@ async fn handle_session_resume(
                     Err(e) => {
                         let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
                         send_stream(ui_tx, MessageSource::Error, text);
-                        return;
+                        return None;
                     }
                 }
             } else {
@@ -1540,7 +1668,7 @@ async fn handle_session_resume(
                     Err(e) => {
                         let text = format!("[Error] Session '{id}' not found or invalid: {e}\n");
                         send_stream(ui_tx, MessageSource::Error, text);
-                        return;
+                        return None;
                     }
                 }
             }
@@ -1551,14 +1679,14 @@ async fn handle_session_resume(
                 Err(e) => {
                     let text = format!("[Error] Failed to list sessions: {e}\n");
                     send_stream(ui_tx, MessageSource::Error, text);
-                    return;
+                    return None;
                 }
             };
 
             if sessions.is_empty() {
                 let text = "[System] No sessions found for this workspace.\n".to_string();
                 send_stream(ui_tx, MessageSource::System, text);
-                return;
+                return None;
             }
 
             let mut sessions = sessions;
@@ -1581,16 +1709,35 @@ async fn handle_session_resume(
                 .collect();
 
             let _ = ui_tx.send(UiOutput::SessionPicker(items));
-            return;
+            return None;
         }
     };
+
+    let mut resume_config = config.clone();
+    apply_session_model_to_config(&mut resume_config, &target_session);
+    let resume_api_key = match resume_config.api_key() {
+        Ok(key) => key,
+        Err(e) if mock => {
+            tracing::warn!("failed to resolve resumed session api key in mock mode: {e}");
+            api_key.to_string()
+        }
+        Err(e) => {
+            let text = format!(
+                "[Error] Failed to resolve API key for resumed session model '{}': {e}\n",
+                resume_config.model
+            );
+            send_stream(ui_tx, MessageSource::Error, text);
+            return None;
+        }
+    };
+    let resume_model_context_limit = resume_config.resolve_model_limits().0;
 
     let resume_history = match target_session.read_messages() {
         Ok(h) => h,
         Err(e) => {
             let text = format!("[Error] Failed to read session history: {e}\n");
             send_stream(ui_tx, MessageSource::Error, text);
-            return;
+            return None;
         }
     };
 
@@ -1599,10 +1746,10 @@ async fn handle_session_resume(
         print_mode: false,
         workspace_root: workspace_root.to_path_buf(),
         initial_history: resume_history,
-        model_context_limit,
+        model_context_limit: resume_model_context_limit,
     };
 
-    let provider = build_provider(config, api_key, mock);
+    let provider = build_provider(&resume_config, &resume_api_key, mock);
     let approval_handler = Arc::new(TuiApprovalHandler::new(
         ui_tx.clone(),
         workspace_root.to_path_buf(),
@@ -1612,7 +1759,7 @@ async fn handle_session_resume(
         Err(e) => {
             let text = format!("[Error] Failed to start MCP runtime: {e}\n");
             send_stream(ui_tx, MessageSource::Error, text);
-            return;
+            return None;
         }
     };
     mcp_runtime.report_startup_failures();
@@ -1628,11 +1775,19 @@ async fn handle_session_resume(
         workspace_root.to_path_buf(),
         hooks.clone(),
     );
-    agent.set_tool_protocol(config.tool_protocol());
+    agent.set_tool_protocol(resume_config.tool_protocol());
     if let Ok(skills) = discover_runtime_skills(workspace_root) {
         apply_runtime_skills(&mut agent, &skills);
     }
-    maybe_set_memory_provider(&mut agent, config);
+    maybe_set_memory_provider(&mut agent, &resume_config);
+    match context_files_for_agent(&resume_config, workspace_root, true) {
+        Ok(files) => agent.set_context_files(files),
+        Err(e) => {
+            let text = format!("[Error] Failed to load context files: {e}\n");
+            send_stream(ui_tx, MessageSource::Error, text);
+            return None;
+        }
+    }
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
@@ -1642,15 +1797,15 @@ async fn handle_session_resume(
         let _ = std::fs::remove_file(&target_session_for_watch.file_path);
         let text = format!("[Error] Failed to prepare resume: {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
-        return;
+        return None;
     }
 
     match transition.commit(actor) {
         Ok(result) => {
-            let _ = session_watch_tx.send(target_session_for_watch);
+            let _ = session_watch_tx.send(target_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .send((target_session_for_watch.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
                 eprintln!(
@@ -1663,6 +1818,7 @@ async fn handle_session_resume(
                 session_id.unwrap_or_default()
             );
             send_stream(ui_tx, MessageSource::System, text);
+            Some(resume_config)
         }
         Err(e) => {
             transition.rollback();
@@ -1670,6 +1826,7 @@ async fn handle_session_resume(
             let text =
                 format!("[Error] Failed to commit resume: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
+            None
         }
     }
 }
@@ -1799,10 +1956,10 @@ async fn handle_session_fork(
 
     match transition.commit(actor) {
         Ok(result) => {
-            let _ = session_watch_tx.send(child_session_for_watch);
+            let _ = session_watch_tx.send(child_session_for_watch.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .send((child_session_for_watch.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
                 eprintln!(

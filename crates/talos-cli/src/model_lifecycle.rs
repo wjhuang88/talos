@@ -96,6 +96,34 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
     }
 }
 
+/// Resolves the model to activate after provider-level credential setup.
+///
+/// Provider setup rows represent a provider rather than a specific model. After
+/// credentials are saved, prefer the current configured model when it belongs
+/// to that provider; otherwise use the first catalog model for the provider.
+/// Duplicate model IDs are provider-qualified so `Config::set_active_model`
+/// resolves the intended provider.
+pub(crate) fn provider_setup_target_model(config: &Config, provider: &str) -> Option<String> {
+    let catalog = config.all_models();
+    let mut id_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for m in &catalog {
+        *id_counts.entry(m.id.as_str()).or_default() += 1;
+    }
+
+    let target = catalog
+        .iter()
+        .find(|m| m.provider == provider && m.id == config.model)
+        .or_else(|| catalog.iter().find(|m| m.provider == provider))?;
+
+    Some(
+        if id_counts.get(target.id.as_str()).copied().unwrap_or(0) > 1 {
+            format!("{}/{}", target.provider, target.id)
+        } else {
+            target.id.clone()
+        },
+    )
+}
+
 /// Parameters for the shared session rebuild logic when switching models.
 ///
 /// This struct bundles all the context needed to rebuild a session for a new
@@ -132,7 +160,7 @@ pub(crate) struct RebuildSessionParams<'a> {
 /// `success_message` and `provider_for_status` strings, which differ between
 /// the normal model switch path and the credential-first path.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) {
+pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) -> bool {
     let RebuildSessionParams {
         transition,
         ui_tx,
@@ -157,7 +185,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     if let Err(e) = current_session.ensure_persisted() {
         let text = format!("[Error] Failed to create session file: {e}\n");
         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
-        return;
+        return false;
     }
     let history = current_session.read_messages().unwrap_or_default();
 
@@ -178,7 +206,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         Err(e) => {
             let text = format!("[Error] Failed to start MCP runtime: {e}\n");
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
-            return;
+            return false;
         }
     };
     mcp_runtime.report_startup_failures();
@@ -198,13 +226,21 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     if let Ok(skills) = discover_runtime_skills(workspace_root) {
         apply_runtime_skills(&mut agent, &skills);
     }
+    match crate::mode_runners::context_files_for_agent(model_config, workspace_root, true) {
+        Ok(files) => agent.set_context_files(files),
+        Err(e) => {
+            let text = format!("[Error] Failed to load context files: {e}\n");
+            send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+            return false;
+        }
+    }
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
     let session_for_prepare = current_session.clone();
     if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
         let text = format!("[Error] Failed to prepare model switch: {e}\n");
         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
-        return;
+        return false;
     }
 
     let mut transition_guard = transition.lock().await;
@@ -213,7 +249,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
             let _ = session_watch_tx.send(current_session.clone());
             let _ = sq_tx_watch_tx.send(result.new_handle.sq_tx.clone());
             if bridge_rx_update_tx
-                .send((result.old_session.clone(), result.new_handle.eq_rx))
+                .send((current_session.clone(), result.new_handle.eq_rx))
                 .is_err()
             {
                 eprintln!(
@@ -232,6 +268,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                     ..Default::default()
                 },
             ));
+            true
         }
         Err(e) => {
             transition_guard.rollback();
@@ -239,6 +276,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                 "[Error] Failed to commit model switch: {e}. Previous model remains active.\n"
             );
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
+            false
         }
     }
 }
@@ -422,5 +460,34 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn provider_setup_target_prefers_current_model_for_provider() {
+        let mut config = Config::default();
+        config.model = "glm-5.2".to_string();
+        config.provider = "zai".to_string();
+
+        let target = provider_setup_target_model(&config, "zai").expect("target model");
+
+        assert_eq!(target, "zai/glm-5.2");
+    }
+
+    #[test]
+    fn provider_setup_target_falls_back_to_first_provider_model() {
+        let mut config = Config::default();
+        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.provider = "anthropic".to_string();
+
+        let target = provider_setup_target_model(&config, "openai").expect("target model");
+
+        assert!(!target.is_empty());
+        let provider = config
+            .all_models()
+            .into_iter()
+            .find(|m| m.id == target || format!("{}/{}", m.provider, m.id) == target)
+            .map(|m| m.provider)
+            .expect("target exists in catalog");
+        assert_eq!(provider, "openai");
     }
 }
