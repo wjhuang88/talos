@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use talos_memory::MemoryPromptConfig;
 use thiserror::Error;
 
 pub mod agents;
@@ -194,6 +195,10 @@ pub struct Config {
     /// JSON-RPC configuration placeholder for I009-S5.
     #[serde(default)]
     pub rpc: RpcConfig,
+
+    /// Memory prompt injection configuration.
+    #[serde(default)]
+    pub memory_prompt: MemoryPromptConfig,
 }
 
 fn default_provider_name() -> String {
@@ -210,6 +215,7 @@ impl Default for Config {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         }
     }
 }
@@ -1062,6 +1068,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "env-key-anthropic");
         unsafe { env::remove_var("ANTHROPIC_API_KEY") };
@@ -1079,6 +1086,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "env-key-openai");
         unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -1097,6 +1105,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "bailian-style-key");
         unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
@@ -1115,6 +1124,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         assert_eq!(config.api_key().unwrap(), "real-openai-key");
         unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -1134,6 +1144,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         let err = config.api_key().unwrap_err();
         assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -1155,6 +1166,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         let err = config.api_key().unwrap_err();
         assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -1181,6 +1193,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         assert_eq!(config.base_url().as_deref(), Some("https://example.com/v1"));
     }
@@ -1230,6 +1243,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
 
         assert_eq!(config.api_key().unwrap(), "dashscope-key");
@@ -1248,6 +1262,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         let (builtin_ctx, builtin_out) = builtin.resolve_model_limits();
         assert_eq!(builtin_ctx, 1_047_576);
@@ -1277,6 +1292,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         assert_eq!(custom.context_limit(), Some(202_752));
         assert_eq!(custom.output_limit(), Some(4096));
@@ -1331,6 +1347,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
         let config_openai = Config {
             provider: "openai".to_string(),
@@ -1340,6 +1357,7 @@ mod tests {
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
+            memory_prompt: MemoryPromptConfig::default(),
         };
 
         let a_str = toml::to_string(&config_anthropic).unwrap();

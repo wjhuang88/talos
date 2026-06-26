@@ -18,6 +18,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
+use talos_memory::{MemoryStore, format_memory_prompt};
 use talos_plugin::HookRegistry;
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
@@ -94,6 +95,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     );
     agent.set_tool_protocol(config.tool_protocol());
     apply_runtime_skills(&mut agent, &runtime_skills);
+    maybe_set_memory_provider(&mut agent, &config);
 
     let server = talos_rpc::RpcServer::new(Arc::new(runtime_adapter::AgentRuntime(agent)));
     server.run_stdio().await
@@ -172,6 +174,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     agent.set_tool_protocol(config.tool_protocol());
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
+    maybe_set_memory_provider(&mut agent, &config);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.to_path_buf())
@@ -554,6 +557,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     agent.set_tool_protocol(config.tool_protocol());
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
+    maybe_set_memory_provider(&mut agent, &config);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.to_path_buf())
@@ -924,6 +928,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     agent.set_tool_protocol(config.tool_protocol());
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
+    maybe_set_memory_provider(&mut agent, &config);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.to_path_buf())
@@ -1226,6 +1231,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     agent.set_tool_protocol(config.tool_protocol());
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
+    maybe_set_memory_provider(&mut agent, &config);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.to_path_buf())
@@ -1261,6 +1267,24 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);
     event_loop.run().await
+}
+
+fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
+    if !config.memory_prompt.enabled {
+        return;
+    }
+    let mem_config = config.memory_prompt.clone();
+    let provider = std::sync::Arc::new(move |query: &str| -> Option<String> {
+        let store = match MemoryStore::open_memory() {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("memory store unavailable, skipping memory injection: {e}");
+                return None;
+            }
+        };
+        format_memory_prompt(&store, query, &mem_config)
+    });
+    agent.set_memory_provider(provider);
 }
 
 fn apply_mcp_fixture_config(config: &mut Config, cli: &Cli) {
@@ -1375,6 +1399,7 @@ async fn handle_session_new(
     if let Ok(skills) = discover_runtime_skills(workspace_root) {
         apply_runtime_skills(&mut agent, &skills);
     }
+    maybe_set_memory_provider(&mut agent, config);
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
@@ -1574,6 +1599,7 @@ async fn handle_session_resume(
     if let Ok(skills) = discover_runtime_skills(workspace_root) {
         apply_runtime_skills(&mut agent, &skills);
     }
+    maybe_set_memory_provider(&mut agent, config);
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
@@ -1725,6 +1751,7 @@ async fn handle_session_fork(
     if let Ok(skills) = discover_runtime_skills(workspace_root) {
         apply_runtime_skills(&mut agent, &skills);
     }
+    maybe_set_memory_provider(&mut agent, config);
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
