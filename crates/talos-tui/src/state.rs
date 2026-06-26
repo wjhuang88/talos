@@ -173,7 +173,12 @@ impl BottomPanelState {
 
         let initial_index = panel_items
             .iter()
-            .position(|i| i.action != PanelItemAction::Header)
+            .position(|i| i.is_current && i.action != PanelItemAction::Header)
+            .or_else(|| {
+                panel_items
+                    .iter()
+                    .position(|i| i.action != PanelItemAction::Header)
+            })
             .unwrap_or(0);
         Self {
             is_open: true,
