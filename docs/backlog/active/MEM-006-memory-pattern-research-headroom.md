@@ -25,10 +25,12 @@ Research and prototype-evaluate 5 borrowable patterns from headroom's memory sys
 
 5. **TrafficLearner** — Zero-config, zero-latency rule-based pattern extraction from agent traffic (error→recovery, preferences, environment facts). Requires minimum evidence count (5) before saving. **LOW-MEDIUM value, significant effort (~1300 LoC port).**
 
+6. **Tool Output Compression (SmartCrusher/CodeCompressor)** — Headroom's primary product compresses tool outputs, code blocks, and logs by 60-95% before they enter the model context. Our Compactor only handles retroactive history trimming (Layers 1-5); we have no pre-entry compression. This is evaluated separately in **MEM-007** (Active Context Compression). Headroom's deterministic strategies (field extraction, signature+key-line retention, dedup) are borrowable without the ML model dependency. **Connection to MEM-005/MEM-003**: effective pre-entry compression reduces compaction trigger frequency and may lower the urgency of MEM-003 LLM layers 4-5.
+
 ### Non-goals
 
 - No vector search / embedding model dependency (our ADR-017 defers this to a Spike).
-- No compression proxy (headroom's primary product is context compression, not memory).
+- No ML compression proxy (Headroom's kompress ONNX model is ~86MB; deferred to optional future).
 - No cross-agent memory sharing (Talos is single-agent).
 - No Qdrant/Neo4j backend.
 
@@ -41,6 +43,7 @@ Research and prototype-evaluate 5 borrowable patterns from headroom's memory sys
 ## Dependencies
 
 - MEM-001 (Layered Memory Foundation) — complete via I050-I053.
+- MEM-007 (Active Context Compression) — evaluates Headroom's compression approach for Talos.
 - ADR-016 (memory architecture).
 
 ## Required Reads
