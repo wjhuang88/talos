@@ -43,6 +43,20 @@ fn resolve_talos_root() -> PathBuf {
 }
 
 fn run_ingest(file_path: &str, run_id: Option<&str>, title: Option<&str>) -> Result<()> {
+    let config = ChunkingConfig::default();
+
+    let file_size = std::fs::metadata(file_path)
+        .with_context(|| format!("failed to stat file: {file_path}"))?
+        .len() as usize;
+    if file_size > config.max_file_bytes {
+        anyhow::bail!(
+            "File {} is {} bytes, exceeds the maximum of {} bytes",
+            file_path,
+            file_size,
+            config.max_file_bytes
+        );
+    }
+
     let content = std::fs::read_to_string(file_path)
         .with_context(|| format!("failed to read file: {file_path}"))?;
 
@@ -75,7 +89,6 @@ fn run_ingest(file_path: &str, run_id: Option<&str>, title: Option<&str>) -> Res
             .unwrap_or_else(|| "Untitled".to_string())
     });
 
-    let config = ChunkingConfig::default();
     let report = ingest_text(&mut store, &run, &doc_title, &content, &config)
         .context("failed to ingest text")?;
 

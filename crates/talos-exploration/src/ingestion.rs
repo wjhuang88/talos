@@ -18,6 +18,10 @@ use crate::{ExplorationError, ExplorationStore, Source, SourceChunk, Synthesis};
 pub struct ChunkingConfig {
     pub max_chunk_chars: usize,
     pub overlap_chars: usize,
+    /// Maximum input file size in bytes. Files exceeding this are rejected.
+    pub max_file_bytes: usize,
+    /// Maximum number of chunks per source. Exceeding this is an error.
+    pub max_chunks_per_source: usize,
 }
 
 impl Default for ChunkingConfig {
@@ -25,6 +29,8 @@ impl Default for ChunkingConfig {
         Self {
             max_chunk_chars: 1000,
             overlap_chars: 100,
+            max_file_bytes: 10_485_760, // 10 MB
+            max_chunks_per_source: 10_000,
         }
     }
 }
@@ -60,6 +66,13 @@ pub fn ingest_text(
     text: &str,
     config: &ChunkingConfig,
 ) -> Result<IngestionReport, ExplorationError> {
+    if text.len() > config.max_file_bytes {
+        return Err(ExplorationError::FileTooLarge {
+            size: text.len(),
+            max: config.max_file_bytes,
+        });
+    }
+
     let content_hash = compute_hash(text);
     let source_id = uuid::Uuid::new_v4().to_string();
 
@@ -77,6 +90,12 @@ pub fn ingest_text(
     store.insert_source(&source)?;
 
     let chunks = split_text(text, config);
+    if chunks.len() > config.max_chunks_per_source {
+        return Err(ExplorationError::ChunkCapExceeded {
+            count: chunks.len(),
+            max: config.max_chunks_per_source,
+        });
+    }
     let mut chunk_ids = Vec::new();
 
     for (ordinal, chunk_text) in chunks.into_iter().enumerate() {
@@ -419,6 +438,7 @@ mod tests {
         let config = ChunkingConfig {
             max_chunk_chars: 50,
             overlap_chars: 10,
+            ..Default::default()
         };
 
         let report = ingest_text(&mut store, &run.id, "Overlap Test", text, &config).unwrap();
@@ -637,5 +657,60 @@ mod tests {
         assert_eq!(synthesis.cited_source_ids.len(), 1);
 
         // All steps completed without any network calls.
+    }
+
+    #[test]
+    fn ingest_text_exceeds_file_budget_returns_error() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("exploration.db");
+        let mut store = ExplorationStore::open(&db_path).unwrap();
+        let run = store.create_run("budget-test", None).unwrap();
+
+        let config = ChunkingConfig {
+            max_file_bytes: 100,
+            ..Default::default()
+        };
+        let oversized = "x".repeat(200);
+
+        let result = ingest_text(&mut store, &run.id, "oversized", &oversized, &config);
+        assert!(matches!(result, Err(ExplorationError::FileTooLarge { .. })));
+    }
+
+    #[test]
+    fn ingest_text_within_budget_succeeds() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("exploration.db");
+        let mut store = ExplorationStore::open(&db_path).unwrap();
+        let run = store.create_run("budget-test", None).unwrap();
+
+        let config = ChunkingConfig {
+            max_file_bytes: 10_000,
+            ..Default::default()
+        };
+        let text = "Hello world. This is a test.\n\nSecond paragraph here.";
+
+        let report = ingest_text(&mut store, &run.id, "normal", text, &config).unwrap();
+        assert!(report.chunks_created > 0);
+    }
+
+    #[test]
+    fn ingest_text_exceeds_chunk_cap_returns_error() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("exploration.db");
+        let mut store = ExplorationStore::open(&db_path).unwrap();
+        let run = store.create_run("cap-test", None).unwrap();
+
+        let config = ChunkingConfig {
+            max_chunk_chars: 5,
+            max_chunks_per_source: 2,
+            ..Default::default()
+        };
+        let text = "aaaaa\n\nbbbbb\n\nccccc";
+
+        let result = ingest_text(&mut store, &run.id, "cap-test", text, &config);
+        assert!(matches!(
+            result,
+            Err(ExplorationError::ChunkCapExceeded { .. })
+        ));
     }
 }

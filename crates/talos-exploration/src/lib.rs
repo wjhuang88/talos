@@ -160,6 +160,14 @@ pub enum ExplorationError {
     /// Invalid input provided.
     #[error("invalid input: {0}")]
     InvalidInput(String),
+
+    /// Input file exceeds the configured size budget.
+    #[error("file too large: {size} bytes exceeds max of {max} bytes")]
+    FileTooLarge { size: usize, max: usize },
+
+    /// Chunk count exceeds the configured cap.
+    #[error("chunk cap exceeded: {count} chunks exceeds max of {max}")]
+    ChunkCapExceeded { count: usize, max: usize },
 }
 
 // ---------------------------------------------------------------------------
@@ -469,7 +477,8 @@ impl ExplorationStore {
             .into_iter()
             .map(|(chunk_id, rank, source_id, source_title, text)| {
                 let snippet = if text.len() > 200 {
-                    format!("{}...", &text[..197])
+                    let truncated: String = text.chars().take(197).collect();
+                    format!("{truncated}...")
                 } else {
                     text
                 };
@@ -982,6 +991,33 @@ mod tests {
             let _source = store.get_source("persistent-source").unwrap();
             let sources_count = store.count_sources().unwrap();
             assert_eq!(sources_count, 1, "Data should persist across reopen");
+        }
+    }
+
+    #[test]
+    fn search_snippet_multibyte_utf8_no_panic() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("exploration.db");
+        let mut store = ExplorationStore::open(&db_path).unwrap();
+        let run = store.create_run("test", None).unwrap();
+        let source = make_source(Some(&run.id), "Multi-byte Test");
+        store.insert_source(&source).unwrap();
+
+        let chinese: String = "你好世界".repeat(25);
+        let text =
+            format!("KEYWORDSTART {chinese} more text here to push past 200 bytes total for sure");
+        let chunk = SourceChunk {
+            id: uuid::Uuid::new_v4().to_string(),
+            source_id: source.id.clone(),
+            chunk_ordinal: 0,
+            text,
+            token_estimate: None,
+        };
+        store.insert_chunk(&chunk).unwrap();
+
+        let results = store.search_chunks("KEYWORDSTART", 10).unwrap();
+        if !results.is_empty() {
+            assert!(results[0].snippet.len() < 500);
         }
     }
 }
