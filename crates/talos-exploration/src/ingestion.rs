@@ -73,8 +73,8 @@ pub fn ingest_text(
         });
     }
 
-    let content_hash = compute_hash(text);
-    let source_id = uuid::Uuid::new_v4().to_string();
+    let prepared = prepare_chunks(text, config)?;
+    let source_id = prepared.source_id.clone();
 
     let source = Source {
         id: source_id.clone(),
@@ -85,37 +85,14 @@ pub fn ingest_text(
         publication_date: None,
         fetched_at: Utc::now(),
         license_notes: None,
-        content_hash,
+        content_hash: compute_hash(text),
     };
-    store.insert_source(&source)?;
-
-    let chunks = split_text(text, config);
-    if chunks.len() > config.max_chunks_per_source {
-        return Err(ExplorationError::ChunkCapExceeded {
-            count: chunks.len(),
-            max: config.max_chunks_per_source,
-        });
-    }
-    let mut chunk_ids = Vec::new();
-
-    for (ordinal, chunk_text) in chunks.into_iter().enumerate() {
-        let chunk_id = uuid::Uuid::new_v4().to_string();
-        let token_estimate = (chunk_text.len() / 4) as i64;
-        let chunk = SourceChunk {
-            id: chunk_id.clone(),
-            source_id: source_id.clone(),
-            chunk_ordinal: ordinal as i64,
-            text: chunk_text,
-            token_estimate: Some(token_estimate),
-        };
-        store.insert_chunk(&chunk)?;
-        chunk_ids.push(chunk_id);
-    }
+    store.insert_source_with_chunks(&source, &prepared.chunks)?;
 
     Ok(IngestionReport {
         source_id,
-        chunks_created: chunk_ids.len(),
-        chunk_ids,
+        chunks_created: prepared.chunk_ids.len(),
+        chunk_ids: prepared.chunk_ids,
     })
 }
 
@@ -128,8 +105,15 @@ pub fn ingest_fetched(
     content: &FetchedContent,
     config: &ChunkingConfig,
 ) -> Result<IngestionReport, ExplorationError> {
-    let content_hash = compute_hash(&content.text);
-    let source_id = uuid::Uuid::new_v4().to_string();
+    if content.text.len() > config.max_file_bytes {
+        return Err(ExplorationError::FileTooLarge {
+            size: content.text.len(),
+            max: config.max_file_bytes,
+        });
+    }
+
+    let prepared = prepare_chunks(&content.text, config)?;
+    let source_id = prepared.source_id.clone();
 
     let source = Source {
         id: source_id.clone(),
@@ -140,30 +124,53 @@ pub fn ingest_fetched(
         publication_date: None,
         fetched_at: content.fetched_at,
         license_notes: None,
-        content_hash,
+        content_hash: compute_hash(&content.text),
     };
-    store.insert_source(&source)?;
-
-    let chunks = split_text(&content.text, config);
-    let mut chunk_ids = Vec::new();
-
-    for (ordinal, chunk_text) in chunks.into_iter().enumerate() {
-        let chunk_id = uuid::Uuid::new_v4().to_string();
-        let token_estimate = (chunk_text.len() / 4) as i64;
-        let chunk = SourceChunk {
-            id: chunk_id.clone(),
-            source_id: source_id.clone(),
-            chunk_ordinal: ordinal as i64,
-            text: chunk_text,
-            token_estimate: Some(token_estimate),
-        };
-        store.insert_chunk(&chunk)?;
-        chunk_ids.push(chunk_id);
-    }
+    store.insert_source_with_chunks(&source, &prepared.chunks)?;
 
     Ok(IngestionReport {
         source_id,
-        chunks_created: chunk_ids.len(),
+        chunks_created: prepared.chunk_ids.len(),
+        chunk_ids: prepared.chunk_ids,
+    })
+}
+
+struct PreparedChunks {
+    source_id: String,
+    chunks: Vec<SourceChunk>,
+    chunk_ids: Vec<String>,
+}
+
+fn prepare_chunks(text: &str, config: &ChunkingConfig) -> Result<PreparedChunks, ExplorationError> {
+    let source_id = uuid::Uuid::new_v4().to_string();
+    let chunks = split_text(text, config);
+    if chunks.len() > config.max_chunks_per_source {
+        return Err(ExplorationError::ChunkCapExceeded {
+            count: chunks.len(),
+            max: config.max_chunks_per_source,
+        });
+    }
+
+    let mut chunk_ids = Vec::with_capacity(chunks.len());
+    let chunks = chunks
+        .into_iter()
+        .enumerate()
+        .map(|(ordinal, chunk_text)| {
+            let chunk_id = uuid::Uuid::new_v4().to_string();
+            chunk_ids.push(chunk_id.clone());
+            SourceChunk {
+                id: chunk_id,
+                source_id: source_id.clone(),
+                chunk_ordinal: ordinal as i64,
+                token_estimate: Some((chunk_text.len() / 4) as i64),
+                text: chunk_text,
+            }
+        })
+        .collect();
+
+    Ok(PreparedChunks {
+        source_id,
+        chunks,
         chunk_ids,
     })
 }
@@ -395,9 +402,17 @@ fn split_sentences(text: &str) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::ExplorationStore;
+    use rusqlite::Connection;
+    use std::path::Path;
 
     fn make_store() -> ExplorationStore {
         ExplorationStore::open_memory().unwrap()
+    }
+
+    fn source_count(db_path: &Path) -> i64 {
+        let conn = Connection::open(db_path).unwrap();
+        conn.query_row("SELECT COUNT(*) FROM sources", [], |row| row.get(0))
+            .unwrap()
     }
 
     // --- ingest_text tests ---
@@ -484,6 +499,50 @@ mod tests {
             fetched_at.timestamp(),
             "fetched_at should match"
         );
+    }
+
+    #[test]
+    fn ingest_fetched_exceeds_file_budget_returns_error() {
+        let mut store = make_store();
+        let run = store.create_run("fetched budget test", None).unwrap();
+        let content = FetchedContent {
+            url: "https://example.com/large".to_string(),
+            title: "Large Article".to_string(),
+            text: "x".repeat(200),
+            fetched_at: Utc::now(),
+        };
+        let config = ChunkingConfig {
+            max_file_bytes: 100,
+            ..Default::default()
+        };
+
+        let result = ingest_fetched(&mut store, &run.id, &content, &config);
+
+        assert!(matches!(result, Err(ExplorationError::FileTooLarge { .. })));
+    }
+
+    #[test]
+    fn ingest_fetched_exceeds_chunk_cap_returns_error() {
+        let mut store = make_store();
+        let run = store.create_run("fetched cap test", None).unwrap();
+        let content = FetchedContent {
+            url: "https://example.com/chunky".to_string(),
+            title: "Chunky Article".to_string(),
+            text: "aaaaa\n\nbbbbb\n\nccccc".to_string(),
+            fetched_at: Utc::now(),
+        };
+        let config = ChunkingConfig {
+            max_chunk_chars: 5,
+            max_chunks_per_source: 2,
+            ..Default::default()
+        };
+
+        let result = ingest_fetched(&mut store, &run.id, &content, &config);
+
+        assert!(matches!(
+            result,
+            Err(ExplorationError::ChunkCapExceeded { .. })
+        ));
     }
 
     // --- extract_claims tests ---
@@ -712,5 +771,29 @@ mod tests {
             result,
             Err(ExplorationError::ChunkCapExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn ingest_text_chunk_cap_failure_leaves_no_source() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("exploration.db");
+        let mut store = ExplorationStore::open(&db_path).unwrap();
+        let run = store.create_run("atomic-cap-test", None).unwrap();
+
+        let config = ChunkingConfig {
+            max_chunk_chars: 5,
+            max_chunks_per_source: 2,
+            ..Default::default()
+        };
+        let text = "aaaaa\n\nbbbbb\n\nccccc";
+
+        let result = ingest_text(&mut store, &run.id, "cap-test", text, &config);
+
+        assert!(matches!(
+            result,
+            Err(ExplorationError::ChunkCapExceeded { .. })
+        ));
+        drop(store);
+        assert_eq!(source_count(&db_path), 0);
     }
 }

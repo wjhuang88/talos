@@ -154,7 +154,7 @@ fn run_storage_cleanup(args: &CleanupArgs) -> Result<()> {
     }
 
     // --apply path: evaluate through the permission boundary.
-    let engine = PermissionEngine::new();
+    let engine = storage_permission_engine()?;
     match authorize_cleanup(&engine, &candidates) {
         PermissionDecision::Allow => {
             // Proceed with deletion.
@@ -174,6 +174,36 @@ fn run_storage_cleanup(args: &CleanupArgs) -> Result<()> {
         .context("failed to apply cleanup")?;
     print_cleanup_report(&report);
     Ok(())
+}
+
+fn storage_permission_engine() -> Result<PermissionEngine> {
+    storage_permission_engine_from_paths(storage_permission_rule_paths())
+}
+
+fn storage_permission_engine_from_paths(paths: Vec<PathBuf>) -> Result<PermissionEngine> {
+    let mut engine = PermissionEngine::new();
+    for path in paths {
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let config = serde_json::from_str::<serde_json::Value>(&contents)
+            .with_context(|| format!("invalid permission rules in {}", path.display()))?;
+        engine
+            .load_from_config(&config)
+            .with_context(|| format!("invalid permission rules in {}", path.display()))?;
+    }
+    Ok(engine)
+}
+
+fn storage_permission_rule_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        paths.push(cwd.join(".talos").join("permissions.json"));
+    }
+    if let Some(home) = dirs::home_dir() {
+        paths.push(home.join(".talos").join("permissions.json"));
+    }
+    paths
 }
 
 fn run_storage_maintenance(args: &MaintenanceArgs) -> Result<()> {
@@ -654,5 +684,35 @@ mod tests {
         let decision = engine.evaluate_with_nature("storage_cleanup", ToolNature::Write, &input);
 
         assert!(matches!(decision, PermissionDecision::Allow));
+    }
+
+    #[test]
+    fn storage_permission_engine_loads_project_rules() {
+        let dir = tempfile::tempdir().unwrap();
+        let rule_dir = dir.path().join(".talos");
+        std::fs::create_dir_all(&rule_dir).unwrap();
+        let rule_path = rule_dir.join("permissions.json");
+        std::fs::write(
+            &rule_path,
+            r#"{"rules":[{"tool_name":"storage_cleanup","path_pattern":null,"decision":"Deny"}]}"#,
+        )
+        .unwrap();
+
+        let engine = storage_permission_engine_from_paths(vec![rule_path]).unwrap();
+
+        let empty: &[talos_session::SessionCleanupCandidate] = &[];
+        let decision = authorize_cleanup(&engine, empty);
+        assert!(matches!(decision, PermissionDecision::Deny(_)));
+    }
+
+    #[test]
+    fn storage_permission_engine_rejects_malformed_rules() {
+        let dir = tempfile::tempdir().unwrap();
+        let rule_path = dir.path().join("permissions.json");
+        std::fs::write(&rule_path, r#"{"rules":"not-an-array"}"#).unwrap();
+
+        let result = storage_permission_engine_from_paths(vec![rule_path]);
+
+        assert!(result.is_err());
     }
 }

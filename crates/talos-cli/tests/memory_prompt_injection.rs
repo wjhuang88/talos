@@ -62,7 +62,7 @@ const MEMORY_CONTENT: &str = "## Relevant Memory\n- [confidence=0.9] Talos uses 
 #[tokio::test]
 async fn memory_prompt_enabled_shows_in_request_preview() {
     let provider = make_mock_provider();
-    let mut agent = make_agent_with_memory(provider, Some(MEMORY_CONTENT.to_string()));
+    let agent = make_agent_with_memory(provider, Some(MEMORY_CONTENT.to_string()));
 
     let result = agent
         .run("/mock-request summarize this repository".to_string())

@@ -1,6 +1,6 @@
 # Iteration I057: Acceptance Remediation And Release Gate
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-06-26
 > Planned objective: Repair the acceptance blockers found in the DATA-001 -> I019 -> I020 review before any v0.2.0 release tag.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -125,6 +125,8 @@ their owner documents.
 |---|---|---|
 | 2026-06-26 | Planning | Created as an acceptance-remediation gate after architecture review found release blockers in I049/I051/I055/I056. Existing Review iterations remain in Review; v0.2.0 tag remains blocked until this iteration passes. |
 | 2026-06-26 | **Activation + Implementation** | All 5 stories delivered. S1: storage cleanup `--apply` routes through `PermissionEngine` with deny/allow regression (7 tests). S2: memory prompt injection wired into `run_inner()` via `memory_provider` callback, config-gated default disabled, mock-provider request-preview regression (2 tests). S3a: UTF-8 snippet panic fixed (`chars().take(197)` replaces byte slice). S3b: resource budget added (`max_file_bytes` 10 MB, `max_chunks_per_source` 10K) with safe-fail (3 tests). S4: hidden-output filter expanded (JSON/Anthropic/system markers + normalization) with 7 bypass tests. Workspace gates all pass. |
+| 2026-06-26 | **Acceptance Repair** | Follow-up review found two runtime gaps: storage cleanup created an empty permission engine, and memory prompt runtime opened an empty in-memory store. Fixed storage cleanup to load project/user JSON permission rules from `.talos/permissions.json` and `~/.talos/permissions.json`; fixed memory prompt runtime to read `~/.talos/memory.db` instead of `MemoryStore::open_memory()`. I056/I057 header status synchronized to Review. |
+| 2026-06-26 | **Acceptance Hardening** | Follow-up logic review closed remaining debt: storage cleanup now fails closed on malformed permission rule files; exploration local/fetched ingestion share the same size/chunk budget path and write source+chunks atomically; `talos-config` owns the pure `MemoryPromptConfig` DTO instead of depending on `talos-memory`; CLI memory prompt runtime caches the opened memory store. |
 
 ## Verification Evidence
 
@@ -133,7 +135,7 @@ their owner documents.
 - `cargo fmt --all -- --check` — clean
 - `cargo check --workspace` — clean
 - `cargo clippy --workspace -- -D warnings` — clean
-- `cargo test --workspace` — all pass (pre-existing `mcp_client_e2e` timing flake passes in isolation; documented in acceptance review §4)
+- `cargo test --workspace` — all pass (1 pre-existing ignored timing-sensitive session test)
 - `scripts/validate_project_governance.sh .` — 0 warnings
 
 ### Targeted Regression Tests
@@ -143,11 +145,16 @@ their owner documents.
 | S1 | `storage_cleanup_denied_by_permission_rule` | Deny rule blocks `--apply` even with explicit flag |
 | S1 | `storage_cleanup_default_engine_returns_ask` | Default Write→Ask; `--apply` resolves to Allow |
 | S1 | `storage_cleanup_explicit_allow_rule` | Allow rule permits cleanup |
+| S1 | `storage_permission_engine_loads_project_rules` | Real storage cleanup permission engine loads `.talos/permissions.json` before evaluating `--apply` |
+| S1 | `storage_permission_engine_rejects_malformed_rules` | Malformed permission rules fail closed instead of falling back to `--apply` authorization |
 | S2 | `memory_prompt_enabled_shows_in_request_preview` | Mock-provider preview contains bounded memory section |
 | S2 | `memory_prompt_disabled_absent_from_request_preview` | Default disabled: no memory content in request |
 | S3a | `search_snippet_multibyte_utf8_no_panic` | Chinese/emoji text through FTS search does not panic |
 | S3b | `ingest_text_exceeds_file_budget_returns_error` | Oversized input rejected with clear error |
 | S3b | `ingest_text_exceeds_chunk_cap_returns_error` | Chunk count cap prevents unbounded growth |
+| S3b | `ingest_text_chunk_cap_failure_leaves_no_source` | Failed chunk-cap ingestion leaves no orphan source records |
+| S3b | `ingest_fetched_exceeds_file_budget_returns_error` | Fetched content uses the same size budget as local text |
+| S3b | `ingest_fetched_exceeds_chunk_cap_returns_error` | Fetched content uses the same chunk cap as local text |
 | S4 | `hidden_output_blocks_json_tool_result_marker` | JSON `"type":"tool_result"` filtered |
 | S4 | `hidden_output_blocks_whitespace_padded_tag` | `< tool_result >` padding bypass blocked |
 | S4 | `hidden_output_blocks_system_reminder` | `<system-reminder>` filtered |
@@ -157,15 +164,15 @@ their owner documents.
 
 | File | Story | Change |
 |---|---|---|
-| `crates/talos-cli/src/storage.rs` | S1 | `authorize_cleanup()` + permission gate in `--apply` path + 7 tests |
+| `crates/talos-cli/src/storage.rs` | S1 | `authorize_cleanup()` + permission gate in `--apply` path + project/user permission rule loading + malformed-rule fail-closed tests |
 | `crates/talos-memory/src/lib.rs` | S2/S4 | Serde on `MemoryPromptConfig`; expanded `HIDDEN_OUTPUT_PATTERNS`; normalization; 7 filter tests |
 | `crates/talos-agent/src/lib.rs` | S2 | `MemoryProviderCallback` type, `memory_provider` field, `set_memory_provider()`, `run_inner()` injection |
-| `crates/talos-config/src/lib.rs` | S2 | `memory_prompt: MemoryPromptConfig` config field |
-| `crates/talos-config/Cargo.toml` | S2 | `talos-memory` dependency |
-| `crates/talos-cli/src/mode_runners.rs` | S2 | `maybe_set_memory_provider()` wired in all 5 mode runners |
+| `crates/talos-config/src/lib.rs` | S2 | Pure `memory_prompt: MemoryPromptConfig` DTO owned by config layer |
+| `crates/talos-config/Cargo.toml` | S2 | Removed `talos-memory` dependency to keep config free of storage/native SQLite coupling |
+| `crates/talos-cli/src/mode_runners.rs` | S2 | `maybe_set_memory_provider()` wired in all 5 mode runners; runtime reads `~/.talos/memory.db` and caches the opened store |
 | `crates/talos-cli/tests/memory_prompt_injection.rs` | S2 | Mock-provider request-preview regression (NEW) |
-| `crates/talos-exploration/src/lib.rs` | S3a | UTF-8-safe snippet truncation + `FileTooLarge`/`ChunkCapExceeded` errors |
-| `crates/talos-exploration/src/ingestion.rs` | S3b | `max_file_bytes`/`max_chunks_per_source` in `ChunkingConfig` + budget checks + 3 tests |
+| `crates/talos-exploration/src/lib.rs` | S3a/S3b | UTF-8-safe snippet truncation + `FileTooLarge`/`ChunkCapExceeded` errors + atomic source/chunk insert helper |
+| `crates/talos-exploration/src/ingestion.rs` | S3b | `max_file_bytes`/`max_chunks_per_source` in `ChunkingConfig` + shared local/fetched budget checks + atomicity tests |
 | `crates/talos-cli/src/exploration_cli.rs` | S3b | File metadata size check before `read_to_string` |
 
 ### Version Status
@@ -180,16 +187,15 @@ No tag, no GitHub Release, no version bump was performed.
   documented in the iteration; an ADR is not required because the pattern follows the existing
   permission pipeline without introducing a new boundary class.
 - **S2 design decision**: `talos-agent` stays decoupled from `talos-memory` via a callback
-  (`MemoryProviderCallback = dyn Fn(&str) -> Option<String> + Send + Sync`). The dependency
-  goes `talos-config → talos-memory` (for the config type) and `talos-cli → talos-memory` (for
-  the runtime closure), not `talos-agent → talos-memory`.
+  (`MemoryProviderCallback = dyn Fn(&str) -> Option<String> + Send + Sync`). `talos-config`
+  owns a pure serializable `MemoryPromptConfig` DTO; only `talos-cli` depends on `talos-memory`
+  for the runtime closure.
 - **S4 scope note**: the filter is content-based defense-in-depth, not role-metadata-aware.
   `MemoryItem` does not currently carry source-role metadata; adding role tracking would require
   a schema change in the consolidation pipeline and is deferred to a future memory-quality
   iteration. The expanded pattern set + normalization covers the known bypass vectors.
-- **Pre-existing flaky test**: `mcp_client_e2e_routes_tool_call_through_fixture_server` is
-  timing-sensitive and fails under parallel test load. Passes in isolation. Documented in the
-  acceptance review §4. Not caused by I057 changes.
+- **Pre-existing ignored test**: `session::tests::test_interrupt_after_success_preserves_history`
+  remains ignored as timing-sensitive async scheduling coverage. Not caused by I057 changes.
 - **v0.2.0 release**: still blocked pending architect approval. I057 closes all acceptance
   blockers; the release decision is external to this iteration.
 

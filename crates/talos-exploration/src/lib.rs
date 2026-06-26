@@ -361,6 +361,53 @@ impl ExplorationStore {
         Ok(())
     }
 
+    /// Insert a source and all of its chunks atomically.
+    pub fn insert_source_with_chunks(
+        &mut self,
+        source: &Source,
+        chunks: &[SourceChunk],
+    ) -> Result<(), ExplorationError> {
+        let tx = self.conn.transaction()?;
+
+        tx.execute(
+            "INSERT INTO sources (id, run_id, url, title, authors, publication_date, fetched_at, license_notes, content_hash) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                source.id,
+                source.run_id,
+                source.url,
+                source.title,
+                source.authors,
+                source.publication_date,
+                source.fetched_at.to_rfc3339(),
+                source.license_notes,
+                source.content_hash,
+            ],
+        )?;
+
+        for chunk in chunks {
+            tx.execute(
+                "INSERT INTO source_chunks (id, source_id, chunk_ordinal, text, token_estimate) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    chunk.id,
+                    chunk.source_id,
+                    chunk.chunk_ordinal,
+                    chunk.text,
+                    chunk.token_estimate,
+                ],
+            )?;
+
+            tx.execute(
+                "INSERT INTO source_chunks_fts (chunk_id, text) VALUES (?1, ?2)",
+                params![chunk.id, chunk.text],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Get a source by ID.
     pub fn get_source(&self, id: &str) -> Result<Option<Source>, ExplorationError> {
         let mut stmt = self.conn.prepare(

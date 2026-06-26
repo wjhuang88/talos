@@ -2,7 +2,7 @@
 
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use anyhow::{Context, Result, anyhow, bail};
 use rmcp::ServiceExt;
@@ -1273,16 +1273,42 @@ fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
     if !config.memory_prompt.enabled {
         return;
     }
-    let mem_config = config.memory_prompt.clone();
+    let mem_config = talos_memory::MemoryPromptConfig {
+        enabled: config.memory_prompt.enabled,
+        max_items: config.memory_prompt.max_items,
+        max_chars: config.memory_prompt.max_chars,
+    };
+    let memory_db = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".talos")
+        .join("memory.db");
+    let memory_store = Arc::new(StdMutex::new(None::<MemoryStore>));
     let provider = std::sync::Arc::new(move |query: &str| -> Option<String> {
-        let store = match MemoryStore::open_memory() {
-            Ok(s) => s,
+        if !memory_db.exists() {
+            tracing::debug!(
+                path = %memory_db.display(),
+                "memory store not initialized, skipping memory injection"
+            );
+            return None;
+        }
+
+        let mut store_guard = match memory_store.lock() {
+            Ok(guard) => guard,
             Err(e) => {
-                tracing::warn!("memory store unavailable, skipping memory injection: {e}");
+                tracing::warn!("memory store lock poisoned, skipping memory injection: {e}");
                 return None;
             }
         };
-        format_memory_prompt(&store, query, &mem_config)
+        if store_guard.is_none() {
+            match MemoryStore::open(&memory_db) {
+                Ok(store) => *store_guard = Some(store),
+                Err(e) => {
+                    tracing::warn!("memory store unavailable, skipping memory injection: {e}");
+                    return None;
+                }
+            }
+        }
+        format_memory_prompt(store_guard.as_ref()?, query, &mem_config)
     });
     agent.set_memory_provider(provider);
 }

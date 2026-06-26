@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { path = "../talos-core" }
-talos-memory = { path = "../talos-memory" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1.2"

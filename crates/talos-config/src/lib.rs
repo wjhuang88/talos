@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use talos_memory::MemoryPromptConfig;
 use thiserror::Error;
 
 pub mod agents;
@@ -123,6 +122,28 @@ impl std::fmt::Debug for Credentials {
         f.debug_struct("Credentials")
             .field("keys", &format!("{} key(s) [redacted]", self.keys.len()))
             .finish()
+    }
+}
+
+/// Configuration for runtime memory prompt injection.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct MemoryPromptConfig {
+    /// Whether memory injection is enabled.
+    pub enabled: bool,
+    /// Maximum number of memory items to include.
+    pub max_items: usize,
+    /// Maximum character budget for the formatted section.
+    pub max_chars: usize,
+}
+
+impl Default for MemoryPromptConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_items: 5,
+            max_chars: 2000,
+        }
     }
 }
 
