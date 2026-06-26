@@ -484,7 +484,7 @@ mod tests {
 
     #[test]
     fn test_schema_migration_creates_tables() {
-        let mut store = MemoryStore::open_memory().unwrap();
+        let store = MemoryStore::open_memory().unwrap();
 
         let table_count: i64 = store
             .conn
