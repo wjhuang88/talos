@@ -138,6 +138,39 @@ pub enum MemoryStoreError {
     Maintenance(String),
 }
 
+/// Memory store status summary (no content exposed).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryStatus {
+    pub total_items: usize,
+    pub semantic_count: usize,
+    pub procedural_count: usize,
+    pub evidence_count: usize,
+    pub entity_count: usize,
+    pub db_path: Option<String>,
+    pub db_size_bytes: u64,
+}
+
+/// Policy for selecting memory retention candidates (dry-run only).
+#[derive(Debug, Clone, Default)]
+pub struct RetentionPolicy {
+    pub min_confidence: Option<f64>,
+    pub max_age_days: Option<i64>,
+    pub unreinforced_only: bool,
+}
+
+/// A memory item selected as a retention candidate (dry-run, no deletion).
+#[derive(Debug, Clone)]
+pub struct RetentionCandidate {
+    pub id: String,
+    pub kind: String,
+    pub key_preview: String,
+    pub confidence: f64,
+    pub last_reinforced: DateTime<Utc>,
+    pub age_days: i64,
+    pub evidence_count: usize,
+    pub reason: String,
+}
+
 /// SQLite-backed store for semantic and procedural memory.
 ///
 /// Provides ADD-only writes, FTS5-based retrieval with multi-signal scoring,
@@ -537,6 +570,160 @@ impl MemoryStore {
         self.conn
             .execute_batch("VACUUM;")
             .map_err(|e| MemoryStoreError::Maintenance(e.to_string()))
+    }
+
+    /// Report memory store status without exposing any content.
+    pub fn memory_status(&self) -> Result<MemoryStatus, MemoryStoreError> {
+        let total_items: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM memory_items", [], |row| row.get(0))?;
+
+        let semantic_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM memory_items WHERE kind = 'semantic'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let procedural_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM memory_items WHERE kind = 'procedural'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let evidence_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM evidence_links", [], |row| row.get(0))?;
+
+        let entity_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM entities", [], |row| row.get(0))?;
+
+        let (db_path, db_size_bytes) = self.db_file_info()?;
+
+        Ok(MemoryStatus {
+            total_items: total_items as usize,
+            semantic_count: semantic_count as usize,
+            procedural_count: procedural_count as usize,
+            evidence_count: evidence_count as usize,
+            entity_count: entity_count as usize,
+            db_path,
+            db_size_bytes,
+        })
+    }
+
+    /// Report memory items that match retention criteria.
+    /// This is DRY-RUN ONLY — no items are deleted. ADD-only semantics are preserved.
+    pub fn retention_candidates(
+        &self,
+        policy: &RetentionPolicy,
+    ) -> Result<Vec<RetentionCandidate>, MemoryStoreError> {
+        let mut query = String::from(
+            "SELECT id, kind, key, confidence, last_reinforced \
+             FROM memory_items WHERE 1=1",
+        );
+        let mut params_vec: Vec<rusqlite::types::Value> = Vec::new();
+
+        if let Some(min_conf) = policy.min_confidence {
+            query.push_str(" AND confidence < ?");
+            params_vec.push(rusqlite::types::Value::Real(min_conf));
+        }
+
+        if let Some(max_age_days) = policy.max_age_days {
+            query.push_str(" AND last_reinforced < datetime('now', ?)");
+            params_vec.push(rusqlite::types::Value::Text(format!(
+                "-{} days",
+                max_age_days
+            )));
+        }
+
+        if policy.unreinforced_only {
+            query.push_str(" AND id NOT IN (SELECT DISTINCT memory_id FROM evidence_links)");
+        }
+
+        let mut stmt = self.conn.prepare(&query)?;
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|v| v as _).collect();
+
+        let rows = stmt.query_map(rusqlite::params_from_iter(param_refs.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, f64>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })?;
+
+        let now = Utc::now();
+        let mut candidates = Vec::new();
+
+        for row in rows {
+            let (id, kind, key, confidence, last_reinforced_str) = row?;
+            let last_reinforced = parse_datetime(&last_reinforced_str)?;
+
+            let evidence_count: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM evidence_links WHERE memory_id = ?1",
+                params![&id],
+                |row| row.get(0),
+            )?;
+
+            let key_preview = if key.len() > 30 {
+                format!("{}...", &key[..27])
+            } else {
+                key.clone()
+            };
+
+            let mut reasons = Vec::new();
+            if policy.min_confidence.is_some_and(|m| confidence < m) {
+                reasons.push(format!("confidence {:.2} below threshold", confidence));
+            }
+            if policy.max_age_days.is_some() {
+                let age_days = (now - last_reinforced).num_days();
+                reasons.push(format!("age {} days", age_days));
+            }
+            if policy.unreinforced_only && evidence_count == 0 {
+                reasons.push("no evidence links".to_string());
+            }
+
+            let age_days = (now - last_reinforced).num_days();
+
+            candidates.push(RetentionCandidate {
+                id,
+                kind,
+                key_preview,
+                confidence,
+                last_reinforced,
+                age_days,
+                evidence_count: evidence_count as usize,
+                reason: reasons.join("; "),
+            });
+        }
+
+        Ok(candidates)
+    }
+
+    fn db_file_info(&self) -> Result<(Option<String>, u64), MemoryStoreError> {
+        let mut stmt = self.conn.prepare("PRAGMA database_list")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+
+        for row in rows {
+            let (_seq, _name, path) = row?;
+            if path.is_empty() || path == ":memory:" {
+                continue;
+            }
+            if let Ok(meta) = std::fs::metadata(&path) {
+                return Ok((Some(path), meta.len()));
+            }
+        }
+
+        Ok((None, 0))
     }
 
     /// Load evidence links for a memory item.
@@ -1573,5 +1760,297 @@ mod tests {
             total_entities > 0,
             "Should have entities in the table, got count={total_entities}"
         );
+    }
+
+    #[test]
+    fn corrupt_db_degrades_gracefully() {
+        let dir = tempfile::tempdir().unwrap();
+        let corrupt_path = dir.path().join("corrupt.db");
+        std::fs::write(&corrupt_path, b"this is not a valid sqlite database file").unwrap();
+
+        let result = MemoryStore::open(&corrupt_path);
+        assert!(
+            result.is_err(),
+            "Opening a corrupt DB should return an error, not panic"
+        );
+        let err = match result {
+            Err(e) => e,
+            Ok(_) => panic!("expected error for corrupt DB"),
+        };
+        let err_msg = err.to_string().to_lowercase();
+        assert!(
+            err_msg.contains("database")
+                || err_msg.contains("file")
+                || err_msg.contains("malformed")
+                || err_msg.contains("not a database"),
+            "Error should be actionable, got: {err}"
+        );
+    }
+
+    #[test]
+    fn missing_db_path_handled() {
+        let dir = tempfile::tempdir().unwrap();
+        let nested_path = dir.path().join("nonexistent").join("sub").join("memory.db");
+
+        let result = MemoryStore::open(&nested_path);
+        assert!(
+            result.is_ok(),
+            "Opening a DB in a nonexistent parent should create the path"
+        );
+    }
+
+    #[test]
+    fn memory_status_reports_counts() {
+        let mut store = MemoryStore::open_memory().unwrap();
+
+        for i in 0..3 {
+            let item = make_item(
+                &format!("sem-{i}"),
+                "status-test",
+                &format!("Update src/lib.rs for semantic fact {i}"),
+            );
+            store.insert(item).unwrap();
+        }
+
+        let now = Utc::now();
+        for i in 0..2 {
+            let item = MemoryItem {
+                id: format!("proc-{i}"),
+                kind: MemoryKind::Procedural,
+                key: "status-proc".to_string(),
+                content: format!("Run Cargo.toml test step {i}"),
+                confidence: 0.9,
+                created_at: now,
+                last_reinforced: now,
+                last_accessed: None,
+                contradiction_ref: None,
+            };
+            store.insert(item).unwrap();
+        }
+
+        for i in 0..3 {
+            store
+                .insert_evidence(EvidenceLink {
+                    id: format!("ev-{i}"),
+                    memory_id: format!("sem-{i}"),
+                    source_type: "session".to_string(),
+                    source_ref: format!("session-{i}"),
+                    created_at: Utc::now(),
+                })
+                .unwrap();
+        }
+
+        let status = store.memory_status().unwrap();
+        assert_eq!(status.total_items, 5);
+        assert_eq!(status.semantic_count, 3);
+        assert_eq!(status.procedural_count, 2);
+        assert_eq!(status.evidence_count, 3);
+        assert!(status.entity_count > 0, "entity_count should be > 0");
+        assert!(status.db_path.is_none());
+        assert_eq!(status.db_size_bytes, 0);
+    }
+
+    #[test]
+    fn retention_dry_run_no_deletion() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        let now = Utc::now();
+
+        let low_conf = MemoryItem {
+            id: "low-conf".to_string(),
+            kind: MemoryKind::Semantic,
+            key: "low-confidence".to_string(),
+            content: "A low confidence memory".to_string(),
+            confidence: 0.2,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(low_conf).unwrap();
+
+        let high_conf = MemoryItem {
+            id: "high-conf".to_string(),
+            kind: MemoryKind::Semantic,
+            key: "high-confidence".to_string(),
+            content: "A high confidence memory".to_string(),
+            confidence: 0.9,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(high_conf).unwrap();
+
+        let policy = RetentionPolicy {
+            min_confidence: Some(0.5),
+            ..Default::default()
+        };
+
+        let candidates = store.retention_candidates(&policy).unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, "low-conf");
+
+        let count_before = store.count().unwrap();
+        assert_eq!(count_before, 2);
+    }
+
+    #[test]
+    fn retention_key_preview_truncated() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        let now = Utc::now();
+
+        let long_key =
+            "this_is_a_very_long_key_that_should_be_truncated_in_the_retention_candidate_output"
+                .to_string();
+        let item = MemoryItem {
+            id: "long-key".to_string(),
+            kind: MemoryKind::Semantic,
+            key: long_key.clone(),
+            content: "Some content".to_string(),
+            confidence: 0.1,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(item).unwrap();
+
+        let policy = RetentionPolicy {
+            min_confidence: Some(0.5),
+            ..Default::default()
+        };
+
+        let candidates = store.retention_candidates(&policy).unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert!(
+            candidates[0].key_preview.len() <= 30,
+            "key_preview should be <= 30 chars, got {} chars: '{}'",
+            candidates[0].key_preview.len(),
+            candidates[0].key_preview
+        );
+        assert!(candidates[0].key_preview.ends_with("..."));
+    }
+
+    #[test]
+    fn retention_unreinforced_only() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        let now = Utc::now();
+
+        let with_evidence = MemoryItem {
+            id: "with-ev".to_string(),
+            kind: MemoryKind::Semantic,
+            key: "reinforced".to_string(),
+            content: "Has evidence".to_string(),
+            confidence: 0.3,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(with_evidence).unwrap();
+        store
+            .insert_evidence(EvidenceLink {
+                id: "ev-1".to_string(),
+                memory_id: "with-ev".to_string(),
+                source_type: "session".to_string(),
+                source_ref: "session-1".to_string(),
+                created_at: now,
+            })
+            .unwrap();
+
+        let without_evidence = MemoryItem {
+            id: "without-ev".to_string(),
+            kind: MemoryKind::Semantic,
+            key: "unreinforced".to_string(),
+            content: "No evidence".to_string(),
+            confidence: 0.3,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(without_evidence).unwrap();
+
+        let policy = RetentionPolicy {
+            unreinforced_only: true,
+            ..Default::default()
+        };
+
+        let candidates = store.retention_candidates(&policy).unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, "without-ev");
+    }
+
+    #[test]
+    fn end_to_end_memory_pipeline() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        let now = Utc::now();
+
+        let semantic = MemoryItem {
+            id: "e2e-sem".to_string(),
+            kind: MemoryKind::Semantic,
+            key: "rust-safety".to_string(),
+            content: "Rust guarantees memory safety without a garbage collector".to_string(),
+            confidence: 0.85,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(semantic).unwrap();
+
+        store
+            .insert_evidence(EvidenceLink {
+                id: "e2e-ev".to_string(),
+                memory_id: "e2e-sem".to_string(),
+                source_type: "session".to_string(),
+                source_ref: "session-e2e:turn-0".to_string(),
+                created_at: now,
+            })
+            .unwrap();
+
+        let procedural = MemoryItem {
+            id: "e2e-proc".to_string(),
+            kind: MemoryKind::Procedural,
+            key: "cargo-test".to_string(),
+            content: "Run cargo test before merging".to_string(),
+            confidence: 0.95,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        store.insert(procedural).unwrap();
+
+        let sem_results = store.retrieve("Rust memory safety", 5).unwrap();
+        assert!(
+            sem_results.iter().any(|r| r.item.id == "e2e-sem"),
+            "Should retrieve semantic memory"
+        );
+
+        let proc_results = store.retrieve("cargo test", 5).unwrap();
+        assert!(
+            proc_results.iter().any(|r| r.item.id == "e2e-proc"),
+            "Should retrieve procedural memory"
+        );
+
+        let config = MemoryPromptConfig {
+            enabled: true,
+            max_items: 5,
+            max_chars: 2000,
+        };
+        let prompt = format_memory_prompt(&store, "Rust memory safety", &config);
+        assert!(prompt.is_some(), "Should produce formatted prompt");
+        let prompt_text = prompt.unwrap();
+        assert!(
+            prompt_text.contains("memory safety"),
+            "Prompt should contain memory content"
+        );
+
+        let status = store.memory_status().unwrap();
+        assert_eq!(status.total_items, 2);
+        assert_eq!(status.semantic_count, 1);
+        assert_eq!(status.procedural_count, 1);
+        assert_eq!(status.evidence_count, 1);
     }
 }

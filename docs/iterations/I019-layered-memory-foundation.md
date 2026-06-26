@@ -3,7 +3,7 @@
 **User can**: Trust that future memory work follows a four-layer architecture rather than an
 ad-hoc vector store or prompt-stuffing mechanism.
 
-## Status: Planned (prerequisites cleared 2026-06-25)
+## Status: Review (2026-06-26) — all acceptance criteria closed via I050-I053
 
 All known prerequisites are now satisfied as of I047:
 
@@ -26,12 +26,14 @@ This iteration turns ADR-016 into the first executable storage and retrieval fou
 
 ## Acceptance Criteria
 
-- [ ] Working, episodic, semantic, and procedural memory are represented as distinct concepts.
-- [ ] Raw sessions remain source-of-truth; semantic/procedural memory links back to evidence.
-- [ ] Retrieval output is bounded by count/tokens and includes provenance.
-- [ ] Contradictory facts are recorded explicitly instead of overwriting each other.
-- [ ] No vector or graph DB dependency is added in this iteration.
-- [ ] `cargo test --workspace` passes.
+- [x] Working, episodic, semantic, and procedural memory are represented as distinct concepts.
+- [x] Raw sessions remain source-of-truth; semantic/procedural memory links back to evidence.
+- [x] Retrieval output is bounded by count/tokens and includes provenance.
+- [x] Contradictory facts are recorded explicitly instead of overwriting each other.
+- [x] No vector or graph DB dependency is added in this iteration.
+- [x] `cargo test --workspace` passes.
+
+Evidence: I047 MEM-001-A starter (schema + retrieval), I050 consolidation pipeline (episodic→semantic with evidence), I051 bounded prompt injection (provenance + budgets + hidden-output guard), I052 entity linking + procedural memory (entity overlap boost + permission boundary regression), I053 quality hardening (status + retention dry-run + corruption tolerance). All delivered 2026-06-26.
 
 ## Out of Scope
 

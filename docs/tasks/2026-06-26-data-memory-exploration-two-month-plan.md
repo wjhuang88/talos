@@ -62,7 +62,7 @@ The sequence intentionally treats storage lifecycle as the gate before autonomou
 | T3 | I050 | Episodic-to-semantic consolidation pipeline | T2 | Batch/end-of-session consolidation tests with ADD-only evidence links | Keep consolidation manual-only if automatic trigger is risky | Review (2026-06-26) |
 | T4 | I051 | Bounded memory retrieval prompt injection | T3 | Token-budgeted prompt section tests; hidden tool outputs never injected | Keep retrieval API exposed but injection disabled by config | Review (2026-06-26) |
 | T5 | I052 | Procedural memory extraction and entity linking | T4 | Entity extraction and procedural adaptation tests; no permission authority | Limit procedural memory to advisory prompt text | Review (2026-06-26) |
-| T6 | I053 | Memory quality gates and release hardening | T5 | Contradiction, decay, retention dry-run, observability, and docs verified | Defer non-blocking ranking polish | Planned |
+| T6 | I053 | Memory quality gates and release hardening | T5 | Contradiction, decay, retention dry-run, observability, and docs verified | Defer non-blocking ranking polish | Review (2026-06-26) |
 | T7 | I054 | Exploration library storage foundation | T6 | SQLite schema + FTS source/chunk/claim/synthesis tests | Keep exploration storage library-only | Planned |
 | T8 | I055 | Exploration ingestion and citation workflow | T7 | Permission-aware ingestion, claim citation, and synthesis tests | Keep network ingestion disabled by default | Planned |
 | T9 | I056 | Two-month closeout and `v0.2.0` readiness decision | T8 | Workspace gates, governance, release checklist, residuals, and docs complete | Mark Review with exact blockers | Planned |

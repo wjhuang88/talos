@@ -69,3 +69,27 @@ enabled through deterministic tests and mock-provider runtime evidence.
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-06-26 | **Activation** | I053 activated. Dependencies met: I052 in Review (entity linking + procedural memory + retrieval boost, commit `951afda`). Scope: memory status reporting (counts/sizes by kind), retention dry-run (no deletion), corruption/missing DB graceful degradation, I019 acceptance closure with evidence. No destructive compaction, no vector/graph. |
+| 2026-06-26 | **Implementation** | All acceptance criteria delivered. `MemoryStore::memory_status()` reports counts by kind, evidence/entity counts, DB path/size without exposing content. `MemoryStore::retention_candidates(policy)` dry-run reports candidates with truncated key previews and reasons. CLI `talos memory status` and `talos memory retention` commands degrade gracefully on missing/corrupt DB. 7 tests including corruption tolerance and end-to-end pipeline. |
+
+## Verification Evidence
+
+### Workspace Gates (2026-06-26)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all pass, 0 failures
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### End-to-End Runtime Evidence (ITERATION-WORKFLOW §3a)
+
+- `talos memory status`: Total items: 2, Semantic: 2, Evidence links: 2, DB size: 48.0 KB.
+- `talos memory retention --min-confidence 0.9`: 2 candidates found, dry-run disclaimer shown, no deletion.
+
+### Changed Files
+
+| File | Change |
+|---|---|
+| `crates/talos-memory/src/lib.rs` | MemoryStatus, RetentionPolicy, RetentionCandidate types; memory_status(), retention_candidates() methods; 7 tests |
+| `crates/talos-cli/src/memory_cli.rs` | MemoryCommand::Status and MemoryCommand::Retention CLI handlers with graceful degradation |
