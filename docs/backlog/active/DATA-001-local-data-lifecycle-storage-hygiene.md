@@ -116,6 +116,8 @@ acceptance boundary.
 ## Required Reads
 
 - `docs/iterations/I048-local-data-lifecycle-storage-hygiene.md`
+- `docs/iterations/I049-storage-status-and-cleanup-cli.md`
+- `docs/tasks/2026-06-26-data-memory-exploration-two-month-plan.md`
 - `docs/iterations/I047-v012-release-readiness-and-runtime-polish.md`
 - `docs/backlog/active/MEM-001-layered-memory-foundation.md`
 - `docs/backlog/active/MEM-005-context-compaction-policy.md`

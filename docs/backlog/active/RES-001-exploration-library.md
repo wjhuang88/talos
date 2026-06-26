@@ -16,6 +16,9 @@ P2.
 ## Required Reads
 
 - `docs/iterations/I020-exploration-library.md`
+- `docs/iterations/I054-exploration-library-storage-foundation.md`
+- `docs/iterations/I055-exploration-ingestion-and-citation-workflow.md`
+- `docs/tasks/2026-06-26-data-memory-exploration-two-month-plan.md`
 - `docs/decisions/017-exploration-library-storage.md`
 - `docs/decisions/008-sqlite-bundled-storage.md`
 - `docs/backlog/active/MEM-001-layered-memory-foundation.md`

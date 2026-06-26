@@ -3,6 +3,7 @@
 **Status**: Planned
 **Created**: 2026-06-26
 **Depends On**: I047 release publication; DATA-001; SESSION-002; MEM-001-A
+**Long Task**: [DATA-001 -> I019 -> I020 Two-Month Execution Plan](../tasks/2026-06-26-data-memory-exploration-two-month-plan.md)
 
 ## Objective
 
@@ -105,3 +106,5 @@ visibility, and memory retention dry-run are implemented and validated.
 
 - Copy-on-write fork storage, automatic cleanup scheduling, and richer memory archive/export remain
   future stories unless I048 evidence shows they are required for correctness.
+- User-facing CLI continuation is planned in
+  [I049 Storage Status And Cleanup CLI](I049-storage-status-and-cleanup-cli.md).

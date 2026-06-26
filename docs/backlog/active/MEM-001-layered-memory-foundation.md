@@ -20,6 +20,11 @@ P2. I024 (MEM-002) is P0 and must land first.
 ## Required Reads
 
 - `docs/iterations/I019-layered-memory-foundation.md`
+- `docs/iterations/I050-memory-consolidation-pipeline.md`
+- `docs/iterations/I051-bounded-memory-prompt-injection.md`
+- `docs/iterations/I052-procedural-memory-and-entity-linking.md`
+- `docs/iterations/I053-memory-quality-and-release-hardening.md`
+- `docs/tasks/2026-06-26-data-memory-exploration-two-month-plan.md`
 - `docs/iterations/I047-v012-release-readiness-and-runtime-polish.md`
 - `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md`
 - `docs/decisions/016-layered-memory-architecture.md` (including Comparative Analysis section)

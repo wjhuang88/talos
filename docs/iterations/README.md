@@ -83,6 +83,14 @@ docs/iterations/
 | I046 | Architecture, Structure, And Governance Repair | **Complete (2026-06-25)** | All 5 stories: S1 (test baseline restored), S2 (provider-aware model identity — `find_model_by_provider`, `(provider, model_id)` semantics), S3 (inline api_key boundary — custom Debug masking, config_get_dotted api_key case, ADR-023), S4 (model_lifecycle.rs extracted from mode_runners.rs), S5 (docs sync — config.reference.toml, AGENTS.md, README, I045 correction). `cargo test/clippy/governance` all pass. See `I046-architecture-structure-governance-repair.md`. |
 | I047 | v0.1.2 Release Readiness And Runtime Polish | **Review (2026-06-25)** | All slices delivered: REL-001 audit, CONF-002 talos init, OBS-001 closure, MEM-001-A memory starter, MEM-005-A compaction policy, GOV-003-A governance status. v0.1.2 tag pushed 2026-06-26. Awaiting release workflow evidence before Complete. See `I047-v012-release-readiness-and-runtime-polish.md`. |
 | I048 | Local Data Lifecycle And Storage Hygiene | **Planned (2026-06-26)** | DATA-001: storage status, session cleanup, fork visibility, SQLite maintenance, and memory lifecycle gate before I019 automatic memory writes. See `I048-local-data-lifecycle-storage-hygiene.md`. |
+| I049 | Storage Status And Cleanup CLI | **Planned (2026-06-26)** | DATA-001 user-facing CLI slice: storage status, cleanup dry-run/apply, active-session protection, fork visibility, and maintenance commands. See `I049-storage-status-and-cleanup-cli.md`. |
+| I050 | Memory Consolidation Pipeline | **Planned (2026-06-26)** | I019 activation slice: episodic-to-semantic consolidation pipeline with ADD-only evidence-backed writes. See `I050-memory-consolidation-pipeline.md`. |
+| I051 | Bounded Memory Prompt Injection | **Planned (2026-06-26)** | Bounded retrieval-to-prompt assembly with provenance, token budgets, and hidden-output guard. See `I051-bounded-memory-prompt-injection.md`. |
+| I052 | Procedural Memory And Entity Linking | **Planned (2026-06-26)** | Procedural memory and deterministic entity linking without permission authority or external NLP runtime. See `I052-procedural-memory-and-entity-linking.md`. |
+| I053 | Memory Quality And Release Hardening | **Planned (2026-06-26)** | I019 closeout: memory status, retention dry-run, quality gates, docs, and release-quality evidence. See `I053-memory-quality-and-release-hardening.md`. |
+| I054 | Exploration Library Storage Foundation | **Planned (2026-06-26)** | I020 storage foundation for research runs, sources, chunks, claims, claim edges, syntheses, and FTS5 search. See `I054-exploration-library-storage-foundation.md`. |
+| I055 | Exploration Ingestion And Citation Workflow | **Planned (2026-06-26)** | Permission-aware ingestion and citation-preserving synthesis workflow on top of I054. See `I055-exploration-ingestion-and-citation-workflow.md`. |
+| I056 | Two-Month Closeout And v0.2.0 Readiness | **Planned (2026-06-26)** | Two-month closeout, regression sweep, docs, residual mapping, and release-readiness decision. See `I056-two-month-closeout-and-v020-readiness.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -101,6 +109,14 @@ rewrite published iteration baselines.
 | I028 | Planned | Deferred; scheduling is not the current priority. |
 | I047 | Review | All slices delivered 2026-06-25. `v0.1.2` tag pushed 2026-06-26. Awaiting CI/release evidence before Complete. |
 | I048 | Planned | Candidate next iteration for DATA-001. Do not activate until I047 release evidence is reviewed or explicitly deferred. |
+| I049 | Planned | DATA-001 CLI/user-facing continuation. Activate after I048 foundation disposition and release evidence decision. |
+| I050 | Planned | I019 consolidation activation. Blocked until DATA-001/I049 lifecycle controls complete or change-control exception is recorded. |
+| I051 | Planned | Depends on I050 consolidation evidence. |
+| I052 | Planned | Depends on I051 bounded prompt injection evidence. |
+| I053 | Planned | Depends on I052; closes I019 quality/release gate before I020 starts. |
+| I054 | Planned | I020 storage foundation. Blocked until I053 or explicit research-priority replan. |
+| I055 | Planned | Depends on I054 exploration storage foundation. |
+| I056 | Planned | Depends on I055; closeout/release readiness only, no tag without explicit approval. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
@@ -146,3 +162,4 @@ existing backlog stories only; new ideas still go through `docs/proposals/` or r
 | R23: Research Consolidation | ✅ Done (2026-06-20) | `I036-research-consolidation.md`; `../backlog/active/REMOTE-001-remote-session-protocol.md`; `../backlog/active/WEB-001-embedded-web-control-surface.md`; `../backlog/active/PLUGIN-001-wasm-runtime-plugins.md`; `../backlog/active/OKF-001-native-okf-support.md`; `../backlog/active/MEM-005-context-compaction-policy.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md`; `../backlog/active/MODEL-002-local-micro-model-decision-layer.md`; `../backlog/active/DIST-001-optional-runtime-asset-distribution.md`; `../backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`; `../backlog/active/STORE-001-zvec-storage-evaluation.md` | Research-heavy items are deduplicated into ADR candidates, deferred decisions, or executable follow-up stories; no implementation code changes. |
 | R24: Model Catalog Foundation | ✅ Done (2026-06-20) | `I038-model-catalog-foundation.md`; `../backlog/active/MODEL-001-model-catalog-and-reasoning.md` | Built-in model dataset + models.dev import; catalog-only, reasoning split to MODEL-003. |
 | R25: Network Tools & TUI Polish | ⏳ Active (2026-06-21) | `I039-network-tools-tui-polish.md` | WEBFETCH-001 Phase 0 (http_request) → TOOL-009 (web_search) ∥ TUI-011 (status bar) + TOOL-005 (bash streaming). |
+| R26: DATA/I019/I020 Two-Month Sequence | Planned (2026-06-26) | `../tasks/2026-06-26-data-memory-exploration-two-month-plan.md`; `I049-storage-status-and-cleanup-cli.md`; `I050-memory-consolidation-pipeline.md`; `I051-bounded-memory-prompt-injection.md`; `I052-procedural-memory-and-entity-linking.md`; `I053-memory-quality-and-release-hardening.md`; `I054-exploration-library-storage-foundation.md`; `I055-exploration-ingestion-and-citation-workflow.md`; `I056-two-month-closeout-and-v020-readiness.md` | DATA-001 closes before automatic memory writes; I019 closes before I020 exploration ingestion; I056 records release readiness but does not tag without explicit approval. |
