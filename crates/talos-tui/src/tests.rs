@@ -628,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn test_status_bar_shows_processing_spinner() {
+    fn test_status_bar_omits_processing_text() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
             provider: String::new(),
@@ -641,8 +641,8 @@ mod tests {
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
-        assert!(content.contains("◷"));
-        assert!(content.contains("processing"));
+        assert!(!content.contains("◷"));
+        assert!(!content.contains("processing"));
     }
 
     #[test]
@@ -704,9 +704,9 @@ mod tests {
         let narrow = build_status_text(&status, 60);
         let wide_text = format!("{:?}", wide);
         let narrow_text = format!("{:?}", narrow);
-        assert!(wide_text.contains("processing"));
+        assert!(!wide_text.contains("processing"));
         assert!(!narrow_text.contains("processing"));
-        assert!(narrow_text.contains("◷"));
+        assert!(!narrow_text.contains("◷"));
     }
 
     #[test]
@@ -744,6 +744,28 @@ mod tests {
             content.contains("talos"),
             "status bar must include workspace path"
         );
+    }
+
+    #[test]
+    fn test_status_bar_does_not_repeat_provider_qualified_model() {
+        let status = StatusSnapshot {
+            model_name: "zhipu-coding-plan/glm-5.2".to_string(),
+            provider: "zhipu-coding-plan".to_string(),
+            workspace_path: "~/WorkSpace/RustProjects/talos".to_string(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+        };
+
+        let text = build_status_text(&status, 100);
+        let content = format!("{:?}", text);
+
+        assert!(content.contains("zhipu-coding-plan/glm"));
+        assert!(!content.contains("(zhipu-coding"));
+        assert!(content.contains("talos"));
+        assert!(content.contains("0 tokens"));
     }
 
     #[test]

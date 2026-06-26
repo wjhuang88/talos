@@ -71,6 +71,15 @@ pub(crate) fn animated_hold_preview_text(status: &HoldStatus, frame: usize) -> S
     format!("{base}{dots}")
 }
 
+pub(crate) fn idle_processing_preview_text(frame: usize) -> &'static str {
+    match (frame / 2) % 4 {
+        0 => "",
+        1 => ".",
+        2 => "..",
+        _ => "...",
+    }
+}
+
 pub(crate) fn hold_preview_color(frame: usize) -> Color {
     semantic::HOLD_PREVIEW[(frame / 2) % semantic::HOLD_PREVIEW.len()]
 }
@@ -312,14 +321,7 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 _ => ("?", None),
             };
             let buffer = self.menu.credential_buffer.as_str();
-            let display: std::borrow::Cow<'_, str> = if buffer.is_empty() {
-                "Enter API key…".into()
-            } else {
-                let visible = buffer.len().saturating_sub(4);
-                let masked = "•".repeat(visible.min(buffer.len()));
-                let last_four = &buffer[visible..];
-                format!("{masked}{last_four}").into()
-            };
+            let display = credential_display_text(buffer);
             let style = Style::default().bg(semantic::INPUT_BG);
             let dim = Style::default().fg(semantic::DIM_TEXT);
             let text_color = if buffer.is_empty() {
@@ -1389,6 +1391,18 @@ pub(crate) fn cursor_line_col(buffer_before_cursor: &str) -> (u16, u16) {
     (row, col)
 }
 
+pub(crate) fn credential_display_text(buffer: &str) -> std::borrow::Cow<'_, str> {
+    if buffer.is_empty() {
+        "Enter API key…".into()
+    } else {
+        "•".repeat(buffer.chars().count()).into()
+    }
+}
+
+pub(crate) fn credential_cursor_col(buffer: &str) -> u16 {
+    3u16.saturating_add(buffer.chars().count() as u16)
+}
+
 pub(crate) fn build_input_text(state: &crate::state::TuiState) -> Text<'static> {
     let buffer = &state.input_buffer;
     let prompt_style = Style::default().fg(semantic::APPROVAL_PROMPT);
@@ -1429,21 +1443,23 @@ pub(crate) fn build_status_text(
     if compact {
         return build_compact_status(
             model_name,
-            provider,
+            status_provider_for_display(model_name, provider),
             workspace,
             status.is_processing,
             total_tokens,
             queue_total,
+            width,
         );
     }
 
     build_expanded_status(
         model_name,
-        provider,
+        status_provider_for_display(model_name, provider),
         workspace,
         status.is_processing,
         total_tokens,
         queue_total,
+        width,
     )
 }
 
@@ -1451,15 +1467,34 @@ fn build_compact_status(
     model_name: &str,
     provider: &str,
     workspace: &str,
-    is_processing: bool,
+    _is_processing: bool,
     total_tokens: u64,
     queue_total: usize,
+    width: u16,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
     let accent = Style::default().fg(semantic::TEXT_ACCENT);
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
-    let model_part = format!("⬡ {}", truncate_str(model_name, 20));
+    let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
+    let queue_part = if queue_total > 0 {
+        format!(" · ⬡{queue_total}")
+    } else {
+        String::new()
+    };
+    let reserved = tokens_part.chars().count() + queue_part.chars().count() + 1;
+    let available = (width as usize).saturating_sub(reserved);
+    let model_limit = if workspace.is_empty() {
+        available.saturating_sub(2).clamp(8, 20)
+    } else {
+        (available / 2).clamp(8, 20)
+    };
+    let workspace_limit = available
+        .saturating_sub(model_limit)
+        .saturating_sub(provider.chars().count().min(14))
+        .clamp(8, 16);
+
+    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
     let provider_part = if provider.is_empty() {
         String::new()
     } else {
@@ -1468,15 +1503,12 @@ fn build_compact_status(
     let workspace_part = if workspace.is_empty() {
         String::new()
     } else {
-        format!(" ▸ {}", truncate_str(workspace, 16))
+        format!(
+            " ▸ {}",
+            truncate_end_to_width(workspace, workspace_limit as u16)
+        )
     };
-    let spinner_part = if is_processing { " ◷" } else { "" };
-    let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
-    let queue_part = if queue_total > 0 {
-        format!(" · ⬡{queue_total}")
-    } else {
-        String::new()
-    };
+    let spinner_part = "";
 
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
@@ -1492,30 +1524,16 @@ fn build_expanded_status(
     model_name: &str,
     provider: &str,
     workspace: &str,
-    is_processing: bool,
+    _is_processing: bool,
     total_tokens: u64,
     queue_total: usize,
+    width: u16,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
     let accent = Style::default().fg(semantic::TEXT_ACCENT);
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
-    let model_part = format!("⬡ {}", truncate_str(model_name, 24));
-    let provider_part = if provider.is_empty() {
-        String::new()
-    } else {
-        format!(" ({})", truncate_str(provider, 16))
-    };
-    let workspace_part = if workspace.is_empty() {
-        String::new()
-    } else {
-        format!(" ▸ {}", truncate_str(workspace, 40))
-    };
-    let spinner_part = if is_processing {
-        " ◷ processing…"
-    } else {
-        ""
-    };
+    let spinner_part = "";
     let tokens_part = format!("{} tokens", crate::formatting::format_tokens(total_tokens));
     let queue_part = if queue_total > 0 {
         format!(" · ⬡ {} queued", queue_total)
@@ -1524,6 +1542,39 @@ fn build_expanded_status(
     };
 
     let right_part = format!("{tokens_part}{queue_part}");
+    let reserved = 1 + right_part.chars().count() + spinner_part.chars().count() + 5;
+    let available = (width as usize).saturating_sub(reserved);
+    let provider_budget = if provider.is_empty() {
+        0
+    } else {
+        provider.chars().count().min(18) + 3
+    };
+    let model_limit = if workspace.is_empty() {
+        available.saturating_sub(provider_budget).clamp(10, 40)
+    } else {
+        (available / 2)
+            .saturating_sub(provider_budget / 2)
+            .clamp(10, 36)
+    };
+    let workspace_limit = available
+        .saturating_sub(model_limit)
+        .saturating_sub(provider_budget)
+        .clamp(12, 48);
+
+    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
+    let provider_part = if provider.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", truncate_str(provider, 18))
+    };
+    let workspace_part = if workspace.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " ▸ {}",
+            truncate_end_to_width(workspace, workspace_limit as u16)
+        )
+    };
 
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
@@ -1533,6 +1584,14 @@ fn build_expanded_status(
         Span::styled("     ", dim),
         Span::styled(right_part, val),
     ]))
+}
+
+fn status_provider_for_display<'a>(model_name: &str, provider: &'a str) -> &'a str {
+    if provider.is_empty() || model_name.starts_with(&format!("{provider}/")) {
+        ""
+    } else {
+        provider
+    }
 }
 
 pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {

@@ -28,6 +28,20 @@ fn truncate_to_width_short_enough() {
 }
 
 #[test]
+fn credential_display_never_reveals_secret_suffix() {
+    let display = scrollback::credential_display_text("sk-test-Ewqw");
+
+    assert_eq!(display, "••••••••••••");
+    assert!(!display.contains("Ewqw"));
+    assert!(!display.contains("sk-test"));
+}
+
+#[test]
+fn credential_cursor_tracks_masked_buffer() {
+    assert_eq!(scrollback::credential_cursor_col("abcd"), 7);
+}
+
+#[test]
 fn approval_summary_uses_tool_summary_fields() {
     let args = serde_json::json!({
         "command": "cd /repo && git status --short",
@@ -213,6 +227,14 @@ fn markdown_hold_preview_animates_text_and_color() {
         scrollback::hold_preview_color(0),
         scrollback::hold_preview_color(2)
     );
+}
+
+#[test]
+fn idle_processing_preview_animates_ellipsis() {
+    assert_eq!(scrollback::idle_processing_preview_text(0), "");
+    assert_eq!(scrollback::idle_processing_preview_text(2), ".");
+    assert_eq!(scrollback::idle_processing_preview_text(4), "..");
+    assert_eq!(scrollback::idle_processing_preview_text(6), "...");
 }
 
 #[test]

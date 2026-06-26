@@ -395,6 +395,21 @@ impl TuiState {
         }
     }
 
+    pub(crate) fn input_paste(&mut self, text: &str) {
+        self.ctrl_c_state = CtrlCState::Idle;
+        if !matches!(self.approval_state, ApprovalState::Hidden) {
+            return;
+        }
+        if self.slash_menu.is_credential_input() {
+            self.credential_append_str(text);
+        } else if self.slash_menu.is_slash() {
+            self.input_append_str(text);
+            self.slash_menu.selected_index = 0;
+        } else if !self.slash_menu.is_open {
+            self.input_append_str(text);
+        }
+    }
+
     pub(crate) fn input_backspace(&mut self) {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
@@ -454,6 +469,12 @@ impl TuiState {
         }
     }
 
+    pub(crate) fn credential_append_str(&mut self, text: &str) {
+        if self.slash_menu.is_credential_input() {
+            self.slash_menu.credential_buffer.push_str(text);
+        }
+    }
+
     pub(crate) fn credential_backspace(&mut self) {
         if self.slash_menu.is_credential_input() {
             self.slash_menu.credential_buffer.pop();
@@ -470,7 +491,9 @@ impl TuiState {
             }
             _ => return None,
         };
-        let key = std::mem::take(&mut self.slash_menu.credential_buffer);
+        let key = std::mem::take(&mut self.slash_menu.credential_buffer)
+            .trim()
+            .to_string();
         self.slash_menu.close();
         if key.is_empty() {
             None
@@ -597,5 +620,72 @@ impl TuiState {
         {
             self.tip = None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn credential_input_collects_pasted_text_and_submits() {
+        let mut state = TuiState::new();
+
+        state.open_credential_input("openai", None);
+        state.credential_append_str("sk-test-key\n");
+
+        let response = state.credential_submit().expect("credential response");
+        assert_eq!(response.provider, "openai");
+        assert_eq!(response.api_key, "sk-test-key");
+        assert_eq!(response.model_id, None);
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn empty_credential_submit_closes_without_response() {
+        let mut state = TuiState::new();
+
+        state.open_credential_input("openai", Some("gpt-4.1"));
+
+        assert!(state.credential_submit().is_none());
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn paste_is_ignored_while_approval_is_visible() {
+        let mut state = TuiState::new();
+
+        state.activate_approval("write", "file edit");
+        state.input_paste("secret");
+
+        assert_eq!(state.input_buffer, "");
+    }
+
+    #[test]
+    fn paste_is_ignored_while_picker_is_visible() {
+        let mut state = TuiState::new();
+        let data = ModelPickerData {
+            ready_models: vec![],
+            setup_providers: vec![],
+        };
+
+        state.open_model_picker(&data);
+        state.input_paste("secret");
+
+        assert_eq!(state.input_buffer, "");
+    }
+
+    #[test]
+    fn paste_still_updates_slash_query_and_composer() {
+        let mut state = TuiState::new();
+
+        state.input_paste("hello");
+        assert_eq!(state.input_buffer, "hello");
+
+        state.input_clear();
+        state.open_slash_menu(talos_conversation::command_registry());
+        state.input_paste("model");
+
+        assert_eq!(state.input_buffer, "/model");
     }
 }

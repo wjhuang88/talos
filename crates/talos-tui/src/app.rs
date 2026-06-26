@@ -495,9 +495,8 @@ impl Tui {
                 }
             }
             PanelAction::ProviderSetup(provider) => {
-                if let Some(ref tx) = self.user_input_tx {
-                    let _ = tx.send(UserInput::ProviderSetup(provider));
-                }
+                self.state.open_credential_input(&provider, None);
+                self.state.input_clear();
             }
             PanelAction::None => {}
         }
@@ -1193,7 +1192,15 @@ impl Tui {
             .map(|status| {
                 crate::scrollback::animated_hold_preview_text(status, self.processing_frame)
             })
-            .unwrap_or_else(|| self.stream_render.preview().to_string());
+            .unwrap_or_else(|| {
+                let preview = self.stream_render.preview();
+                if status.is_processing && preview.is_empty() {
+                    crate::scrollback::idle_processing_preview_text(self.processing_frame)
+                        .to_string()
+                } else {
+                    preview.to_string()
+                }
+            });
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));
@@ -1294,23 +1301,46 @@ impl Tui {
         {
             let viewport = self.terminal.viewport_area();
             let screen_w = self.terminal.screen_size().width;
-            let mut input_y_offset: u16 = preview.height_hint(screen_w)
-                + queue.height_hint(screen_w)
-                + tips.height_hint(screen_w)
-                + input_pad_top.height_hint(screen_w);
-            if matches!(
-                menu_placement,
-                crate::scrollback::BottomPanelPlacement::AboveInput
-            ) {
-                input_y_offset += bottom_panel.height_hint(screen_w);
+            let stack_top = viewport.bottom().saturating_sub(total_height);
+            if self.state.slash_menu.is_credential_input() {
+                let panel_y_offset = match menu_placement {
+                    crate::scrollback::BottomPanelPlacement::AboveInput => {
+                        preview.height_hint(screen_w)
+                            + queue.height_hint(screen_w)
+                            + tips.height_hint(screen_w)
+                    }
+                    crate::scrollback::BottomPanelPlacement::BelowInput => {
+                        preview.height_hint(screen_w)
+                            + queue.height_hint(screen_w)
+                            + tips.height_hint(screen_w)
+                            + input_pad_top.height_hint(screen_w)
+                            + input.height_hint(screen_w)
+                    }
+                };
+                let input_row = stack_top.saturating_add(panel_y_offset).saturating_add(2);
+                let cursor_col = crate::scrollback::credential_cursor_col(
+                    &self.state.slash_menu.credential_buffer,
+                );
+                self.terminal.set_cursor(cursor_col, input_row)?;
+            } else {
+                let mut input_y_offset: u16 = preview.height_hint(screen_w)
+                    + queue.height_hint(screen_w)
+                    + tips.height_hint(screen_w)
+                    + input_pad_top.height_hint(screen_w);
+                if matches!(
+                    menu_placement,
+                    crate::scrollback::BottomPanelPlacement::AboveInput
+                ) {
+                    input_y_offset += bottom_panel.height_hint(screen_w);
+                }
+                let input_top = stack_top + input_y_offset;
+                let byte_pos = self.state.cursor_byte_pos();
+                let (cursor_row_offset, cursor_col_offset) =
+                    crate::scrollback::cursor_line_col(&self.state.input_buffer[..byte_pos]);
+                let input_row = input_top.saturating_add(cursor_row_offset);
+                let cursor_col = 3u16 + cursor_col_offset;
+                self.terminal.set_cursor(cursor_col, input_row)?;
             }
-            let input_top = viewport.bottom().saturating_sub(total_height) + input_y_offset;
-            let byte_pos = self.state.cursor_byte_pos();
-            let (cursor_row_offset, cursor_col_offset) =
-                crate::scrollback::cursor_line_col(&self.state.input_buffer[..byte_pos]);
-            let input_row = input_top.saturating_add(cursor_row_offset);
-            let cursor_col = 3u16 + cursor_col_offset;
-            self.terminal.set_cursor(cursor_col, input_row)?;
         }
 
         Ok(())
@@ -1334,9 +1364,11 @@ impl Tui {
                             {
                                 let _ = tx.send(UserInput::Credential(resp));
                             }
+                            self.state.input_clear();
                         }
                         KeyCode::Esc => {
                             self.state.credential_cancel();
+                            self.state.input_clear();
                         }
                         KeyCode::Backspace => {
                             self.state.credential_backspace();
@@ -1446,13 +1478,7 @@ impl Tui {
                 }
             }
             Event::Paste(text) => {
-                self.state.ctrl_c_state = CtrlCState::Idle;
-                if self.state.slash_menu.is_open {
-                    self.state.input_append_str(text);
-                    self.state.slash_menu.selected_index = 0;
-                } else {
-                    self.state.input_append_str(text);
-                }
+                self.state.input_paste(text);
             }
             Event::Resize(_, _) => {}
             _ => {}
