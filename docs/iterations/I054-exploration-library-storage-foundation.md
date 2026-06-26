@@ -65,3 +65,23 @@ with FTS5 search and provenance tests.
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-06-26 | **Activation** | I054 activated. Dependencies met: I053 in Review (I019 quality gate closed, commit `e745e2c`). Scope: new `talos-exploration` crate with SQLite/FTS5 schema for research_runs, sources, source_chunks, claims, claim_edges, syntheses. Citation integrity enforcement. No network ingestion, no vector/graph, no memory consolidation. |
+| 2026-06-26 | **Implementation** | All acceptance criteria delivered. New `talos-exploration` crate (17th workspace member) with full schema: research_runs, sources, source_chunks (FTS5), claims, claim_edges, syntheses. `ExplorationStore` with open/open_memory/migrate, CRUD for all entities, FTS5 chunk search, citation integrity validation (claims validate chunk existence, syntheses validate source existence, edges validate both claims). 8 tests including schema migration, FTS bounded search, citation validation failures, full round-trip, idempotent reopen. |
+
+## Verification Evidence
+
+### Workspace Gates (2026-06-26)
+
+- `cargo fmt --all -- --check` — clean
+- `cargo check --workspace` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `cargo test --workspace` — all pass, 0 failures
+- `scripts/validate_project_governance.sh .` — 0 warnings
+
+### Changed Files
+
+| File | Change |
+|---|---|
+| `crates/talos-exploration/Cargo.toml` | NEW: crate manifest matching talos-memory deps |
+| `crates/talos-exploration/src/lib.rs` | NEW: ExplorationStore with full schema, CRUD, FTS5 search, citation integrity, 8 tests |
+| `Cargo.toml` | Added `crates/talos-exploration` to workspace members |
