@@ -12,6 +12,7 @@
 > [I054](../iterations/I054-exploration-library-storage-foundation.md),
 > [I055](../iterations/I055-exploration-ingestion-and-citation-workflow.md),
 > [I056](../iterations/I056-two-month-closeout-and-v020-readiness.md)
+> Programmer handoff: [Programmer Handoff](2026-06-26-programmer-handoff-data-memory-exploration.md)
 > Baseline rule: this task inventory is preserved; changed objectives use a new task record or
 > change-control entry.
 
@@ -170,3 +171,12 @@ runtime behavior is claimed by this checkpoint.
 
 Recovery/resume instruction: start with I048/I049 owner docs, verify I047 release workflow status,
 then activate I049 only if DATA-001 CLI/storage status scope remains the next priority.
+
+### T0b — Programmer Handoff Created (2026-06-26)
+
+Created `docs/tasks/2026-06-26-programmer-handoff-data-memory-exploration.md` for assignment
+distribution. It records assignment boundaries, required reads, gates, risks, and handoff note
+format for I049-I056.
+
+Recovery/resume instruction: distribute the handoff before assigning I049; require each programmer
+to append activation/evidence records to the owning iteration before implementation.
