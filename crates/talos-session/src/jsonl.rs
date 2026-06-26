@@ -106,7 +106,12 @@ impl Session {
                     .into()
                 }
                 "system" => {
-                    if serde_json::from_str::<AgentEvent>(&entry.content).is_ok() {
+                    if let Some(sys_content) = entry.content.strip_prefix("__SYSTEM__:") {
+                        Some(Message::System {
+                            content: sys_content.to_string(),
+                            cache_markers: Vec::new(),
+                        })
+                    } else if serde_json::from_str::<AgentEvent>(&entry.content).is_ok() {
                         None
                     } else {
                         let (is_error, tool_use_id, content) = parse_tool_result(&entry.content);
@@ -291,7 +296,7 @@ fn message_parts(message: &Message) -> (String, String) {
             };
             ("system".to_string(), format!("{prefix}{}", result.content))
         }
-        Message::System { content, .. } => ("system".to_string(), content.clone()),
+        Message::System { content, .. } => ("system".to_string(), format!("__SYSTEM__:{content}")),
         Message::Context { content } => ("user".to_string(), content.clone()),
     }
 }

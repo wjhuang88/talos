@@ -592,6 +592,26 @@ impl Tui {
                     self.consume_stream_completely();
                     self.finalize_active_stream();
                 }
+                Message::System { content, .. } if !content.is_empty() => {
+                    let stream = futures::stream::iter(vec![content.clone()]);
+                    let msg = talos_conversation::StreamMessage {
+                        source: talos_conversation::MessageSource::System,
+                        stream: Box::pin(stream),
+                    };
+                    self.handle_ui_output(UiOutput::Stream(msg));
+                    self.consume_stream_completely();
+                    self.finalize_active_stream();
+                }
+                Message::Context { content } if !content.is_empty() => {
+                    let stream = futures::stream::iter(vec![content.clone()]);
+                    let msg = talos_conversation::StreamMessage {
+                        source: talos_conversation::MessageSource::System,
+                        stream: Box::pin(stream),
+                    };
+                    self.handle_ui_output(UiOutput::Stream(msg));
+                    self.consume_stream_completely();
+                    self.finalize_active_stream();
+                }
                 _ => {}
             }
         }

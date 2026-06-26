@@ -835,6 +835,13 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let mut tui = Tui::new().context("failed to initialize TUI")?;
     tui.hydrate_history(&visible_history);
+    if !visible_history.is_empty() {
+        send_stream(
+            &ui_output_tx,
+            MessageSource::System,
+            format!("[System] Continued session {}.\n", session.id),
+        );
+    }
 
     let (user_input_tx, user_input_rx) = mpsc::unbounded_channel::<UserInput>();
 
