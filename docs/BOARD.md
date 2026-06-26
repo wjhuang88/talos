@@ -17,6 +17,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I047 v0.1.2 Release Readiness And Runtime Polish | Review | [I047](iterations/I047-v012-release-readiness-and-runtime-polish.md) | `v0.1.2` tag pushed; record release workflow evidence before moving I047 to Complete. |
+| I057 Acceptance Remediation And Release Gate | Review | [I057](iterations/I057-acceptance-remediation-and-release-gate.md) | All 5 stories delivered: storage cleanup permission gate, memory prompt runtime wiring + mock-provider evidence, UTF-8/resource hardening, hidden-output filter, governance sync. Workspace gates + targeted regressions pass. v0.2.0 still needs architect approval. |
 
 ## Review
 

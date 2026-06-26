@@ -93,6 +93,7 @@ docs/iterations/
 | I055 | Exploration Ingestion And Citation Workflow | **Review (2026-06-26)** | Ingestion pipeline + claim extraction + citation-preserving synthesis + CLI explore ingest/search delivered. 8 tests + runtime verified. See `I055-exploration-ingestion-and-citation-workflow.md`. |
 | I020 | Exploration Library | **Review (2026-06-26)** | S1-S3 delivered via I054-I055: ExplorationStore schema + FTS5 + citation integrity + ingestion + claim extraction + synthesis. S4 (vector/graph Spike) deferred per ADR-017. See `I020-exploration-library.md`. |
 | I056 | Two-Month Closeout And v0.2.0 Readiness | **Review (2026-06-26)** | All gates green. I019/I020/DATA-001 acceptance synchronized. README updated. Release decision package prepared — v0.2.0 ready for tag upon architect approval. See `I056-two-month-closeout-and-v020-readiness.md`. |
+| I057 | Acceptance Remediation And Release Gate | **Review (2026-06-26)** | All 5 stories delivered: S1 storage cleanup permission gate, S2 memory prompt runtime wiring + mock-provider evidence, S3 UTF-8/resource-budget hardening, S4 hidden-output filter expansion, S5 governance sync. All workspace gates + targeted regressions pass. v0.2.0 still needs architect approval. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -119,6 +120,7 @@ rewrite published iteration baselines.
 | I054 | Planned | I020 storage foundation. Blocked until I053 or explicit research-priority replan. |
 | I055 | Planned | Depends on I054 exploration storage foundation. |
 | I056 | Planned | Depends on I055; closeout/release readiness only, no tag without explicit approval. |
+| I057 | Review | All 5 acceptance stories delivered 2026-06-26. Workspace gates + targeted regressions pass. v0.2.0 still blocked on architect approval; I049-I056 remain in Review. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
