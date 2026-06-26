@@ -81,29 +81,37 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n 1 || true)"
+          RELEASE_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          RAW_URL_BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TAG}"
+          TAG_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/tag"
+          COMMIT_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/commit"
+
+          format_commits() {
+            git log --pretty=format:'%s%x09%h%x09%H' "$@" |
+              sed -E 's/ \[model:[^]]+\]//g' |
+              while IFS="$(printf '\t')" read -r subject short_hash full_hash || [ -n "$subject" ]; do
+                [ -n "$subject" ] || continue
+                echo "- ${subject} ([${short_hash}](${COMMIT_URL_BASE}/${full_hash}))"
+              done
+          }
 
           {
-            RELEASE_URL_BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
-            RAW_URL_BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TAG}"
-
             if [ "$IS_PRERELEASE" = "true" ]; then
               echo "⚠️ **This is a pre-release build. Expect bugs and breaking changes.**"
               echo
             fi
 
             if [ -n "$PREVIOUS_TAG" ]; then
-              echo "## Changes since \`$PREVIOUS_TAG\`"
+              echo "## Changes since [\`$PREVIOUS_TAG\`](${TAG_URL_BASE}/${PREVIOUS_TAG})"
               echo
-              git log --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..${TAG}" |
-                sed -E 's/ \[model:[^]]+\]//g'
+              format_commits "${PREVIOUS_TAG}..${TAG}"
               echo
               echo
-              echo "Compare: https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG}"
+              echo "Compare: [\`${PREVIOUS_TAG}...${TAG}\`](https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${TAG})"
             else
               echo "## Initial release"
               echo
-              git log --pretty=format:'- %s (%h)' "$TAG" |
-                sed -E 's/ \[model:[^]]+\]//g'
+              format_commits "$TAG"
             fi
 
             echo
