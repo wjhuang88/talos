@@ -1,6 +1,6 @@
 # Long-Running Task: I047 -> I019 Memory And Release Readiness Sequence
 
-> Status: In Progress (T0 confirmed 2026-06-25)
+> Status: Complete (awaiting explicit `v0.1.2` tag approval)
 > Created: 2026-06-25
 > Owner iteration: [I047 v0.1.2 Release Readiness And Runtime Polish](../iterations/I047-v012-release-readiness-and-runtime-polish.md)
 > Baseline rule: this task inventory is preserved; changed objectives use a new task record or
@@ -64,8 +64,8 @@ The intended sequence is:
 | T7 | MEM-005-A compaction policy | Threshold policy, safe-boundary compaction, manual command/status, failure fallback | T6 | Unit/mock session/TUI command tests; hidden output never printed | Keep policy library-only if command integration risks the timebox | ✅ Done |
 | T8 | GOV-003-A read-only governance status | Governance status command reads iteration/backlog/board/validation state without writing docs | T2 | Empty/partial/full workspace tests; dirty-worktree guard | Keep as library/status report only; defer prompt injection | ✅ Done |
 | T9 | I047 closeout and release rehearsal | I047 evidence, docs, release checklist, and residuals are synchronized; release decision ready | T3-T8 | check/clippy/test/governance pass; release rehearsal recorded | Mark I047 Review/Partial if any required gate fails | ✅ Done |
-| T10 | I019 activation decision | I019 can activate, be replanned, or remain deferred with explicit reason | T9 | I019 prerequisites recorded as satisfied; Board/iterations index agree | Create a new I048/I019 activation plan if full I019 scope changes | Planned |
-| T11 | I020 dependency disposition | I020 remains blocked/deferred until I019 or explicit research-priority replan | T10 | Board and iterations index state dependency clearly | Leave I020 unchanged if no research activation is requested | Planned |
+| T10 | I019 activation decision | I019 can activate, be replanned, or remain deferred with explicit reason | T9 | I019 prerequisites recorded as satisfied; Board/iterations index agree | Create a new I048/I019 activation plan if full I019 scope changes | ✅ Done |
+| T11 | I020 dependency disposition | I020 remains blocked/deferred until I019 or explicit research-priority replan | T10 | Board and iterations index state dependency clearly | Leave I020 unchanged if no research activation is requested | ✅ Done |
 
 ### Dependencies And Prerequisites
 

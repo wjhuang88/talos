@@ -389,6 +389,9 @@ slice; the long-running task is the recovery/checkpoint owner.
 
 ## Retrospective
 
-- Outcome: Pending.
-- Documentation: Pending.
-- Lessons: Pending.
+- Outcome: All selected I047 slices delivered and verified. The iteration is in Review while the
+  final release tag approval remains outside the task authorization boundary.
+- Documentation: Backlog, Board, iteration evidence, release readiness notes, README files, and
+  long-running task checkpoints were synchronized for the `v0.1.2` handoff.
+- Lessons: No new reusable project lesson was recorded; known residuals are tracked as deferred
+  release/I019/I020 follow-up work.
