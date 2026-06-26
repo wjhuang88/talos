@@ -12,6 +12,10 @@ use uuid::Uuid;
 /// at the time the entry was created.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionMetadata {
+    /// Provider used for this entry (e.g., `anthropic`, `openai`, `zhipu-coding-plan`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+
     /// The model name used to generate this entry (e.g., `claude-sonnet-4-20250514`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
@@ -28,7 +32,10 @@ pub struct SessionMetadata {
 impl SessionMetadata {
     /// Returns `true` if all fields are `None`.
     pub(crate) fn is_empty(&self) -> bool {
-        self.model.is_none() && self.token_count.is_none() && self.working_directory.is_none()
+        self.provider.is_none()
+            && self.model.is_none()
+            && self.token_count.is_none()
+            && self.working_directory.is_none()
     }
 }
 

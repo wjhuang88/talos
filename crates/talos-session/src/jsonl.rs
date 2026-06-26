@@ -8,19 +8,32 @@ use uuid::Uuid;
 
 impl Session {
     pub fn append(&self, message: &Message) -> Result<(), SessionError> {
+        self.append_with_metadata(message, SessionMetadata::default())
+    }
+
+    pub fn append_with_metadata(
+        &self,
+        message: &Message,
+        metadata: SessionMetadata,
+    ) -> Result<(), SessionError> {
         let (role, content) = message_parts(message);
-        let entry = self.build_entry(&role, &content)?;
+        let entry = self.build_entry(&role, &content, metadata)?;
         self.append_entry_locked(&entry)
     }
 
     pub fn append_event(&self, event: &AgentEvent) -> Result<(), SessionError> {
         let content =
             serde_json::to_string(event).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
-        let entry = self.build_entry("system", &content)?;
+        let entry = self.build_entry("system", &content, SessionMetadata::default())?;
         self.append_entry_locked(&entry)
     }
 
-    fn build_entry(&self, role: &str, content: &str) -> Result<SessionEntry, SessionError> {
+    fn build_entry(
+        &self,
+        role: &str,
+        content: &str,
+        metadata: SessionMetadata,
+    ) -> Result<SessionEntry, SessionError> {
         let parent_id = {
             let guard = self
                 .last_entry_id
@@ -45,7 +58,7 @@ impl Session {
             timestamp: Utc::now(),
             role: role.to_string(),
             content: content.to_string(),
-            metadata: SessionMetadata::default(),
+            metadata,
         })
     }
 

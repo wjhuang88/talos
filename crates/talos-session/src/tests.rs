@@ -548,6 +548,7 @@ fn backward_compatibility_with_old_jsonl_format() {
 #[test]
 fn session_metadata_serialization() {
     let metadata = SessionMetadata {
+        provider: Some("anthropic".into()),
         model: Some("claude-sonnet-4".into()),
         token_count: Some(1500),
         working_directory: Some("/home/user/project".into()),
@@ -556,6 +557,7 @@ fn session_metadata_serialization() {
     let json = serde_json::to_string(&metadata).unwrap();
     let decoded: SessionMetadata = serde_json::from_str(&json).unwrap();
 
+    assert_eq!(decoded.provider, Some("anthropic".into()));
     assert_eq!(decoded.model, Some("claude-sonnet-4".into()));
     assert_eq!(decoded.token_count, Some(1500));
     assert_eq!(decoded.working_directory, Some("/home/user/project".into()));
@@ -570,6 +572,7 @@ fn session_entry_serialization() {
         role: "user".into(),
         content: "Hello".into(),
         metadata: SessionMetadata {
+            provider: Some("anthropic".into()),
             model: Some("claude".into()),
             token_count: None,
             working_directory: None,
@@ -584,6 +587,32 @@ fn session_entry_serialization() {
     assert_eq!(decoded.role, "user");
     assert_eq!(decoded.content, "Hello");
     assert_eq!(decoded.metadata.model, Some("claude".into()));
+}
+
+#[test]
+fn append_with_metadata_persists_provider_and_model() {
+    let manager = test_manager();
+    let session = manager.create_session("test-project", "").unwrap();
+
+    session
+        .append_with_metadata(
+            &Message::User {
+                content: "hello".into(),
+            },
+            SessionMetadata {
+                provider: Some("zhipu-coding-plan".into()),
+                model: Some("glm-5.2".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    let entries = session.read_entries().unwrap();
+    assert_eq!(
+        entries[0].metadata.provider,
+        Some("zhipu-coding-plan".into())
+    );
+    assert_eq!(entries[0].metadata.model, Some("glm-5.2".into()));
 }
 
 #[test]
