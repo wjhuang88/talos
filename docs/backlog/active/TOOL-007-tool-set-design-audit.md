@@ -3,7 +3,7 @@
 **Status**: Research
 **Priority**: P2 (Medium-term)
 **Source**: User request 2026-06-19
-**Depends on**: TOOL-005/TOOL-006 (bash tool evolution); no implementation dependency
+**Depends on**: TOOL-004 first for grep/search engine direction; TOOL-005/TOOL-006 (bash tool evolution); no implementation dependency
 
 ## Problem
 
@@ -19,6 +19,10 @@ A comprehensive audit is needed to validate that the tool set is:
 - **Agent-friendly** — tool schemas, descriptions, and result formats help the
   model choose and use tools correctly
 - **Safe** — the permission model accurately reflects each tool's real risk
+
+TOOL-004 must run before this audit is finalized. Search semantics and performance shape the
+baseline tool family, and WEBFETCH-001 Phase 2+ should be planned inside this audit rather than as a
+separate one-off network/document tool expansion.
 
 ## Current Tool Inventory (22 tools)
 
@@ -86,9 +90,10 @@ A comprehensive audit is needed to validate that the tool set is:
 
 ### 2. Coverage Gaps
 
-- [ ] **Network**: No HTTP fetch tool exists.  The agent cannot read web pages,
-  API docs, or download assets without `bash` + `curl`/`wget`.  (Tracked by
-  WEBFETCH-001, but is this a P0 gap?)
+- [ ] **Network/document ingestion**: `http_request`, `fetch_url`, and `save_url` exist, but
+  WEBFETCH-001 Phase 2+ still needs a cohesive place in the tool family: document extraction,
+  result handles, save/download boundaries, and permission classes should be planned as part of this
+  audit rather than bolted on separately.
 - [ ] **Image reading**: `read` is text-only.  No tool for reading image files
   (screenshots, diagrams).  (Tracked by TOOL-003 residual)
 - [ ] **Binary inspection**: No `hexdump` or `file`-type tool.

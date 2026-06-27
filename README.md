@@ -7,33 +7,92 @@
 
 [中文文档](README.zh-CN.md)
 
-Talos is a Rust-native agent runtime for local coding workflows. It provides a terminal UI, provider adapters, sessions, built-in tools, permissions, skills, MCP/RPC integration, and self-evolution hooks while keeping the core small and safety-first.
+Talos is a Rust-native local coding agent for developers who want a safety-first runtime they can
+inspect, extend, and operate from their own machine. It combines a terminal UI, provider adapters,
+session history, built-in coding tools, explicit permissions, runtime Skills, MCP/RPC integration,
+and project-governance support while keeping the default core local and auditable.
 
-Talos is pre-1.0 and under active development. The core CLI/TUI, tool pipeline, Git tools, sessions, skills, MCP/RPC server, provider configuration, prompt cache support, and governance workflow are already implemented. See [Project Status](#project-status) for where to track the engineering roadmap.
+Talos has published its first stable pre-1.0 release line. The current release version in this
+workspace is `v0.1.2`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+surfaces, and storage formats may change as the product hardens. This README describes shipped
+user-facing behavior; research tracks such as the embedded web control surface, dotagents shared
+Skills, WASM plugins, and advanced document ingestion are tracked separately under
+[Project Status](#project-status).
 
 ## Highlights
 
-- **Terminal-first agent experience**: interactive TUI plus print mode for scripts and automation.
-- **Rust-native core**: workspace-oriented architecture with small crates and explicit boundaries.
-- **Built-in tools**: file, search, edit, shell, symbol, directory tree, diff/stat, and Git operations.
-- **Permission-gated writes**: write-capable and execute-capable actions go through the approval pipeline.
-- **Provider adapters**: Anthropic Messages, OpenAI Chat, OpenAI Responses, and OpenAI-compatible gateways.
-- **Session memory**: SQLite-backed sessions, search, summaries, branches, and export support.
-- **Extensibility**: skills, hooks, MCP tools, RPC server, and protocol-focused design.
+- **Local-first coding agent**: interactive TUI, inline mode, and print mode for scripts and smoke tests.
+- **Safety-first tool runtime**: file writes, deletes, Git writes, shell execution, network actions, and MCP tools route through explicit permission boundaries.
+- **Rust-native core**: workspace-oriented crates with minimal runtime assumptions and no Node/Python runtime dependency.
+- **Auditable internals**: oversized memory, config, CLI/TUI, and agent compaction modules are split into focused Rust modules with behavior-preserving gates.
+- **Built-in coding tools**: file, search, edit, shell, symbol, directory tree, diff/stat, Git, HTTP request, and web search operations.
+- **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
+- **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
+- **Extensible surface**: MCP tools, hooks, JSON-RPC, and governance-aware project status are implemented; plugin/WASM and browser control surfaces remain research tracks.
+
+## Current Release Boundary
+
+`v0.1.2` is suitable for local developer use where the operator reviews tool actions and keeps
+configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
+dashboard, or autonomous background daemon.
+
+Currently shipped:
+
+- TUI, inline, and print execution modes.
+- Local provider configuration with masked secrets.
+- Built-in coding tools with permission gating.
+- Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.
+- Runtime Skills from `.talos/skills/`, `~/.talos/skills/`, and inherited parent `.talos/skills/`.
+- MCP stdio tools and JSON-RPC infrastructure.
+
+Not shipped yet:
+
+- `~/.agents/skills/` discovery from the dotagents shared directory.
+- Embedded browser/web control surface.
+- WASM plugin runtime and plugin marketplace.
+- PDF/Office document extraction beyond the current web/fetch foundations.
+- Remote or P2P session control.
 
 ## Install
 
 ### Download A Release
 
-Download the archive for your platform from [GitHub Releases](https://github.com/wjhuang88/talos/releases), then unpack it:
+Install the latest release on macOS or Linux:
 
 ```bash
-tar -xzf talos-aarch64-apple-darwin.tar.gz
+curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh | sh
+```
+
+Install the latest Windows x86_64 release from PowerShell:
+
+```powershell
+iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
+```
+
+Installers live under `install/` because they are user-facing release entrypoints. Development and
+governance scripts live under `scripts/`; the old `scripts/install.*` paths are intentionally not
+kept after the pre-1.0 installer layout cleanup.
+
+Or download the archive for your platform from
+[GitHub Releases](https://github.com/wjhuang88/talos/releases), then unpack it:
+
+```bash
+tar -xzf talos-aarch64-darwin.tar.gz
 chmod +x talos
 ./talos --help
 ```
 
-Windows releases are published as `.zip` archives. macOS and Linux releases are published as `.tar.gz` archives.
+Published archive names:
+
+| Platform | Archive |
+|---|---|
+| Linux x86_64 | `talos-x86_64-linux.tar.gz` |
+| Linux ARM64 | `talos-aarch64-linux.tar.gz` |
+| macOS Intel | `talos-x86_64-darwin.tar.gz` |
+| macOS Apple Silicon | `talos-aarch64-darwin.tar.gz` |
+| Windows x86_64 | `talos-x86_64-windows.zip` |
+
+Windows ARM64 artifacts are not published yet.
 
 ### First-Run Setup
 
@@ -57,6 +116,8 @@ talos --config-get model                     # get a single value
 talos --config-set model=claude-sonnet-4-20250514  # set and persist
 talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 ```
+
+## Development
 
 ### Build From Source
 
@@ -239,7 +300,8 @@ The default prompt asks models to prefer built-in tools and use shell commands a
 
 ## Slash Commands
 
-Type `/` in the TUI to access these commands:
+Type `/` in the TUI to access these commands. The Skill commands are also available in inline
+mode.
 
 | Command | Description |
 |---|---|
@@ -247,7 +309,9 @@ Type `/` in the TUI to access these commands:
 | `/quit`, `/exit` | Exit Talos |
 | `/status` | Show session info (model, token usage) |
 | `/plugins` | List observed tool provenance and MCP server status |
-| `/skills` | List available runtime skills (Level 0 metadata) |
+| `/skills` | List available runtime skills and active state |
+| `/skills activate <name>` | Activate one Skill body for subsequent provider requests |
+| `/skills reference <path>` | Load a bounded reference file for the active Skill |
 | `/copy last` | Copy the last assistant message to clipboard |
 | `/copy all` | Copy the full transcript to clipboard |
 | `/export <path>` | Export transcript to a file (permission-gated) |
@@ -269,10 +333,15 @@ Skill search paths, in priority order:
 - `~/.talos/skills/`
 - parent `.talos/skills/` directories up to the Git root
 
-Use `/skills` in the TUI to list the runtime-discovered skills. Full skill body
-activation and reference loading are intentionally gated for a later explicit
-activation flow, so large skill content is not dumped into the prompt or history
-by default.
+Use `/skills` in the TUI or inline mode to list runtime-discovered skills. Use
+`/skills activate <name>` to explicitly load one Skill body into provider
+context for subsequent turns. After a Skill is active, use
+`/skills reference <relative-path>` to load a bounded reference file from that
+Skill directory.
+
+Activated Skill bodies and references are added to provider context only. Talos
+does not print the full content into scrollback command output or transcript
+history, and reference paths must stay inside the active Skill directory.
 
 ## MCP Tools
 
@@ -306,7 +375,7 @@ local stdio transport is currently supported.
 - Local secrets should live in environment variables or private config files, never in source.
 - Talos does not auto-commit changes. Git commits happen only through explicit tool/user action.
 
-## Development
+## Contributing And Local Checks
 
 Common checks:
 
@@ -326,7 +395,15 @@ The release workflow builds Linux, macOS, and Windows artifacts from a macOS run
 
 ## Project Status
 
-Talos is moving from core runtime implementation toward product hardening. For current engineering status, use the project governance docs instead of this README:
+Talos is moving from core runtime implementation toward product hardening and differentiated
+developer experience. The next research priorities are:
+
+- `AGENT-002-B`: dotagents `~/.agents/skills/` compatibility.
+- `TOOL-004`: search engine direction before broader tool-set redesign.
+- `TOOL-007`: holistic tool-set audit, including WEBFETCH Phase 2+ planning.
+- `WEB-001`: embedded local web control surface as a product differentiation track.
+
+For current engineering status, use the project governance docs instead of this README:
 
 - [Board](docs/BOARD.md): active, review, and next work
 - [Implementation Roadmap](docs/roadmap/IMPLEMENTATION-ROADMAP.md): planned phases

@@ -1,12 +1,12 @@
-# Talos installer for Windows.
+# Talos release installer for Windows.
 #
 # Usage:
-#   iex (irm https://<your-domain>/install.ps1)
+#   iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 #
 # Environment overrides:
 #   $env:TALOS_REPO         GitHub <owner>/<repo>   (default: wjhuang88/talos)
-#   $env:TALOS_VERSION       release tag or 'latest' (default: latest)
-#   $env:TALOS_INSTALL_DIR   install directory       (default: %USERPROFILE%\.talos\bin)
+#   $env:TALOS_VERSION      release tag or 'latest' (default: latest)
+#   $env:TALOS_INSTALL_DIR  install directory       (default: %USERPROFILE%\.talos\bin)
 $ErrorActionPreference = 'Stop'
 
 $Repo = if ($env:TALOS_REPO) { $env:TALOS_REPO } else { 'wjhuang88/talos' }

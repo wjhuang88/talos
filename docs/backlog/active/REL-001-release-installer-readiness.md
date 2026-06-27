@@ -40,7 +40,7 @@ tag untouched.
 ## Validation Plan
 
 1. Audit archive-name construction in `build.sh`, `.github/workflows/release.yml`,
-   `scripts/install.sh`, and `scripts/install.ps1`.
+   `install/install.sh`, and `install/install.ps1`.
 2. Run a local packaging smoke or explicitly record why a target must be validated only in CI.
 3. Verify `dist/` contains no stale artifacts before checksum generation.
 4. Verify installer URL construction without creating or moving a tag.
@@ -51,7 +51,7 @@ tag untouched.
 ## Acceptance Criteria
 
 - [ ] `v0.1.2` release plan explicitly preserves `v0.1.1` history and does not move the old tag.
-- [ ] `build.sh`, `.github/workflows/release.yml`, `scripts/install.sh`, and `scripts/install.ps1`
+- [ ] `build.sh`, `.github/workflows/release.yml`, `install/install.sh`, and `install/install.ps1`
       agree on archive names.
 - [ ] Linux release artifacts are built from the `musl` targets and published as
       `talos-x86_64-linux.tar.gz` and `talos-aarch64-linux.tar.gz`.
@@ -67,8 +67,8 @@ tag untouched.
 - `docs/iterations/I046-architecture-structure-governance-repair.md`
 - `build.sh`
 - `.github/workflows/release.yml`
-- `scripts/install.sh`
-- `scripts/install.ps1`
+- `install/install.sh`
+- `install/install.ps1`
 - `README.md`
 - `README.zh-CN.md`
 - `EVOLUTION.md` lesson #31

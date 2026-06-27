@@ -7,33 +7,86 @@
 
 [English](README.md)
 
-Talos 是一个 Rust 原生的本地编码 Agent 运行时。它提供终端 UI、模型提供商适配、会话、内置工具、权限控制、Skills、MCP/RPC 集成和自进化钩子，同时保持核心边界清晰、默认安全。
+Talos 是一个 Rust 原生的本地编码 Agent，面向希望在自己机器上运行、审查和扩展 Agent
+运行时的开发者。它提供终端 UI、模型提供商适配、会话历史、内置编码工具、显式权限控制、
+运行时 Skills、MCP/RPC 集成和项目治理支持，同时保持默认本地、边界清晰、可审计。
 
-Talos 仍处于 1.0 之前的活跃开发阶段。核心 CLI/TUI、工具管线、Git 工具、会话、Skills、MCP/RPC 服务、模型配置、提示词缓存和工程治理流程已经可用。工程进度请查看[项目状态](#项目状态)中的链接。
+Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.1.2`。它已经可以用于
+本地编码工作流，但仍然处于 1.0 之前：API、命令界面和存储格式仍可能随着产品化加固继续演进。
+本 README 只描述已经发布或当前已实现的用户可见能力；内嵌 Web 控制面、dotagents shared
+Skills、WASM 插件和高级文档解析等研究方向请查看[项目状态](#项目状态)。
 
 ## 主要能力
 
-- **终端优先的 Agent 体验**：提供交互式 TUI，也支持脚本友好的 print 模式。
-- **Rust 原生核心**：基于 Cargo workspace 的小 crate 架构，边界明确。
-- **内置工具**：覆盖文件、搜索、编辑、Shell、符号索引、目录树、diff/stat 和 Git 操作。
-- **写操作权限控制**：文件写入、删除、Git 写操作和命令执行都会进入批准流程。
-- **模型提供商适配**：支持 Anthropic Messages、OpenAI Chat、OpenAI Responses 和 OpenAI 兼容网关。
-- **会话记忆**：基于 SQLite 的会话、搜索、摘要、分支和导出能力。
-- **可扩展性**：支持 Skills、Hooks、MCP 工具、RPC 服务和面向协议的扩展设计。
+- **本地优先的编码 Agent**：支持交互式 TUI、inline 模式和脚本友好的 print 模式。
+- **默认安全的工具运行时**：文件写入、删除、Git 写操作、Shell 执行、网络动作和 MCP 工具都经过显式权限边界。
+- **Rust 原生核心**：基于 workspace 的小 crate 架构，默认不依赖 Node/Python 运行时。
+- **可审计内部结构**：记忆、配置、CLI/TUI 和 agent compaction 等超大模块已拆成聚焦的 Rust 模块，并通过行为保持验证。
+- **内置编码工具**：覆盖文件、搜索、编辑、Shell、符号索引、目录树、diff/stat、Git、HTTP 请求和 Web 搜索。
+- **持久会话与记忆**：SQLite 会话历史、搜索、分支/分叉、导出、语义记忆固化和保留策略预览。
+- **渐进式上下文**：运行时 Skill 发现和显式 Skill 主体/引用激活，不把隐藏内容直接倒入可见历史。
+- **可扩展表面**：MCP 工具、Hooks、JSON-RPC 和工程治理状态已实现；插件/WASM 与浏览器控制面仍是研究方向。
+
+## 当前 Release 边界
+
+`v0.1.2` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
+插件市场、浏览器仪表盘或自主后台守护进程。
+
+当前已发布/已实现：
+
+- TUI、inline 和 print 运行模式。
+- 本地模型配置，密钥显示自动脱敏。
+- 带权限控制的内置编码工具。
+- 会话存储、搜索、清理、维护、记忆固化和探索库导入。
+- 从 `.talos/skills/`、`~/.talos/skills/` 和父级 `.talos/skills/` 发现运行时 Skills。
+- MCP stdio 工具和 JSON-RPC 基础设施。
+
+尚未发布：
+
+- 从 dotagents shared directory 发现 `~/.agents/skills/`。
+- 内嵌浏览器/Web 控制面。
+- WASM 插件运行时和插件市场。
+- 当前 web/fetch 基础能力之外的 PDF/Office 文档解析。
+- 远程或 P2P 会话控制。
 
 ## 安装
 
 ### 下载 Release
 
-从 [GitHub Releases](https://github.com/wjhuang88/talos/releases) 下载对应平台的压缩包，然后解压：
+macOS 或 Linux 安装最新 release：
 
 ```bash
-tar -xzf talos-aarch64-apple-darwin.tar.gz
+curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh | sh
+```
+
+Windows x86_64 在 PowerShell 中安装最新 release：
+
+```powershell
+iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
+```
+
+安装脚本放在 `install/`，因为它们是面向用户的 release 入口。开发和治理脚本放在
+`scripts/`；pre-1.0 安装器目录清理后，不再保留旧的 `scripts/install.*` 路径。
+
+也可以从 [GitHub Releases](https://github.com/wjhuang88/talos/releases) 下载对应平台的压缩包，然后解压：
+
+```bash
+tar -xzf talos-aarch64-darwin.tar.gz
 chmod +x talos
 ./talos --help
 ```
 
-Windows 发布包是 `.zip`，macOS 和 Linux 发布包是 `.tar.gz`。
+已发布的压缩包名称：
+
+| 平台 | 压缩包 |
+|---|---|
+| Linux x86_64 | `talos-x86_64-linux.tar.gz` |
+| Linux ARM64 | `talos-aarch64-linux.tar.gz` |
+| macOS Intel | `talos-x86_64-darwin.tar.gz` |
+| macOS Apple Silicon | `talos-aarch64-darwin.tar.gz` |
+| Windows x86_64 | `talos-x86_64-windows.zip` |
+
+Windows ARM64 产物暂未发布。
 
 ### 首次启动设置
 
@@ -56,6 +109,8 @@ talos --config-get model                     # 查询单个值
 talos --config-set model=claude-sonnet-4-20250514  # 设置并持久化
 talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 ```
+
+## 开发
 
 ### 从源码构建
 
@@ -215,7 +270,8 @@ talos explore search --query "会话管理" --limit 10
 
 在交互式 TUI 中，于输入区开头键入 `/` 即可打开命令菜单。继续输入可筛选命令，使用
 `Up`/`Down` 移动选项，按 `Enter` 或 `Tab` 完成命令。`Backspace` 编辑筛选内容，`Esc`
-关闭菜单但保留输入区文本。使用 `/help` 可以查看当前会话可用的命令。
+关闭菜单但保留输入区文本。使用 `/help` 可以查看当前会话可用的命令。Skill 相关命令也可在
+inline 模式中使用。
 
 TUI 中可用的斜杠命令：
 
@@ -225,7 +281,9 @@ TUI 中可用的斜杠命令：
 | `/quit`、`/exit` | 退出 Talos |
 | `/status` | 显示会话信息（模型、token 用量） |
 | `/plugins` | 列出已观察的工具来源和 MCP 服务状态 |
-| `/skills` | 列出运行时发现的技能（Level 0 元数据） |
+| `/skills` | 列出运行时可用技能和当前激活状态 |
+| `/skills activate <name>` | 激活一个 Skill 主体，加入后续模型请求上下文 |
+| `/skills reference <path>` | 为当前激活 Skill 加载一个有大小上限的引用文件 |
 | `/copy last` | 复制上一条助手消息到剪贴板 |
 | `/copy all` | 复制完整对话记录到剪贴板 |
 | `/export <path>` | 导出对话记录到文件（需权限批准） |
@@ -234,6 +292,21 @@ TUI 中可用的斜杠命令：
 | `/fork` | 分叉当前会话（将历史记录克隆到子会话） |
 | `/delete` | 打开会话选择器（排除当前会话）；选择一行进行删除 |
 | `/model` | 打开模型选择器，在运行时浏览和切换模型 |
+
+## Skills
+
+Talos 会在启动时发现运行时 Skill 元数据，并把可用 Skill 的简要清单加入模型上下文。
+发现路径包括：
+
+- `.talos/skills/`（当前工作区）
+- `~/.talos/skills/`
+- 从当前目录向上到 Git 根目录之间的父级 `.talos/skills/`
+
+在 TUI 或 inline 模式中使用 `/skills` 查看已发现 Skill 和当前激活状态。使用
+`/skills activate <name>` 可以显式加载一个 Skill 的 `SKILL.md` 主体到后续模型请求上下文；
+使用 `/skills reference <relative-path>` 可以从该 Skill 目录内加载一个受大小限制的引用文件。
+Skill 主体和引用内容不会被直接打印到滚动历史、诊断信息或可见对话导出中。引用路径必须是
+相对路径，并且不能逃逸出当前激活 Skill 的目录。
 
 ## 内置能力
 
@@ -277,7 +350,7 @@ MCP 请求也有超时上限。TUI 中可使用 `/plugins` 查看启动连接快
 - 本地密钥应放在环境变量或私有配置文件中，不应进入源码。
 - Talos 不会自动提交代码。Git 提交只会在用户或工具显式请求时发生。
 
-## 开发
+## 贡献与本地检查
 
 常用检查命令：
 
@@ -297,7 +370,14 @@ Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
 
 ## 项目状态
 
-Talos 正从核心运行时实现阶段进入产品化加固阶段。当前工程状态不再放在 README 中维护，请查看项目治理文档：
+Talos 正从核心运行时实现阶段进入产品化加固和差异化体验阶段。接下来的研究重点是：
+
+- `AGENT-002-B`：兼容 dotagents `~/.agents/skills/`。
+- `TOOL-004`：先确定搜索引擎方向，再做工具集整体重构。
+- `TOOL-007`：工具集综合审计，并纳入 WEBFETCH Phase 2+ 规划。
+- `WEB-001`：以内嵌本地 Web 控制面作为产品特色优势方向。
+
+当前工程状态不再放在 README 中维护，请查看项目治理文档：
 
 - [Board](docs/BOARD.md)：当前、Review 和下一步工作
 - [Implementation Roadmap](docs/roadmap/IMPLEMENTATION-ROADMAP.md)：阶段规划

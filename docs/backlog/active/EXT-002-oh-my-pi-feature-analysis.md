@@ -2,7 +2,7 @@
 
 **Status**: Research
 **Priority**: P3
-**Source**: User request 2026-06-26; analysis of [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) (14.7k stars, MIT)
+**Source**: User request 2026-06-26; analysis of [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) (14.7k stars, MIT); user-highlighted omp.sh web control surface reference for WEB-001
 **Iteration**: None yet
 
 ## Problem
@@ -14,6 +14,11 @@ oh-my-pi is the most feature-complete terminal coding agent in OSS. Several of i
 Research and assess 5 standout features for Talos adoption.
 
 ### Features to evaluate
+
+0. **Browser/Web Control Surface** — omp.sh demonstrates an agent product direction where a browser
+   surface complements the terminal. Evaluate which interaction patterns map to Talos' loopback-only
+   WEB-001 model: status, project/governance views, history, approvals, logs, and config. **HIGH
+   strategic relevance.**
 
 1. **Hashline: Content-Hash-Anchored Edits** — Diff format where hunks are bound to file-content hashes. Stale anchors are rejected before corruption. Claims 61% fewer output tokens and 10x edit pass rate improvement (6.7% → 68.3%). Language-agnostic, portable to Rust. Directly improves our `edit` tool. **HIGH borrowability.**
 
@@ -35,6 +40,7 @@ Research and assess 5 standout features for Talos adoption.
 ## Acceptance
 
 - [ ] Hashline edit format analyzed for Rust port feasibility; grammar and prompt spec documented.
+- [ ] omp.sh/browser control surface patterns mapped to WEB-001 MVP/non-goals.
 - [ ] Internal URL scheme trait interface sketched for Talos tool registry.
 - [ ] Decision recorded: which features to create backlog stories for, which to defer.
 

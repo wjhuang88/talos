@@ -1,13 +1,13 @@
 #!/bin/sh
-# Talos installer.
+# Talos release installer for macOS and Linux.
 #
 # Usage:
-#   curl -fsSL https://<your-domain>/install | sh
+#   curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh | sh
 #
 # Environment overrides:
 #   TALOS_REPO         GitHub <owner>/<repo>     (default: wjhuang88/talos)
-#   TALOS_VERSION       release tag or "latest"  (default: latest)
-#   TALOS_INSTALL_DIR   install directory         (default: ~/.talos/bin)
+#   TALOS_VERSION      release tag or "latest"  (default: latest)
+#   TALOS_INSTALL_DIR  install directory         (default: ~/.talos/bin)
 set -eu
 
 owner_repo="${TALOS_REPO:-wjhuang88/talos}"

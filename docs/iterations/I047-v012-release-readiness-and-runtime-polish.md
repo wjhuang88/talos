@@ -87,7 +87,7 @@ slice; the long-running task is the recovery/checkpoint owner.
   - `aarch64-unknown-linux-musl` -> `talos-aarch64-linux.tar.gz`
   - `x86_64-apple-darwin` -> `talos-x86_64-darwin.tar.gz`
   - `aarch64-apple-darwin` -> `talos-aarch64-darwin.tar.gz`
-- Confirm `scripts/install.sh` and `scripts/install.ps1` construct exactly those names.
+- Confirm `install/install.sh` and `install/install.ps1` construct exactly those names.
 - Add a dry-run or testable helper only if it is needed to validate installers without a network
   release.
 - Record whether local validation covered every target or a documented subset. A subset is
@@ -313,7 +313,7 @@ slice; the long-running task is the recovery/checkpoint owner.
 - [x] Release workflow target list matches `build.sh`.
 - [x] Download table in generated release notes matches actual artifacts.
 - [x] `checksum.sha256` includes every artifact and no stale files.
-- [x] README install instructions match `scripts/install.sh` / `scripts/install.ps1`.
+- [x] README install instructions match `install/install.sh` / `install/install.ps1`.
 - [ ] GitHub Actions release workflow succeeds for the tag. (Requires tag push — deferred to explicit release approval.)
 - [ ] Post-release install smoke is run from the published assets. (Deferred to post-tag.)
 

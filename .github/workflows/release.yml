@@ -131,11 +131,13 @@ jobs:
             echo
             echo '```bash'
             echo "# macOS / Linux"
-            echo "curl -fsSL ${RAW_URL_BASE}/scripts/install.sh | sh"
+            echo "curl -fsSL ${RAW_URL_BASE}/install/install.sh | sh"
             echo
             echo '# Windows (PowerShell)'
-            echo "irm ${RAW_URL_BASE}/scripts/install.ps1 | iex"
+            echo "irm ${RAW_URL_BASE}/install/install.ps1 | iex"
             echo '```'
+            echo
+            echo "Installer scripts are published under \`install/\`. The old \`scripts/install.*\` paths are not kept after the pre-1.0 installer layout cleanup."
             echo
             echo "Each archive contains a single \`talos\` (or \`talos.exe\`) binary."
           } > RELEASE_BODY.md

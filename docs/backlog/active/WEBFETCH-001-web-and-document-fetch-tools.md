@@ -8,11 +8,12 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) blocked on PLUGIN-001 WASM.
+Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) blocked on PLUGIN-001 WASM and must be planned through TOOL-007's holistic tool-set design audit so network/document tools do not grow outside the tool family, permission model, or progressive-loading strategy.
 
 ## Priority
 
-P0 (I036 execution map). Next phases: HTML extraction, link ranking, markdown conversion (Phase 1+).
+P2 research/planning for Phase 2+. Next phases: HTML extraction, link ranking, markdown conversion,
+and document extraction design, coordinated with TOOL-004/TOOL-007 before new tool implementation.
 
 ## Origin
 
