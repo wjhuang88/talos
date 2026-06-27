@@ -1,4 +1,6 @@
 mod app;
+mod app_stream;
+mod app_summary;
 mod clipboard;
 pub mod evolution;
 mod export;
@@ -6,6 +8,9 @@ pub mod formatting;
 mod highlight;
 mod inline_terminal;
 mod scrollback;
+mod scrollback_input;
+mod scrollback_markdown;
+mod scrollback_status;
 mod sidebar;
 mod splash;
 mod state;

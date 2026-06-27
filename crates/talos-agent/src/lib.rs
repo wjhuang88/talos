@@ -43,7 +43,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-pub use prompt::{ContextFile, SystemPromptBuilder, ToolDescription};
+pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 
 /// Maximum number of tool calls allowed per turn before budget exhaustion.
 const MAX_TOOL_CALLS_PER_TURN: usize = 50;
@@ -342,6 +342,16 @@ impl Agent {
     /// Only Level 0 metadata (name, description, triggers) is included.
     pub fn set_skill_index(&mut self, skills: Vec<SkillIndex>) {
         self.prompt_builder = std::mem::take(&mut self.prompt_builder).with_skill_index(skills);
+        self.invalidate_stable_prefix_cache();
+    }
+
+    /// Sets explicitly activated Level 1/2 Skill content for the system prompt.
+    ///
+    /// The caller must load, bound, and validate this content before passing it
+    /// here. Changing activated Skill content invalidates the stable prefix.
+    pub fn set_activated_skill_context(&mut self, context: Option<ActivatedSkillContext>) {
+        self.prompt_builder =
+            std::mem::take(&mut self.prompt_builder).with_activated_skill(context);
         self.invalidate_stable_prefix_cache();
     }
 

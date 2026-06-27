@@ -1,8 +1,7 @@
 //! Runtime mode runner implementations for the Talos CLI.
 
-use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
 use rmcp::ServiceExt;
@@ -18,9 +17,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
-use talos_memory::{MemoryStore, format_memory_prompt};
 use talos_plugin::HookRegistry;
-use talos_session::SessionMetadata;
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -35,6 +32,10 @@ use tokio::sync::{mpsc, watch};
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
+use crate::mode_runtime::{
+    apply_mcp_fixture_config, maybe_set_memory_provider, session_metadata_for_model,
+};
+pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
     RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
     rebuild_session_for_model,
@@ -46,14 +47,17 @@ use crate::registry::{
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
-    ResumeSelection, canonical_workspace_root, resolve_prompt, resolve_session_for_workspace,
+    ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name, workspace_path_display,
 };
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
-use crate::tui_bridge::{SessionLifecycleRequest, run_conversation_loop};
+use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
 use crate::{Cli, build_hook_registry, event_loop};
 use tokio::sync::Mutex;
+
+pub(crate) use crate::mode_inline::run_inline_mode;
+pub(crate) use crate::mode_print::run_print_mode;
 
 pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     // I009-S5 begin
@@ -109,186 +113,6 @@ fn send_stream(ui_tx: &mpsc::UnboundedSender<UiOutput>, source: MessageSource, t
         source,
         stream: Box::pin(futures::stream::once(async move { text })),
     }));
-}
-
-fn session_metadata_for_model(model: &str, provider: &str) -> SessionMetadata {
-    SessionMetadata {
-        provider: (!provider.is_empty()).then(|| provider.to_string()),
-        model: (!model.is_empty()).then(|| model.to_string()),
-        token_count: None,
-        working_directory: std::env::current_dir()
-            .ok()
-            .map(|path| path.to_string_lossy().to_string()),
-    }
-}
-
-fn latest_session_model_info(session: &talos_session::Session) -> Option<(String, String)> {
-    session
-        .read_entries()
-        .ok()?
-        .into_iter()
-        .rev()
-        .find_map(
-            |entry| match (entry.metadata.model, entry.metadata.provider) {
-                (Some(model), Some(provider)) => Some((model, provider)),
-                (Some(model), None) => Some((model, String::new())),
-                _ => None,
-            },
-        )
-}
-
-pub(crate) fn apply_session_model_to_config(config: &mut Config, session: &talos_session::Session) {
-    let Some((model, provider)) = latest_session_model_info(session) else {
-        return;
-    };
-    let model_ref = if provider.is_empty() || model.starts_with(&format!("{provider}/")) {
-        model
-    } else {
-        format!("{provider}/{model}")
-    };
-    if let Err(e) = config.set_active_model(&model_ref) {
-        tracing::warn!(
-            session_id = %session.id,
-            model = %model_ref,
-            "failed to restore session model metadata: {e}"
-        );
-    }
-}
-
-pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
-    let mut config = Config::load().context("failed to load configuration")?;
-
-    if let Some(ref model) = cli.model {
-        config.model = model.clone();
-    }
-    if let Some(ref provider_str) = cli.provider {
-        config.provider = parse_provider(provider_str)?;
-    }
-
-    if config.model.is_empty() && !cli.mock {
-        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
-    }
-
-    let api_key = if cli.mock {
-        config.api_key().unwrap_or_default()
-    } else {
-        config.api_key().map_err(|e| anyhow!("{e}"))?
-    };
-
-    let workspace_root = resolve_workspace_root(&cli)?;
-    apply_mcp_fixture_config(&mut config, &cli);
-    let prompt = resolve_prompt(cli.prompt)?;
-
-    let hooks = build_hook_registry(true);
-    let mut registry = build_print_tool_registry();
-
-    #[cfg(debug_assertions)]
-    let fixture_mode = cli.mcp_server_fixture.is_some();
-    #[cfg(not(debug_assertions))]
-    let fixture_mode = false;
-    let request_preview_mode = prompt.trim_start().starts_with("/mock-request");
-
-    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
-    mcp_runtime.report_startup_failures();
-    let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
-    )));
-    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
-
-    let provider = if fixture_mode && cli.mock && !request_preview_mode {
-        use talos_provider::mock::MockProvider;
-        Arc::new(
-            MockProvider::new()
-                .with_tool_call("mcp:fixture:echo", serde_json::json!({ "text": "ping" }))
-                .with_response("fixture tool call complete"),
-        ) as Arc<dyn talos_core::provider::LanguageModel>
-    } else {
-        build_provider(&config, &api_key, cli.mock)
-    };
-    // I009-S3 end
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(
-            talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
-        )),
-        None,
-        workspace_root.to_path_buf(),
-        hooks,
-    );
-    agent.set_tool_protocol(config.tool_protocol());
-    let runtime_skills = discover_runtime_skills(&workspace_root)?;
-    apply_runtime_skills(&mut agent, &runtime_skills);
-    maybe_set_memory_provider(&mut agent, &config);
-
-    agent.set_context_files(context_files_for_agent(
-        &config,
-        &workspace_root,
-        !cli.no_context,
-    )?);
-
-    if let Some(ref system_prompt) = cli.system_prompt {
-        agent.set_custom_prompt(system_prompt.clone());
-    }
-
-    if let Some(ref append_prompt) = cli.append_system_prompt {
-        agent.set_append_prompt(append_prompt.clone());
-    }
-
-    let (model_context_limit, _) = config.resolve_model_limits();
-    let session_config = SessionConfig {
-        print_mode: true,
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history: vec![],
-        model_context_limit,
-    };
-    let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
-    tokio::spawn(async move { actor.run().await });
-
-    handle
-        .sq_tx
-        .send(SessionOp::Submit { message: prompt })
-        .await
-        .context("failed to submit message to session")?;
-
-    let mut stdout = io::stdout().lock();
-    while let Some(event) = handle.eq_rx.recv().await {
-        match event {
-            SessionEvent::AgentEvent(AgentEvent::TextDelta { delta }) => {
-                print!("{delta}");
-                stdout.flush().context("failed to flush stdout")?;
-            }
-            SessionEvent::AgentEvent(AgentEvent::TurnEnd { .. }) => {
-                println!();
-                return Ok(());
-            }
-            SessionEvent::AgentEvent(AgentEvent::Error { message }) => {
-                eprintln!("Error: {message}");
-                std::process::exit(1);
-            }
-            SessionEvent::TurnCompleted { status, .. } => match status {
-                talos_core::session::TurnCompletionStatus::Success { .. } => {
-                    println!();
-                    return Ok(());
-                }
-                talos_core::session::TurnCompletionStatus::Cancelled => {
-                    return Ok(());
-                }
-                talos_core::session::TurnCompletionStatus::Error { message } => {
-                    eprintln!("Error: {message}");
-                    std::process::exit(1);
-                }
-            },
-            SessionEvent::Error { message } => {
-                eprintln!("Error: {message}");
-                std::process::exit(1);
-            }
-            SessionEvent::AgentEvent(_) => {}
-            _ => {}
-        }
-    }
-    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -633,6 +457,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     agent.set_tool_protocol(config.tool_protocol());
     let runtime_skills = discover_runtime_skills(&workspace_root)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
+    let runtime_skills = Arc::new(Mutex::new(runtime_skills));
     maybe_set_memory_provider(&mut agent, &config);
 
     agent.set_context_files(context_files_for_agent(
@@ -933,21 +758,25 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_provider(config.provider.clone());
     tui.set_workspace_path(workspace_path_display(&workspace_root));
 
+    let skill_diagnostics = runtime_skills.lock().await.diagnostics();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
-        .with_skills(runtime_skills.diagnostics())
+        .with_skills(skill_diagnostics)
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
     let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
             engine,
-            bridge_rx,
-            user_input_rx,
-            ui_output_tx,
-            user_msg_tx,
-            sq_tx_watch_for_loop,
-            model_info_rx,
-            session_tx,
+            ConversationLoopIo {
+                agent_rx: bridge_rx,
+                user_rx: user_input_rx,
+                ui_tx: ui_output_tx,
+                submit_tx: user_msg_tx,
+                sq_tx_watch: sq_tx_watch_for_loop,
+                model_info_watch: model_info_rx,
+                session_tx,
+                runtime_skills,
+            },
         )
         .await;
     });
@@ -972,209 +801,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     tui.run().await?;
-    Ok(())
-}
-
-pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
-    let mut config = Config::load().context("failed to load configuration")?;
-
-    if let Some(ref model) = cli.model {
-        config.model = model.clone();
-    }
-    if let Some(ref provider_str) = cli.provider {
-        config.provider = parse_provider(provider_str)?;
-    }
-
-    if config.model.is_empty() && !cli.mock {
-        bail!("no model configured. Set 'model' in ~/.talos/config.toml or pass --model.");
-    }
-
-    let api_key = if cli.mock {
-        config.api_key().unwrap_or_default()
-    } else {
-        config.api_key().map_err(|e| anyhow!("{e}"))?
-    };
-
-    let workspace_root = resolve_workspace_root(&cli)?;
-    let hooks = build_hook_registry(true);
-    let provider = build_provider(&config, &api_key, cli.mock);
-    apply_mcp_fixture_config(&mut config, &cli);
-    let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
-    mcp_runtime.report_startup_failures();
-    let mut registry = build_print_tool_registry();
-    let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
-    )));
-    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
-
-    let mut agent = Agent::with_security_and_hooks(
-        provider,
-        registry,
-        Some(Arc::new(talos_permission::PermissionEngine::new())),
-        None,
-        workspace_root.to_path_buf(),
-        hooks,
-    );
-    agent.set_tool_protocol(config.tool_protocol());
-    let runtime_skills = discover_runtime_skills(&workspace_root)?;
-    apply_runtime_skills(&mut agent, &runtime_skills);
-    maybe_set_memory_provider(&mut agent, &config);
-
-    if !cli.no_context {
-        let context = ContextLoader::new(workspace_root.to_path_buf())
-            .load()
-            .map_err(|e| anyhow!("{e}"))?;
-        if !context.is_empty() {
-            agent.set_context_files(vec![ContextFile {
-                path: "AGENTS.md".into(),
-                content: context,
-            }]);
-        }
-    }
-
-    if let Some(ref prompt) = cli.system_prompt {
-        agent.set_custom_prompt(prompt.clone());
-    }
-    if let Some(ref append) = cli.append_system_prompt {
-        agent.set_append_prompt(append.clone());
-    }
-
-    let session_manager =
-        talos_session::SessionManager::new().context("failed to initialize session manager")?;
-    let display_name = workspace_display_name(&workspace_root);
-    let workspace_root_str = canonical_workspace_root(&workspace_root);
-    let session = resolve_session_for_workspace(
-        &session_manager,
-        &workspace_root_str,
-        &display_name,
-        &cli,
-        ResumeSelection::Disabled,
-        false,
-    )?;
-
-    let initial_history = session.read_messages().unwrap_or_default();
-
-    let (model_context_limit, _) = config.resolve_model_limits();
-    let session_config = SessionConfig {
-        print_mode: true,
-        workspace_root: workspace_root.to_path_buf(),
-        initial_history,
-        model_context_limit,
-    };
-    let (handle, mut actor) = AppServerSession::new(agent, session_config);
-    tokio::spawn(async move { actor.run().await });
-
-    let sq_tx = handle.sq_tx.clone();
-    let mut eq_rx = handle.eq_rx;
-
-    let stdin = io::stdin();
-
-    tokio::spawn(async move {
-        loop {
-            tokio::signal::ctrl_c().await.ok();
-            let _ = sq_tx.try_send(SessionOp::Interrupt);
-        }
-    });
-
-    println!("Talos inline mode. Type /quit to exit.");
-    println!();
-
-    loop {
-        print!("> ");
-        let _ = io::stdout().flush();
-
-        let mut line = String::new();
-        match stdin.read_line(&mut line) {
-            Ok(0) => break,
-            Ok(_) => {}
-            Err(e) => bail!("stdin error: {e}"),
-        }
-
-        let input = line.trim();
-        if input.is_empty() {
-            continue;
-        }
-        if input == "/quit" || input == "/exit" {
-            break;
-        }
-
-        let _ = handle
-            .sq_tx
-            .send(SessionOp::Submit {
-                message: input.to_string(),
-            })
-            .await;
-
-        let user_msg = talos_core::message::Message::User {
-            content: input.to_string(),
-        };
-        if let Err(e) = session.append(&user_msg) {
-            eprintln!("Warning: failed to persist user message: {e}");
-        }
-
-        let mut turn_done = false;
-        while let Some(event) = eq_rx.recv().await {
-            match event {
-                SessionEvent::AgentEvent(agent_event) => match agent_event {
-                    AgentEvent::TextDelta { delta } => {
-                        print!("{delta}");
-                        let _ = io::stdout().flush();
-                    }
-                    AgentEvent::TurnEnd { .. } => {
-                        println!();
-                        turn_done = true;
-                        break;
-                    }
-                    AgentEvent::Error { message } => {
-                        eprintln!("\nError: {message}");
-                        turn_done = true;
-                        break;
-                    }
-                    _ => {}
-                },
-                SessionEvent::TurnCompleted { status, .. } => {
-                    match status {
-                        talos_core::session::TurnCompletionStatus::Success {
-                            final_text: _,
-                            new_messages,
-                        } => {
-                            for msg in &new_messages {
-                                if matches!(msg, talos_core::message::Message::User { .. }) {
-                                    continue;
-                                }
-                                if let Err(e) = session.append(msg) {
-                                    eprintln!("Warning: failed to persist message: {e}");
-                                }
-                            }
-                            if let Err(e) = session_manager.update_index(&session) {
-                                eprintln!("Warning: failed to update session index: {e}");
-                            }
-                        }
-                        talos_core::session::TurnCompletionStatus::Cancelled => {
-                            println!("\n(turn cancelled)");
-                        }
-                        talos_core::session::TurnCompletionStatus::Error { message } => {
-                            eprintln!("\nError: {message}");
-                        }
-                    }
-                    turn_done = true;
-                    break;
-                }
-                SessionEvent::Error { message } => {
-                    eprintln!("\nError: {message}");
-                    turn_done = true;
-                    break;
-                }
-                _ => {}
-            }
-        }
-
-        if !turn_done {
-            break;
-        }
-    }
-
-    let _ = handle.sq_tx.send(SessionOp::Shutdown).await;
     Ok(())
 }
 
@@ -1359,114 +985,6 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     event_loop.run().await
 }
 
-fn maybe_set_memory_provider(agent: &mut Agent, config: &Config) {
-    if !config.memory_prompt.enabled {
-        return;
-    }
-    let mem_config = talos_memory::MemoryPromptConfig {
-        enabled: config.memory_prompt.enabled,
-        max_items: config.memory_prompt.max_items,
-        max_chars: config.memory_prompt.max_chars,
-    };
-    let memory_db = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".talos")
-        .join("memory.db");
-    let memory_store = Arc::new(StdMutex::new(None::<MemoryStore>));
-    let provider = std::sync::Arc::new(move |query: &str| -> Option<String> {
-        if !memory_db.exists() {
-            tracing::debug!(
-                path = %memory_db.display(),
-                "memory store not initialized, skipping memory injection"
-            );
-            return None;
-        }
-
-        let mut store_guard = match memory_store.lock() {
-            Ok(guard) => guard,
-            Err(e) => {
-                tracing::warn!("memory store lock poisoned, skipping memory injection: {e}");
-                return None;
-            }
-        };
-        if store_guard.is_none() {
-            match MemoryStore::open(&memory_db) {
-                Ok(store) => *store_guard = Some(store),
-                Err(e) => {
-                    tracing::warn!("memory store unavailable, skipping memory injection: {e}");
-                    return None;
-                }
-            }
-        }
-        format_memory_prompt(store_guard.as_ref()?, query, &mem_config)
-    });
-    agent.set_memory_provider(provider);
-}
-
-pub(crate) fn model_metadata_context_file(config: &Config) -> ContextFile {
-    let (context_limit, output_limit) = config.resolve_model_limits();
-    let output_limit = output_limit
-        .map(|limit| limit.to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    ContextFile {
-        path: "TALOS_MODEL.md".into(),
-        content: format!(
-            "# Current Model\n\
-             Provider: {}\n\
-             Model: {}\n\
-             Provider protocol: {:?}\n\
-             Tool protocol: {:?}\n\
-             Context limit: {} tokens\n\
-             Output limit: {} tokens\n",
-            config.provider,
-            config.model,
-            config.provider_protocol(),
-            config.tool_protocol(),
-            context_limit,
-            output_limit
-        ),
-    }
-}
-
-pub(crate) fn context_files_for_agent(
-    config: &Config,
-    workspace_root: &std::path::Path,
-    include_workspace_context: bool,
-) -> Result<Vec<ContextFile>> {
-    let mut files = vec![model_metadata_context_file(config)];
-    if include_workspace_context {
-        let context = ContextLoader::new(workspace_root.to_path_buf())
-            .load()
-            .map_err(|e| anyhow!("{e}"))?;
-        if !context.is_empty() {
-            files.push(ContextFile {
-                path: "AGENTS.md".into(),
-                content: context,
-            });
-        }
-    }
-    Ok(files)
-}
-
-fn apply_mcp_fixture_config(config: &mut Config, cli: &Cli) {
-    #[cfg(debug_assertions)]
-    if let Some(path) = cli.mcp_server_fixture.clone() {
-        config.mcp.servers = vec![talos_config::McpServerConfig {
-            name: "fixture".to_string(),
-            transport: "stdio".to_string(),
-            command: path.to_string_lossy().to_string(),
-            args: Vec::new(),
-            env: std::collections::HashMap::from([(
-                "ECHO_PREFIX".to_string(),
-                "fixture".to_string(),
-            )]),
-            cwd: std::env::current_dir().ok(),
-        }];
-    }
-
-    #[cfg(not(debug_assertions))]
-    let _ = (config, cli);
-}
 pub(crate) async fn run_mcp_server() -> Result<()> {
     let config_for_logging = Config::load().ok();
     init_logger(config_for_logging.as_ref().map(|config| &config.log), false);
