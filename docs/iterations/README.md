@@ -110,6 +110,7 @@ docs/iterations/
 | I071 | Agent Configuration Decomposition | **Complete (2026-06-27)** | ARCH-026 split Agent constructors/configuration setters into `configuration.rs`; duplicate prompt-builder mutation centralized; `lib.rs` 914→655 lines. See `I071-agent-configuration-decomposition.md`. |
 | I072 | Conversation Command Registry Decomposition | **Complete (2026-06-27)** | ARCH-027 split command registry metadata/completion into `command_registry.rs`; `engine.rs` 960→739 lines; workspace gates pass. See `I072-conversation-command-registry-decomposition.md`. |
 | I073 | OpenAI Request Assembly Decomposition | **Complete (2026-06-28)** | ARCH-028 split OpenAI request DTOs/body assembly/redaction into `openai_request.rs`; `openai.rs` 1001→848 lines; workspace gates pass. See `I073-openai-request-assembly-decomposition.md`. |
+| I074 | Exploration Types Decomposition | **Complete (2026-06-28)** | ARCH-029 split exploration domain entities into `types.rs`; `lib.rs` 1070→958 lines; workspace gates pass. See `I074-exploration-types-decomposition.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
