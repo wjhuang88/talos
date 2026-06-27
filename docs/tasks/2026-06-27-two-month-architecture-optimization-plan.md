@@ -10,9 +10,9 @@ execution plan and implement it
 ## Outcome
 
 Reduce architecture corrosion across production modules through ordered, behavior-preserving
-decomposition slices. The task is complete when the currently known oversized production roots are
-either decomposed below the review-risk threshold or owned by explicit residual stories with
-acceptance, validation gates, and a deferral reason.
+decomposition slices. The task is complete when the currently known oversized production roots and
+material duplicate logic are either eliminated, decomposed below the review-risk threshold, or
+owned by explicit residual stories with acceptance, validation gates, and a deferral reason.
 
 ## In Scope
 
@@ -31,6 +31,9 @@ acceptance, validation gates, and a deferral reason.
   - `crates/talos-tools/src/git.rs`
   - `crates/talos-session/src/sqlite.rs`
 - Test-suite partitioning only when the test file itself blocks review or compile feedback.
+- Repeated logic that creates maintenance risk, including duplicated state transitions,
+  builder/setter boilerplate, formatting, parsing, permission setup, request assembly, or error
+  mapping that should be centralized in a local helper or shared module.
 - Backlog, iteration, Board, README, and task synchronization for each completed slice.
 
 ## Out of Scope Without Separate Approval
@@ -64,9 +67,9 @@ acceptance, validation gates, and a deferral reason.
 | M2 | CLI residual implementation | Extract one remaining CLI mode-runner flow or helper. | M1 | `cargo test -p talos-cli --quiet`, workspace gates, governance, diff check. | Stop after one safe helper. | Complete |
 | M3 | TUI residual boundary map | Select the next ARCH-023 slice from `app.rs`. | M0 | Owner story/iteration names frame/cursor/input risk. | Defer if visual behavior is too entangled. | Complete |
 | M4 | TUI residual implementation | Extract one low-risk TUI app helper group. | M3 | `cargo test -p talos-tui --quiet`, workspace gates, governance, diff check. | Stop before cursor/frame behavior changes if not provable. | Complete |
-| M5 | Agent root map | Map `talos-agent/src/lib.rs` into config, prompt, turn, tools, memory, and cache responsibilities. | M2 or M4 | Owner story/iteration created. | Keep as residual if root is stable enough. | In Progress |
-| M6 | Agent root implementation | Extract one low-risk agent root responsibility. | M5 | `cargo test -p talos-agent --quiet`, workspace gates. | Stop after pure helper extraction. | Planned |
-| M7 | Conversation engine map/implementation | Split one command/registry/output helper group. | M0 | `cargo test -p talos-conversation --quiet`, workspace gates. | Plan-only if UI behavior risk is high. | Planned |
+| M5 | Agent root map | Map `talos-agent/src/lib.rs` into config, prompt, turn, tools, memory, and cache responsibilities; identify duplicated setup/setter logic. | M2 or M4 | Owner story/iteration created. | Keep as residual only if root and duplication are both stable enough. | Complete |
+| M6 | Agent root implementation | Extract one low-risk agent root responsibility and centralize any repeated local logic in that slice. | M5 | `cargo test -p talos-agent --quiet`, workspace gates. | Stop after pure helper extraction. | Complete |
+| M7 | Conversation engine map/implementation | Split one command/registry/output helper group. | M0 | `cargo test -p talos-conversation --quiet`, workspace gates. | Plan-only if UI behavior risk is high. | Complete |
 | M8 | Provider adapter map/implementation | Split one OpenAI adapter helper group without request semantics changes. | M0 | Provider targeted tests and workspace gates. | Map-only if protocol behavior cannot be frozen. | Planned |
 | M9 | Exploration/tools/storage map/implementation | Pick one clear production root from exploration/tools/session storage. | M0 | Targeted crate tests and workspace gates. | Register residual owner. | Planned |
 | M10 | Secondary audit and residual registration | Re-run large-file audit and register remaining owners. | M2-M9 | No unowned production root above threshold except explicit exclusions. | Mark Partial with residuals. | Planned |
@@ -107,6 +110,8 @@ Every implementation slice must record:
 - `scripts/validate_project_governance.sh .`.
 - `git diff --check`.
 - Before/after line counts for the touched root module.
+- Duplicate-logic disposition: either extracted, intentionally left local with a reason, or
+  registered as a residual owner.
 
 ## Checkpoint and Recovery Rules
 
@@ -123,3 +128,5 @@ Every implementation slice must record:
 | 2026-06-27 | M0 started. | Two-month architecture optimization plan created from the post-burn-down large-file audit. Current dirty tree already contains completed architecture, skill, README, and governance work from this context; continue without reverting unrelated work. | `find crates ... | xargs wc -l | sort -nr | head -60`, `git status --short --branch`, and Board/backlog inspection completed. | Commit/push requested earlier was superseded by the user's latest request to continue architecture optimization. | M1 | Resume by selecting the next ARCH-022 CLI residual slice from `crates/talos-cli/src/mode_runners.rs`. |
 | 2026-06-27 | M0, M1, M2. | ARCH-024/I069 extracted CLI inline mode into `crates/talos-cli/src/mode_inline.rs`; `mode_runners.rs` now re-exports inline mode and dropped from 1778 to 1500 lines. | `cargo test -p talos-cli --quiet`, `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace --quiet`, `scripts/validate_project_governance.sh .`, and `git diff --check` passed. | Remaining CLI residual stays under ARCH-022; no behavior change, dependency, release, commit, push, network, or destructive action. | M3 | Resume by mapping the next ARCH-023 TUI residual slice from `crates/talos-tui/src/app.rs`, with frame/cursor behavior treated as visual-risk sensitive. |
 | 2026-06-27 | M3, M4. | ARCH-025/I070 extracted TUI exit-summary formatting into `crates/talos-tui/src/app_summary.rs`; `app.rs` dropped from 1118 to 1005 lines. | `cargo test -p talos-tui --quiet`, `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace --quiet`, `scripts/validate_project_governance.sh .`, and `git diff --check` passed. | Frame rendering, cursor placement, viewport sizing, input handling, approval flow, and scrollback flushing were intentionally untouched. | M5 | Resume by mapping `crates/talos-agent/src/lib.rs` and deciding whether one low-risk root responsibility should move under a child module. |
+| 2026-06-27 | M5, M6. | ARCH-026/I071 extracted Agent construction/configuration into `crates/talos-agent/src/configuration.rs`; `lib.rs` dropped from 914 to 655 lines and repeated prompt-builder mutation was centralized. | `cargo test -p talos-agent --quiet`, `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace --quiet`, `scripts/validate_project_governance.sh .`, and `git diff --check` passed. | Turn-loop, tool execution, provider request, permission, sandbox, and hook behavior were intentionally untouched. | M7 | Resume by mapping `crates/talos-conversation/src/engine.rs` for command/registry/output helper extraction and duplicate-logic cleanup. |
+| 2026-06-27 | M7. | ARCH-027/I072 extracted conversation command registry metadata/completion into `crates/talos-conversation/src/command_registry.rs`; `engine.rs` dropped from 960 to 739 lines. | `cargo test -p talos-conversation --quiet`, `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace --quiet`, `scripts/validate_project_governance.sh .`, and `git diff --check` passed. | Slash command dispatch, TUI menu rendering, CLI behavior, aliases, and availability rules were intentionally untouched. | M8 | Resume by mapping `crates/talos-provider/src/openai.rs` for request/stream/error helper extraction and duplicate-logic cleanup. |

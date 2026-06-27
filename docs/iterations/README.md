@@ -107,6 +107,8 @@ docs/iterations/
 | I068 | Agent Session Turn Decomposition | **Complete (2026-06-27)** | ARCH-021 split `talos-agent/src/session.rs` turn forwarding and tests while preserving actor-loop behavior; workspace gates pass. See `I068-agent-session-turn-decomposition.md`. |
 | I069 | CLI Inline Mode Decomposition | **Complete (2026-06-27)** | ARCH-024 split CLI inline mode and inline `/skills` handling into `mode_inline.rs`; `mode_runners.rs` 1778→1500 lines; workspace gates pass. See `I069-cli-inline-mode-decomposition.md`. |
 | I070 | TUI Exit Summary Decomposition | **Complete (2026-06-27)** | ARCH-025 split TUI exit-summary formatting into `app_summary.rs`; `app.rs` 1118→1005 lines; workspace gates pass. See `I070-tui-exit-summary-decomposition.md`. |
+| I071 | Agent Configuration Decomposition | **Complete (2026-06-27)** | ARCH-026 split Agent constructors/configuration setters into `configuration.rs`; duplicate prompt-builder mutation centralized; `lib.rs` 914→655 lines. See `I071-agent-configuration-decomposition.md`. |
+| I072 | Conversation Command Registry Decomposition | **Complete (2026-06-27)** | ARCH-027 split command registry metadata/completion into `command_registry.rs`; `engine.rs` 960→739 lines; workspace gates pass. See `I072-conversation-command-registry-decomposition.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
