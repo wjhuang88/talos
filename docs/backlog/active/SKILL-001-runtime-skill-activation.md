@@ -68,6 +68,13 @@ runtime startup wires `SkillLoader` to `Agent::set_skill_index(...)`.
   executable in mock request-preview mode, and verifies that Level 0 metadata reaches the provider
   request. This closes SKILL-001's published runtime wiring scope.
 
+2026-06-27 residual closure note:
+
+- SKILL-002/I058 implemented explicit Level 1 Skill body activation and bounded Level 2 reference
+  loading through typed runtime/session context. A real `talos --inline --mock` binary regression
+  now proves `/skills activate <name>` reaches provider request preview. SKILL-001 remains closed;
+  explicit activation review is owned by SKILL-002/I058.
+
 ## Required Reads
 
 - `docs/backlog/active/ARCH-009-skill-module-decomposition.md`

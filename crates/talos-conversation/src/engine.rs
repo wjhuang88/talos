@@ -9,8 +9,9 @@ use tokio::sync::mpsc;
 use crate::types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
     ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
-    SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillDiagnostic, StatusSnapshot,
-    StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
+    SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
+    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
+    ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -173,9 +174,9 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
         CommandDefinition {
             name: "/skills",
             aliases: &[],
-            usage: "/skills",
-            description: "List available runtime skills",
-            arg_hint: None,
+            usage: "/skills [activate <name> | reference <path>]",
+            description: "List or activate runtime skills",
+            arg_hint: Some("[activate <name> | reference <path>]"),
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
@@ -300,6 +301,10 @@ impl ConversationEngine {
     pub fn with_skills(mut self, skills: Vec<SkillDiagnostic>) -> Self {
         self.skills = skills;
         self
+    }
+
+    pub fn set_skills(&mut self, skills: Vec<SkillDiagnostic>) {
+        self.skills = skills;
     }
 
     pub fn with_mcp_servers(mut self, servers: Vec<McpServerDiagnostic>) -> Self {
@@ -527,7 +532,7 @@ impl ConversationEngine {
                 outputs.extend(self.handle_plugins_command());
             }
             "/skills" => {
-                outputs.extend(self.handle_skills_command());
+                outputs.extend(self.handle_skills_command(arg));
             }
             "/copy" => {
                 outputs.extend(self.handle_copy_command(arg));
@@ -732,7 +737,61 @@ impl ConversationEngine {
         })]
     }
 
-    fn handle_skills_command(&mut self) -> Vec<UiOutput> {
+    fn handle_skills_command(&mut self, arg: &str) -> Vec<UiOutput> {
+        let mut parts = arg.split_whitespace();
+        match parts.next() {
+            Some("activate") => {
+                if self.is_processing {
+                    let text = "[System] Cannot activate a skill while a turn is active. Wait for the current turn to finish.\n".to_string();
+                    return vec![UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(stream::once(async move { text })),
+                    })];
+                }
+                let name = parts.collect::<Vec<_>>().join(" ");
+                if name.trim().is_empty() {
+                    let text = "[Error] Usage: /skills activate <name>\n".to_string();
+                    return vec![UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(stream::once(async move { text })),
+                    })];
+                }
+                return vec![UiOutput::SkillCommand(SkillCommandRequest::Activate {
+                    name,
+                })];
+            }
+            Some("reference") => {
+                if self.is_processing {
+                    let text = "[System] Cannot load a skill reference while a turn is active. Wait for the current turn to finish.\n".to_string();
+                    return vec![UiOutput::Stream(StreamMessage {
+                        source: MessageSource::System,
+                        stream: Box::pin(stream::once(async move { text })),
+                    })];
+                }
+                let path = parts.collect::<Vec<_>>().join(" ");
+                if path.trim().is_empty() {
+                    let text = "[Error] Usage: /skills reference <relative-path>\n".to_string();
+                    return vec![UiOutput::Stream(StreamMessage {
+                        source: MessageSource::Error,
+                        stream: Box::pin(stream::once(async move { text })),
+                    })];
+                }
+                return vec![UiOutput::SkillCommand(SkillCommandRequest::Reference {
+                    path,
+                })];
+            }
+            Some(other) => {
+                let text = format!(
+                    "[Error] Unknown /skills action: {other}. Usage: /skills [activate <name> | reference <path>]\n"
+                );
+                return vec![UiOutput::Stream(StreamMessage {
+                    source: MessageSource::Error,
+                    stream: Box::pin(stream::once(async move { text })),
+                })];
+            }
+            None => {}
+        }
+
         if self.skills.is_empty() {
             let text = "[System] No skills available.\n".to_string();
             return vec![UiOutput::Stream(StreamMessage {
@@ -750,7 +809,7 @@ impl ConversationEngine {
             ));
         }
         text.push_str(
-            "[System] Level 1 skill bodies and Level 2 references are gated until explicit activation lands.\n",
+            "[System] Use /skills activate <name> to load one Skill body, then /skills reference <relative-path> for bounded references.\n",
         );
         vec![UiOutput::Stream(StreamMessage {
             source: MessageSource::System,

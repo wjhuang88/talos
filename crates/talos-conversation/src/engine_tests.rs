@@ -6,7 +6,8 @@ use talos_core::tool::ToolProvenance;
 use crate::engine::ConversationEngine;
 use crate::types::{
     ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, ModelPickerItem,
-    PluginObservation, SkillDiagnostic, TipKind, ToolCallDisplay, ToolResultDisplay, UiOutput,
+    PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind, ToolCallDisplay,
+    ToolResultDisplay, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -568,7 +569,56 @@ async fn slash_skills_lists_runtime_skill_metadata() {
     assert!(text.contains("Available skills"));
     assert!(text.contains("review"));
     assert!(text.contains("Review code"));
-    assert!(text.contains("Level 1 skill bodies"));
+    assert!(text.contains("/skills activate"));
+}
+
+#[tokio::test]
+async fn slash_skills_activate_emits_typed_request() {
+    let mut engine = new_engine().with_skills(vec![SkillDiagnostic {
+        name: "review".to_string(),
+        description: "Review code".to_string(),
+        active: false,
+    }]);
+
+    let outputs = engine.handle_slash_command("/skills activate review");
+
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::SkillCommand(SkillCommandRequest::Activate { name }) => {
+            assert_eq!(name, "review");
+        }
+        _ => panic!("expected skill activation request"),
+    }
+}
+
+#[tokio::test]
+async fn slash_skills_reference_emits_typed_request() {
+    let mut engine = new_engine().with_skills(vec![SkillDiagnostic {
+        name: "review".to_string(),
+        description: "Review code".to_string(),
+        active: true,
+    }]);
+
+    let outputs = engine.handle_slash_command("/skills reference references/rules.md");
+
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::SkillCommand(SkillCommandRequest::Reference { path }) => {
+            assert_eq!(path, "references/rules.md");
+        }
+        _ => panic!("expected skill reference request"),
+    }
+}
+
+#[tokio::test]
+async fn slash_skills_activate_requires_name() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/skills activate");
+
+    let (source, text) = collect_stream(outputs).await.unwrap();
+    assert_eq!(source, MessageSource::Error);
+    assert!(text.contains("Usage: /skills activate <name>"));
 }
 
 // ---------------------------------------------------------------------------

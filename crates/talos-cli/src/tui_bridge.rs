@@ -3,24 +3,43 @@
 //! Contains the conversation loop that mediates between agent events,
 //! user input, and UI output channels.
 
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
+
+use crate::skill_runtime::RuntimeSkills;
+use talos_conversation::MessageSource;
 use talos_conversation::{
     ConversationEngine, CredentialResponseData, ModelSwitchRequest, SessionDeleteRequest,
-    SessionForkRequest, SessionNewRequest, SessionResumeRequest, UiOutput, UserInput,
+    SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
+    StreamMessage, UiOutput, UserInput,
 };
 use talos_core::message::AgentEvent;
 
-pub(crate) async fn run_conversation_loop(
-    mut engine: ConversationEngine,
-    mut agent_rx: tokio::sync::mpsc::UnboundedReceiver<AgentEvent>,
-    mut user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
-    ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
-    submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
-    sq_tx_watch: tokio::sync::watch::Receiver<
-        tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
-    >,
-    mut model_info_watch: tokio::sync::watch::Receiver<(String, String)>,
-    session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
-) {
+pub(crate) struct ConversationLoopIo {
+    pub agent_rx: tokio::sync::mpsc::UnboundedReceiver<AgentEvent>,
+    pub user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
+    pub ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    pub submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
+    pub sq_tx_watch:
+        tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<talos_core::session::SessionOp>>,
+    pub model_info_watch: tokio::sync::watch::Receiver<(String, String)>,
+    pub session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
+    pub runtime_skills: Arc<Mutex<RuntimeSkills>>,
+}
+
+pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: ConversationLoopIo) {
+    let ConversationLoopIo {
+        mut agent_rx,
+        mut user_rx,
+        ui_tx,
+        submit_tx,
+        sq_tx_watch,
+        mut model_info_watch,
+        session_tx,
+        runtime_skills,
+    } = io;
+
     loop {
         tokio::select! {
             changed = model_info_watch.changed() => {
@@ -80,6 +99,15 @@ pub(crate) async fn run_conversation_loop(
                                     UiOutput::ModelSwitchRequest(req) => {
                                         let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(req));
                                     }
+                                    UiOutput::SkillCommand(req) => {
+                                        handle_skill_command(
+                                            req,
+                                            &mut engine,
+                                            &ui_tx,
+                                            &sq_tx_watch,
+                                            runtime_skills.clone(),
+                                        ).await;
+                                    }
                                     other => { let _ = ui_tx.send(other); }
                                 }
                             }
@@ -117,6 +145,67 @@ pub(crate) async fn run_conversation_loop(
             }
         }
     }
+}
+
+async fn handle_skill_command(
+    req: SkillCommandRequest,
+    engine: &mut ConversationEngine,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    sq_tx_watch: &tokio::sync::watch::Receiver<
+        tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    >,
+    runtime_skills: Arc<Mutex<RuntimeSkills>>,
+) {
+    let mut skills = runtime_skills.lock().await;
+    let result = match req {
+        SkillCommandRequest::Activate { name } => {
+            let trimmed = name.trim().to_string();
+            skills
+                .activate(&trimmed)
+                .map(|content| (Some(trimmed), Some(content), "activated"))
+        }
+        SkillCommandRequest::Reference { path } => {
+            let active = skills.active_name().map(str::to_string);
+            skills
+                .load_reference(path.trim())
+                .map(|content| (active, Some(content), "loaded reference"))
+        }
+    };
+
+    match result {
+        Ok((name, content, action)) => {
+            let sq_tx = sq_tx_watch.borrow().clone();
+            let _ = sq_tx
+                .send(talos_core::session::SessionOp::SetSkillContext {
+                    name: name.clone(),
+                    content,
+                })
+                .await;
+            engine.set_skills(skills.diagnostics());
+            let label = name.unwrap_or_else(|| "active skill".to_string());
+            send_bridge_stream(
+                ui_tx,
+                MessageSource::System,
+                format!(
+                    "[System] Skill {action}: {label}. Content added to provider context only.\n"
+                ),
+            );
+        }
+        Err(error) => {
+            send_bridge_stream(ui_tx, MessageSource::Error, format!("[Error] {error}\n"));
+        }
+    }
+}
+
+fn send_bridge_stream(
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    source: MessageSource,
+    text: String,
+) {
+    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
+        source,
+        stream: Box::pin(futures::stream::once(async move { text })),
+    }));
 }
 
 /// Session lifecycle request forwarded from the conversation loop to the mode runner.

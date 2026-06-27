@@ -62,6 +62,12 @@ pub struct SkillDiagnostic {
     pub active: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillCommandRequest {
+    Activate { name: String },
+    Reference { path: String },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ScrollbackState {
     pub scrolled_line_count: usize,
@@ -151,6 +157,8 @@ pub enum UiOutput {
     ModelPicker(ModelPickerData),
     /// Request to switch the active model.
     ModelSwitchRequest(ModelSwitchRequest),
+    /// Request runtime Skill activation or reference loading.
+    SkillCommand(SkillCommandRequest),
     /// Ask the TUI to collect an API key for the named provider.
     CredentialRequest(CredentialRequestData),
     /// TUI returns a collected API key to the lifecycle handler.

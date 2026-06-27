@@ -4,7 +4,7 @@
 |---|---|
 | Type | State/Product Story |
 | Priority | P1 |
-| Status | Refinement |
+| Status | Review (implemented in I058) |
 | Depends On | I033 review closure; CMD-001 first-class BuiltinCommand registry |
 | Decision Links | ADR-006; prompt cache constraints recorded by ARCH-006 |
 
@@ -42,14 +42,63 @@ Skill body into every request or leaking hidden content into history.
   rejects or truncates according to documented policy without crashing.
 - Given activated content changes the stable prompt prefix, when the next turn runs, then cache
   invalidation/rebuild behavior is deterministic and tested.
-- [ ] A real `talos` binary scenario proves activation reaches the provider request.
-- [ ] README, SKILL-001/SKILL-002, iteration, Product Backlog, and Board owners are synchronized.
+- [x] A real `talos` binary scenario proves activation reaches the provider request.
+- [x] README, SKILL-002, iteration, Product Backlog, and Board owners are synchronized.
+
+## Implementation Evidence
+
+- `talos-agent` accepts an optional activated Skill context, renders it as a cacheable prompt
+  section, and invalidates the stable prefix when activation changes.
+- `talos-core` exposes typed `SessionOp::SetSkillContext` for session-owned Skill context mutation.
+- `talos-cli::skill_runtime` activates one discovered Skill, loads bounded path-confined
+  references, tracks active diagnostics, and avoids printing full content in diagnostics.
+- `talos-conversation` routes `/skills activate <name>` and `/skills reference <path>` as typed UI
+  outputs instead of appending Skill content to chat history.
+- `talos-cli` TUI bridge applies Skill command requests to runtime state and session context while
+  only emitting bounded status messages to the visible transcript.
+- `talos-cli` inline mode accepts the same Skill activation/reference commands, enabling a
+  deterministic real-binary request-preview regression without TUI screenshot coupling.
+
+Targeted checks already passed on 2026-06-27:
+
+- `cargo check -p talos-agent -p talos-conversation -p talos-cli -p talos-tui`
+- `cargo test -p talos-agent -p talos-conversation -p talos-cli skill -- --nocapture`
+- `cargo test -p talos-agent set_skill_context_reaches_request_preview -- --nocapture`
+- `cargo test -p talos-cli conversation_loop_routes_skill_activation_to_session_op -- --nocapture`
+- `cargo clippy -p talos-core -p talos-agent -p talos-conversation -p talos-cli -p talos-tui -- -D warnings`
+
+Workspace checks passed on 2026-06-27:
+
+- `cargo fmt --all -- --check`
+- `cargo check --workspace`
+- `cargo clippy --workspace -- -D warnings`
+- `cargo test --workspace`
+- `scripts/validate_project_governance.sh .`
+- `git diff --check`
+
+Real-binary proof passed on 2026-06-27:
+
+- `cargo test -p talos-cli --test skill_runtime_e2e -- --nocapture`
+  - Real `talos --inline --mock` binary flow activates a workspace Skill, runs `/mock-request`, and
+    verifies the activated Skill body appears in the provider request preview.
 
 ## Uncertainty
 
-- The final context owner and whether activation mutates the stable prefix or a per-turn context
-  block must be validated against current Agent/session cache behavior before this Story becomes
-  Ready. If the choice changes a public protocol or Soft architecture constraint, record an ADR.
+- Resolved 2026-06-27 by R27/T2 code inspection and I058 planning:
+  - `talos-cli::skill_runtime` owns runtime SkillManager state, activation budgets, path-confined
+    reference loading, and diagnostics.
+  - `talos-agent` owns model-visible activated Skill context through a typed prompt-builder field.
+  - Activated Skill body/reference content belongs to the cacheable stable prefix after activation;
+    changing activation invalidates and rebuilds `cached_stable_prefix`.
+  - Conversation/TUI command handling must route activation through a typed runtime/session
+    operation and must not append full Skill content to chat history or scrollback.
+  - No new ADR is required unless implementation changes a public protocol, adds plugin command
+    behavior, or changes the prompt-cache boundary beyond ARCH-006.
+
+## Iteration Selection
+
+Selected into [I058 Explicit Runtime Skill Activation](../../iterations/I058-explicit-runtime-skill-activation.md)
+on 2026-06-27 as the R27/T2 implementation carrier.
 
 ## Required Reads
 

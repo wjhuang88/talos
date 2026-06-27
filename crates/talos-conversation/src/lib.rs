@@ -17,6 +17,6 @@ pub use types::{
     MessageRole, MessageSource, MessageStatus, ModelPickerData, ModelPickerItem,
     ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
-    SessionResumeRequest, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay,
-    ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
+    SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,
+    TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };

@@ -5,10 +5,19 @@ mod tests {
     use crate::colors;
     use crate::provider_setup::parse_provider;
     use crate::registry;
-    use crate::tui_bridge::{SessionLifecycleRequest, run_conversation_loop};
+    use crate::skill_runtime::discover_runtime_skills;
+    use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
     use crate::{config_get_dotted, is_secret_key, mask_secrets};
     use talos_conversation::{ConversationEngine, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
+
+    fn empty_runtime_skills()
+    -> std::sync::Arc<tokio::sync::Mutex<crate::skill_runtime::RuntimeSkills>> {
+        let dir = tempfile::tempdir().unwrap();
+        std::sync::Arc::new(tokio::sync::Mutex::new(
+            discover_runtime_skills(dir.path()).unwrap(),
+        ))
+    }
 
     #[test]
     fn parse_provider_anthropic() {
@@ -123,7 +132,17 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
         let loop_handle = tokio::spawn(run_conversation_loop(
-            engine, agent_rx, user_rx, ui_tx, submit_tx, sq_rx, model_rx, session_tx,
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                submit_tx,
+                sq_tx_watch: sq_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+            },
         ));
 
         agent_tx.send(AgentEvent::TurnStart).unwrap();
@@ -184,7 +203,17 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
         let loop_handle = tokio::spawn(run_conversation_loop(
-            engine, agent_rx, user_rx, ui_tx, submit_tx, sq_rx, model_rx, session_tx,
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                submit_tx,
+                sq_tx_watch: sq_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+            },
         ));
 
         model_tx
@@ -207,6 +236,78 @@ mod tests {
         loop_handle.abort();
     }
 
+    #[tokio::test]
+    async fn conversation_loop_routes_skill_activation_to_session_op() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill_dir = dir.path().join(".talos/skills/review");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: review\ndescription: Review code\ntriggers:\n  - review\n---\n\n# Review\nCheck safety.\n",
+        )
+        .unwrap();
+
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            discover_runtime_skills(dir.path()).unwrap(),
+        ));
+        let skills = runtime_skills.lock().await.diagnostics();
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string())
+            .with_skills(skills);
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) =
+            tokio::sync::watch::channel(("test-model".to_string(), "test-provider".to_string()));
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                submit_tx,
+                sq_tx_watch: sq_watch_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::Message("/skills activate review".to_string()))
+            .unwrap();
+
+        let op = tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+            .await
+            .expect("skill context op")
+            .expect("session op");
+        match op {
+            talos_core::session::SessionOp::SetSkillContext { name, content } => {
+                assert_eq!(name.as_deref(), Some("review"));
+                assert!(content.unwrap().contains("Check safety."));
+            }
+            _ => panic!("expected skill context session op"),
+        }
+
+        let mut saw_confirmation = false;
+        for _ in 0..3 {
+            if let Some(UiOutput::Stream(msg)) = ui_rx.recv().await {
+                if msg.source == talos_conversation::MessageSource::System {
+                    saw_confirmation = true;
+                    break;
+                }
+            }
+        }
+        assert!(saw_confirmation);
+
+        loop_handle.abort();
+    }
+
     #[test]
     fn model_metadata_context_includes_model_info_without_secret() {
         let mut config = talos_config::Config::default();
@@ -214,7 +315,7 @@ mod tests {
         config.model = "claude-sonnet-4-5-20250929".to_string();
         config.set_provider_credential("anthropic", "sk-secret-value");
 
-        let file = crate::mode_runners::model_metadata_context_file(&config);
+        let file = crate::mode_runtime::model_metadata_context_file(&config);
 
         assert_eq!(file.path, "TALOS_MODEL.md");
         assert!(file.content.contains("Provider: anthropic"));
@@ -247,7 +348,7 @@ mod tests {
         config.provider = "anthropic".to_string();
         config.model = "claude-sonnet-4-5-20250929".to_string();
 
-        crate::mode_runners::apply_session_model_to_config(&mut config, &session);
+        crate::mode_runtime::apply_session_model_to_config(&mut config, &session);
 
         assert_eq!(config.provider, "zhipu-coding-plan");
         assert_eq!(config.model, "glm-5.2");

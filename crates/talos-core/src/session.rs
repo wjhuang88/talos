@@ -17,6 +17,17 @@ use crate::message::Message;
 pub enum SessionOp {
     /// Submit a user message for the agent to process.
     Submit { message: String },
+    /// Replace the model-visible activated Skill context.
+    ///
+    /// The CLI/runtime layer is responsible for validating paths and budgets
+    /// before sending this operation. The session actor only updates prompt
+    /// state and invalidates the agent's stable prompt prefix.
+    SetSkillContext {
+        /// Active Skill name, or `None` to clear activation.
+        name: Option<String>,
+        /// Bounded Skill body/reference content, or `None` to clear activation.
+        content: Option<String>,
+    },
     /// Interrupt the current turn.
     Interrupt,
     /// Shut down the session actor.
