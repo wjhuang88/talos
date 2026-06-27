@@ -13,7 +13,7 @@ session history, built-in coding tools, explicit permissions, runtime Skills, MC
 and project-governance support while keeping the default core local and auditable.
 
 Talos has published its first stable pre-1.0 release line. The current release version in this
-workspace is `v0.1.2`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+workspace is `v0.2.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
 user-facing behavior; research tracks such as the embedded web control surface, dotagents shared
 Skills, WASM plugins, and advanced document ingestion are tracked separately under
@@ -32,7 +32,7 @@ Skills, WASM plugins, and advanced document ingestion are tracked separately und
 
 ## Current Release Boundary
 
-`v0.1.2` is suitable for local developer use where the operator reviews tool actions and keeps
+`v0.2.0` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
 dashboard, or autonomous background daemon.
 

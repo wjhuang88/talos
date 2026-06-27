@@ -23,7 +23,7 @@ their owner documents.
 |---|---|---|
 | Hard | Write-capable operations must go through the permission pipeline. | `storage cleanup --apply` cannot rely on `--apply` alone as its safety boundary. |
 | Hard | User-provided text must not be able to crash the CLI. | Exploration search snippets must be UTF-8 safe and covered by regression tests. |
-| Hard | A release tag must not be created before explicit approval and version/release evidence. | v0.2.0 remains blocked until this gate is complete. |
+| Hard | A release tag must not be created before explicit approval and version/release evidence. | User approval on 2026-06-27 unblocks the v0.2.0 tag after validation. |
 | Soft | The memory prompt section can remain opt-in. | Runtime wiring must exist and be demonstrably disabled by default or controlled by config. |
 | Assumption | The existing memory hidden-output filter is only defense-in-depth. | Confirm or replace it with metadata/role-aware filtering during implementation. |
 
@@ -48,6 +48,8 @@ their owner documents.
 ### Non-Goals
 
 - No v0.2.0 tag, GitHub Release, or release workflow mutation without architect approval.
+- 2026-06-27: user explicitly requested completing a release; this is recorded as approval to
+  bump version metadata and tag `v0.2.0` after validation.
 - No vector/graph database implementation.
 - No destructive memory retention apply path.
 - No LLM-based memory extraction.
@@ -177,8 +179,9 @@ their owner documents.
 
 ### Version Status
 
-Workspace version remains `0.1.2` (Cargo.toml). v0.2.0 requires architect explicit approval.
-No tag, no GitHub Release, no version bump was performed.
+Workspace version remained `0.1.2` at I057 closeout. On 2026-06-27, the user explicitly requested
+completing a release; release execution updates workspace metadata to `0.2.0` and may tag
+`v0.2.0` after validation.
 
 ## Variance And Residuals
 
@@ -196,8 +199,8 @@ No tag, no GitHub Release, no version bump was performed.
   iteration. The expanded pattern set + normalization covers the known bypass vectors.
 - **Pre-existing ignored test**: `session::tests::test_interrupt_after_success_preserves_history`
   remains ignored as timing-sensitive async scheduling coverage. Not caused by I057 changes.
-- **v0.2.0 release**: still blocked pending architect approval. I057 closes all acceptance
-  blockers; the release decision is external to this iteration.
+- **v0.2.0 release**: unblocked by explicit user approval on 2026-06-27. I057 closed all
+  acceptance blockers before publication.
 
 ## Retrospective
 

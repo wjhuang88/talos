@@ -68,6 +68,7 @@ are green, user docs are current, and the architect has a concrete release/no-re
 | Date | Type | Record |
 |---|---|---|
 | 2026-06-26 | **Activation + Closeout** | I056 activated and closed in same session. All T2-T8 task items in Review with evidence. Full workspace gates pass (fmt, clippy -D warnings, test 0 failures, governance 0 warnings). Runtime smoke verified for storage (95 sessions, cleanup dry-run), memory (2 items consolidated, status/retention), and exploration (92 chunks ingested, FTS search). I019 acceptance all checked. I020 S1-S3 checked, S4 deferred (vector/graph Spike + ADR required). DATA-001 9/10 acceptance checked (memory retention dry-run deferred to I053, which delivered it). README updated with storage/memory/exploration commands. Release decision: v0.2.0 ready for tag upon architect approval — NOT tagged without explicit approval per handoff escalation rules. |
+| 2026-06-27 | **Release Approval** | User explicitly requested completing a release. This is recorded as approval to bump workspace metadata to `0.2.0`, create `v0.2.0` after validation, and push the tag to trigger the GitHub Release workflow. |
 
 ## Verification Evidence
 
@@ -101,7 +102,7 @@ are green, user docs are current, and the architect has a concrete release/no-re
 - [x] I019 acceptance: all 6 criteria checked.
 - [x] I020 acceptance: 5/5 checked (S4 vector/graph deferred per ADR-017).
 - [x] DATA-001 acceptance: 9/10 checked (memory retention dry-run delivered in I053).
-- [ ] GitHub Actions release workflow for v0.2.0 — NOT run (no tag without architect approval).
+- [ ] GitHub Actions release workflow for v0.2.0 — pending `v0.2.0` tag push after 2026-06-27 approval.
 - [ ] Post-release install smoke — deferred to post-tag.
 
 ### Known Residuals

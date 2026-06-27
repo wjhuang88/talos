@@ -72,7 +72,8 @@ project gate, not a claim that the current agent is the sole reviewer or archite
 
 - I047 is Review; `v0.1.2` tag has been pushed, but release workflow evidence is still required
   before I047 can be Complete.
-- I056 and I057 are Review; `v0.2.0` still requires explicit architect approval.
+- I056 and I057 are Review; `v0.2.0` required explicit architect approval before release
+  execution.
 - I049-I055 and I019/I020 are Review with implementation evidence; do not rewrite their baselines.
 - SKILL-002 is Review after I058; context/cache ownership and real-binary request-preview evidence
   are resolved.
@@ -242,9 +243,12 @@ Current state and artifacts:
 - I047 remains Review. Local `v0.1.2` tag exists and I047 records that the tag was pushed, but
   release workflow evidence and post-release install smoke are still not recorded.
 - I056 remains Review. It states `v0.2.0` is ready for tag only upon architect approval.
-- I057 remains Review. It records that workspace version is still `0.1.2`, no `v0.2.0` tag,
-  GitHub Release, or version bump was performed, and release is blocked pending architect approval.
+- I057 remains Review. It records that workspace version was still `0.1.2`, no `v0.2.0` tag,
+  GitHub Release, or version bump had been performed at that checkpoint.
 - No tag, push, release workflow mutation, or version bump was performed by this task.
+- 2026-06-27 release execution note: the user explicitly requested completing a release, which
+  supplies the approval required by this gate for the `v0.2.0` version bump and tag after
+  validation.
 
 Commands/checks and actual results:
 
