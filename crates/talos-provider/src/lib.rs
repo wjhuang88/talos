@@ -2,6 +2,7 @@
 
 pub mod mock;
 pub mod openai;
+mod openai_request;
 
 use std::time::Duration;
 
