@@ -8,7 +8,7 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) remains blocked on the TOOL-007 follow-ups: TOOL-013 must define hybrid network/write permission classification, and TOOL-012 must define progressive-loading/result-boundary behavior. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
+Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) remains blocked on the remaining TOOL-007 follow-up: TOOL-012 must define progressive-loading/result-boundary behavior. TOOL-013 hybrid network/write permission classification is complete. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
 
 ## Priority
 
@@ -334,7 +334,7 @@ incrementally.
       explicit local destination.
 - [ ] Candidate dependencies are evaluated with license, native-code, feature, build, and output
       quality evidence before implementation.
-- [ ] Hybrid network/write permission behavior is defined through TOOL-013 before adding new
+- [x] Hybrid network/write permission behavior is defined through TOOL-013 before adding new
       save/download/extract tools.
 - [ ] Progressive-loading and result-handle behavior is aligned with TOOL-012 before adding large
       document extraction outputs.

@@ -369,6 +369,13 @@ LLM Request -> [ Approval ] -> [ Sandbox ] -> [ Execute ] -> [ Retry ]
 3. **Execute**: The tool runs inside the sandbox.
 4. **Retry**: If the tool fails with a transient error, the pipeline can attempt a recovery or ask the LLM to fix the input.
 
+Permission checks use invocation-specific profiles. A simple tool exposes one facet derived from
+`ToolNature`; a hybrid tool exposes every risk surface through `ToolPermissionFacet` plus a
+resource kind such as path, domain, command, or remote. The permission engine evaluates all facets
+conservatively: any denied facet denies the call, otherwise any ask facet requires approval, and
+only an all-allow profile executes. Agent, CLI/TUI, MCP, and `talos-runtime` use the same profile
+evaluation path.
+
 ## Context Compaction Pipeline
 
 To handle long conversations, Talos uses a progressive compaction strategy. Layers are activated as context pressure increases:

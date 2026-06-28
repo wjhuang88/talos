@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolNature, ToolResult};
+use talos_core::tool::{AgentTool, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult};
 use thiserror::Error;
 
 use crate::http_request::is_private_ip;
@@ -126,6 +126,34 @@ impl AgentTool for SaveUrlTool {
         ToolNature::Write
     }
 
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        let mut profile = Vec::new();
+        if let Some(url) = input.get("url").and_then(Value::as_str)
+            && let Ok(parsed) = reqwest::Url::parse(url)
+            && let Some(host) = parsed.host_str()
+        {
+            profile.push(ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                host.to_lowercase(),
+                ToolResourceKind::Domain,
+            ));
+        } else {
+            profile.push(ToolPermissionFacet::new(ToolNature::Network));
+        }
+
+        if let Some(destination) = input.get("destination").and_then(Value::as_str) {
+            profile.push(ToolPermissionFacet::with_resource(
+                ToolNature::Write,
+                destination,
+                ToolResourceKind::Path,
+            ));
+        } else {
+            profile.push(ToolPermissionFacet::new(ToolNature::Write));
+        }
+
+        profile
+    }
+
     fn summary_fields(&self) -> &'static [&'static str] {
         &["url", "destination"]
     }
@@ -237,6 +265,26 @@ mod tests {
     fn test_tool_nature_is_write() {
         let tool = SaveUrlTool::new();
         assert!(matches!(tool.nature(), ToolNature::Write));
+    }
+
+    #[test]
+    fn test_permission_profile_includes_network_and_write_facets() {
+        let tool = SaveUrlTool::new();
+        let profile = tool.permission_profile(&serde_json::json!({
+            "url": "https://Example.com/archive.zip",
+            "destination": "downloads/archive.zip"
+        }));
+
+        assert_eq!(profile.len(), 2);
+        assert_eq!(profile[0].nature, ToolNature::Network);
+        assert_eq!(profile[0].resource.as_deref(), Some("example.com"));
+        assert_eq!(profile[0].resource_kind, Some(ToolResourceKind::Domain));
+        assert_eq!(profile[1].nature, ToolNature::Write);
+        assert_eq!(
+            profile[1].resource.as_deref(),
+            Some("downloads/archive.zip")
+        );
+        assert_eq!(profile[1].resource_kind, Some(ToolResourceKind::Path));
     }
 
     #[test]

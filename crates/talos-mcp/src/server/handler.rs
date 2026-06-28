@@ -71,10 +71,6 @@ impl ServerHandler for TalosMcpHandler {
             name: request.name.to_string(),
             arguments: request.arguments.clone(),
         };
-        self.permission_gate
-            .evaluate_call(&hook_context, &talos_request)
-            .await?;
-
         let Some(tool) = self.tool_registry.get(request.name.as_ref()) else {
             return Err(McpError::new(
                 ErrorCode::METHOD_NOT_FOUND,
@@ -88,6 +84,11 @@ impl ServerHandler for TalosMcpHandler {
             .clone()
             .map(serde_json::Value::Object)
             .unwrap_or_else(|| serde_json::json!({}));
+        let profile = tool.permission_profile(&input);
+        self.permission_gate
+            .evaluate_call(&hook_context, &talos_request, &profile)
+            .await?;
+
         let result = tool.execute(input).await;
 
         let content = vec![Content::text(result.content)];

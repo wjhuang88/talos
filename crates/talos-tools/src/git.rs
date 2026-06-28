@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult};
 use talos_core::tool_parameters;
 use thiserror::Error;
 
@@ -720,6 +720,29 @@ impl AgentTool for GitPushTool {
     fn nature(&self) -> talos_core::tool::ToolNature {
         talos_core::tool::ToolNature::Execute
     }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        let remote = input
+            .get("remote")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("origin");
+
+        vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                "git",
+                ToolResourceKind::Command,
+            )
+            .with_description("host git push command"),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                remote,
+                ToolResourceKind::Remote,
+            )
+            .with_description("remote repository mutation"),
+        ]
+    }
 }
 
 impl GitPushTool {
@@ -786,6 +809,35 @@ impl AgentTool for GitPullTool {
 
     fn nature(&self) -> talos_core::tool::ToolNature {
         talos_core::tool::ToolNature::Execute
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        let remote = input
+            .get("remote")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("origin");
+
+        vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                "git",
+                ToolResourceKind::Command,
+            )
+            .with_description("host git pull command"),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                remote,
+                ToolResourceKind::Remote,
+            )
+            .with_description("remote repository fetch"),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Write,
+                self.workspace_root.to_string_lossy(),
+                ToolResourceKind::Path,
+            )
+            .with_description("workspace update"),
+        ]
     }
 }
 
@@ -864,5 +916,43 @@ impl GitCheckoutTool {
 
         run_host_git(&workdir, &args).await?;
         Ok(format!("switched to branch {}", git_input.branch))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn git_push_permission_profile_has_execute_and_remote_network() {
+        let tool = GitPushTool::new(PathBuf::from("/workspace"));
+        let profile = tool.permission_profile(&serde_json::json!({
+            "remote": "upstream",
+            "branch": "main"
+        }));
+
+        assert_eq!(profile.len(), 2);
+        assert_eq!(profile[0].nature, ToolNature::Execute);
+        assert_eq!(profile[0].resource.as_deref(), Some("git"));
+        assert_eq!(profile[0].resource_kind, Some(ToolResourceKind::Command));
+        assert_eq!(profile[1].nature, ToolNature::Network);
+        assert_eq!(profile[1].resource.as_deref(), Some("upstream"));
+        assert_eq!(profile[1].resource_kind, Some(ToolResourceKind::Remote));
+    }
+
+    #[test]
+    fn git_pull_permission_profile_has_execute_remote_and_workspace_write() {
+        let tool = GitPullTool::new(PathBuf::from("/workspace"));
+        let profile = tool.permission_profile(&serde_json::json!({}));
+
+        assert_eq!(profile.len(), 3);
+        assert_eq!(profile[0].nature, ToolNature::Execute);
+        assert_eq!(profile[0].resource.as_deref(), Some("git"));
+        assert_eq!(profile[1].nature, ToolNature::Network);
+        assert_eq!(profile[1].resource.as_deref(), Some("origin"));
+        assert_eq!(profile[1].resource_kind, Some(ToolResourceKind::Remote));
+        assert_eq!(profile[2].nature, ToolNature::Write);
+        assert_eq!(profile[2].resource.as_deref(), Some("/workspace"));
+        assert_eq!(profile[2].resource_kind, Some(ToolResourceKind::Path));
     }
 }

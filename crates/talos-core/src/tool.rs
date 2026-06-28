@@ -82,6 +82,68 @@ pub enum ToolNature {
     Network,
 }
 
+/// Identifies how a permission resource string should be interpreted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ToolResourceKind {
+    /// File or directory path resource.
+    Path,
+    /// URL host or domain resource.
+    Domain,
+    /// External command or executable resource.
+    Command,
+    /// Named remote resource, such as a Git remote.
+    Remote,
+}
+
+/// One permission facet touched by a tool invocation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ToolPermissionFacet {
+    /// Risk nature for this facet.
+    pub nature: ToolNature,
+    /// Optional concrete resource touched by this facet.
+    #[serde(default)]
+    pub resource: Option<String>,
+    /// Optional interpretation hint for [`resource`](Self::resource).
+    #[serde(default)]
+    pub resource_kind: Option<ToolResourceKind>,
+    /// Optional human-readable detail used in approval or diagnostics.
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+impl ToolPermissionFacet {
+    /// Creates a facet with no concrete resource.
+    pub fn new(nature: ToolNature) -> Self {
+        Self {
+            nature,
+            resource: None,
+            resource_kind: None,
+            description: None,
+        }
+    }
+
+    /// Creates a facet with a concrete resource.
+    pub fn with_resource(
+        nature: ToolNature,
+        resource: impl Into<String>,
+        resource_kind: ToolResourceKind,
+    ) -> Self {
+        Self {
+            nature,
+            resource: Some(resource.into()),
+            resource_kind: Some(resource_kind),
+            description: None,
+        }
+    }
+
+    /// Adds display-oriented detail to this facet.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+}
+
 /// A pluggable agent tool that can be registered and invoked dynamically.
 ///
 /// Implementors must provide a name, description, parameter schema, and
@@ -122,6 +184,15 @@ pub trait AgentTool: Send + Sync {
         } else {
             ToolNature::Write
         }
+    }
+
+    /// Returns the permission facets touched by this concrete invocation.
+    ///
+    /// Tools that only touch one risk surface can rely on the default
+    /// single-facet profile derived from [`nature`](Self::nature). Hybrid tools
+    /// should override this to expose every relevant risk surface.
+    fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![ToolPermissionFacet::new(self.nature())]
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

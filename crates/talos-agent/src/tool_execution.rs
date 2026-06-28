@@ -247,8 +247,8 @@ impl Agent {
             self.run_hook(hook_ctx, HookEvent::BeforePermissionCheck { call })
                 .await?;
 
-            let nature = tool.nature();
-            let decision = engine.evaluate_with_nature(&call.name, nature, &call.input);
+            let profile = tool.permission_profile(&call.input);
+            let decision = engine.evaluate_profile(&call.name, &profile, &call.input);
             self.run_hook(
                 hook_ctx,
                 HookEvent::AfterPermissionCheck {

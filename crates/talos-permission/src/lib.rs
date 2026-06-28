@@ -57,7 +57,7 @@ use glob::Pattern;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use talos_core::tool::ToolNature;
+use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
 use thiserror::Error;
 use url::Url;
 
@@ -128,12 +128,27 @@ pub enum ResourceKind {
     Path,
     /// Glob or exact match against a URL host (Network tools).
     Domain,
+    /// Glob matched against an executable or command token.
+    Command,
+    /// Glob matched against a named remote resource.
+    Remote,
+}
+
+impl From<ToolResourceKind> for ResourceKind {
+    fn from(value: ToolResourceKind) -> Self {
+        match value {
+            ToolResourceKind::Path => Self::Path,
+            ToolResourceKind::Domain => Self::Domain,
+            ToolResourceKind::Command => Self::Command,
+            ToolResourceKind::Remote => Self::Remote,
+        }
+    }
 }
 
 /// Extracts resource strings from tool input based on [`ToolNature`].
 ///
 /// Each nature maps to specific input fields:
-/// - Read/Write → `input["path"]` or `input["file"]`
+/// - Read/Write → `input["path"]`, `input["file"]`, or `input["destination"]`
 /// - Execute → first whitespace-delimited token of `input["command"]`
 ///   (e.g., `scripts/deploy.sh --arg` → `scripts/deploy.sh`)
 /// - Network → host from `input["url"]` (lowercase, no port)
@@ -149,6 +164,7 @@ impl ResourceExtractor {
             ToolNature::Read | ToolNature::Write => input
                 .get("path")
                 .or_else(|| input.get("file"))
+                .or_else(|| input.get("destination"))
                 .and_then(Value::as_str)
                 .map(String::from),
             ToolNature::Execute => input
@@ -240,6 +256,7 @@ impl PermissionRule {
         tool_name: &str,
         nature: ToolNature,
         input: &Value,
+        explicit_resource: Option<&str>,
     ) -> Result<bool, PermissionError> {
         // Nature-based matching (new form)
         if let Some(rule_nature) = self.nature {
@@ -253,7 +270,9 @@ impl PermissionRule {
             };
 
             // Extract the resource from input based on nature
-            let extracted = Self::extract_resource(nature, input);
+            let extracted = explicit_resource
+                .map(str::to_owned)
+                .or_else(|| Self::extract_resource(nature, input));
 
             let Some(extracted) = extracted else {
                 return Ok(false);
@@ -273,10 +292,16 @@ impl PermissionRule {
         }
 
         if let Some(ref pattern) = self.path_pattern {
-            let path = input
-                .get("path")
-                .or_else(|| input.get("file"))
-                .and_then(Value::as_str)
+            let path = explicit_resource
+                .map(str::to_owned)
+                .or_else(|| {
+                    input
+                        .get("path")
+                        .or_else(|| input.get("file"))
+                        .or_else(|| input.get("destination"))
+                        .and_then(Value::as_str)
+                        .map(String::from)
+                })
                 .ok_or_else(|| {
                     PermissionError::InvalidRule(
                         "rule has path_pattern but tool input has no path field".to_owned(),
@@ -286,7 +311,7 @@ impl PermissionRule {
             let glob = Pattern::new(pattern)
                 .map_err(|e| PermissionError::InvalidGlobPattern(format!("{pattern}: {e}")))?;
 
-            return Ok(glob.matches(path));
+            return Ok(glob.matches(&path));
         }
 
         Ok(true)
@@ -410,15 +435,59 @@ impl PermissionEngine {
         nature: talos_core::tool::ToolNature,
         input: &Value,
     ) -> PermissionDecision {
+        self.evaluate_profile(tool_name, &[ToolPermissionFacet::new(nature)], input)
+    }
+
+    /// Evaluates a tool invocation with all risk facets considered.
+    ///
+    /// Aggregation is conservative: any denied facet denies the whole call,
+    /// otherwise any ask facet asks for approval, otherwise the call is
+    /// allowed.
+    pub fn evaluate_profile(
+        &self,
+        tool_name: &str,
+        profile: &[ToolPermissionFacet],
+        input: &Value,
+    ) -> PermissionDecision {
+        let facets = if profile.is_empty() {
+            vec![ToolPermissionFacet::new(infer_nature(tool_name))]
+        } else {
+            profile.to_vec()
+        };
+
+        let mut saw_ask = false;
+        for facet in facets {
+            match self.evaluate_facet(tool_name, &facet, input) {
+                PermissionDecision::Allow => {}
+                PermissionDecision::Ask => saw_ask = true,
+                PermissionDecision::Deny(reason) => return PermissionDecision::Deny(reason),
+            }
+        }
+
+        if saw_ask {
+            PermissionDecision::Ask
+        } else {
+            PermissionDecision::Allow
+        }
+    }
+
+    /// Evaluates one explicit permission facet.
+    pub fn evaluate_facet(
+        &self,
+        tool_name: &str,
+        facet: &ToolPermissionFacet,
+        input: &Value,
+    ) -> PermissionDecision {
+        let nature = facet.nature;
         if let Some(ref root) = self.workspace_root
             && nature == talos_core::tool::ToolNature::Read
-            && is_workspace_path_allowed(input, root)
+            && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
         {
             return PermissionDecision::Allow;
         }
 
         for rule in &self.rules {
-            match rule.matches(tool_name, nature, input) {
+            match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
                 Ok(true) => return rule.decision.clone(),
                 Ok(false) => continue,
                 Err(_) => continue,
@@ -517,7 +586,15 @@ fn infer_nature(tool_name: &str) -> talos_core::tool::ToolNature {
     }
 }
 
-fn is_workspace_path_allowed(input: &Value, root: &Path) -> bool {
+fn is_workspace_path_allowed_with_resource(
+    input: &Value,
+    root: &Path,
+    explicit_resource: Option<&str>,
+) -> bool {
+    if let Some(resource) = explicit_resource {
+        return is_path_in_workspace(resource, root);
+    }
+
     for key in &["path", "file"] {
         if let Some(path_str) = input.get(*key).and_then(Value::as_str)
             && is_path_in_workspace(path_str, root)
@@ -971,6 +1048,88 @@ mod tests {
             &serde_json::json!({"url": "https://example.com/api"}),
         );
         assert_eq!(decision, PermissionDecision::Ask);
+    }
+
+    #[test]
+    fn test_profile_denies_when_any_facet_is_denied() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Network,
+            Some("example.com".to_owned()),
+            Some(ResourceKind::Domain),
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            Some("blocked/**".to_owned()),
+            Some(ResourceKind::Path),
+            PermissionDecision::Deny("write blocked".to_owned()),
+        ));
+
+        let profile = vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                "example.com",
+                ToolResourceKind::Domain,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Write,
+                "blocked/file.txt",
+                ToolResourceKind::Path,
+            ),
+        ];
+
+        let decision = engine.evaluate_profile("save_url", &profile, &serde_json::json!({}));
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("write blocked".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_profile_asks_when_any_facet_requires_approval() {
+        let mut engine = PermissionEngine {
+            rules: Vec::new(),
+            workspace_root: None,
+        };
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Network,
+            Some("example.com".to_owned()),
+            Some(ResourceKind::Domain),
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
+
+        let profile = vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                "example.com",
+                ToolResourceKind::Domain,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Write,
+                "out/file.txt",
+                ToolResourceKind::Path,
+            ),
+        ];
+
+        let decision = engine.evaluate_profile("save_url", &profile, &serde_json::json!({}));
+        assert_eq!(decision, PermissionDecision::Ask);
+    }
+
+    #[test]
+    fn test_extractor_write_from_destination() {
+        let input = serde_json::json!({"destination": "downloads/file.txt"});
+        let result = ResourceExtractor::extract(ToolNature::Write, &input);
+        assert_eq!(result, Some("downloads/file.txt".to_owned()));
     }
 
     #[test]

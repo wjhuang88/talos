@@ -270,7 +270,8 @@ impl AgentTool for RuntimePermissionAwareTool {
         let decision = {
             match self.engine.lock() {
                 Ok(engine) => {
-                    engine.evaluate_with_nature(self.inner.name(), self.inner.nature(), &input)
+                    let profile = self.inner.permission_profile(&input);
+                    engine.evaluate_profile(self.inner.name(), &profile, &input)
                 }
                 Err(_) => {
                     return ToolResult::error("Permission denied: permission engine lock poisoned");
@@ -295,6 +296,10 @@ impl AgentTool for RuntimePermissionAwareTool {
 
     fn nature(&self) -> talos_core::tool::ToolNature {
         self.inner.nature()
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<talos_core::tool::ToolPermissionFacet> {
+        self.inner.permission_profile(input)
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
@@ -326,13 +331,17 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use talos_core::message::Message;
-    use talos_core::tool::ToolNature;
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
     use talos_permission::PermissionDecision;
     use talos_provider::mock::MockProvider;
 
     use super::*;
 
     struct RecordingWriteTool {
+        executions: Arc<AtomicUsize>,
+    }
+
+    struct RecordingHybridTool {
         executions: Arc<AtomicUsize>,
     }
 
@@ -367,6 +376,52 @@ mod tests {
 
         fn nature(&self) -> ToolNature {
             ToolNature::Write
+        }
+    }
+
+    #[async_trait]
+    impl AgentTool for RecordingHybridTool {
+        fn name(&self) -> &str {
+            "record_hybrid"
+        }
+
+        fn description(&self) -> &str {
+            "Records a network plus write operation"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "url": { "type": "string" },
+                    "destination": { "type": "string" }
+                },
+                "required": ["url", "destination"]
+            })
+        }
+
+        async fn execute(&self, _input: Value) -> ToolResult {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            ToolResult::success("hybrid executed")
+        }
+
+        fn nature(&self) -> ToolNature {
+            ToolNature::Write
+        }
+
+        fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+            vec![
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Network,
+                    "example.com",
+                    ToolResourceKind::Domain,
+                ),
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Write,
+                    "blocked/output.txt",
+                    ToolResourceKind::Path,
+                ),
+            ]
         }
     }
 
@@ -466,6 +521,59 @@ mod tests {
             TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
         ));
         assert_eq!(executions.load(Ordering::SeqCst), 1);
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_denies_hybrid_tool_when_write_facet_is_denied() {
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call(
+                    "record_hybrid",
+                    serde_json::json!({
+                        "url": "https://example.com/file",
+                        "destination": "blocked/output.txt"
+                    }),
+                )
+                .with_response("done"),
+        );
+        let executions = Arc::new(AtomicUsize::new(0));
+        let tool = Arc::new(RecordingHybridTool {
+            executions: executions.clone(),
+        });
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Network,
+                Some("example.com".to_string()),
+                Some(talos_permission::ResourceKind::Domain),
+                PermissionDecision::Allow,
+            ))
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Write,
+                Some("blocked/**".to_string()),
+                Some(talos_permission::ResourceKind::Path),
+                PermissionDecision::Deny("write blocked".to_string()),
+            ))
+            .tool(tool)
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("fetch and save")
+            .await
+            .expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        assert!(matches!(
+            status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
+        ));
+        assert_eq!(executions.load(Ordering::SeqCst), 0);
 
         runtime.shutdown().await.expect("shutdown succeeds");
     }

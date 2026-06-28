@@ -13,7 +13,7 @@
 use std::io::{self, BufRead, Write};
 
 use anyhow::{Context, Result};
-use talos_core::tool::ToolNature;
+use talos_core::tool::{ToolNature, ToolPermissionFacet};
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
@@ -50,12 +50,13 @@ impl ApprovalPrompt {
         &self.engine
     }
 
-    /// Presents an approval prompt to the user for the given tool call.
+    /// Presents an approval prompt for a multi-facet tool permission profile.
     ///
     /// Prints a formatted prompt to stderr showing the tool name, arguments,
     /// and available actions. Reads a single character from stdin:
     /// - `y` — approve once, returns [`PermissionDecision::Allow`]
-    /// - `a` — always approve, adds an allow rule to the engine and returns [`PermissionDecision::Allow`]
+    /// - `a` — always approve, adds allow rules for all facets and returns
+    ///   [`PermissionDecision::Allow`]
     /// - `n` — deny, returns [`PermissionDecision::Deny`]
     ///
     /// Invalid input causes the prompt to be re-displayed.
@@ -63,10 +64,10 @@ impl ApprovalPrompt {
     /// # Errors
     ///
     /// Returns an error if reading from stdin fails.
-    pub fn prompt(
+    pub fn prompt_profile(
         &mut self,
         tool_name: &str,
-        nature: ToolNature,
+        profile: &[ToolPermissionFacet],
         input: &serde_json::Value,
     ) -> Result<PermissionDecision> {
         let formatted = Self::format_input(input);
@@ -89,18 +90,22 @@ impl ApprovalPrompt {
             match line.trim() {
                 "y" => return Ok(PermissionDecision::Allow),
                 "a" => {
-                    let resource = ResourceExtractor::extract(nature, input);
-                    let resource_kind = match nature {
-                        ToolNature::Network => Some(ResourceKind::Domain),
-                        _ => Some(ResourceKind::Path),
-                    };
-                    let rule = PermissionRule::new_nature(
-                        nature,
-                        resource,
-                        resource_kind,
-                        PermissionDecision::Allow,
-                    );
-                    self.engine.add_rule(rule);
+                    for facet in permission_facets_or_default(profile, tool_name) {
+                        let resource = facet
+                            .resource
+                            .clone()
+                            .or_else(|| ResourceExtractor::extract(facet.nature, input));
+                        let resource_kind = facet
+                            .resource_kind
+                            .map(ResourceKind::from)
+                            .or_else(|| Some(default_resource_kind(facet.nature)));
+                        self.engine.add_rule(PermissionRule::new_nature(
+                            facet.nature,
+                            resource,
+                            resource_kind,
+                            PermissionDecision::Allow,
+                        ));
+                    }
                     return Ok(PermissionDecision::Allow);
                 }
                 "n" => {
@@ -152,6 +157,25 @@ impl ApprovalPrompt {
     ) -> (String, String, ToolNature) {
         let formatted = Self::format_input(input);
         (tool_name.to_string(), formatted, nature)
+    }
+}
+
+fn permission_facets_or_default(
+    profile: &[ToolPermissionFacet],
+    _tool_name: &str,
+) -> Vec<ToolPermissionFacet> {
+    if profile.is_empty() {
+        vec![ToolPermissionFacet::new(ToolNature::Write)]
+    } else {
+        profile.to_vec()
+    }
+}
+
+fn default_resource_kind(nature: ToolNature) -> ResourceKind {
+    match nature {
+        ToolNature::Network => ResourceKind::Domain,
+        ToolNature::Execute => ResourceKind::Command,
+        ToolNature::Read | ToolNature::Write => ResourceKind::Path,
     }
 }
 

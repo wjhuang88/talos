@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::ApprovalChoice;
-use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
+use talos_core::tool::{AgentTool, ToolPermissionFacet, ToolRegistry, ToolResult};
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
@@ -52,13 +52,13 @@ impl TuiApprovalHandler {
     async fn request_approval(
         &self,
         tool_name: &str,
-        nature: talos_core::tool::ToolNature,
+        profile: &[ToolPermissionFacet],
         input: &serde_json::Value,
         summary_fields: Vec<String>,
     ) -> ApprovalChoice {
         let decision = {
             let engine = self.engine.lock().expect("engine lock poisoned");
-            engine.evaluate_with_nature(tool_name, nature, input)
+            engine.evaluate_profile(tool_name, profile, input)
         };
         match decision {
             PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
@@ -87,24 +87,34 @@ impl TuiApprovalHandler {
         }
     }
 
-    fn add_always_allow_rule(
-        &self,
-        nature: talos_core::tool::ToolNature,
-        input: &serde_json::Value,
-    ) {
-        let resource = ResourceExtractor::extract(nature, input);
-        let resource_kind = match nature {
-            talos_core::tool::ToolNature::Network => Some(ResourceKind::Domain),
-            _ => Some(ResourceKind::Path),
-        };
-
+    fn add_always_allow_rules(&self, profile: &[ToolPermissionFacet], input: &serde_json::Value) {
         let mut engine = self.engine.lock().expect("engine lock poisoned");
-        engine.add_rule(PermissionRule::new_nature(
-            nature,
-            resource,
-            resource_kind,
-            PermissionDecision::Allow,
-        ));
+        for facet in profile {
+            let resource = facet
+                .resource
+                .clone()
+                .or_else(|| ResourceExtractor::extract(facet.nature, input));
+            let resource_kind = facet
+                .resource_kind
+                .map(ResourceKind::from)
+                .or_else(|| Some(default_resource_kind(facet.nature)));
+            engine.add_rule(PermissionRule::new_nature(
+                facet.nature,
+                resource,
+                resource_kind,
+                PermissionDecision::Allow,
+            ));
+        }
+    }
+}
+
+fn default_resource_kind(nature: talos_core::tool::ToolNature) -> ResourceKind {
+    match nature {
+        talos_core::tool::ToolNature::Network => ResourceKind::Domain,
+        talos_core::tool::ToolNature::Execute => ResourceKind::Command,
+        talos_core::tool::ToolNature::Read | talos_core::tool::ToolNature::Write => {
+            ResourceKind::Path
+        }
     }
 }
 
@@ -139,16 +149,16 @@ impl AgentTool for TuiPermissionAwareTool {
             .iter()
             .map(|field| (*field).to_string())
             .collect();
+        let profile = self.inner.permission_profile(&input);
         let choice = self
             .approval
-            .request_approval(&tool_name, self.inner.nature(), &input, summary_fields)
+            .request_approval(&tool_name, &profile, &input, summary_fields)
             .await;
 
         match choice {
             ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
             ApprovalChoice::AlwaysApprove => {
-                self.approval
-                    .add_always_allow_rule(self.inner.nature(), &input);
+                self.approval.add_always_allow_rules(&profile, &input);
                 self.inner.execute(input).await
             }
             ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
@@ -161,6 +171,10 @@ impl AgentTool for TuiPermissionAwareTool {
 
     fn nature(&self) -> talos_core::tool::ToolNature {
         self.inner.nature()
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        self.inner.permission_profile(input)
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
@@ -197,12 +211,12 @@ impl AgentTool for PermissionAwareTool {
 
     async fn execute(&self, input: Value) -> ToolResult {
         let tool_name = self.inner.name().to_owned();
+        let profile = self.inner.permission_profile(&input);
         let decision = {
             let mut approval = self.approval.lock().expect("approval lock poisoned");
-            let engine_decision =
-                approval
-                    .engine()
-                    .evaluate_with_nature(&tool_name, self.inner.nature(), &input);
+            let engine_decision = approval
+                .engine()
+                .evaluate_profile(&tool_name, &profile, &input);
 
             match engine_decision {
                 PermissionDecision::Allow => PermissionDecision::Allow,
@@ -213,7 +227,7 @@ impl AgentTool for PermissionAwareTool {
                             "Print mode: interactive approval unavailable".to_string(),
                         )
                     } else {
-                        match approval.prompt(&tool_name, self.inner.nature(), &input) {
+                        match approval.prompt_profile(&tool_name, &profile, &input) {
                             Ok(decision) => decision,
                             Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
                         }
@@ -241,6 +255,10 @@ impl AgentTool for PermissionAwareTool {
 
     fn nature(&self) -> talos_core::tool::ToolNature {
         self.inner.nature()
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        self.inner.permission_profile(input)
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

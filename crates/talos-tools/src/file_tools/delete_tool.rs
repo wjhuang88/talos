@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult};
 use talos_core::tool_parameters;
 
 use super::{DeleteError, FileToolError, resolve_workspace_path};
@@ -82,6 +82,23 @@ impl AgentTool for DeleteTool {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        let Some(path) = input.get("path").and_then(Value::as_str) else {
+            return vec![ToolPermissionFacet::new(ToolNature::Write)];
+        };
+
+        let description = match resolve_workspace_path(&self.workspace_root, path) {
+            Ok(resolved) if resolved.is_dir() => "directory deletion",
+            Ok(_) => "file deletion",
+            Err(_) => "delete path",
+        };
+
+        vec![
+            ToolPermissionFacet::with_resource(ToolNature::Write, path, ToolResourceKind::Path)
+                .with_description(description),
+        ]
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

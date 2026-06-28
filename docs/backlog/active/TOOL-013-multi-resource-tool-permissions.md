@@ -4,7 +4,7 @@
 |---|---|
 | Type | Story |
 | Priority | P2 |
-| Status | Planned |
+| Status | Complete (2026-06-28) |
 | Depends On | `TOOL-007`; current `ToolNature` permission engine |
 | Owner Boundary | H2/H3 architect-owned permission boundary work |
 
@@ -29,14 +29,32 @@ a permission model that can evaluate all relevant resources for one tool call.
 
 ## Acceptance Criteria
 
-- [ ] A tool can expose multiple risk facets or resources for one invocation.
-- [ ] Permission evaluation can require approval for each relevant facet without bypassing the
+- [x] A tool can expose multiple risk facets or resources for one invocation.
+- [x] Permission evaluation can require approval for each relevant facet without bypassing the
       existing deny/ask/allow flow.
-- [ ] `save_url` checks both URL/domain and destination path.
-- [ ] `git_push` and `git_pull` model remote/network and workspace/execute effects explicitly.
-- [ ] Directory deletion can be distinguished from file deletion in approval text or risk metadata.
-- [ ] TUI, print, MCP, and embeddable runtime paths share the same classification.
-- [ ] Regression tests prove no write/network hybrid tool can execute when either facet is denied.
+- [x] `save_url` checks both URL/domain and destination path.
+- [x] `git_push` and `git_pull` model remote/network and workspace/execute effects explicitly.
+- [x] Directory deletion can be distinguished from file deletion in approval text or risk metadata.
+- [x] TUI, print, MCP, and embeddable runtime paths share the same classification.
+- [x] Regression tests prove no write/network hybrid tool can execute when either facet is denied.
+
+## Execution Notes
+
+- 2026-06-28: Added `ToolPermissionFacet` and `ToolResourceKind` to `talos-core`.
+- 2026-06-28: Added `PermissionEngine::evaluate_profile()` with conservative aggregation:
+  denied facet wins, otherwise ask wins, otherwise allow.
+- 2026-06-28: Updated `save_url`, `git_push`, `git_pull`, and `delete` to expose invocation-specific
+  permission profiles.
+- 2026-06-28: Updated Agent, CLI print, TUI, MCP, and `talos-runtime` permission paths to evaluate
+  the same profile.
+- 2026-06-28: Recorded ADR-026 for the multi-resource permission boundary.
+
+## Validation Notes
+
+- `cargo test -p talos-permission -p talos-tools -p talos-runtime`
+- `cargo test -p talos-agent -p talos-mcp -p talos-cli registry`
+- `cargo check --workspace`
+- `cargo fmt --all -- --check`
 
 ## Non-Goals
 
