@@ -58,6 +58,9 @@ docs/proposals/
   Markdown recognition/rendering direction for the inline TUI stream renderer.
 - [Tree-sitter Code Analysis](tree-sitter-code-analysis.md) — research proposal for adding
   parser-backed code analysis after dependency and ADR review.
+- [Talos Crate Distribution Architecture](talos-crate-distribution-architecture.md) — proposal for
+  making Talos-owned capabilities independently publishable as crates while keeping
+  `talos-runtime` as the SDK facade.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.
 - [Remote Session Protocol](remote-session-protocol.md) — far-future research proposal for remote
   session query and command protocol (mobile app, web dashboard, cross-device continuity).

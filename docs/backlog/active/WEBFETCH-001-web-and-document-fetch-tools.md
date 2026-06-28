@@ -8,7 +8,7 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) blocked on PLUGIN-001 WASM and must be planned through TOOL-007's holistic tool-set design audit so network/document tools do not grow outside the tool family, permission model, or progressive-loading strategy.
+Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) remains blocked on the TOOL-007 follow-ups: TOOL-013 must define hybrid network/write permission classification, and TOOL-012 must define progressive-loading/result-boundary behavior. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
 
 ## Priority
 
@@ -334,6 +334,10 @@ incrementally.
       explicit local destination.
 - [ ] Candidate dependencies are evaluated with license, native-code, feature, build, and output
       quality evidence before implementation.
+- [ ] Hybrid network/write permission behavior is defined through TOOL-013 before adding new
+      save/download/extract tools.
+- [ ] Progressive-loading and result-handle behavior is aligned with TOOL-012 before adding large
+      document extraction outputs.
 - [ ] webclaw is recorded as reference/optional external integration, not a direct embed candidate.
 - [ ] MarkItDown-like functionality is phased by format; no Python runtime dependency is added.
 - [ ] RES-001 can use these tools without requiring unattended crawling or hosted services.
@@ -353,6 +357,9 @@ incrementally.
 - `docs/backlog/active/RES-001-exploration-library.md`
 - `docs/backlog/active/MEM-005-context-compaction-policy.md`
 - `docs/backlog/active/DIST-001-optional-runtime-asset-distribution.md`
+- `docs/backlog/active/TOOL-012-tool-family-progressive-loading.md`
+- `docs/backlog/active/TOOL-013-multi-resource-tool-permissions.md`
+- `docs/proposals/builtin-tool-family-design.md`
 - `docs/decisions/010-git-search-tool-dependency-boundary.md`
 - `docs/decisions/017-exploration-library-storage.md`
 - `docs/iterations/I036-research-consolidation.md`

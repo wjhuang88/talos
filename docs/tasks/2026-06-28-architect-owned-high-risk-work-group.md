@@ -38,7 +38,7 @@ An item belongs here if at least one condition is true:
 | Group | Items | Why It Is High Risk | Required Handling |
 |---|---|---|---|
 | H1 Runtime SDK boundary | `RUNTIME-001` | Defines whether Talos can be safely embedded by other Rust projects without importing CLI/TUI/product assumptions. Bad choices become semver-bound architecture debt. | Architect-owned API audit and ADR/proposal before any facade crate/module implementation. |
-| H2 Tool family and ingestion architecture | `TOOL-004`, `TOOL-007`, `WEBFETCH-001`, later `TOOL-009` | Search, web/document fetch, progressive tool loading, and result bounding all affect permission accuracy, prompt cache stability, context size, and agent behavior. | Run TOOL-004 before TOOL-007; include WEBFETCH Phase 2+ in the holistic tool design before new tools. |
+| H2 Tool family and ingestion architecture | `TOOL-004`, `TOOL-007`, `TOOL-011`, `TOOL-012`, `TOOL-013`, `WEBFETCH-001`, later `TOOL-009` | Search, web/document fetch, progressive tool loading, hybrid permissions, and result bounding all affect permission accuracy, prompt cache stability, context size, and agent behavior. | TOOL-004 and TOOL-007 are complete. Next handle TOOL-013 before WEBFETCH Phase 2+ expansion, then TOOL-012 for progressive loading. Activate TOOL-011 when grep behavior must be stabilized in code. |
 | H3 Permission and autonomous execution | `PERM-001`, `SCHED-001`, `TOOL-010` | Guardian approval, exec policy, scheduled task injection, and batch file writes can bypass or dilute the permission model if treated as normal features. | No implementation without deny/ask/allow regression tests and explicit non-bypass proof. |
 | H4 Extension and plugin runtime | `PLUGIN-001`, `DIST-001`, `TOOL-008` Phase 3 | WASM/runtime plugin loading and optional asset installation create supply-chain, sandbox, lifecycle, and dependency risks. | Spec and ADR before dependency selection; package installation follows DIST-001 consent and verification rules. |
 | H5 Web/remote control surfaces | `WEB-001`, `REMOTE-001`, `REMOTE-002`, `GOV-003` Phase 3 | Local web UI and remote session control can expose logs, approvals, config, and governance actions outside the TUI path. | Loopback/auth/permission/RPC boundaries must be specified before implementation; no auth bypass. |
@@ -62,8 +62,9 @@ These can generally be delegated with normal review unless they touch one of the
 ## Execution Order
 
 1. **H1 Runtime SDK boundary**: start with `RUNTIME-001` API audit and boundary ADR/proposal.
-2. **H2 Tool family and ingestion architecture**: run `TOOL-004`, then `TOOL-007` with
-   `WEBFETCH-001` Phase 2+ included.
+2. **H2 Tool family and ingestion architecture**: `TOOL-004` and `TOOL-007` are complete. Next run
+   `TOOL-013` before WEBFETCH Phase 2+ expansion, then `TOOL-012` for progressive loading. Activate
+   `TOOL-011` when grep behavior must be proven in code.
 3. **H5 Web control MVP design**: define `WEB-001` after the runtime/tool boundaries are clear.
 4. **H3 Permission/autonomy packet**: handle `PERM-001`, `SCHED-001`, and `TOOL-010` only after
    the tool family design is stable.
@@ -144,8 +145,62 @@ Validation:
 - `cargo test -p talos-cli --test skill_runtime_e2e`
 - `cargo test -p talos-cli --test memory_prompt_injection`
 
-Next direct-owned packet moves to H2: run `TOOL-004` before `TOOL-007`, and include
-`WEBFETCH-001` Phase 2+ in the holistic tool-family design.
+Next direct-owned packet moved to H2-002 (`TOOL-007`) and is now recorded below.
+
+### H2-001 — TOOL-004 Ripgrep Engine Evaluation (2026-06-28)
+
+Completed the research slice without changing `GrepTool` runtime behavior:
+
+- Confirmed the top-level `ripgrep` crate is the CLI package for `rg`, not the right embedded API.
+- Selected ripgrep library crates (`grep-searcher`, `grep-regex`, `grep-matcher`, `ignore`) as the
+  preferred Talos grep engine target.
+- Rejected host `rg` as a runtime primary path; it remains benchmark/reference only.
+- Added ADR-025 for the dependency and architecture decision.
+- Added `TOOL-011` as the executable implementation story.
+- Updated `TOOL-007` so the holistic tool-set audit can proceed from ADR-025, with
+  `WEBFETCH-001` Phase 2+ still included.
+
+Validation:
+
+- `cargo test -p talos-tools grep_tool_tests`
+- `cargo info grep-searcher`
+- `cargo info grep-regex`
+- `cargo info grep-matcher`
+- `cargo info ignore`
+- `cargo info grep-cli`
+- `cargo info ripgrep`
+- local host-`rg` reference timings recorded in `TOOL-004` and ADR-025
+
+Next direct-owned packet moved to H2-002 (`TOOL-007`) and is now recorded below.
+
+### H2-002 — TOOL-007 Tool Set Design Audit (2026-06-28)
+
+Completed the holistic tool-set research/design slice without changing runtime behavior:
+
+- Recounted the actual shared native tool surface as 28 tools, plus MCP-only `status`.
+- Added `docs/proposals/builtin-tool-family-design.md` with tool-family principles and an
+  orthogonality map.
+- Confirmed `ToolRegistry` should remain executable capability truth, while progressive loading
+  belongs in a presentation policy.
+- Confirmed Git tools should remain split for now because structured schemas and permission clarity
+  are more valuable than token reduction from a raw `git` subcommand.
+- Identified the single-`ToolNature` model as insufficient for hybrid tools such as `save_url`,
+  `git_push`, and `git_pull`.
+- Added `TOOL-012` for tool-family metadata/progressive loading.
+- Added `TOOL-013` for multi-resource permission classification.
+- Updated `WEBFETCH-001` so Phase 2+ remains gated by TOOL-013 and TOOL-012.
+
+Validation:
+
+- Source audit of `crates/talos-core/src/tool.rs`
+- Source audit of `crates/talos-permission/src/lib.rs`
+- Source audit of `crates/talos-cli/src/registry.rs`
+- Source audit of `crates/talos-agent/src/prompt/builder.rs`
+- Source audit of `crates/talos-agent/src/configuration.rs`
+- Source audit of current network/save/Git tool nature implementations
+
+Next direct-owned packet is `TOOL-013`, because WEBFETCH Phase 2+ should not expand until hybrid
+network/write permission behavior is explicit.
 
 ## Relationship To R27
 

@@ -1,9 +1,9 @@
 # TOOL-007: Built-in Tool Set Design Audit
 
-**Status**: Research
+**Status**: Complete (research, 2026-06-28)
 **Priority**: P2 (Medium-term)
 **Source**: User request 2026-06-19
-**Depends on**: TOOL-004 first for grep/search engine direction; TOOL-005/TOOL-006 (bash tool evolution); no implementation dependency
+**Depends on**: TOOL-004 complete for grep/search engine direction (ADR-025); TOOL-005/TOOL-006 (bash tool evolution); no implementation dependency
 
 ## Problem
 
@@ -20,9 +20,11 @@ A comprehensive audit is needed to validate that the tool set is:
   model choose and use tools correctly
 - **Safe** — the permission model accurately reflects each tool's real risk
 
-TOOL-004 must run before this audit is finalized. Search semantics and performance shape the
-baseline tool family, and WEBFETCH-001 Phase 2+ should be planned inside this audit rather than as a
-separate one-off network/document tool expansion.
+TOOL-004 completed on 2026-06-28 and selected ripgrep library crates as the grep engine direction
+through ADR-025. Search semantics and performance shape the baseline tool family, and WEBFETCH-001
+Phase 2+ should be planned inside this audit rather than as a separate one-off network/document
+tool expansion. `TOOL-011` may implement the selected grep engine before or during this audit, but
+the audit can proceed from ADR-025 without waiting for code.
 
 ## Current Tool Inventory (22 tools)
 
@@ -211,6 +213,49 @@ based on context signals:
    - Permission model adjustments
 4. **Updated backlog items** — Any recommendations that become new stories.
 
+## Audit Result (2026-06-28)
+
+The audit is complete as a research/design slice. The implementation work is split into focused
+follow-up stories rather than folded into this audit.
+
+Deliverables:
+
+- Tool family design proposal: `docs/proposals/builtin-tool-family-design.md`
+- Progressive loading story: `docs/backlog/active/TOOL-012-tool-family-progressive-loading.md`
+- Multi-resource permission story:
+  `docs/backlog/active/TOOL-013-multi-resource-tool-permissions.md`
+
+Current tool inventory is 28 shared native tools, plus an MCP-only `status` tool. The older
+"22 tools" inventory in this file is historical and should not be used as the current count.
+
+Key findings:
+
+- Tool count is not the main issue; flat prompt/provider presentation is. `SystemPromptBuilder`
+  renders every tool description and parameter property into a cacheable `# Tools` section, and
+  `Agent::with_security` builds provider tool definitions from the full registry once.
+- `ToolRegistry` should remain the executable source of truth. Progressive loading should be a
+  presentation policy over registered tools, not separate registration.
+- Git tools should remain split for now. A single raw `git` tool would reduce prompt rows but lose
+  structured schemas and permission clarity.
+- `ls`, `tree`, `glob`, and `stat` overlap only superficially. Keep them separate but describe
+  their use cases by family.
+- `grep` and AST symbol tools are orthogonal. `grep` remains text search; symbol tools remain
+  structure search.
+- `ToolNature` as a single enum is insufficient for hybrid tools. `save_url` is network + write
+  but reports `Write`; `git_push` and `git_pull` use host git and remote/workspace side effects but
+  report `Execute`.
+- `WEBFETCH-001` Phase 2+ must wait for the permission/result-boundary decisions in this audit
+  before adding PDF/Office/document extraction or more save/download tools.
+
+Recommended order:
+
+1. Implement `TOOL-013` before expanding web/document save/extract behavior.
+2. Implement `TOOL-012` before trying to reduce prompt/tool-schema cost through progressive
+   loading.
+3. Implement `TOOL-011` when grep behavior needs to be stabilized in code; otherwise ADR-025 is
+   enough for design work.
+4. Resume `WEBFETCH-001` Phase 2+ design only after `TOOL-013` is clear.
+
 ## Non-goals
 
 - Do not implement any tool changes as part of this research.
@@ -223,6 +268,8 @@ based on context signals:
 | Requirement | Relationship |
 |---|---|
 | TOOL-003 | Residual POSIX tool gaps (image reading, write/edit display) |
+| TOOL-004 | Complete research input; ADR-025 fixes the grep engine direction |
+| TOOL-011 | Optional implementation follow-up for ripgrep-backed grep before/during audit |
 | TOOL-005/TOOL-006 | Bash tool evolution is in scope for consistency analysis |
 | WEBFETCH-001 | Network fetch gap is a known coverage issue |
 | CODE-001/CODE-002 | Code intelligence tools are a distinct category |
@@ -243,3 +290,5 @@ based on context signals:
 - `crates/talos-permission/src/lib.rs` — PermissionEngine + default rules
 - `crates/talos-cli/src/registry.rs` — which tools are registered in each mode
 - `crates/talos-agent/src/prompt.rs` — how tools are formatted for the model
+- `docs/decisions/025-ripgrep-library-search-engine.md` — grep engine direction
+- `docs/backlog/active/TOOL-011-ripgrep-backed-grep-engine.md` — optional implementation story
