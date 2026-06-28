@@ -1,0 +1,105 @@
+# Architect-Owned High-Risk Work Group
+
+> Status: Active grouping
+> Created: 2026-06-28
+> Owner boundary: direct architect/senior-agent execution or review required
+> Source: user request to separate work that is too risky to delegate blindly
+
+## Purpose
+
+This document groups the backlog items that can materially affect Talos's architecture, security
+boundary, runtime dependency surface, public SDK contract, prompt/cache behavior, tool permission
+model, or user data integrity.
+
+These items are not ordinary implementation tickets. A different contributor may gather evidence,
+write benchmarks, or prepare isolated prototypes, but the design decision, boundary change, and
+final integration must be handled through this group before implementation lands.
+
+This group does not replace the owning backlog files, iterations, ADRs, or the existing R27
+high-risk governance gate. It is the direct-oversight view of the work that should not be delegated
+as routine product development.
+
+## Selection Rules
+
+An item belongs here if at least one condition is true:
+
+- It changes permission, sandbox, approval, tool execution, or remote-control boundaries.
+- It introduces or selects a new runtime/native dependency.
+- It creates public SDK/API surface that other projects will depend on.
+- It changes provider protocol semantics, stream parsing, prompt cache behavior, or context
+  injection.
+- It introduces background execution, scheduling, ingestion, downloads, or optional asset
+  installation.
+- It touches persistence or storage replacement decisions for user data.
+- It can create hidden architecture coupling between CLI/TUI/web/RPC/runtime layers.
+
+## Direct-Ownership Group
+
+| Group | Items | Why It Is High Risk | Required Handling |
+|---|---|---|---|
+| H1 Runtime SDK boundary | `RUNTIME-001` | Defines whether Talos can be safely embedded by other Rust projects without importing CLI/TUI/product assumptions. Bad choices become semver-bound architecture debt. | Architect-owned API audit and ADR/proposal before any facade crate/module implementation. |
+| H2 Tool family and ingestion architecture | `TOOL-004`, `TOOL-007`, `WEBFETCH-001`, later `TOOL-009` | Search, web/document fetch, progressive tool loading, and result bounding all affect permission accuracy, prompt cache stability, context size, and agent behavior. | Run TOOL-004 before TOOL-007; include WEBFETCH Phase 2+ in the holistic tool design before new tools. |
+| H3 Permission and autonomous execution | `PERM-001`, `SCHED-001`, `TOOL-010` | Guardian approval, exec policy, scheduled task injection, and batch file writes can bypass or dilute the permission model if treated as normal features. | No implementation without deny/ask/allow regression tests and explicit non-bypass proof. |
+| H4 Extension and plugin runtime | `PLUGIN-001`, `DIST-001`, `TOOL-008` Phase 3 | WASM/runtime plugin loading and optional asset installation create supply-chain, sandbox, lifecycle, and dependency risks. | Spec and ADR before dependency selection; package installation follows DIST-001 consent and verification rules. |
+| H5 Web/remote control surfaces | `WEB-001`, `REMOTE-001`, `REMOTE-002`, `GOV-003` Phase 3 | Local web UI and remote session control can expose logs, approvals, config, and governance actions outside the TUI path. | Loopback/auth/permission/RPC boundaries must be specified before implementation; no auth bypass. |
+| H6 Provider and reasoning protocol | `MODEL-003`, provider residual roots in `ARCH-030` | Reasoning fields and stream parsing affect provider contracts, persisted messages, TUI display, and hidden reasoning boundaries. | ADR first; provider-specific request/stream changes require focused tests and public message-boundary review. |
+| H7 Shared ecosystem import | `AGENT-002-B`, `AGENT-002-C` | Shared Skill discovery and MCP import can silently inject prompt content or start external processes from `~/.agents`. | Opt-in policy and precedence ADR before runtime loading or server startup changes. |
+| H8 Memory/context compression | `MEM-007`, `MEM-005` interaction, `MEM-003` interaction | Active compression can corrupt model-visible context, break prompt cache prefixes, or lose raw tool output. | Deterministic proof, stable-prefix proof, and raw-output preservation before selection. |
+| H9 Storage replacement or derived indexes | `STORE-001`, exploration/session SQLite residuals in `ARCH-030` | Storage changes can corrupt user history, claims, memory, or search indexes. | Spike/ADR first; SQLite remains source of truth unless a migration and rollback plan exists. |
+| H10 Architecture residual roots when activated | `ARCH-030` roots: session SQLite, Git tools, providers, CLI/TUI roots, exploration store/ingestion | These roots are large because they own behavior-sensitive flows. Blind splits can create more coupling. | Activate one root at a time only when touched by a concrete feature or risk-reducing slice. |
+
+## Excluded From Direct-Ownership Group
+
+These can generally be delegated with normal review unless they touch one of the boundaries above:
+
+- Static site work under `WEB-002`.
+- README wording, release-note polish, and non-runtime documentation sync.
+- TUI display polish that does not change event/session/permission semantics.
+- Pure config import for `AGENT-002-A` after schema stability is proven.
+- Research data gathering for TOOL-004, STORE-001, MODEL-002, or REMOTE-002, as long as no
+  dependency or implementation decision is made by the delegate.
+
+## Execution Order
+
+1. **H1 Runtime SDK boundary**: start with `RUNTIME-001` API audit and boundary ADR/proposal.
+2. **H2 Tool family and ingestion architecture**: run `TOOL-004`, then `TOOL-007` with
+   `WEBFETCH-001` Phase 2+ included.
+3. **H5 Web control MVP design**: define `WEB-001` after the runtime/tool boundaries are clear.
+4. **H3 Permission/autonomy packet**: handle `PERM-001`, `SCHED-001`, and `TOOL-010` only after
+   the tool family design is stable.
+5. **H4/H6/H7 Protocol expansion**: plugin, reasoning, and shared ecosystem import require ADRs
+   before implementation.
+6. **H8/H9 Storage/context work**: activate only with explicit evidence and rollback boundaries.
+7. **H10 Architecture residual roots**: activate opportunistically when a selected item touches the
+   root.
+
+## Immediate Implementation Packet
+
+The next direct-owned implementation packet is:
+
+| Packet | Scope | Deliverable | Validation |
+|---|---|---|---|
+| HP-001 | `RUNTIME-001` Slice 1: embeddable runtime API audit and boundary decision | ADR/proposal classifying SDK public surface and deciding `talos-runtime` crate vs `talos-agent::runtime` module | Governance validation; `cargo check -p talos-core -p talos-agent` if code references are added; no runtime code changes in the decision slice |
+
+## Checkpoints
+
+### HP-001 — Runtime API Boundary Decision (2026-06-28)
+
+Implemented the decision slice without runtime code changes:
+
+- Added ADR-024 and accepted a dedicated `talos-runtime` facade crate for SDK-style embedding.
+- Kept `talos-agent` as the turn-loop implementation crate.
+- Kept foundational protocol and trait types in `talos-core`.
+- Required cleanup of `SessionEvent::AgentEvent` serialization, `SessionConfig::print_mode`, and
+  `/mock-request` magic handling before the SDK facade can be considered stable.
+
+Next packet remains the first code slice for `RUNTIME-001`: create the minimal `talos-runtime`
+crate/facade and an embedder proof, unless the maintainer reprioritizes H2 tool-design work first.
+
+## Relationship To R27
+
+The existing R27 High-Risk Governance Gate remains the active long-running execution gate. This
+group updates R27's scope by adding `RUNTIME-001` and by making the direct-ownership set explicit.
+
+R27's rule still applies: this grouping does not authorize tag, push, destructive cleanup, network
+spend, new runtime dependency, or permission-boundary changes without the named gates.

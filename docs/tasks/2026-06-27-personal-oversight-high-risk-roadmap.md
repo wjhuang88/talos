@@ -38,6 +38,10 @@ project gate, not a claim that the current agent is the sole reviewer or archite
   inside the holistic tool-set design audit rather than as a standalone tool expansion.
 - Keep extension/protocol work under direct review: PLUGIN-001, MODEL-003, WEB-001, REMOTE-001,
   and any ADR they require.
+- Keep embeddable runtime/API productization under direct review: RUNTIME-001 defines public SDK
+  boundaries for other Rust projects and must not be delegated as routine crate plumbing.
+- Use `docs/tasks/2026-06-28-architect-owned-high-risk-work-group.md` as the explicit grouping of
+  work that needs direct senior/architectural handling.
 - Treat WEB-001 as a product differentiation research track, not a far-future novelty. It must study
   the omp.sh/EXT-002 browser control surface reference before defining a loopback-only Talos MVP.
 - Record checkpoints before moving from one risk packet to the next.
@@ -66,7 +70,8 @@ project gate, not a claim that the current agent is the sole reviewer or archite
 | T5 | Permission-sensitive execution packet | PERM-001, TOOL-010, and SCHED-001 are split into safe slices with permission-pipeline tests before write/execute/scheduled behavior ships. | T2/T3 or explicit priority override | Deny/ask/allow regressions prove no bypass for batch files, scheduled injections, Guardian, or exec DSL. | Keep features disabled or research-only. | Planned |
 | T6 | Context compression packet | MEM-007 gets a Spike/prototype decision, cache-stability proof, deterministic compression tests, and raw-output preservation design. | T2/T3 where shared tool-history code is stable | Stable prefix hash unchanged with compression on/off; `/export` retains raw output; token-savings evidence recorded. | Reject compression strategy and keep MEM-005 compaction only. | Planned |
 | T7 | Protocol and extension ADR packet | PLUGIN-001 and MODEL-003 have accepted ADRs/specs before implementation; REMOTE-001 stays research unless loopback/auth boundaries are proven. | T0 and relevant Spikes | ADR/spec accepted; no runtime dependency added before decision; governance validation passes. | Keep items Research/ADR-needed. | Planned |
-| T8 | Final synchronization | Backlog, iterations, Board, README/user docs, ADR index, and residuals match actual delivered behavior. | T1-T7 | Workspace gates and governance harness pass; final checkpoint names residual owners. | Mark task Partial with exact unfinished owners. | Planned |
+| T8 | Embeddable runtime boundary packet | RUNTIME-001 API audit classifies SDK/public/internal surfaces and decides facade placement before implementation. | T2 or explicit priority override | ADR/proposal accepted; no CLI/TUI assumptions leak into the runtime API; event/config cleanup stories are named. | Keep RUNTIME-001 Planned and do not add facade code. | Planned |
+| T9 | Final synchronization | Backlog, iterations, Board, README/user docs, ADR index, and residuals match actual delivered behavior. | T1-T8 | Workspace gates and governance harness pass; final checkpoint names residual owners. | Mark task Partial with exact unfinished owners. | Planned |
 
 ### Dependencies And Prerequisites
 
@@ -102,6 +107,7 @@ project gate, not a claim that the current agent is the sole reviewer or archite
 | PLUGIN-001 | Research | T6 spec/ADR only before runtime dependency. |
 | MODEL-003 | ADR-needed | T6 ADR before provider/session/TUI implementation. |
 | WEB-001 / REMOTE-001 | Research | WEB-001 moves through T4 as a product-differentiation Spike; REMOTE-001 remains T7 research unless loopback/auth/API boundaries are accepted. |
+| RUNTIME-001 | Planned | T8 API audit/ADR first; facade implementation only after the public SDK boundary is accepted. |
 
 ### Artifacts And State Owners To Update
 
@@ -206,6 +212,7 @@ approved in their owner documents.
 - Compression residuals: MEM-007/MEM-005/MEM-003.
 - Web/document residuals: WEBFETCH-001, RES-001, STORE-001.
 - Protocol residuals: PLUGIN-001, MODEL-003, WEB-001, REMOTE-001, DIST-001.
+- Runtime SDK residuals: RUNTIME-001 and any follow-up iteration created from its boundary ADR.
 
 ## Checkpoints
 

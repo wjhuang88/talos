@@ -5,7 +5,7 @@
 **Created**: 2026-06-28
 **Source**: User request to reuse Talos runtime capabilities from other projects
 **Depends on**: `talos-agent` turn-loop stability; `talos-core` protocol stability; permission
-pipeline stability; session protocol cleanup
+pipeline stability; session protocol cleanup; ADR-024
 
 ## Problem
 
@@ -53,6 +53,9 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
      transitional surface.
    - Decide whether the facade lives in a new `talos-runtime` crate or a `talos-agent::runtime`
      module.
+   - **Done 2026-06-28**: ADR-024 selects a dedicated `talos-runtime` facade crate, keeps
+     `talos-agent` as the turn-loop implementation crate, keeps foundational protocol/trait types
+     in `talos-core`, and requires protocol cleanup before SDK stability.
 
 2. **Runtime facade**
    - Add a builder that accepts provider, tools, workspace root, permission policy, sandbox policy,
@@ -105,6 +108,7 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
 - `docs/decisions/006-event-architecture-boundary.md`
 - `docs/decisions/009-tool-provenance.md`
 - `docs/decisions/021-tool-call-protocol-architecture.md`
+- `docs/decisions/024-embeddable-runtime-api-boundary.md`
 - `crates/talos-core/src/`
 - `crates/talos-agent/src/`
 - `crates/talos-provider/src/`
