@@ -345,6 +345,19 @@ MCP 请求也有超时上限。TUI 中可使用 `/plugins` 查看启动连接快
 会话期间 MCP 工具集保持不变，以维持模型可见工具定义和提示词缓存前缀稳定。修改 MCP
 配置后需要重启会话。当前仅支持本地 stdio transport。
 
+## 在 Rust 中嵌入 Talos
+
+Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI crate 的情况下嵌入
+核心 Agent 循环。当前 pre-1.0 初始 facade 提供 `RuntimeBuilder` 和 `RuntimeHandle`，
+用于注入 provider/tool、接收类型化事件流、中断、关闭和显式 request preview。
+
+注册的工具默认会经过权限包装。在 headless 嵌入模式下，未解决的 `Ask` 决策会被拒绝，
+除非 embedder 提供更窄的 allow-list 规则。
+
+这还不是稳定的 1.0 SDK 承诺。当前公开嵌入表面是 `talos-runtime` 以及它从
+`talos-core` 重新导出的协议和 trait 类型；低层 `talos-agent` 构造器仍视为实现表面，
+除非文档另行声明。
+
 ## 安全模型
 
 - 只读工作区工具可以免批准执行。

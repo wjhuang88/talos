@@ -370,6 +370,20 @@ The MCP tool set is fixed for the lifetime of a session so the model-visible too
 prompt cache prefix remain stable. Restart the session after changing MCP configuration. Only
 local stdio transport is currently supported.
 
+## Embedding Talos In Rust
+
+Rust applications can depend on the `talos-runtime` crate to embed the core agent loop without
+linking Talos CLI or TUI crates. The initial pre-1.0 facade exposes `RuntimeBuilder` and
+`RuntimeHandle` for provider/tool injection, typed event streaming, interruption, shutdown, and
+explicit request previews.
+
+Registered tools are permission-wrapped by default. In headless embedding, unresolved `Ask`
+decisions are denied unless the embedder supplies narrower allow-list rules.
+
+This is not a stable 1.0 SDK guarantee yet. The public embedding surface is `talos-runtime`
+plus the protocol and trait types it re-exports from `talos-core`; lower-level `talos-agent`
+constructors remain implementation surface unless documented otherwise.
+
 ## Safety Model
 
 - Read-only workspace tools can run without approval.

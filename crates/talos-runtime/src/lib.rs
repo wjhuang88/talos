@@ -12,7 +12,9 @@ use talos_agent::session::AppServerSession;
 use talos_agent::{Agent, AgentError};
 use talos_core::message::Message;
 use talos_core::provider::LanguageModel;
-use talos_core::session::{SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus};
+use talos_core::session::{
+    RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus,
+};
 use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
 use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
 use talos_sandbox::SandboxProvider;
@@ -165,7 +167,7 @@ impl RuntimeBuilder {
             self.workspace_root.clone(),
         );
         let config = SessionConfig {
-            print_mode: true,
+            runtime_policy: RuntimePolicy::headless_deny(),
             workspace_root: self.workspace_root,
             initial_history: self.initial_history,
             model_context_limit: self.model_context_limit,
@@ -201,6 +203,16 @@ impl RuntimeHandle {
     pub async fn submit(&self, message: impl Into<String>) -> RuntimeResult<()> {
         self.command_tx
             .send(SessionOp::Submit {
+                message: message.into(),
+            })
+            .await
+            .map_err(|_| RuntimeError::CommandChannelClosed)
+    }
+
+    /// Requests a provider request preview without making a provider call.
+    pub async fn preview_request(&self, message: impl Into<String>) -> RuntimeResult<()> {
+        self.command_tx
+            .send(SessionOp::PreviewRequest {
                 message: message.into(),
             })
             .await
@@ -477,6 +489,35 @@ mod tests {
             status,
             TurnCompletionStatus::Success { final_text, .. } if final_text == "continued"
         ));
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_previews_request_without_submit_magic_string() {
+        let provider = Arc::new(MockProvider::new().with_request_debug_builder(|messages| {
+            serde_json::to_string(messages).expect("messages serialize")
+        }));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .preview_request("inspect request")
+            .await
+            .expect("preview request succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        match status {
+            TurnCompletionStatus::Success { final_text, .. } => {
+                assert!(final_text.contains("Request preview (no API call made)"));
+                assert!(final_text.contains("inspect request"));
+            }
+            other => panic!("unexpected status: {other:?}"),
+        }
 
         runtime.shutdown().await.expect("shutdown succeeds");
     }

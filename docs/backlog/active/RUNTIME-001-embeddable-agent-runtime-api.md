@@ -1,6 +1,6 @@
 # RUNTIME-001: Embeddable Agent Runtime API
 
-**Status**: Active (partial facade landed)
+**Status**: Complete (pre-1.0 facade)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to reuse Talos runtime capabilities from other projects
@@ -72,10 +72,16 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
    - Replace `SessionConfig::print_mode` with product-neutral runtime policy.
    - Convert `/mock-request` from a magic user-message command into an explicit diagnostic API or
      caller-owned command.
+   - **Done 2026-06-28**: `SessionEvent::AgentEvent` now serializes as a nested `event` payload,
+     `SessionConfig` uses product-neutral `RuntimePolicy`, and request preview runs through
+     explicit `SessionOp::PreviewRequest` / `RuntimeHandle::preview_request()` instead of
+     `talos-agent` parsing `/mock-request`.
 
 4. **Embedding proof**
    - Add a minimal non-CLI integration test or example showing another Rust crate using the runtime
      facade with a mock provider and custom tool.
+   - **Done 2026-06-28**: `talos-runtime` tests cover response streaming, safe default write
+     denial, explicit write allow-listing, initial history, and explicit request preview.
 
 ## Acceptance Criteria
 
@@ -85,11 +91,11 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
       execution.
 - [x] A consumer can submit a turn, stream events, interrupt a turn, and shut down without using
       Talos product UI code.
-- [ ] Runtime events and commands have tested serialization round-trips suitable for RPC or
+- [x] Runtime events and commands have tested serialization round-trips suitable for RPC or
       cross-crate integration.
-- [ ] CLI/TUI/debug-only behavior is not triggered by hidden magic strings inside the core runtime.
-- [ ] Existing Talos CLI/TUI behavior remains compatible through adapter code.
-- [ ] User-facing and developer-facing docs explain how to embed the runtime and which APIs are
+- [x] CLI/TUI/debug-only behavior is not triggered by hidden magic strings inside the core runtime.
+- [x] Existing Talos CLI/TUI behavior remains compatible through adapter code.
+- [x] User-facing and developer-facing docs explain how to embed the runtime and which APIs are
       semver-supported.
 
 ## Validation
@@ -107,9 +113,15 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
 - 2026-06-28: Verified embedder behavior with mock-provider tests:
   `runtime_streams_mock_response`, `runtime_denies_ask_tools_by_default`,
   `runtime_allows_tool_when_rule_allows_write`, and `runtime_accepts_initial_history`.
-- 2026-06-28: Remaining scope is protocol cleanup and SDK hardening: command/event
-  serialization coverage, product-neutral session policy, `/mock-request` diagnostic extraction,
-  semver surface documentation, and a fuller embedder example.
+- 2026-06-28: The facade slice initially left protocol cleanup and SDK hardening open:
+  command/event serialization coverage, product-neutral session policy, `/mock-request`
+  diagnostic extraction, semver surface documentation, and a fuller embedder example.
+- 2026-06-28: Completed protocol cleanup for the pre-1.0 facade: `SessionOp::PreviewRequest`,
+  `RuntimePolicy`, round-trippable `SessionEvent::AgentEvent { event }`, and CLI-owned
+  `/mock-request` parsing.
+- 2026-06-28: README and README.zh-CN now document the embedding boundary: `talos-runtime` plus
+  re-exported `talos-core` protocol/trait types are the public pre-1.0 surface; lower-level
+  `talos-agent` constructors remain implementation surface unless documented otherwise.
 
 ## Required Reads
 

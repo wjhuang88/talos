@@ -30,7 +30,7 @@ pub mod prompt;
 pub mod session;
 mod tool_execution;
 
-use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
+use talos_core::message::{AgentEvent, Message, MessageToolResult, ToolCall};
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolProvenance, ToolRegistry};
 use talos_permission::PermissionEngine;
@@ -203,33 +203,37 @@ impl Agent {
         self.run_inner(user_message, history, Some(event_tx)).await
     }
 
-    /// Internal implementation shared by [`run`] and [`run_streaming`].
+    /// Builds a provider request preview without calling the provider.
     ///
-    /// Executes the full turn loop: user message → provider → tool calls →
-    /// execute → tool results → provider → ... → final response.
-    async fn run_inner(
+    /// This is the explicit diagnostic API used by product layers that expose
+    /// request-inspection commands. The normal turn loop treats all user
+    /// messages literally and does not parse diagnostic magic strings.
+    pub async fn preview_request(
         &self,
         user_message: String,
         history: Vec<Message>,
-        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-    ) -> AgentResult<(String, Vec<Message>)> {
+    ) -> AgentResult<Option<String>> {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
+        let (messages, _) = self
+            .build_provider_messages(user_message, history, &hook_ctx)
+            .await?;
 
-        const DEBUG_CMD: &str = "/mock-request";
-        let is_debug = user_message.trim_start().starts_with(DEBUG_CMD);
+        Ok(self.provider.request_preview(&messages).map(|preview| {
+            let snapshot =
+                serde_json::to_string_pretty(&preview).unwrap_or_else(|_| preview.to_string());
+            format!("Request preview (no API call made):\n\n```json\n{snapshot}\n```")
+        }))
+    }
 
-        let actual_user_message = if is_debug {
-            user_message.trim_start()[DEBUG_CMD.len()..]
-                .trim()
-                .to_string()
-        } else {
-            user_message
-        };
-
-        // Resolve the prompt builder: clone with memory section if provider is set.
+    async fn build_provider_messages(
+        &self,
+        user_message: String,
+        history: Vec<Message>,
+        hook_ctx: &HookContext,
+    ) -> AgentResult<(Vec<Message>, usize)> {
         let prompt_builder = if let Some(ref mem_provider) = self.memory_provider {
-            let memory_section = mem_provider(&actual_user_message);
+            let memory_section = mem_provider(&user_message);
             self.prompt_builder
                 .clone()
                 .with_memory_section(memory_section)
@@ -261,22 +265,15 @@ impl Agent {
             format!("{stable_prefix}\n{dynamic_suffix}")
         };
 
-        let (system_prompt, cache_markers) = match prompt_builder
+        let (system_prompt, cache_markers) = prompt_builder
             .build_with_hooks_from_prompt(
                 self.hook_registry.as_ref(),
-                &hook_ctx,
+                hook_ctx,
                 &combined,
                 stable_prefix_len,
             )
             .await
-        {
-            Ok(prompt) => prompt,
-            Err(reason) => {
-                let error = AgentError::HookDenied(reason);
-                self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
-                return Err(error);
-            }
-        };
+            .map_err(AgentError::HookDenied)?;
 
         let mut messages = history;
 
@@ -298,25 +295,36 @@ impl Agent {
         let persist_start = messages.len();
 
         messages.push(Message::User {
-            content: actual_user_message,
+            content: user_message,
         });
 
-        if is_debug && let Some(preview) = self.provider.request_preview(&messages) {
-            let snapshot =
-                serde_json::to_string_pretty(&preview).unwrap_or_else(|_| preview.to_string());
-            let result = format!("Request preview (no API call made):\n\n```json\n{snapshot}\n```");
-            if let Some(ref tx) = event_tx {
-                let _ = tx.send(AgentEvent::TurnStart);
-                let _ = tx.send(AgentEvent::TextDelta {
-                    delta: result.clone(),
-                });
-                let _ = tx.send(AgentEvent::TurnEnd {
-                    stop_reason: StopReason::EndTurn,
-                    usage: Usage::default(),
-                });
+        Ok((messages, persist_start))
+    }
+
+    /// Internal implementation shared by [`run`] and [`run_streaming`].
+    ///
+    /// Executes the full turn loop: user message → provider → tool calls →
+    /// execute → tool results → provider → ... → final response.
+    async fn run_inner(
+        &self,
+        user_message: String,
+        history: Vec<Message>,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+    ) -> AgentResult<(String, Vec<Message>)> {
+        let turn_id = TurnId::new();
+        let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
+
+        let (mut messages, persist_start) = match self
+            .build_provider_messages(user_message, history, &hook_ctx)
+            .await
+        {
+            Ok(messages) => messages,
+            Err(error) => {
+                self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
+                return Err(error);
             }
-            return Ok((result, Vec::new()));
-        }
+        };
+
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
 

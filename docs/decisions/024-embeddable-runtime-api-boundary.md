@@ -141,6 +141,16 @@ can exist behind explicit names, but it must not be the primary runtime builder.
 - README and architecture docs must describe the distinction between Talos product crates and
   embeddable runtime API once code lands.
 
+## Implementation Status
+
+- 2026-06-28: `talos-runtime` landed as the pre-1.0 embeddable facade with
+  `RuntimeBuilder`, `RuntimeHandle`, permission-wrapped tools, typed events, and embedder tests.
+- 2026-06-28: SDK-blocking protocol cleanup landed: `SessionEvent::AgentEvent` round-trips with a
+  nested `event` payload, `SessionConfig` uses product-neutral `RuntimePolicy`, and request
+  preview is exposed through explicit runtime/session APIs instead of `talos-agent` parsing
+  `/mock-request`.
+- Stable 1.0 SDK guarantees remain tied to the separate REL-002 self-bootstrap release gate.
+
 ## Reversal Trigger
 
 Revisit this decision if:

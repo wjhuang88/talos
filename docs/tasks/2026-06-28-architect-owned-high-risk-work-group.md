@@ -81,7 +81,7 @@ The next direct-owned implementation packet is:
 |---|---|---|---|
 | HP-001 | `RUNTIME-001` Slice 1: embeddable runtime API audit and boundary decision | ADR/proposal classifying SDK public surface and deciding `talos-runtime` crate vs `talos-agent::runtime` module | Complete 2026-06-28 |
 | HP-002 | `RUNTIME-001` Slice 2: minimal `talos-runtime` facade and embedder proof | Workspace crate with `RuntimeBuilder`, `RuntimeHandle`, safe-by-default tool wrapping, and mock-provider tests | Complete 2026-06-28 |
-| HP-003 | `RUNTIME-001` Slice 3: runtime protocol cleanup and SDK hardening | Command/event serialization tests, product-neutral session policy, diagnostic API extraction, and semver/docs boundary | Planned |
+| HP-003 | `RUNTIME-001` Slice 3: runtime protocol cleanup and SDK hardening | Command/event serialization tests, product-neutral session policy, diagnostic API extraction, and semver/docs boundary | Complete 2026-06-28 |
 
 ## Checkpoints
 
@@ -95,8 +95,8 @@ Implemented the decision slice without runtime code changes:
 - Required cleanup of `SessionEvent::AgentEvent` serialization, `SessionConfig::print_mode`, and
   `/mock-request` magic handling before the SDK facade can be considered stable.
 
-Next packet is HP-003: protocol cleanup and SDK hardening before any stable embedding claim,
-unless the maintainer reprioritizes H2 tool-design work first.
+Next packet was HP-002: create the minimal `talos-runtime` crate/facade and an embedder proof,
+unless the maintainer reprioritized H2 tool-design work first.
 
 ### HP-002 — Minimal Runtime Facade (2026-06-28)
 
@@ -122,6 +122,30 @@ Validation:
 - `cargo test --workspace`
 
 Next packet is HP-003: protocol cleanup and SDK hardening before any stable embedding claim.
+
+### HP-003 — Runtime Protocol Cleanup And SDK Hardening (2026-06-28)
+
+Completed the protocol hardening slice for the pre-1.0 embedding surface:
+
+- `SessionEvent::AgentEvent` now serializes with a nested `event` payload, so session events
+  round-trip through serde without duplicate `type` fields.
+- `SessionConfig::print_mode` was replaced with product-neutral `RuntimePolicy` and
+  `ApprovalMode`.
+- Request preview now uses explicit `SessionOp::PreviewRequest`,
+  `Agent::preview_request()`, and `RuntimeHandle::preview_request()` APIs.
+- CLI/TUI keep `/mock-request` as caller-owned diagnostic syntax and translate it before calling
+  the core runtime; `talos-agent` no longer parses that magic string inside the normal turn loop.
+- README and README.zh-CN document the pre-1.0 embedding boundary and distinguish it from stable
+  1.0 SDK guarantees.
+
+Validation:
+
+- `cargo test -p talos-core -p talos-agent -p talos-runtime`
+- `cargo test -p talos-cli --test skill_runtime_e2e`
+- `cargo test -p talos-cli --test memory_prompt_injection`
+
+Next direct-owned packet moves to H2: run `TOOL-004` before `TOOL-007`, and include
+`WEBFETCH-001` Phase 2+ in the holistic tool-family design.
 
 ## Relationship To R27
 

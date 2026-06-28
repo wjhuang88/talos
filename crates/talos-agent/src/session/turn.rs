@@ -48,7 +48,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 event = event_rx.recv() => {
                     match event {
                         Some(event) => {
-                            let _ = eq_tx.send(SessionEvent::AgentEvent(event));
+                            let _ = eq_tx.send(SessionEvent::AgentEvent { event });
                         }
                         None => break,
                     }

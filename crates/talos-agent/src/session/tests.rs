@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use talos_core::message::{Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderResult};
-use talos_core::session::TurnCompletionStatus;
+use talos_core::session::{RuntimePolicy, TurnCompletionStatus};
 use talos_core::tool::ToolRegistry;
 use tokio::sync::mpsc;
 
@@ -123,7 +123,7 @@ async fn collect_events(
 async fn test_submit_and_receive() {
     let agent = make_agent(MockModel::new(vec![success_events("hello")]));
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -154,7 +154,7 @@ async fn test_submit_and_receive() {
         "Should have TurnStarted"
     );
     assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::AgentEvent(AgentEvent::TextDelta { delta }) if delta == "hello")),
+            events.iter().any(|e| matches!(e, SessionEvent::AgentEvent { event: AgentEvent::TextDelta { delta } } if delta == "hello")),
             "Should have TextDelta with 'hello'"
         );
     assert!(
@@ -173,7 +173,7 @@ async fn test_submit_and_receive() {
 async fn set_skill_context_reaches_request_preview() {
     let agent = make_agent(PreviewModel);
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -192,8 +192,8 @@ async fn set_skill_context_reaches_request_preview() {
         .await
         .unwrap();
     sq_tx
-        .send(SessionOp::Submit {
-            message: "/mock-request verify skill".into(),
+        .send(SessionOp::PreviewRequest {
+            message: "verify skill".into(),
         })
         .await
         .unwrap();
@@ -204,7 +204,9 @@ async fn set_skill_context_reaches_request_preview() {
     let preview_text = events
         .iter()
         .find_map(|event| match event {
-            SessionEvent::AgentEvent(AgentEvent::TextDelta { delta }) => Some(delta.as_str()),
+            SessionEvent::AgentEvent {
+                event: AgentEvent::TextDelta { delta },
+            } => Some(delta.as_str()),
             _ => None,
         })
         .expect("request preview text");
@@ -220,7 +222,7 @@ async fn test_multi_turn() {
         success_events("second"),
     ]));
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -292,7 +294,7 @@ async fn test_interrupt() {
         events: slow_events,
     });
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -340,7 +342,7 @@ async fn test_interrupt() {
 async fn test_shutdown() {
     let agent = make_agent(MockModel::new(vec![]));
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -361,7 +363,7 @@ async fn test_shutdown() {
 async fn test_eq_consumer_disconnect() {
     let agent = make_agent(MockModel::new(vec![success_events("hello")]));
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -393,7 +395,7 @@ async fn test_eq_consumer_disconnect() {
 async fn test_sq_backpressure() {
     let agent = make_agent(MockModel::new(vec![success_events("hello")]));
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -430,7 +432,7 @@ async fn test_sq_backpressure() {
 async fn test_panic_recovery() {
     let agent = make_agent(PanicModel);
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -503,7 +505,7 @@ async fn test_concurrent_submit_and_interrupt() {
         events: slow_events,
     });
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -597,7 +599,7 @@ async fn test_multi_turn_with_history() {
         captured: captured_messages.clone(),
     });
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -709,7 +711,7 @@ async fn test_interrupt_after_success_preserves_history() {
         captured: captured_messages.clone(),
     });
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: vec![],
         model_context_limit: 128_000,
@@ -814,7 +816,7 @@ async fn test_initial_history_from_jsonl_resume() {
         captured: captured_messages.clone(),
     });
     let config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: prior_history,
         model_context_limit: 128_000,

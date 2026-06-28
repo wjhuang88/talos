@@ -14,7 +14,7 @@ use talos_conversation::{
     ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput,
 };
 use talos_core::message::{AgentEvent, Message};
-use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_plugin::HookRegistry;
@@ -33,7 +33,8 @@ use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
-    apply_mcp_fixture_config, maybe_set_memory_provider, session_metadata_for_model,
+    apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
+    session_metadata_for_model,
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
@@ -471,7 +472,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history,
         model_context_limit,
@@ -667,9 +668,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         loop {
             while let Some(session_event) = bridge_forwarder.recv().await {
                 match session_event {
-                    SessionEvent::AgentEvent(ref agent_event) => {
-                        let _ = owning_session.append_event(agent_event);
-                        let _ = bridge_tx.send(agent_event.clone());
+                    SessionEvent::AgentEvent { event } => {
+                        let _ = owning_session.append_event(&event);
+                        let _ = bridge_tx.send(event);
                     }
                     SessionEvent::TurnCompleted {
                         status:
@@ -736,7 +737,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 eprintln!("Warning: failed to update session index: {e}");
             }
             let sq_tx = sq_tx_watch_rx_for_user.borrow().clone();
-            let _ = sq_tx.send(SessionOp::Submit { message: msg }).await;
+            let _ = sq_tx
+                .send(match request_preview_payload(&msg) {
+                    Some(message) => SessionOp::PreviewRequest { message },
+                    None => SessionOp::Submit { message: msg },
+                })
+                .await;
         }
     });
 
@@ -973,7 +979,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history,
         model_context_limit,
@@ -1042,7 +1048,7 @@ async fn handle_session_new(
 
     let new_history: Vec<Message> = vec![];
     let session_config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history: new_history,
         model_context_limit,
@@ -1261,7 +1267,7 @@ async fn handle_session_resume(
 
     let resume_history_for_hydrate = resume_history.clone();
     let session_config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history: resume_history,
         model_context_limit: resume_model_context_limit,
@@ -1423,7 +1429,7 @@ async fn handle_session_fork(
     }
 
     let session_config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history: fork_history,
         model_context_limit,

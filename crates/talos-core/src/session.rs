@@ -17,6 +17,8 @@ use crate::message::Message;
 pub enum SessionOp {
     /// Submit a user message for the agent to process.
     Submit { message: String },
+    /// Build a provider request preview for diagnostics without calling the provider.
+    PreviewRequest { message: String },
     /// Replace the model-visible activated Skill context.
     ///
     /// The CLI/runtime layer is responsible for validating paths and budgets
@@ -40,7 +42,10 @@ pub enum SessionOp {
 #[non_exhaustive]
 pub enum SessionEvent {
     /// An agent event (text delta, tool call, etc.) from the current turn.
-    AgentEvent(AgentEvent),
+    AgentEvent {
+        /// The inner streaming agent event.
+        event: AgentEvent,
+    },
     /// A tool requires user approval. The consumer must respond via the approval channel.
     ApprovalRequired {
         tool_name: String,
@@ -96,8 +101,9 @@ pub struct SessionHandle {
 /// Captures CLI-layer decisions that the session actor needs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionConfig {
-    /// Whether to auto-deny approval requests (non-interactive mode).
-    pub print_mode: bool,
+    /// Product-neutral runtime policy for the session actor.
+    #[serde(default)]
+    pub runtime_policy: RuntimePolicy,
     /// Workspace root path for file operations.
     pub workspace_root: PathBuf,
     /// Prior conversation messages to include in the first turn.
@@ -106,6 +112,50 @@ pub struct SessionConfig {
     /// Model context token limit for compaction triggering.
     #[serde(default = "default_model_context_limit")]
     pub model_context_limit: u32,
+}
+
+/// Product-neutral policy for session runtime behavior.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RuntimePolicy {
+    /// How the runtime should behave when a tool requests approval and no
+    /// caller-specific approval handler handles it first.
+    pub approval_mode: ApprovalMode,
+}
+
+impl RuntimePolicy {
+    /// Interactive policy for UI-owned sessions.
+    #[must_use]
+    pub fn interactive() -> Self {
+        Self {
+            approval_mode: ApprovalMode::Interactive,
+        }
+    }
+
+    /// Headless policy for non-interactive sessions that cannot ask a user.
+    #[must_use]
+    pub fn headless_deny() -> Self {
+        Self {
+            approval_mode: ApprovalMode::HeadlessDeny,
+        }
+    }
+}
+
+impl Default for RuntimePolicy {
+    fn default() -> Self {
+        Self::interactive()
+    }
+}
+
+/// Approval behavior for a session runtime.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalMode {
+    /// Approval prompts may be surfaced by the product/UI layer.
+    #[default]
+    Interactive,
+    /// Approval requests are denied because no user approval channel exists.
+    HeadlessDeny,
 }
 
 fn default_model_context_limit() -> u32 {
@@ -126,6 +176,9 @@ mod tests {
             SessionOp::Submit {
                 message: "hello".into(),
             },
+            SessionOp::PreviewRequest {
+                message: "diagnostic".into(),
+            },
             SessionOp::Interrupt,
             SessionOp::Shutdown,
         ];
@@ -141,10 +194,12 @@ mod tests {
 
     #[test]
     fn session_event_serde_roundtrip() {
-        // Note: SessionEvent::AgentEvent cannot be roundtripped because both
-        // SessionEvent and AgentEvent use #[serde(tag = "type")], causing
-        // duplicate "type" field in JSON. Skip that variant.
         let events = vec![
+            SessionEvent::AgentEvent {
+                event: AgentEvent::TextDelta {
+                    delta: "hello".into(),
+                },
+            },
             SessionEvent::ApprovalRequired {
                 tool_name: "write".into(),
                 arguments: "{}".into(),
@@ -187,16 +242,27 @@ mod tests {
     #[test]
     fn session_config_serde_roundtrip() {
         let config = SessionConfig {
-            print_mode: true,
+            runtime_policy: RuntimePolicy::headless_deny(),
             workspace_root: PathBuf::from("/tmp/test"),
             initial_history: vec![],
             model_context_limit: 128_000,
         };
         let json = serde_json::to_string(&config).unwrap();
         let back: SessionConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(config.print_mode, back.print_mode);
+        assert_eq!(config.runtime_policy, back.runtime_policy);
         assert_eq!(config.workspace_root, back.workspace_root);
         assert_eq!(config.initial_history, back.initial_history);
         assert_eq!(config.model_context_limit, back.model_context_limit);
+    }
+
+    #[test]
+    fn session_config_defaults_to_interactive_runtime_policy() {
+        let json = r#"{
+            "workspace_root": "/tmp/test",
+            "initial_history": [],
+            "model_context_limit": 128000
+        }"#;
+        let back: SessionConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(back.runtime_policy, RuntimePolicy::interactive());
     }
 }

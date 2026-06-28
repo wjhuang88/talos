@@ -142,6 +142,68 @@ impl AppServerSession {
 
                     current_turn = Some(handle);
                 }
+                SessionOp::PreviewRequest { message } => {
+                    if let Some(token) = cancel_token.take() {
+                        token.cancel();
+                    }
+                    if let Some(handle) = current_turn.take() {
+                        self.commit_finished_turn(handle).await;
+                    }
+
+                    turn_counter += 1;
+                    let turn_id = format!("turn_{turn_counter}");
+
+                    let _ = self.eq_tx.send(SessionEvent::TurnStarted {
+                        turn_id: turn_id.clone(),
+                    });
+
+                    match self
+                        .agent
+                        .preview_request(message, self.history.clone())
+                        .await
+                    {
+                        Ok(Some(preview)) => {
+                            let _ = self.eq_tx.send(SessionEvent::AgentEvent {
+                                event: AgentEvent::TurnStart,
+                            });
+                            let _ = self.eq_tx.send(SessionEvent::AgentEvent {
+                                event: AgentEvent::TextDelta {
+                                    delta: preview.clone(),
+                                },
+                            });
+                            let _ = self.eq_tx.send(SessionEvent::AgentEvent {
+                                event: AgentEvent::TurnEnd {
+                                    stop_reason: talos_core::message::StopReason::EndTurn,
+                                    usage: talos_core::message::Usage::default(),
+                                },
+                            });
+                            let _ = self.eq_tx.send(SessionEvent::TurnCompleted {
+                                turn_id,
+                                status: talos_core::session::TurnCompletionStatus::Success {
+                                    final_text: preview,
+                                    new_messages: vec![],
+                                },
+                            });
+                        }
+                        Ok(None) => {
+                            let _ = self.eq_tx.send(SessionEvent::TurnCompleted {
+                                turn_id,
+                                status: talos_core::session::TurnCompletionStatus::Error {
+                                    message: "request preview is unavailable for this provider"
+                                        .into(),
+                                },
+                            });
+                        }
+                        Err(error) => {
+                            let _ = self.eq_tx.send(SessionEvent::TurnCompleted {
+                                turn_id,
+                                status: talos_core::session::TurnCompletionStatus::Error {
+                                    message: error.to_string(),
+                                },
+                            });
+                        }
+                    }
+                }
                 SessionOp::Interrupt => {
                     if let Some(token) = cancel_token.take() {
                         token.cancel();

@@ -9,7 +9,7 @@ use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_conversation::{ModelPickerData, ModelPickerItem, ProviderSetupItem};
-use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
 use talos_session::Session;
 use tokio::sync::{Mutex, mpsc, watch};
@@ -190,7 +190,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     let history = current_session.read_messages().unwrap_or_default();
 
     let session_config = SessionConfig {
-        print_mode: false,
+        runtime_policy: RuntimePolicy::interactive(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history: history,
         model_context_limit,

@@ -6,12 +6,13 @@ use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_core::message::AgentEvent;
-use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 
 use crate::approval::ApprovalPrompt;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, context_files_for_agent, maybe_set_memory_provider,
+    request_preview_payload,
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
@@ -50,7 +51,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let fixture_mode = cli.mcp_server_fixture.is_some();
     #[cfg(not(debug_assertions))]
     let fixture_mode = false;
-    let request_preview_mode = prompt.trim_start().starts_with("/mock-request");
+    let request_preview = request_preview_payload(&prompt);
 
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
@@ -59,7 +60,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     )));
     register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
 
-    let provider = if fixture_mode && cli.mock && !request_preview_mode {
+    let provider = if fixture_mode && cli.mock && request_preview.is_none() {
         use talos_provider::mock::MockProvider;
         Arc::new(
             MockProvider::new()
@@ -101,7 +102,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
-        print_mode: true,
+        runtime_policy: RuntimePolicy::headless_deny(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history: vec![],
         model_context_limit,
@@ -111,22 +112,31 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     handle
         .sq_tx
-        .send(SessionOp::Submit { message: prompt })
+        .send(match request_preview {
+            Some(message) => SessionOp::PreviewRequest { message },
+            None => SessionOp::Submit { message: prompt },
+        })
         .await
         .context("failed to submit message to session")?;
 
     let mut stdout = io::stdout().lock();
     while let Some(event) = handle.eq_rx.recv().await {
         match event {
-            SessionEvent::AgentEvent(AgentEvent::TextDelta { delta }) => {
+            SessionEvent::AgentEvent {
+                event: AgentEvent::TextDelta { delta },
+            } => {
                 print!("{delta}");
                 stdout.flush().context("failed to flush stdout")?;
             }
-            SessionEvent::AgentEvent(AgentEvent::TurnEnd { .. }) => {
+            SessionEvent::AgentEvent {
+                event: AgentEvent::TurnEnd { .. },
+            } => {
                 println!();
                 return Ok(());
             }
-            SessionEvent::AgentEvent(AgentEvent::Error { message }) => {
+            SessionEvent::AgentEvent {
+                event: AgentEvent::Error { message },
+            } => {
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }
@@ -147,7 +157,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }
-            SessionEvent::AgentEvent(_) => {}
+            SessionEvent::AgentEvent { .. } => {}
             _ => {}
         }
     }

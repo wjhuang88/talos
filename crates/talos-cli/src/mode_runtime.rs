@@ -11,6 +11,18 @@ use talos_session::SessionMetadata;
 
 use crate::Cli;
 
+const REQUEST_PREVIEW_COMMAND: &str = "/mock-request";
+
+pub(crate) fn request_preview_payload(input: &str) -> Option<String> {
+    let trimmed = input.trim_start();
+    let rest = trimmed.strip_prefix(REQUEST_PREVIEW_COMMAND)?;
+    if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+        Some(rest.trim().to_string())
+    } else {
+        None
+    }
+}
+
 pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> SessionMetadata {
     SessionMetadata {
         provider: (!provider.is_empty()).then(|| provider.to_string()),

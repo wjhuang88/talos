@@ -10,12 +10,14 @@ use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_core::message::AgentEvent;
-use talos_core::session::{SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use tokio::sync::mpsc;
 
 use crate::approval::ApprovalPrompt;
 use crate::mcp_runtime::McpSessionRuntime;
-use crate::mode_runtime::{apply_mcp_fixture_config, maybe_set_memory_provider};
+use crate::mode_runtime::{
+    apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
+};
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
 use crate::session_setup::{
@@ -106,7 +108,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
-        print_mode: true,
+        runtime_policy: RuntimePolicy::headless_deny(),
         workspace_root: workspace_root.to_path_buf(),
         initial_history,
         model_context_limit,
@@ -154,8 +156,11 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
         let _ = handle
             .sq_tx
-            .send(SessionOp::Submit {
-                message: input.to_string(),
+            .send(match request_preview_payload(input) {
+                Some(message) => SessionOp::PreviewRequest { message },
+                None => SessionOp::Submit {
+                    message: input.to_string(),
+                },
             })
             .await;
 
@@ -169,7 +174,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         let mut turn_done = false;
         while let Some(event) = eq_rx.recv().await {
             match event {
-                SessionEvent::AgentEvent(agent_event) => match agent_event {
+                SessionEvent::AgentEvent { event } => match event {
                     AgentEvent::TextDelta { delta } => {
                         print!("{delta}");
                         let _ = io::stdout().flush();

@@ -14,6 +14,7 @@ use crate::event_loop::AppEvent::{
     AgentCompleted, AgentError, AgentTextDelta, AgentToolCall, AgentToolResult, UserInput,
     UserInterrupt,
 };
+use crate::mode_runtime::request_preview_payload;
 
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
@@ -81,30 +82,29 @@ impl EventLoop {
         tokio::spawn(async move {
             while let Some(session_event) = eq_rx.recv().await {
                 match session_event {
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::TextDelta {
-                        delta,
-                    }) => {
+                    SessionEvent::AgentEvent {
+                        event: talos_core::message::AgentEvent::TextDelta { delta },
+                    } => {
                         let _ = event_tx_forward.send(AgentTextDelta(delta));
                     }
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::ToolCall {
-                        call,
-                        ..
-                    }) => {
+                    SessionEvent::AgentEvent {
+                        event: talos_core::message::AgentEvent::ToolCall { call, .. },
+                    } => {
                         let _ = event_tx_forward.send(AgentToolCall(call.name.clone()));
                     }
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::ToolResult {
-                        result,
-                    }) => {
+                    SessionEvent::AgentEvent {
+                        event: talos_core::message::AgentEvent::ToolResult { result },
+                    } => {
                         let _ = event_tx_forward.send(AgentToolResult(result.is_error));
                     }
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::TurnEnd {
-                        ..
-                    }) => {
+                    SessionEvent::AgentEvent {
+                        event: talos_core::message::AgentEvent::TurnEnd { .. },
+                    } => {
                         let _ = event_tx_forward.send(AgentCompleted);
                     }
-                    SessionEvent::AgentEvent(talos_core::message::AgentEvent::Error {
-                        message,
-                    }) => {
+                    SessionEvent::AgentEvent {
+                        event: talos_core::message::AgentEvent::Error { message },
+                    } => {
                         let _ = event_tx_forward.send(AgentError(message));
                     }
                     SessionEvent::TurnCompleted { status, .. } => match status {
@@ -364,7 +364,12 @@ impl EventLoop {
         // Submit through session.
         let sq_tx = self.sq_tx.clone();
         let task_handle = tokio::spawn(async move {
-            let _ = sq_tx.send(SessionOp::Submit { message: input }).await;
+            let _ = sq_tx
+                .send(match request_preview_payload(&input) {
+                    Some(message) => SessionOp::PreviewRequest { message },
+                    None => SessionOp::Submit { message: input },
+                })
+                .await;
         });
 
         self.state = AppState::AgentRunning {
