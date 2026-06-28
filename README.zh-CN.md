@@ -21,6 +21,7 @@ Skills、WASM 插件和高级文档解析等研究方向请查看[项目状态](
 - **本地优先的编码 Agent**：支持交互式 TUI、inline 模式和脚本友好的 print 模式。
 - **默认安全的工具运行时**：文件写入、删除、Git 写操作、Shell 执行、网络动作和 MCP 工具都经过显式权限边界。
 - **Rust 原生核心**：基于 workspace 的小 crate 架构，默认不依赖 Node/Python 运行时。
+- **可嵌入 Rust 运行时**：初始 `talos-runtime` facade 允许其他 Rust 项目在不依赖 Talos CLI/TUI crate 的情况下构造安全的进程内 Agent 运行时。
 - **可审计内部结构**：记忆、配置、CLI/TUI 和 agent compaction 等超大模块已拆成聚焦的 Rust 模块，并通过行为保持验证。
 - **内置编码工具**：覆盖文件、搜索、编辑、Shell、符号索引、目录树、diff/stat、Git、HTTP 请求和 Web 搜索。
 - **持久会话与记忆**：SQLite 会话历史、搜索、分支/分叉、导出、语义记忆固化和保留策略预览。
@@ -40,9 +41,11 @@ Skills、WASM 插件和高级文档解析等研究方向请查看[项目状态](
 - 会话存储、搜索、清理、维护、记忆固化和探索库导入。
 - 从 `.talos/skills/`、`~/.talos/skills/` 和父级 `.talos/skills/` 发现运行时 Skills。
 - MCP stdio 工具和 JSON-RPC 基础设施。
+- `talos-runtime` crate 中的初始 Rust 嵌入 facade。
 
 尚未发布：
 
+- 嵌入式运行时 facade 的稳定 1.0 SDK 承诺。
 - 从 dotagents shared directory 发现 `~/.agents/skills/`。
 - 内嵌浏览器/Web 控制面。
 - WASM 插件运行时和插件市场。

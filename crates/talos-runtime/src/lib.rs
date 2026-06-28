@@ -1,0 +1,483 @@
+//! Embeddable Talos agent runtime facade.
+//!
+//! This crate is the SDK-style entrypoint for Rust projects that want to reuse
+//! Talos's agent turn loop without depending on the Talos CLI or TUI crates.
+
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use async_trait::async_trait;
+use serde_json::Value;
+use talos_agent::session::AppServerSession;
+use talos_agent::{Agent, AgentError};
+use talos_core::message::Message;
+use talos_core::provider::LanguageModel;
+use talos_core::session::{SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus};
+use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
+use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+use talos_sandbox::SandboxProvider;
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+
+pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
+pub use talos_core::provider::{ProviderError, ToolDefinition};
+pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
+pub use talos_core::tool::{ToolNature, ToolProvenance};
+
+/// Errors returned by the embeddable runtime facade.
+#[derive(Debug, Error)]
+pub enum RuntimeError {
+    /// The builder cannot create a runtime without a provider.
+    #[error("runtime provider is required")]
+    MissingProvider,
+
+    /// A command could not be sent because the runtime actor is closed.
+    #[error("runtime command channel is closed")]
+    CommandChannelClosed,
+
+    /// The runtime actor task failed to join.
+    #[error("runtime actor failed: {0}")]
+    ActorJoin(#[from] tokio::task::JoinError),
+
+    /// The underlying agent returned an error.
+    #[error("agent error: {0}")]
+    Agent(#[from] AgentError),
+}
+
+/// Result alias for runtime facade operations.
+pub type RuntimeResult<T> = Result<T, RuntimeError>;
+
+/// Builder for an embeddable Talos runtime.
+///
+/// The safe default is conservative: registered tools are wrapped in a
+/// permission-aware adapter, and unresolved `Ask` decisions are denied instead
+/// of being executed.
+pub struct RuntimeBuilder {
+    provider: Option<Arc<dyn LanguageModel>>,
+    tools: Vec<Arc<dyn AgentTool>>,
+    workspace_root: PathBuf,
+    permission_rules: Vec<PermissionRule>,
+    sandbox: Option<Box<dyn SandboxProvider>>,
+    initial_history: Vec<Message>,
+    model_context_limit: u32,
+}
+
+impl RuntimeBuilder {
+    /// Creates a builder with no provider and the current directory as the
+    /// workspace root.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            provider: None,
+            tools: Vec::new(),
+            workspace_root: PathBuf::from("."),
+            permission_rules: Vec::new(),
+            sandbox: None,
+            initial_history: Vec::new(),
+            model_context_limit: 128_000,
+        }
+    }
+
+    /// Sets the language model provider used by the runtime.
+    #[must_use]
+    pub fn provider(mut self, provider: Arc<dyn LanguageModel>) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    /// Sets the workspace root used for path-sensitive runtime behavior.
+    #[must_use]
+    pub fn workspace_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.workspace_root = root.into();
+        self
+    }
+
+    /// Registers a tool with runtime-level permission gating.
+    #[must_use]
+    pub fn tool(mut self, tool: Arc<dyn AgentTool>) -> Self {
+        self.tools.push(tool);
+        self
+    }
+
+    /// Adds an extra permission rule to the runtime permission engine.
+    ///
+    /// Runtime rules are evaluated before the engine's default fallback, so
+    /// embedders can add narrow allow-list or deny-list rules without changing
+    /// the safe default for unmatched write, execute, and network tools. Richer
+    /// policy import remains a later RUNTIME-001 follow-up.
+    #[must_use]
+    pub fn permission_rule(mut self, rule: PermissionRule) -> Self {
+        self.permission_rules.push(rule);
+        self
+    }
+
+    /// Sets an optional sandbox provider for sandbox-capable tools.
+    #[must_use]
+    pub fn sandbox(mut self, sandbox: Box<dyn SandboxProvider>) -> Self {
+        self.sandbox = Some(sandbox);
+        self
+    }
+
+    /// Seeds the runtime with existing conversation history.
+    #[must_use]
+    pub fn initial_history(mut self, history: Vec<Message>) -> Self {
+        self.initial_history = history;
+        self
+    }
+
+    /// Sets the model context limit used by the session compactor.
+    #[must_use]
+    pub fn model_context_limit(mut self, limit: u32) -> Self {
+        self.model_context_limit = limit;
+        self
+    }
+
+    /// Builds and starts the runtime actor.
+    ///
+    /// The returned handle owns the command sender, event receiver, and actor
+    /// task. Dropping the handle drops those channels; prefer
+    /// [`RuntimeHandle::shutdown`] for orderly shutdown.
+    pub fn build(self) -> RuntimeResult<RuntimeHandle> {
+        let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
+        let tool_engine = Arc::new(Mutex::new(build_permission_engine(
+            self.workspace_root.clone(),
+            &self.permission_rules,
+        )));
+        let agent_engine = Arc::new(build_permission_engine(
+            self.workspace_root.clone(),
+            &self.permission_rules,
+        ));
+
+        let mut registry = ToolRegistry::new();
+        for tool in self.tools {
+            registry.register(Arc::new(RuntimePermissionAwareTool {
+                inner: tool,
+                engine: tool_engine.clone(),
+            }));
+        }
+
+        let agent = Agent::with_security(
+            provider,
+            registry,
+            Some(agent_engine),
+            self.sandbox,
+            self.workspace_root.clone(),
+        );
+        let config = SessionConfig {
+            print_mode: true,
+            workspace_root: self.workspace_root,
+            initial_history: self.initial_history,
+            model_context_limit: self.model_context_limit,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+        let actor_task = tokio::spawn(async move {
+            actor.run().await;
+        });
+
+        Ok(RuntimeHandle {
+            command_tx: handle.sq_tx,
+            event_rx: handle.eq_rx,
+            actor_task,
+        })
+    }
+}
+
+impl Default for RuntimeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Handle for interacting with a running embedded Talos runtime.
+pub struct RuntimeHandle {
+    command_tx: mpsc::Sender<SessionOp>,
+    event_rx: mpsc::UnboundedReceiver<SessionEvent>,
+    actor_task: JoinHandle<()>,
+}
+
+impl RuntimeHandle {
+    /// Submits a user message as a new turn.
+    pub async fn submit(&self, message: impl Into<String>) -> RuntimeResult<()> {
+        self.command_tx
+            .send(SessionOp::Submit {
+                message: message.into(),
+            })
+            .await
+            .map_err(|_| RuntimeError::CommandChannelClosed)
+    }
+
+    /// Interrupts the active turn, if any.
+    pub async fn interrupt(&self) -> RuntimeResult<()> {
+        self.command_tx
+            .send(SessionOp::Interrupt)
+            .await
+            .map_err(|_| RuntimeError::CommandChannelClosed)
+    }
+
+    /// Receives the next runtime event.
+    pub async fn next_event(&mut self) -> Option<SessionEvent> {
+        self.event_rx.recv().await
+    }
+
+    /// Shuts down the runtime actor and waits for it to finish.
+    pub async fn shutdown(self) -> RuntimeResult<()> {
+        let _ = self.command_tx.send(SessionOp::Shutdown).await;
+        self.actor_task.await?;
+        Ok(())
+    }
+}
+
+fn build_permission_engine(root: PathBuf, rules: &[PermissionRule]) -> PermissionEngine {
+    PermissionEngine {
+        rules: rules.to_vec(),
+        workspace_root: Some(root),
+    }
+}
+
+struct RuntimePermissionAwareTool {
+    inner: Arc<dyn AgentTool>,
+    engine: Arc<Mutex<PermissionEngine>>,
+}
+
+#[async_trait]
+impl AgentTool for RuntimePermissionAwareTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+
+    fn parameters(&self) -> Value {
+        self.inner.parameters()
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let decision = {
+            match self.engine.lock() {
+                Ok(engine) => {
+                    engine.evaluate_with_nature(self.inner.name(), self.inner.nature(), &input)
+                }
+                Err(_) => {
+                    return ToolResult::error("Permission denied: permission engine lock poisoned");
+                }
+            }
+        };
+
+        match decision {
+            PermissionDecision::Allow => self.inner.execute(input).await,
+            PermissionDecision::Deny(reason) => {
+                ToolResult::error(format!("Permission denied: {reason}"))
+            }
+            PermissionDecision::Ask => ToolResult::error(
+                "Permission denied: approval required but no runtime approval handler is configured",
+            ),
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.inner.is_read_only()
+    }
+
+    fn nature(&self) -> talos_core::tool::ToolNature {
+        self.inner.nature()
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        self.inner.summary_fields()
+    }
+
+    fn provenance(&self) -> talos_core::tool::ToolProvenance {
+        self.inner.provenance()
+    }
+}
+
+/// Collects events until the current turn completes.
+///
+/// This helper is intended for embedders that want a simple per-turn API on top
+/// of the streaming event channel.
+pub async fn collect_until_turn_completed(
+    runtime: &mut RuntimeHandle,
+) -> Option<TurnCompletionStatus> {
+    while let Some(event) = runtime.next_event().await {
+        if let SessionEvent::TurnCompleted { status, .. } = event {
+            return Some(status);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use talos_core::message::Message;
+    use talos_core::tool::ToolNature;
+    use talos_permission::PermissionDecision;
+    use talos_provider::mock::MockProvider;
+
+    use super::*;
+
+    struct RecordingWriteTool {
+        executions: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl AgentTool for RecordingWriteTool {
+        fn name(&self) -> &str {
+            "record_write"
+        }
+
+        fn description(&self) -> &str {
+            "Records a write-like operation"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "message": { "type": "string" }
+                },
+                "required": ["message"]
+            })
+        }
+
+        async fn execute(&self, input: Value) -> ToolResult {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            let message = input
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            ToolResult::success(format!("recorded: {message}"))
+        }
+
+        fn nature(&self) -> ToolNature {
+            ToolNature::Write
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_streams_mock_response() {
+        let provider = Arc::new(MockProvider::new().with_response("hello from runtime"));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .build()
+            .expect("runtime builds");
+
+        runtime.submit("hello").await.expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        match status {
+            TurnCompletionStatus::Success { final_text, .. } => {
+                assert_eq!(final_text, "hello from runtime");
+            }
+            other => panic!("unexpected status: {other:?}"),
+        }
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_denies_ask_tools_by_default() {
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call("record_write", serde_json::json!({"message": "secret"}))
+                .with_response("done"),
+        );
+        let executions = Arc::new(AtomicUsize::new(0));
+        let tool = Arc::new(RecordingWriteTool {
+            executions: executions.clone(),
+        });
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .tool(tool)
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("write something")
+            .await
+            .expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        assert!(matches!(
+            status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
+        ));
+        assert_eq!(executions.load(Ordering::SeqCst), 0);
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_allows_tool_when_rule_allows_write() {
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call("record_write", serde_json::json!({"message": "allowed"}))
+                .with_response("done"),
+        );
+        let executions = Arc::new(AtomicUsize::new(0));
+        let tool = Arc::new(RecordingWriteTool {
+            executions: executions.clone(),
+        });
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Write,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ))
+            .tool(tool)
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("write something")
+            .await
+            .expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        assert!(matches!(
+            status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
+        ));
+        assert_eq!(executions.load(Ordering::SeqCst), 1);
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_accepts_initial_history() {
+        let provider = Arc::new(MockProvider::new().with_response("continued"));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .initial_history(vec![Message::User {
+                content: "earlier".into(),
+            }])
+            .build()
+            .expect("runtime builds");
+
+        runtime.submit("continue").await.expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(
+            status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "continued"
+        ));
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+}

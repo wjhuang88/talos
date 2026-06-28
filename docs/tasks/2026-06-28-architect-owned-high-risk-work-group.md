@@ -79,7 +79,9 @@ The next direct-owned implementation packet is:
 
 | Packet | Scope | Deliverable | Validation |
 |---|---|---|---|
-| HP-001 | `RUNTIME-001` Slice 1: embeddable runtime API audit and boundary decision | ADR/proposal classifying SDK public surface and deciding `talos-runtime` crate vs `talos-agent::runtime` module | Governance validation; `cargo check -p talos-core -p talos-agent` if code references are added; no runtime code changes in the decision slice |
+| HP-001 | `RUNTIME-001` Slice 1: embeddable runtime API audit and boundary decision | ADR/proposal classifying SDK public surface and deciding `talos-runtime` crate vs `talos-agent::runtime` module | Complete 2026-06-28 |
+| HP-002 | `RUNTIME-001` Slice 2: minimal `talos-runtime` facade and embedder proof | Workspace crate with `RuntimeBuilder`, `RuntimeHandle`, safe-by-default tool wrapping, and mock-provider tests | Complete 2026-06-28 |
+| HP-003 | `RUNTIME-001` Slice 3: runtime protocol cleanup and SDK hardening | Command/event serialization tests, product-neutral session policy, diagnostic API extraction, and semver/docs boundary | Planned |
 
 ## Checkpoints
 
@@ -93,8 +95,33 @@ Implemented the decision slice without runtime code changes:
 - Required cleanup of `SessionEvent::AgentEvent` serialization, `SessionConfig::print_mode`, and
   `/mock-request` magic handling before the SDK facade can be considered stable.
 
-Next packet remains the first code slice for `RUNTIME-001`: create the minimal `talos-runtime`
-crate/facade and an embedder proof, unless the maintainer reprioritizes H2 tool-design work first.
+Next packet is HP-003: protocol cleanup and SDK hardening before any stable embedding claim,
+unless the maintainer reprioritizes H2 tool-design work first.
+
+### HP-002 — Minimal Runtime Facade (2026-06-28)
+
+Implemented the first code slice:
+
+- Added the `talos-runtime` workspace crate as the SDK-style facade selected by ADR-024.
+- Exposed `RuntimeBuilder` for provider, tool, workspace, permission-rule, sandbox, initial
+  history, and context-limit construction.
+- Exposed `RuntimeHandle` for submit, interrupt, event receiving, and orderly shutdown.
+- Wrapped caller-registered tools in runtime-level permission checks; unresolved `Ask` decisions
+  are denied in headless embedding instead of silently executing.
+- Added mock-provider embedder tests for turn streaming, default write denial, explicit write
+  allow-listing, and initial history.
+- Updated README, architecture reference, backlog, and Board to mark this as a partial facade, not
+  a stable 1.0 SDK surface.
+
+Validation:
+
+- `cargo test -p talos-runtime`
+- `cargo fmt --all -- --check`
+- `cargo check --workspace`
+- `cargo clippy --workspace -- -D warnings`
+- `cargo test --workspace`
+
+Next packet is HP-003: protocol cleanup and SDK hardening before any stable embedding claim.
 
 ## Relationship To R27
 

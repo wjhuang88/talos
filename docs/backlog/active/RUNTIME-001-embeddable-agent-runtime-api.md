@@ -1,6 +1,6 @@
 # RUNTIME-001: Embeddable Agent Runtime API
 
-**Status**: Planned
+**Status**: Active (partial facade landed)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to reuse Talos runtime capabilities from other projects
@@ -62,6 +62,10 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
      memory provider, skill index, and prompt customization without exposing every internal
      construction detail.
    - Expose a handle that can submit turns, interrupt turns, receive typed events, and shut down.
+   - **Done 2026-06-28, first slice only**: `talos-runtime` now provides a minimal
+     `RuntimeBuilder` / `RuntimeHandle` facade with safe-by-default tool wrapping,
+     caller-supplied permission rules, provider/tool injection, typed session events, and
+     mock-provider embedder tests. This is not yet the stable 1.0 SDK surface.
 
 3. **Protocol cleanup**
    - Fix nested event serialization so runtime events can round-trip cleanly across RPC boundaries.
@@ -75,11 +79,11 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
 
 ## Acceptance Criteria
 
-- [ ] A decision record or proposal defines the embeddable runtime boundary and public SDK surface.
-- [ ] External consumers can build a safe runtime without depending on `talos-cli` or `talos-tui`.
-- [ ] Runtime construction has a single documented happy path that defaults to permission-aware
+- [x] A decision record or proposal defines the embeddable runtime boundary and public SDK surface.
+- [x] External consumers can build a safe runtime without depending on `talos-cli` or `talos-tui`.
+- [x] Runtime construction has a single documented happy path that defaults to permission-aware
       execution.
-- [ ] A consumer can submit a turn, stream events, interrupt a turn, and shut down without using
+- [x] A consumer can submit a turn, stream events, interrupt a turn, and shut down without using
       Talos product UI code.
 - [ ] Runtime events and commands have tested serialization round-trips suitable for RPC or
       cross-crate integration.
@@ -95,6 +99,17 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
 - A minimal embedder example or integration test using a mock provider and custom tool.
 - Workspace `cargo test --workspace` before closing an implementation iteration.
 - Governance validation if backlog, architecture, or SDK documentation changes.
+
+## Execution Notes
+
+- 2026-06-28: Added the `talos-runtime` crate to the workspace with `RuntimeBuilder`,
+  `RuntimeHandle`, permission-aware tool wrapping, and `collect_until_turn_completed()`.
+- 2026-06-28: Verified embedder behavior with mock-provider tests:
+  `runtime_streams_mock_response`, `runtime_denies_ask_tools_by_default`,
+  `runtime_allows_tool_when_rule_allows_write`, and `runtime_accepts_initial_history`.
+- 2026-06-28: Remaining scope is protocol cleanup and SDK hardening: command/event
+  serialization coverage, product-neutral session policy, `/mock-request` diagnostic extraction,
+  semver surface documentation, and a fuller embedder example.
 
 ## Required Reads
 

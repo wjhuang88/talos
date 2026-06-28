@@ -44,6 +44,7 @@ Talos crates are introduced progressively across iterations (see Implementation 
 | `talos-mcp` | I009 | Model Context Protocol implementation for external tool and resource access. |
 | `talos-rpc` | I009 | API layer for remote interaction and frontend integration. |
 | `talos-conversation` | I023 | Business logic layer between agent and TUI: owns conversation state, emits typed `UiOutput` events via async channels. |
+| `talos-runtime` | RUNTIME-001 | Embeddable SDK facade for other Rust projects. Wraps `talos-agent` behind safe runtime construction and typed session handles without depending on CLI/TUI. |
 
 ### Session Persistence Boundary
 

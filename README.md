@@ -24,6 +24,7 @@ Skills, WASM plugins, and advanced document ingestion are tracked separately und
 - **Local-first coding agent**: interactive TUI, inline mode, and print mode for scripts and smoke tests.
 - **Safety-first tool runtime**: file writes, deletes, Git writes, shell execution, network actions, and MCP tools route through explicit permission boundaries.
 - **Rust-native core**: workspace-oriented crates with minimal runtime assumptions and no Node/Python runtime dependency.
+- **Embeddable Rust runtime**: an initial `talos-runtime` facade lets Rust projects construct a safe in-process agent runtime without depending on Talos CLI/TUI crates.
 - **Auditable internals**: oversized memory, config, CLI/TUI, and agent compaction modules are split into focused Rust modules with behavior-preserving gates.
 - **Built-in coding tools**: file, search, edit, shell, symbol, directory tree, diff/stat, Git, HTTP request, and web search operations.
 - **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
@@ -44,9 +45,11 @@ Currently shipped:
 - Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.
 - Runtime Skills from `.talos/skills/`, `~/.talos/skills/`, and inherited parent `.talos/skills/`.
 - MCP stdio tools and JSON-RPC infrastructure.
+- Initial Rust embedding facade in the `talos-runtime` crate.
 
 Not shipped yet:
 
+- Stable 1.0 SDK guarantees for the embedded runtime facade.
 - `~/.agents/skills/` discovery from the dotagents shared directory.
 - Embedded browser/web control surface.
 - WASM plugin runtime and plugin marketplace.
