@@ -1,9 +1,9 @@
 # TUI-013: Preview Spinner Single-Block Alignment
 
-**Status**: Refinement
+**Status**: Complete
 **Priority**: P3
 **Source**: User request 2026-06-26
-**Iteration**: None yet
+**Iteration**: Next-iteration sidecar, implemented 2026-06-28
 
 ## Problem
 
@@ -52,6 +52,14 @@ preview row aligns with other rows.
 - Given the existing TUI tests,
   When `preview_spinner_padding` is called,
   Then the returned string contains exactly one `SPINNER_FRAMES` character.
+
+## Completion Notes
+
+Implemented 2026-06-28:
+
+- `preview_spinner_padding()` now renders exactly one spinner glyph with the same leading space.
+- The returned color index follows the single rendered frame.
+- `preview_spinner_uses_single_block` covers the one-glyph prefix and color index behavior.
 
 ## Dependencies
 

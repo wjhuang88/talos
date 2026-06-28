@@ -104,12 +104,8 @@ pub(crate) fn preview_spinner_padding(
     _processing_tick: usize,
 ) -> (String, usize) {
     let n = SPINNER_FRAMES.len();
-    let lead_idx = (processing_frame + n / 2) % n;
-    let chase_idx = processing_frame % n;
-    (
-        format!(" {}{}", SPINNER_FRAMES[lead_idx], SPINNER_FRAMES[chase_idx]),
-        lead_idx,
-    )
+    let frame_idx = processing_frame % n;
+    (format!(" {}", SPINNER_FRAMES[frame_idx]), frame_idx)
 }
 
 pub(crate) struct QueuePreviewComponent {

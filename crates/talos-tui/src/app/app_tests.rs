@@ -238,22 +238,21 @@ fn idle_processing_preview_animates_ellipsis() {
 }
 
 #[test]
-fn preview_spinner_uses_canon_rhythm() {
+fn preview_spinner_uses_single_block() {
     let n = SPINNER_FRAMES.len();
-    let phase = n / 2;
 
-    let (p0, _) = scrollback::preview_spinner_padding(0, 0);
-    let (p1, _) = scrollback::preview_spinner_padding(1, 0);
+    let (p0, c0) = scrollback::preview_spinner_padding(0, 0);
+    let (p1, c1) = scrollback::preview_spinner_padding(1, 0);
 
-    let lead0 = SPINNER_FRAMES[(n - phase) % n];
-    let chase0 = SPINNER_FRAMES[0];
-    assert_eq!(p0, format!(" {lead0}{chase0}"));
+    assert_eq!(p0, format!(" {}", SPINNER_FRAMES[0]));
+    assert_eq!(c0, 0);
+    assert_eq!(p0.chars().count(), 2);
 
-    let lead1 = SPINNER_FRAMES[(1 + n - phase) % n];
-    let chase1 = SPINNER_FRAMES[1];
-    assert_eq!(p1, format!(" {lead1}{chase1}"));
+    assert_eq!(p1, format!(" {}", SPINNER_FRAMES[1]));
+    assert_eq!(c1, 1);
+    assert_eq!(p1.chars().count(), 2);
 
-    assert_ne!(lead0, chase0);
+    assert_ne!(SPINNER_FRAMES[0], SPINNER_FRAMES[1 % n]);
 }
 
 #[test]
