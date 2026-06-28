@@ -244,13 +244,13 @@ fn preview_spinner_uses_single_block() {
     let (p0, c0) = scrollback::preview_spinner_padding(0, 0);
     let (p1, c1) = scrollback::preview_spinner_padding(1, 0);
 
-    assert_eq!(p0, format!(" {}", SPINNER_FRAMES[0]));
+    assert_eq!(p0, format!(" {} ", SPINNER_FRAMES[0]));
     assert_eq!(c0, 0);
-    assert_eq!(p0.chars().count(), 2);
+    assert_eq!(p0.chars().count(), 3);
 
-    assert_eq!(p1, format!(" {}", SPINNER_FRAMES[1]));
+    assert_eq!(p1, format!(" {} ", SPINNER_FRAMES[1]));
     assert_eq!(c1, 1);
-    assert_eq!(p1.chars().count(), 2);
+    assert_eq!(p1.chars().count(), 3);
 
     assert_ne!(SPINNER_FRAMES[0], SPINNER_FRAMES[1 % n]);
 }

@@ -57,7 +57,8 @@ preview row aligns with other rows.
 
 Implemented 2026-06-28:
 
-- `preview_spinner_padding()` now renders exactly one spinner glyph with the same leading space.
+- `preview_spinner_padding()` now renders exactly one spinner glyph while preserving the
+  three-column prefix width with a trailing space.
 - The returned color index follows the single rendered frame.
 - `preview_spinner_uses_single_block` covers the one-glyph prefix and color index behavior.
 
