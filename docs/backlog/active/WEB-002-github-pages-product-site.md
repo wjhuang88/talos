@@ -102,6 +102,12 @@ engineering docs.
   closeout is a published execution baseline; future follow-ups start
   by re-running both validators and reading the "Updating the site
   after a release" section of `site/README.md`.
+- 2026-06-29 — D10 CNAME created. `site/CNAME` set to `talos.hwj.zone`.
+  **Remaining maintainer DNS actions**: (1) Add DNS CNAME record
+  `talos` → `wjhuang88.github.io`, (2) Enable Pages (Settings → Pages →
+  Deploy from a branch, folder `/site`), (3) Enter custom domain
+  `talos.hwj.zone` in Pages settings for automatic HTTPS provisioning.
+  The `site/README.md` publishing checklist covers these steps.
 
 ## Validation
 
