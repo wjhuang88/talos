@@ -5,8 +5,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
-use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
-use talos_core::tool::{AgentTool, ToolRegistry, ToolResult as ToolExecutionResult};
+use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolPresentationPolicy, ToolRegistry, ToolResult as ToolExecutionResult,
+};
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
     HookContext, HookEvent, HookEventKind, HookHandler, HookRegistry, HookResult, TurnId,
@@ -101,6 +103,45 @@ impl AgentTool for TimedMockTool {
             .await
             .push(format!("end:{}:{}", self.tool_name, input));
         self.result.clone()
+    }
+}
+
+/// Mock tool with explicit presentation metadata for TOOL-012 tests.
+struct FamilyMockTool {
+    tool_name: String,
+    family: ToolFamily,
+    always_on: bool,
+    execution_log: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl AgentTool for FamilyMockTool {
+    fn name(&self) -> &str {
+        &self.tool_name
+    }
+
+    fn description(&self) -> &str {
+        "Mock tool with family metadata"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({})
+    }
+
+    fn family(&self) -> ToolFamily {
+        self.family
+    }
+
+    fn is_always_on(&self) -> bool {
+        self.always_on
+    }
+
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        self.execution_log
+            .lock()
+            .await
+            .push(format!("{}:{input}", self.tool_name));
+        ToolExecutionResult::success("executed")
     }
 }
 
@@ -1614,17 +1655,40 @@ fn test_set_append_prompt_opt_none() {
 struct CapturingModel {
     responses: Arc<Mutex<Vec<Vec<AgentEvent>>>>,
     captured_system_prompts: Arc<std::sync::Mutex<Vec<String>>>,
+    captured_tool_names: Arc<std::sync::Mutex<Vec<Vec<String>>>>,
 }
 
 impl CapturingModel {
     fn new(responses: Vec<Vec<AgentEvent>>) -> (Self, Arc<std::sync::Mutex<Vec<String>>>) {
         let captured = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let captured_tool_names = Arc::new(std::sync::Mutex::new(Vec::new()));
         (
             Self {
                 responses: Arc::new(Mutex::new(responses)),
                 captured_system_prompts: captured.clone(),
+                captured_tool_names,
             },
             captured,
+        )
+    }
+
+    fn new_with_tool_capture(
+        responses: Vec<Vec<AgentEvent>>,
+    ) -> (
+        Self,
+        Arc<std::sync::Mutex<Vec<String>>>,
+        Arc<std::sync::Mutex<Vec<Vec<String>>>>,
+    ) {
+        let captured = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let captured_tool_names = Arc::new(std::sync::Mutex::new(Vec::new()));
+        (
+            Self {
+                responses: Arc::new(Mutex::new(responses)),
+                captured_system_prompts: captured.clone(),
+                captured_tool_names: captured_tool_names.clone(),
+            },
+            captured,
+            captured_tool_names,
         )
     }
 }
@@ -1651,6 +1715,136 @@ impl LanguageModel for CapturingModel {
         });
         Ok(rx)
     }
+
+    async fn stream_with_tools(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured_tool_names
+            .lock()
+            .expect("lock poisoned")
+            .push(tools.iter().map(|tool| tool.name.clone()).collect());
+        self.stream(messages).await
+    }
+}
+
+#[tokio::test]
+async fn test_tool_presentation_policy_syncs_prompt_and_provider_definitions() {
+    let response_events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta { delta: "OK".into() },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ];
+
+    let (model, captured_prompts, captured_tool_names) =
+        CapturingModel::new_with_tool_capture(vec![response_events]);
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(FamilyMockTool {
+        tool_name: "read".into(),
+        family: ToolFamily::File,
+        always_on: true,
+        execution_log: execution_log.clone(),
+    }));
+    registry.register(Arc::new(FamilyMockTool {
+        tool_name: "git_status".into(),
+        family: ToolFamily::Git,
+        always_on: false,
+        execution_log: execution_log.clone(),
+    }));
+    registry.register(Arc::new(FamilyMockTool {
+        tool_name: "web_search".into(),
+        family: ToolFamily::Network,
+        always_on: false,
+        execution_log,
+    }));
+
+    let mut agent =
+        Agent::with_security(Arc::new(model), registry, None, None, PathBuf::from("/tmp"));
+    agent.set_tool_presentation_policy(ToolPresentationPolicy::with_families([ToolFamily::Git]));
+
+    let response = agent.run("status".into()).await.unwrap();
+    assert_eq!(response, "OK");
+
+    let prompts = captured_prompts.lock().expect("lock poisoned");
+    assert_eq!(prompts.len(), 1);
+    assert!(prompts[0].contains("## git_status"));
+    assert!(prompts[0].contains("## read"));
+    assert!(!prompts[0].contains("## web_search"));
+
+    let tool_names = captured_tool_names.lock().expect("lock poisoned");
+    assert_eq!(
+        tool_names.as_slice(),
+        &[vec![String::from("git_status"), String::from("read")]]
+    );
+}
+
+#[tokio::test]
+async fn test_unpresented_registered_tool_returns_recoverable_error_without_execution() {
+    let call = ToolCall {
+        id: "call-1".into(),
+        name: "git_status".into(),
+        input: serde_json::json!({}),
+    };
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call,
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(FamilyMockTool {
+        tool_name: "read".into(),
+        family: ToolFamily::File,
+        always_on: true,
+        execution_log: execution_log.clone(),
+    }));
+    registry.register(Arc::new(FamilyMockTool {
+        tool_name: "git_status".into(),
+        family: ToolFamily::Git,
+        always_on: false,
+        execution_log: execution_log.clone(),
+    }));
+
+    let mut agent = Agent::with_security(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    );
+    agent.set_tool_presentation_policy(ToolPresentationPolicy::always_on());
+
+    let response = agent.run("status".into()).await.unwrap();
+    assert_eq!(response, "done");
+    assert!(
+        execution_log.lock().await.is_empty(),
+        "unpresented registered tool must not execute"
+    );
 }
 
 #[tokio::test]

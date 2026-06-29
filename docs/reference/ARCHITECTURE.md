@@ -158,6 +158,18 @@ Talos uses traits to decouple logic and allow for alternative implementations.
 *   `SkillProvider`: Interface for loading and injecting domain-specific knowledge.
 *   `PluginHost`: Manages the lifecycle and hooks for WASM-based extensions.
 
+## Tool Presentation
+
+`ToolRegistry` is the executable source of truth. Model-visible tools are selected by
+`ToolPresentationPolicy`, which filters registered tools by explicit `ToolFamily` metadata plus an
+always-on baseline for common file/search/edit workflows. The Agent derives both prompt tool
+descriptions and native provider `ToolDefinition`s from the same selected set. If a model requests
+a registered tool that was not presented, Talos returns a recoverable tool error and does not
+execute the tool.
+
+Tool prompt content is grouped into stable family sections. Adding or removing one family should
+not rewrite unchanged family blocks, preserving provider cache friendliness.
+
 ## TUI Event-Driven Architecture (I023)
 
 The TUI follows a single-directional information flow: Agent → ConversationEngine → UI.

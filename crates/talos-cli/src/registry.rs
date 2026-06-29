@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::ApprovalChoice;
-use talos_core::tool::{AgentTool, ToolPermissionFacet, ToolRegistry, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult};
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
@@ -173,6 +173,14 @@ impl AgentTool for TuiPermissionAwareTool {
         self.inner.nature()
     }
 
+    fn family(&self) -> ToolFamily {
+        self.inner.family()
+    }
+
+    fn is_always_on(&self) -> bool {
+        self.inner.is_always_on()
+    }
+
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
         self.inner.permission_profile(input)
     }
@@ -257,6 +265,14 @@ impl AgentTool for PermissionAwareTool {
         self.inner.nature()
     }
 
+    fn family(&self) -> ToolFamily {
+        self.inner.family()
+    }
+
+    fn is_always_on(&self) -> bool {
+        self.inner.is_always_on()
+    }
+
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
         self.inner.permission_profile(input)
     }
@@ -324,6 +340,10 @@ impl AgentTool for StatusTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
     }
 }
 

@@ -19,6 +19,7 @@ pub mod compaction;
 pub mod token;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -32,7 +33,7 @@ mod tool_execution;
 
 use talos_core::message::{AgentEvent, Message, MessageToolResult, ToolCall};
 use talos_core::provider::{LanguageModel, ProviderError};
-use talos_core::tool::{ToolProvenance, ToolRegistry};
+use talos_core::tool::{ToolPresentationPolicy, ToolProvenance, ToolRegistry};
 use talos_permission::PermissionEngine;
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnId,
@@ -152,6 +153,12 @@ pub struct Agent {
     workspace_context: Option<String>,
     /// Cached tool definitions for native API calls.
     tool_definitions: Vec<talos_core::provider::ToolDefinition>,
+    /// Names of tools currently presented to the provider.
+    presented_tool_names: HashSet<String>,
+    /// Whether execution is restricted to provider-presented tools.
+    enforce_tool_presentation_policy: bool,
+    /// Current model-facing tool presentation policy.
+    tool_presentation_policy: ToolPresentationPolicy,
     /// Cached stable prefix (Identity + Tools + Skills) computed once and
     /// reused across turns. Invalidated when tools, skills, or identity change.
     cached_stable_prefix: std::sync::Mutex<Option<String>>,

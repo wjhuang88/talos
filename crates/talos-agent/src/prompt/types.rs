@@ -1,4 +1,5 @@
 use talos_core::message::{SystemCacheMarker, SystemCacheType};
+use talos_core::tool::ToolFamily;
 
 /// A description of a tool for inclusion in the system prompt.
 ///
@@ -9,6 +10,7 @@ pub struct ToolDescription {
     pub name: String,
     pub description: String,
     pub parameters: serde_json::Value,
+    pub family: ToolFamily,
 }
 
 /// A context file for inclusion in the system prompt.

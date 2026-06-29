@@ -298,6 +298,14 @@ impl AgentTool for RuntimePermissionAwareTool {
         self.inner.nature()
     }
 
+    fn family(&self) -> talos_core::tool::ToolFamily {
+        self.inner.family()
+    }
+
+    fn is_always_on(&self) -> bool {
+        self.inner.is_always_on()
+    }
+
     fn permission_profile(&self, input: &Value) -> Vec<talos_core::tool::ToolPermissionFacet> {
         self.inner.permission_profile(input)
     }

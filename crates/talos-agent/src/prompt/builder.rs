@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 use talos_core::message::{SystemCacheMarker, SystemCacheType};
@@ -252,51 +253,62 @@ impl SystemPromptBuilder {
             kind: PromptSectionKind::Cacheable,
         });
 
-        let mut sorted_tools: Vec<&ToolDescription> = self.tools.iter().collect();
-        sorted_tools.sort_by(|a, b| a.name.cmp(&b.name));
-
-        if sorted_tools.is_empty() {
+        if self.tools.is_empty() {
             sections.push(PromptSection {
                 text: String::from("# Tools\nNo tools available.\n"),
                 kind: PromptSectionKind::Cacheable,
             });
         } else {
-            let mut tools_section = String::from("# Tools\n");
-            for tool in &sorted_tools {
-                tools_section.push_str(&format!("## {}\n{}\n", tool.name, tool.description));
-                if let Some(props) = tool.parameters.get("properties")
-                    && let Some(required) = tool.parameters.get("required")
-                {
-                    let req_list: Vec<&str> = required
-                        .as_array()
-                        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
-                        .unwrap_or_default();
-                    let mut param_parts = Vec::new();
-                    for (key, val) in props.as_object().unwrap_or(&serde_json::Map::new()) {
-                        let desc = val
-                            .get("description")
-                            .and_then(|d| d.as_str())
-                            .unwrap_or("");
-                        let ptype = val.get("type").and_then(|t| t.as_str()).unwrap_or("any");
-                        let req = if req_list.contains(&key.as_str()) {
-                            "required"
-                        } else {
-                            "optional"
-                        };
-                        param_parts.push(format!("  - {} ({}): {} [{}]", key, ptype, desc, req));
-                    }
-                    if !param_parts.is_empty() {
-                        tools_section.push_str("Parameters:\n");
-                        tools_section.push_str(&param_parts.join("\n"));
-                        tools_section.push_str("\n\n");
-                    }
-                }
-                tools_section.push('\n');
+            let mut families: BTreeMap<_, Vec<&ToolDescription>> = BTreeMap::new();
+            for tool in &self.tools {
+                families.entry(tool.family).or_default().push(tool);
             }
+
             sections.push(PromptSection {
-                text: tools_section,
+                text: String::from("# Tools\nTool definitions are grouped by stable family.\n"),
                 kind: PromptSectionKind::Cacheable,
             });
+
+            for (family, mut sorted_tools) in families {
+                sorted_tools.sort_by(|a, b| a.name.cmp(&b.name));
+                let mut tools_section = format!("# Tool Family: {family:?}\n");
+                for tool in sorted_tools {
+                    tools_section.push_str(&format!("## {}\n{}\n", tool.name, tool.description));
+                    if let Some(props) = tool.parameters.get("properties")
+                        && let Some(required) = tool.parameters.get("required")
+                    {
+                        let req_list: Vec<&str> = required
+                            .as_array()
+                            .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+                            .unwrap_or_default();
+                        let mut param_parts = Vec::new();
+                        for (key, val) in props.as_object().unwrap_or(&serde_json::Map::new()) {
+                            let desc = val
+                                .get("description")
+                                .and_then(|d| d.as_str())
+                                .unwrap_or("");
+                            let ptype = val.get("type").and_then(|t| t.as_str()).unwrap_or("any");
+                            let req = if req_list.contains(&key.as_str()) {
+                                "required"
+                            } else {
+                                "optional"
+                            };
+                            param_parts
+                                .push(format!("  - {} ({}): {} [{}]", key, ptype, desc, req));
+                        }
+                        if !param_parts.is_empty() {
+                            tools_section.push_str("Parameters:\n");
+                            tools_section.push_str(&param_parts.join("\n"));
+                            tools_section.push_str("\n\n");
+                        }
+                    }
+                    tools_section.push('\n');
+                }
+                sections.push(PromptSection {
+                    text: tools_section,
+                    kind: PromptSectionKind::Cacheable,
+                });
+            }
         }
 
         if self.skill_index.is_empty() {

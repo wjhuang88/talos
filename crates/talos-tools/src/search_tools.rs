@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
 use crate::file_tools::{FileToolError, is_binary_file, is_skip_dir, resolve_workspace_path};
@@ -181,6 +181,12 @@ impl AgentTool for GrepTool {
     fn is_read_only(&self) -> bool {
         true
     }
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Search
+    }
+    fn is_always_on(&self) -> bool {
+        true
+    }
     fn summary_fields(&self) -> &'static [&'static str] {
         &["pattern", "path", "include"]
     }
@@ -282,6 +288,12 @@ impl AgentTool for GlobTool {
     }
 
     fn is_read_only(&self) -> bool {
+        true
+    }
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Search
+    }
+    fn is_always_on(&self) -> bool {
         true
     }
     fn summary_fields(&self) -> &'static [&'static str] {

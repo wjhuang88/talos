@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolNature, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------
@@ -476,6 +476,10 @@ impl AgentTool for WebSearchTool {
 
     fn nature(&self) -> ToolNature {
         ToolNature::Network
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Network
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

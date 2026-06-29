@@ -1,9 +1,11 @@
 //! Agent construction and runtime configuration.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use talos_core::tool::{ToolProtocol, ToolRegistry};
+use talos_core::provider::ToolDefinition;
+use talos_core::tool::{AgentTool, ToolPresentationPolicy, ToolProtocol, ToolRegistry};
 use talos_permission::PermissionEngine;
 use talos_plugin::HookRegistry;
 use talos_sandbox::SandboxProvider;
@@ -45,6 +47,9 @@ impl Agent {
             hook_registry: Arc::new(HookRegistry::new()),
             workspace_context: None,
             tool_definitions: Vec::new(),
+            presented_tool_names: HashSet::new(),
+            enforce_tool_presentation_policy: false,
+            tool_presentation_policy: ToolPresentationPolicy::full(),
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
         }
@@ -90,28 +95,13 @@ impl Agent {
         workspace_root: PathBuf,
         hook_registry: Arc<HookRegistry>,
     ) -> Self {
-        let descriptions: Vec<ToolDescription> = tools
-            .list()
-            .into_iter()
-            .map(|tool| ToolDescription {
-                name: tool.name().to_string(),
-                description: tool.description().to_string(),
-                parameters: tool.parameters(),
-            })
-            .collect();
+        let tool_presentation_policy = ToolPresentationPolicy::full();
+        let (descriptions, tool_definitions, presented_tool_names) =
+            describe_presented_tools(&tools, &tool_presentation_policy);
 
         let prompt_builder = SystemPromptBuilder::new()
             .with_workspace_info(format!("Workspace root: {}", workspace_root.display()))
             .with_tools(descriptions.clone());
-
-        let tool_definitions: Vec<talos_core::provider::ToolDefinition> = descriptions
-            .into_iter()
-            .map(|d| talos_core::provider::ToolDefinition {
-                name: d.name,
-                description: d.description,
-                parameters: d.parameters,
-            })
-            .collect();
 
         Self {
             provider,
@@ -123,6 +113,9 @@ impl Agent {
             hook_registry,
             workspace_context: None,
             tool_definitions,
+            presented_tool_names,
+            enforce_tool_presentation_policy: true,
+            tool_presentation_policy,
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
         }
@@ -141,7 +134,32 @@ impl Agent {
     /// Tools are sorted alphabetically by name in the assembled prompt
     /// to ensure stable ordering across turns.
     pub fn set_tools(&mut self, tools: Vec<ToolDescription>) {
+        self.tool_definitions = tools
+            .iter()
+            .map(|tool| ToolDefinition {
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                parameters: tool.parameters.clone(),
+            })
+            .collect();
+        self.presented_tool_names = tools.iter().map(|tool| tool.name.clone()).collect();
+        self.enforce_tool_presentation_policy = true;
         self.update_prompt_builder(true, |builder| builder.with_tools(tools));
+    }
+
+    /// Sets which registered tool families are presented to the model.
+    ///
+    /// The executable [`ToolRegistry`] is unchanged. Calls to registered tools
+    /// that were not presented return a recoverable tool error instead of
+    /// executing silently.
+    pub fn set_tool_presentation_policy(&mut self, policy: ToolPresentationPolicy) {
+        self.tool_presentation_policy = policy;
+        let (descriptions, tool_definitions, presented_tool_names) =
+            describe_presented_tools(&self.tools, &self.tool_presentation_policy);
+        self.tool_definitions = tool_definitions;
+        self.presented_tool_names = presented_tool_names;
+        self.enforce_tool_presentation_policy = true;
+        self.update_prompt_builder(true, |builder| builder.with_tools(descriptions));
     }
 
     /// Sets the provider tool-call protocol.
@@ -239,4 +257,38 @@ impl Agent {
             .lock()
             .expect("cache lock poisoned") = None;
     }
+}
+
+fn describe_presented_tools(
+    tools: &ToolRegistry,
+    policy: &ToolPresentationPolicy,
+) -> (Vec<ToolDescription>, Vec<ToolDefinition>, HashSet<String>) {
+    let mut selected: Vec<&dyn AgentTool> = tools
+        .list()
+        .into_iter()
+        .filter(|tool| policy.allows_tool(*tool))
+        .collect();
+    selected.sort_by(|a, b| a.name().cmp(b.name()));
+
+    let descriptions: Vec<ToolDescription> = selected
+        .iter()
+        .map(|tool| ToolDescription {
+            name: tool.name().to_string(),
+            description: tool.description().to_string(),
+            parameters: tool.parameters(),
+            family: tool.family(),
+        })
+        .collect();
+
+    let tool_definitions = descriptions
+        .iter()
+        .map(|tool| ToolDefinition {
+            name: tool.name.clone(),
+            description: tool.description.clone(),
+            parameters: tool.parameters.clone(),
+        })
+        .collect();
+    let presented_tool_names = descriptions.iter().map(|tool| tool.name.clone()).collect();
+
+    (descriptions, tool_definitions, presented_tool_names)
 }

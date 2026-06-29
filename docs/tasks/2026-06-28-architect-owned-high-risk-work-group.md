@@ -38,7 +38,7 @@ An item belongs here if at least one condition is true:
 | Group | Items | Why It Is High Risk | Required Handling |
 |---|---|---|---|
 | H1 Runtime SDK boundary | `RUNTIME-001` | Defines whether Talos can be safely embedded by other Rust projects without importing CLI/TUI/product assumptions. Bad choices become semver-bound architecture debt. | Architect-owned API audit and ADR/proposal before any facade crate/module implementation. |
-| H2 Tool family and ingestion architecture | `TOOL-004`, `TOOL-007`, `TOOL-011`, `TOOL-012`, `TOOL-013`, `WEBFETCH-001`, later `TOOL-009` | Search, web/document fetch, progressive tool loading, hybrid permissions, and result bounding all affect permission accuracy, prompt cache stability, context size, and agent behavior. | TOOL-004, TOOL-007, and TOOL-013 are complete. Next handle TOOL-012 for progressive loading before WEBFETCH Phase 2+ expansion. Activate TOOL-011 when grep behavior must be stabilized in code. |
+| H2 Tool family and ingestion architecture | `TOOL-004`, `TOOL-007`, `TOOL-011`, `TOOL-012`, `TOOL-013`, `WEBFETCH-001`, later `TOOL-009` | Search, web/document fetch, progressive tool loading, hybrid permissions, and result bounding all affect permission accuracy, prompt cache stability, context size, and agent behavior. | TOOL-004, TOOL-007, TOOL-012, and TOOL-013 are complete. Next handle WEBFETCH Phase 2+ design or activate TOOL-011 when grep behavior must be stabilized in code. |
 | H3 Permission and autonomous execution | `PERM-001`, `SCHED-001`, `TOOL-010` | Guardian approval, exec policy, scheduled task injection, and batch file writes can bypass or dilute the permission model if treated as normal features. | No implementation without deny/ask/allow regression tests and explicit non-bypass proof. |
 | H4 Extension and plugin runtime | `PLUGIN-001`, `DIST-001`, `TOOL-008` Phase 3 | WASM/runtime plugin loading and optional asset installation create supply-chain, sandbox, lifecycle, and dependency risks. | Spec and ADR before dependency selection; package installation follows DIST-001 consent and verification rules. |
 | H5 Web/remote control surfaces | `WEB-001`, `REMOTE-001`, `REMOTE-002`, `GOV-003` Phase 3 | Local web UI and remote session control can expose logs, approvals, config, and governance actions outside the TUI path. | Loopback/auth/permission/RPC boundaries must be specified before implementation; no auth bypass. |
@@ -62,9 +62,9 @@ These can generally be delegated with normal review unless they touch one of the
 ## Execution Order
 
 1. **H1 Runtime SDK boundary**: start with `RUNTIME-001` API audit and boundary ADR/proposal.
-2. **H2 Tool family and ingestion architecture**: `TOOL-004`, `TOOL-007`, and `TOOL-013` are
-   complete. Next run `TOOL-012` before WEBFETCH Phase 2+ expansion. Activate
-   `TOOL-011` when grep behavior must be proven in code.
+2. **H2 Tool family and ingestion architecture**: `TOOL-004`, `TOOL-007`, `TOOL-012`, and
+   `TOOL-013` are complete. Next run WEBFETCH Phase 2+ bounded extraction/save design, or
+   activate `TOOL-011` when grep behavior must be proven in code.
 3. **H5 Web control MVP design**: define `WEB-001` after the runtime/tool boundaries are clear.
 4. **H3 Permission/autonomy packet**: handle `PERM-001`, `SCHED-001`, and `TOOL-010` only after
    the tool family design is stable.
@@ -224,8 +224,33 @@ Validation:
 - `cargo check --workspace`
 - `cargo fmt --all -- --check`
 
-Next direct-owned packet is `TOOL-012`, because WEBFETCH Phase 2+ should not expand until
-progressive-loading and result-boundary behavior is explicit.
+### H2-004 — TOOL-012 Tool Family Progressive Loading (2026-06-29)
+
+Status: Complete.
+
+Scope completed:
+
+- Added explicit `ToolFamily` and `ToolPresentationPolicy` metadata in `talos-core`.
+- Classified built-in file/search/code-intelligence/Git/network/shell tools without relying on
+  name prefixes.
+- Kept `ToolRegistry` as execution truth while deriving provider `ToolDefinition`s and prompt
+  tool descriptions from the same presentation policy.
+- Added a safe always-on baseline: `read`, `write`, `edit`, `ls`, `grep`, and `glob`.
+- Added recoverable fallback for registered tools that the model calls from an unloaded family;
+  such calls do not execute.
+- Split prompt tool descriptions into stable family sections so an added family does not rewrite
+  an unchanged family block.
+
+Validation:
+
+- `cargo test -p talos-core tool_presentation_policy`
+- `cargo test -p talos-agent prompt::tests`
+- `cargo test -p talos-agent tool_presentation`
+- `cargo test -p talos-agent unpresented_registered_tool`
+- `cargo check --workspace`
+
+Next direct-owned packet is WEBFETCH Phase 2+ bounded extraction/save design unless grep behavior
+needs to be stabilized first through `TOOL-011`.
 
 ## Relationship To R27
 

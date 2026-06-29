@@ -242,6 +242,13 @@ impl Agent {
                 )));
             }
         };
+        if self.enforce_tool_presentation_policy && !self.presented_tool_names.contains(&call.name)
+        {
+            return Ok(ToolExecutionResult::error(format!(
+                "tool family not loaded for '{}'; continue with a presented tool or request the relevant tool family",
+                call.name
+            )));
+        }
 
         if let Some(engine) = self.permission_engine.as_deref() {
             self.run_hook(hook_ctx, HookEvent::BeforePermissionCheck { call })

@@ -8,7 +8,7 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. Phase 2+ (PDF/Office/document extraction) remains blocked on the remaining TOOL-007 follow-up: TOOL-012 must define progressive-loading/result-boundary behavior. TOOL-013 hybrid network/write permission classification is complete. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
+Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. TOOL-012 progressive loading and TOOL-013 hybrid network/write permission boundaries are complete. Phase 2+ (PDF/Office/document extraction) now needs a bounded extraction/save workflow design before implementation. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
 
 ## Priority
 
@@ -336,8 +336,9 @@ incrementally.
       quality evidence before implementation.
 - [x] Hybrid network/write permission behavior is defined through TOOL-013 before adding new
       save/download/extract tools.
-- [ ] Progressive-loading and result-handle behavior is aligned with TOOL-012 before adding large
-      document extraction outputs.
+- [x] Progressive-loading behavior is aligned with TOOL-012 before adding large document
+      extraction outputs.
+- [ ] Result-handle behavior is specified before adding large document extraction outputs.
 - [ ] webclaw is recorded as reference/optional external integration, not a direct embed candidate.
 - [ ] MarkItDown-like functionality is phased by format; no Python runtime dependency is added.
 - [ ] RES-001 can use these tools without requiring unattended crawling or hosted services.

@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
 use arborium::tree_sitter; // arborium re-exports tree-sitter
@@ -162,6 +162,9 @@ macro_rules! impl_read_only_tool {
             }
             fn is_read_only(&self) -> bool {
                 true
+            }
+            fn family(&self) -> ToolFamily {
+                ToolFamily::CodeIntelligence
             }
             fn summary_fields(&self) -> &'static [&'static str] {
                 $summary

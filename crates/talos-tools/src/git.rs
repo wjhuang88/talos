@@ -10,7 +10,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 use talos_core::tool_parameters;
 use thiserror::Error;
 
@@ -71,6 +73,10 @@ impl AgentTool for GitStatusTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
     }
 }
 
@@ -163,6 +169,10 @@ impl AgentTool for GitLogTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
     }
 }
 
@@ -262,6 +272,10 @@ impl AgentTool for GitBranchListTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
     }
 }
 
@@ -382,6 +396,10 @@ impl AgentTool for GitDiffTool {
     fn is_read_only(&self) -> bool {
         true
     }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
+    }
 }
 
 impl GitDiffTool {
@@ -465,6 +483,10 @@ impl AgentTool for GitShowTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
     }
 }
 
@@ -578,6 +600,11 @@ impl AgentTool for GitAddTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["paths"]
     }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -640,6 +667,11 @@ impl AgentTool for GitCommitTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["message", "all"]
     }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -710,6 +742,11 @@ impl AgentTool for GitPushTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["remote", "branch", "force"]
     }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -800,6 +837,11 @@ impl AgentTool for GitPullTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["remote"]
     }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),
@@ -893,6 +935,11 @@ impl AgentTool for GitCheckoutTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["branch", "create"]
     }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Git
+    }
+
     async fn execute(&self, input: Value) -> ToolResult {
         match self.execute_inner(input).await {
             Ok(content) => ToolResult::success(content),

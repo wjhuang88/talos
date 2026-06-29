@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
 use crate::is_skip_dir;
@@ -52,6 +52,10 @@ impl AgentTool for TreeTool {
 
     fn is_read_only(&self) -> bool {
         true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::File
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

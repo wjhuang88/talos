@@ -1,4 +1,5 @@
 use super::*;
+use talos_core::tool::ToolFamily;
 use talos_skill::SkillIndex;
 
 // --- Basic assembly tests ---
@@ -127,7 +128,7 @@ fn test_cache_marker_generation() {
 
     let (prompt, markers) = builder.build_with_cache_markers();
 
-    assert_eq!(markers.len(), 3);
+    assert_eq!(markers.len(), 4);
 
     // All markers should be Ephemeral type
     for marker in &markers {
@@ -137,6 +138,7 @@ fn test_cache_marker_generation() {
     // Markers should be in increasing order
     assert!(markers[0].offset < markers[1].offset);
     assert!(markers[1].offset < markers[2].offset);
+    assert!(markers[2].offset < markers[3].offset);
 
     // Verify marker content matches prompt sections
     let identity_section = &prompt[markers[0].offset..markers[0].offset + markers[0].length];
@@ -144,7 +146,10 @@ fn test_cache_marker_generation() {
 
     let tools_section = &prompt[markers[1].offset..markers[1].offset + markers[1].length];
     assert!(tools_section.contains("# Tools"));
-    assert!(tools_section.contains("## read"));
+
+    let file_family_section = &prompt[markers[2].offset..markers[2].offset + markers[2].length];
+    assert!(file_family_section.contains("# Tool Family: File"));
+    assert!(file_family_section.contains("## read"));
 
     assert!(prompt.contains("# Skills"));
     assert!(prompt.contains("test-skill"));
@@ -377,6 +382,87 @@ fn test_tools_sorted_alphabetically() {
 
     assert!(bash_pos < read_pos, "bash should come before read");
     assert!(read_pos < write_pos, "read should come before write");
+}
+
+#[test]
+fn test_tools_grouped_by_family_with_stable_sections() {
+    let builder = SystemPromptBuilder::new().with_tools(vec![
+        ToolDescription {
+            name: "git_status".into(),
+            description: "Inspect Git state".into(),
+            family: ToolFamily::Git,
+            ..Default::default()
+        },
+        ToolDescription {
+            name: "read".into(),
+            description: "Read a file".into(),
+            family: ToolFamily::File,
+            ..Default::default()
+        },
+    ]);
+
+    let (prompt, markers) = builder.build_with_cache_markers();
+
+    assert!(prompt.contains("# Tool Family: File"));
+    assert!(prompt.contains("# Tool Family: Git"));
+    assert!(
+        prompt.find("# Tool Family: File").unwrap() < prompt.find("# Tool Family: Git").unwrap(),
+        "families should be ordered by stable enum order"
+    );
+    assert_eq!(
+        markers
+            .iter()
+            .filter(|marker| {
+                let section = &prompt[marker.offset..marker.offset + marker.length];
+                section.contains("# Tool Family:")
+            })
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn test_unchanged_tool_family_section_remains_stable_when_new_family_is_added() {
+    fn file_family_section(prompt: &str) -> &str {
+        let start = prompt.find("# Tool Family: File").unwrap();
+        let after_start = start + "# Tool Family: File".len();
+        let end = prompt[after_start..]
+            .find("# Tool Family:")
+            .map(|offset| after_start + offset)
+            .unwrap_or_else(|| prompt.find("# Skills").unwrap());
+        &prompt[start..end]
+    }
+
+    let file_only = SystemPromptBuilder::new()
+        .with_tools(vec![ToolDescription {
+            name: "read".into(),
+            description: "Read a file".into(),
+            family: ToolFamily::File,
+            ..Default::default()
+        }])
+        .build_stable_prefix();
+    let with_git = SystemPromptBuilder::new()
+        .with_tools(vec![
+            ToolDescription {
+                name: "read".into(),
+                description: "Read a file".into(),
+                family: ToolFamily::File,
+                ..Default::default()
+            },
+            ToolDescription {
+                name: "git_status".into(),
+                description: "Inspect Git state".into(),
+                family: ToolFamily::Git,
+                ..Default::default()
+            },
+        ])
+        .build_stable_prefix();
+
+    assert_eq!(
+        file_family_section(&file_only),
+        file_family_section(&with_git),
+        "adding another family must not rewrite an unchanged family section"
+    );
 }
 
 // --- Log size test ---

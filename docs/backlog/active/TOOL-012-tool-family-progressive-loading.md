@@ -4,7 +4,7 @@
 |---|---|
 | Type | Story |
 | Priority | P2 |
-| Status | Planned |
+| Status | Complete (2026-06-29) |
 | Depends On | `TOOL-007`; ADR-025 search direction |
 | Owner Boundary | H2 architect-owned tool-family work |
 
@@ -24,15 +24,40 @@ tool description and schema as one flat prompt block on every turn.
 
 ## Acceptance Criteria
 
-- [ ] Tool families are explicit data, not inferred from string prefixes alone.
-- [ ] Always-on tools are documented and tested.
-- [ ] Git, code intelligence, network/web, and shell families can be loaded independently.
-- [ ] Provider tool definitions and prompt tool descriptions stay in sync.
-- [ ] Fallback behavior is defined when the model requests a tool from an unloaded family.
-- [ ] Stable-prefix cache invalidation is tested for unchanged families.
-- [ ] The implementation degrades gracefully for providers that require a full tool list per
+- [x] Tool families are explicit data, not inferred from string prefixes alone.
+- [x] Always-on tools are documented and tested.
+- [x] Git, code intelligence, network/web, and shell families can be loaded independently.
+- [x] Provider tool definitions and prompt tool descriptions stay in sync.
+- [x] Fallback behavior is defined when the model requests a tool from an unloaded family.
+- [x] Stable-prefix cache invalidation is tested for unchanged families.
+- [x] The implementation degrades gracefully for providers that require a full tool list per
       request.
-- [ ] `TOOL-007` audit recommendations are reflected in README only if user-facing behavior changes.
+- [x] `TOOL-007` audit recommendations are reflected in README only if user-facing behavior changes.
+
+## Implementation Notes
+
+- Added `ToolFamily` and `ToolPresentationPolicy` in `talos-core`; `ToolRegistry` remains the
+  executable source of truth.
+- Built-in tools now expose explicit family metadata. The always-on set is `read`, `write`,
+  `edit`, `ls`, `grep`, and `glob`; shell, Git, network/web, and code-intelligence tools are
+  independently selectable families.
+- `talos-agent` derives prompt tool descriptions and provider `ToolDefinition`s from the same
+  policy. Calls to registered but unpresented tools return a recoverable tool error and do not
+  execute.
+- Prompt rendering groups tools into stable family sections so adding a family does not rewrite an
+  unchanged family block.
+- Default policy is `ToolPresentationPolicy::full()`, so existing user-facing behavior and README
+  usage remain unchanged.
+
+## Validation
+
+- `cargo check --workspace`
+- `cargo test -p talos-core tool_presentation_policy`
+- `cargo test -p talos-agent prompt::tests`
+- `cargo test -p talos-agent tool_presentation`
+- `cargo test -p talos-agent unpresented_registered_tool`
+- `cargo test --workspace`
+- `sh scripts/validate_project_governance.sh .`
 
 ## Non-Goals
 

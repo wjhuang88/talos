@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
 use super::{FileToolError, is_skip_dir, resolve_workspace_path};
@@ -120,6 +120,12 @@ impl AgentTool for LsTool {
     }
 
     fn is_read_only(&self) -> bool {
+        true
+    }
+    fn family(&self) -> ToolFamily {
+        ToolFamily::File
+    }
+    fn is_always_on(&self) -> bool {
         true
     }
     fn summary_fields(&self) -> &'static [&'static str] {

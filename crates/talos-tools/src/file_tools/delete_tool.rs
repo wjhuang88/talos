@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 use talos_core::tool_parameters;
 
 use super::{DeleteError, FileToolError, resolve_workspace_path};
@@ -75,6 +77,10 @@ impl AgentTool for DeleteTool {
 
     fn parameters(&self) -> Value {
         tool_parameters!(DeleteInput)
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::File
     }
 
     async fn execute(&self, input: Value) -> ToolResult {

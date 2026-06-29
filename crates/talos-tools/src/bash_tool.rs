@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolResult};
+use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -231,6 +231,10 @@ impl AgentTool for BashTool {
 
     fn nature(&self) -> talos_core::tool::ToolNature {
         talos_core::tool::ToolNature::Execute
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Shell
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

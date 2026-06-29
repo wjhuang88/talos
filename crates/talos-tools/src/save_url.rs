@@ -11,7 +11,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 use thiserror::Error;
 
 use crate::http_request::is_private_ip;
@@ -124,6 +126,10 @@ impl AgentTool for SaveUrlTool {
 
     fn nature(&self) -> ToolNature {
         ToolNature::Write
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Network
     }
 
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {

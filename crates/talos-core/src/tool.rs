@@ -5,6 +5,7 @@
 //! types for tool execution results and errors.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -80,6 +81,108 @@ pub enum ToolNature {
     Execute,
     /// Makes network requests (HTTP, API calls).
     Network,
+}
+
+/// Stable presentation family for a tool.
+///
+/// Families are model-presentation metadata, not execution registration. The
+/// registry remains the source of executable tools; presentation policy decides
+/// which registered tools are shown to the provider for a turn/session.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolFamily {
+    /// File and directory operations.
+    #[default]
+    File,
+    /// Text search and file inspection operations.
+    Search,
+    /// AST/code-structure tools.
+    CodeIntelligence,
+    /// Git repository tools.
+    Git,
+    /// Network, web, and URL tools.
+    Network,
+    /// Shell or command execution tools.
+    Shell,
+    /// Tools supplied by extensions, MCP, or unknown sources.
+    Extension,
+}
+
+/// Policy for selecting model-visible tool families.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ToolPresentationPolicy {
+    /// If true, every registered tool is presented.
+    pub include_all: bool,
+    /// If true, the always-on baseline is presented even when not in `families`.
+    pub include_always_on: bool,
+    /// Additional families to present.
+    #[serde(default)]
+    pub families: Vec<ToolFamily>,
+}
+
+impl ToolPresentationPolicy {
+    /// Presents every registered tool. This preserves pre-TOOL-012 behavior.
+    #[must_use]
+    pub fn full() -> Self {
+        Self {
+            include_all: true,
+            include_always_on: true,
+            families: Vec::new(),
+        }
+    }
+
+    /// Presents the always-on baseline only.
+    #[must_use]
+    pub fn always_on() -> Self {
+        Self {
+            include_all: false,
+            include_always_on: true,
+            families: Vec::new(),
+        }
+    }
+
+    /// Presents the always-on baseline plus specific families.
+    #[must_use]
+    pub fn with_families(families: impl IntoIterator<Item = ToolFamily>) -> Self {
+        Self {
+            include_all: false,
+            include_always_on: true,
+            families: families.into_iter().collect(),
+        }
+    }
+
+    /// Returns true when this policy presents the given tool.
+    #[must_use]
+    pub fn allows_tool(&self, tool: &dyn AgentTool) -> bool {
+        self.include_all
+            || (self.include_always_on && tool.is_always_on())
+            || self.families.contains(&tool.family())
+    }
+
+    /// Returns the family set explicitly enabled by this policy.
+    #[must_use]
+    pub fn family_set(&self) -> HashSet<ToolFamily> {
+        self.families.iter().copied().collect()
+    }
+}
+
+impl Default for ToolPresentationPolicy {
+    fn default() -> Self {
+        Self::full()
+    }
 }
 
 /// Identifies how a permission resource string should be interpreted.
@@ -184,6 +287,16 @@ pub trait AgentTool: Send + Sync {
         } else {
             ToolNature::Write
         }
+    }
+
+    /// Returns the stable presentation family for this tool.
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    /// Returns whether this tool belongs to the always-on presentation set.
+    fn is_always_on(&self) -> bool {
+        false
     }
 
     /// Returns the permission facets touched by this concrete invocation.
@@ -320,6 +433,8 @@ mod tests {
         tool_name: String,
         tool_description: String,
         read_only: bool,
+        family: ToolFamily,
+        always_on: bool,
     }
 
     impl MockTool {
@@ -328,7 +443,19 @@ mod tests {
                 tool_name: name.to_owned(),
                 tool_description: description.to_owned(),
                 read_only: true,
+                family: ToolFamily::Extension,
+                always_on: false,
             }
+        }
+
+        fn with_family(mut self, family: ToolFamily) -> Self {
+            self.family = family;
+            self
+        }
+
+        fn always_on(mut self) -> Self {
+            self.always_on = true;
+            self
         }
     }
 
@@ -365,6 +492,14 @@ mod tests {
 
         fn is_read_only(&self) -> bool {
             self.read_only
+        }
+
+        fn family(&self) -> ToolFamily {
+            self.family
+        }
+
+        fn is_always_on(&self) -> bool {
+            self.always_on
         }
     }
 
@@ -523,6 +658,29 @@ mod tests {
         let error = ToolResult::error("failed");
         assert!(error.is_error);
         assert_eq!(error.content, "failed");
+    }
+
+    #[test]
+    fn test_tool_presentation_policy_selects_always_on_baseline() {
+        let baseline = MockTool::new("read", "Read file").always_on();
+        let shell = MockTool::new("bash", "Run command").with_family(ToolFamily::Shell);
+
+        let policy = ToolPresentationPolicy::always_on();
+
+        assert!(policy.allows_tool(&baseline));
+        assert!(!policy.allows_tool(&shell));
+    }
+
+    #[test]
+    fn test_tool_presentation_policy_selects_explicit_family() {
+        let git = MockTool::new("git_status", "Git status").with_family(ToolFamily::Git);
+        let network = MockTool::new("web_search", "Search web").with_family(ToolFamily::Network);
+
+        let policy = ToolPresentationPolicy::with_families([ToolFamily::Git]);
+
+        assert!(policy.allows_tool(&git));
+        assert!(!policy.allows_tool(&network));
+        assert!(policy.family_set().contains(&ToolFamily::Git));
     }
 }
 
