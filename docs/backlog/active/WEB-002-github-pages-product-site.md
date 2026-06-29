@@ -1,10 +1,11 @@
 # WEB-002: GitHub Pages Product Site And Custom Domain
 
-**Status**: Planned
+**Status**: Ready for delegated assignment
 **Priority**: P3
 **Created**: 2026-06-27
 **Source**: User request to publish a separate GitHub Pages site under a personal domain
 **Depends on**: v0.1.2 release baseline; README positioning update
+**Execution plan**: `docs/tasks/2026-06-29-delegable-product-site-docs-two-month-plan.md`
 
 ## Problem
 
@@ -45,3 +46,10 @@ engineering docs.
 - Static link/path check for `site/`.
 - GitHub Pages workflow dry-run or repository settings checklist.
 - Manual review against `README.md`, `README.zh-CN.md`, and the latest release tag.
+
+## Delegation Boundary
+
+This item is suitable for non-architect implementation when scoped to static site and
+documentation work. Do not implement `WEB-001`, runtime web control, session/RPC surfaces,
+permission UI, release publishing, DNS changes, or GitHub Pages settings changes without explicit
+maintainer approval.

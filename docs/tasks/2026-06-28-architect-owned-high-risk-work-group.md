@@ -1,6 +1,6 @@
 # Architect-Owned High-Risk Work Group
 
-> Status: Active grouping
+> Status: Paused by maintainer direction (2026-06-29)
 > Created: 2026-06-28
 > Owner boundary: direct architect/senior-agent execution or review required
 > Source: user request to separate work that is too risky to delegate blindly
@@ -18,6 +18,11 @@ final integration must be handled through this group before implementation lands
 This group does not replace the owning backlog files, iterations, ADRs, or the existing R27
 high-risk governance gate. It is the direct-oversight view of the work that should not be delegated
 as routine product development.
+
+Current handling: high-risk implementation is paused while delegated low-risk public-site and user
+documentation work proceeds through
+`docs/tasks/2026-06-29-delegable-product-site-docs-two-month-plan.md`. Resume this group only after
+explicit maintainer direction.
 
 ## Selection Rules
 
