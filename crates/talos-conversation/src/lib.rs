@@ -2,6 +2,18 @@
 //!
 //! Owns all conversation state and event processing, sitting between the
 //! Agent Loop and the UI Loop. Communicates via typed async channels.
+//!
+//! This crate is the reusable state/command layer for Talos-style interfaces. Its pre-1.0 support
+//! boundary is:
+//!
+//! - typed conversation inputs and UI outputs are public integration surfaces;
+//! - terminal rendering, keyboard handling, and visual layout are owned by `talos-tui`;
+//! - provider execution and tool execution are owned by the runtime/agent layers;
+//! - command registration is reusable, but built-in command semantics may still evolve before 1.0;
+//! - consumers should expect additive events and fields while the external UI contract settles.
+//!
+//! Alternate UIs can depend on this crate to share conversation state transitions without pulling
+//! in the Talos terminal UI.
 
 mod command_registry;
 mod engine;

@@ -1,4 +1,17 @@
 //! Talos provider — LLM client abstractions and provider-specific implementations.
+//!
+//! This crate contains provider adapters and request-shaping helpers used by Talos.
+//! The public boundary is intentionally narrow in the pre-1.0 line:
+//!
+//! - provider types implement the [`talos_core::provider::LanguageModel`] trait;
+//! - request previews are diagnostic snapshots and must redact credentials;
+//! - network calls return typed provider errors instead of panicking;
+//! - retry behavior is bounded and provider-specific;
+//! - model catalogs, credential storage, and runtime selection live outside this crate.
+//!
+//! Publishing this crate does not make Talos provider configuration stable. Consumers should treat
+//! concrete provider structs as pre-1.0 adapters and prefer the `talos-core` provider traits for
+//! long-lived integration code.
 
 pub mod mock;
 pub mod openai;
