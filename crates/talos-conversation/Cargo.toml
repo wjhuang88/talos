@@ -4,10 +4,12 @@ description = "Conversation engine for Talos agent runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { path = "../talos-core" }
+talos-core = { version = "0.2.0", path = "../talos-core" }
 tokio = { version = "1", features = ["sync", "macros", "time", "rt", "io-util"] }
 tokio-stream = "0.1"
 futures = "0.3"

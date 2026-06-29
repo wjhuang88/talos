@@ -4,13 +4,15 @@ description = "MCP client/server integration for Talos"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { path = "../talos-core" }
-talos-plugin = { path = "../talos-plugin" }
+talos-core = { version = "0.2.0", path = "../talos-core" }
+talos-plugin = { version = "0.2.0", path = "../talos-plugin" }
 # I009-S4 begin
-talos-permission = { path = "../talos-permission" }
+talos-permission = { version = "0.2.0", path = "../talos-permission" }
 rmcp = { version = "1.7.0", default-features = false, features = ["server", "client", "transport-io", "transport-child-process", "transport-async-rw"] }
 # I009-S4 end
 tokio = { version = "1", features = ["full"] }
@@ -24,7 +26,7 @@ async-trait = "0.1"
 [dev-dependencies]
 tempfile = "3"
 # I009-S4 begin
-talos-tools = { path = "../talos-tools" }
+talos-tools = { version = "0.2.0", path = "../talos-tools" }
 # I009-S4 end
 
 [lints]

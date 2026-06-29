@@ -2,8 +2,12 @@
 
 ## Status
 
-Proposal. Created 2026-06-28 from the requirement that Talos-owned capabilities should be
-distributable as crates, not only as the `talos` binary or the `talos-runtime` SDK facade.
+Accepted as the implementation baseline on 2026-06-29 for publication-readiness work. A separate
+release/ADR gate is still required before any real crates.io publish or placeholder name
+reservation.
+
+Created 2026-06-28 from the requirement that Talos-owned capabilities should be distributable as
+crates, not only as the `talos` binary or the `talos-runtime` SDK facade.
 
 ## Problem
 

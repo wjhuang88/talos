@@ -170,6 +170,20 @@ execute the tool.
 Tool prompt content is grouped into stable family sections. Adding or removing one family should
 not rewrite unchanged family blocks, preserving provider cache friendliness.
 
+## Crate Distribution
+
+Talos has three distribution layers:
+
+1. Binary/product distribution through the `talos` CLI release artifacts and installers.
+2. The embeddable SDK facade through `talos-runtime`.
+3. Standalone capability crates such as `talos-core`, `talos-config`, `talos-permission`,
+   `talos-skill`, `talos-session`, and later provider/tool/storage crates.
+
+The crate publication model follows the ripgrep-style boundary: product crates aggregate reusable
+library crates, while reusable crates must not depend on CLI/TUI/product assumptions. Publication
+readiness is tracked in `docs/reference/CRATE-PUBLICATION-MATRIX.md`. Real crates.io publication or
+placeholder name reservation remains a separate maintainer-approved release action.
+
 ## TUI Event-Driven Architecture (I023)
 
 The TUI follows a single-directional information flow: Agent → ConversationEngine → UI.

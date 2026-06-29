@@ -4,11 +4,13 @@ description = "Self-evolution engine for Talos agent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { path = "../talos-core" }
-talos-plugin = { path = "../talos-plugin" }
+talos-core = { version = "0.2.0", path = "../talos-core" }
+talos-plugin = { version = "0.2.0", path = "../talos-plugin" }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"

@@ -4,13 +4,15 @@ description = "Permission rules engine for gating tool execution"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
 glob = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-talos-core = { path = "../talos-core" }
+talos-core = { version = "0.2.0", path = "../talos-core" }
 thiserror = "2"
 url = "2"
 

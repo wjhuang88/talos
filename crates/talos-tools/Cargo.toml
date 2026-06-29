@@ -4,11 +4,13 @@ description = "Built-in agent tools: bash, file operations, and more"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { path = "../talos-core" }
-talos-sandbox = { path = "../talos-sandbox" }
+talos-core = { version = "0.2.0", path = "../talos-core" }
+talos-sandbox = { version = "0.2.0", path = "../talos-sandbox" }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -4,6 +4,8 @@ description = "Primary command-line interface"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 rust-version.workspace = true
 
 [[bin]]
@@ -11,24 +13,24 @@ name = "talos"
 path = "src/main.rs"
 
 [dependencies]
-talos-core = { path = "../talos-core" }
-talos-config = { path = "../talos-config" }
-talos-provider = { path = "../talos-provider" }
-talos-agent = { path = "../talos-agent" }
-talos-plugin = { path = "../talos-plugin" }
+talos-core = { version = "0.2.0", path = "../talos-core" }
+talos-config = { version = "0.2.0", path = "../talos-config" }
+talos-provider = { version = "0.2.0", path = "../talos-provider" }
+talos-agent = { version = "0.2.0", path = "../talos-agent" }
+talos-plugin = { version = "0.2.0", path = "../talos-plugin" }
 # I009-S3 begin
-talos-mcp = { path = "../talos-mcp" }
+talos-mcp = { version = "0.2.0", path = "../talos-mcp" }
 # I009-S3 end
 # I009-S5 begin
-talos-rpc = { path = "../talos-rpc" }
+talos-rpc = { version = "0.2.0", path = "../talos-rpc" }
 # I009-S5 end
-talos-tools = { path = "../talos-tools" }
-talos-session = { path = "../talos-session" }
-talos-memory = { path = "../talos-memory" }
-talos-permission = { path = "../talos-permission" }
-talos-evolution = { path = "../talos-evolution" }
-talos-skill = { path = "../talos-skill" }
-talos-exploration = { path = "../talos-exploration" }
+talos-tools = { version = "0.2.0", path = "../talos-tools" }
+talos-session = { version = "0.2.0", path = "../talos-session" }
+talos-memory = { version = "0.2.0", path = "../talos-memory" }
+talos-permission = { version = "0.2.0", path = "../talos-permission" }
+talos-evolution = { version = "0.2.0", path = "../talos-evolution" }
+talos-skill = { version = "0.2.0", path = "../talos-skill" }
+talos-exploration = { version = "0.2.0", path = "../talos-exploration" }
 serde_json = "1"
 toml = "1.1.2"
 async-trait = "0.1"
@@ -36,8 +38,8 @@ clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 tokio-util = "0.7"
-talos-tui = { path = "../talos-tui" }
-talos-conversation = { path = "../talos-conversation" }
+talos-tui = { version = "0.2.0", path = "../talos-tui" }
+talos-conversation = { version = "0.2.0", path = "../talos-conversation" }
 uuid = { version = "1", features = ["v4"] }
 dirs = "6"
 tracing = "0.1"

@@ -1,6 +1,6 @@
 # ARCH-031: Crate Publication Boundary And Distribution Architecture
 
-**Status**: Planned
+**Status**: In Progress (publication readiness; real publish blocked)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to make Talos-owned capabilities independently publishable as crates,
@@ -68,9 +68,9 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 
 ## Acceptance Criteria
 
-- [ ] `docs/proposals/talos-crate-distribution-architecture.md` is accepted, superseded, or
+- [x] `docs/proposals/talos-crate-distribution-architecture.md` is accepted, superseded, or
       converted into an ADR before implementation begins.
-- [ ] A publication matrix covers all workspace crates and classifies each crate's intended
+- [x] A publication matrix covers all workspace crates and classifies each crate's intended
       support level.
 - [ ] Publishable crates have complete Cargo package metadata and publish-compatible internal
       dependency specs.
@@ -89,6 +89,25 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - `cargo test -p <crate>` for each selected crate
 - `cargo check --workspace`
 - `scripts/validate_project_governance.sh .`
+
+## Execution Notes
+
+2026-06-29:
+
+- Accepted `docs/proposals/talos-crate-distribution-architecture.md` as the implementation
+  baseline for publication-readiness work; real publish/name reservation remains blocked pending
+  explicit maintainer approval.
+- Added `docs/reference/CRATE-PUBLICATION-MATRIX.md`.
+- Added workspace repository/homepage metadata and publish-compatible `version = "0.2.0"` plus
+  `path` specs for Talos crate-to-crate dependencies.
+- Checked crate name availability with `cargo search <name> --limit 3`: no exact matches found for
+  current workspace crate names; `talos-core` returned only the near-match `talos-core-rs`.
+- Checked top-level `talos`: it is already taken by an unrelated crate, so Cargo package
+  publication should use the current `talos-*` names.
+- `cargo publish --dry-run --allow-dirty -p talos-core` passed.
+- `cargo publish --dry-run --allow-dirty -p talos-skill` passed.
+- `talos-config`, `talos-permission`, and `talos-session` dry-runs are correctly blocked until
+  `talos-core` exists in the crates.io index.
 
 ## Required Reads
 
