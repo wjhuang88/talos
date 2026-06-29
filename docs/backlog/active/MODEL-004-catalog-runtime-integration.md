@@ -1,6 +1,6 @@
 # MODEL-004: Model Catalog Runtime Integration
 
-**Status**: Planned
+**Status**: Planned (selected into crate distribution hardening two-month plan)
 **Priority**: P2
 **Source**: I038 residual (2026-06-20)
 **Depends on**: MODEL-001 (I038 — catalog data layer complete); MEM-005 (compaction policy)
@@ -13,6 +13,12 @@ uses hardcoded `128_000` as the context limit fallback, and no runtime code
 consumes model pricing or capability metadata.
 
 Without integration, the catalog is dead data — it exists but nothing uses it.
+
+## Planning Link
+
+Selected into
+`docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md` as the M1-M3 feature track:
+runtime design checkpoint, catalog-backed limits, and compaction/UI metadata integration.
 
 ## Scope
 

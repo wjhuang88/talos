@@ -135,13 +135,19 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - Added `publish = false` to `talos-cli`, `talos-tui`, and `talos-evolution` so product-only crates
   cannot be accidentally published through `cargo publish --workspace`.
 - Created the two-month crate distribution hardening plan and programmer handoff to delegate
-  published-crate docs, product-only guards, high-risk gates, runtime dependency closure, and
-  user-facing distribution docs without authorizing additional real publishes.
+  published-crate docs, product-only guards, high-risk gates, runtime dependency closure,
+  user-facing distribution docs, and feature tracks for WEBFETCH bounded document capture,
+  MODEL-004 runtime catalog integration, CONF-001 CLI config editing, and AGENT-002-B shared skill
+  discovery without authorizing additional real publishes.
 
 ## Required Reads
 
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
 - `docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md`
+- `docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`
+- `docs/backlog/active/MODEL-004-catalog-runtime-integration.md`
+- `docs/backlog/active/CONF-001-config-editing.md`
+- `docs/backlog/active/AGENT-002-dotagents-protocol-support.md`
 - `docs/proposals/talos-crate-distribution-architecture.md`
 - `docs/reference/ARCHITECTURE.md`
 - `docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`

@@ -1,6 +1,6 @@
 # AGENT-002: dotagentsprotocol.com Shared Config Support
 
-**Status**: Research
+**Status**: Research (skills discovery selected into crate distribution hardening plan)
 **Priority**: P3
 **Source**: I035 Survey (2026-06-19)
 **Depends on**: AGENT-001 complete; dotagentsprotocol.com stabilization
@@ -16,6 +16,12 @@ Talos's existing subsystems — each requiring different compatibility work:
 | Models | `~/.agents/models.json` | `talos-config` | Pure config import |
 | Skills | `~/.agents/skills/` | `talos-skill` | Runtime discovery path |
 | MCP | `~/.agents/mcp.json` | `talos-mcp` | Config import + server lifecycle |
+
+## Planning Link
+
+Only AGENT-002-B (`~/.agents/skills/` discovery) is selected into
+`docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md` as the S1-S3 feature track.
+Models import and MCP import remain out of scope for that plan.
 
 ## Sub-items
 

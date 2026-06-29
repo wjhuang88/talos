@@ -8,7 +8,7 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. TOOL-012 progressive loading and TOOL-013 hybrid network/write permission boundaries are complete. Phase 2+ (PDF/Office/document extraction) now needs a bounded extraction/save workflow design before implementation. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
+Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. TOOL-012 progressive loading and TOOL-013 hybrid network/write permission boundaries are complete. Phase 2+ is now selected into the crate-distribution hardening two-month plan as a bounded document-capture feature track: design first, then `document_extract` for local text/HTML/JSON/CSV/Markdown-like resources, then fetch/save/extract integration. PDF/Office/OCR and browser automation remain out of scope without a separate dependency gate. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
 
 ## Priority
 

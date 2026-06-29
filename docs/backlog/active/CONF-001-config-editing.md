@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | CONF-001 |
 | Priority | P2 |
-| Status | Planned |
+| Status | Planned (selected into crate distribution hardening two-month plan) |
 | Depends On | None |
 | Estimate | M |
 | Origin | User request 2026-06-17 — no in-app way to edit config; users must hand-edit `~/.talos/config.toml` |
@@ -28,6 +28,12 @@ Provide two complementary configuration surfaces that both round-trip through `t
   - `talos config edit` — open the file in `$EDITOR` (optional convenience).
 - **TUI slash command** `/config` — view and edit the most important settings (at minimum model +
   provider) inline, without leaving the TUI.
+
+## Planning Link
+
+Selected into
+`docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md` as the C1-C3 feature track:
+CLI key grammar/design, `talos config get/list/set` MVP, and UX hardening/TUI readiness decision.
 
 ## Acceptance Criteria
 
