@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roadmap — Talos</title>
+    <meta
+      name="description"
+      content="Talos project status: what is shipped in v0.2.0, what is planned, and what remains research."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script defer src="assets/site.js"></script>
+  </head>
+  <body data-page="roadmap">
+    <a class="talos-skip" href="#main">Skip to content</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">Home</a>
+          <a href="install.html" data-nav-slug="install">Install</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
+          <a href="safety.html" data-nav-slug="safety">Safety</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
+          <a href="releases.html" data-nav-slug="releases">Releases</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>Roadmap</h1>
+        <p>
+          The shipped, planned, and research split for Talos. Items marked
+          <span class="talos-pill talos-pill--shipped">Shipped</span>
+          are part of v0.2.0; items marked
+          <span class="talos-pill talos-pill--planned">Planned</span>
+          are scoped; items marked
+          <span class="talos-pill talos-pill--research">Research</span>
+          are exploratory and have no committed timeline.
+        </p>
+      </header>
+
+      <section>
+        <h2>How to read this page</h2>
+        <p>
+          The roadmap mirrors the public face of the project only. Detailed
+          engineering state lives in
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/BOARD.md"
+            rel="noopener"
+            >docs/BOARD.md</a
+          >, the iteration records, and the backlog. This page is the
+          short, conservative public summary. If a public claim here ever
+          disagrees with a shipped behavior, the shipped behavior wins
+          until the page is updated.
+        </p>
+      </section>
+
+      <section>
+        <h2>Shipped in v0.2.0</h2>
+        <p>
+          The following are part of the current published release. They are
+          documented in detail on the
+          <a href="capabilities.html">Capabilities page</a> and the
+          <a href="safety.html">Safety page</a>.
+        </p>
+        <ul>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            TUI, inline, and print execution modes.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Local provider configuration with masked secrets per
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/023-inline-api-key-boundary.md"
+              rel="noopener"
+              >ADR-023</a
+            >.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Built-in coding tools (files, search, code intelligence, Git,
+            <code>http_request</code>, <code>web_search</code>,
+            <code>bash</code>) with permission gating.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Session storage, search, cleanup, maintenance, memory
+            consolidation, and exploration ingestion.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Runtime Skills from <code>.talos/skills/</code>,
+            <code>~/.talos/skills/</code>, and inherited parent
+            <code>.talos/skills/</code>.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            MCP stdio tools and JSON-RPC infrastructure.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Initial <code>talos-runtime</code> embeddable facade
+            (pre-1.0; <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/024-embeddable-runtime-api-boundary.md"
+              rel="noopener"
+              >ADR-024</a
+            >).
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Planned</h2>
+        <p>
+          These items are scoped but not yet shipped. The order below is
+          a sequencing preference, not a release-date commitment.
+        </p>
+        <ul>
+          <li>
+            <span class="talos-pill talos-pill--planned">Planned</span>
+            Stable 1.0 SDK guarantee for the
+            <code>talos-runtime</code> facade. Gated by
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md"
+              rel="noopener"
+              >REL-002</a
+            >, which requires Talos to perform 100% self-bootstrap
+            development as the primary runtime with recorded evidence.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--planned">Planned</span>
+            A bounded document-extraction and save workflow for PDF and
+            Office formats, building on the current
+            <code>http_request</code> / <code>web_search</code> foundation
+            (see
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md"
+              rel="noopener"
+              >WEBFETCH-001</a
+            >).
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--planned">Planned</span>
+            Multi-resource tool permission profiles beyond the current
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/026-multi-resource-tool-permissions.md"
+              rel="noopener"
+              >ADR-026</a
+            > foundation.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Research</h2>
+        <p>
+          These items are exploratory. They have no committed timeline and
+          are not presented as shipped. Some are tracked as separate
+          product-differentiation work and will not land in the Talos
+          core runtime at all.
+        </p>
+        <ul>
+          <li>
+            <span class="talos-pill talos-pill--research">Research</span>
+            <code>~/.agents/skills/</code> dotagents shared-directory
+            discovery. Tracked under
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/AGENT-002-dotagents-protocol-support.md"
+              rel="noopener"
+              >AGENT-002</a
+            >.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">Research</span>
+            Embedded browser / web control surface. Tracked separately
+            under
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+              rel="noopener"
+              >WEB-001</a
+            >. This is a product-differentiation track; it is
+            <strong>not</strong> enabled in v0.2.0 and it is
+            <strong>not</strong> a safety boundary.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">Research</span>
+            WASM plugin runtime and plugin marketplace. Tracked under
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md"
+              rel="noopener"
+              >PLUGIN-001</a
+            >.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">Research</span>
+            Remote or P2P session control. Tracked under
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/REMOTE-001-remote-session-protocol.md"
+              rel="noopener"
+              >REMOTE-001</a
+            >. A remote-session control surface requires an ADR gate
+            before any prototype work.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">Research</span>
+            Local micro-model decision layer (small on-device model for
+            hints). Tracked under
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/MODEL-002-local-micro-model-decision-layer.md"
+              rel="noopener"
+              >MODEL-002</a
+            >.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Non-goals for v0.2.0</h2>
+        <p>
+          These are explicit non-goals. They are listed so users do not
+          have to discover them by experiment.
+        </p>
+        <ul>
+          <li>
+            Talos is <strong>not</strong> a remote multi-user service.
+            There is no remote control plane, no hosted session router,
+            and no remote approval UI.
+          </li>
+          <li>
+            Talos is <strong>not</strong> a marketplace runtime. The
+            WASM plugin runtime and plugin marketplace are research only.
+          </li>
+          <li>
+            Talos is <strong>not</strong> a browser dashboard. The
+            embedded browser / web control surface is a separate research
+            track (<a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+              rel="noopener"
+              >WEB-001</a
+            >).
+          </li>
+          <li>
+            Talos is <strong>not</strong> an autonomous background
+            daemon. It runs interactively or in print mode; it does not
+            sit in the background waiting for a trigger.
+          </li>
+          <li>
+            Talos does <strong>not</strong> auto-commit, auto-publish,
+            or auto-merge. Git writes happen only through explicit
+            tool or user action.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Engineering status</h2>
+        <p>
+          For the current engineering operating view (Now, Review,
+          Blocked, Next, Done), use
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/BOARD.md"
+            rel="noopener"
+            >docs/BOARD.md</a
+          >
+          and the
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/iterations/README.md"
+            rel="noopener"
+            >iteration records</a
+          >. Those are the source of truth for engineering progress; this
+          roadmap is the source of truth for the public boundary.
+        </p>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >Source docs</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

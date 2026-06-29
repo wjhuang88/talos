@@ -439,6 +439,7 @@ For current engineering status, use the project governance docs instead of this 
 | Local development | [docs/sop/LOCAL-DEV.md](docs/sop/LOCAL-DEV.md) |
 | Testing | [docs/sop/TESTING.md](docs/sop/TESTING.md) |
 | Git workflow | [docs/sop/GIT-WORKFLOW.md](docs/sop/GIT-WORKFLOW.md) |
+| Public product site | [site/](site/) &mdash; static GitHub Pages site (publishing pending maintainer approval) |
 
 ## License
 

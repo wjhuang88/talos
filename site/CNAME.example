@@ -1,0 +1,12 @@
+# Replace this file with `site/CNAME` (no extension) to enable a custom
+# domain. The CNAME file must contain exactly one line: the bare domain name.
+# Example:
+#
+#   talos.example.com
+#
+# GitHub Pages reads `site/CNAME` automatically when Pages is configured to
+# serve from the `site/` directory. Until a domain is selected, leave this
+# file as `site/CNAME.example` so the repository does not pin an unowned
+# domain.
+#
+# Reference: https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site

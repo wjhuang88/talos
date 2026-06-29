@@ -1,0 +1,469 @@
+/* Talos product-site stylesheet
+ *
+ * Plain CSS, no build step, no external resources.
+ * Theme tokens are defined as CSS custom properties and switch on
+ * `prefers-color-scheme: dark`. Override by adding a `data-theme`
+ * attribute on <html> if a future maintainer wants a manual toggle.
+ */
+
+:root {
+  --talos-fg: #1a1d23;
+  --talos-fg-muted: #525866;
+  --talos-bg: #ffffff;
+  --talos-bg-subtle: #f5f6f8;
+  --talos-bg-code: #f1f2f5;
+  --talos-border: #d8dbe0;
+  --talos-accent: #2b6cb0;
+  --talos-accent-strong: #1f4f86;
+  --talos-link: #1f4f86;
+  --talos-shipped: #1f7a4d;
+  --talos-planned: #8a5a00;
+  --talos-research: #6a3fa0;
+  --talos-danger: #a83232;
+  --talos-radius: 6px;
+  --talos-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --talos-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "Noto Sans CJK SC", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --talos-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --talos-max-width: 64rem;
+  --talos-nav-height: 3.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --talos-fg: #e5e7eb;
+    --talos-fg-muted: #9aa3b2;
+    --talos-bg: #0f1115;
+    --talos-bg-subtle: #161a21;
+    --talos-bg-code: #1c2129;
+    --talos-border: #2a313b;
+    --talos-accent: #6aa9e8;
+    --talos-accent-strong: #a4c8f3;
+    --talos-link: #7ab3ee;
+    --talos-shipped: #4ade80;
+    --talos-planned: #f0b452;
+    --talos-research: #c4a4ee;
+    --talos-danger: #f08c8c;
+    --talos-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--talos-font-sans);
+  color: var(--talos-fg);
+  background-color: var(--talos-bg);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Skip link for keyboard users */
+.talos-skip {
+  position: absolute;
+  top: -3rem;
+  left: 0;
+  padding: 0.5rem 1rem;
+  background: var(--talos-accent);
+  color: #fff;
+  text-decoration: none;
+  z-index: 100;
+  border-bottom-right-radius: var(--talos-radius);
+  transition: top 0.15s ease;
+}
+.talos-skip:focus {
+  top: 0;
+}
+
+/* Header / top navigation */
+.talos-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--talos-bg);
+  border-bottom: 1px solid var(--talos-border);
+  box-shadow: var(--talos-shadow);
+}
+.talos-header__inner {
+  max-width: var(--talos-max-width);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: var(--talos-nav-height);
+}
+.talos-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  color: var(--talos-fg);
+}
+.talos-brand__mark {
+  color: var(--talos-accent);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.talos-brand__name {
+  font-family: var(--talos-font-mono);
+  letter-spacing: 0.18em;
+}
+.talos-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-left: auto;
+}
+.talos-nav a {
+  color: var(--talos-fg-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--talos-radius);
+}
+.talos-nav a:hover,
+.talos-nav a:focus {
+  color: var(--talos-fg);
+  background: var(--talos-bg-subtle);
+}
+.talos-nav a[aria-current="page"] {
+  color: var(--talos-fg);
+  font-weight: 600;
+}
+
+/* Main content */
+.talos-main {
+  max-width: var(--talos-max-width);
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+.talos-main h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+  letter-spacing: -0.01em;
+}
+.talos-main h2 {
+  font-size: 1.4rem;
+  line-height: 1.25;
+  margin: 2.5rem 0 0.75rem;
+  border-bottom: 1px solid var(--talos-border);
+  padding-bottom: 0.4rem;
+}
+.talos-main h3 {
+  font-size: 1.1rem;
+  line-height: 1.3;
+  margin: 1.75rem 0 0.5rem;
+}
+.talos-main p,
+.talos-main ul,
+.talos-main ol {
+  margin: 0 0 1rem;
+}
+.talos-main ul,
+.talos-main ol {
+  padding-left: 1.25rem;
+}
+.talos-main li {
+  margin: 0.25rem 0;
+}
+.talos-main a {
+  color: var(--talos-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 0.05em;
+}
+.talos-main a:hover {
+  text-decoration-thickness: 0.12em;
+}
+.talos-main strong {
+  font-weight: 600;
+}
+
+/* Hero on the home page */
+.talos-hero {
+  padding: 1rem 0 0.5rem;
+}
+.talos-hero__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  color: var(--talos-accent);
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+.talos-hero h1 {
+  font-size: 2.4rem;
+  margin: 0 0 0.5rem;
+}
+.talos-hero__tagline {
+  font-size: 1.1rem;
+  color: var(--talos-fg-muted);
+  margin: 0 0 1.5rem;
+}
+.talos-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.5rem;
+}
+.talos-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--talos-radius);
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+.talos-button--primary {
+  background: var(--talos-accent);
+  color: #fff;
+}
+.talos-button--primary:hover {
+  background: var(--talos-accent-strong);
+  text-decoration: none;
+}
+.talos-button--secondary {
+  background: var(--talos-bg);
+  color: var(--talos-fg);
+  border-color: var(--talos-border);
+}
+.talos-button--secondary:hover {
+  background: var(--talos-bg-subtle);
+  text-decoration: none;
+}
+
+/* Callout / note boxes */
+.talos-callout {
+  border: 1px solid var(--talos-border);
+  background: var(--talos-bg-subtle);
+  border-radius: var(--talos-radius);
+  padding: 1rem 1.1rem;
+  margin: 1.5rem 0;
+}
+.talos-callout--warn {
+  border-left: 4px solid var(--talos-planned);
+}
+.talos-callout--info {
+  border-left: 4px solid var(--talos-accent);
+}
+.talos-callout p:last-child {
+  margin-bottom: 0;
+}
+.talos-callout strong {
+  color: var(--talos-fg);
+}
+
+/* Code blocks */
+.talos-main code,
+.talos-main pre {
+  font-family: var(--talos-font-mono);
+  font-size: 0.9em;
+}
+.talos-main :not(pre) > code {
+  background: var(--talos-bg-code);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  border: 1px solid var(--talos-border);
+}
+.talos-main pre {
+  background: var(--talos-bg-code);
+  border: 1px solid var(--talos-border);
+  border-radius: var(--talos-radius);
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.talos-main pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+.talos-codeblock {
+  position: relative;
+}
+.talos-codeblock__copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--talos-bg);
+  color: var(--talos-fg-muted);
+  border: 1px solid var(--talos-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--talos-font-sans);
+  display: none;
+}
+.talos-codeblock:hover .talos-codeblock__copy,
+.talos-codeblock:focus-within .talos-codeblock__copy {
+  display: inline-block;
+}
+.talos-codeblock__copy:focus {
+  outline: 2px solid var(--talos-accent);
+  outline-offset: 1px;
+}
+
+/* Tables */
+.talos-main table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.5rem;
+  font-size: 0.95rem;
+}
+.talos-main th,
+.talos-main td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--talos-border);
+  vertical-align: top;
+}
+.talos-main th {
+  background: var(--talos-bg-subtle);
+  font-weight: 600;
+}
+
+/* Status pills */
+.talos-pill {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+.talos-pill--shipped {
+  color: var(--talos-shipped);
+  border-color: var(--talos-shipped);
+  background: color-mix(in srgb, var(--talos-shipped) 12%, transparent);
+}
+.talos-pill--planned {
+  color: var(--talos-planned);
+  border-color: var(--talos-planned);
+  background: color-mix(in srgb, var(--talos-planned) 12%, transparent);
+}
+.talos-pill--research {
+  color: var(--talos-research);
+  border-color: var(--talos-research);
+  background: color-mix(in srgb, var(--talos-research) 12%, transparent);
+}
+
+/* Highlight card grid (home page) */
+.talos-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+}
+.talos-card {
+  border: 1px solid var(--talos-border);
+  border-radius: var(--talos-radius);
+  padding: 1.1rem 1.1rem 1.2rem;
+  background: var(--talos-bg);
+}
+.talos-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+.talos-card p {
+  margin: 0;
+  color: var(--talos-fg-muted);
+  font-size: 0.95rem;
+}
+
+/* Footer */
+.talos-footer {
+  border-top: 1px solid var(--talos-border);
+  background: var(--talos-bg-subtle);
+  padding: 1.5rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--talos-fg-muted);
+}
+.talos-footer__inner {
+  max-width: var(--talos-max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.talos-footer a {
+  color: var(--talos-fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.talos-footer a:hover {
+  color: var(--talos-fg);
+}
+
+/* Page-lead block (used at top of inner pages) */
+.talos-lead {
+  border-bottom: 1px solid var(--talos-border);
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.talos-lead p {
+  color: var(--talos-fg-muted);
+  font-size: 1.05rem;
+  margin: 0.25rem 0 0;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .talos-header__inner {
+    flex-wrap: wrap;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .talos-nav {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+  .talos-main {
+    padding: 1.5rem 1rem 3rem;
+  }
+  .talos-hero h1 {
+    font-size: 1.85rem;
+  }
+  .talos-main h1 {
+    font-size: 1.6rem;
+  }
+  .talos-main h2 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Focus visible for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--talos-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
