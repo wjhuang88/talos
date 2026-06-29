@@ -1,6 +1,6 @@
 # ARCH-031: Crate Publication Boundary And Distribution Architecture
 
-**Status**: In Progress (publication readiness; real publish blocked)
+**Status**: In Progress (first-wave crates published)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to make Talos-owned capabilities independently publishable as crates,
@@ -72,9 +72,9 @@ unclear and lets product-layer coupling hide inside internal dependencies.
       converted into an ADR before implementation begins.
 - [x] A publication matrix covers all workspace crates and classifies each crate's intended
       support level.
-- [ ] Publishable crates have complete Cargo package metadata and publish-compatible internal
+- [x] Publishable crates have complete Cargo package metadata and publish-compatible internal
       dependency specs.
-- [ ] The first selected wave passes `cargo publish --dry-run` in dependency order, or failures are
+- [x] The first selected wave passes `cargo publish --dry-run` in dependency order, or failures are
       recorded with owning follow-up items.
 - [ ] `talos-runtime` remains the documented SDK facade; implementation crates document direct-use
       caveats.
@@ -111,6 +111,11 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - After maintainer approval, real `cargo publish -p talos-core` was attempted from clean commit
   `30c9abc`, but crates.io rejected the upload because the publisher account does not have a
   verified email address. No crate was published and no name was reserved.
+- After email verification, real publishes succeeded from clean commit `c8884f6`:
+  `talos-core 0.2.0`, `talos-skill 0.2.0`, `talos-config 0.2.0`,
+  `talos-permission 0.2.0`, and `talos-session 0.2.0`.
+- `cargo search talos-core --limit 5` confirmed `talos-core = "0.2.0"` is visible in the
+  crates.io index before publishing the core-dependent crates.
 
 ## Required Reads
 

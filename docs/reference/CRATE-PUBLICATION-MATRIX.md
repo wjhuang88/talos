@@ -47,11 +47,11 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 
 | Order | Crate | Layer | Support level | Publish readiness | First action |
 |---:|---|---|---|---|---|
-| 1 | `talos-core` | Foundation protocol | Publish-now candidate | `cargo publish --dry-run --allow-dirty -p talos-core` passed | Real publish/name reservation requires maintainer approval. |
-| 2 | `talos-config` | Policy/config | Publish-after-core | Manifest-ready; dry-run blocked until `talos-core` exists in crates.io index | Dry-run after core is published/reserved. |
-| 3 | `talos-permission` | Policy/safety | Publish-after-core-docs | Manifest-ready; dry-run blocked until `talos-core` exists in crates.io index | Dry-run after core is published/reserved. |
-| 4 | `talos-skill` | Capability/parser | Publish-now candidate | `cargo publish --dry-run --allow-dirty -p talos-skill` passed | Real publish/name reservation requires maintainer approval. |
-| 5 | `talos-session` | Storage/session | Publish-after-core-docs | Manifest-ready; dry-run blocked until `talos-core` exists in crates.io index | Dry-run after core is published/reserved. |
+| 1 | `talos-core` | Foundation protocol | Published first wave | `talos-core 0.2.0` published | Continue API docs before 1.0 stability claims. |
+| 2 | `talos-config` | Policy/config | Published first wave | `talos-config 0.2.0` published | Add crate-specific docs/keywords later. |
+| 3 | `talos-permission` | Policy/safety | Published first wave | `talos-permission 0.2.0` published | Add safety support boundary docs. |
+| 4 | `talos-skill` | Capability/parser | Published first wave | `talos-skill 0.2.0` published | Add crate-specific docs/keywords later. |
+| 5 | `talos-session` | Storage/session | Published first wave | `talos-session 0.2.0` published | Add SQLite storage contract docs. |
 | 6 | `talos-provider` | Provider/network | Publish-after-docs | Manifest-ready; network/provider API docs needed | Document support boundary. |
 | 7 | `talos-sandbox` | Platform safety | Publish-after-ADR-review | Manifest-ready; platform behavior sensitive | Safety review before dry-run. |
 | 8 | `talos-plugin` | Extension foundation | Publish-after-boundary-docs | Manifest-ready; depends on core + permission | Document extension support boundary. |
@@ -90,6 +90,11 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 - Real `cargo publish -p talos-core` was attempted from clean commit `30c9abc` after maintainer
   approval. crates.io rejected the upload because the publisher account does not have a verified
   email address. No crate was published and no name was reserved.
+- After email verification, real publishes from clean commit `c8884f6` succeeded:
+  `talos-core 0.2.0`, `talos-skill 0.2.0`, `talos-config 0.2.0`,
+  `talos-permission 0.2.0`, and `talos-session 0.2.0`.
+- `cargo search talos-core --limit 5` confirmed `talos-core = "0.2.0"` was visible in the
+  crates.io index before publishing `talos-config`, `talos-permission`, and `talos-session`.
 
 Remaining manifest work before broad publish:
 
@@ -103,11 +108,13 @@ Remaining manifest work before broad publish:
 
 Recommended reservation sequence if the maintainer explicitly authorizes real publish:
 
-1. Reserve P0 names first with real minimal, usable crates: `talos-core`, `talos-runtime`.
-2. Reserve P1 names in dependency order: `talos-skill`, `talos-config`, `talos-permission`,
-   `talos-session`, `talos-agent`.
+1. Completed first-wave reservation with real usable crates: `talos-core`, `talos-skill`,
+   `talos-config`, `talos-permission`, and `talos-session`.
+2. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
+   dependencies are intentionally published or decoupled.
 3. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
-4. Defer P2/P3 names until docs, feature gates, and API support boundaries are clearer.
+4. Defer remaining P1/P2/P3 names until docs, feature gates, and API support boundaries are
+   clearer.
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear
 description, and state its pre-1.0 support boundary.
