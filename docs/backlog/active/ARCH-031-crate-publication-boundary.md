@@ -1,6 +1,6 @@
 # ARCH-031: Crate Publication Boundary And Distribution Architecture
 
-**Status**: In Progress (second wave published; boundary docs next)
+**Status**: In Progress (integration crates published; high-risk crates deferred)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to make Talos-owned capabilities independently publishable as crates,
@@ -122,6 +122,13 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - Real `cargo publish -p talos-exploration` initially passed packaging and verification but
   crates.io rejected upload with a new-crate rate limit. Retry after 2026-06-29 07:28:33 GMT was
   successful, publishing `talos-exploration 0.2.0`.
+- Added crate-level support boundary docs for `talos-provider`, `talos-conversation`, and
+  `talos-rpc` in commit `92a0c99`.
+- `cargo test -p talos-provider -p talos-conversation -p talos-rpc` passed.
+- `cargo publish --dry-run -p talos-provider`, `cargo publish --dry-run -p talos-conversation`,
+  and `cargo publish --dry-run -p talos-rpc` passed from clean commit `92a0c99`.
+- Real publishes succeeded for `talos-provider 0.2.0`, `talos-conversation 0.2.0`, and
+  `talos-rpc 0.2.0`. Each package is visible via `cargo search`.
 
 ## Required Reads
 

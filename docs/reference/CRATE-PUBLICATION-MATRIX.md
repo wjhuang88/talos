@@ -52,17 +52,17 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 3 | `talos-permission` | Policy/safety | Published first wave | `talos-permission 0.2.0` published | Add safety support boundary docs. |
 | 4 | `talos-skill` | Capability/parser | Published first wave | `talos-skill 0.2.0` published | Add crate-specific docs/keywords later. |
 | 5 | `talos-session` | Storage/session | Published first wave | `talos-session 0.2.0` published | Add SQLite storage contract docs. |
-| 6 | `talos-provider` | Provider/network | Publish-after-docs | `cargo publish --dry-run -p talos-provider` passed | Document network/provider support boundary before real publish. |
+| 6 | `talos-provider` | Provider/network | Published integration wave | `talos-provider 0.2.0` published | Continue provider support boundary docs before 1.0 stability claims. |
 | 7 | `talos-sandbox` | Platform safety | Publish-after-ADR-review | Manifest-ready; platform behavior sensitive | Safety review before dry-run. |
 | 8 | `talos-plugin` | Extension foundation | Published second wave | `talos-plugin 0.2.0` published | Continue extension boundary docs before 1.0 stability claims. |
 | 9 | `talos-tools` | Built-in tools | Publish-after-feature-gates | Manifest-ready; heavy defaults | Design feature gates. |
 | 10 | `talos-memory` | Memory storage | Published second wave | `talos-memory 0.2.0` published | Add fuller SQLite storage contract docs before 1.0 stability claims. |
 | 11 | `talos-exploration` | Exploration storage | Published second wave | `talos-exploration 0.2.0` published | Add fuller SQLite/FTS storage contract docs before 1.0 stability claims. |
-| 12 | `talos-conversation` | UI/runtime state | Publish-after-docs | `cargo publish --dry-run -p talos-conversation` passed | Document alternate UI/state API before real publish. |
+| 12 | `talos-conversation` | UI/runtime state | Published integration wave | `talos-conversation 0.2.0` published | Continue alternate UI/state API docs before 1.0 stability claims. |
 | 13 | `talos-agent` | Runtime implementation | Advanced/transitional | Manifest-ready; not primary SDK | Publish after lower deps. |
 | 14 | `talos-runtime` | SDK facade | Primary SDK | Manifest-ready; depends on lower deps | Publish after implementation deps. |
 | 15 | `talos-mcp` | Protocol transport | Publish-after-ADR | Manifest-ready; protocol boundary sensitive | ADR/support boundary. |
-| 16 | `talos-rpc` | JSON-RPC transport | Publish-after-ADR | Manifest-ready; remote/control semantics sensitive | ADR/support boundary. |
+| 16 | `talos-rpc` | JSON-RPC transport | Published integration wave | `talos-rpc 0.2.0` published | Keep support boundary to local stdio; remote semantics still need ADR. |
 | 17 | `talos-evolution` | Product learning | Product-specific | Manifest-ready but not first-wave | Defer. |
 | 18 | `talos-tui` | Product UI | Product assembly | Manifest-ready but heavy/UI-specific | Defer. |
 | 19 | `talos-cli` | Binary product | Product assembly | Manifest-ready as package; not first-wave library | Defer until binary publish decision. |
@@ -101,6 +101,13 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 - Real `cargo publish -p talos-exploration` initially passed packaging and verification but
   crates.io rejected upload with a new-crate rate limit. Retry after 2026-06-29 07:28:33 GMT was
   successful, publishing `talos-exploration 0.2.0`.
+- Added crate-level support boundary docs for `talos-provider`, `talos-conversation`, and
+  `talos-rpc` in commit `92a0c99`.
+- `cargo test -p talos-provider -p talos-conversation -p talos-rpc` passed.
+- `cargo publish --dry-run -p talos-provider`, `cargo publish --dry-run -p talos-conversation`,
+  and `cargo publish --dry-run -p talos-rpc` passed from clean commit `92a0c99`.
+- Real publishes succeeded for `talos-provider 0.2.0`, `talos-conversation 0.2.0`, and
+  `talos-rpc 0.2.0`. Each package is visible via `cargo search`.
 
 Remaining manifest work before broad publish:
 
@@ -118,8 +125,8 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
    `talos-config`, `talos-permission`, and `talos-session`.
 2. Completed second-wave reservation for `talos-plugin`, `talos-memory`, and
    `talos-exploration`.
-3. Document support boundaries before publishing `talos-provider`, `talos-conversation`,
-   `talos-rpc`, or other protocol/runtime surfaces.
+3. Completed integration-wave reservation for `talos-provider`, `talos-conversation`, and
+   `talos-rpc` after adding crate-level support boundary docs.
 4. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
    dependencies are intentionally published or decoupled.
 5. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
