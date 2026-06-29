@@ -118,6 +118,11 @@ talos --config-list                          # print all settings (secrets maske
 talos --config-get model                     # get a single value
 talos --config-set model=claude-sonnet-4-20250514  # set and persist
 talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
+
+# Subcommand form (equivalent to the flags above):
+talos config list                                # print all settings (secrets masked)
+talos config get model                           # get a single value
+talos config set model=claude-sonnet-4-20250514  # set and persist
 ```
 
 ## Development
@@ -297,6 +302,7 @@ Talos ships with built-in tools for common coding-agent work:
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
 - Network: `http_request` (SSRF-protected, permission-gated), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
+- Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Shell escape hatch: `bash`
 
 The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a
@@ -337,6 +343,7 @@ Skill search paths, in priority order:
 - `.talos/skills/` in the active workspace
 - `~/.talos/skills/`
 - parent `.talos/skills/` directories up to the Git root
+- `~/.agents/skills/` (shared, opt-in via `[skills] discover_shared = true` in config)
 
 Use `/skills` in the TUI or inline mode to list runtime-discovered skills. Use
 `/skills activate <name>` to explicitly load one Skill body into provider

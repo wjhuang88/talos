@@ -151,3 +151,44 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear
 description, and state its pre-1.0 support boundary.
+
+## A1: Published-Crate Docs Audit (2026-06-29)
+
+All 11 published crates have `description` and workspace-inherited `repository`/`homepage`. None
+have `keywords`, `categories`, `readme`, or `documentation` fields. Crate-level `//!` docs exist
+for `talos-permission` (comprehensive), `talos-provider`/`talos-conversation`/`talos-rpc` (support
+boundary), `talos-core`/`talos-plugin` (minimal). Missing for `talos-config`, `talos-skill`,
+`talos-session`, `talos-memory`, `talos-exploration`.
+
+## A2: Product-Only Guard (2026-06-29)
+
+`scripts/check_publish_guard.sh` verifies `publish = false` on product-only crates
+(`talos-cli`, `talos-tui`, `talos-evolution`) and its absence on gate crates
+(`talos-sandbox`, `talos-tools`, `talos-agent`, `talos-runtime`, `talos-mcp`). All checks pass.
+
+## A3-A6: Gate Analysis (2026-06-29)
+
+### A3: `talos-sandbox` — DO NOT PUBLISH
+
+Dependencies: `talos-core` (published), `libc 1.0.0-alpha.3` (pre-release, ADR-007), `tokio`.
+Escape-vector checklist (7 items) must be verified with targeted tests before publish. The
+`libc` pre-release version is a stability risk.
+
+### A4: `talos-tools` — DO NOT PUBLISH (heaviest crate)
+
+Dependencies include `gix` (~5MB), `arborium` 25+ langs (~30MB), `reqwest`, `scraper`. Feature
+gates needed: `default = ["file", "search", "git", "code-intelligence", "network"]` with optional
+ shedding. Permission profiles verified TOOL-013 compliant. Publish after sandbox gate + feature
+gates implemented.
+
+### A5: `talos-agent`/`talos-runtime` — Publish Closure Path
+
+Decision: publish implementation crates in dependency order (sandbox → tools → agent → runtime).
+`talos-agent` remains implementation surface (embedders use `talos-runtime`). `talos-runtime` SDK
+support contract: `RuntimeBuilder`/`RuntimeHandle` are the stable pre-1.0 surface.
+
+### A6: `talos-mcp` — DO NOT PUBLISH until rmcp evaluated
+
+Transport: local stdio only (no TCP/HTTP). Support boundary: server opt-in, tool conflict policy
+(built-in takes precedence), bounded timeout. `rmcp 1.7.0` stability must be evaluated. No
+`~/.agents/mcp.json` import (gated under AGENT-002-C).

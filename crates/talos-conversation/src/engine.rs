@@ -592,8 +592,10 @@ impl ConversationEngine {
         for skill in &self.skills {
             let state = if skill.active { "active" } else { "available" };
             text.push_str(&format!(
-                "[System]   {} ({state}) — {}\n",
-                skill.name, skill.description,
+                "[System]   {} ({source}) ({state}) — {}\n",
+                skill.name,
+                skill.description,
+                source = skill.source,
             ));
         }
         text.push_str(

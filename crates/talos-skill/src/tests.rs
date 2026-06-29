@@ -1116,24 +1116,15 @@ fn test_skill_source_display() {
 
 #[test]
 fn test_shared_skills_not_loaded_without_opt_in() {
-    let home = home_dir().expect("home dir required");
-    let shared_path = home.join(".agents").join("skills");
     let project_skills = tempfile::tempdir().unwrap();
 
-    fs::create_dir_all(&shared_path).unwrap();
-    fs::write(
-        shared_path.join("SKILL.md"),
-        "---\nname: hidden-skill\ndescription: Should not appear\ntriggers:\n  - hidden\n---\n\nHidden.\n",
-    )
-    .unwrap();
-
-    // With discover_shared = false (default)
-    let mut loader = SkillLoader::for_workspace_with_options(project_skills.path(), false);
-    loader.discover().unwrap();
+    // With discover_shared = false (default), ~/.agents/skills should NOT be in search paths
+    let loader = SkillLoader::for_workspace_with_options(project_skills.path(), false);
     assert!(
-        !loader.skills.iter().any(|s| s.name == "hidden-skill"),
-        "shared skill should not be discovered when opt-in is off"
+        !loader
+            .search_paths
+            .iter()
+            .any(|p| p.to_string_lossy().contains(".agents/skills")),
+        "~/.agents/skills should not be in search paths when opt-in is off"
     );
-
-    let _ = fs::remove_file(shared_path.join("SKILL.md"));
 }

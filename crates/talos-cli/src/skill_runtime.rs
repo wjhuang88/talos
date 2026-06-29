@@ -42,6 +42,7 @@ impl RuntimeSkills {
                 name: skill.name.clone(),
                 description: skill.description.clone(),
                 active: self.active_name.as_deref() == Some(skill.name.as_str()),
+                source: skill.source.to_string(),
             })
             .collect()
     }

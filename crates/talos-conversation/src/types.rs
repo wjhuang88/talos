@@ -60,6 +60,8 @@ pub struct SkillDiagnostic {
     pub name: String,
     pub description: String,
     pub active: bool,
+    /// Where this skill was discovered from (e.g. "project", "user", "shared").
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

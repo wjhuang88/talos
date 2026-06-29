@@ -560,6 +560,7 @@ async fn slash_skills_lists_runtime_skill_metadata() {
         name: "review".to_string(),
         description: "Review code".to_string(),
         active: false,
+        source: "project".to_string(),
     }]);
 
     let outputs = engine.handle_slash_command("/skills");
@@ -578,6 +579,7 @@ async fn slash_skills_activate_emits_typed_request() {
         name: "review".to_string(),
         description: "Review code".to_string(),
         active: false,
+        source: "project".to_string(),
     }]);
 
     let outputs = engine.handle_slash_command("/skills activate review");
@@ -597,6 +599,7 @@ async fn slash_skills_reference_emits_typed_request() {
         name: "review".to_string(),
         description: "Review code".to_string(),
         active: true,
+        source: "project".to_string(),
     }]);
 
     let outputs = engine.handle_slash_command("/skills reference references/rules.md");
@@ -619,6 +622,55 @@ async fn slash_skills_activate_requires_name() {
     let (source, text) = collect_stream(outputs).await.unwrap();
     assert_eq!(source, MessageSource::Error);
     assert!(text.contains("Usage: /skills activate <name>"));
+}
+
+#[tokio::test]
+async fn slash_skills_output_shows_source() {
+    let mut engine = new_engine().with_skills(vec![SkillDiagnostic {
+        name: "git-skill".to_string(),
+        description: "Git operations".to_string(),
+        active: false,
+        source: "project".to_string(),
+    }]);
+
+    let outputs = engine.handle_slash_command("/skills");
+
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("git-skill (project)"));
+    assert!(text.contains("Git operations"));
+}
+
+#[tokio::test]
+async fn slash_skills_shared_shows_shared_source() {
+    let mut engine = new_engine().with_skills(vec![SkillDiagnostic {
+        name: "shared-skill".to_string(),
+        description: "Shared tooling".to_string(),
+        active: false,
+        source: "shared".to_string(),
+    }]);
+
+    let outputs = engine.handle_slash_command("/skills");
+
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("shared-skill (shared)"));
+}
+
+#[tokio::test]
+async fn slash_skills_output_does_not_leak_body() {
+    let mut engine = new_engine().with_skills(vec![SkillDiagnostic {
+        name: "secret-skill".to_string(),
+        description: "Does secret things".to_string(),
+        active: false,
+        source: "user".to_string(),
+    }]);
+
+    let outputs = engine.handle_slash_command("/skills");
+
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("secret-skill (user)"));
+    assert!(text.contains("Does secret things"));
+    assert!(!text.contains("## Skill Body"));
+    assert!(!text.contains("skill body content"));
 }
 
 // ---------------------------------------------------------------------------

@@ -351,3 +351,24 @@ crates.io publication is claimed by this checkpoint.
 
 Recovery/resume instruction: start from ARCH-031, then the publication matrix, then this plan.
 Assign A1 first unless the maintainer explicitly reprioritizes a high-risk gate.
+
+### Session — Phase 1+2 Checkpoint (2026-06-29)
+
+**Completed**: M1, M2 (evidence), F1/C1/S1 (designs), A1-A6 (audit/guard/gates), F2/C2/S2/M3
+(implementation). 1215 tests pass, 0 failures.
+
+**Implemented features**:
+- `document_extract` tool (F2): read-only bounded extractor for text/HTML/JSON/CSV/Markdown/XML
+- `talos config get/list/set` subcommands (C2): alongside existing `--config-*` flags
+- Opt-in `~/.agents/skills/` discovery (S2): `SkillSource` tracking, Talos-owned precedence
+- TUI catalog metadata (M3): status bar shows context limit, exit summary uses catalog pricing
+
+**Validation**: `cargo fmt --check`, `cargo check --workspace`, `cargo test --workspace` (1215/0/1),
+`cargo clippy` (0 warnings on modified crates), governance validation (0 warnings).
+
+**Remaining**: F3 (integration tests, in progress), C3 (UX hardening), S3 (diagnostics, in progress),
+F4-F5 (docs), A7-A8 (user docs + closeout).
+
+**Git state**: commits `21ffd1e` (docs/guard) and `98f66de` (features) on `main`. Not pushed.
+
+Recovery/resume: check `git log --oneline -5`, read this checkpoint, continue from F3/C3/S3.
