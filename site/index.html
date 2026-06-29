@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talos — A safety-first local coding agent for Rust developers</title>
+    <meta
+      name="description"
+      content="Talos is a Rust-native local coding agent with a safety-first runtime, explicit permissions, runtime Skills, MCP/RPC integration, and an embeddable runtime facade. Open source under Apache-2.0."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script defer src="assets/site.js"></script>
+  </head>
+  <body data-page="home">
+    <a class="talos-skip" href="#main">Skip to content</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">Home</a>
+          <a href="install.html" data-nav-slug="install">Install</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
+          <a href="safety.html" data-nav-slug="safety">Safety</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
+          <a href="releases.html" data-nav-slug="releases">Releases</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <section class="talos-hero">
+        <p class="talos-hero__eyebrow">v0.2.0 — pre-1.0 release line</p>
+        <h1>A safety-first local coding agent, written in Rust.</h1>
+        <p class="talos-hero__tagline">
+          Talos is a Rust-native local coding agent for developers who want a
+          runtime they can inspect, extend, and operate from their own machine.
+          It ships an interactive TUI, explicit permissions, runtime Skills,
+          MCP/RPC integration, and an embeddable runtime facade &mdash; with
+          the default core kept local and auditable.
+        </p>
+        <div class="talos-hero__cta">
+          <a class="talos-button talos-button--primary" href="install.html">
+            Install Talos
+          </a>
+          <a
+            class="talos-button talos-button--secondary"
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+          >
+            View on GitHub
+          </a>
+        </div>
+      </section>
+
+      <section>
+        <h2>Highlights</h2>
+        <div class="talos-cards">
+          <article class="talos-card">
+            <h3>Local-first by default</h3>
+            <p>
+              Interactive TUI, inline mode, and print mode for scripts and smoke
+              tests. No remote service required to start.
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>Explicit permission boundaries</h3>
+            <p>
+              File writes, deletes, Git writes, shell execution, network
+              actions, and MCP tools all route through the permission pipeline.
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>Rust-native core</h3>
+            <p>
+              Workspace-oriented crates with minimal runtime assumptions.
+              No Node.js or Python runtime is required to run Talos.
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>Embeddable runtime facade</h3>
+            <p>
+              The <code>talos-runtime</code> crate lets Rust projects construct
+              a safe in-process agent runtime without depending on Talos
+              CLI/TUI crates.
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>Durable sessions and memory</h3>
+            <p>
+              SQLite-backed session history, search, branch/fork support,
+              semantic memory consolidation, and retention previews.
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>Extensible surface</h3>
+            <p>
+              MCP stdio tools, hooks, JSON-RPC, and project-governance status
+              are implemented; plugin/WASM and browser control surfaces remain
+              research tracks.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Current release boundary</h2>
+        <p>
+          <span class="talos-pill talos-pill--shipped">Shipped in v0.2.0</span>
+          TUI, inline, and print execution modes; local provider configuration
+          with masked secrets; built-in coding tools with permission gating;
+          session storage, search, cleanup, maintenance, memory consolidation,
+          and exploration ingestion; runtime Skills from
+          <code>.talos/skills/</code>, <code>~/.talos/skills/</code>, and
+          inherited parent <code>.talos/skills/</code>; MCP stdio tools and
+          JSON-RPC infrastructure; and the initial
+          <code>talos-runtime</code> embeddable facade.
+        </p>
+        <p>
+          <span class="talos-pill talos-pill--research">Not shipped yet</span>
+          A stable 1.0 SDK guarantee for the embeddable runtime facade,
+          <code>~/.agents/skills/</code> dotagents shared-directory discovery,
+          the embedded browser or web control surface, the WASM plugin
+          runtime and plugin marketplace, PDF/Office document extraction
+          beyond the current web/fetch foundations, and remote or P2P session
+          control. See the <a href="roadmap.html">Roadmap</a> for the
+          full shipped / planned / research split.
+        </p>
+      </section>
+
+      <section>
+        <h2>Where to go next</h2>
+        <ul>
+          <li>
+            <a href="install.html">Install</a> &mdash; pick the install path
+            for your platform and verify the archive layout.
+          </li>
+          <li>
+            <a href="capabilities.html">Capabilities</a> &mdash; the built-in
+            tools, slash commands, Skills, and MCP integration.
+          </li>
+          <li>
+            <a href="safety.html">Safety</a> &mdash; the permission posture,
+            the sandbox boundary, and the secret-masking boundary.
+          </li>
+          <li>
+            <a href="releases.html">Releases</a> &mdash; the current tag,
+            the post-release update checklist, and the link to the
+            full release history on GitHub.
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >Source docs</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

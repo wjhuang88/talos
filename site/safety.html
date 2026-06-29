@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Safety — Talos</title>
+    <meta
+      name="description"
+      content="Talos safety model: explicit permission boundaries, secret masking, sandbox posture, and the limits of the pre-1.0 release line."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script defer src="assets/site.js"></script>
+  </head>
+  <body data-page="safety">
+    <a class="talos-skip" href="#main">Skip to content</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">Home</a>
+          <a href="install.html" data-nav-slug="install">Install</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
+          <a href="safety.html" data-nav-slug="safety">Safety</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
+          <a href="releases.html" data-nav-slug="releases">Releases</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>Safety</h1>
+        <p>
+          The permission posture, secret-masking boundary, and sandbox
+          boundary that Talos commits to in v0.2.0.
+        </p>
+      </header>
+
+      <section>
+        <h2>What ships in v0.2.0</h2>
+        <p>
+          Talos is a local coding agent for developers who review the
+          actions it takes. The safety model is built on three explicit
+          boundaries:
+        </p>
+        <ul>
+          <li>
+            <strong>Read-only workspace tools can run without approval.</strong>
+          </li>
+          <li>
+            <strong>File writes, deletes, Git writes, and shell execution
+            are routed through permissions.</strong> The permission
+            pipeline is the only path these tools take to act on the
+            workspace.
+          </li>
+          <li>
+            <strong>Tool display focuses on key arguments</strong> instead
+            of raw JSON where the tool definition provides summary fields.
+            This makes approvals reviewable at a glance.
+          </li>
+        </ul>
+        <p>
+          Local secrets should live in environment variables or private
+          config files, never in source. Talos does not auto-commit
+          changes &mdash; Git commits happen only through explicit tool
+          or user action.
+        </p>
+      </section>
+
+      <section>
+        <h2>Secret masking boundary</h2>
+        <p>
+          Provider API keys can be stored inline in
+          <code>~/.talos/config.toml</code> as <code>api_key</code>, or
+          referenced from the environment via <code>api_key_env</code>.
+          Either way, every non-file-persistence output surface masks
+          the key so it never appears in command output, logs, debug
+          prints, exported transcripts, or repository files.
+        </p>
+        <p>The masking surface is:</p>
+        <ul>
+          <li>
+            <code>talos --config-list</code> &mdash;
+            <code>mask_secrets()</code> replaces
+            <code>api_key</code> with <code>***</code>.
+          </li>
+          <li>
+            <code>talos --config-get providers.X.api_key</code> &mdash;
+            <code>is_secret_key()</code> prints <code>***</code> before
+            the value leaves the process.
+          </li>
+          <li>
+            <code>talos --config-set providers.X.api_key=...</code> &mdash;
+            echoes <code>***</code> on the confirmation line.
+          </li>
+          <li>
+            Custom <code>Debug</code> impls on
+            <code>ProviderConfig</code>, <code>Credentials</code>, and
+            <code>CredentialResponseData</code> render
+            <code>***</code> instead of the raw key.
+          </li>
+          <li>
+            Provider HTTP debug snapshots use
+            <code>redact_secret()</code> (first4 + <code>****</code> +
+            last4) so the key is recognizable in debug logs without
+            being exposed.
+          </li>
+        </ul>
+        <p>
+          <code>${ENV_VAR}</code> substitution remains supported for
+          users who prefer env-var credentials without hardcoding.
+        </p>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            The full reasoning, the rejected
+            <code>skip_serializing</code> approach, and the reversal
+            trigger (e.g. an OS keychain integration) are recorded in
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/023-inline-api-key-boundary.md"
+              rel="noopener"
+              >ADR-023</a
+            >. The public site mirrors the boundary; the ADR is the
+            source of truth.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Permission posture</h2>
+        <p>
+          Talos does not give a model unrestricted access to the local
+          machine. The permission pipeline is the only path that
+          reaches the workspace. A few rules of thumb:
+        </p>
+        <ul>
+          <li>
+            Read-only tools (<code>read</code>, <code>ls</code>,
+            <code>tree</code>, <code>glob</code>, <code>grep</code>,
+            <code>diff</code>, <code>stat</code>, the four
+            <code>*_symbol*</code> / <code>find_references</code>
+            tools, the read-only Git tools, <code>http_request</code>
+            with read-only intent, and so on) do not require approval
+            to run.
+          </li>
+          <li>
+            Write-capable tools (<code>write</code>, <code>edit</code>,
+            <code>delete</code>, write-side Git tools,
+            <code>bash</code>, write-side MCP tools) require explicit
+            approval through the permission pipeline.
+          </li>
+          <li>
+            <code>http_request</code> is SSRF-protected and
+            permission-gated; outbound network calls are not
+            automatic.
+          </li>
+          <li>
+            MCP tools that arrive without a read-only annotation go
+            through the same approval path. If interactive approval is
+            not available (e.g. <code>talos -p</code> in a CI shell),
+            MCP tools are denied by default.
+          </li>
+          <li>
+            Talos never auto-commits. Git writes only happen through
+            an explicit tool invocation the operator approved.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Sandbox posture</h2>
+        <p>
+          Talos is a local process, not a remote service. It does not
+          open a network port for approvals, logs, or session control
+          in v0.2.0, and the runtime is designed to keep the default
+          core local and auditable. Hardening details (the four
+          production <code>unsafe</code> sites in
+          <code>talos-sandbox/hardening.rs</code>, the
+          <code>libc</code> FFI discipline, and the
+          <code>rusqlite/bundled</code> exception for local storage)
+          are tracked as Architecture Decision Records; see
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/007-process-hardening-unsafe.md"
+            rel="noopener"
+            >ADR-007</a
+          >,
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/008-sqlite-bundled-storage.md"
+            rel="noopener"
+            >ADR-008</a
+          >, and the full
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/README.md"
+            rel="noopener"
+            >ADR index</a
+          >.
+        </p>
+        <p>
+          Talos is also <strong>not</strong> a remote multi-user
+          service, marketplace runtime, browser dashboard, or
+          autonomous background daemon in v0.2.0. See the
+          <a href="roadmap.html">Roadmap</a> for the shipped /
+          planned / research split.
+        </p>
+      </section>
+
+      <section>
+        <h2>Limits of the pre-1.0 line</h2>
+        <ul>
+          <li>
+            The <code>talos-runtime</code> embeddable facade is
+            pre-1.0; the SDK surface can change before
+            <code>v1.0.0</code>.
+          </li>
+          <li>
+            The <code>~/.agents/skills/</code> dotagents shared
+            directory is research, not shipped.
+          </li>
+          <li>
+            The embedded browser / web control surface (<a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+              rel="noopener"
+              >WEB-001</a
+            >) is a separate product differentiation track. It is
+            <strong>not</strong> a safety boundary; it is a product
+            surface that the maintainer has not enabled.
+          </li>
+          <li>
+            The WASM plugin runtime is research, not shipped. The
+            site will reflect that on the
+            <a href="roadmap.html">Roadmap</a> page.
+          </li>
+        </ul>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>Reporting concerns:</strong> if you find a safety
+            issue in the runtime, follow the responsible-disclosure
+            pattern described in the project governance docs. The
+            internal safety review queue is paused for routine
+            handoff-style work, but real safety bugs are not &mdash;
+            raise them directly with the maintainer.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >Source docs</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

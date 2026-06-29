@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Releases — Talos</title>
+    <meta
+      name="description"
+      content="The current Talos release, the link to the full release history, and the post-release update checklist for maintainers."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script defer src="assets/site.js"></script>
+  </head>
+  <body data-page="releases">
+    <a class="talos-skip" href="#main">Skip to content</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">Home</a>
+          <a href="install.html" data-nav-slug="install">Install</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
+          <a href="safety.html" data-nav-slug="safety">Safety</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
+          <a href="releases.html" data-nav-slug="releases">Releases</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>Releases</h1>
+        <p>
+          The current Talos release tag, the full release history on GitHub,
+          and the post-release update checklist that keeps this site and the
+          public READMEs in sync.
+        </p>
+      </header>
+
+      <section>
+        <h2>Current release</h2>
+        <p>
+          <span class="talos-pill talos-pill--shipped">v0.2.0</span>
+          is the current published release. It is the first stable pre-1.0
+          release line. APIs, command surfaces, and storage formats may
+          change as the product hardens, but v0.2.0 is usable for local
+          developer workflows today.
+        </p>
+        <p>
+          For install instructions see
+          <a href="install.html">Install</a>. For the historical release
+          notes, see
+          <a
+            href="https://github.com/wjhuang88/talos/releases"
+            rel="noopener"
+            >GitHub Releases</a
+          >.
+        </p>
+      </section>
+
+      <section>
+        <h2>Release tag scheme</h2>
+        <p>
+          Release tags drive the GitHub release workflow. The workflow builds
+          Linux, macOS, and Windows artifacts from a macOS runner.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Tag pattern</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Stable</td>
+              <td><code>v0.1.0</code></td>
+            </tr>
+            <tr>
+              <td>Pre-release</td>
+              <td>
+                <code>v0.1.0-alpha.1</code>, <code>v0.1.0-beta.1</code>,
+                <code>v0.1.0-rc.1</code>, <code>v0.1.0-pre.1</code>,
+                <code>v0.1.0-dev.1</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          See the
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/.github/workflows/release.yml"
+            rel="noopener"
+            >release workflow</a
+          >
+          for the full build matrix.
+        </p>
+      </section>
+
+      <section>
+        <h2>Post-release update checklist</h2>
+        <p>
+          After the maintainer tags a new release, the public materials must
+          be updated in this order. This keeps <code>site/</code> and the
+          root <code>README.md</code> / <code>README.zh-CN.md</code> from
+          drifting apart.
+        </p>
+        <ol>
+          <li>
+            Update <code>README.md</code> and <code>README.zh-CN.md</code>:
+            the version callout, the install section, and the
+            <em>Current Release Boundary</em> block.
+          </li>
+          <li>
+            Update the version string on the
+            <a href="index.html">home page</a> hero and the
+            <em>Current release</em> section on this page.
+          </li>
+          <li>
+            Reconcile the <a href="roadmap.html">Roadmap</a>: anything that
+            landed in this release must move from
+            <span class="talos-pill talos-pill--planned">Planned</span> /
+            <span class="talos-pill talos-pill--research">Research</span>
+            into
+            <span class="talos-pill talos-pill--shipped">Shipped</span>.
+          </li>
+          <li>
+            Run the static-validation harness (task item
+            <code>D8</code>): all internal links resolve, all
+            <code>href</code> targets exist, no claim contradicts
+            <code>README.md</code>.
+          </li>
+          <li>
+            Open a PR titled
+            <code>docs(site): sync vX.Y.Z release notes</code> referencing
+            the iteration or release that produced the change.
+          </li>
+          <li>
+            After the PR merges, GitHub Pages publishes on its normal
+            schedule; no separate release action is required for the site.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Public READMEs</h2>
+        <p>
+          The repository root carries the canonical user and developer READMEs
+          that this site cross-references:
+        </p>
+        <ul>
+          <li>
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/README.md"
+              rel="noopener"
+              >README.md</a
+            >
+            &mdash; English user and developer README.
+          </li>
+          <li>
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/README.zh-CN.md"
+              rel="noopener"
+              >README.zh-CN.md</a
+            >
+            &mdash; Chinese translation of the user and developer README.
+          </li>
+        </ul>
+        <p>
+          If you find a contradiction between this site and the root READMEs,
+          the root READMEs win until the discrepancy is resolved. See the
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/tasks/2026-06-29-delegable-product-site-docs-two-month-plan.md"
+            rel="noopener"
+            >delegable two-month plan</a
+          >
+          for the failure-retry policy.
+        </p>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >Source docs</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

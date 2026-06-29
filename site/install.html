@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Install Talos</title>
+    <meta
+      name="description"
+      content="Install Talos on macOS, Linux, or Windows. Download a release archive, or use the official shell and PowerShell installers."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script defer src="assets/site.js"></script>
+  </head>
+  <body data-page="install">
+    <a class="talos-skip" href="#main">Skip to content</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">Home</a>
+          <a href="install.html" data-nav-slug="install">Install</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
+          <a href="safety.html" data-nav-slug="safety">Safety</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
+          <a href="releases.html" data-nav-slug="releases">Releases</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>Install</h1>
+        <p>
+          Pick the install path for your platform. The official installers and
+          release archives are the only supported entrypoints for v0.2.0.
+        </p>
+      </header>
+
+      <section>
+        <h2>Download a release</h2>
+        <p>Install the latest release on macOS or Linux:</p>
+        <div class="talos-codeblock">
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh | sh</code></pre>
+        </div>
+        <p>Install the latest Windows x86_64 release from PowerShell:</p>
+        <div class="talos-codeblock">
+          <pre><code>iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)</code></pre>
+        </div>
+        <p>
+          Installers live under <code>install/</code> in the repository because
+          they are user-facing release entrypoints. Development and governance
+          scripts live under <code>scripts/</code>; the old
+          <code>scripts/install.*</code> paths are intentionally not kept
+          after the pre-1.0 installer layout cleanup.
+        </p>
+
+        <h3>Or download an archive</h3>
+        <p>
+          Download the archive for your platform from
+          <a
+            href="https://github.com/wjhuang88/talos/releases"
+            rel="noopener"
+            >GitHub Releases</a
+          >, then unpack it:
+        </p>
+        <div class="talos-codeblock">
+          <pre><code>tar -xzf talos-aarch64-darwin.tar.gz
+chmod +x talos
+./talos --help</code></pre>
+        </div>
+
+        <h3>Published archive names</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Platform</th>
+              <th>Archive</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Linux x86_64</td>
+              <td><code>talos-x86_64-linux.tar.gz</code></td>
+            </tr>
+            <tr>
+              <td>Linux ARM64</td>
+              <td><code>talos-aarch64-linux.tar.gz</code></td>
+            </tr>
+            <tr>
+              <td>macOS Intel</td>
+              <td><code>talos-x86_64-darwin.tar.gz</code></td>
+            </tr>
+            <tr>
+              <td>macOS Apple Silicon</td>
+              <td><code>talos-aarch64-darwin.tar.gz</code></td>
+            </tr>
+            <tr>
+              <td>Windows x86_64</td>
+              <td><code>talos-x86_64-windows.zip</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>Note:</strong> Windows ARM64 artifacts are not published
+            yet. The Windows installer script also refuses to run on ARM64
+            until a published artifact is available.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>First-run setup</h2>
+        <p>
+          When you start Talos without a model configured, the TUI opens with
+          a model picker instead of failing. Choose a model to get started. If
+          the provider needs credentials, Talos shows instructions for setting
+          the API key.
+        </p>
+        <p>To skip the wizard in CI or non-interactive environments:</p>
+        <div class="talos-codeblock">
+          <pre><code>talos --no-init -p "summarize this repo"</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Configuration management</h2>
+        <p>
+          View and edit configuration without hand-editing TOML. Secrets are
+          masked in every display surface; see the
+          <a href="safety.html">Safety page</a> for the full secret-masking
+          boundary.
+        </p>
+        <div class="talos-codeblock">
+          <pre><code>talos --config-list                          # print all settings (secrets masked)
+talos --config-get model                     # get a single value
+talos --config-set model=claude-sonnet-4-20250514  # set and persist
+talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Build from source</h2>
+        <p>Requirements:</p>
+        <ul>
+          <li>Rust 1.95 or newer</li>
+          <li>Cargo</li>
+        </ul>
+        <div class="talos-codeblock">
+          <pre><code>cargo build --release -p talos-cli
+./target/release/talos --help</code></pre>
+        </div>
+        <p>To build all release artifacts locally:</p>
+        <div class="talos-codeblock">
+          <pre><code>./build.sh</code></pre>
+        </div>
+        <p>
+          The multi-platform build writes archives and checksums to
+          <code>dist/</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Verify your install</h2>
+        <p>
+          After install, run a one-shot prompt in print mode to confirm the
+          binary works end-to-end:
+        </p>
+        <div class="talos-codeblock">
+          <pre><code>talos -p --mock "/mock-request summarize this repository"</code></pre>
+        </div>
+        <p>
+          The mock provider gives a deterministic local response without
+          touching a network provider. It is the same command the TUI smoke
+          tests use to verify the runtime path before connecting to a real
+          model.
+        </p>
+        <p>
+          The full release history is on the
+          <a href="releases.html">Releases page</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >Source docs</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
