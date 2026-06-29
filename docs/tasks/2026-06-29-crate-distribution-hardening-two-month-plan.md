@@ -372,3 +372,62 @@ F4-F5 (docs), A7-A8 (user docs + closeout).
 **Git state**: commits `21ffd1e` (docs/guard) and `98f66de` (features) on `main`. Not pushed.
 
 Recovery/resume: check `git log --oneline -5`, read this checkpoint, continue from F3/C3/S3.
+
+### Session — Closeout Checkpoint (2026-06-29)
+
+**Status**: Phase 1-3 complete. All 22 assignments addressed.
+
+**Completed assignments**:
+| Assignment | Status | Evidence |
+|---|---|---|
+| T0 | Complete | Plan committed |
+| M1 | Evidence recorded | resolve_model_limits() from I045 |
+| M2 | Evidence recorded | SessionConfig/compactor wiring from I045 |
+| M3 | Implemented | TUI status/exit use catalog pricing/context limit |
+| F1 | Design recorded | WEBFETCH-001 Phase 2 design section |
+| F2 | Implemented | document_extract tool (836 lines + 13 boundary tests) |
+| F3 | Implemented | 13 boundary separation tests in tests/document_boundaries.rs |
+| F4 | Verified | Tool registered in all 3 builders with ToolFamily::File |
+| F5 | Documented | README updated with document_extract |
+| C1 | Design recorded | CONF-001 reconciliation design section |
+| C2 | Implemented | talos config get/list/set subcommands + existing flags |
+| C3 | Decision recorded | TUI /config deferred; CLI subcommands + /model cover the need |
+| S1 | Policy recorded | AGENT-002-B policy section |
+| S2 | Implemented | Opt-in ~/.agents/skills with SkillSource tracking |
+| S3 | Implemented | /skills shows source (project/shared/user/parent) |
+| A1 | Audit recorded | Publication matrix: 5 crates missing crate-level docs |
+| A2 | Guard implemented | scripts/check_publish_guard.sh — all checks pass |
+| A3 | Gate recorded | Sandbox: DO NOT PUBLISH (escape-vector checklist + libc pre-release) |
+| A4 | Gate recorded | Tools: DO NOT PUBLISH (feature gates needed for heavy deps) |
+| A5 | Decision recorded | Runtime: publish closure path (sandbox→tools→agent→runtime) |
+| A6 | Gate recorded | MCP: DO NOT PUBLISH (rmcp stability evaluation needed) |
+| A7 | Documented | README updated with config subcommands, shared skills |
+| A8 | This closeout | — |
+| T1-T8 | Covered | T1=A1, T2=A2, T3=A3, T4=A4, T5=A5, T6=A6, T7=A7, T8=A8 |
+
+**Validation evidence**:
+- `cargo test --workspace`: 1231 passed, 0 failed, 1 ignored
+- `cargo fmt --all -- --check`: clean
+- `cargo check --workspace`: clean
+- `scripts/validate_project_governance.sh .`: 0 warnings
+- `scripts/check_publish_guard.sh .`: all guards pass
+- Clippy: 0 warnings on modified crates
+
+**Publish decisions**:
+- No crate published. No tag or release created.
+- Product-only (publish=false): talos-cli, talos-tui, talos-evolution — unchanged.
+- Gate-before-publish: talos-sandbox, talos-tools, talos-agent, talos-runtime, talos-mcp — all
+  gates say DO NOT PUBLISH until their specific requirements are met.
+- Already published: 11 crates at 0.2.0 — unchanged.
+
+**Residual work** (for future iterations):
+1. Crate-level `//!` docs for talos-config, talos-skill, talos-session, talos-memory,
+   talos-exploration (5 crates).
+2. Keywords/categories for all 11 published crates.
+3. Feature gates for talos-tools heavy dependencies (gix, arborium, reqwest, scraper).
+4. Sandbox escape-vector verification tests (A3 checklist).
+5. rmcp stability evaluation for talos-mcp.
+6. Full design docs for F1/C1/S1 in backlog stories (designs were used for implementation but
+   not all persisted in backlog files due to concurrent agent execution).
+
+**Git state**: 4 commits on `main` (21ffd1e, 98f66de, cdd4f90, + this closeout). Not pushed.
