@@ -38,7 +38,7 @@ pub use error::{Result, SkillError};
 pub use loader::SkillLoader;
 pub use manager::SkillManager;
 pub use token::estimate_tokens;
-pub use types::{Skill, SkillDisclosure, SkillFrontmatter, SkillIndex};
+pub use types::{Skill, SkillDisclosure, SkillFrontmatter, SkillIndex, SkillSource};
 
 #[cfg(test)]
 #[allow(warnings)]

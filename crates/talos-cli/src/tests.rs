@@ -7,8 +7,8 @@ mod tests {
     use crate::registry;
     use crate::skill_runtime::discover_runtime_skills;
     use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
-    use crate::{config_get_dotted, is_secret_key, mask_secrets};
-    use talos_conversation::{ConversationEngine, UiOutput, UserInput};
+    use crate::{config_get_dotted, config_set_dotted, is_secret_key, mask_secrets};
+    use talos_conversation::{ConversationEngine, ModelInfo, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
 
     fn empty_runtime_skills()
@@ -126,8 +126,11 @@ mod tests {
         let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
-        let (_model_tx, model_rx) =
-            tokio::sync::watch::channel(("test-model".to_string(), "test-provider".to_string()));
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            ..Default::default()
+        });
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
@@ -197,8 +200,11 @@ mod tests {
         let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
-        let (model_tx, model_rx) =
-            tokio::sync::watch::channel(("old-model".to_string(), "old-provider".to_string()));
+        let (model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "old-model".to_string(),
+            provider: "old-provider".to_string(),
+            ..Default::default()
+        });
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
@@ -217,7 +223,11 @@ mod tests {
         ));
 
         model_tx
-            .send(("new-model".to_string(), "new-provider".to_string()))
+            .send(ModelInfo {
+                model_name: "new-model".to_string(),
+                provider: "new-provider".to_string(),
+                ..Default::default()
+            })
             .unwrap();
 
         let status = tokio::time::timeout(std::time::Duration::from_secs(1), async {
@@ -259,8 +269,11 @@ mod tests {
         let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
-        let (_model_tx, model_rx) =
-            tokio::sync::watch::channel(("test-model".to_string(), "test-provider".to_string()));
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            ..Default::default()
+        });
         let (session_tx, _session_rx) =
             tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
@@ -679,5 +692,157 @@ api_key_env = "ANTHROPIC_API_KEY"
             results.iter().any(|r| r.session_id == s.id.to_string()),
             "sessions must survive maintenance operations"
         );
+    }
+
+    // === Config Subcommand Tests (CONF-001) ===
+
+    #[test]
+    fn config_subcommand_list_masks_secrets() {
+        let mut config = talos_config::Config::default();
+        config.provider = "anthropic".to_string();
+        config.model = "claude-sonnet-4".to_string();
+        config.set_provider_credential("anthropic", "sk-test-secret-123");
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let masked = mask_secrets(&toml_str, &config);
+        assert!(!masked.contains("sk-test-secret-123"));
+        assert!(masked.contains("api_key = ***"));
+    }
+
+    #[test]
+    fn config_subcommand_get_returns_value() {
+        let config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            config_get_dotted(&config, "model").unwrap(),
+            "claude-sonnet-4"
+        );
+        assert_eq!(config_get_dotted(&config, "provider").unwrap(), "anthropic");
+    }
+
+    #[test]
+    fn config_subcommand_set_persists() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+
+        let mut config = talos_config::Config::default();
+        config.model = "old-model".to_string();
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        std::fs::write(&config_path, toml_str).unwrap();
+
+        let raw = std::fs::read_to_string(&config_path).unwrap();
+        let mut config: talos_config::Config = toml::from_str(&raw).unwrap();
+        config_set_dotted(&mut config, "model", "new-model").unwrap();
+        let saved = toml::to_string_pretty(&config).unwrap();
+        std::fs::write(&config_path, &saved).unwrap();
+
+        let reloaded = std::fs::read_to_string(&config_path).unwrap();
+        assert!(reloaded.contains("new-model"));
+        assert!(!reloaded.contains("old-model"));
+    }
+
+    #[test]
+    fn config_subcommand_get_secret_masks() {
+        let config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4".to_string(),
+            providers: std::collections::HashMap::from([(
+                "anthropic".to_string(),
+                talos_config::ProviderConfig {
+                    api_key: Some("sk-should-be-masked".to_string()),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let raw = config_get_dotted(&config, "providers.anthropic.api_key").unwrap();
+        assert_eq!(raw, "sk-should-be-masked");
+        assert!(is_secret_key("providers.anthropic.api_key"));
+    }
+
+    #[test]
+    fn config_set_protocol() {
+        let mut config = talos_config::Config::default();
+        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-chat").unwrap();
+        let provider = config.providers.get("my-gw").unwrap();
+        assert_eq!(
+            provider.protocol,
+            talos_config::ProviderProtocol::OpenAIChat
+        );
+
+        config_set_dotted(
+            &mut config,
+            "providers.my-gw.protocol",
+            "anthropic-messages",
+        )
+        .unwrap();
+        let provider = config.providers.get("my-gw").unwrap();
+        assert_eq!(
+            provider.protocol,
+            talos_config::ProviderProtocol::AnthropicMessages
+        );
+
+        let err =
+            config_set_dotted(&mut config, "providers.my-gw.protocol", "invalid").unwrap_err();
+        assert!(err.to_string().contains("unknown protocol"));
+    }
+
+    #[test]
+    fn config_set_model_context_limit() {
+        let mut config = talos_config::Config::default();
+        config_set_dotted(
+            &mut config,
+            "providers.my-gw.models.claude-4.context_limit",
+            "200000",
+        )
+        .unwrap();
+
+        let provider = config.providers.get("my-gw").unwrap();
+        let model = provider.models.get("claude-4").unwrap();
+        assert_eq!(model.context_limit, Some(200000));
+
+        assert_eq!(
+            config_get_dotted(&config, "providers.my-gw.models.claude-4.context_limit").unwrap(),
+            "200000"
+        );
+    }
+
+    #[test]
+    fn config_set_model_output_limit() {
+        let mut config = talos_config::Config::default();
+        config_set_dotted(
+            &mut config,
+            "providers.my-gw.models.claude-4.output_limit",
+            "4096",
+        )
+        .unwrap();
+
+        let provider = config.providers.get("my-gw").unwrap();
+        let model = provider.models.get("claude-4").unwrap();
+        assert_eq!(model.output_limit, Some(4096));
+
+        assert_eq!(
+            config_get_dotted(&config, "providers.my-gw.models.claude-4.output_limit").unwrap(),
+            "4096"
+        );
+    }
+
+    #[test]
+    fn config_flag_and_subcommand_equivalence() {
+        let config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4".to_string(),
+            ..Default::default()
+        };
+        let flag_result = config_get_dotted(&config, "model");
+        let subcommand_result = config_get_dotted(&config, "model");
+        assert_eq!(flag_result.unwrap(), subcommand_result.unwrap());
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let masked = mask_secrets(&toml_str, &config);
+        assert!(masked.contains("model = \"claude-sonnet-4\""));
     }
 }

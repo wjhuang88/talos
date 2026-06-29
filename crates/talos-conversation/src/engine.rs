@@ -44,6 +44,9 @@ pub struct ConversationEngine {
     pub(crate) skills: Vec<SkillDiagnostic>,
     pub(crate) scrollback: ScrollbackState,
     pub(crate) is_processing: bool,
+    pub(crate) context_limit: Option<u32>,
+    pub(crate) input_price_per_million: Option<f64>,
+    pub(crate) output_price_per_million: Option<f64>,
     last_flushed_message: usize,
     stream_tx: Option<mpsc::UnboundedSender<String>>,
 }
@@ -72,6 +75,9 @@ impl ConversationEngine {
             skills: Vec::new(),
             scrollback: ScrollbackState::default(),
             is_processing: false,
+            context_limit: None,
+            input_price_per_million: None,
+            output_price_per_million: None,
             last_flushed_message: 0,
             stream_tx: None,
         }
@@ -101,15 +107,18 @@ impl ConversationEngine {
             steering_count: self.steering_queue.len(),
             followup_count: self.followup_queue.len(),
             is_processing: self.is_processing,
+            context_limit: self.context_limit,
+            input_price_per_million: self.input_price_per_million,
+            output_price_per_million: self.output_price_per_million,
         }
     }
 
-    /// Update model and provider info after a runtime model switch.
-    ///
-    /// Called by the bridge when the lifecycle handler completes a model switch.
-    pub fn set_model_info(&mut self, model_name: &str, provider: &str) {
-        self.model_name = model_name.to_string();
-        self.provider_name = provider.to_string();
+    pub fn set_model_info(&mut self, info: &crate::types::ModelInfo) {
+        self.model_name = info.model_name.clone();
+        self.provider_name = info.provider.clone();
+        self.context_limit = info.context_limit;
+        self.input_price_per_million = info.input_price_per_million;
+        self.output_price_per_million = info.output_price_per_million;
     }
 
     pub fn is_processing(&self) -> bool {

@@ -18,10 +18,12 @@ pub(crate) fn build_status_text(
     let workspace = &status.workspace_path;
     let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
     let queue_total = status.steering_count + status.followup_count;
+    let context_label = format_context_limit(status.context_limit);
 
     if compact {
         return build_compact_status(
             model_name,
+            &context_label,
             status_provider_for_display(model_name, provider),
             workspace,
             total_tokens,
@@ -32,6 +34,7 @@ pub(crate) fn build_status_text(
 
     build_expanded_status(
         model_name,
+        &context_label,
         status_provider_for_display(model_name, provider),
         workspace,
         total_tokens,
@@ -40,8 +43,20 @@ pub(crate) fn build_status_text(
     )
 }
 
+fn format_context_limit(limit: Option<u32>) -> String {
+    match limit {
+        Some(tokens) if tokens >= 1000 => {
+            let k = tokens / 1000;
+            format!("{k}k ctx")
+        }
+        Some(tokens) => format!("{tokens} ctx"),
+        None => String::new(),
+    }
+}
+
 fn build_compact_status(
     model_name: &str,
+    context_label: &str,
     provider: &str,
     workspace: &str,
     total_tokens: u64,
@@ -58,7 +73,12 @@ fn build_compact_status(
     } else {
         String::new()
     };
-    let reserved = tokens_part.chars().count() + queue_part.chars().count() + 1;
+    let ctx_len = if context_label.is_empty() {
+        0
+    } else {
+        context_label.chars().count() + 2
+    };
+    let reserved = tokens_part.chars().count() + queue_part.chars().count() + ctx_len + 1;
     let available = (width as usize).saturating_sub(reserved);
     let model_limit = if workspace.is_empty() {
         available.saturating_sub(2).clamp(8, 20)
@@ -71,6 +91,11 @@ fn build_compact_status(
         .clamp(8, 16);
 
     let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
+    let ctx_part = if context_label.is_empty() {
+        String::new()
+    } else {
+        format!(" ({context_label})")
+    };
     let provider_part = if provider.is_empty() {
         String::new()
     } else {
@@ -87,7 +112,7 @@ fn build_compact_status(
 
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
-        Span::styled(format!("{model_part}{provider_part}"), accent),
+        Span::styled(format!("{model_part}{ctx_part}{provider_part}"), accent),
         Span::styled(workspace_part, val),
         Span::styled("", dim),
         Span::styled(tokens_part, val),
@@ -97,6 +122,7 @@ fn build_compact_status(
 
 fn build_expanded_status(
     model_name: &str,
+    context_label: &str,
     provider: &str,
     workspace: &str,
     total_tokens: u64,
@@ -114,8 +140,13 @@ fn build_expanded_status(
         String::new()
     };
 
+    let ctx_len = if context_label.is_empty() {
+        0
+    } else {
+        context_label.chars().count() + 2
+    };
     let right_part = format!("{tokens_part}{queue_part}");
-    let reserved = 1 + right_part.chars().count() + 5;
+    let reserved = 1 + right_part.chars().count() + 5 + ctx_len;
     let available = (width as usize).saturating_sub(reserved);
     let provider_budget = if provider.is_empty() {
         0
@@ -135,6 +166,11 @@ fn build_expanded_status(
         .clamp(12, 48);
 
     let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
+    let ctx_part = if context_label.is_empty() {
+        String::new()
+    } else {
+        format!(" ({context_label})")
+    };
     let provider_part = if provider.is_empty() {
         String::new()
     } else {
@@ -151,7 +187,7 @@ fn build_expanded_status(
 
     Text::from(Line::from(vec![
         Span::styled(" ", dim),
-        Span::styled(format!("{model_part}{provider_part}"), accent),
+        Span::styled(format!("{model_part}{ctx_part}{provider_part}"), accent),
         Span::styled(workspace_part, val),
         Span::styled("", dim),
         Span::styled("     ", dim),

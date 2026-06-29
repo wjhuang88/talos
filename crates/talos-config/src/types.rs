@@ -90,6 +90,14 @@ impl Default for MemoryPromptConfig {
     }
 }
 
+/// Configuration for skill discovery behavior.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct SkillConfig {
+    /// When true, scan ~/.agents/skills/ as a lowest-priority discovery path.
+    pub discover_shared: bool,
+}
+
 /// Talos configuration.
 ///
 /// Contains the model provider, model name, and optional API key.
@@ -127,6 +135,10 @@ pub struct Config {
     /// Memory prompt injection configuration.
     #[serde(default)]
     pub memory_prompt: MemoryPromptConfig,
+
+    /// Skill discovery configuration.
+    #[serde(default)]
+    pub skills: SkillConfig,
 }
 
 fn default_provider_name() -> String {
@@ -144,6 +156,7 @@ impl Default for Config {
             mcp: McpConfig::default(),
             rpc: RpcConfig::default(),
             memory_prompt: MemoryPromptConfig::default(),
+            skills: SkillConfig::default(),
         }
     }
 }

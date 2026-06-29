@@ -1,5 +1,7 @@
 use crate::parser::{split_frontmatter, validate_frontmatter};
-use crate::{Result, Skill, SkillError, SkillFrontmatter, SkillIndex, estimate_tokens};
+use crate::{
+    Result, Skill, SkillError, SkillFrontmatter, SkillIndex, SkillSource, estimate_tokens,
+};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -19,6 +21,10 @@ pub struct SkillLoader {
     pub skills: Vec<Skill>,
     /// Directories to search for SKILL.md files.
     pub search_paths: Vec<PathBuf>,
+    /// Whether to include ~/.agents/skills/ as a discovery path.
+    pub discover_shared: bool,
+    /// Workspace root for source classification.
+    pub workspace_root: Option<PathBuf>,
 }
 
 impl SkillLoader {
@@ -30,9 +36,12 @@ impl SkillLoader {
     /// 3. Parent directories up to git root, each with `.talos/skills/`
     pub fn new() -> Self {
         let cwd = std::env::current_dir().ok();
+
         Self {
             skills: Vec::new(),
-            search_paths: default_search_paths(cwd.as_deref()),
+            search_paths: default_search_paths(cwd.as_deref(), false),
+            discover_shared: false,
+            workspace_root: cwd.map(|p| p.to_path_buf()),
         }
     }
 
@@ -42,9 +51,23 @@ impl SkillLoader {
     /// when the process current directory may differ from the active session
     /// workspace.
     pub fn for_workspace(workspace_root: impl AsRef<Path>) -> Self {
+        Self::for_workspace_with_options(workspace_root.as_ref(), false)
+    }
+
+    /// Creates a new loader with optional shared skills discovery.
+    ///
+    /// When `discover_shared` is true, `~/.agents/skills/` is appended as the
+    /// lowest-priority search path.
+    pub fn for_workspace_with_options(
+        workspace_root: impl AsRef<Path>,
+        discover_shared: bool,
+    ) -> Self {
+        let root = workspace_root.as_ref();
         Self {
             skills: Vec::new(),
-            search_paths: default_search_paths(Some(workspace_root.as_ref())),
+            search_paths: default_search_paths(Some(root), discover_shared),
+            discover_shared,
+            workspace_root: Some(root.to_path_buf()),
         }
     }
 
@@ -60,6 +83,8 @@ impl SkillLoader {
                 continue;
             }
 
+            let source = self.classify_source(path);
+
             for entry in WalkDir::new(path)
                 .follow_links(false)
                 .into_iter()
@@ -68,7 +93,10 @@ impl SkillLoader {
                 let entry_path = entry.path();
                 if entry_path.file_name() == Some(std::ffi::OsStr::new("SKILL.md")) {
                     match Self::parse(entry_path) {
-                        Ok(skill) => self.skills.push(skill),
+                        Ok(mut skill) => {
+                            skill.source = source;
+                            self.skills.push(skill);
+                        }
                         Err(e) => {
                             let _ = e;
                         }
@@ -80,6 +108,29 @@ impl SkillLoader {
         self.skills.dedup_by_key(|s| s.name.clone());
 
         Ok(&self.skills)
+    }
+
+    /// Determines the [`SkillSource`] for a given search path.
+    fn classify_source(&self, path: &Path) -> SkillSource {
+        if let Some(ref home) = home_dir() {
+            let agents_skills = home.join(".agents").join("skills");
+            if path.starts_with(&agents_skills) {
+                return SkillSource::Shared;
+            }
+            let talos_skills = home.join(".talos").join("skills");
+            if path.starts_with(&talos_skills) {
+                return SkillSource::UserGlobal;
+            }
+        }
+
+        if let Some(ref root) = self.workspace_root {
+            let project_skills = root.join(".talos").join("skills");
+            if path.starts_with(&project_skills) {
+                return SkillSource::Project;
+            }
+        }
+
+        SkillSource::Parent
     }
 
     /// Parses a single SKILL.md file into a [`Skill`].
@@ -109,6 +160,7 @@ impl SkillLoader {
             triggers: fm.triggers,
             body: body.trim().to_string(),
             source_path: path.to_path_buf(),
+            source: SkillSource::default(),
         })
     }
 
@@ -126,6 +178,7 @@ impl SkillLoader {
                     description: s.description.clone(),
                     triggers: s.triggers.clone(),
                     estimated_tokens: estimate_tokens(&level0_text),
+                    source: s.source,
                 }
             })
             .collect()
@@ -138,7 +191,7 @@ impl Default for SkillLoader {
     }
 }
 
-fn home_dir() -> Option<PathBuf> {
+pub(crate) fn home_dir() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         std::env::var("USERPROFILE").ok().map(PathBuf::from)
@@ -149,7 +202,7 @@ fn home_dir() -> Option<PathBuf> {
     }
 }
 
-fn default_search_paths(workspace_root: Option<&Path>) -> Vec<PathBuf> {
+fn default_search_paths(workspace_root: Option<&Path>, discover_shared: bool) -> Vec<PathBuf> {
     let mut search_paths = Vec::new();
 
     if let Some(root) = workspace_root {
@@ -170,6 +223,10 @@ fn default_search_paths(workspace_root: Option<&Path>) -> Vec<PathBuf> {
                 break;
             }
         }
+    }
+
+    if discover_shared && let Some(home) = home_dir() {
+        push_if_dir(&mut search_paths, home.join(".agents/skills"));
     }
 
     search_paths

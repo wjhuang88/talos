@@ -1,4 +1,5 @@
 use super::*;
+use crate::loader::home_dir;
 use crate::parser::{split_frontmatter, validate_frontmatter};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -151,6 +152,8 @@ fn discover_from_single_directory() {
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -194,6 +197,8 @@ Body B.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills1, skills2],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -241,6 +246,8 @@ Body V2.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills1, skills2],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -263,6 +270,8 @@ fn discover_skips_non_skill_files() {
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -284,6 +293,8 @@ fn discover_skips_unparseable_files() {
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let skills = loader.discover().expect("discovery should succeed");
@@ -329,6 +340,8 @@ Body B.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     loader.discover().expect("discovery should succeed");
@@ -351,6 +364,8 @@ fn skill_index_empty_when_no_skills() {
     let loader = SkillLoader {
         skills: Vec::new(),
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let index = loader.get_index();
@@ -384,6 +399,8 @@ Git instructions.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     loader.discover().expect("discovery should succeed");
@@ -417,6 +434,8 @@ Body.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     loader.discover().expect("discovery should succeed");
@@ -447,6 +466,8 @@ Body.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skills_dir],
+        discover_shared: false,
+        workspace_root: None,
     };
 
     loader.discover().expect("discovery should succeed");
@@ -596,6 +617,7 @@ fn make_skill(name: &str, description: &str, triggers: &[&str], body: &str) -> S
         triggers: triggers.iter().map(|s| s.to_string()).collect(),
         body: body.to_string(),
         source_path: PathBuf::from(format!("/tmp/skills/{name}/SKILL.md")),
+        source: SkillSource::default(),
     }
 }
 
@@ -607,6 +629,8 @@ fn skill_manager_level0_index_generation() {
             make_skill("test", "Unit testing", &["test", "unit"], "body"),
         ],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -625,6 +649,8 @@ fn skill_manager_index_cached() {
     let loader = SkillLoader {
         skills: vec![make_skill("a", "desc a", &["a"], "body")],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -646,6 +672,8 @@ fn skill_manager_get_index_tokens() {
             make_skill("b", "short", &["b"], "body"),
         ],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -669,6 +697,8 @@ fn skill_manager_get_index_tokens_under_3000_for_20_skills() {
     let loader = SkillLoader {
         skills,
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -690,6 +720,8 @@ fn skill_manager_load_skill_level1() {
     let loader = SkillLoader {
         skills: vec![skill],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -705,6 +737,8 @@ fn skill_manager_load_skill_not_found() {
     let loader = SkillLoader {
         skills: vec![make_skill("exists", "desc", &["x"], "body")],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -718,6 +752,8 @@ fn skill_manager_load_skill_idempotent() {
     let loader = SkillLoader {
         skills: vec![skill],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -734,6 +770,8 @@ fn skill_manager_unload_skill() {
     let loader = SkillLoader {
         skills: vec![skill],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -757,6 +795,8 @@ fn skill_manager_get_active_skills() {
     let loader = SkillLoader {
         skills,
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -778,6 +818,8 @@ fn skill_manager_match_skill_exact() {
     let loader = SkillLoader {
         skills,
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let manager = SkillManager::new(loader);
@@ -803,6 +845,8 @@ fn skill_manager_match_skill_case_insensitive() {
     let loader = SkillLoader {
         skills,
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let manager = SkillManager::new(loader);
@@ -823,6 +867,8 @@ fn skill_manager_match_skill_no_match() {
     let loader = SkillLoader {
         skills,
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let manager = SkillManager::new(loader);
@@ -838,6 +884,8 @@ fn skill_manager_match_skill_first_wins() {
     let loader = SkillLoader {
         skills,
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let manager = SkillManager::new(loader);
@@ -871,6 +919,8 @@ See `template.txt` for the template.
     let mut loader = SkillLoader {
         skills: Vec::new(),
         search_paths: vec![skill_dir.clone()],
+        discover_shared: false,
+        workspace_root: None,
     };
     loader.discover().expect("discover");
 
@@ -888,6 +938,8 @@ fn skill_manager_load_reference_skill_not_loaded() {
     let loader = SkillLoader {
         skills: Vec::new(),
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let manager = SkillManager::new(loader);
@@ -901,6 +953,8 @@ fn skill_manager_load_reference_file_not_found() {
     let loader = SkillLoader {
         skills: vec![skill],
         search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
     };
 
     let mut manager = SkillManager::new(loader);
@@ -921,4 +975,165 @@ fn skill_disclosure_enum_variants() {
     assert_ne!(l0, l1);
     assert_ne!(l1, l2);
     assert_ne!(l0, l2);
+}
+
+// -----------------------------------------------------------------------
+// Shared skills discovery tests
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_shared_skills_disabled_by_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let loader = SkillLoader::for_workspace_with_options(dir.path(), false);
+    // ~/.agents/skills should NOT be in search paths when disabled
+    assert!(
+        !loader
+            .search_paths
+            .iter()
+            .any(|p| p.to_string_lossy().contains(".agents/skills"))
+    );
+}
+
+#[test]
+fn test_shared_skills_enabled_adds_path() {
+    let home = home_dir().expect("home dir required");
+    let shared_path = home.join(".agents").join("skills");
+    fs::create_dir_all(&shared_path).unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let loader = SkillLoader::for_workspace_with_options(dir.path(), true);
+    assert!(
+        loader.search_paths.iter().any(|p| p == &shared_path),
+        "~/.agents/skills should be in search paths when enabled"
+    );
+
+    let last = loader.search_paths.last().unwrap();
+    assert_eq!(last, &shared_path);
+}
+
+#[test]
+fn test_dedup_project_shadows_shared() {
+    let home = home_dir().expect("home dir required");
+    let shared_path = home.join(".agents").join("skills").join("dedup-test");
+    let project_skills = tempfile::tempdir().unwrap();
+    let proj_skills_dir = project_skills.path().join(".talos/skills/dup-skill");
+
+    fs::create_dir_all(&shared_path).unwrap();
+    fs::create_dir_all(&proj_skills_dir).unwrap();
+
+    fs::write(
+        shared_path.join("SKILL.md"),
+        "---\nname: dup-skill\ndescription: Shared version\ntriggers:\n  - dup\n---\n\nShared body.\n",
+    )
+    .unwrap();
+
+    fs::write(
+        proj_skills_dir.join("SKILL.md"),
+        "---\nname: dup-skill\ndescription: Project version\ntriggers:\n  - dup\n---\n\nProject body.\n",
+    )
+    .unwrap();
+
+    let mut loader = SkillLoader::for_workspace_with_options(project_skills.path(), true);
+    loader.discover().unwrap();
+
+    let dup_skills: Vec<_> = loader
+        .skills
+        .iter()
+        .filter(|s| s.name == "dup-skill")
+        .collect();
+    assert_eq!(
+        dup_skills.len(),
+        1,
+        "dup-skill should appear exactly once after dedup"
+    );
+    assert_eq!(dup_skills[0].description, "Project version");
+    assert_eq!(dup_skills[0].source, SkillSource::Project);
+
+    let _ = fs::remove_dir_all(&shared_path);
+}
+
+#[test]
+fn test_skill_source_tagged_correctly() {
+    let project_skills = tempfile::tempdir().unwrap();
+    let proj_skills_dir = project_skills.path().join(".talos/skills/proj-skill");
+    let shared_dir = project_skills.path().join("shared-skills");
+
+    fs::create_dir_all(&proj_skills_dir).unwrap();
+    fs::create_dir_all(&shared_dir).unwrap();
+
+    fs::write(
+        shared_dir.join("SKILL.md"),
+        "---\nname: shared-only\ndescription: From shared\ntriggers:\n  - shared\n---\n\nShared.\n",
+    )
+    .unwrap();
+
+    fs::write(
+        proj_skills_dir.join("SKILL.md"),
+        "---\nname: proj-only\ndescription: From project\ntriggers:\n  - proj\n---\n\nProject.\n",
+    )
+    .unwrap();
+
+    // Manually construct loader with known search paths to avoid home-dir race
+    let mut loader = SkillLoader {
+        skills: Vec::new(),
+        search_paths: vec![proj_skills_dir.clone(), shared_dir.clone()],
+        discover_shared: true,
+        workspace_root: Some(project_skills.path().to_path_buf()),
+    };
+    loader.discover().unwrap();
+
+    // Project skill should be Project source
+    let proj_skill = loader
+        .skills
+        .iter()
+        .find(|s| s.name == "proj-only")
+        .unwrap();
+    assert_eq!(proj_skill.source, SkillSource::Project);
+
+    // Second path skill should be Parent source (not in ~/.talos/skills or workspace .talos/skills)
+    let shared_skill = loader
+        .skills
+        .iter()
+        .find(|s| s.name == "shared-only")
+        .unwrap();
+    assert_eq!(shared_skill.source, SkillSource::Parent);
+
+    // Verify index propagates source
+    let index = loader.get_index();
+    let proj_idx = index.iter().find(|e| e.name == "proj-only").unwrap();
+    assert_eq!(proj_idx.source, SkillSource::Project);
+    let shared_idx = index.iter().find(|e| e.name == "shared-only").unwrap();
+    assert_eq!(shared_idx.source, SkillSource::Parent);
+}
+
+#[test]
+fn test_skill_source_display() {
+    assert_eq!(SkillSource::Project.to_string(), "project");
+    assert_eq!(SkillSource::Parent.to_string(), "parent");
+    assert_eq!(SkillSource::UserGlobal.to_string(), "user");
+    assert_eq!(SkillSource::Shared.to_string(), "shared");
+}
+
+#[test]
+fn test_shared_skills_not_loaded_without_opt_in() {
+    let home = home_dir().expect("home dir required");
+    let shared_path = home.join(".agents").join("skills");
+    let project_skills = tempfile::tempdir().unwrap();
+
+    fs::create_dir_all(&shared_path).unwrap();
+    fs::write(
+        shared_path.join("SKILL.md"),
+        "---\nname: hidden-skill\ndescription: Should not appear\ntriggers:\n  - hidden\n---\n\nHidden.\n",
+    )
+    .unwrap();
+
+    // With discover_shared = false (default)
+    let mut loader = SkillLoader::for_workspace_with_options(project_skills.path(), false);
+    loader.discover().unwrap();
+    assert!(
+        !loader.skills.iter().any(|s| s.name == "hidden-skill"),
+        "shared skill should not be discovered when opt-in is off"
+    );
+
+    let _ = fs::remove_file(shared_path.join("SKILL.md"));
 }

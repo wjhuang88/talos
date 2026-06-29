@@ -10,9 +10,9 @@ use tokio::sync::Mutex;
 use crate::skill_runtime::RuntimeSkills;
 use talos_conversation::MessageSource;
 use talos_conversation::{
-    ConversationEngine, CredentialResponseData, ModelSwitchRequest, SessionDeleteRequest,
-    SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
-    StreamMessage, UiOutput, UserInput,
+    ConversationEngine, CredentialResponseData, ModelInfo, ModelSwitchRequest,
+    SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest,
+    SkillCommandRequest, StreamMessage, UiOutput, UserInput,
 };
 use talos_core::message::AgentEvent;
 
@@ -23,7 +23,7 @@ pub(crate) struct ConversationLoopIo {
     pub submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
     pub sq_tx_watch:
         tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<talos_core::session::SessionOp>>,
-    pub model_info_watch: tokio::sync::watch::Receiver<(String, String)>,
+    pub model_info_watch: tokio::sync::watch::Receiver<ModelInfo>,
     pub session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
     pub runtime_skills: Arc<Mutex<RuntimeSkills>>,
 }
@@ -44,8 +44,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
         tokio::select! {
             changed = model_info_watch.changed() => {
                 if changed.is_ok() {
-                    let (model, provider) = model_info_watch.borrow().clone();
-                    engine.set_model_info(&model, &provider);
+                    let info = model_info_watch.borrow().clone();
+                    engine.set_model_info(&info);
                     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
                 }
             }

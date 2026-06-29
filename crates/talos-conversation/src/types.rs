@@ -93,6 +93,19 @@ pub struct StatusSnapshot {
     pub steering_count: usize,
     pub followup_count: usize,
     pub is_processing: bool,
+    pub context_limit: Option<u32>,
+    pub input_price_per_million: Option<f64>,
+    pub output_price_per_million: Option<f64>,
+}
+
+/// Model metadata passed from the CLI layer to the conversation engine.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ModelInfo {
+    pub model_name: String,
+    pub provider: String,
+    pub context_limit: Option<u32>,
+    pub input_price_per_million: Option<f64>,
+    pub output_price_per_million: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

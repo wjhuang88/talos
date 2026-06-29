@@ -28,7 +28,7 @@ pub use command_registry::{
 pub use engine::ConversationEngine;
 pub use types::{
     ChatMessage, CopyScope, CredentialRequestData, CredentialResponseData, McpServerDiagnostic,
-    MessageRole, MessageSource, MessageStatus, ModelPickerData, ModelPickerItem,
+    MessageRole, MessageSource, MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem,
     ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
     SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,

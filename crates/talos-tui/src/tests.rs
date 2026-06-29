@@ -289,6 +289,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -308,6 +309,7 @@ mod tests {
             steering_count: 3,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -621,6 +623,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -638,6 +641,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: true,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -656,6 +660,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -677,6 +682,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -699,6 +705,7 @@ mod tests {
             steering_count: 2,
             followup_count: 1,
             is_processing: true,
+            ..Default::default()
         };
         let wide = build_status_text(&status, 120);
         let narrow = build_status_text(&status, 60);
@@ -737,6 +744,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
@@ -757,6 +765,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
 
         let text = build_status_text(&status, 100);
@@ -779,9 +788,119 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            ..Default::default()
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
         assert!(!content.contains("  t") || content.contains("test"));
+    }
+
+    #[test]
+    fn test_status_bar_shows_context_limit() {
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4".to_string(),
+            provider: "anthropic".to_string(),
+            workspace_path: String::new(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            context_limit: Some(200_000),
+            ..Default::default()
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(
+            content.contains("200k ctx"),
+            "status bar must show context limit, got: {content}"
+        );
+    }
+
+    #[test]
+    fn test_status_bar_omits_context_when_none() {
+        let status = StatusSnapshot {
+            model_name: "unknown-model".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            context_limit: None,
+            ..Default::default()
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(
+            !content.contains("ctx"),
+            "status bar must not show ctx when limit is None, got: {content}"
+        );
+    }
+
+    #[test]
+    fn test_exit_summary_uses_catalog_pricing() {
+        use crate::app_summary::build_exit_summary_lines;
+        use std::time::Duration;
+
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4".to_string(),
+            provider: "anthropic".to_string(),
+            workspace_path: String::new(),
+            usage: Usage {
+                input_tokens: 1_000_000,
+                output_tokens: 500_000,
+                ..Default::default()
+            },
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            context_limit: Some(200_000),
+            input_price_per_million: Some(3.0),
+            output_price_per_million: Some(15.0),
+        };
+        let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5);
+        let text: String = lines.iter().map(|l| l.text.as_str()).collect();
+        assert!(
+            text.contains("Est") && !text.contains("default"),
+            "exit summary should use catalog pricing, got: {text}"
+        );
+        let expected = 1_000_000.0 * 3.0 / 1_000_000.0 + 500_000.0 * 15.0 / 1_000_000.0;
+        assert!(
+            text.contains(&format!("${expected:.2}")),
+            "exit summary should show correct cost, got: {text}"
+        );
+    }
+
+    #[test]
+    fn test_exit_summary_falls_back_to_default_pricing() {
+        use crate::app_summary::build_exit_summary_lines;
+        use std::time::Duration;
+
+        let status = StatusSnapshot {
+            model_name: "unknown-model".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage {
+                input_tokens: 1_000_000,
+                output_tokens: 500_000,
+                ..Default::default()
+            },
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            context_limit: Some(128_000),
+            input_price_per_million: None,
+            output_price_per_million: None,
+        };
+        let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5);
+        let text: String = lines.iter().map(|l| l.text.as_str()).collect();
+        assert!(
+            text.contains("default"),
+            "exit summary should indicate default pricing fallback, got: {text}"
+        );
     }
 }

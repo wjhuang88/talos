@@ -1,6 +1,31 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
+/// Identifies where a skill was discovered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum SkillSource {
+    /// `.talos/skills/` in the active workspace.
+    #[default]
+    Project,
+    /// Parent `.talos/skills/` directories (monorepo inheritance).
+    Parent,
+    /// `~/.talos/skills/` (user-global Talos-owned).
+    UserGlobal,
+    /// `~/.agents/skills/` (shared, opt-in).
+    Shared,
+}
+
+impl std::fmt::Display for SkillSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SkillSource::Project => write!(f, "project"),
+            SkillSource::Parent => write!(f, "parent"),
+            SkillSource::UserGlobal => write!(f, "user"),
+            SkillSource::Shared => write!(f, "shared"),
+        }
+    }
+}
+
 /// YAML frontmatter extracted from a SKILL.md file.
 ///
 /// All fields are required. The frontmatter must appear between `---` delimiters
@@ -28,6 +53,8 @@ pub struct Skill {
     pub body: String,
     /// Absolute path to the source SKILL.md file.
     pub source_path: PathBuf,
+    /// Where this skill was discovered from.
+    pub source: SkillSource,
 }
 
 /// Lightweight skill index entry for Level 0 progressive disclosure.
@@ -44,6 +71,8 @@ pub struct SkillIndex {
     pub triggers: Vec<String>,
     /// Estimated token count for this skill's Level 0 entry (name + description).
     pub estimated_tokens: usize,
+    /// Where this skill was discovered from.
+    pub source: SkillSource,
 }
 
 /// Disclosure level for progressive skill loading.

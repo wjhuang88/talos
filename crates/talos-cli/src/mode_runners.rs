@@ -11,7 +11,8 @@ use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_conversation::{
-    ConversationEngine, MessageSource, SessionPickerItem, StreamMessage, UiOutput, UserInput,
+    ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, StreamMessage, UiOutput,
+    UserInput,
 };
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
@@ -203,6 +204,26 @@ async fn handle_session_delete(
                 }
             }
         }
+    }
+}
+
+pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
+    let builtins = talos_config::model::builtin_models();
+    let meta =
+        talos_config::model::find_model_by_provider(&builtins, &config.provider, &config.model);
+
+    let (context_limit, _) = config.resolve_model_limits();
+
+    let pricing = meta.and_then(|m| m.pricing.as_ref());
+    let input_price = pricing.and_then(|p| p.input_per_1m);
+    let output_price = pricing.and_then(|p| p.output_per_1m);
+
+    ModelInfo {
+        model_name: config.model.clone(),
+        provider: config.provider.clone(),
+        context_limit: Some(context_limit),
+        input_price_per_million: input_price,
+        output_price_per_million: output_price,
     }
 }
 
@@ -497,8 +518,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     // CURRENTLY active session and sq_tx without owning a stale clone.
     let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
     let (sq_tx_watch_tx, sq_tx_watch_rx) = tokio::sync::watch::channel(handle.sq_tx.clone());
-    let (model_info_tx, model_info_rx) =
-        tokio::sync::watch::channel((config.model.clone(), config.provider.clone()));
+    let (model_info_tx, model_info_rx) = tokio::sync::watch::channel(resolve_model_info(&config));
     // Dedicated channel for handing off the new eq_rx + old_session to the
     // bridge forwarder after a session switch. The bridge must keep persisting
     // any in-flight events for the previous session until that actor's eq_rx
@@ -568,8 +588,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     )
                     .await
                     {
-                        let _ = model_info_tx_for_handler
-                            .send((new_config.model.clone(), new_config.provider.clone()));
+                        let _ = model_info_tx_for_handler.send(resolve_model_info(&new_config));
                         config_for_handler = new_config;
                     }
                 }
@@ -619,8 +638,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     )
                     .await
                     {
-                        let _ = model_info_tx_for_handler
-                            .send((new_config.model.clone(), new_config.provider.clone()));
+                        let _ = model_info_tx_for_handler.send(resolve_model_info(&new_config));
                         config_for_handler = new_config;
                     }
                 }
@@ -641,8 +659,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     )
                     .await
                     {
-                        let _ = model_info_tx_for_handler
-                            .send((new_config.model.clone(), new_config.provider.clone()));
+                        let _ = model_info_tx_for_handler.send(resolve_model_info(&new_config));
                         config_for_handler = new_config;
                     }
                 }
@@ -684,8 +701,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                             if matches!(msg, Message::User { .. }) {
                                 continue;
                             }
-                            let (model, provider) = model_info_rx_for_bridge.borrow().clone();
-                            let metadata = session_metadata_for_model(&model, &provider);
+                            let info = model_info_rx_for_bridge.borrow().clone();
+                            let metadata =
+                                session_metadata_for_model(&info.model_name, &info.provider);
                             if let Err(e) = owning_session.append_with_metadata(msg, metadata) {
                                 eprintln!("Warning: failed to persist message: {e}");
                             }
@@ -728,8 +746,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 content: msg.clone(),
             };
             let session = session_watch_rx_for_user.borrow().clone();
-            let (model, provider) = model_info_rx_for_user.borrow().clone();
-            let metadata = session_metadata_for_model(&model, &provider);
+            let info = model_info_rx_for_user.borrow().clone();
+            let metadata = session_metadata_for_model(&info.model_name, &info.provider);
             if let Err(e) = session.append_with_metadata(&user_msg, metadata) {
                 eprintln!("Warning: failed to persist user message: {e}");
             }

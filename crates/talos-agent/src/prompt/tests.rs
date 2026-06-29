@@ -26,6 +26,7 @@ fn test_build_with_all_components() {
             description: "Git operations".into(),
             triggers: vec!["git".into()],
             estimated_tokens: 0,
+            source: talos_skill::SkillSource::Project,
         }])
         .with_context_files(vec![ContextFile {
             path: "AGENTS.md".into(),
@@ -124,6 +125,7 @@ fn test_cache_marker_generation() {
             description: "A test skill".into(),
             triggers: vec!["test".into()],
             estimated_tokens: 0,
+            source: talos_skill::SkillSource::Project,
         }]);
 
     let (prompt, markers) = builder.build_with_cache_markers();
@@ -278,6 +280,7 @@ fn test_prompt_ordering_tools_before_skills() {
             description: "Test skill".into(),
             triggers: vec![],
             estimated_tokens: 0,
+            source: talos_skill::SkillSource::Project,
         }]);
 
     let prompt = builder.build();
@@ -296,6 +299,7 @@ fn test_prompt_ordering_skills_before_context() {
             description: "Test skill".into(),
             triggers: vec![],
             estimated_tokens: 0,
+            source: talos_skill::SkillSource::Project,
         }])
         .with_context_files(vec![ContextFile {
             path: "AGENTS.md".into(),

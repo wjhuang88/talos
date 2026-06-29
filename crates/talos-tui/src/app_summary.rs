@@ -106,11 +106,12 @@ pub(crate) fn build_exit_summary_lines(
         ));
     }
 
-    if let Some(cost) = estimate_cost(usage) {
+    let (cost, label) = estimate_cost(status);
+    if let Some(cost) = cost {
         lines.push(ScrollbackLine::plain(String::new(), None));
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("  Est cost: ${cost:.2}"),
+                format!("  {label} cost: ${cost:.2}"),
                 to_crossterm_color(semantic::TEXT_ACCENT),
                 HistoryAttrs::default(),
             )],
@@ -122,11 +123,25 @@ pub(crate) fn build_exit_summary_lines(
     lines
 }
 
-fn estimate_cost(usage: &talos_core::message::Usage) -> Option<f64> {
+const DEFAULT_INPUT_PER_M: f64 = 3.0;
+const DEFAULT_OUTPUT_PER_M: f64 = 15.0;
+
+fn estimate_cost(status: &StatusSnapshot) -> (Option<f64>, &'static str) {
+    let usage = &status.usage;
     if usage.input_tokens == 0 && usage.output_tokens == 0 {
-        return None;
+        return (None, "");
     }
-    let input_cost = usage.input_tokens as f64 * 3.0 / 1_000_000.0;
-    let output_cost = usage.output_tokens as f64 * 15.0 / 1_000_000.0;
-    Some(input_cost + output_cost)
+
+    if let (Some(input_rate), Some(output_rate)) = (
+        status.input_price_per_million,
+        status.output_price_per_million,
+    ) {
+        let input_cost = usage.input_tokens as f64 * input_rate / 1_000_000.0;
+        let output_cost = usage.output_tokens as f64 * output_rate / 1_000_000.0;
+        return (Some(input_cost + output_cost), "Est");
+    }
+
+    let input_cost = usage.input_tokens as f64 * DEFAULT_INPUT_PER_M / 1_000_000.0;
+    let output_cost = usage.output_tokens as f64 * DEFAULT_OUTPUT_PER_M / 1_000_000.0;
+    (Some(input_cost + output_cost), "Est (default)")
 }

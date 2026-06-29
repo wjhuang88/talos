@@ -73,6 +73,7 @@ fn test_api_key_from_env_anthropic() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "env-key-anthropic");
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
@@ -91,6 +92,7 @@ fn test_api_key_from_env_openai() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "env-key-openai");
     unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -110,6 +112,7 @@ fn test_api_key_from_env_openai_compat() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "bailian-style-key");
     unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
@@ -129,6 +132,7 @@ fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "real-openai-key");
     unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -149,6 +153,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     let err = config.api_key().unwrap_err();
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -171,6 +176,7 @@ fn test_api_key_missing_error() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     let err = config.api_key().unwrap_err();
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -198,6 +204,7 @@ fn test_base_url_getter() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     assert_eq!(config.base_url().as_deref(), Some("https://example.com/v1"));
 }
@@ -248,6 +255,7 @@ fn test_custom_provider_api_key_env() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
 
     assert_eq!(config.api_key().unwrap(), "dashscope-key");
@@ -267,6 +275,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     let (builtin_ctx, builtin_out) = builtin.resolve_model_limits();
     assert_eq!(builtin_ctx, 1_047_576);
@@ -297,6 +306,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     assert_eq!(custom.context_limit(), Some(202_752));
     assert_eq!(custom.output_limit(), Some(4096));
@@ -352,6 +362,7 @@ fn test_provider_serialization() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
     let config_openai = Config {
         provider: "openai".to_string(),
@@ -362,6 +373,7 @@ fn test_provider_serialization() {
         mcp: McpConfig::default(),
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
+        skills: SkillConfig::default(),
     };
 
     let a_str = toml::to_string(&config_anthropic).unwrap();
@@ -1062,4 +1074,36 @@ fn test_config_debug_masks_provider_api_keys() {
         "Config Debug must not leak api_key"
     );
     assert!(debug.contains("***"));
+}
+
+#[test]
+fn test_skill_config_default_off() {
+    let config = Config::default();
+    assert!(!config.skills.discover_shared);
+}
+
+#[test]
+fn test_skill_config_deserializes() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+
+[skills]
+discover_shared = true
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.skills.discover_shared);
+}
+
+#[test]
+fn test_skill_config_serializes() {
+    let config = Config {
+        skills: SkillConfig {
+            discover_shared: true,
+        },
+        ..Default::default()
+    };
+    let serialized = toml::to_string(&config).unwrap();
+    assert!(serialized.contains("discover_shared"));
+    assert!(serialized.contains("true"));
 }

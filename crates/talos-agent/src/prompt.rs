@@ -39,6 +39,7 @@
 //!         description: "Git operations".into(),
 //!         triggers: vec!["git".into()],
 //!         estimated_tokens: 0,
+//!         source: talos_skill::SkillSource::Project,
 //!     }])
 //!     .with_context_files(vec![ContextFile {
 //!         path: "AGENTS.md".into(),

@@ -43,7 +43,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
-use talos_config::Config;
+use talos_config::{Config, ProviderProtocol};
 use talos_plugin::{HookRegistry, LoggingHandler};
 
 use crate::logging::init_logger;
@@ -91,6 +91,30 @@ pub(crate) enum TalosCommand {
     Explore {
         #[command(subcommand)]
         command: exploration_cli::ExploreCommand,
+    },
+    /// Configuration operations.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
+}
+
+/// Subcommands for `talos config`.
+#[derive(Subcommand, Clone)]
+pub(crate) enum ConfigCommand {
+    /// Print all configuration settings (secrets masked).
+    List,
+    /// Get a single configuration value by dotted key.
+    Get {
+        /// Dotted key path (e.g., "model", "providers.anthropic.api_key_env").
+        key: String,
+    },
+    /// Set a configuration value and persist to disk.
+    Set {
+        /// Dotted key path (e.g., "model", "providers.anthropic.base_url").
+        key: String,
+        /// New value.
+        value: String,
     },
 }
 
@@ -283,6 +307,14 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Explore { command }) = &cli.command {
         return crate::exploration_cli::run_explore_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Config { command }) = &cli.command {
+        return match command {
+            ConfigCommand::List => run_config_list(),
+            ConfigCommand::Get { key } => run_config_get(key),
+            ConfigCommand::Set { key, value } => run_config_set(&format!("{key}={value}")),
+        };
     }
 
     if let Some(path) = &cli.import_models {
@@ -587,7 +619,7 @@ pub(crate) fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
     }
 }
 
-fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> Result<()> {
+pub(crate) fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> Result<()> {
     let parts: Vec<&str> = key.split('.').collect();
     match parts.as_slice() {
         ["model"] => {
@@ -596,6 +628,23 @@ fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> Result<()> 
         }
         ["provider"] => {
             config.provider = value.to_string();
+            Ok(())
+        }
+        ["providers", name, "protocol"] => {
+            let protocol = match value {
+                "anthropic-messages" => ProviderProtocol::AnthropicMessages,
+                "openai-chat" => ProviderProtocol::OpenAIChat,
+                _ => anyhow::bail!(
+                    "unknown protocol '{value}': must be 'anthropic-messages' or 'openai-chat'"
+                ),
+            };
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_insert_with(|| talos_config::ProviderConfig {
+                    ..Default::default()
+                })
+                .protocol = protocol;
             Ok(())
         }
         ["providers", name, "api_key_env"] => {
@@ -624,6 +673,38 @@ fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> Result<()> 
         }
         ["providers", name, "api_key"] => {
             config.set_provider_credential(name, value);
+            Ok(())
+        }
+        ["providers", name, "models", model, "context_limit"] => {
+            let limit: u32 = value.parse().map_err(|_| {
+                anyhow::anyhow!("invalid context_limit '{value}': must be a positive integer")
+            })?;
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_insert_with(|| talos_config::ProviderConfig {
+                    ..Default::default()
+                })
+                .models
+                .entry((*model).to_string())
+                .or_default()
+                .context_limit = Some(limit);
+            Ok(())
+        }
+        ["providers", name, "models", model, "output_limit"] => {
+            let limit: u32 = value.parse().map_err(|_| {
+                anyhow::anyhow!("invalid output_limit '{value}': must be a positive integer")
+            })?;
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_insert_with(|| talos_config::ProviderConfig {
+                    ..Default::default()
+                })
+                .models
+                .entry((*model).to_string())
+                .or_default()
+                .output_limit = Some(limit);
             Ok(())
         }
         _ => anyhow::bail!("unsupported config key for set: '{key}'"),

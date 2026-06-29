@@ -1979,6 +1979,7 @@ async fn test_stable_prefix_changes_after_set_skill_index() {
         description: "A new skill".into(),
         triggers: vec!["new".into()],
         estimated_tokens: 0,
+        source: talos_skill::SkillSource::Project,
     }]);
 
     let _ = agent.run("turn 2".into()).await.unwrap();
@@ -2023,6 +2024,7 @@ fn test_build_stable_prefix_and_dynamic_suffix() {
             description: "A test skill".into(),
             triggers: vec!["test".into()],
             estimated_tokens: 0,
+            source: talos_skill::SkillSource::Project,
         }]);
 
     let stable = builder.build_stable_prefix();

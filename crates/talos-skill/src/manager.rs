@@ -57,6 +57,7 @@ impl SkillManager {
                         description: s.description.clone(),
                         triggers: s.triggers.clone(),
                         estimated_tokens,
+                        source: s.source,
                     }
                 })
                 .collect();

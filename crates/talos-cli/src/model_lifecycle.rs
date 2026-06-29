@@ -261,10 +261,21 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                 talos_conversation::MessageSource::System,
                 success_message,
             );
+            let (ctx_limit, _) = model_config.resolve_model_limits();
+            let builtins = talos_config::model::builtin_models();
+            let meta = talos_config::model::find_model_by_provider(
+                &builtins,
+                &model_config.provider,
+                &model_config.model,
+            );
+            let pricing = meta.and_then(|m| m.pricing.as_ref());
             let _ = ui_tx.send(talos_conversation::UiOutput::Status(
                 talos_conversation::StatusSnapshot {
                     model_name: model_id.clone(),
                     provider: provider_for_status,
+                    context_limit: Some(ctx_limit),
+                    input_price_per_million: pricing.and_then(|p| p.input_per_1m),
+                    output_price_per_million: pricing.and_then(|p| p.output_per_1m),
                     ..Default::default()
                 },
             ));
