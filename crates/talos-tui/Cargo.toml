@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
+publish = false
 
 [dependencies]
 talos-core = { version = "0.2.0", path = "../talos-core" }

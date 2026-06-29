@@ -53,19 +53,19 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 4 | `talos-skill` | Capability/parser | Published first wave | `talos-skill 0.2.0` published | Add crate-specific docs/keywords later. |
 | 5 | `talos-session` | Storage/session | Published first wave | `talos-session 0.2.0` published | Add SQLite storage contract docs. |
 | 6 | `talos-provider` | Provider/network | Published integration wave | `talos-provider 0.2.0` published | Continue provider support boundary docs before 1.0 stability claims. |
-| 7 | `talos-sandbox` | Platform safety | Publish-after-ADR-review | Manifest-ready; platform behavior sensitive | Safety review before dry-run. |
+| 7 | `talos-sandbox` | Platform safety | Gate-before-publish | Manifest-ready; platform behavior sensitive | Complete sandbox safety gate before dry-run or real publish. |
 | 8 | `talos-plugin` | Extension foundation | Published second wave | `talos-plugin 0.2.0` published | Continue extension boundary docs before 1.0 stability claims. |
-| 9 | `talos-tools` | Built-in tools | Publish-after-feature-gates | Manifest-ready; heavy defaults | Design feature gates. |
+| 9 | `talos-tools` | Built-in tools | Gate-before-publish | Manifest-ready; heavy defaults and tool execution surface | Complete feature/permission gate before dry-run or real publish. |
 | 10 | `talos-memory` | Memory storage | Published second wave | `talos-memory 0.2.0` published | Add fuller SQLite storage contract docs before 1.0 stability claims. |
 | 11 | `talos-exploration` | Exploration storage | Published second wave | `talos-exploration 0.2.0` published | Add fuller SQLite/FTS storage contract docs before 1.0 stability claims. |
 | 12 | `talos-conversation` | UI/runtime state | Published integration wave | `talos-conversation 0.2.0` published | Continue alternate UI/state API docs before 1.0 stability claims. |
-| 13 | `talos-agent` | Runtime implementation | Advanced/transitional | Manifest-ready; not primary SDK | Publish after lower deps. |
-| 14 | `talos-runtime` | SDK facade | Primary SDK | Manifest-ready; depends on lower deps | Publish after implementation deps. |
-| 15 | `talos-mcp` | Protocol transport | Publish-after-ADR | Manifest-ready; protocol boundary sensitive | ADR/support boundary. |
+| 13 | `talos-agent` | Runtime implementation | Gate-before-publish | Manifest-ready; not primary SDK | Publish only after sandbox/tools dependency gates or decoupling. |
+| 14 | `talos-runtime` | SDK facade | Gate-before-publish | Manifest-ready; depends on lower deps | Publish after dependency closure is safe or runtime is decoupled. |
+| 15 | `talos-mcp` | Protocol transport | Gate-before-publish | Manifest-ready; protocol boundary sensitive | ADR/support boundary before dry-run or real publish. |
 | 16 | `talos-rpc` | JSON-RPC transport | Published integration wave | `talos-rpc 0.2.0` published | Keep support boundary to local stdio; remote semantics still need ADR. |
-| 17 | `talos-evolution` | Product learning | Product-specific | Manifest-ready but not first-wave | Defer. |
-| 18 | `talos-tui` | Product UI | Product assembly | Manifest-ready but heavy/UI-specific | Defer. |
-| 19 | `talos-cli` | Binary product | Product assembly | Manifest-ready as package; not first-wave library | Defer until binary publish decision. |
+| 17 | `talos-evolution` | Product learning | Product-only | `publish = false` | Do not publish until external reusable API is proven. |
+| 18 | `talos-tui` | Product UI | Product-only | `publish = false` | Do not publish unless Talos intentionally offers a reusable TUI library. |
+| 19 | `talos-cli` | Binary product | Product-only | `publish = false` | Distribute as binary/install artifact, not a library crate. |
 
 ## Current Manifest Readiness
 
@@ -113,9 +113,24 @@ Remaining manifest work before broad publish:
 
 - Decide whether each crate should use a shared README, crate-specific README, or docs.rs-only docs.
 - Add crate-specific `keywords` and `categories` once first-wave crate docs are final.
-- Add `publish = false` to crates intentionally kept product-only if the team does not want their
-  names reserved.
 - Add feature gates for heavy tool/UI/provider capabilities before broad public consumption.
+- Keep `publish = false` on product-only crates unless a future story changes their distribution
+  model.
+
+## Remaining Publication Gates
+
+These crates are intentionally not published yet:
+
+| Crate | Current decision | Required gate before publish |
+|---|---|---|
+| `talos-sandbox` | Candidate, high risk | Security review against escape vectors, platform behavior docs, ADR-007/ADR-008/ADR-020 dependency boundary check, targeted sandbox tests. |
+| `talos-tools` | Candidate, high risk | Feature-gate plan for heavy/default tools, permission profile audit, network/write/execute tool boundary docs, dry-run after `talos-sandbox` decision. |
+| `talos-agent` | Candidate, transitional | Decide whether public consumers should depend on `talos-agent` directly or only through `talos-runtime`; publish only after sandbox/tools/memory/session dependency support is clear. |
+| `talos-runtime` | Candidate, SDK facade | Resolve dependency closure: either publish required implementation crates or decouple runtime from unpublished implementation surfaces; document pre-1.0 SDK support contract. |
+| `talos-mcp` | Candidate, protocol sensitive | MCP support boundary ADR or equivalent doc, server opt-in/conflict policy, transport/auth non-goals, dry-run after `talos-tools` decision. |
+| `talos-evolution` | Product-only now | Prove an external reusable API; remove `publish = false` only through a new story/decision. |
+| `talos-tui` | Product-only now | Decide to offer reusable TUI library; otherwise keep product UI out of crates.io. |
+| `talos-cli` | Product-only now | Binary/install distribution decision; keep Cargo library publishing disabled. |
 
 ## Name Reservation Plan
 
@@ -129,9 +144,10 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
    `talos-rpc` after adding crate-level support boundary docs.
 4. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
    dependencies are intentionally published or decoupled.
-5. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
-6. Defer remaining P1/P2/P3 names until docs, feature gates, and API support boundaries are
-   clearer.
+5. Keep `talos-cli`, `talos-tui`, and `talos-evolution` product-only with `publish = false`.
+6. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
+7. Defer remaining high-risk names until docs, feature gates, and API support boundaries are
+   complete.
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear
 description, and state its pre-1.0 support boundary.

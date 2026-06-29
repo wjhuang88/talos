@@ -1,6 +1,6 @@
 # ARCH-031: Crate Publication Boundary And Distribution Architecture
 
-**Status**: In Progress (integration crates published; high-risk crates deferred)
+**Status**: In Progress (publication classification enforced)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to make Talos-owned capabilities independently publishable as crates,
@@ -78,7 +78,7 @@ unclear and lets product-layer coupling hide inside internal dependencies.
       recorded with owning follow-up items.
 - [ ] `talos-runtime` remains the documented SDK facade; implementation crates document direct-use
       caveats.
-- [ ] Heavy optional capabilities have feature gates or recorded split triggers.
+- [x] Heavy optional capabilities have feature gates or recorded split triggers.
 - [ ] README, README.zh-CN, and architecture docs explain crate distribution when the first
       implementation slice lands.
 
@@ -129,6 +129,11 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   and `cargo publish --dry-run -p talos-rpc` passed from clean commit `92a0c99`.
 - Real publishes succeeded for `talos-provider 0.2.0`, `talos-conversation 0.2.0`, and
   `talos-rpc 0.2.0`. Each package is visible via `cargo search`.
+- Classified remaining crates:
+  `talos-sandbox`, `talos-tools`, `talos-agent`, `talos-runtime`, and `talos-mcp` are
+  gate-before-publish candidates; `talos-cli`, `talos-tui`, and `talos-evolution` are product-only.
+- Added `publish = false` to `talos-cli`, `talos-tui`, and `talos-evolution` so product-only crates
+  cannot be accidentally published through `cargo publish --workspace`.
 
 ## Required Reads
 
