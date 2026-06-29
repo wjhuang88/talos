@@ -52,13 +52,13 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 3 | `talos-permission` | Policy/safety | Published first wave | `talos-permission 0.2.0` published | Add safety support boundary docs. |
 | 4 | `talos-skill` | Capability/parser | Published first wave | `talos-skill 0.2.0` published | Add crate-specific docs/keywords later. |
 | 5 | `talos-session` | Storage/session | Published first wave | `talos-session 0.2.0` published | Add SQLite storage contract docs. |
-| 6 | `talos-provider` | Provider/network | Publish-after-docs | Manifest-ready; network/provider API docs needed | Document support boundary. |
+| 6 | `talos-provider` | Provider/network | Publish-after-docs | `cargo publish --dry-run -p talos-provider` passed | Document network/provider support boundary before real publish. |
 | 7 | `talos-sandbox` | Platform safety | Publish-after-ADR-review | Manifest-ready; platform behavior sensitive | Safety review before dry-run. |
-| 8 | `talos-plugin` | Extension foundation | Publish-after-boundary-docs | Manifest-ready; depends on core + permission | Document extension support boundary. |
+| 8 | `talos-plugin` | Extension foundation | Published second wave | `talos-plugin 0.2.0` published | Continue extension boundary docs before 1.0 stability claims. |
 | 9 | `talos-tools` | Built-in tools | Publish-after-feature-gates | Manifest-ready; heavy defaults | Design feature gates. |
-| 10 | `talos-memory` | Memory storage | Publish-after-docs | Manifest-ready; SQLite bundled behavior needs docs | Document storage contract. |
-| 11 | `talos-exploration` | Exploration storage | Publish-after-docs | Manifest-ready; SQLite/FTS behavior needs docs | Document storage contract. |
-| 12 | `talos-conversation` | UI/runtime state | Publish-after-docs | Manifest-ready; alternate UI contract needed | Document state API. |
+| 10 | `talos-memory` | Memory storage | Published second wave | `talos-memory 0.2.0` published | Add fuller SQLite storage contract docs before 1.0 stability claims. |
+| 11 | `talos-exploration` | Exploration storage | Rate-limited after dry-run | `cargo publish --dry-run -p talos-exploration` passed; real publish blocked by crates.io rate limit | Retry after 2026-06-29 07:28:33 GMT. |
+| 12 | `talos-conversation` | UI/runtime state | Publish-after-docs | `cargo publish --dry-run -p talos-conversation` passed | Document alternate UI/state API before real publish. |
 | 13 | `talos-agent` | Runtime implementation | Advanced/transitional | Manifest-ready; not primary SDK | Publish after lower deps. |
 | 14 | `talos-runtime` | SDK facade | Primary SDK | Manifest-ready; depends on lower deps | Publish after implementation deps. |
 | 15 | `talos-mcp` | Protocol transport | Publish-after-ADR | Manifest-ready; protocol boundary sensitive | ADR/support boundary. |
@@ -95,6 +95,12 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
   `talos-permission 0.2.0`, and `talos-session 0.2.0`.
 - `cargo search talos-core --limit 5` confirmed `talos-core = "0.2.0"` was visible in the
   crates.io index before publishing `talos-config`, `talos-permission`, and `talos-session`.
+- Second-wave dry-runs succeeded for `talos-plugin`, `talos-provider`, `talos-conversation`,
+  `talos-memory`, and `talos-exploration`.
+- Real publishes succeeded for `talos-plugin 0.2.0` and `talos-memory 0.2.0`.
+- Real `cargo publish -p talos-exploration` passed packaging and verification but crates.io
+  rejected upload with a new-crate rate limit. Retry after 2026-06-29 07:28:33 GMT. No
+  `talos-exploration` package was published in this attempt.
 
 Remaining manifest work before broad publish:
 
@@ -110,10 +116,12 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
 
 1. Completed first-wave reservation with real usable crates: `talos-core`, `talos-skill`,
    `talos-config`, `talos-permission`, and `talos-session`.
-2. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
+2. Completed second-wave reservation for `talos-plugin` and `talos-memory`.
+3. Retry `talos-exploration` after the crates.io new-crate rate-limit window.
+4. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
    dependencies are intentionally published or decoupled.
-3. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
-4. Defer remaining P1/P2/P3 names until docs, feature gates, and API support boundaries are
+5. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
+6. Defer remaining P1/P2/P3 names until docs, feature gates, and API support boundaries are
    clearer.
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear

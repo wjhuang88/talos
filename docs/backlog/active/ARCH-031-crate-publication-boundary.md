@@ -1,6 +1,6 @@
 # ARCH-031: Crate Publication Boundary And Distribution Architecture
 
-**Status**: In Progress (first-wave crates published)
+**Status**: In Progress (second wave partially published; crates.io rate-limited)
 **Priority**: P2
 **Created**: 2026-06-28
 **Source**: User request to make Talos-owned capabilities independently publishable as crates,
@@ -116,6 +116,12 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   `talos-permission 0.2.0`, and `talos-session 0.2.0`.
 - `cargo search talos-core --limit 5` confirmed `talos-core = "0.2.0"` is visible in the
   crates.io index before publishing the core-dependent crates.
+- Second-wave dry-runs succeeded for `talos-plugin`, `talos-provider`, `talos-conversation`,
+  `talos-memory`, and `talos-exploration`.
+- Real publishes succeeded for `talos-plugin 0.2.0` and `talos-memory 0.2.0`.
+- Real `cargo publish -p talos-exploration` passed packaging and verification but crates.io
+  rejected upload with a new-crate rate limit. Retry after 2026-06-29 07:28:33 GMT. No
+  `talos-exploration` package was published in this attempt.
 
 ## Required Reads
 
