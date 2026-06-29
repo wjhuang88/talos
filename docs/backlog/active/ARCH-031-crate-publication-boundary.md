@@ -134,9 +134,14 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   gate-before-publish candidates; `talos-cli`, `talos-tui`, and `talos-evolution` are product-only.
 - Added `publish = false` to `talos-cli`, `talos-tui`, and `talos-evolution` so product-only crates
   cannot be accidentally published through `cargo publish --workspace`.
+- Created the two-month crate distribution hardening plan and programmer handoff to delegate
+  published-crate docs, product-only guards, high-risk gates, runtime dependency closure, and
+  user-facing distribution docs without authorizing additional real publishes.
 
 ## Required Reads
 
+- `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
+- `docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md`
 - `docs/proposals/talos-crate-distribution-architecture.md`
 - `docs/reference/ARCHITECTURE.md`
 - `docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`
