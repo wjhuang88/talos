@@ -139,11 +139,16 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   user-facing distribution docs, and feature tracks for WEBFETCH bounded document capture,
   MODEL-004 runtime catalog integration, CONF-001 CLI config editing, and AGENT-002-B shared skill
   discovery without authorizing additional real publishes.
+- Reconciled the two-month plan against I045 on 2026-06-29: MODEL-004 M1/M2 and the CONF-001
+  `--config-*` flag surface are baseline work already completed; remaining delegated work is
+  MODEL-004 TUI/exit metadata, CONF-001 subcommand/validation hardening, WEBFETCH document capture,
+  shared skill discovery, and A1-A8 distribution gates.
 
 ## Required Reads
 
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
 - `docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md`
+- `docs/iterations/I045-product-readiness-model-lifecycle-observability.md`
 - `docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md`
 - `docs/backlog/active/MODEL-004-catalog-runtime-integration.md`
 - `docs/backlog/active/CONF-001-config-editing.md`

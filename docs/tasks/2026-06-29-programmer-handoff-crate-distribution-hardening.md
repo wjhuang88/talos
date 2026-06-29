@@ -1,6 +1,6 @@
 # Programmer Handoff: Crate Distribution Hardening
 
-> Status: Ready for assignment
+> Status: Ready for assignment (baseline reconciled 2026-06-29)
 > Created: 2026-06-29
 > Applies to:
 > [Crate Distribution Hardening Two-Month Plan](2026-06-29-crate-distribution-hardening-two-month-plan.md)
@@ -31,10 +31,29 @@ runtime limits, CLI config editing, and opt-in shared skill discovery.
 - `talos` is not available as a Cargo package name; use `talos-*` names only.
 - WEBFETCH-001 has Phase 0/1 complete (`http_request`, content detection, `save_url`); Phase 2+
   needs bounded document extraction/save workflow implementation.
-- MODEL-004 is planned; model catalog data exists but runtime still needs catalog-backed limits and
-  metadata display.
-- CONF-001 is planned; users still need a safer CLI path for viewing and editing config.
+- MODEL-004 is not clean-slate. I045 already implemented `Config::resolve_model_limits()`, tests,
+  CLI/session wiring, and compactor limit plumbing. Remaining work is catalog-aware TUI/exit
+  metadata and preserving the existing runtime limit path.
+- CONF-001 is not clean-slate. I045 already implemented top-level `--config-list`,
+  `--config-get`, and `--config-set` flags with secret masking. Remaining work is reconciling that
+  flag surface with the planned `talos config ...` subcommand UX, validating env/schema behavior,
+  and hardening docs/errors.
 - AGENT-002-B is research/planned for this handoff only as opt-in `~/.agents/skills` discovery.
+
+## Baseline Reconciliation
+
+Do not assign M1/M2 or the existing config flags as greenfield implementation work.
+
+| Track | Actual Baseline | Assignment Meaning |
+|---|---|---|
+| M1 | `resolve_model_limits()` exists and is tested | Record/preserve evidence only |
+| M2 | CLI/session paths pass resolved limit into `SessionConfig`; compactor consumes it | Record/preserve evidence only |
+| M3 | TUI status/exit summary still use hardcoded cost/rate logic | Implement residual catalog metadata display |
+| C1 | Existing flag grammar works but no formal migration design exists | Write reconciliation design |
+| C2 | `--config-*` flags exist; `talos config` subcommand does not | Add subcommands or record compatibility decision with tests |
+| C3 | UX hardening/TUI `/config` not started | Implement hardening or record readiness decision |
+| F1-F5 | `http_request` and `save_url` exist; extraction is clean-slate | Implement bounded document extraction workflow |
+| S1-S3 | Workspace skill discovery exists; no `~/.agents/skills` global path | Implement opt-in shared discovery |
 
 ## Non-Negotiable Rules
 
@@ -63,12 +82,13 @@ Read these in order:
 2. `docs/backlog/active/ARCH-031-crate-publication-boundary.md`
 3. `docs/reference/CRATE-PUBLICATION-MATRIX.md`
 4. `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
-5. `docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md` for feature-track work
-6. `docs/backlog/active/MODEL-004-catalog-runtime-integration.md` for model runtime work
-7. `docs/backlog/active/CONF-001-config-editing.md` for config editing work
-8. `docs/backlog/active/AGENT-002-dotagents-protocol-support.md` for shared skill discovery work
-9. The assigned crate's `Cargo.toml` and crate-level `src/lib.rs`
-10. Any ADR listed by the assigned work item
+5. `docs/iterations/I045-product-readiness-model-lifecycle-observability.md`
+6. `docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md` for feature-track work
+7. `docs/backlog/active/MODEL-004-catalog-runtime-integration.md` for model runtime work
+8. `docs/backlog/active/CONF-001-config-editing.md` for config editing work
+9. `docs/backlog/active/AGENT-002-dotagents-protocol-support.md` for shared skill discovery work
+10. The assigned crate's `Cargo.toml` and crate-level `src/lib.rs`
+11. Any ADR listed by the assigned work item
 
 ## Assignment Map
 
@@ -87,11 +107,11 @@ Read these in order:
 | F3 fetch/save/extract integration | Tools/permissions | Tests proving fetch, save, and extract stay separate and permission-aware | Do not auto-save or auto-inject full content |
 | F4 tool presentation | Agent/tools | Registry/presentation coverage for document tools | Do not expose tools outside intended family/policy |
 | F5 feature docs | Technical writing/Rust | README/README.zh-CN docs for supported formats, limits, and non-goals | Do not imply full MarkItDown/PDF/Office support |
-| M1 model runtime design | Config/agent | MODEL-004 limit precedence and call-site design | Do not change runtime behavior before tests are planned |
-| M2 catalog-backed limits | Config/agent | Runtime context/output limit resolution from catalog with fallback | Do not remove conservative fallback |
-| M3 compaction/UI metadata | Agent/TUI | Compaction and existing displays use catalog metadata where available | Do not add catalog auto-refresh |
-| C1 config editing design | CLI/config | Key grammar, validation, secret masking design | Do not mutate TOML ad hoc |
-| C2 config get/list/set | CLI/config | `talos config get/list/set` through `talos-config` | Do not print secrets |
+| M1 model runtime baseline evidence | Config/agent | Evidence note preserving existing `resolve_model_limits()` precedence and call sites | Do not reimplement completed runtime behavior |
+| M2 catalog-backed compaction baseline evidence | Config/agent | Evidence note preserving existing `SessionConfig.model_context_limit` and compactor wiring | Do not remove conservative fallback |
+| M3 TUI metadata residual | TUI/config | Status and exit summary use catalog context/pricing where available | Do not add catalog auto-refresh |
+| C1 config editing reconciliation | CLI/config | Flag-to-subcommand design, key grammar, validation, and secret masking behavior | Do not mutate TOML ad hoc |
+| C2 config subcommand/compatibility | CLI/config | `talos config get/list/set` or explicit compatibility decision, through `talos-config` | Do not print secrets or break `--config-*` flags |
 | C3 config UX hardening | CLI/TUI | Error messages, docs, TUI `/config` readiness decision | Do not implement partial unsafe TUI writes |
 | S1 shared skills policy | Skill/runtime | Opt-in policy and precedence for `~/.agents/skills` | Do not auto-load bodies |
 | S2 shared skills discovery | Skill/runtime | Optional path discovery with dedup/budget tests | Do not import MCP config |
@@ -157,10 +177,11 @@ Read these first, in order:
 3. docs/reference/CRATE-PUBLICATION-MATRIX.md
 4. docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md
 5. docs/tasks/2026-06-29-programmer-handoff-crate-distribution-hardening.md
-6. docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md if your assignment is F1-F5
-7. docs/backlog/active/MODEL-004-catalog-runtime-integration.md if your assignment is M1-M3
-8. docs/backlog/active/CONF-001-config-editing.md if your assignment is C1-C3
-9. docs/backlog/active/AGENT-002-dotagents-protocol-support.md if your assignment is S1-S3
+6. docs/iterations/I045-product-readiness-model-lifecycle-observability.md
+7. docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md if your assignment is F1-F5
+8. docs/backlog/active/MODEL-004-catalog-runtime-integration.md if your assignment is M1-M3
+9. docs/backlog/active/CONF-001-config-editing.md if your assignment is C1-C3
+10. docs/backlog/active/AGENT-002-dotagents-protocol-support.md if your assignment is S1-S3
 
 Your assignment is: <ASSIGNMENT ID AND TITLE>.
 
@@ -173,7 +194,8 @@ Hard constraints:
 - If working on WEBFETCH, keep fetch_url/http_request context ingestion, save_url file writes, and document_extract local extraction as separate permission-aware operations.
 - If working on WEBFETCH, implement bounded deterministic output and explicit unsupported-format behavior. Do not add PDF/Office/OCR/browser automation dependencies.
 - If working on MODEL-004, preserve conservative fallback when catalog metadata is absent.
-- If working on CONF-001, route reads/writes through talos-config and mask secrets on all display surfaces.
+- If working on MODEL-004 M1/M2, treat the task as evidence preservation, not greenfield implementation.
+- If working on CONF-001, route reads/writes through talos-config, mask secrets on all display surfaces, and preserve existing --config-* flags unless an owner doc explicitly replaces them.
 - If working on AGENT-002-B, make shared skill discovery opt-in and never load skill bodies without explicit activation.
 
 Expected output:

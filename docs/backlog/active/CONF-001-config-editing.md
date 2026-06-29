@@ -4,17 +4,18 @@
 |-------|-------|
 | Story ID | CONF-001 |
 | Priority | P2 |
-| Status | Planned (selected into crate distribution hardening two-month plan) |
+| Status | Partial (flag surface complete via I045; subcommand/validation hardening selected into crate distribution hardening two-month plan) |
 | Depends On | None |
 | Estimate | M |
 | Origin | User request 2026-06-17 — no in-app way to edit config; users must hand-edit `~/.talos/config.toml` |
 
 ## Problem
 
-Talos stores all settings in `~/.talos/config.toml` (managed by `talos-config`), but there is no
-built-in way to view or edit configuration from inside the product. Users have to know the file
-location, understand the schema, and edit TOML by hand. This is error-prone and a poor experience,
-especially for provider/model/API-key setup.
+Talos stores all settings in `~/.talos/config.toml` (managed by `talos-config`). I045 added a
+basic CLI flag surface for viewing and editing config: `--config-list`, `--config-get`, and
+`--config-set`. The original product-facing target remains only partially satisfied because there
+is no `talos config ...` subcommand UX, env/schema behavior still needs explicit evidence in this
+story, and TUI `/config` remains deferred.
 
 ## Proposed
 
@@ -32,8 +33,9 @@ Provide two complementary configuration surfaces that both round-trip through `t
 ## Planning Link
 
 Selected into
-`docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md` as the C1-C3 feature track:
-CLI key grammar/design, `talos config get/list/set` MVP, and UX hardening/TUI readiness decision.
+`docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md` as a reconciled C1-C3
+feature track. The existing `--config-*` flags are baseline behavior; remaining work is
+subcommand/compatibility design, validation evidence, UX hardening, and TUI readiness decision.
 
 ## Acceptance Criteria
 
@@ -45,6 +47,23 @@ CLI key grammar/design, `talos config get/list/set` MVP, and UX hardening/TUI re
       `get`/`list`; `set` accepts them but masks on redisplay.
 - [ ] TUI `/config` can view and edit model + provider settings inline.
 - [ ] No regression for env-var-driven config or for existing config files on load.
+
+## Execution Baseline
+
+- I045 closed on 2026-06-24 and records CONF-001-S as complete for the flag-based CLI surface.
+- Current code evidence:
+  - `crates/talos-cli/src/main.rs` defines `--config-list`, `--config-get`, and `--config-set`.
+  - `crates/talos-cli/src/main.rs` routes reads/writes through `Config::load()`,
+    `config_get_dotted()`, `config_set_dotted()`, `Config::validate()`, and `Config::save()`.
+  - `crates/talos-cli/src/main.rs` masks `api_key` values for list/get display.
+  - `crates/talos-config/src/tests.rs` covers inline `api_key` serialization, env resolution, and
+    config save/load behavior from the I045 fix.
+- Residual implementation:
+  - Decide whether to add `talos config get/list/set` subcommands or formally keep/document the
+    existing flags.
+  - Add/confirm tests that `${ENV_VAR}` substitution and JSON-Schema validation survive the chosen
+    get/set/list path.
+  - Improve user-facing errors/docs and decide whether TUI `/config` is ready or remains residual.
 
 ## Required Reads
 
