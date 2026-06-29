@@ -57,7 +57,7 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 8 | `talos-plugin` | Extension foundation | Published second wave | `talos-plugin 0.2.0` published | Continue extension boundary docs before 1.0 stability claims. |
 | 9 | `talos-tools` | Built-in tools | Publish-after-feature-gates | Manifest-ready; heavy defaults | Design feature gates. |
 | 10 | `talos-memory` | Memory storage | Published second wave | `talos-memory 0.2.0` published | Add fuller SQLite storage contract docs before 1.0 stability claims. |
-| 11 | `talos-exploration` | Exploration storage | Rate-limited after dry-run | `cargo publish --dry-run -p talos-exploration` passed; real publish blocked by crates.io rate limit | Retry after 2026-06-29 07:28:33 GMT. |
+| 11 | `talos-exploration` | Exploration storage | Published second wave | `talos-exploration 0.2.0` published | Add fuller SQLite/FTS storage contract docs before 1.0 stability claims. |
 | 12 | `talos-conversation` | UI/runtime state | Publish-after-docs | `cargo publish --dry-run -p talos-conversation` passed | Document alternate UI/state API before real publish. |
 | 13 | `talos-agent` | Runtime implementation | Advanced/transitional | Manifest-ready; not primary SDK | Publish after lower deps. |
 | 14 | `talos-runtime` | SDK facade | Primary SDK | Manifest-ready; depends on lower deps | Publish after implementation deps. |
@@ -98,9 +98,9 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 - Second-wave dry-runs succeeded for `talos-plugin`, `talos-provider`, `talos-conversation`,
   `talos-memory`, and `talos-exploration`.
 - Real publishes succeeded for `talos-plugin 0.2.0` and `talos-memory 0.2.0`.
-- Real `cargo publish -p talos-exploration` passed packaging and verification but crates.io
-  rejected upload with a new-crate rate limit. Retry after 2026-06-29 07:28:33 GMT. No
-  `talos-exploration` package was published in this attempt.
+- Real `cargo publish -p talos-exploration` initially passed packaging and verification but
+  crates.io rejected upload with a new-crate rate limit. Retry after 2026-06-29 07:28:33 GMT was
+  successful, publishing `talos-exploration 0.2.0`.
 
 Remaining manifest work before broad publish:
 
@@ -116,8 +116,10 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
 
 1. Completed first-wave reservation with real usable crates: `talos-core`, `talos-skill`,
    `talos-config`, `talos-permission`, and `talos-session`.
-2. Completed second-wave reservation for `talos-plugin` and `talos-memory`.
-3. Retry `talos-exploration` after the crates.io new-crate rate-limit window.
+2. Completed second-wave reservation for `talos-plugin`, `talos-memory`, and
+   `talos-exploration`.
+3. Document support boundaries before publishing `talos-provider`, `talos-conversation`,
+   `talos-rpc`, or other protocol/runtime surfaces.
 4. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
    dependencies are intentionally published or decoupled.
 5. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
