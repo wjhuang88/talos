@@ -81,9 +81,9 @@ engineering docs.
 - 2026-06-29 — D6 GitHub Pages readiness. `site/CNAME.example` carries
   a placeholder template. `site/README.md` (maintainer-only) documents
   the repository-settings checklist. No `.github/workflows/pages.yml`
-  was added; a workflow would create a duplicate deployment path. Domain
-  selection, repository Pages settings, DNS, and HTTPS enforcement
-  remain maintainer actions.
+  was added (initially); a workflow was avoided to keep the deployment
+  path simple. Domain selection, repository Pages settings, DNS, and
+  HTTPS enforcement remain maintainer actions.
 - 2026-06-29 — D7 README sync. A new "Public product site" row was
   added to the Documentation table in `README.md` and the 文档 table in
   `README.zh-CN.md`. Both READMEs reference the relative `site/` path
@@ -108,6 +108,12 @@ engineering docs.
   Deploy from a branch, folder `/site`), (3) Enter custom domain
   `talos.hwj.zone` in Pages settings for automatic HTTPS provisioning.
   The `site/README.md` publishing checklist covers these steps.
+- 2026-06-29 — D11 Pages workflow + doc fix. Added
+  `.github/workflows/pages.yml` after discovering that "Deploy from a
+  branch" does not support `/site` as a folder (only `/` and `/docs`).
+  Updated `site/README.md` to document the GitHub Actions deployment
+  path. **Maintainer action**: switch Pages source to "GitHub Actions"
+  in repository settings; the workflow handles the rest.
 
 ## Validation
 

@@ -39,20 +39,23 @@ open site/index.html
 
 ## Publishing
 
-This task does **not** change GitHub Pages settings. The recommended path is
-a repository settings checklist rather than a workflow, because Pages is
-a one-time configuration:
+GitHub Pages does not support `/site` as a branch-deployment folder (only `/`
+and `/docs` are available). This repository uses a lightweight
+[GitHub Actions workflow](../.github/workflows/pages.yml) to deploy the site
+instead.
+
+### One-time setup
 
 1. Repository settings &rarr; Pages &rarr; Build and deployment &rarr; Source:
-   "Deploy from a branch".
-2. Branch: `main`, Folder: `/site`.
-3. (Optional, when a domain is selected) Custom domain: enter the bare domain
-   in the Pages settings UI. Then copy `site/CNAME.example` to `site/CNAME`
-   with the same domain on a single line.
-4. (Optional) Enforce HTTPS once the certificate is provisioned.
+   "GitHub Actions". The workflow is already committed; it takes effect after
+   one push to `main` that touches `site/`.
+2. (Optional, when a domain is selected) Custom domain: enter the bare domain
+   in the Pages settings UI. The `site/CNAME` file must also contain the same
+   domain on a single line.
+3. (Optional) Enforce HTTPS once the certificate is provisioned.
 
-If the maintainer later prefers a workflow, see the `pages.yml` template
-recorded in the two-month plan task file.
+After setup, every push to `main` that changes files under `site/` triggers
+`pages.yml`, which uploads `site/` as an artifact and deploys it.
 
 ## What does not belong here
 
