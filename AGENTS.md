@@ -4,9 +4,8 @@
 
 ## Project Overview
 
-Talos is a Rust-based agent runtime that combines the safety of Codex, the extensibility of Pi,
-the optimization depth of Claude Code, the openness of OpenCode, and the self-evolution of Hermes.
-Starting as a pure CLI tool, evolving into a full agent runtime platform.
+Talos is a Rust-based agent runtime, starting as a CLI tool and evolving into a full agent runtime
+platform.
 
 **Language**: Rust (stable, edition 2024)
 **Workspace**: Cargo workspace with 16 crates under `crates/`
@@ -35,10 +34,27 @@ These are immutable facts that every change must respect:
 
 ## Coding Behavior
 
+### Accuracy Over Approval
+
+- Accuracy beats approval. Do not flatter, praise an idea, or agree merely to satisfy the user.
+- If a premise, plan, or change has a material flaw, lead with the counterargument and evidence.
+- Do not fabricate facts, citations, standards, laws, APIs, release status, benchmark results, or
+  named-entity claims.
+- If you do not know, say "I don't know." first, then give the shortest verification path.
+- For architecture, security, permissions, legal/medical/financial meaning, release status, or
+  named external dependencies, make the claim basis clear: known fact, computed result, inference,
+  common field knowledge, symbolic frame, or guess.
+- Keep guesses visibly tentative and low-confidence. Mark any translation from symbolic frames,
+  analogies, typologies, or metaphors into real-world claims.
+- Watch for anti-sycophancy red flags: one elegant explanation fitting everything, agreement after
+  pushback without new evidence, over-specific weak-evidence claims, and post-hoc reasoning.
+  When they appear, cut unsupported specifics, mark uncertainty, or say you do not know.
+- If you held a position for consistency rather than evidence, revise openly and state what changed.
+
 ### Think Before Coding
 
 - State assumptions explicitly before implementing. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
+- If multiple interpretations exist, present them. Do not pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - Classify constraints: Hard (immutable), Soft (negotiable), Assumption (unvalidated).
 
@@ -59,11 +75,10 @@ These are immutable facts that every change must respect:
 ### Goal-Driven Execution
 
 - Define verifiable success criteria before starting.
-- For multi-step tasks, state the plan with verification checkpoints.
-- Loop until verified, not until "it looks right."
-- Treat a committed `Planned` iteration as a published baseline. Preserve its objective,
-  dependencies, exclusions, acceptance, validation, and documentation targets; append execution
-  facts instead of replacing the plan.
+- For multi-step tasks, state the plan with verification checkpoints; loop until verified.
+- Treat committed `Planned` iterations as published baselines. Preserve objectives, dependencies,
+  exclusions, acceptance, validation, and docs targets; append execution facts instead of replacing
+  the plan.
 - Before selecting or activating iteration work, inventory every Active, Review, Planned, and
   Blocked iteration and record its disposition. A different objective or acceptance target uses a
   new iteration ID, even when it continues the same product area.
@@ -72,14 +87,13 @@ These are immutable facts that every change must respect:
 
 ### Dependency Discipline
 
-- Prefer self-contained capabilities over host environment assumptions. When choosing between
-  a Rust-native/library-backed implementation and invoking host utilities, default to the
-  self-contained path.
-- Host utilities (`git`, `find`, `grep`, shell features, platform tools) may be used as
-  compatibility fallbacks, temporary bridges, or explicit escape hatches only when the rationale,
-  unavailable-host behavior, and replacement trigger are recorded.
-- If a primary implementation depends on host capabilities, classify that as a Soft constraint
-  tradeoff and record it in the relevant ADR, backlog story, or iteration note before coding.
+- Prefer self-contained capabilities over host environment assumptions. Default to Rust-native or
+  library-backed implementations when available.
+- Host utilities (`git`, `find`, `grep`, shell features, platform tools) are compatibility
+  fallbacks, temporary bridges, or explicit escape hatches only. Record rationale,
+  unavailable-host behavior, and replacement trigger.
+- If a primary implementation depends on host capabilities, record the Soft constraint tradeoff in
+  the relevant ADR, backlog story, or iteration note before coding.
 
 ## Rust-Specific Rules
 
@@ -139,15 +153,16 @@ Before ending a session, verify:
 1. **Status sync**: Update backlog story status, iteration progress in `docs/iterations/`.
 2. **Verification evidence**: Did tests pass? Did you run `cargo check --workspace`?
 3. **Residual work**: Record incomplete items in the backlog or iteration notes.
-4. **Lessons**: If you hit a non-obvious problem, failed validation, or user correction, follow `docs/sop/EVOLUTION-FEEDBACK.md` before updating `EVOLUTION.md`.
-5. **Decision records**: Did this session make a technical choice affecting Soft/Assumption constraints? If yes, record in `docs/decisions/`.
-6. **Commit readiness**: Staged diff reviewed? No secrets? Conventional commit message?
-7. **No orphaned changes**: All modified files trace to a requirement.
-8. **README sync**: Update `README.md` to reflect any new features, usage changes, or architecture updates from this session. README is a living document, not a one-time setup.
-9. **Board sync**: If active/review/paused/next work changed, update `docs/BOARD.md` after the owner docs. The board is a derived view, not a source of truth.
-10. **Governance harness**: If governance files changed, run `scripts/validate_project_governance.sh .`; when profile, branch mode, worktree mode, or governance depth is affected, also run `scripts/assess_project_scale.sh .`.
-11. **Long task recovery**: If a long-running task record is active, append validation evidence,
-    current state, next item, and recovery/resume instructions before stopping.
+4. **Lessons / decisions**: For non-obvious problems, failed validation, or user correction, follow
+   `docs/sop/EVOLUTION-FEEDBACK.md`; record Soft/Assumption choices in `docs/decisions/`.
+5. **Commit readiness**: Staged diff reviewed? No secrets? Conventional commit message? No
+   orphaned changes?
+6. **README / Board sync**: Update README for user-visible changes; update `docs/BOARD.md` after
+   owner docs when active/review/paused/next work changes.
+7. **Governance / long task recovery**: If governance files changed, run
+   `scripts/validate_project_governance.sh .`; run `scripts/assess_project_scale.sh .` when
+   profile, branch mode, worktree mode, or governance depth changes. If a long task is active,
+   append validation evidence, current state, next item, and recovery/resume instructions.
 
 ## Current Known Traps
 

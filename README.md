@@ -299,7 +299,9 @@ Talos ships with built-in tools for common coding-agent work:
 - Network: `http_request` (SSRF-protected, permission-gated), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
 - Shell escape hatch: `bash`
 
-The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a native tool cannot cover the task.
+The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a
+native tool cannot cover the task. It also emphasizes accuracy over approval: do not flatter,
+fabricate citations, or hide uncertainty when evidence is missing.
 
 ## Slash Commands
 

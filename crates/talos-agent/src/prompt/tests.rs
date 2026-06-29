@@ -457,6 +457,14 @@ fn test_identity_prompt_contains_talos_identity() {
     assert!(DEFAULT_IDENTITY.contains("Talos"));
 }
 
+#[test]
+fn test_identity_prompt_contains_accuracy_discipline() {
+    assert!(DEFAULT_IDENTITY.contains("Accuracy beats approval"));
+    assert!(DEFAULT_IDENTITY.contains("Do not fabricate facts"));
+    assert!(DEFAULT_IDENTITY.contains("If you do not know"));
+    assert!(DEFAULT_IDENTITY.contains("anti-sycophancy red flags"));
+}
+
 // --- Memory section tests ---
 
 #[test]
