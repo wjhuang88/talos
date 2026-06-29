@@ -108,6 +108,9 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - `cargo publish --dry-run --allow-dirty -p talos-skill` passed.
 - `talos-config`, `talos-permission`, and `talos-session` dry-runs are correctly blocked until
   `talos-core` exists in the crates.io index.
+- After maintainer approval, real `cargo publish -p talos-core` was attempted from clean commit
+  `30c9abc`, but crates.io rejected the upload because the publisher account does not have a
+  verified email address. No crate was published and no name was reserved.
 
 ## Required Reads
 

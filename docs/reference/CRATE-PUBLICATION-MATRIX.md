@@ -87,6 +87,9 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
   yet in the crates.io index.
 - `cargo publish --dry-run --allow-dirty -p talos-session` failed because `talos-core` is not yet
   in the crates.io index.
+- Real `cargo publish -p talos-core` was attempted from clean commit `30c9abc` after maintainer
+  approval. crates.io rejected the upload because the publisher account does not have a verified
+  email address. No crate was published and no name was reserved.
 
 Remaining manifest work before broad publish:
 
