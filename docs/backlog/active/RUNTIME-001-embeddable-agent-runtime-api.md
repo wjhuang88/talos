@@ -122,6 +122,11 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
 - 2026-06-28: README and README.zh-CN now document the embedding boundary: `talos-runtime` plus
   re-exported `talos-core` protocol/trait types are the public pre-1.0 surface; lower-level
   `talos-agent` constructors remain implementation surface unless documented otherwise.
+- 2026-06-30: GitHub issue #4 closed the interactive approval gap for embedders:
+  `talos-runtime` now exposes `ApprovalHandler` and `RuntimeBuilder::approval_handler(...)`.
+  Missing handlers still deny `Ask` decisions, `ApproveOnce` executes one call, and
+  `AlwaysApprove` installs in-memory allow rules for the current runtime without writing user
+  configuration.
 
 ## Required Reads
 

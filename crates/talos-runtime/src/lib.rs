@@ -10,13 +10,16 @@ use async_trait::async_trait;
 use serde_json::Value;
 use talos_agent::session::AppServerSession;
 use talos_agent::{Agent, AgentError};
+use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::provider::LanguageModel;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus,
 };
-use talos_core::tool::{AgentTool, ToolRegistry, ToolResult};
-use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+use talos_core::tool::{AgentTool, ToolPermissionFacet, ToolRegistry, ToolResult};
+use talos_permission::{
+    PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
+};
 use talos_sandbox::SandboxProvider;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -50,6 +53,24 @@ pub enum RuntimeError {
 /// Result alias for runtime facade operations.
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
+/// Handles approval requests for permission-gated runtime tool calls.
+///
+/// Embedders can provide an implementation through
+/// [`RuntimeBuilder::approval_handler`] to bridge `Ask` decisions into their
+/// own UI, RPC, or policy layer. If no handler is configured, the runtime keeps
+/// the safe headless default and denies approval-gated calls.
+#[async_trait]
+pub trait ApprovalHandler: Send + Sync {
+    /// Requests a decision for a tool call whose permission policy returned
+    /// [`PermissionDecision::Ask`].
+    async fn request_approval(
+        &self,
+        tool_name: &str,
+        arguments: &Value,
+        summary_fields: &[String],
+    ) -> ApprovalChoice;
+}
+
 /// Builder for an embeddable Talos runtime.
 ///
 /// The safe default is conservative: registered tools are wrapped in a
@@ -63,6 +84,7 @@ pub struct RuntimeBuilder {
     sandbox: Option<Box<dyn SandboxProvider>>,
     initial_history: Vec<Message>,
     model_context_limit: u32,
+    approval_handler: Option<Arc<dyn ApprovalHandler>>,
 }
 
 impl RuntimeBuilder {
@@ -78,6 +100,7 @@ impl RuntimeBuilder {
             sandbox: None,
             initial_history: Vec::new(),
             model_context_limit: 128_000,
+            approval_handler: None,
         }
     }
 
@@ -135,6 +158,18 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Sets the approval handler for tools whose permission policy returns
+    /// `Ask`.
+    ///
+    /// Without a handler, `Ask` decisions are denied. `AlwaysApprove` choices
+    /// install in-memory allow rules for the current runtime only; they are not
+    /// persisted to user configuration.
+    #[must_use]
+    pub fn approval_handler(mut self, handler: Arc<dyn ApprovalHandler>) -> Self {
+        self.approval_handler = Some(handler);
+        self
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned handle owns the command sender, event receiver, and actor
@@ -156,6 +191,7 @@ impl RuntimeBuilder {
             registry.register(Arc::new(RuntimePermissionAwareTool {
                 inner: tool,
                 engine: tool_engine.clone(),
+                approval_handler: self.approval_handler.clone(),
             }));
         }
 
@@ -250,6 +286,7 @@ fn build_permission_engine(root: PathBuf, rules: &[PermissionRule]) -> Permissio
 struct RuntimePermissionAwareTool {
     inner: Arc<dyn AgentTool>,
     engine: Arc<Mutex<PermissionEngine>>,
+    approval_handler: Option<Arc<dyn ApprovalHandler>>,
 }
 
 #[async_trait]
@@ -267,12 +304,10 @@ impl AgentTool for RuntimePermissionAwareTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
+        let profile = self.inner.permission_profile(&input);
         let decision = {
             match self.engine.lock() {
-                Ok(engine) => {
-                    let profile = self.inner.permission_profile(&input);
-                    engine.evaluate_profile(self.inner.name(), &profile, &input)
-                }
+                Ok(engine) => engine.evaluate_profile(self.inner.name(), &profile, &input),
                 Err(_) => {
                     return ToolResult::error("Permission denied: permission engine lock poisoned");
                 }
@@ -284,9 +319,30 @@ impl AgentTool for RuntimePermissionAwareTool {
             PermissionDecision::Deny(reason) => {
                 ToolResult::error(format!("Permission denied: {reason}"))
             }
-            PermissionDecision::Ask => ToolResult::error(
-                "Permission denied: approval required but no runtime approval handler is configured",
-            ),
+            PermissionDecision::Ask => {
+                let Some(handler) = &self.approval_handler else {
+                    return ToolResult::error(
+                        "Permission denied: approval required but no runtime approval handler is configured",
+                    );
+                };
+                let summary_fields = self
+                    .inner
+                    .summary_fields()
+                    .iter()
+                    .map(|field| (*field).to_string())
+                    .collect::<Vec<_>>();
+                match handler
+                    .request_approval(self.inner.name(), &input, &summary_fields)
+                    .await
+                {
+                    ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
+                    ApprovalChoice::AlwaysApprove => {
+                        add_always_allow_rules(&self.engine, &profile, &input);
+                        self.inner.execute(input).await
+                    }
+                    ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied"),
+                }
+            }
         }
     }
 
@@ -319,6 +375,40 @@ impl AgentTool for RuntimePermissionAwareTool {
     }
 }
 
+fn add_always_allow_rules(
+    engine: &Arc<Mutex<PermissionEngine>>,
+    profile: &[ToolPermissionFacet],
+    input: &Value,
+) {
+    let Ok(mut engine) = engine.lock() else {
+        return;
+    };
+    for facet in profile {
+        let resource = facet
+            .resource
+            .clone()
+            .or_else(|| ResourceExtractor::extract(facet.nature, input));
+        let resource_kind = facet
+            .resource_kind
+            .map(ResourceKind::from)
+            .or_else(|| Some(default_resource_kind(facet.nature)));
+        engine.add_rule(PermissionRule::new_nature(
+            facet.nature,
+            resource,
+            resource_kind,
+            PermissionDecision::Allow,
+        ));
+    }
+}
+
+fn default_resource_kind(nature: ToolNature) -> ResourceKind {
+    match nature {
+        ToolNature::Network => ResourceKind::Domain,
+        ToolNature::Execute => ResourceKind::Command,
+        ToolNature::Read | ToolNature::Write => ResourceKind::Path,
+    }
+}
+
 /// Collects events until the current turn completes.
 ///
 /// This helper is intended for embedders that want a simple per-turn API on top
@@ -336,6 +426,7 @@ pub async fn collect_until_turn_completed(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use talos_core::message::Message;
@@ -351,6 +442,44 @@ mod tests {
 
     struct RecordingHybridTool {
         executions: Arc<AtomicUsize>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct ApprovalRecord {
+        tool_name: String,
+        arguments: Value,
+        summary_fields: Vec<String>,
+    }
+
+    struct RecordingApprovalHandler {
+        choice: ApprovalChoice,
+        records: Arc<StdMutex<Vec<ApprovalRecord>>>,
+    }
+
+    impl RecordingApprovalHandler {
+        fn new(choice: ApprovalChoice, records: Arc<StdMutex<Vec<ApprovalRecord>>>) -> Self {
+            Self { choice, records }
+        }
+    }
+
+    #[async_trait]
+    impl ApprovalHandler for RecordingApprovalHandler {
+        async fn request_approval(
+            &self,
+            tool_name: &str,
+            arguments: &Value,
+            summary_fields: &[String],
+        ) -> ApprovalChoice {
+            self.records
+                .lock()
+                .expect("records lock is available")
+                .push(ApprovalRecord {
+                    tool_name: tool_name.to_string(),
+                    arguments: arguments.clone(),
+                    summary_fields: summary_fields.to_vec(),
+                });
+            self.choice.clone()
+        }
     }
 
     #[async_trait]
@@ -384,6 +513,10 @@ mod tests {
 
         fn nature(&self) -> ToolNature {
             ToolNature::Write
+        }
+
+        fn summary_fields(&self) -> &'static [&'static str] {
+            &["message"]
         }
     }
 
@@ -529,6 +662,116 @@ mod tests {
             TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
         ));
         assert_eq!(executions.load(Ordering::SeqCst), 1);
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_approval_handler_can_approve_ask_tool() {
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call("record_write", serde_json::json!({"message": "approved"}))
+                .with_response("done"),
+        );
+        let executions = Arc::new(AtomicUsize::new(0));
+        let approval_records = Arc::new(StdMutex::new(Vec::new()));
+        let tool = Arc::new(RecordingWriteTool {
+            executions: executions.clone(),
+        });
+        let approval_handler = Arc::new(RecordingApprovalHandler::new(
+            ApprovalChoice::ApproveOnce,
+            approval_records.clone(),
+        ));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .approval_handler(approval_handler)
+            .tool(tool)
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("write something")
+            .await
+            .expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        assert!(matches!(
+            status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "done"
+        ));
+        assert_eq!(executions.load(Ordering::SeqCst), 1);
+        let records = approval_records.lock().expect("records lock is available");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].tool_name, "record_write");
+        assert_eq!(
+            records[0].arguments,
+            serde_json::json!({"message": "approved"})
+        );
+        assert_eq!(records[0].summary_fields, vec!["message"]);
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_always_approve_installs_in_memory_rule() {
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call("record_write", serde_json::json!({"message": "first"}))
+                .with_response("first done")
+                .with_tool_call("record_write", serde_json::json!({"message": "second"}))
+                .with_response("second done"),
+        );
+        let executions = Arc::new(AtomicUsize::new(0));
+        let approval_records = Arc::new(StdMutex::new(Vec::new()));
+        let tool = Arc::new(RecordingWriteTool {
+            executions: executions.clone(),
+        });
+        let approval_handler = Arc::new(RecordingApprovalHandler::new(
+            ApprovalChoice::AlwaysApprove,
+            approval_records.clone(),
+        ));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .approval_handler(approval_handler)
+            .tool(tool)
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("write first")
+            .await
+            .expect("first submit succeeds");
+        let first_status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("first turn completes");
+        runtime
+            .submit("write second")
+            .await
+            .expect("second submit succeeds");
+        let second_status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("second turn completes");
+
+        assert!(matches!(
+            first_status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "first done"
+        ));
+        assert!(matches!(
+            second_status,
+            TurnCompletionStatus::Success { final_text, .. } if final_text == "second done"
+        ));
+        assert_eq!(executions.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            approval_records
+                .lock()
+                .expect("records lock is available")
+                .len(),
+            1
+        );
 
         runtime.shutdown().await.expect("shutdown succeeds");
     }
