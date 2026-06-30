@@ -223,7 +223,8 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         hooks.clone(),
     );
     agent.set_tool_protocol(model_config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+    if let Ok(skills) = discover_runtime_skills(workspace_root, model_config.skills.discover_shared)
+    {
         apply_runtime_skills(&mut agent, &skills);
     }
     match crate::mode_runners::context_files_for_agent(model_config, workspace_root, true) {

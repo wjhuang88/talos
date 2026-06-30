@@ -92,8 +92,11 @@ impl RuntimeSkills {
 ///
 /// Invalid skill files are skipped by `SkillLoader`; duplicate names keep the
 /// first match according to search-path priority.
-pub(crate) fn discover_runtime_skills(workspace_root: &Path) -> Result<RuntimeSkills> {
-    let mut loader = SkillLoader::for_workspace(workspace_root);
+pub(crate) fn discover_runtime_skills(
+    workspace_root: &Path,
+    discover_shared: bool,
+) -> Result<RuntimeSkills> {
+    let mut loader = SkillLoader::for_workspace_with_options(workspace_root, discover_shared);
     let search_paths = loader.search_paths.clone();
     loader.discover()?;
 
@@ -212,7 +215,7 @@ mod tests {
             "Review code",
         );
 
-        let runtime = discover_runtime_skills(dir.path()).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
 
         let skill = runtime
             .index
@@ -240,7 +243,7 @@ mod tests {
         )
         .unwrap();
 
-        let runtime = discover_runtime_skills(dir.path()).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
 
         assert!(runtime.index.iter().any(|skill| skill.name == "ok"));
         assert!(!runtime.index.iter().any(|skill| skill.name == "bad"));
@@ -254,7 +257,7 @@ mod tests {
             "planning",
             "Plan work",
         );
-        let runtime = discover_runtime_skills(dir.path()).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
 
         let mut agent = Agent::new(
             Arc::new(MockProvider::new().with_response("ok")),
@@ -273,7 +276,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_skill(&dir.path().join(".talos/skills/doc"), "doc", "Write docs");
 
-        let runtime = discover_runtime_skills(dir.path()).unwrap();
+        let runtime = discover_runtime_skills(dir.path(), false).unwrap();
         let index = runtime.diagnostics();
 
         assert!(
@@ -293,7 +296,7 @@ mod tests {
             "# Instructions\nLook for security issues.",
         );
 
-        let mut runtime = discover_runtime_skills(dir.path()).unwrap();
+        let mut runtime = discover_runtime_skills(dir.path(), false).unwrap();
         let content = runtime.activate("review").unwrap();
         let diagnostics = runtime.diagnostics();
 
@@ -315,7 +318,7 @@ mod tests {
             "Review code",
         );
 
-        let mut runtime = discover_runtime_skills(dir.path()).unwrap();
+        let mut runtime = discover_runtime_skills(dir.path(), false).unwrap();
         let error = runtime.activate("missing").unwrap_err().to_string();
 
         assert!(error.contains("skill 'missing' was not found"));
@@ -329,7 +332,7 @@ mod tests {
         write_skill(&skill_dir, "review", "Review code");
         fs::write(skill_dir.join("guide.md"), "reference details").unwrap();
 
-        let mut runtime = discover_runtime_skills(dir.path()).unwrap();
+        let mut runtime = discover_runtime_skills(dir.path(), false).unwrap();
         runtime.activate("review").unwrap();
         let content = runtime.load_reference("guide.md").unwrap();
 

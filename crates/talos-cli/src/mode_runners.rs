@@ -92,7 +92,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
     register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
-    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
         registry,
@@ -477,7 +477,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         hooks.clone(),
     );
     agent.set_tool_protocol(config.tool_protocol());
-    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
     let runtime_skills = Arc::new(Mutex::new(runtime_skills));
     maybe_set_memory_provider(&mut agent, &config);
@@ -969,7 +969,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
-    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
 
@@ -1099,7 +1099,7 @@ async fn handle_session_new(
         hooks.clone(),
     );
     agent.set_tool_protocol(config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+    if let Ok(skills) = discover_runtime_skills(workspace_root, config.skills.discover_shared) {
         apply_runtime_skills(&mut agent, &skills);
     }
     maybe_set_memory_provider(&mut agent, config);
@@ -1318,7 +1318,9 @@ async fn handle_session_resume(
         hooks.clone(),
     );
     agent.set_tool_protocol(resume_config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+    if let Ok(skills) =
+        discover_runtime_skills(workspace_root, resume_config.skills.discover_shared)
+    {
         apply_runtime_skills(&mut agent, &skills);
     }
     maybe_set_memory_provider(&mut agent, &resume_config);
@@ -1480,7 +1482,7 @@ async fn handle_session_fork(
         hooks.clone(),
     );
     agent.set_tool_protocol(config.tool_protocol());
-    if let Ok(skills) = discover_runtime_skills(workspace_root) {
+    if let Ok(skills) = discover_runtime_skills(workspace_root, config.skills.discover_shared) {
         apply_runtime_skills(&mut agent, &skills);
     }
     maybe_set_memory_provider(&mut agent, config);

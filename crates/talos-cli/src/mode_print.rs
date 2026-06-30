@@ -82,7 +82,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
-    let runtime_skills = discover_runtime_skills(&workspace_root)?;
+    let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
 

@@ -15,7 +15,7 @@ mod tests {
     -> std::sync::Arc<tokio::sync::Mutex<crate::skill_runtime::RuntimeSkills>> {
         let dir = tempfile::tempdir().unwrap();
         std::sync::Arc::new(tokio::sync::Mutex::new(
-            discover_runtime_skills(dir.path()).unwrap(),
+            discover_runtime_skills(dir.path(), false).unwrap(),
         ))
     }
 
@@ -258,7 +258,7 @@ mod tests {
         .unwrap();
 
         let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
-            discover_runtime_skills(dir.path()).unwrap(),
+            discover_runtime_skills(dir.path(), false).unwrap(),
         ));
         let skills = runtime_skills.lock().await.diagnostics();
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string())
