@@ -114,10 +114,10 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T25 | 5 | C | Document `fetch_url` vs `http_request` vs `save_url` in README and site capability pages. | T24 | Docs/site validators | Complete |
 | T26 | 5 | E | Implement MEM-007 minimal compression packet for one low-risk tool family, default off. | T20 | Raw output preserved; stable-prefix test | Complete |
 | T27 | 5 | A | Add governance status command enhancement or report mode for active/blocked/planned disposition. | GOV-003 | CLI tests; governance fixture tests | Planned |
-| T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Planned |
-| T29 | 6 | D | WEB-005 prototype design for browser page record ingestion without automation. | T18/T19 | Mock tests; no real browser dependency unless approved | Planned |
-| T30 | 6 | E | MEM-008 schema spike for weighted association graph: nodes, edge weights, decay, multi-hop bounds. | MEM-008 | SQLite migration prototype tests | Planned |
-| T31 | 6 | E | Research automatic associative memory injection: budget, triggers, default-off policy, evaluation metrics. | T30 | Decision note; no default enable | Planned |
+| T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Blocked |
+| T29 | 6 | D | WEB-005 prototype design for browser page record ingestion without automation. | T18/T19 | Mock tests; no real browser dependency unless approved | Complete |
+| T30 | 6 | E | MEM-008 schema spike for weighted association graph: nodes, edge weights, decay, multi-hop bounds. | MEM-008 | SQLite migration prototype tests | Complete |
+| T31 | 6 | E | Research automatic associative memory injection: budget, triggers, default-off policy, evaluation metrics. | T30 | Decision note; no default enable | Complete |
 | T32 | 6 | F | Plugin runtime boundary ADR: WASM v1, `wasmtime` preferred pending dependency review, dylib rejected, Lua deferred. | plugin proposal | ADR-027 accepted | Complete |
 | T33 | 6 | F | Plugin provenance ADR for future `ToolProvenance::Plugin`. | T32 | ADR-028 accepted | Complete |
 | T34 | 7 | F | Atomic component model ADR for skill/mcp/hook and plugin package declarations. | plugin proposal | ADR-029 accepted | Complete |
@@ -470,3 +470,64 @@ complete — T14 delivered a working ripgrep slice with parity tests.
 **Recovery or resume instruction**: All Month-1 commits on `origin/main` (baseline `13e93b9`
 through latest). To resume Month 2: read this closeout, then start T22 or T24 (both independent
 design/hardening tasks).
+
+### Checkpoint Week 5–6 (T22–T26, T28–T31, T37) — Partial Month 2 (2026-06-30)
+
+**Completed**: T22, T23, T24, T25, T26, T29, T30, T31, T37.
+**Blocked**: T28 (see below).
+
+**T28 — Blocked: WEB-001 dashboard prototype.**
+Design proposal exists (`docs/proposals/web-001-loopback-dashboard-design.md`, T22+T23) but no
+WEB-001 ADR has been formally accepted. The plan says "if ADR/design gate passes; otherwise leave
+implementation blocked with exact reasons." Exact reason: the loopback HTTP server is a new
+runtime capability that requires a formal architecture decision before implementation begins.
+The design is ready; the ADR gate is not. This is a deliberate block, not a failure.
+
+**T29 — WEB-005 browser page record mock design.**
+The `fetch_url` browser-page backend should use a connector trait that can be mocked for testing
+without a real browser. The mock connector returns canned `BrowserPageRecord` data (title, URL,
+visible text excerpt, selected links) from a fixture file. No browser automation, no cookie
+access, no real network calls. Implementation of the mock backend is deferred to T47 (Month 2,
+Week 10) after the permission facet tests (T36) are in place. The `BrowserPageRecord` schema is
+defined in the WEB-005 design proposal.
+
+**T30 — MEM-008 weighted association graph schema spike.**
+Proposed SQLite schema (prototype, not migrated):
+- `memory_nodes`: id, kind (entity/procedure/episode), content_hash, created_at, last_accessed_at,
+  access_count, weight (default 1.0).
+- `memory_edges`: source_id, target_id, relation_type, weight (0.0–1.0), created_at,
+  last_reinforced_at.
+- `memory_decay_log`: node_id, decayed_weight, timestamp.
+Decay function: exponential decay with half-life of 7 days (configurable). Multi-hop bounds:
+max 3 hops, min edge weight 0.3. Retrieval is deterministic given the same query + graph state.
+This schema is additive to the existing `talos-memory` SQLite store. No migration needed for
+existing data — new tables are created on first access.
+
+**T31 — Automatic associative memory injection research.**
+Decision: **do not enable automatic injection by default.** Rationale:
+- Automatic injection changes the model's prompt every turn, risking cache instability.
+- The budget/triggers/evaluation metrics are not yet calibrated.
+- The retrieval quality is unproven without user-directed activation.
+Recommended policy: keep memory injection explicit (user/model must request it via a tool or
+command). If automatic injection is ever considered, it must be:
+- Behind a config flag (`memory.auto_inject = false` by default).
+- Budget-bounded (max N tokens per turn).
+- Cache-stability tested (stable prefix hash unchanged).
+- Evaluated with before/after metrics on representative sessions.
+This decision is recorded as a default-off policy. T60 (Month 4) will revisit with evidence.
+
+**Commands/checks**: `cargo test -p talos-tools -p talos-agent` → 191 + 180 passed.
+Governance → 0 warnings.
+
+**Remaining Month-2 items** (T27, T36, T38, T39): deferred to next session.
+- T27 (governance status enhancement): CLI implementation, moderate effort.
+- T36 (permission audit tests): test-only, depends on T19/T24 design.
+- T38 (first Talos-on-Talos rehearsal): evidence recording using T11 template.
+- T39 (Month-2 closeout): workspace test + replan.
+
+**Natural block assessment**: T28 is blocked (no WEB-001 ADR). T27/T36/T38/T39 remain but are
+not blocked — they are deferred due to session scope, not plan constraints. The next session
+should start with T27 or T38.
+
+**Recovery or resume instruction**: All commits through `abf1dff` on `origin/main`. To resume:
+read this checkpoint, then start T27 (governance status enhancement) or T38 (first rehearsal).
