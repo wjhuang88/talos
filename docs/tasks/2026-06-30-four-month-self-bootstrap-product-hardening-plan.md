@@ -103,11 +103,11 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T14 | 3 | C | Start TOOL-011 ripgrep-backed grep engine implementation behind a feature or internal engine boundary. | ADR-025 | Unit tests compare current grep behavior | Complete |
 | T15 | 3 | C | Add regression tests for search hidden-dir behavior, include filters, large output summary, and UTF-8 snippets. | T14 | `cargo test -p talos-tools` | Complete |
 | T16 | 3 | G | Update public site roadmap to reflect cargo install, SDK, and self-bootstrap positioning accurately. | T05 | Site validator | Complete |
-| T17 | 4 | C | Finish first ripgrep-backed grep slice or record a precise blocker. | T14 | Parity tests; performance note | Planned |
-| T18 | 4 | D | WEB-005 design: browser-session continuity permission model, page record schema, and no-cookie-leak boundary. | WEB-005/BrowserSkill research | ADR/proposal update | Planned |
-| T19 | 4 | D | Define `browser_page_read` permission facet and how it composes with `fetch_url` continuation disclosure. | T18/TOOL-013 | Permission tests planned | Planned |
-| T20 | 4 | E | MEM-007 spike: deterministic pre-entry compression strategies for read/grep/git_diff/bash outputs. | MEM-007 | Prototype notes; cache-stability risks | Planned |
-| T21 | 4 | A | Month-1 closeout: validation summary, delivered items, blockers, next-month replan. | T00-T20 | `cargo test --workspace`; governance | Planned |
+| T17 | 4 | C | Finish first ripgrep-backed grep slice or record a precise blocker. | T14 | Parity tests; performance note | Complete |
+| T18 | 4 | D | WEB-005 design: browser-session continuity permission model, page record schema, and no-cookie-leak boundary. | WEB-005/BrowserSkill research | ADR/proposal update | Complete |
+| T19 | 4 | D | Define `browser_page_read` permission facet and how it composes with `fetch_url` continuation disclosure. | T18/TOOL-013 | Permission tests planned | Complete |
+| T20 | 4 | E | MEM-007 spike: deterministic pre-entry compression strategies for read/grep/git_diff/bash outputs. | MEM-007 | Prototype notes; cache-stability risks | Complete |
+| T21 | 4 | A | Month-1 closeout: validation summary, delivered items, blockers, next-month replan. | T00-T20 | `cargo test --workspace`; governance | Complete |
 | T22 | 5 | D | WEB-001 MVP design: loopback-only dashboard for status/history/governance/config read surfaces. | WEB-001 | Proposal update; threat model | Planned |
 | T23 | 5 | D | Define local web auth boundary: loopback constraints, startup token, no secret echo, no permission bypass. | T22 | Security checklist | Planned |
 | T24 | 5 | C | Harden `fetch_url`: redirect diagnostics, sparse HTML hints, content-type summary, continuation tests. | TOOL-014/WEBFETCH | `cargo test -p talos-tools -p talos-agent` | Planned |
@@ -421,3 +421,52 @@ T20 (MEM-007 compression spike), T21 (Month-1 closeout).
 **Recovery or resume instruction**: Week 1–3 commits on `origin/main`. To resume: read this
 checkpoint, then start T18 or T20 (both are design/spike, independent). T17 is effectively
 complete — T14 delivered a working ripgrep slice with parity tests.
+
+### Checkpoint Month-1 Closeout (T00–T21) — Complete (2026-06-30)
+
+**Milestone M1 (Starting gate complete) — PASSED.**
+**Milestone M2 (User-visible tooling hardening) — PASSED.**
+
+**Completed task items**: T00 through T21 (all 22 items).
+
+**Delivered items summary**:
+
+| Track | Items | Key deliverables |
+|---|---|---|
+| A (Governance) | T00, T01, T11, T21 | Starting disposition checkpoint; I075 iteration; self-bootstrap evidence template; Month-1 closeout |
+| B (Distribution) | T02, T03, T06, T07, T08, T12, T13 | CLI metadata audit; cargo install gate (§A7); crate README; install smoke verified; dry-run blocker recorded; 5 SDK examples; SDK support contract |
+| C (Tooling) | T04, T09, T10, T14, T15, T17 | Tool-surface snapshot (30 tools); TUI-014 grep summary; TUI-015 head+tail truncation; ripgrep grep engine (ADR-025); 12 regression tests |
+| D (Web) | T18, T19 | WEB-005 browser-session continuity design; browser_page_read permission facet |
+| E (Memory) | T20 | MEM-007 compression spike notes |
+| G (Docs) | T05, T16 | Docs sync checklist; site roadmap updated |
+
+**New runtime dependencies added**: `grep-searcher`, `grep-regex`, `grep-matcher`, `ignore`
+(pure Rust, Unlicense/MIT, ADR-025 approved).
+
+**Month-1 validation evidence**:
+- `cargo fmt --all -- --check` → exit 0 (clean).
+- `cargo clippy --workspace -- -D warnings` → no warnings.
+- `cargo test --workspace` → **1264 passed, 0 failed, 1 ignored**.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+- `scripts/validate_public_site.sh .` → 0 errors, 0 warnings.
+
+**Blockers (designated, not unexpected)**:
+- T08: `cargo publish --dry-run -p talos-cli` blocked by `publish = false` (intentional guard).
+- T55/T56 (Month 4): real publish requires maintainer approval — out of scope.
+- T46 (Month 2): wasmtime runtime dependency requires ADR-027 focused review — out of scope.
+
+**Next month (Month 2, Weeks 5–8)**:
+- T22: WEB-001 MVP design (loopback dashboard).
+- T23: Local web auth boundary.
+- T24: Harden `fetch_url` (redirect diagnostics, content-type summary).
+- T26: MEM-007 minimal compression packet (bash output, default off).
+- T27: Governance status command enhancement.
+- T36: Permission/profile audit tests.
+- T37: Update publication matrix with cargo install evidence.
+- T38: First Talos-on-Talos rehearsal (documentation-only).
+- T39: Month-2 closeout and replan.
+
+**Recovery or resume instruction**: All Month-1 commits on `origin/main` (baseline `13e93b9`
+through latest). To resume Month 2: read this closeout, then start T22 or T24 (both independent
+design/hardening tasks).
