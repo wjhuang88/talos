@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | PLUGIN-001 |
-| Status | **Blocked** — pending `docs/proposals/plugin-encapsulation-format.md` and its ADRs. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools with multiple carriers. |
+| Status | **Planned — architecture unblocked 2026-06-30**. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools. ADR-027/028/029/030 accepted; next slice is local explicit WASM plugin MVP, still gated by focused `wasmtime` dependency/security review. |
 | Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
 | Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
 | Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
@@ -18,7 +18,9 @@ Design a protocol specification and runtime architecture for loading Talos plugi
 > additional tool definitions, carried by an external artifact. Carrier set settled 2026-06-30:
 > **WASM first-class, Lua optional, dynamic library rejected.** The detailed draft is
 > [`docs/proposals/plugin-encapsulation-format.md`](../../proposals/plugin-encapsulation-format.md).
-> PLUGIN-001 is **blocked** until that proposal and its ADRs are accepted.
+> ADR-027/028/029/030 accepted on 2026-06-30. PLUGIN-001 is no longer blocked on missing
+> architecture decisions; implementation must start with the bounded local WASM MVP and the
+> dependency/security review required by ADR-027.
 
 Plugins may provide:
 
@@ -83,9 +85,27 @@ host calls, sandbox limits, compatibility, and failure behavior.
       download path.
 - [ ] No implementation starts until the spec and ADR are accepted.
 
+## Next Implementation Slice
+
+1. Add plugin manifest parser and validation only; no executable artifact instantiation during
+   discovery.
+2. Add `ToolProvenance::Plugin { name, version, carrier }` and render/serialize it through existing
+   tool-call paths.
+3. Add local explicit plugin package loading behind config/CLI opt-in.
+4. Add one fixture WASM read-only tool through the existing `AgentTool`/permission pipeline.
+5. Cover success, malformed manifest, invalid module, trap, timeout, oversized output, and denied
+   permission.
+
+Do not add remote package installation, marketplace behavior, Lua, dylib, write-capable plugin
+tools, or automatic plugin discovery in the first slice.
+
 ## Required Reads
 
 - `docs/proposals/plugin-encapsulation-format.md` **(governing draft, 2026-06-30)**
+- `docs/decisions/027-plugin-runtime-boundary.md`
+- `docs/decisions/028-plugin-tool-provenance-extension.md`
+- `docs/decisions/029-extensibility-atomic-component-model.md`
+- `docs/decisions/030-extensibility-command-taxonomy.md`
 - `docs/proposals/wasm-runtime-plugin-protocol.md` (subsumed as the WASM-carrier slice)
 - `docs/backlog/active/DIST-001-optional-runtime-asset-distribution.md`
 - `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`

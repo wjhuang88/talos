@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | HOOK-001 |
-| Status | **Blocked** — pending `docs/proposals/plugin-encapsulation-format.md` ADR #3 (atomic component model). |
+| Status | **Planned — architecture unblocked 2026-06-30**. ADR-029 accepted. First slice is schema and diagnostics for config-introduced hooks; executable hook carriers remain governed by ADR-027. |
 | Priority | P3 |
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | PLUGIN-001, CMD-002, `talos-plugin`, I009 |
@@ -22,7 +22,7 @@ of skill and mcp in the three-atomic-component model the owner declared on 2026-
 
 ## Scope
 
-After the atomic component model ADR is accepted:
+ADR-029 accepts hook as a config-introduced atomic component. Next slices:
 
 - Define a user-facing config schema for declaring hooks (event kind, handler entry, provenance,
   ordering/priority).
@@ -30,6 +30,9 @@ After the atomic component model ADR is accepted:
 - Route config-introduced hooks through the same `HookChain` execution path with provenance.
 - Decide whether standalone config hooks are script-based (Lua) or require a plugin package (i.e.,
   config hooks only exist inside plugins). This is coupled to the carrier-strategy ADR.
+
+First slice should prefer schema/diagnostics and builtin-hook listing. Do not add Lua or any
+executable hook carrier without a separate ADR or the plugin runtime adapter from ADR-027.
 
 ## Non-Goals
 
@@ -47,6 +50,9 @@ After the atomic component model ADR is accepted:
 ## Required Reads
 
 - `docs/proposals/plugin-encapsulation-format.md`
+- `docs/decisions/027-plugin-runtime-boundary.md`
+- `docs/decisions/029-extensibility-atomic-component-model.md`
+- `docs/decisions/030-extensibility-command-taxonomy.md`
 - `docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md`
 - `docs/backlog/active/CMD-002-command-taxonomy-realignment.md`
 - `crates/talos-plugin/src/`

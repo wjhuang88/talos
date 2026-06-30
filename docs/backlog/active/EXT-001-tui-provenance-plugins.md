@@ -32,5 +32,4 @@ P1 because this closes a user-facing gap from completed extensibility work.
 ## Residual Work Destination
 
 The only residual is the command *naming* (`/plugins` shows MCP/provenance, not plugins). That is
-captured by CMD-002 (command taxonomy realignment), blocked on the plugin encapsulation proposal.
-
+captured by CMD-002 (command taxonomy realignment), now architecture-unblocked by ADR-030.

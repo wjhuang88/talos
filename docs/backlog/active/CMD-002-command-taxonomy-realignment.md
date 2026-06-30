@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | CMD-002 |
-| Status | **Blocked** — pending `docs/proposals/plugin-encapsulation-format.md` ADR #4 (command taxonomy) and the plugin entity existing. |
+| Status | **Planned — architecture unblocked 2026-06-30**. ADR-030 accepted. First slice can move MCP status to `/mcp` and make `/plugins` a transition notice before plugin packages ship. |
 | Priority | P2 |
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | CMD-001, PLUGIN-001, EXT-001, HOOK-001, ADR-009 |
@@ -22,12 +22,18 @@ but MCP and hooks have no dedicated command.
 
 ## Scope
 
-After the plugin encapsulation ADRs are accepted:
+ADR-030 accepted the taxonomy. Implement in two slices:
+
+Slice 1, before plugin packages ship:
 
 - Add `/mcp` to list MCP server status + observed MCP tool provenance (the current `/plugins` body,
   renamed).
-- Repurpose `/plugins` to list loaded plugin packages and their declared capabilities
-  (skills/mcp/hooks/tools) once PLUGIN-001 ships.
+- Repurpose `/plugins` to show a short transition notice: plugin packages are not available yet;
+  use `/mcp` for MCP server status. Do not alias `/plugins` to `/mcp`.
+
+Slice 2, after PLUGIN-001 ships:
+
+- `/plugins` lists loaded plugin packages and their declared capabilities (skills/mcp/hooks/tools).
 - Add `/hooks` to list registered hooks (builtin + config-introduced) once HOOK-001 ships.
 - Keep `/skills` as-is.
 - Update README, TUI command menu metadata (CMD-001 registry), help text, and provenance markers.
@@ -52,6 +58,7 @@ After the plugin encapsulation ADRs are accepted:
 ## Required Reads
 
 - `docs/proposals/plugin-encapsulation-format.md`
+- `docs/decisions/030-extensibility-command-taxonomy.md`
 - `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
 - `docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md`
 - `docs/backlog/active/HOOK-001-config-introduced-hooks.md`

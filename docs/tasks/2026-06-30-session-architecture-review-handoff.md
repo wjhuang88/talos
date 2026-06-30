@@ -145,7 +145,9 @@ tool the docs already specify. But this is the owner/architecture call.
 ## 5. Artifacts
 
 - Draft proposal: `docs/proposals/plugin-encapsulation-format.md`
-- Blocked items: `PLUGIN-001`, `CMD-002`, `HOOK-001` (new), `TOOL-008` Phase 3
+- At-handoff blocked items: `PLUGIN-001`, `CMD-002`, `HOOK-001` (new), `TOOL-008` Phase 3.
+  Follow-up on 2026-06-30 accepted ADR-027/028/029/030, so these are no longer blocked on missing
+  architecture decisions; they remain gated by their next implementation/security reviews.
 - Conflict sources: `TOOL-014`, `WEBFETCH-001`, `WEB-005` backlog docs; `I040` iteration record;
   `crates/talos-tools/src/http_request.rs`, `save_url.rs`; TOOL-014 framework in
   `crates/talos-core/src/tool.rs` and tests in `crates/talos-agent/src/tests.rs`

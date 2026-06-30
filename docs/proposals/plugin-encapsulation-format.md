@@ -1,9 +1,11 @@
 # Plugin Encapsulation Format
 
-> Status: **DRAFT — awaiting architecture decision. Not committed work.**
+> Status: **Accepted as architecture baseline — ADR-027/028/029/030 unblock implementation planning.**
 > Supersedes/extends: [wasm-runtime-plugin-protocol.md](wasm-runtime-plugin-protocol.md)
 > Owner declaration: user, 2026-06-30
-> Blocks: PLUGIN-001, CMD-002, HOOK-001, TOOL-008 Phase 3
+> Previously blocked: PLUGIN-001, CMD-002, HOOK-001, TOOL-008 Phase 3. These are now unblocked for
+> scoped planning/implementation under ADR-027/028/029/030; runtime execution still requires the
+> focused dependency/security review named by ADR-027.
 
 ## Problem
 
@@ -153,17 +155,17 @@ transport; whether skills inside a plugin are just bundled `SKILL.md` files or c
 
 ## Required Decisions / ADRs
 
-Before any implementation, these must be accepted:
+The required decisions have been accepted:
 
-1. **Plugin runtime boundary ADR** — carrier strategy (WASM first-class, Lua optional, dylib
-   rejected per owner 2026-06-30), WASM runtime/sandbox model, permission integration, lifecycle,
+1. **ADR-027 Plugin Runtime Boundary** — carrier strategy (WASM v1, Lua deferred, dylib rejected),
+   `wasmtime` preferred pending focused dependency review, permission integration, lifecycle,
    failure behavior, and host-call surface.
-2. **ADR-009 extension** — add a `Plugin { name, version, carrier }` variant to `ToolProvenance`
-   (additive, `#[non_exhaustive]` already in place).
-3. **Atomic component model ADR** — formally establish skill/mcp/hook as the three config-introduced
-   peer component types and define how plugins declare/override them.
-4. **Command taxonomy ADR** — `/skills` `/mcp` `/plugins` as three peer commands; `/plugins` realigns
-   to list actual plugin packages; existing MCP status moves to `/mcp`.
+2. **ADR-028 Plugin Tool Provenance Extension** — future
+   `Plugin { name, version, carrier }` variant for `ToolProvenance`.
+3. **ADR-029 Extensibility Atomic Component Model** — skill/mcp/hook are the three
+   config-introduced peer component types; plugin is the package format.
+4. **ADR-030 Extensibility Command Taxonomy** — `/skills`, `/mcp`, `/plugins`, and `/hooks`
+   command vocabulary; `/plugins` uses a notice, not an alias, until real plugin packages ship.
 
 ## Open Questions
 
@@ -186,15 +188,16 @@ Before any implementation, these must be accepted:
 
 ## Dependencies (Blocked Items)
 
-The following are blocked pending acceptance of this proposal and its ADRs:
+The following were blocked pending this proposal and its ADRs. They are now unblocked for their next
+scoped slice:
 
-- **PLUGIN-001** — repositioned from "WASM protocol" to "plugin encapsulation system". Absorbs this
-  proposal. Blocked on ADR #1 and #3.
-- **CMD-002** (new) — command taxonomy realignment (`/plugins` → `/mcp`, `/plugins` repurposed for
-  plugin packages, `/hooks` added). Blocked on ADR #4 and on the plugin entity existing.
-- **HOOK-001** (new) — user-config-introduced hooks. Blocked on ADR #3.
-- **TOOL-008 Phase 3** — runtime parser loading via WASM. Blocked on the plugin runtime (Phase 3
-  explicitly reuses PLUGIN-001 infrastructure).
+- **PLUGIN-001** — next slice is a local explicit WASM plugin package MVP with manifest parsing,
+  provenance, permission-gated read-only tool execution, and trap/timeout/error tests.
+- **CMD-002** — next slice can move MCP status to `/mcp` and make `/plugins` a notice, before real
+  plugin package listing lands.
+- **HOOK-001** — next slice can design and validate config-introduced hook schema/diagnostics.
+- **TOOL-008 Phase 3** — remains dependent on PLUGIN-001's runtime adapter existing, but no longer
+  blocked on missing architecture decisions.
 
 Items noted as related but not fully blocked:
 
