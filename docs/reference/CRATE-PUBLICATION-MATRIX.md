@@ -12,6 +12,10 @@ maintainer explicitly approves publishing or name-reservation packages.
 - Internal dependencies must include both `version = "0.2.0"` and `path = "../..."`.
 - `talos-runtime` remains the primary SDK facade.
 - Product assembly crates are not required dependencies for embedders.
+- `cargo install` support is a binary distribution surface, not a library API promise. Because the
+  top-level `talos` package name is unavailable, the planned Cargo install shape is
+  `cargo install talos-cli --bin talos` unless a later release decision chooses another package
+  name.
 - Heavy/default-weight capability crates need feature-gate review before broad publication.
 - Name reservation means real crates.io publication. Do not reserve by publishing placeholder
   packages unless the maintainer explicitly approves the package list and version.
@@ -41,7 +45,7 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | `talos-rpc` | No exact match | P3 | Transport surface; publish after remote/control boundary review. |
 | `talos-evolution` | No exact match | P3 | Product-specific until external use case is proven. |
 | `talos-tui` | No exact match | P3 | Product/UI surface; likely not first-wave library crate. |
-| `talos-cli` | No exact match | P3 | Binary/product package, not a library dependency target. |
+| `talos-cli` | No exact match | P2 | Binary/product package candidate for `cargo install talos-cli --bin talos`; library API remains unsupported. |
 
 ## Publication Matrix
 
@@ -65,7 +69,7 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 16 | `talos-rpc` | JSON-RPC transport | Published integration wave | `talos-rpc 0.2.0` published | Keep support boundary to local stdio; remote semantics still need ADR. |
 | 17 | `talos-evolution` | Product learning | Product-only | `publish = false` | Do not publish until external reusable API is proven. |
 | 18 | `talos-tui` | Product UI | Product-only | `publish = false` | Do not publish unless Talos intentionally offers a reusable TUI library. |
-| 19 | `talos-cli` | Binary product | Product-only | `publish = false` | Distribute as binary/install artifact, not a library crate. |
+| 19 | `talos-cli` | Binary product | Cargo-install candidate | `publish = false` today; requires binary package gate | Design and validate `cargo install talos-cli --bin talos`; do not expose or promise a stable library API. |
 
 ## Current Manifest Readiness
 
@@ -115,7 +119,8 @@ Remaining manifest work before broad publish:
 - Add crate-specific `keywords` and `categories` once first-wave crate docs are final.
 - Add feature gates for heavy tool/UI/provider capabilities before broad public consumption.
 - Keep `publish = false` on product-only crates unless a future story changes their distribution
-  model.
+  model. `talos-cli` is now a binary package candidate, so removing its guard requires a dedicated
+  install-package gate rather than a reusable-library gate.
 
 ## Remaining Publication Gates
 
@@ -130,7 +135,7 @@ These crates are intentionally not published yet:
 | `talos-mcp` | Candidate, protocol sensitive | MCP support boundary ADR or equivalent doc, server opt-in/conflict policy, transport/auth non-goals, dry-run after `talos-tools` decision. |
 | `talos-evolution` | Product-only now | Prove an external reusable API; remove `publish = false` only through a new story/decision. |
 | `talos-tui` | Product-only now | Decide to offer reusable TUI library; otherwise keep product UI out of crates.io. |
-| `talos-cli` | Product-only now | Binary/install distribution decision; keep Cargo library publishing disabled. |
+| `talos-cli` | Binary package candidate | Add package metadata/readme for crates.io, ensure the `talos` bin target is included, verify `cargo install --path crates/talos-cli --bin talos` and `cargo publish --dry-run -p talos-cli`, document that only the binary is supported, then remove `publish = false` through an explicit release gate. |
 
 ## Name Reservation Plan
 
@@ -144,9 +149,12 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
    `talos-rpc` after adding crate-level support boundary docs.
 4. Keep `talos-runtime` reserved for the SDK facade, but publish it only after its implementation
    dependencies are intentionally published or decoupled.
-5. Keep `talos-cli`, `talos-tui`, and `talos-evolution` product-only with `publish = false`.
-6. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
-7. Defer remaining high-risk names until docs, feature gates, and API support boundaries are
+5. Reserve `talos-cli` for the CLI binary package only after the install-package gate passes;
+   install docs should use `cargo install talos-cli --bin talos` unless a later decision chooses a
+   different package name.
+6. Keep `talos-tui` and `talos-evolution` product-only with `publish = false`.
+7. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
+8. Defer remaining high-risk names until docs, feature gates, and API support boundaries are
    complete.
 
 Do not publish empty placeholder crates. Each reservation package should compile, include a clear

@@ -3,20 +3,30 @@
 | Field | Value |
 | --- | --- |
 | Story ID | PLUGIN-001 |
-| Status | Research |
+| Status | **Blocked** — pending `docs/proposals/plugin-encapsulation-format.md` and its ADRs. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools with multiple carriers. |
 | Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
-| Source | User request, 2026-06-18 |
-| Relates To | CMD-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
+| Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
+| Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
 
 ## Requirement
 
-Design a protocol specification and runtime architecture for loading WASM-based Talos plugins.
+Design a protocol specification and runtime architecture for loading Talos plugins.
+
+> **2026-06-30 repositioning.** The owner declared the target architecture as four entities:
+> skill / mcp / hook are three independent config-introduced atomic component types; **plugin** is
+> a packaging/distribution format that bundles an arbitrary subset of {skill, mcp, hook} plus
+> additional tool definitions, carried by an external artifact. Carrier set settled 2026-06-30:
+> **WASM first-class, Lua optional, dynamic library rejected.** The detailed draft is
+> [`docs/proposals/plugin-encapsulation-format.md`](../../proposals/plugin-encapsulation-format.md).
+> PLUGIN-001 is **blocked** until that proposal and its ADRs are accepted.
+
 Plugins may provide:
 
 - tools;
 - commands;
 - hooks;
 - filters;
+- bundled skills and MCP component declarations (added 2026-06-30);
 - future extension capabilities registered through the same protocol boundary.
 
 ## Problem
@@ -50,7 +60,9 @@ host calls, sandbox limits, compatibility, and failure behavior.
 - Implementing a WASM runtime.
 - Loading untrusted network packages.
 - Plugin marketplace.
-- Native dynamic library loading.
+- **Native dynamic library loading — firmly rejected per owner decision 2026-06-30.** A `.so`/`.dll`
+  cannot be sandboxed and conflicts with Hard Constraint #1. This is a permanent non-goal, not a
+  deferred decision.
 - Node/Python plugin runtimes.
 - Provider plugin execution.
   Runtime-downloadable plugin packages require DIST-001 and a follow-up ADR before implementation.
@@ -73,9 +85,12 @@ host calls, sandbox limits, compatibility, and failure behavior.
 
 ## Required Reads
 
-- `docs/proposals/wasm-runtime-plugin-protocol.md`
+- `docs/proposals/plugin-encapsulation-format.md` **(governing draft, 2026-06-30)**
+- `docs/proposals/wasm-runtime-plugin-protocol.md` (subsumed as the WASM-carrier slice)
 - `docs/backlog/active/DIST-001-optional-runtime-asset-distribution.md`
 - `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md`
+- `docs/backlog/active/CMD-002-command-taxonomy-realignment.md`
+- `docs/backlog/active/HOOK-001-config-introduced-hooks.md`
 - `docs/iterations/I009-extensible-agent.md`
 - `docs/decisions/009-tool-provenance.md`
 - `docs/decisions/013-provider-config-schema-boundary.md`

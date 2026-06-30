@@ -29,12 +29,15 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   directly when their APIs are documented.
 - Use the ripgrep-style pattern: binary/product crates aggregate independently reusable library
   crates.
+- Add a Cargo-native binary installation path for the product CLI without making `talos-cli` a
+  supported library dependency.
 
 ## Non-Goals
 
 - Do not publish crates.io packages under this story without an explicit release/ADR gate.
 - Do not split every crate immediately.
 - Do not make `talos-cli` or `talos-tui` required dependencies for embedders.
+- Do not promise a stable `talos-cli` library API as part of `cargo install` support.
 - Do not convert release archives, installers, or optional runtime assets into crates.io packages.
 - Do not make independent per-crate versioning a pre-1.0 requirement.
 
@@ -66,6 +69,13 @@ unclear and lets product-layer coupling hide inside internal dependencies.
      standalone crate consumption.
    - Draft a release/ADR gate for the first real crates.io publish.
 
+6. **Cargo install package path**
+   - Treat `talos-cli` as a binary package candidate, not a reusable library crate.
+   - Plan the supported install command as `cargo install talos-cli --bin talos` because the
+     top-level `talos` package name is already taken on crates.io.
+   - Before removing `publish = false`, verify package metadata/readme, included binary target,
+     install from local path, publish dry-run, and README install instructions.
+
 ## Acceptance Criteria
 
 - [x] `docs/proposals/talos-crate-distribution-architecture.md` is accepted, superseded, or
@@ -81,6 +91,7 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 - [x] Heavy optional capabilities have feature gates or recorded split triggers.
 - [ ] README, README.zh-CN, and architecture docs explain crate distribution when the first
       implementation slice lands.
+- [ ] The publish plan defines and validates the Cargo install path for the CLI binary.
 
 ## Validation
 
@@ -144,6 +155,13 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   MODEL-004 TUI/exit metadata, CONF-001 subcommand/validation hardening, WEBFETCH document capture,
   shared skill discovery, and A1-A8 distribution gates.
 
+2026-06-30:
+
+- Added Cargo-native binary install to the publish plan. `talos-cli` is now classified as a
+  binary package candidate for `cargo install talos-cli --bin talos`, while its library API remains
+  unsupported. Removing `publish = false` requires a dedicated install-package release gate, not a
+  reusable-library publication gate.
+
 ## Required Reads
 
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`
@@ -171,3 +189,5 @@ unclear and lets product-layer coupling hide inside internal dependencies.
 2. Which crate names should be reserved on crates.io before APIs are fully stable?
 3. Should `talos-tui` be a reusable UI library package or product-only implementation detail?
 4. Should post-1.0 crates move to independent versions, or stay lockstep for user simplicity?
+5. Should the CLI Cargo package remain `talos-cli`, or should a later release choose another
+   available package name for product branding while still shipping the `talos` binary?

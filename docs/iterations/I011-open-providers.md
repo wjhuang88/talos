@@ -4,7 +4,12 @@
 — no Rust changes, no provider recompile. Foundation for a future provider plugin
 architecture.
 
-## Status: PAUSED — first slice (S1) landed 2026-06-02; S2 deferred
+## Status: Complete (2026-06-30 closure) — S1 delivered; S2 superseded by I015
+
+> 2026-06-30 closure: S1 (OpenAI-compatible `base_url` override) shipped and remains valid. S2
+> (provider plugin architecture foundation) was superseded by I015, which delivered the typed
+> provider/model schema, built-in defaults, opencode import, and ADR-013 (PROV-001 Complete).
+> Dynamic provider loading remains a separate future-ADR item outside I011's scope. I011 is closed.
 
 > 2026-06-06 note: I015 supersedes the S1 top-level `base_url` config shape with named
 > provider/model config. Keep this file as historical S1 evidence; use

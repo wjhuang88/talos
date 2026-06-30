@@ -45,7 +45,7 @@ docs/iterations/
 | R1 | Review Closure | **Complete** (2026-06-03) | I008/I009 moved to Complete; I009 TUI consumer work deferred to #I009-S6. I010 R2 is the next mainline slice. See `R1-review-closure.md`. |
 | I009 | Extensible Agent | **Complete** (2026-06-03) | Backend/runtime surface shipped (S2 hooks, S3 MCP client, S4 MCP server, S5 JSON-RPC, S1 ToolProvenance producers). TUI consumer markers + `/plugins` deferred to #I009-S6. See `I009-extensible-agent.md`. |
 | I010 | Polished Agent | **Complete** (2026-06-04; status repaired 2026-06-19) | R2 and R3 evidence is preserved; later command/session/TUI residuals have separate owners. See `I010-polished-agent.md`. |
-| I011 | Open Providers | **Paused** (S1 landed 2026-06-02; S2 deferred) | OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var shipped. S2 provider-plugin architecture is deferred until after R1/I010 or explicit priority change. See `I011-open-providers.md`. |
+| I011 | Open Providers | **Complete** (S1 delivered; S2 superseded by I015) | OpenAI-compatible `base_url` override + `OPENAI_COMPAT_API_KEY` env var shipped (S1). S2 (provider plugin architecture foundation) superseded by I015, which delivered the typed schema + opencode import under ADR-013 (PROV-001 Complete). Closed 2026-06-30. See `I011-open-providers.md`. |
 | I012 | Portable Tools | **Superseded** (2026-06-19 mapping) | Umbrella split into I016/I017; actual deliveries mapped to I025/I026 with residuals under TOOL-001/GIT-001. See `I012-portable-tools.md`. |
 | I013 | Boundary Control | **Complete** (2026-06-05) | Front-loaded high-risk boundary work: ADR-011 Guardian, ADR-012 exec DSL, ADR-013 provider schema, and #ARCH-S8 R1 centralized logging. See `I013-boundary-control.md`. |
 | I014 | TUI Completion | **Complete** (2026-06-06) | Finish TUI provenance/plugin visibility and copy/export workflows. Two stories: #I009-S6 (provenance markers + `/plugins`) and #I010-S9 (clipboard copy/export) landed via 2 atomic commits. 652 tests pass workspace-wide (was 615; +37 from talos-tui). See `I014-tui-completion.md`; EXT-001 backlog; ADR-009. |
@@ -122,7 +122,7 @@ rewrite published iteration baselines.
 
 | Iteration | Current State | Disposition Before Next Activation |
 |---|---|---|
-| I011 | Paused | Continue paused; provider schema work moved through I015 and broader plugin architecture remains deferred. |
+| I011 | Complete (2026-06-30 closure) | S1 delivered; S2 (provider plugin arch) superseded by I015 (PROV-001 Complete). Removed from non-terminal inventory. |
 | I018 | Planned | Deferred; remains a valid future observability/prompt-assets baseline. |
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |

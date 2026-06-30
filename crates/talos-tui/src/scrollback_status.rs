@@ -2,7 +2,6 @@ use ratatui::{
     style::Style,
     text::{Line, Span, Text},
 };
-use talos_core::message::Usage;
 
 use crate::scrollback::truncate_end_to_width;
 use crate::theme::semantic;
@@ -213,11 +212,4 @@ pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {
     }
     let truncated: String = chars[..max_len - 1].iter().collect();
     format!("{truncated}…")
-}
-
-#[allow(dead_code)]
-pub(crate) fn calculate_cost(usage: &Usage) -> String {
-    let total = usage.input_tokens + usage.output_tokens;
-    let cost = (total as f64) * 0.003 / 1000.0;
-    format!("${cost:.4}")
 }

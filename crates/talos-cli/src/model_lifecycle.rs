@@ -263,9 +263,9 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                 success_message,
             );
             let (ctx_limit, _) = model_config.resolve_model_limits();
-            let builtins = talos_config::model::builtin_models();
+            let all_models = model_config.all_models();
             let meta = talos_config::model::find_model_by_provider(
-                &builtins,
+                &all_models,
                 &model_config.provider,
                 &model_config.model,
             );

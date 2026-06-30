@@ -1,6 +1,6 @@
 # MODEL-004: Model Catalog Runtime Integration
 
-**Status**: Partial (M1/M2 complete via I045; M3 residual selected into crate distribution hardening two-month plan)
+**Status**: Complete (M1/M2 via I045; M3 delivered 2026-06-30)
 **Priority**: P2
 **Source**: I038 residual (2026-06-20)
 **Depends on**: MODEL-001 (I038 — catalog data layer complete); MEM-005 (compaction policy)
@@ -74,9 +74,33 @@ from the catalog where available:
 - [x] Runtime session construction uses resolved catalog-aware limits instead of hardcoded
       `128_000` in active CLI paths.
 - [x] Compactor receives the correct model limit from the catalog.
-- [ ] Status bar and exit summary display metadata sourced from catalog.
+- [x] Status bar and exit summary display metadata sourced from catalog.
 - [x] Fallback to 128_000 works when model is not in catalog.
-- [ ] `cargo test --workspace` passes.
+- [x] `cargo test --workspace` passes.
+
+## M3 Delivery (2026-06-30)
+
+Root cause: `model_lifecycle.rs` resolved pricing from `builtin_models()` only, but the builtin
+`models.toml` carries no pricing — so `StatusSnapshot.input_price_per_million`/`output_price_per_million`
+were always `None` and the exit summary fell back to fabricated `$3/$15` defaults.
+
+Fix delivered:
+- `crates/talos-cli/src/model_lifecycle.rs` — pricing now resolved from `model_config.all_models()`
+  (full merge: builtin + user-config + models.dev imports). `context_limit` resolution unchanged
+  (M1/M2 baseline preserved).
+- `crates/talos-tui/src/app_summary.rs` — removed the fabricated `DEFAULT_INPUT_PER_M`/`DEFAULT_OUTPUT_PER_M`
+  fallback. When no pricing metadata exists, the cost line is omitted entirely (honest) instead of
+  printing a made-up estimate. Catalog-based estimate labeled "Est" remains.
+- `crates/talos-tui/src/scrollback_status.rs` — removed the dead `calculate_cost` helper and unused
+  `Usage` import; `crates/talos-tui/src/scrollback.rs` + `tests.rs` re-export/test cleanup.
+- 4 new `app_summary` tests cover: pricing present → cost line; pricing absent → no cost line;
+  zero tokens → no cost line; partial pricing → no cost line.
+
+Builtin `models.toml` intentionally left pricing-free — pricing comes from models.dev import or
+user config, not fabricated defaults (per project accuracy rules).
+
+Validation: `cargo fmt/check/test --workspace` all pass (56/56 test binaries, 0 failures);
+`sh scripts/validate_project_governance.sh .` passes with 0 warnings.
 
 ## Execution Baseline
 

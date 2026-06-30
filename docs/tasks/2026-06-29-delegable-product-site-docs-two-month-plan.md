@@ -1,6 +1,6 @@
 # 2026-06-29 Delegable Product Site And User Docs Two-Month Plan
 
-**Status**: Ready for delegated assignment
+**Status**: Complete
 **Owner area**: Public product site, user documentation, and release-accurate messaging
 **Primary backlog item**: `docs/backlog/active/WEB-002-github-pages-product-site.md`
 **Created**: 2026-06-29

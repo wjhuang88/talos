@@ -54,6 +54,10 @@ Replace compile-time embedding of tree-sitter parsers with on-demand loading:
 - Download and cache via DIST-001 optional asset distribution.
 - **Binary size**: 64 MB → ~20-25 MB (core binary only, parsers as WASM modules).
 
+> **2026-06-30 note.** Phase 3 is blocked on PLUGIN-001, which is itself blocked pending
+> `docs/proposals/plugin-encapsulation-format.md` and its ADRs. Phase 3 cannot proceed until the
+> plugin runtime carrier strategy and sandbox boundary are decided.
+
 ## Non-Goals
 
 - Do not remove tree-sitter as the code analysis engine.

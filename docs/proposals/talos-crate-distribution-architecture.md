@@ -61,7 +61,7 @@ not the reverse.
 | Runtime implementation | `talos-agent` | Publishable as an implementation crate, but not the primary SDK entrypoint. Public docs must mark lower-level surfaces as advanced/transitional. |
 | Capability crates | `talos-provider`, `talos-tools`, `talos-skill`, `talos-session`, `talos-memory`, `talos-exploration` | Publishable libraries with narrow feature flags and no CLI/TUI dependency. |
 | Extension and transport | `talos-plugin`, `talos-mcp`, `talos-rpc`, `talos-conversation` | Publish after protocol boundaries stabilize; useful for external integrations and alternate UIs. |
-| Product assembly | `talos-cli`, `talos-tui` | May be published for binary/UI reuse, but they are product surfaces, not required dependencies for embedders. |
+| Product assembly | `talos-cli`, `talos-tui` | May be published for binary/UI reuse, but they are product surfaces, not required dependencies for embedders. `talos-cli` may become the crates.io binary package that supports `cargo install talos-cli --bin talos`. |
 
 ### Publishable Crate Contract
 
@@ -130,8 +130,12 @@ This matches ripgrep's lesson without creating premature crate sprawl.
    - Gate optional tool/provider/storage capabilities through features.
 
 5. **Product package decision**
-   - Decide whether crates.io should publish only libraries plus a `talos-cli` binary package, or
-     also publish `talos-tui` as a reusable UI library.
+   - Publish libraries separately from product binaries.
+   - Design `talos-cli` as the crates.io binary install package for `cargo install talos-cli --bin
+     talos`, because the top-level `talos` package name is already taken by an unrelated crate.
+   - Keep `talos-cli`'s library API unsupported unless a future story intentionally exposes one;
+     the supported crates.io surface is the `talos` binary target and install metadata.
+   - Decide whether `talos-tui` should remain product-only or become a reusable UI library.
    - Keep release archives and install scripts as separate distribution channels from library
      crates.
 
@@ -144,6 +148,8 @@ This matches ripgrep's lesson without creating premature crate sprawl.
 - `cargo publish --dry-run` passes for the selected first wave in dependency order.
 - Heavy/default-weight capabilities have feature-gating or a recorded split plan.
 - README and architecture docs explain crate distribution alongside binary installation.
+- The publish plan includes a `cargo install` path for the Talos CLI, with package-name constraints
+  and support boundaries documented.
 - A release/ADR gate exists before the first real crates.io publish.
 
 ## Alternatives Considered
@@ -161,6 +167,9 @@ This matches ripgrep's lesson without creating premature crate sprawl.
 
 - Which crate names on crates.io are available and should be reserved early?
 - Should `talos-tui` be treated as reusable UI infrastructure or product-only UI?
+- Should the first `cargo install` path publish `talos-cli` as package `talos-cli` with binary
+  `talos`, or pursue an alternate package name such as `talos-ai` if product naming becomes more
+  important than package-name consistency?
 - Which crates are allowed to publish before the 1.0 self-bootstrap gate?
 - Should public package docs use one shared root README or one crate-specific README per crate?
 - Which optional features should be default-on for developer convenience versus default-off for

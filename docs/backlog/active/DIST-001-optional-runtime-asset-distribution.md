@@ -115,6 +115,10 @@ Potential examples:
 
 - `MODEL-002` depends on this strategy before any local model weights are shipped or downloaded.
 - `PLUGIN-001` depends on this strategy before remote WASM plugin package installation is allowed.
+  **(2026-06-30) The plugin-package *distribution* slice of DIST-001 is additionally blocked on
+  `docs/proposals/plugin-encapsulation-format.md` — the package format must be decided before its
+  distribution path. DIST-001's broader research scope (model weights, non-executable resource packs)
+  can proceed independently.**
 - `TUI-010` may provide the future prompt surface for optional asset installation.
 - `AGENT-001` may influence shared config locations for asset policy, but Talos-owned assets should
   remain under Talos-controlled state unless a later ADR decides otherwise.

@@ -301,7 +301,7 @@ Talos ships with built-in tools for common coding-agent work:
 - Search and inspection: `grep`, `diff`, `stat`
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
-- Network: `http_request` (SSRF-protected, permission-gated), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
+- Network: `fetch_url` (bounded URL context), `http_request` (advanced HTTP/API inspection, disclosed on demand), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Shell escape hatch: `bash`
 
@@ -384,7 +384,8 @@ local stdio transport is currently supported.
 Rust applications can depend on the `talos-runtime` crate to embed the core agent loop without
 linking Talos CLI or TUI crates. The initial pre-1.0 facade exposes `RuntimeBuilder` and
 `RuntimeHandle` for provider/tool injection, typed event streaming, interruption, shutdown, and
-explicit request previews.
+explicit request previews. Embedders can also provide approval handlers and customize or append the
+runtime system prompt through `RuntimeBuilder`.
 
 Registered tools are permission-wrapped by default. In headless embedding, unresolved `Ask`
 decisions are denied unless the embedder supplies narrower allow-list rules.
@@ -446,7 +447,7 @@ For current engineering status, use the project governance docs instead of this 
 | Local development | [docs/sop/LOCAL-DEV.md](docs/sop/LOCAL-DEV.md) |
 | Testing | [docs/sop/TESTING.md](docs/sop/TESTING.md) |
 | Git workflow | [docs/sop/GIT-WORKFLOW.md](docs/sop/GIT-WORKFLOW.md) |
-| Public product site | [site/](site/) &mdash; static GitHub Pages site (publishing pending maintainer approval) |
+| Public product site | [https://talos.hwj.zone](https://talos.hwj.zone) &mdash; static GitHub Pages site (source under [`site/`](site/)) |
 
 ## License
 

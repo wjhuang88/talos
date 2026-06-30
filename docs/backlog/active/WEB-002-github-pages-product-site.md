@@ -1,6 +1,6 @@
 # WEB-002: GitHub Pages Product Site And Custom Domain
 
-**Status**: Ready for delegated assignment
+**Status**: Complete
 **Priority**: P3
 **Created**: 2026-06-27
 **Source**: User request to publish a separate GitHub Pages site under a personal domain
@@ -35,11 +35,11 @@ engineering docs.
 
 ## Acceptance Criteria
 
-- [ ] A `site/` directory can be served by GitHub Pages without depending on local developer tools.
-- [ ] A custom-domain `CNAME` path is documented and can be enabled by changing one file.
-- [ ] The site does not expose internal task notes, private governance records, or unpublished claims.
-- [ ] README install and positioning claims match the site.
-- [ ] Pages deployment is documented and recoverable by future agents.
+- [x] A `site/` directory can be served by GitHub Pages without depending on local developer tools.
+- [x] A custom-domain `CNAME` path is documented and can be enabled by changing one file.
+- [x] The site does not expose internal task notes, private governance records, or unpublished claims.
+- [x] README install and positioning claims match the site.
+- [x] Pages deployment is documented and recoverable by future agents.
 
 ## Progress Log
 
@@ -114,6 +114,13 @@ engineering docs.
   Updated `site/README.md` to document the GitHub Actions deployment
   path. **Maintainer action**: switch Pages source to "GitHub Actions"
   in repository settings; the workflow handles the rest.
+- 2026-06-30 — D12 Maintainer publishing actions complete. Maintainer
+  performed the three remaining GitHub Pages actions: (1) DNS CNAME
+  `talos` → `wjhuang88.github.io` added, (2) Pages source switched to
+  "GitHub Actions", (3) custom domain `talos.hwj.zone` entered in Pages
+  settings with HTTPS provisioning. `site/CNAME` already carried
+  `talos.hwj.zone`. The site is now live; WEB-002 acceptance criteria
+  all satisfied. No tag, release, or runtime change.
 
 ## Validation
 

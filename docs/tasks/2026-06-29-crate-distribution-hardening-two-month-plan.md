@@ -44,13 +44,16 @@ The work is intentionally ordered:
 - 11 crates are published at `0.2.0`: `talos-core`, `talos-config`, `talos-permission`,
   `talos-skill`, `talos-session`, `talos-plugin`, `talos-memory`, `talos-exploration`,
   `talos-provider`, `talos-conversation`, and `talos-rpc`.
-- `talos-cli`, `talos-tui`, and `talos-evolution` are product-only and have `publish = false`.
+- `talos-cli`, `talos-tui`, and `talos-evolution` currently have `publish = false`. `talos-cli`
+  is now a future Cargo binary-install candidate, not a reusable library dependency.
 - `talos-sandbox`, `talos-tools`, `talos-agent`, `talos-runtime`, and `talos-mcp` are
   gate-before-publish candidates.
 - `talos-runtime` remains the intended SDK facade, but it must not be published until its
   dependency closure is either safely published or decoupled.
 - `talos` as a Cargo package name is already taken by an unrelated crate; Talos uses `talos-*`
   package names.
+- The planned Cargo-native CLI install shape is `cargo install talos-cli --bin talos`, pending a
+  dedicated install-package gate.
 - MODEL-004 baseline from I045 is already partly complete: `Config::resolve_model_limits()` exists,
   has tests, is wired into CLI/session creation paths, and `Compactor::new()` receives
   `SessionConfig.model_context_limit`.
@@ -88,6 +91,8 @@ that all MODEL-004 and CONF-001 work is clean-slate.
 - Publish additional crates only if their gate is satisfied and the maintainer explicitly
   authorizes the publish.
 - Update README, README.zh-CN, architecture docs, and release notes for crate distribution.
+- Include a future `cargo install` path for the CLI binary in the publish design; do not implement
+  or publish it under this plan unless separately approved.
 - Design and implement WEBFETCH-001 Phase 2 as a bounded feature slice:
   `document_extract` for local saved documents/text-like resources, metadata-rich extraction
   summaries, explicit unsupported-format behavior, and integration with `save_url`/`http_request`.
@@ -106,7 +111,8 @@ that all MODEL-004 and CONF-001 work is clean-slate.
 - No automatic publication of remaining high-risk crates.
 - No release tag, GitHub release, installer change, or binary distribution change unless separately
   approved.
-- No `talos-cli`, `talos-tui`, or `talos-evolution` crates.io publication in this plan.
+- No `talos-cli`, `talos-tui`, or `talos-evolution` crates.io publication in this plan. `talos-cli`
+  Cargo-install support is design-only here and requires a later install-package gate.
 - No remote server semantics for `talos-rpc`; it remains local stdio.
 - No new runtime dependency solely to improve packaging presentation.
 - No independent per-crate versioning before a separate decision.
@@ -175,7 +181,8 @@ that all MODEL-004 and CONF-001 work is clean-slate.
 - Do not run real `cargo publish` unless the assigned task explicitly says the gate is satisfied
   and the maintainer has approved that exact crate.
 - Do not remove `publish = false` from `talos-cli`, `talos-tui`, or `talos-evolution` without a new
-  story or decision.
+  story or decision. For `talos-cli`, that story must validate `cargo install talos-cli --bin
+  talos` and document that only the binary target is supported.
 - Do not publish `talos-runtime` until the dependency closure is safe or decoupled.
 - Do not publish `talos-sandbox` or `talos-tools` before security/permission gates are complete.
 - Do not make `talos-cli` or `talos-tui` required dependencies for embedders.
@@ -252,7 +259,8 @@ in the matrix.
 Add or document a lightweight check that proves product-only crates remain unpublished:
 `talos-cli`, `talos-tui`, and `talos-evolution` must keep `publish = false`. The check may be a
 script, governance validator extension, or documented command evidence if a script would be
-overkill.
+overkill. If `talos-cli` later moves to Cargo binary distribution, this guard must be updated in
+the same change that adds the install-package gate.
 
 ### A3: Sandbox Safety Gate
 
@@ -281,6 +289,8 @@ policy, transport/auth non-goals, and relationship to `talos-rpc`.
 Update README, README.zh-CN, and architecture docs with three distribution paths:
 
 - binary/product install;
+- Cargo-native CLI install plan: `cargo install talos-cli --bin talos` after the install-package
+  gate passes;
 - embeddable SDK facade through `talos-runtime` when its gate is ready;
 - standalone crates for configuration, permissions, storage, memory, exploration, provider,
   conversation, plugin, and local RPC foundations.
@@ -415,7 +425,9 @@ Recovery/resume: check `git log --oneline -5`, read this checkpoint, continue fr
 
 **Publish decisions**:
 - No crate published. No tag or release created.
-- Product-only (publish=false): talos-cli, talos-tui, talos-evolution — unchanged.
+- Product-only guards remain unchanged for this task: talos-cli, talos-tui, talos-evolution all
+  still have `publish = false`. Follow-up publish design now treats `talos-cli` as a future
+  binary-install candidate, not as a reusable library crate.
 - Gate-before-publish: talos-sandbox, talos-tools, talos-agent, talos-runtime, talos-mcp — all
   gates say DO NOT PUBLISH until their specific requirements are met.
 - Already published: 11 crates at 0.2.0 — unchanged.
@@ -429,5 +441,8 @@ Recovery/resume: check `git log --oneline -5`, read this checkpoint, continue fr
 5. rmcp stability evaluation for talos-mcp.
 6. Full design docs for F1/C1/S1 in backlog stories (designs were used for implementation but
    not all persisted in backlog files due to concurrent agent execution).
+7. Cargo install support for the CLI binary: validate package metadata, readme, included `talos`
+   binary target, `cargo install talos-cli --bin talos`, and publish dry-run before removing
+   `publish = false`.
 
 **Git state**: 4 commits on `main` (21ffd1e, 98f66de, cdd4f90, + this closeout). Not pushed.

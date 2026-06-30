@@ -10,8 +10,8 @@ mod tests {
     use crate::inline_terminal::ViewportComponent;
     use crate::scrollback::{
         BottomPanelComponent, BottomPanelPlacement, bottom_panel_placement, bottom_panel_rows,
-        build_input_text, build_status_text, calculate_cost, cursor_line_col, input_line_count,
-        stream_padding_for, truncate_str,
+        build_input_text, build_status_text, cursor_line_col, input_line_count, stream_padding_for,
+        truncate_str,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, BottomPanelState, CtrlCState, PanelItem, Tip, TuiState};
@@ -150,27 +150,6 @@ mod tests {
 
         state.ctrl_c_state = CtrlCState::Idle;
         assert!(matches!(state.ctrl_c_state, CtrlCState::Idle));
-    }
-
-    // ── Cost ────────────────────────────────────────────────────────────
-
-    #[test]
-    fn test_calculate_cost_zero() {
-        let usage = Usage::default();
-        assert_eq!(calculate_cost(&usage), "$0.0000");
-    }
-
-    #[test]
-    fn test_calculate_cost_nonzero() {
-        let usage = Usage {
-            input_tokens: 1000,
-            output_tokens: 500,
-            ..Default::default()
-        };
-        let cost = calculate_cost(&usage);
-        assert!(cost.starts_with('$'));
-        let value: f64 = cost[1..].parse().unwrap();
-        assert!(value > 0.0);
     }
 
     // ── Approval ────────────────────────────────────────────────────────
@@ -875,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn test_exit_summary_falls_back_to_default_pricing() {
+    fn test_exit_summary_omits_cost_without_pricing() {
         use crate::app_summary::build_exit_summary_lines;
         use std::time::Duration;
 
@@ -899,8 +878,8 @@ mod tests {
         let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5);
         let text: String = lines.iter().map(|l| l.text.as_str()).collect();
         assert!(
-            text.contains("default"),
-            "exit summary should indicate default pricing fallback, got: {text}"
+            !text.contains("cost") && !text.contains("default"),
+            "exit summary must omit cost line when no pricing, got: {text}"
         );
     }
 }
