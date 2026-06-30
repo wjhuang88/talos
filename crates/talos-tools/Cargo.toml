@@ -20,6 +20,10 @@ tokio = { version = "1", features = ["fs", "process", "time"] }
 regex = "1"
 walkdir = "2"
 glob = "0.3"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+grep-matcher = "0.1"
+ignore = "0.4"
 similar = "3"
 gix = { version = "0.84", default-features = false, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"

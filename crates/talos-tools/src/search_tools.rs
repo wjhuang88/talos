@@ -9,7 +9,8 @@ use serde_json::Value;
 use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
-use crate::file_tools::{FileToolError, is_binary_file, is_skip_dir, resolve_workspace_path};
+use crate::file_tools::{FileToolError, resolve_workspace_path};
+use crate::search_engine::{RipgrepSearchEngine, SearchEngine, SearchError as EngineError};
 
 /// Input parameters for the [`GrepTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -42,9 +43,6 @@ impl GrepTool {
         let grep_input: GrepInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let re = regex::Regex::new(&grep_input.pattern)
-            .map_err(|e| FileToolError::InvalidInput(format!("invalid regex: {e}")))?;
-
         let canonical_root = self
             .workspace_root
             .canonicalize()
@@ -70,90 +68,23 @@ impl GrepTool {
 
         let max_results = grep_input.max_results.unwrap_or(50) as usize;
 
-        let files: Vec<PathBuf> = if search_path.is_file() {
-            vec![search_path.clone()]
-        } else {
-            walkdir::WalkDir::new(&search_path)
-                .into_iter()
-                .filter_entry(|e| {
-                    if e.depth() == 0 {
-                        return true;
-                    }
-                    !(e.file_type().is_dir() && is_skip_dir(&e.file_name().to_string_lossy()))
-                })
-                .filter_map(Result::ok)
-                .filter(|e| e.file_type().is_file())
-                .map(|e| e.path().to_path_buf())
-                .collect()
-        };
-
-        let root = canonical_root;
-        let mut matches: Vec<(String, usize, String)> = Vec::new();
-
-        for file_path in &files {
-            if matches.len() >= max_results {
-                break;
-            }
-
-            if let Some(ref pat) = include_pattern {
-                let file_name = file_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                if !pat.matches(&file_name) {
-                    continue;
+        let engine = RipgrepSearchEngine;
+        let output = engine
+            .search(
+                &grep_input.pattern,
+                &search_path,
+                include_pattern.as_ref(),
+                max_results,
+            )
+            .map_err(|e| match e {
+                EngineError::InvalidRegex(msg) => {
+                    FileToolError::InvalidInput(format!("invalid regex: {msg}"))
                 }
-            }
+                EngineError::Io(e) => FileToolError::Io(e),
+                EngineError::SearchPanic(msg) => FileToolError::InvalidInput(msg),
+            })?;
 
-            if is_binary_file(file_path)? {
-                continue;
-            }
-
-            let content = match std::fs::read_to_string(file_path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            let display_path = file_path
-                .strip_prefix(&root)
-                .unwrap_or(file_path)
-                .to_string_lossy()
-                .to_string();
-
-            for (i, line) in content.lines().enumerate() {
-                if matches.len() >= max_results {
-                    break;
-                }
-                if re.is_match(line) {
-                    matches.push((display_path.clone(), i + 1, line.trim_end().to_string()));
-                }
-            }
-        }
-
-        if matches.is_empty() {
-            return Ok(format!(
-                "no matches found for pattern '{}'",
-                grep_input.pattern
-            ));
-        }
-
-        let mut output = String::new();
-        let mut current_file = String::new();
-        for (file, line_num, line) in &matches {
-            if file != &current_file {
-                output.push_str(&format!("{file}:\n"));
-                current_file = file.clone();
-            }
-            output.push_str(&format!("  {line_num}: {line}\n"));
-        }
-
-        if matches.len() >= max_results {
-            output.push_str(&format!(
-                "\n... (showing first {max_results} matches, refine pattern for more)"
-            ));
-        }
-
-        Ok(output)
+        format_output(&grep_input.pattern, &output.matches, max_results)
     }
 }
 
@@ -190,6 +121,37 @@ impl AgentTool for GrepTool {
     fn summary_fields(&self) -> &'static [&'static str] {
         &["pattern", "path", "include"]
     }
+}
+
+fn format_output(
+    pattern: &str,
+    matches: &[crate::search_engine::FileMatches],
+    max_results: usize,
+) -> Result<String, FileToolError> {
+    let total: usize = matches.iter().map(|m| m.lines.len()).sum();
+
+    if total == 0 {
+        return Ok(format!("no matches found for pattern '{pattern}'"));
+    }
+
+    let mut output = String::new();
+    for fm in matches {
+        if fm.lines.is_empty() {
+            continue;
+        }
+        output.push_str(&format!("{}:\n", fm.path));
+        for (line_num, line) in &fm.lines {
+            output.push_str(&format!("  {line_num}: {line}\n"));
+        }
+    }
+
+    if total >= max_results {
+        output.push_str(&format!(
+            "\n... (showing first {max_results} matches, refine pattern for more)"
+        ));
+    }
+
+    Ok(output)
 }
 
 /// Input parameters for the [`GlobTool`].

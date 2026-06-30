@@ -12,6 +12,7 @@ pub mod file_tools;
 pub mod git;
 pub mod http_request;
 pub mod save_url;
+pub mod search_engine;
 pub mod search_tools;
 pub mod symbol;
 pub mod tree;

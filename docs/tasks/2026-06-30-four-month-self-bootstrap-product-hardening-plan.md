@@ -98,10 +98,10 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T09 | 2 | C | Implement TUI-014 grep result summary rendering. | TOOL-011/TUI docs | TUI tests; snapshot-free rendering tests | Complete |
 | T10 | 2 | C | Implement TUI-015 head+tail truncation for long unsuppressed tool outputs. | TUI-014 | TUI tests; `/export` raw-output proof | Complete |
 | T11 | 2 | A | Add self-bootstrap session evidence template under docs/tasks or docs/reference. | REL-002 | Governance validation | Complete |
-| T12 | 3 | B | Add runtime SDK quickstart examples for provider/tool injection, approvals, custom/append prompt, preview, shutdown. | RUNTIME-001 | `cargo test -p talos-runtime`; docs compile where applicable | In Progress |
+| T12 | 3 | B | Add runtime SDK quickstart examples for provider/tool injection, approvals, custom/append prompt, preview, shutdown. | RUNTIME-001 | `cargo test -p talos-runtime`; docs compile where applicable | Complete |
 | T13 | 3 | B | Define `talos-runtime` SDK support contract and direct-use caveats for `talos-agent`. | ARCH-031/RUNTIME-001 | Docs updated; matrix updated | Complete |
-| T14 | 3 | C | Start TOOL-011 ripgrep-backed grep engine implementation behind a feature or internal engine boundary. | ADR-025 | Unit tests compare current grep behavior | Planned |
-| T15 | 3 | C | Add regression tests for search hidden-dir behavior, include filters, large output summary, and UTF-8 snippets. | T14 | `cargo test -p talos-tools` | Planned |
+| T14 | 3 | C | Start TOOL-011 ripgrep-backed grep engine implementation behind a feature or internal engine boundary. | ADR-025 | Unit tests compare current grep behavior | Complete |
+| T15 | 3 | C | Add regression tests for search hidden-dir behavior, include filters, large output summary, and UTF-8 snippets. | T14 | `cargo test -p talos-tools` | Complete |
 | T16 | 3 | G | Update public site roadmap to reflect cargo install, SDK, and self-bootstrap positioning accurately. | T05 | Site validator | Complete |
 | T17 | 4 | C | Finish first ripgrep-backed grep slice or record a precise blocker. | T14 | Parity tests; performance note | Planned |
 | T18 | 4 | D | WEB-005 design: browser-session continuity permission model, page record schema, and no-cookie-leak boundary. | WEB-005/BrowserSkill research | ADR/proposal update | Planned |
@@ -376,3 +376,48 @@ T14 (ripgrep grep engine first slice), T15 (search regression tests), T16 (site 
 
 **Recovery or resume instruction**: Week 1+2 commits on `origin/main`. To resume: read this
 checkpoint, then start T12 or T14 (both independent).
+
+### Checkpoint Week 3 (T12–T16) — Complete (2026-06-30)
+
+**Completed task items**: T12, T13, T14, T15, T16.
+
+**Current state and artifacts**:
+- T12: 5 example files under `crates/talos-runtime/examples/` — `common/mod.rs` (shared mock
+  provider + helpers), `quickstart.rs`, `custom_tool.rs`, `approval.rs`, `prompt_and_preview.rs`.
+  All compile and run without panic.
+- T13: `docs/reference/RUNTIME-SDK-CONTRACT.md` — pre-1.0 embedding support boundary: supported
+  surface, implementation surface exclusions, direct-use caveats, embedding patterns, permission
+  model, pre-1.0 change policy.
+- T14: `crates/talos-tools/src/search_engine.rs` — `SearchEngine` trait with `LegacySearchEngine`
+  (exact current behavior) and `RipgrepSearchEngine` (using `grep-searcher`/`grep-regex`/`ignore`
+  crates per ADR-025). GrepTool wired to ripgrep engine. New capability: `.gitignore` respected.
+  All ripgrep calls wrapped in `catch_unwind` (constraint #9). No `unwrap()` in library code.
+- T15: 12 regression tests added — `.gitignore`, binary skipping, max_results truncation, UTF-8
+  unicode, include+path scope, hidden dir at depth 0, target/node_modules skip, legacy parity.
+- T16: `site/roadmap.html` updated with cargo install path, SDK+self-bootstrap plan reference,
+  and plugin ADR status.
+
+**New dependencies added**: `grep-searcher 0.1`, `grep-regex 0.1`, `grep-matcher 0.1`,
+`ignore 0.4` (all Unlicense/MIT, pure Rust, ADR-025 approved).
+
+**Commands/checks and actual results**:
+- `cargo check --workspace` → pass.
+- `cargo test -p talos-tools` → 182 passed (170 existing + 12 new).
+- `cargo test -p talos-runtime` → 9 passed.
+- `cargo build --examples -p talos-runtime` → 4 examples compiled, all run without panic.
+- `cargo clippy -p talos-tools -p talos-runtime -- -D warnings` → no warnings.
+- `cargo fmt --all -- --check` → clean.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Open risks or deviations**: The ripgrep engine now respects `.gitignore` (new capability per
+ADR-025). This is a deliberate behavior improvement, not a regression. Legacy engine preserved
+for parity testing.
+
+**Next task item**: Week 4 — T17 (finish ripgrep slice or record blocker — already done via T14),
+T18 (WEB-005 browser-session continuity design), T19 (browser_page_read permission facet),
+T20 (MEM-007 compression spike), T21 (Month-1 closeout).
+
+**Recovery or resume instruction**: Week 1–3 commits on `origin/main`. To resume: read this
+checkpoint, then start T18 or T20 (both are design/spike, independent). T17 is effectively
+complete — T14 delivered a working ripgrep slice with parity tests.
