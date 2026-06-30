@@ -4,8 +4,7 @@
 //! a [`ToolRegistry`] for dynamic tool registration and lookup, and associated
 //! types for tool execution results and errors.
 
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -121,6 +120,53 @@ pub enum ToolFamily {
     Extension,
 }
 
+/// A named conditional backend behind a model-visible tool.
+///
+/// Backends let one tool expose narrow capabilities only when a presentation
+/// policy discloses them. For example, a unified web-reading tool can keep its
+/// ordinary HTTP path visible while disclosing an authenticated browser-page
+/// backend only after a continuation or strong user intent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ToolBackend {
+    /// Stable backend id within the owning tool.
+    pub id: String,
+    /// Short model-facing description of when this backend is available.
+    pub description: String,
+}
+
+impl ToolBackend {
+    /// Creates a backend descriptor.
+    #[must_use]
+    pub fn new(id: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            description: description.into(),
+        }
+    }
+}
+
+/// A policy entry that discloses one backend for one tool.
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+pub struct ToolBackendDisclosure {
+    /// Tool name that owns the backend.
+    pub tool: String,
+    /// Backend id disclosed for the tool.
+    pub backend: String,
+}
+
+impl ToolBackendDisclosure {
+    /// Creates a backend disclosure entry.
+    #[must_use]
+    pub fn new(tool: impl Into<String>, backend: impl Into<String>) -> Self {
+        Self {
+            tool: tool.into(),
+            backend: backend.into(),
+        }
+    }
+}
+
 /// Policy for selecting model-visible tool families.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ToolPresentationPolicy {
@@ -131,6 +177,9 @@ pub struct ToolPresentationPolicy {
     /// Additional families to present.
     #[serde(default)]
     pub families: Vec<ToolFamily>,
+    /// Conditional backends to present for specific tools.
+    #[serde(default)]
+    pub backends: Vec<ToolBackendDisclosure>,
 }
 
 impl ToolPresentationPolicy {
@@ -141,6 +190,7 @@ impl ToolPresentationPolicy {
             include_all: true,
             include_always_on: true,
             families: Vec::new(),
+            backends: Vec::new(),
         }
     }
 
@@ -151,6 +201,7 @@ impl ToolPresentationPolicy {
             include_all: false,
             include_always_on: true,
             families: Vec::new(),
+            backends: Vec::new(),
         }
     }
 
@@ -161,7 +212,27 @@ impl ToolPresentationPolicy {
             include_all: false,
             include_always_on: true,
             families: families.into_iter().collect(),
+            backends: Vec::new(),
         }
+    }
+
+    /// Presents the always-on baseline plus a specific conditional backend.
+    #[must_use]
+    pub fn with_backend(tool: impl Into<String>, backend: impl Into<String>) -> Self {
+        Self {
+            include_all: false,
+            include_always_on: true,
+            families: Vec::new(),
+            backends: vec![ToolBackendDisclosure::new(tool, backend)],
+        }
+    }
+
+    /// Adds a backend disclosure entry to this policy.
+    #[must_use]
+    pub fn disclose_backend(mut self, tool: impl Into<String>, backend: impl Into<String>) -> Self {
+        self.backends
+            .push(ToolBackendDisclosure::new(tool, backend));
+        self
     }
 
     /// Returns true when this policy presents the given tool.
@@ -170,12 +241,33 @@ impl ToolPresentationPolicy {
         self.include_all
             || (self.include_always_on && tool.is_always_on())
             || self.families.contains(&tool.family())
+            || self.backends.iter().any(|entry| entry.tool == tool.name())
+    }
+
+    /// Returns true when a backend is disclosed for execution.
+    #[must_use]
+    pub fn allows_backend(&self, tool: &str, backend: &str) -> bool {
+        self.include_all
+            || self
+                .backends
+                .iter()
+                .any(|entry| entry.tool == tool && entry.backend == backend)
     }
 
     /// Returns the family set explicitly enabled by this policy.
     #[must_use]
     pub fn family_set(&self) -> HashSet<ToolFamily> {
         self.families.iter().copied().collect()
+    }
+
+    /// Returns the disclosed backend ids for one tool.
+    #[must_use]
+    pub fn backend_set_for(&self, tool: &str) -> HashSet<String> {
+        self.backends
+            .iter()
+            .filter(|entry| entry.tool == tool)
+            .map(|entry| entry.backend.clone())
+            .collect()
     }
 }
 
@@ -297,6 +389,33 @@ pub trait AgentTool: Send + Sync {
     /// Returns whether this tool belongs to the always-on presentation set.
     fn is_always_on(&self) -> bool {
         false
+    }
+
+    /// Returns conditional backends supported by this tool.
+    ///
+    /// Tools with no conditional execution paths should rely on the default
+    /// empty list.
+    fn conditional_backends(&self) -> Vec<ToolBackend> {
+        Vec::new()
+    }
+
+    /// Returns the backend selected by this concrete input, if any.
+    ///
+    /// The agent runtime checks this value against the presentation policy
+    /// before permission evaluation or execution. Returning `None` means the
+    /// tool is using its base path.
+    fn backend_for_input(&self, _input: &Value) -> Option<String> {
+        None
+    }
+
+    /// Returns a model-facing description for the disclosed backend set.
+    fn description_for_backends(&self, _backends: &HashSet<String>) -> String {
+        self.description().to_string()
+    }
+
+    /// Returns an input schema for the disclosed backend set.
+    fn parameters_for_backends(&self, _backends: &HashSet<String>) -> Value {
+        self.parameters()
     }
 
     /// Returns the permission facets touched by this concrete invocation.
@@ -681,6 +800,19 @@ mod tests {
         assert!(policy.allows_tool(&git));
         assert!(!policy.allows_tool(&network));
         assert!(policy.family_set().contains(&ToolFamily::Git));
+    }
+
+    #[test]
+    fn test_tool_presentation_policy_discloses_backend() {
+        let network = MockTool::new("fetch_url", "Fetch URL").with_family(ToolFamily::Network);
+
+        let policy =
+            ToolPresentationPolicy::always_on().disclose_backend("fetch_url", "browser_page");
+
+        assert!(policy.allows_tool(&network));
+        assert!(policy.allows_backend("fetch_url", "browser_page"));
+        assert!(!policy.allows_backend("fetch_url", "advanced_http"));
+        assert!(policy.backend_set_for("fetch_url").contains("browser_page"));
     }
 }
 

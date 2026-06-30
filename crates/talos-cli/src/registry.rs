@@ -3,13 +3,16 @@
 //! Contains the permission-aware tool wrappers for interactive/TUI modes
 //! and functions that build tool registries for different runtime modes.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::ApprovalChoice;
-use talos_core::tool::{AgentTool, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolBackend, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
+};
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
@@ -181,6 +184,22 @@ impl AgentTool for TuiPermissionAwareTool {
         self.inner.is_always_on()
     }
 
+    fn conditional_backends(&self) -> Vec<ToolBackend> {
+        self.inner.conditional_backends()
+    }
+
+    fn backend_for_input(&self, input: &Value) -> Option<String> {
+        self.inner.backend_for_input(input)
+    }
+
+    fn description_for_backends(&self, backends: &HashSet<String>) -> String {
+        self.inner.description_for_backends(backends)
+    }
+
+    fn parameters_for_backends(&self, backends: &HashSet<String>) -> Value {
+        self.inner.parameters_for_backends(backends)
+    }
+
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
         self.inner.permission_profile(input)
     }
@@ -271,6 +290,22 @@ impl AgentTool for PermissionAwareTool {
 
     fn is_always_on(&self) -> bool {
         self.inner.is_always_on()
+    }
+
+    fn conditional_backends(&self) -> Vec<ToolBackend> {
+        self.inner.conditional_backends()
+    }
+
+    fn backend_for_input(&self, input: &Value) -> Option<String> {
+        self.inner.backend_for_input(input)
+    }
+
+    fn description_for_backends(&self, backends: &HashSet<String>) -> String {
+        self.inner.description_for_backends(backends)
+    }
+
+    fn parameters_for_backends(&self, backends: &HashSet<String>) -> Value {
+        self.inner.parameters_for_backends(backends)
     }
 
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {

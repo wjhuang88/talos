@@ -272,11 +272,14 @@ fn describe_presented_tools(
 
     let descriptions: Vec<ToolDescription> = selected
         .iter()
-        .map(|tool| ToolDescription {
-            name: tool.name().to_string(),
-            description: tool.description().to_string(),
-            parameters: tool.parameters(),
-            family: tool.family(),
+        .map(|tool| {
+            let backends = policy.backend_set_for(tool.name());
+            ToolDescription {
+                name: tool.name().to_string(),
+                description: tool.description_for_backends(&backends),
+                parameters: tool.parameters_for_backends(&backends),
+                family: tool.family(),
+            }
         })
         .collect();
 

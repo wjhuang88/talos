@@ -249,6 +249,17 @@ impl Agent {
                 call.name
             )));
         }
+        if self.enforce_tool_presentation_policy
+            && let Some(backend) = tool.backend_for_input(&call.input)
+            && !self
+                .tool_presentation_policy
+                .allows_backend(&call.name, &backend)
+        {
+            return Ok(ToolExecutionResult::error(format!(
+                "tool backend '{backend}' for '{}' is not loaded; continue with a disclosed backend or retry the base tool path",
+                call.name
+            )));
+        }
 
         if let Some(engine) = self.permission_engine.as_deref() {
             self.run_hook(hook_ctx, HookEvent::BeforePermissionCheck { call })

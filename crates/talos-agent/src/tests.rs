@@ -7,7 +7,8 @@ use serde_json::Value;
 use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::{
-    AgentTool, ToolFamily, ToolPresentationPolicy, ToolRegistry, ToolResult as ToolExecutionResult,
+    AgentTool, ToolBackend, ToolFamily, ToolPresentationPolicy, ToolRegistry,
+    ToolResult as ToolExecutionResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
@@ -142,6 +143,139 @@ impl AgentTool for FamilyMockTool {
             .await
             .push(format!("{}:{input}", self.tool_name));
         ToolExecutionResult::success("executed")
+    }
+}
+
+/// Mock tool with a conditional backend for TOOL-014 tests.
+struct BackendMockTool {
+    execution_log: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl AgentTool for BackendMockTool {
+    fn name(&self) -> &str {
+        "fetch_url"
+    }
+
+    fn description(&self) -> &str {
+        "Fetch a URL with the base HTTP backend"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "url": { "type": "string" },
+                "access": {
+                    "type": "string",
+                    "enum": ["http"]
+                }
+            },
+            "required": ["url"]
+        })
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Network
+    }
+
+    fn conditional_backends(&self) -> Vec<ToolBackend> {
+        vec![ToolBackend::new(
+            "browser_page",
+            "Read a user-approved browser page context",
+        )]
+    }
+
+    fn backend_for_input(&self, input: &Value) -> Option<String> {
+        match input.get("access").and_then(Value::as_str) {
+            Some("browser") => Some("browser_page".to_string()),
+            _ => None,
+        }
+    }
+
+    fn description_for_backends(&self, backends: &std::collections::HashSet<String>) -> String {
+        if backends.contains("browser_page") {
+            "Fetch a URL or read a user-approved browser page context".to_string()
+        } else {
+            self.description().to_string()
+        }
+    }
+
+    fn parameters_for_backends(&self, backends: &std::collections::HashSet<String>) -> Value {
+        if backends.contains("browser_page") {
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "url": { "type": "string" },
+                    "access": {
+                        "type": "string",
+                        "enum": ["http", "browser"]
+                    }
+                },
+                "required": ["url"]
+            })
+        } else {
+            self.parameters()
+        }
+    }
+
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        self.execution_log
+            .lock()
+            .await
+            .push(format!("fetch_url:{input}"));
+        ToolExecutionResult::success("executed")
+    }
+}
+
+struct ToolDefinitionCapturingModel {
+    responses: Mutex<Vec<Vec<AgentEvent>>>,
+    captured_tools: Arc<std::sync::Mutex<Vec<Vec<ToolDefinition>>>>,
+}
+
+impl ToolDefinitionCapturingModel {
+    fn new(
+        responses: Vec<Vec<AgentEvent>>,
+    ) -> (Self, Arc<std::sync::Mutex<Vec<Vec<ToolDefinition>>>>) {
+        let captured_tools = Arc::new(std::sync::Mutex::new(Vec::new()));
+        (
+            Self {
+                responses: Mutex::new(responses),
+                captured_tools: captured_tools.clone(),
+            },
+            captured_tools,
+        )
+    }
+}
+
+#[async_trait]
+impl LanguageModel for ToolDefinitionCapturingModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let mut responses = self.responses.lock().await;
+        let events = if responses.is_empty() {
+            Vec::new()
+        } else {
+            responses.remove(0)
+        };
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(async move {
+            for event in events {
+                let _ = tx.send(event).await;
+            }
+        });
+        Ok(rx)
+    }
+
+    async fn stream_with_tools(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured_tools
+            .lock()
+            .expect("lock poisoned")
+            .push(tools.to_vec());
+        self.stream(messages).await
     }
 }
 
@@ -1844,6 +1978,104 @@ async fn test_unpresented_registered_tool_returns_recoverable_error_without_exec
     assert!(
         execution_log.lock().await.is_empty(),
         "unpresented registered tool must not execute"
+    );
+}
+
+#[tokio::test]
+async fn test_disclosed_backend_updates_provider_schema() {
+    let response_events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta { delta: "OK".into() },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ];
+    let (model, captured_tools) = ToolDefinitionCapturingModel::new(vec![response_events]);
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BackendMockTool {
+        execution_log: execution_log.clone(),
+    }));
+
+    let mut agent =
+        Agent::with_security(Arc::new(model), registry, None, None, PathBuf::from("/tmp"));
+    agent.set_tool_presentation_policy(
+        ToolPresentationPolicy::always_on().disclose_backend("fetch_url", "browser_page"),
+    );
+
+    let response = agent.run("read browser page".into()).await.unwrap();
+    assert_eq!(response, "OK");
+
+    let captured = captured_tools.lock().expect("lock poisoned");
+    let fetch_definition = captured[0]
+        .iter()
+        .find(|tool| tool.name == "fetch_url")
+        .expect("fetch_url should be presented by backend disclosure");
+    let access_enum = fetch_definition
+        .parameters
+        .pointer("/properties/access/enum")
+        .and_then(Value::as_array)
+        .expect("access enum");
+    assert!(access_enum.iter().any(|value| value == "browser"));
+}
+
+#[tokio::test]
+async fn test_undisclosed_backend_returns_recoverable_error_without_execution() {
+    let call = ToolCall {
+        id: "call-1".into(),
+        name: "fetch_url".into(),
+        input: serde_json::json!({
+            "url": "https://example.com",
+            "access": "browser"
+        }),
+    };
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call,
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BackendMockTool {
+        execution_log: execution_log.clone(),
+    }));
+
+    let mut agent = Agent::with_security(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    );
+    agent
+        .set_tool_presentation_policy(ToolPresentationPolicy::with_families([ToolFamily::Network]));
+
+    let response = agent.run("read browser page".into()).await.unwrap();
+    assert_eq!(response, "done");
+    assert!(
+        execution_log.lock().await.is_empty(),
+        "undisclosed backend must not execute"
     );
 }
 
