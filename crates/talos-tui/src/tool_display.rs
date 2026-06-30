@@ -9,6 +9,12 @@ use crate::theme::{semantic, to_crossterm_color};
 /// When a tool's result exceeds this many lines, the scrollback shows a summary
 /// instead of the full content. Only applies to tools in the threshold-summarize set.
 const SUMMARIZE_OUTPUT_THRESHOLD_LINES: usize = 30;
+/// Leading lines retained when a non-summarized tool result exceeds the shared
+/// threshold and is rendered with head+tail truncation (TUI-015).
+const HEAD_LINES: usize = 10;
+/// Trailing lines retained when a non-summarized tool result exceeds the shared
+/// threshold and is rendered with head+tail truncation (TUI-015).
+const TAIL_LINES: usize = 10;
 
 pub(crate) fn truncate_single_line(s: &str, max: usize) -> String {
     let single = s.replace('\n', " ");
@@ -68,6 +74,33 @@ pub(crate) fn summarize_symbol_results(content: &str, noun: &str) -> String {
     format!("found {count} {label}")
 }
 
+/// One-line summary for a `grep` result. Grep output uses `path:` file headers
+/// followed by indented `  line_num: content` match lines; we count each shape
+/// and fall back to a raw line count if neither is recognizable.
+pub(crate) fn summarize_grep_result(content: &str) -> String {
+    let byte_count = content.len();
+    let mut file_count = 0usize;
+    let mut match_count = 0usize;
+    for line in content.lines() {
+        let indented = line.len() > line.trim_start().len();
+        if indented && line.contains(':') {
+            match_count += 1;
+        } else if !indented && line.ends_with(':') {
+            file_count += 1;
+        }
+    }
+    if match_count == 0 {
+        let line_count = content.lines().count();
+        let label = if line_count == 1 { "line" } else { "lines" };
+        return format!("grep matched {line_count} {label}, {byte_count} bytes");
+    }
+    let line_label = if match_count == 1 { "line" } else { "lines" };
+    let file_label = if file_count == 1 { "file" } else { "files" };
+    format!(
+        "grep matched {match_count} {line_label} in {file_count} {file_label}, {byte_count} bytes"
+    )
+}
+
 pub(crate) fn should_suppress_tool_result_content(display: &ToolResultDisplay) -> bool {
     if display.is_error {
         return false;
@@ -87,7 +120,7 @@ pub(crate) fn should_suppress_tool_result_content(display: &ToolResultDisplay) -
     if ALWAYS_SUMMARIZE.contains(&name) {
         return true;
     }
-    const THRESHOLD_SUMMARIZE: &[&str] = &["glob", "ls", "list_imports"];
+    const THRESHOLD_SUMMARIZE: &[&str] = &["glob", "grep", "ls", "list_imports"];
     if THRESHOLD_SUMMARIZE.contains(&name) {
         return display.content.lines().count() > SUMMARIZE_OUTPUT_THRESHOLD_LINES;
     }
@@ -110,6 +143,7 @@ pub(crate) fn suppressed_tool_result_summary(display: &ToolResultDisplay) -> Str
             let label = if line_count == 1 { "file" } else { "files" };
             format!("glob matched {line_count} {label}, {byte_count} bytes")
         }
+        "grep" => summarize_grep_result(&display.content),
         "ls" => {
             let label = if line_count == 1 { "entry" } else { "entries" };
             format!("ls returned {line_count} {label}, {byte_count} bytes")
@@ -211,13 +245,74 @@ pub(crate) fn build_tool_result_scrollback_lines(
         )];
     }
 
-    let mut lines = Vec::new();
-    for (idx, line) in display.content.lines().enumerate() {
+    let all_lines: Vec<&str> = display.content.lines().collect();
+
+    // TUI-015: tools that are not summarized still collapse once they cross the
+    // shared threshold, keeping the first and last lines visible with an omitted
+    // counter in between. This is scrollback-display only; `/export` writes the
+    // raw `ToolResultDisplay::content` and never enters this path.
+    if all_lines.len() > SUMMARIZE_OUTPUT_THRESHOLD_LINES {
+        return build_head_tail_scrollback_lines(&all_lines, icon, color);
+    }
+
+    let mut lines = Vec::with_capacity(all_lines.len());
+    for (idx, line) in all_lines.iter().enumerate() {
         let prefix = if idx == 0 { icon } else { " " };
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
                 format!("   {prefix} {truncated}"),
+                color,
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+    }
+
+    lines
+}
+
+fn build_head_tail_scrollback_lines(
+    all_lines: &[&str],
+    icon: &str,
+    color: Option<CColor>,
+) -> Vec<ScrollbackLine> {
+    const MAX_RESULT_LINE_CHARS: usize = 120;
+    let dim = to_crossterm_color(semantic::DIM_TEXT);
+    let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
+
+    for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
+        let prefix = if idx == 0 { icon } else { " " };
+        let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("   {prefix} {truncated}"),
+                color,
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+    }
+
+    let omitted = all_lines
+        .len()
+        .saturating_sub(HEAD_LINES)
+        .saturating_sub(TAIL_LINES);
+    lines.push(ScrollbackLine::styled(
+        vec![HistorySegment::styled(
+            format!("   ⋯ {omitted} lines omitted"),
+            dim,
+            HistoryAttrs::default(),
+        )],
+        None,
+    ));
+
+    let tail_start = all_lines.len().saturating_sub(TAIL_LINES);
+    for line in all_lines.iter().skip(tail_start) {
+        let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("     {truncated}"),
                 color,
                 HistoryAttrs::default(),
             )],

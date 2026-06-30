@@ -232,6 +232,11 @@ Gate verification steps (T07):
 3. `/tmp/talos-install-smoke/bin/talos --help` must print the help text without panic.
 4. `cargo uninstall talos-cli` must clean up.
 
+**2026-06-30 install smoke (T07)**: `cargo install --path crates/talos-cli --bin talos --root
+/tmp/talos-install-smoke` succeeded in 4m 48s (release profile). `/tmp/talos-install-smoke/bin/talos
+--version` printed `talos 0.2.0`. `--help` printed the full CLI reference without panic. Local
+install path verified.
+
 ### crates.io Publish Path (`cargo install talos-cli`)
 
 **Does NOT work today.** Three independent blockers, all intentional:
@@ -250,6 +255,12 @@ Dry-run gate (T08):
    error (missing registry versions for unpublished workspace crates).
 2. The dry-run is evidence of *readiness posture*, not a publish attempt. Do not remove
    `publish = false` to make the dry-run pass.
+
+**2026-06-30 dry-run evidence**: `cargo publish --dry-run --allow-dirty -p talos-cli` fails
+immediately with: *"`talos-cli` cannot be published. `package.publish` must be set to `true` or a
+non-empty list in Cargo.toml to publish."* This confirms the first blocker (`publish = false`)
+prevents even the dry-run packaging step. The path-dependency and transitive `publish = false`
+blockers are not reached. No action to fix until T55 (maintainer approval to remove the guard).
 
 ### Install Documentation Requirements
 

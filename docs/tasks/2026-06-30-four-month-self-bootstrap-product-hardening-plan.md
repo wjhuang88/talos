@@ -92,12 +92,12 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T03 | 1 | B | Design `cargo install talos-cli --bin talos` gate: package name, binary target, README, dry-run, uninstall/upgrade notes. | T02 | Gate checklist in ARCH-031/matrix | Complete |
 | T04 | 1 | C | Audit current native tool surface after `fetch_url`/`http_request` split. | TOOL-014 | Tool list snapshot; prompt-surface diff | Complete |
 | T05 | 1 | G | Define docs sync checklist for README, README.zh-CN, site, release notes, and crates.io docs. | T00 | Checklist committed | Complete |
-| T06 | 2 | B | Add or update crate/package README content for `talos-cli` binary install without promising library API. | T03 | README link checks; package list | Planned |
-| T07 | 2 | B | Verify local install path: `cargo install --path crates/talos-cli --bin talos` into a temp `CARGO_HOME`. | T03 | Install smoke; `talos --version` | Planned |
-| T08 | 2 | B | Run `cargo publish --dry-run -p talos-cli` without removing `publish = false`; record blockers. | T03 | Dry-run evidence or blocker list | Planned |
-| T09 | 2 | C | Implement TUI-014 grep result summary rendering. | TOOL-011/TUI docs | TUI tests; snapshot-free rendering tests | Planned |
-| T10 | 2 | C | Implement TUI-015 head+tail truncation for long unsuppressed tool outputs. | TUI-014 | TUI tests; `/export` raw-output proof | Planned |
-| T11 | 2 | A | Add self-bootstrap session evidence template under docs/tasks or docs/reference. | REL-002 | Governance validation | Planned |
+| T06 | 2 | B | Add or update crate/package README content for `talos-cli` binary install without promising library API. | T03 | README link checks; package list | Complete |
+| T07 | 2 | B | Verify local install path: `cargo install --path crates/talos-cli --bin talos` into a temp `CARGO_HOME`. | T03 | Install smoke; `talos --version` | Complete |
+| T08 | 2 | B | Run `cargo publish --dry-run -p talos-cli` without removing `publish = false`; record blockers. | T03 | Dry-run evidence or blocker list | Complete |
+| T09 | 2 | C | Implement TUI-014 grep result summary rendering. | TOOL-011/TUI docs | TUI tests; snapshot-free rendering tests | Complete |
+| T10 | 2 | C | Implement TUI-015 head+tail truncation for long unsuppressed tool outputs. | TUI-014 | TUI tests; `/export` raw-output proof | Complete |
+| T11 | 2 | A | Add self-bootstrap session evidence template under docs/tasks or docs/reference. | REL-002 | Governance validation | Complete |
 | T12 | 3 | B | Add runtime SDK quickstart examples for provider/tool injection, approvals, custom/append prompt, preview, shutdown. | RUNTIME-001 | `cargo test -p talos-runtime`; docs compile where applicable | Planned |
 | T13 | 3 | B | Define `talos-runtime` SDK support contract and direct-use caveats for `talos-agent`. | ARCH-031/RUNTIME-001 | Docs updated; matrix updated | Planned |
 | T14 | 3 | C | Start TOOL-011 ripgrep-backed grep engine implementation behind a feature or internal engine boundary. | ADR-025 | Unit tests compare current grep behavior | Planned |
@@ -339,3 +339,40 @@ governance. All are independent and can be parallelized.
 
 **Recovery or resume instruction**: Baseline commit `13e93b9` is on `origin/main`. Week 1
 artifacts are staged for the next commit. To resume: read this checkpoint, then start T06 or T09.
+
+### Checkpoint Week 2 (T06–T11) — Complete (2026-06-30)
+
+**Completed task items**: T06, T07, T08, T09, T10, T11.
+
+**Current state and artifacts**:
+- `crates/talos-cli/README.md` (T06): crate-level binary install README with cargo install/upgrade/
+  uninstall instructions and binary-only support boundary.
+- T07 install smoke: `cargo install --path crates/talos-cli --bin talos --root
+  /tmp/talos-install-smoke` succeeded (4m 48s release build); `talos --version` → `talos 0.2.0`.
+- T08 dry-run: `cargo publish --dry-run -p talos-cli` fails immediately — `publish = false`
+  blocks even the packaging step. Evidence recorded in CRATE-PUBLICATION-MATRIX §A7.
+- `docs/reference/SELF-BOOTSTRAP-EVIDENCE-TEMPLATE.md` (T11): rehearsal evidence template for
+  Talos-on-Talos sessions (T38/T52/T61).
+- TUI-014 (T09): `grep` added to `THRESHOLD_SUMMARIZE` set; `summarize_grep_result()` parses
+  file/match counts from grep output format with fallback. Summary format:
+  `grep matched {N} lines in {M} files, {B} bytes`.
+- TUI-015 (T10): `build_head_tail_scrollback_lines()` — first 10 lines, dim `⋯ {N} lines omitted`
+  separator, last 10 lines. Uses shared `SUMMARIZE_OUTPUT_THRESHOLD_LINES = 30` gate. `/export`
+  path confirmed unaffected (writes raw content, never enters scrollback builder).
+
+**Commands/checks and actual results**:
+- `cargo install --path crates/talos-cli --bin talos` → success, `talos 0.2.0` runs.
+- `cargo publish --dry-run -p talos-cli` → blocked by `publish = false` (expected).
+- `cargo test -p talos-tui` → 171 passed, 0 failed (+2 doctests).
+- `cargo clippy -p talos-tui -- -D warnings` → no warnings.
+- `cargo fmt --all -- --check` → clean.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Open risks or deviations**: None. T09/T10 are display-layer-only changes; no tool data or
+export path affected. 8 new tests pin the behavior including the `/export` invariant.
+
+**Next task item**: Week 3 — T12 (runtime SDK quickstart examples), T13 (SDK support contract),
+T14 (ripgrep grep engine first slice), T15 (search regression tests), T16 (site roadmap update).
+
+**Recovery or resume instruction**: Week 1+2 commits on `origin/main`. To resume: read this
+checkpoint, then start T12 or T14 (both independent).

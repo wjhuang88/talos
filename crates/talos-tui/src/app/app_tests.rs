@@ -618,3 +618,142 @@ fn suppressed_summary_fallback_for_unknown_tool() {
     let summary = tool_display::suppressed_tool_result_summary(&display);
     assert_eq!(summary, "2 lines, 18 bytes");
 }
+
+#[test]
+fn grep_under_threshold_renders_inline() {
+    let display = ToolResultDisplay {
+        tool_name: Some("grep".to_string()),
+        is_error: false,
+        content: "src/main.rs:\n  10: foo\nsrc/lib.rs:\n  5: bar\n".to_string(),
+    };
+    assert!(!tool_display::should_suppress_tool_result_content(&display));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+    assert_eq!(lines.len(), 4);
+    assert!(lines[0].text.contains("src/main.rs:"));
+    assert!(lines[3].text.contains("bar"));
+    assert!(lines.iter().all(|l| !l.text.contains("omitted")));
+}
+
+#[test]
+fn grep_over_threshold_renders_summary() {
+    let mut content = String::from("src/a.rs:\n");
+    for i in 0..20 {
+        content.push_str(&format!("  {i}: match-a-{i}\n"));
+    }
+    content.push_str("src/b.rs:\n");
+    for i in 0..15 {
+        content.push_str(&format!("  {i}: match-b-{i}\n"));
+    }
+    let display = ToolResultDisplay {
+        tool_name: Some("grep".to_string()),
+        is_error: false,
+        content,
+    };
+    assert!(tool_display::should_suppress_tool_result_content(&display));
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+    assert_eq!(lines.len(), 1);
+    let summary = tool_display::suppressed_tool_result_summary(&display);
+    assert!(summary.contains("grep matched"));
+    assert!(summary.contains("35 lines"));
+    assert!(summary.contains("2 files"));
+    assert!(summary.contains("bytes"));
+    assert!(!lines[0].text.contains("match-a-5"));
+}
+
+#[test]
+fn grep_summary_fallback_on_unrecognized_shape() {
+    let content = "plain text\nwithout file headers\nor indented matches\n".to_string();
+    let summary = tool_display::summarize_grep_result(&content);
+    assert_eq!(summary, "grep matched 3 lines, 52 bytes");
+}
+
+#[test]
+fn bash_under_threshold_renders_full() {
+    let content = (0..10)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let display = ToolResultDisplay {
+        tool_name: Some("bash".to_string()),
+        is_error: false,
+        content,
+    };
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+    assert_eq!(lines.len(), 10);
+    assert!(lines[0].text.contains("line 0"));
+    assert!(lines[9].text.contains("line 9"));
+    assert!(lines.iter().all(|l| !l.text.contains("omitted")));
+}
+
+#[test]
+fn bash_over_threshold_renders_head_and_tail() {
+    let content = (0..50)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let display = ToolResultDisplay {
+        tool_name: Some("bash".to_string()),
+        is_error: false,
+        content,
+    };
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+    assert_eq!(lines.len(), 21);
+    assert!(lines[0].text.contains("line 0"));
+    assert!(lines[9].text.contains("line 9"));
+    assert!(lines[10].text.contains("30 lines omitted"));
+    assert!(lines[11].text.contains("line 40"));
+    assert!(lines[20].text.contains("line 49"));
+    assert!(lines.iter().all(|l| !l.text.contains("line 20")));
+    assert!(lines.iter().all(|l| !l.text.contains("line 39")));
+}
+
+#[test]
+fn head_tail_omitted_count_is_correct() {
+    for total in [31usize, 32, 50, 100] {
+        let content = (0..total)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            is_error: false,
+            content,
+        };
+        let lines =
+            tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+        let expected_omitted = total - 10 - 10;
+        assert!(
+            lines[10]
+                .text
+                .contains(&format!("{expected_omitted} lines omitted")),
+            "total={total}: {:?}",
+            lines[10].text
+        );
+        assert_eq!(lines.len(), 21);
+    }
+}
+
+#[test]
+fn head_tail_truncation_does_not_affect_export_content() {
+    // `/export` writes `ToolResultDisplay::content` verbatim and never calls
+    // `build_tool_result_scrollback_lines`, so scrollback truncation must be a
+    // pure display transform. The display is borrowed immutably here, which
+    // guarantees the raw content survives for export.
+    let content = (0..50)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let original = content.clone();
+    let display = ToolResultDisplay {
+        tool_name: Some("bash".to_string()),
+        is_error: false,
+        content,
+    };
+    let _ = tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+    assert_eq!(display.content, original);
+    assert!(display.content.contains("line 25"));
+}
