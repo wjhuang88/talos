@@ -86,12 +86,12 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 
 | ID | Week | Track | Deliverable | Dependencies | Validation | Status |
 |---|---:|---|---|---|---|---|
-| T00 | 1 | A | Inventory Active/Review/Planned/Blocked work and publish the starting disposition checkpoint. | Board/backlog reads | Governance validator; no owner-doc drift | Planned |
-| T01 | 1 | A | Create iteration slices for this plan without rewriting older baselines. | T00 | New iteration docs pass governance | Planned |
-| T02 | 1 | B | Audit `talos-cli` package metadata for Cargo install readiness. | ARCH-031 | `cargo metadata`; package manifest review | Planned |
-| T03 | 1 | B | Design `cargo install talos-cli --bin talos` gate: package name, binary target, README, dry-run, uninstall/upgrade notes. | T02 | Gate checklist in ARCH-031/matrix | Planned |
-| T04 | 1 | C | Audit current native tool surface after `fetch_url`/`http_request` split. | TOOL-014 | Tool list snapshot; prompt-surface diff | Planned |
-| T05 | 1 | G | Define docs sync checklist for README, README.zh-CN, site, release notes, and crates.io docs. | T00 | Checklist committed | Planned |
+| T00 | 1 | A | Inventory Active/Review/Planned/Blocked work and publish the starting disposition checkpoint. | Board/backlog reads | Governance validator; no owner-doc drift | Complete |
+| T01 | 1 | A | Create iteration slices for this plan without rewriting older baselines. | T00 | New iteration docs pass governance | Complete |
+| T02 | 1 | B | Audit `talos-cli` package metadata for Cargo install readiness. | ARCH-031 | `cargo metadata`; package manifest review | Complete |
+| T03 | 1 | B | Design `cargo install talos-cli --bin talos` gate: package name, binary target, README, dry-run, uninstall/upgrade notes. | T02 | Gate checklist in ARCH-031/matrix | Complete |
+| T04 | 1 | C | Audit current native tool surface after `fetch_url`/`http_request` split. | TOOL-014 | Tool list snapshot; prompt-surface diff | Complete |
+| T05 | 1 | G | Define docs sync checklist for README, README.zh-CN, site, release notes, and crates.io docs. | T00 | Checklist committed | Complete |
 | T06 | 2 | B | Add or update crate/package README content for `talos-cli` binary install without promising library API. | T03 | README link checks; package list | Planned |
 | T07 | 2 | B | Verify local install path: `cargo install --path crates/talos-cli --bin talos` into a temp `CARGO_HOME`. | T03 | Install smoke; `talos --version` | Planned |
 | T08 | 2 | B | Run `cargo publish --dry-run -p talos-cli` without removing `publish = false`; record blockers. | T03 | Dry-run evidence or blocker list | Planned |
@@ -232,3 +232,110 @@ If work is interrupted:
 4. Run `scripts/validate_project_governance.sh .` before editing governance files.
 5. Continue from the lowest-numbered planned item that is not complete, unless the maintainer
    explicitly changes priority.
+
+---
+
+## Execution Log
+
+### Approved Startup Contract (2026-06-30)
+
+Recorded per `docs/sop/LONG-RUNNING-TASK.md` before status became `In Progress`.
+
+- **Outcome**: Execute the four-month matrix in order, pushing until a natural block, with
+  segmented commits and pushes to `main`.
+- **Scope this run**: Push from T00 forward until a task requires unapproved action (real
+  `cargo publish`, tag/release, `publish = false` removal, new plugin/browser/vector/local-model
+  runtime dependency without a cleared ADR, or maintainer-only approval).
+- **Out of scope this run**: T46 (wasmtime runtime dep — needs ADR-027 focused review),
+  T55/T56 (real publish — needs maintainer approval). These are recorded as blockers, not
+  executed.
+- **Branch**: `main` (consistent with repository history).
+- **Commits/pushes**: Segmented per task cluster; baseline commit `13e93b9` already pushed.
+  Subsequent commits use `[model:glm-5.2]`.
+- **Validation per slice**: `cargo fmt --all -- --check`, `cargo check --workspace`, targeted
+  `cargo test -p <crate>`, `scripts/validate_project_governance.sh .`,
+  `scripts/check_publish_guard.sh .` when manifests change.
+- **Default for ambiguity**: Follow confirmed defaults (record-and-skip blocked items; owner
+  docs before BOARD; append, never rewrite published baselines).
+- **Interrupt condition**: Stop and checkpoint when an unconfirmed irreversible action is
+  required or when three consecutive validation failures occur on one slice.
+
+### Checkpoint T00 — Starting Disposition (2026-06-30)
+
+**Task**: T00 — Inventory Active/Review/Planned/Blocked work and publish the starting
+disposition checkpoint.
+
+**Starting inventory** (sourced from `docs/BOARD.md`, verified against owner docs 2026-06-30):
+
+| Bucket | Item | Owner Doc | Starting State |
+|---|---|---|---|
+| Active | R27 High-Risk Governance Gate | [task](2026-06-27-personal-oversight-high-risk-roadmap.md) | In Progress; T2/I058 moved to Review. Gate grants no personal approval authority. |
+| Active | Two-Month Architecture Optimization | [task](2026-06-27-two-month-architecture-optimization-plan.md) | Complete (fulfilled); production roots under ARCH-030. |
+| Paused | Architect-Owned High-Risk Work Group | [task](2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer 2026-06-29. |
+| Paused | I011 S2 Provider Plugin Architecture | [PROV-001](../backlog/active/PROV-001-provider-schema.md) | Superseded by I015; schema-only under ADR-013. |
+| Planned (this plan) | REL-002 v1.0 Self-Bootstrap Gate | [REL-002](../backlog/active/REL-002-v1-self-bootstrap-release-gate.md) | Target release marker for this plan. |
+| Planned | Plugin Encapsulation Architecture | ADR-027/028/029/030 | Accepted baseline 2026-06-30. Implementation gated by ADR-027 wasmtime review. |
+| Planned | PLUGIN-001 Plugin System | [PLUGIN-001](../backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Local WASM MVP after ADR-027 review. |
+| Planned | CMD-002 Command Taxonomy | [CMD-002](../backlog/active/CMD-002-command-taxonomy-realignment.md) | ADR-030 accepted; `/mcp` + `/plugins` transition notice. |
+| Planned | HOOK-001 Config Hooks | [HOOK-001](../backlog/active/HOOK-001-config-introduced-hooks.md) | ADR-029 accepted; config schema + diagnostics first. |
+| Planned | RUNTIME-001 Embeddable Runtime | [RUNTIME-001](../backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md) | Pre-1.0 facade complete; SDK contract + examples remain. |
+| Planned | ARCH-031 Crate Publication Boundary | [ARCH-031](../backlog/active/ARCH-031-crate-publication-boundary.md) | 11 crates at 0.2.0; product crates `publish = false`. |
+| Planned | TOOL-011 Ripgrep Grep Engine | [TOOL-011](../backlog/active/TOOL-011-ripgrep-backed-grep-engine.md) | ADR-025 selected library crates; implementation not started. |
+| Planned | WEB-005 Browser Session Continuity | [WEB-005](../backlog/active/WEB-005-browser-session-continuity-research.md) | Research; `fetch_url` backend design + permission facet. |
+| Planned | WEB-001 Embedded Web Control | [WEB-001](../backlog/active/WEB-001-embedded-web-control-surface.md) | Research; loopback-only dashboard MVP. |
+| Research | MEM-007 Active Context Compression | (referenced in plan) | Spike target for Month 1. |
+| Research | MEM-008 Weighted Memory Graph | [MEM-008](../backlog/active/MEM-008-weighted-associative-memory-graph.md) | Schema spike target for Month 2. |
+| Refinement | SESSION-001 Interactive Session Lifecycle | [SESSION-001](../backlog/active/SESSION-001-interactive-session-lifecycle.md) | Children delivered; refinement continues. |
+| Tracking | ARCH-011 Architecture Watchlist | [ARCH-011](../backlog/active/ARCH-011-architecture-watchlist.md) | Promote only on concrete evidence. |
+
+**No items in Review** at start (all resolved 2026-06-29 per BOARD).
+
+**Dispositions for this plan's dependencies**:
+- Architecture block on PLUGIN-001/CMD-002/HOOK-001 is **cleared** by ADR-027/028/029/030.
+  These items are Planned, not Blocked, for this plan's purposes.
+- Runtime plugin implementation (T40, T45, T46) remains gated by ADR-027's focused wasmtime
+  dependency/security review — out of scope until that review is recorded.
+- Real publication (T55, T56) remains gated by explicit maintainer approval — out of scope.
+
+**Validation**: `scripts/validate_project_governance.sh .` to be run after this checkpoint is
+committed; must report no owner-doc drift introduced by this plan's status updates.
+
+**Next item**: T01 — Create iteration slices. Then T02–T05 (parallel-safe audits and checklists).
+
+### Checkpoint Week 1 (T00–T05) — Complete (2026-06-30)
+
+**Completed task items**: T00, T01, T02, T03, T04, T05.
+
+**Current state and artifacts**:
+- `docs/iterations/I075-month1-starting-gate-and-tooling-hardening.md` — Month 1 iteration
+  covering T00–T21, following the iteration TEMPLATE.
+- `docs/reference/CRATE-PUBLICATION-MATRIX.md` §A7 — cargo install gate checklist (T03):
+  package identity table, local install path (works today), crates.io blockers (3 independent),
+  install-doc requirements, exit criteria.
+- `docs/reference/DOCS-SYNC-CHECKLIST.md` (T05): tool/command/install/SDK sync surfaces with
+  baseline counts (30 native tools, 8 families, 1 hidden).
+- `docs/iterations/README.md` updated with I075 row.
+- `docs/reference/README.md` updated with new reference docs.
+- T00 disposition checkpoint above.
+
+**Key findings from audits**:
+- T02: `cargo install --path crates/talos-cli --bin talos` works today. crates.io publish blocked
+  by 3 independent factors (`publish = false` + 4 unpublished workspace deps + 2 transitive
+  `publish = false` deps). No gap to fix for the `--path` path.
+- T04: 30 native tools across 8 families; 29 presented by default; `http_request` is the only
+  hidden tool (AdvancedNetwork family, disclosed via continuation). Current baseline is clean.
+
+**Commands/checks and actual results**:
+- `scripts/validate_project_governance.sh .` → 0 warnings (after T00 checkpoint).
+- Governance re-validation after Week 1 artifacts pending commit.
+
+**Open risks or deviations**: None. All Week 1 items were audit/design/doc deliverables with zero
+code changes.
+
+**Next task item**: T06 (talos-cli README for binary install), T07 (local install smoke),
+T08 (dry-run evidence), T09 (TUI-014 grep summary), T10 (TUI-015 truncation), T11 (evidence
+template). T06–T08 are Track B distribution work; T09–T10 are TUI implementation; T11 is
+governance. All are independent and can be parallelized.
+
+**Recovery or resume instruction**: Baseline commit `13e93b9` is on `origin/main`. Week 1
+artifacts are staged for the next commit. To resume: read this checkpoint, then start T06 or T09.

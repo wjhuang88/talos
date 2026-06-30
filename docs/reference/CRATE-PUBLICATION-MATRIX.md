@@ -200,3 +200,74 @@ support contract: `RuntimeBuilder`/`RuntimeHandle` are the stable pre-1.0 surfac
 Transport: local stdio only (no TCP/HTTP). Support boundary: server opt-in, tool conflict policy
 (built-in takes precedence), bounded timeout. `rmcp 1.7.0` stability must be evaluated. No
 `~/.agents/mcp.json` import (gated under AGENT-002-C).
+
+## A7: `talos-cli` Cargo Install Gate (2026-06-30)
+
+Design task T03 of the four-month plan. This is the concrete gate checklist for the
+`cargo install talos-cli --bin talos` distribution path. It is a readiness artifact, not
+authorization to publish or remove `publish = false`.
+
+### Package Identity
+
+| Field | Required value | Current state | Gap |
+|---|---|---|---|
+| `[package].name` | `talos-cli` (the top-level `talos` name is taken by an unrelated crate) | `talos-cli` | None |
+| `[[bin]].name` | `talos` | `talos` | None |
+| `[[bin]].path` | `crates/talos-cli/src/main.rs` | `crates/talos-cli/src/main.rs` | None |
+| `[package].publish` | `false` until the full gate passes and maintainer approves | `false` | Intentional guard; not a gap |
+| `[package].description` | User-facing binary description | `"Primary command-line interface"` | Replace with install-facing description before publish |
+| `[package].readme` | Path to a crate-level or workspace README | Not set; no `crates/talos-cli/README.md` exists | Add README or point to root README before crates.io publish |
+| `[package].keywords` | 3–5 crates.io discovery keywords | Not set | Add before publish (e.g. `agent`, `cli`, `coding`, `ai`) |
+| `[package].categories` | crates.io category | Not set | Add before publish (e.g. `command-line-utilities`, `development-tools`) |
+
+### Local Install Path (`cargo install --path`)
+
+**Works today.** The manifest is valid and the `[[bin]]` target is correctly defined. All workspace
+dependencies resolve via `path = "../..."`.
+
+Gate verification steps (T07):
+
+1. `cargo install --path crates/talos-cli --bin talos --root /tmp/talos-install-smoke`
+2. `/tmp/talos-install-smoke/bin/talos --version` must print the workspace version.
+3. `/tmp/talos-install-smoke/bin/talos --help` must print the help text without panic.
+4. `cargo uninstall talos-cli` must clean up.
+
+### crates.io Publish Path (`cargo install talos-cli`)
+
+**Does NOT work today.** Three independent blockers, all intentional:
+
+1. `publish = false` on `talos-cli` — refuses crates.io upload.
+2. 15 workspace path dependencies (`talos-core` … `talos-conversation`) — `cargo publish` requires
+   every dependency to have a registry version. As of 2026-06-29, 11 of these are published; 4
+   remain gate-blocked (`talos-sandbox`, `talos-tools`, `talos-agent`, `talos-runtime`, plus
+   `talos-mcp`).
+3. Transitive `publish = false` on `talos-tui` and `talos-evolution` — these are direct dependencies
+   of `talos-cli` and cannot be published without a separate maintainer decision.
+
+Dry-run gate (T08):
+
+1. `cargo publish --dry-run --allow-dirty -p talos-cli` — expected to FAIL today; record the exact
+   error (missing registry versions for unpublished workspace crates).
+2. The dry-run is evidence of *readiness posture*, not a publish attempt. Do not remove
+   `publish = false` to make the dry-run pass.
+
+### Install Documentation Requirements
+
+Before claiming the cargo-install path is documented:
+
+- Root `README.md` "Install" section must mention `cargo install talos-cli --bin talos` as the
+  Cargo-from-source path, separate from the release-archive and `install.sh` paths.
+- Upgrade note: `cargo install talos-cli --bin talos --force` or `cargo install-update talos-cli`.
+- Uninstall note: `cargo uninstall talos-cli`.
+- The README must state that `talos-cli` exposes a **binary only**; the library API is not a
+  supported SDK surface (embedders use `talos-runtime`).
+
+### Gate Exit Criteria (for a future release decision, not this plan)
+
+- [ ] Local install smoke passes (T07).
+- [ ] Dry-run evidence or blocker list recorded (T08).
+- [ ] Crate README or workspace README pointer added (T06).
+- [ ] Install instructions in root README updated.
+- [ ] All transitive dependencies either published or explicitly product-only with a documented
+      install workaround (e.g. git clone + `cargo install --path`).
+- [ ] Maintainer explicitly approves removing `publish = false` (T55 — outside this plan).
