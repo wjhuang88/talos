@@ -319,7 +319,7 @@ Talos 自带一组面向编码 Agent 工作流的工具：
 - 搜索和检查：`grep`、`diff`、`stat`
 - 代码智能：`find_symbol`、`find_references`、`list_symbols`、`list_imports`
 - Git：`git_status`、`git_diff`、`git_log`、`git_show`、`git_branch_list`、`git_add`、`git_commit`、`git_push`、`git_pull`、`git_checkout`
-- 网络：`fetch_url`（有边界的 URL 上下文读取）、`http_request`（按需披露的高级 HTTP/API 检查）、`web_search`
+- 网络：`fetch_url`（有边界的 URL 上下文读取 — 公开页面、HTML 提取、JSON）、`http_request`（按需披露的高级 HTTP/API 检查 — 自定义方法/请求头/请求体，通过 continuation 触发）、`save_url`（下载 URL 到本地文件 — 网络+写入双重权限）、`web_search`
 - Shell 兜底：`bash`
 
 默认提示词会要求模型优先使用内置工具，只有在原生工具无法覆盖任务时才使用 Shell 命令兜底。

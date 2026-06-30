@@ -301,7 +301,7 @@ Talos ships with built-in tools for common coding-agent work:
 - Search and inspection: `grep`, `diff`, `stat`
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
-- Network: `fetch_url` (bounded URL context), `http_request` (advanced HTTP/API inspection, disclosed on demand), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
+- Network: `fetch_url` (bounded URL context — public pages, HTML extraction, JSON), `http_request` (advanced HTTP/API inspection — custom methods/headers/bodies, disclosed on demand via continuation), `save_url` (download URL to local file — dual network+write permission), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Shell escape hatch: `bash`
 

@@ -108,10 +108,10 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T19 | 4 | D | Define `browser_page_read` permission facet and how it composes with `fetch_url` continuation disclosure. | T18/TOOL-013 | Permission tests planned | Complete |
 | T20 | 4 | E | MEM-007 spike: deterministic pre-entry compression strategies for read/grep/git_diff/bash outputs. | MEM-007 | Prototype notes; cache-stability risks | Complete |
 | T21 | 4 | A | Month-1 closeout: validation summary, delivered items, blockers, next-month replan. | T00-T20 | `cargo test --workspace`; governance | Complete |
-| T22 | 5 | D | WEB-001 MVP design: loopback-only dashboard for status/history/governance/config read surfaces. | WEB-001 | Proposal update; threat model | Planned |
-| T23 | 5 | D | Define local web auth boundary: loopback constraints, startup token, no secret echo, no permission bypass. | T22 | Security checklist | Planned |
+| T22 | 5 | D | WEB-001 MVP design: loopback-only dashboard for status/history/governance/config read surfaces. | WEB-001 | Proposal update; threat model | Complete |
+| T23 | 5 | D | Define local web auth boundary: loopback constraints, startup token, no secret echo, no permission bypass. | T22 | Security checklist | Complete |
 | T24 | 5 | C | Harden `fetch_url`: redirect diagnostics, sparse HTML hints, content-type summary, continuation tests. | TOOL-014/WEBFETCH | `cargo test -p talos-tools -p talos-agent` | Planned |
-| T25 | 5 | C | Document `fetch_url` vs `http_request` vs `save_url` in README and site capability pages. | T24 | Docs/site validators | Planned |
+| T25 | 5 | C | Document `fetch_url` vs `http_request` vs `save_url` in README and site capability pages. | T24 | Docs/site validators | Complete |
 | T26 | 5 | E | Implement MEM-007 minimal compression packet for one low-risk tool family, default off. | T20 | Raw output preserved; stable-prefix test | Planned |
 | T27 | 5 | A | Add governance status command enhancement or report mode for active/blocked/planned disposition. | GOV-003 | CLI tests; governance fixture tests | Planned |
 | T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Planned |
@@ -123,7 +123,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T34 | 7 | F | Atomic component model ADR for skill/mcp/hook and plugin package declarations. | plugin proposal | ADR-029 accepted | Complete |
 | T35 | 7 | F | Command taxonomy ADR: `/mcp`, `/plugins`, `/hooks`, and transition notice policy. | CMD-002 | ADR-030 accepted | Complete |
 | T36 | 7 | C | Add permission/profile audit tests for `fetch_url`, `http_request`, `save_url`, and future browser-page facet. | T19/T24 | Permission boundary tests | Planned |
-| T37 | 7 | B | Update CRATE-PUBLICATION-MATRIX with cargo install dry-run evidence and SDK publish blockers. | T07/T08/T13 | Matrix reviewed | Planned |
+| T37 | 7 | B | Update CRATE-PUBLICATION-MATRIX with cargo install dry-run evidence and SDK publish blockers. | T07/T08/T13 | Matrix reviewed | Complete |
 | T38 | 7 | A | First Talos-on-Talos rehearsal session: documentation-only change with full evidence template. | T11/GOV-003 | Evidence record; external assistance labeled | Planned |
 | T39 | 8 | A | Month-2 closeout and replan: decide whether WEB-001/WEB-005 are ready and whether ADR-027 dependency/security review clears plugin runtime work. | T22-T38 | Workspace tests; governance | Planned |
 | T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Planned |

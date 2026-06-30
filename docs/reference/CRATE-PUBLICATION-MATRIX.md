@@ -64,7 +64,7 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 11 | `talos-exploration` | Exploration storage | Published second wave | `talos-exploration 0.2.0` published | Add fuller SQLite/FTS storage contract docs before 1.0 stability claims. |
 | 12 | `talos-conversation` | UI/runtime state | Published integration wave | `talos-conversation 0.2.0` published | Continue alternate UI/state API docs before 1.0 stability claims. |
 | 13 | `talos-agent` | Runtime implementation | Gate-before-publish | Manifest-ready; not primary SDK | Publish only after sandbox/tools dependency gates or decoupling. |
-| 14 | `talos-runtime` | SDK facade | Gate-before-publish | Manifest-ready; depends on lower deps | Publish after dependency closure is safe or runtime is decoupled. |
+| 14 | `talos-runtime` | SDK facade | Gate-before-publish | Manifest-ready; SDK contract defined (T13) | Publish after dependency closure is safe or runtime is decoupled. SDK support contract: [RUNTIME-SDK-CONTRACT.md](RUNTIME-SDK-CONTRACT.md). Quickstart examples: `crates/talos-runtime/examples/` (T12). |
 | 15 | `talos-mcp` | Protocol transport | Gate-before-publish | Manifest-ready; protocol boundary sensitive | ADR/support boundary before dry-run or real publish. |
 | 16 | `talos-rpc` | JSON-RPC transport | Published integration wave | `talos-rpc 0.2.0` published | Keep support boundary to local stdio; remote semantics still need ADR. |
 | 17 | `talos-evolution` | Product learning | Product-only | `publish = false` | Do not publish until external reusable API is proven. |
