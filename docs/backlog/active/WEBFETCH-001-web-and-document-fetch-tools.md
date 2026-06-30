@@ -8,7 +8,16 @@ metadata for later follow-up fetches.
 
 ## Status
 
-Phase 0 (http_request) and Phase 0+ (content type detection, HTML text extraction, JSON formatting) complete in I039/I040. Phase 1 (fetch_url merge + save_url) complete in I040. TOOL-012 progressive loading and TOOL-013 hybrid network/write permission boundaries are complete. Phase 2+ is now selected into the crate-distribution hardening two-month plan as a bounded document-capture feature track: design first, then `document_extract` for local text/HTML/JSON/CSV/Markdown-like resources, then fetch/save/extract integration. PDF/Office/OCR and browser automation remain out of scope without a separate dependency gate. PLUGIN-001 WASM remains the likely delivery path for heavy format handlers.
+Phase 0 (`http_request`) shipped in I039. Phase 0+ content detection and HTML/JSON extraction were
+temporarily merged into `http_request` in I040, then corrected on 2026-06-30 after the architecture
+review: `fetch_url` is again the unified URL context-ingestion entry and `http_request` is narrowed
+to advanced HTTP/API inspection disclosed on demand. `save_url` remains a separate write-capable
+download tool. TOOL-012 progressive loading, TOOL-013 hybrid network/write permission boundaries,
+and TOOL-014 conditional tool disclosure are complete. Phase 2+ remains the bounded
+document-capture feature track: design first, then `document_extract` for local
+text/HTML/JSON/CSV/Markdown-like resources, then fetch/save/extract integration. PDF/Office/OCR and
+browser automation remain out of scope without a separate dependency gate. PLUGIN-001 WASM remains
+the likely delivery path for heavy format handlers.
 
 ## Priority
 
@@ -46,8 +55,9 @@ summarize, and preserve follow-up context in a deterministic way.
 
 Design a small Rust-native tool family:
 
-- `http_request`: general HTTP/API request tool.
-- `fetch_url`: convenience URL fetcher with `mode = auto | page | api | raw | document`.
+- `fetch_url`: unified URL context-ingestion tool with `mode = auto | raw`.
+- `http_request`: advanced HTTP/API request tool for custom methods, headers, bodies, and
+  low-level inspection; registered but disclosed on demand.
 - `web_fetch`: optional alias or mode for HTML page extraction.
 - `document_extract`: local or fetched document-to-Markdown/text extraction, added format by
   format.
@@ -299,25 +309,25 @@ incrementally.
 - [x] Header sanitization blocking security-sensitive headers and CR/LF injection
 - [x] Response size capped at 64KB, redirect limit of 5
 
-### Phase 0+ — Content Type Detection (I040)
+### Phase 0+ — Content Type Detection (I040; corrected to `fetch_url` on 2026-06-30)
 
-- Given `http_request` with `mode: "auto"` (default) to a URL returning `Content-Type: text/html`
+- Given `fetch_url` with `mode: "auto"` (default) to a URL returning `Content-Type: text/html`
   When the tool executes
   Then response body is HTML-tag-stripped text (via scraper), not raw HTML markup
 
-- Given `http_request` with `mode: "auto"` to a URL returning `Content-Type: application/json`
+- Given `fetch_url` with `mode: "auto"` to a URL returning `Content-Type: application/json`
   When the tool executes
   Then response body is pretty-printed JSON
 
-- Given `http_request` with `mode: "auto"` to a URL returning `Content-Type: text/plain`
+- Given `fetch_url` with `mode: "auto"` to a URL returning `Content-Type: text/plain`
   When the tool executes
   Then response body is returned as-is
 
-- Given `http_request` with `mode: "auto"` to a URL returning binary/non-text content
+- Given `fetch_url` with `mode: "auto"` to a URL returning binary/non-text content
   When the tool executes
   Then response shows content type info and byte count, not raw binary dump
 
-- Given `http_request` with `mode: "raw"`
+- Given `fetch_url` with `mode: "raw"`
   When the tool executes
   Then response body is returned as-is (preserving current behavior)
 

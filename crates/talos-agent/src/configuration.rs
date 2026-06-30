@@ -95,7 +95,7 @@ impl Agent {
         workspace_root: PathBuf,
         hook_registry: Arc<HookRegistry>,
     ) -> Self {
-        let tool_presentation_policy = ToolPresentationPolicy::full();
+        let tool_presentation_policy = ToolPresentationPolicy::runtime_default();
         let (descriptions, tool_definitions, presented_tool_names) =
             describe_presented_tools(&tools, &tool_presentation_policy);
 

@@ -85,6 +85,8 @@ pub struct RuntimeBuilder {
     initial_history: Vec<Message>,
     model_context_limit: u32,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
+    custom_prompt: Option<String>,
+    append_prompt: Option<String>,
 }
 
 impl RuntimeBuilder {
@@ -101,6 +103,8 @@ impl RuntimeBuilder {
             initial_history: Vec::new(),
             model_context_limit: 128_000,
             approval_handler: None,
+            custom_prompt: None,
+            append_prompt: None,
         }
     }
 
@@ -170,6 +174,24 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Replaces the default Talos identity/system prompt.
+    ///
+    /// This is intended for embedders that reuse the runtime in a product with
+    /// its own identity. Use [`RuntimeBuilder::append_prompt`] when the default
+    /// identity should remain and only extra instructions are needed.
+    #[must_use]
+    pub fn custom_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.custom_prompt = Some(prompt.into());
+        self
+    }
+
+    /// Appends extra instructions to the system prompt.
+    #[must_use]
+    pub fn append_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.append_prompt = Some(prompt.into());
+        self
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned handle owns the command sender, event receiver, and actor
@@ -195,13 +217,19 @@ impl RuntimeBuilder {
             }));
         }
 
-        let agent = Agent::with_security(
+        let mut agent = Agent::with_security(
             provider,
             registry,
             Some(agent_engine),
             self.sandbox,
             self.workspace_root.clone(),
         );
+        if let Some(prompt) = self.custom_prompt {
+            agent.set_custom_prompt(prompt);
+        }
+        if let Some(prompt) = self.append_prompt {
+            agent.set_append_prompt(prompt);
+        }
         let config = SessionConfig {
             runtime_policy: RuntimePolicy::headless_deny(),
             workspace_root: self.workspace_root,
@@ -874,6 +902,41 @@ mod tests {
             TurnCompletionStatus::Success { final_text, .. } => {
                 assert!(final_text.contains("Request preview (no API call made)"));
                 assert!(final_text.contains("inspect request"));
+            }
+            other => panic!("unexpected status: {other:?}"),
+        }
+
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_builder_custom_prompt_replaces_default_identity() {
+        let provider = Arc::new(MockProvider::new().with_request_debug_builder(|messages| {
+            serde_json::to_string(messages).expect("messages serialize")
+        }));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .custom_prompt("You are Obei Buddy, a zh-CN office assistant.")
+            .append_prompt("Answer in concise business Chinese.")
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .preview_request("inspect request")
+            .await
+            .expect("preview request succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+
+        match status {
+            TurnCompletionStatus::Success { final_text, .. } => {
+                assert!(final_text.contains("You are Obei Buddy"));
+                assert!(final_text.contains("Answer in concise business Chinese."));
+                assert!(
+                    !final_text.contains("You are Talos, an AI coding assistant"),
+                    "custom prompt should replace the default Talos identity"
+                );
             }
             other => panic!("unexpected status: {other:?}"),
         }

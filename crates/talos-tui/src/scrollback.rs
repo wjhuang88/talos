@@ -26,7 +26,7 @@ pub(crate) use crate::scrollback_markdown::{
 };
 pub(crate) use crate::scrollback_status::build_status_text;
 #[cfg(test)]
-pub(crate) use crate::scrollback_status::{calculate_cost, truncate_str};
+pub(crate) use crate::scrollback_status::truncate_str;
 
 pub(crate) struct PreviewComponent<'a> {
     pub(crate) padding: &'a str,
@@ -613,6 +613,7 @@ pub(crate) fn summary_fields_for(tool_name: &str) -> Vec<String> {
         "bash" => vec!["command".to_string()],
         "grep" => vec!["pattern".to_string()],
         "glob" => vec!["pattern".to_string()],
+        "fetch_url" => vec!["url".to_string(), "mode".to_string()],
         "http_request" => vec!["method".to_string(), "url".to_string()],
         "save_url" => vec!["url".to_string(), "destination".to_string()],
         "web_search" => vec!["query".to_string()],

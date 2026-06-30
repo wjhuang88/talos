@@ -98,9 +98,9 @@ Rules:
 - [x] Define core types for conditional tool continuations.
 - [x] Add tests proving continuations can disclose a narrow backend without loading unrelated
       tools.
-- [ ] Document how WEBFETCH-001 and WEB-005 use `fetch_url` as the unified model-visible read
+- [x] Document how WEBFETCH-001 and WEB-005 use `fetch_url` as the unified model-visible read
       entry.
-- [ ] Keep `save_url` outside this convergence because it is write-capable.
+- [x] Keep `save_url` outside this convergence because it is write-capable.
 
 ## Execution Notes
 
@@ -120,6 +120,11 @@ Rules:
   agent's configured presentation policy.
 - 2026-06-30: Added regression coverage proving a base tool result can disclose `fetch_url`'s
   `browser_page` backend for the next provider call.
+- 2026-06-30: Implemented the architecture-review correction: `fetch_url` is restored as the
+  unified URL context-ingestion tool, `http_request` is narrowed to advanced HTTP/API inspection,
+  and `ToolContinuation` can now disclose either a narrow backend or an individual advanced tool.
+  The secured runtime default uses `ToolPresentationPolicy::runtime_default()` so
+  `http_request` is registered but hidden until explicit disclosure.
 
 ## Validation Notes
 

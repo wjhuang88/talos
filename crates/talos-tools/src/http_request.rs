@@ -58,24 +58,10 @@ pub struct HttpRequestInput {
     #[serde(default)]
     #[schemars(range(min = 1, max = 60))]
     pub timeout_secs: Option<u64>,
-
-    /// Content extraction mode. "auto" (default) detects HTML and extracts
-    /// text, pretty-prints JSON. "raw" returns the body as-is.
-    #[serde(default = "default_mode")]
-    pub mode: String,
-
-    /// Extract and return links from HTML pages. Default false.
-    /// Only meaningful when mode is "auto" and Content-Type is text/html.
-    #[serde(default)]
-    pub extract_links: bool,
 }
 
 fn default_method() -> String {
     "GET".to_string()
-}
-
-fn default_mode() -> String {
-    "auto".to_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +123,7 @@ fn sanitize_headers(headers: Option<&HashMap<String, String>>) -> Option<HashMap
 /// Strips HTML tags, decodes common entities, normalizes whitespace,
 /// and returns the visible text content. Best-effort: JS-heavy SPA
 /// pages will produce limited output since no browser rendering occurs.
-fn extract_html_text(html: &str) -> String {
+pub(crate) fn extract_html_text(html: &str) -> String {
     let document = scraper::Html::parse_document(html);
 
     // Select the body or fall back to the root element.
@@ -171,7 +157,7 @@ fn extract_html_text(html: &str) -> String {
 }
 
 /// Extract normalized, deduplicated links from HTML content.
-fn extract_links(html: &str, base_url: &str) -> Vec<String> {
+pub(crate) fn extract_links(html: &str, base_url: &str) -> Vec<String> {
     let document = scraper::Html::parse_document(html);
     let selector = scraper::Selector::parse("a[href]").expect("valid CSS selector");
 
@@ -252,32 +238,7 @@ impl HttpRequestTool {
     /// (user controls which URLs are fetched), this is an acceptable tradeoff.
     /// In a server-exposed context, use network-layer enforcement instead.
     async fn check_ssrf(&self, host: &str) -> Result<(), String> {
-        // Try to parse as a bare IP address first.
-        if let Ok(ip) = host.parse::<IpAddr>() {
-            if is_private_ip(ip) {
-                return Err(format!(
-                    "URL resolves to a private IP address ({ip}); blocked by SSRF guard"
-                ));
-            }
-            return Ok(());
-        }
-
-        // DNS resolution.
-        let addr = format!("{host}:0");
-        let addrs = tokio::net::lookup_host(&addr)
-            .await
-            .map_err(|e| format!("DNS resolution failed for {host}: {e}"))?;
-
-        for sock_addr in addrs {
-            if is_private_ip(sock_addr.ip()) {
-                return Err(format!(
-                    "URL host {host} resolves to private IP ({})",
-                    sock_addr.ip()
-                ));
-            }
-        }
-
-        Ok(())
+        check_ssrf_host(host).await
     }
 
     /// Build the reqwest request from the input, apply optional body and headers.
@@ -358,6 +319,35 @@ pub(crate) fn is_private_ip(ip: IpAddr) -> bool {
     }
 }
 
+pub(crate) async fn check_ssrf_host(host: &str) -> Result<(), String> {
+    // Try to parse as a bare IP address first.
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if is_private_ip(ip) {
+            return Err(format!(
+                "URL resolves to a private IP address ({ip}); blocked by SSRF guard"
+            ));
+        }
+        return Ok(());
+    }
+
+    // DNS resolution.
+    let addr = format!("{host}:0");
+    let addrs = tokio::net::lookup_host(&addr)
+        .await
+        .map_err(|e| format!("DNS resolution failed for {host}: {e}"))?;
+
+    for sock_addr in addrs {
+        if is_private_ip(sock_addr.ip()) {
+            return Err(format!(
+                "URL host {host} resolves to private IP ({})",
+                sock_addr.ip()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // AgentTool implementation
 // ---------------------------------------------------------------------------
@@ -388,7 +378,7 @@ impl AgentTool for HttpRequestTool {
     }
 
     fn family(&self) -> ToolFamily {
-        ToolFamily::Network
+        ToolFamily::AdvancedNetwork
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
@@ -481,14 +471,6 @@ impl AgentTool for HttpRequestTool {
             &body_bytes
         };
 
-        // Determine content type.
-        let content_type = response_headers
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-
-        let is_raw_mode = parsed.mode == "raw";
-
         // Format output.
         let mut output = String::new();
         output.push_str(&format!("Status: {}\n", status));
@@ -511,65 +493,8 @@ impl AgentTool for HttpRequestTool {
             format!("{} bytes", body_bytes.len())
         };
 
-        if is_raw_mode {
-            // Raw mode: return body as-is.
-            output.push_str(&format!("\nBody ({size_label}):\n",));
-            output.push_str(&String::from_utf8_lossy(body_display));
-        } else if content_type.contains("text/html") {
-            // HTML: extract text content.
-            output.push_str(&format!("\nContent ({size_label}, text/html):\n",));
-            let html_str = String::from_utf8_lossy(body_display);
-            let text = extract_html_text(&html_str);
-            output.push_str(&text);
-
-            if parsed.extract_links {
-                let links = extract_links(&html_str, &parsed.url);
-                if !links.is_empty() {
-                    let count = links.len();
-                    let show = count.min(20);
-                    output.push_str(&format!(
-                        "\n\n── Links ({count} total, showing {show}) ──\n"
-                    ));
-                    for link in links.iter().take(show) {
-                        output.push_str(&format!("  {link}\n"));
-                    }
-                    if links.len() > show {
-                        output.push_str(&format!("  … and {} more\n", links.len() - show));
-                    }
-                }
-            }
-        } else if content_type.contains("application/json") {
-            // JSON: pretty-print.
-            output.push_str(&format!("\nContent ({size_label}, application/json):\n",));
-            match serde_json::from_slice::<serde_json::Value>(body_display) {
-                Ok(val) => {
-                    output.push_str(
-                        &serde_json::to_string_pretty(&val)
-                            .unwrap_or_else(|_| String::from_utf8_lossy(body_display).to_string()),
-                    );
-                }
-                Err(_) => {
-                    output.push_str(&String::from_utf8_lossy(body_display));
-                }
-            }
-        } else if content_type.starts_with("text/") {
-            // Text: return as-is.
-            output.push_str(&format!("\nContent ({size_label}, {content_type}):\n",));
-            output.push_str(&String::from_utf8_lossy(body_display));
-        } else if content_type.is_empty() || content_type.contains("octet-stream") {
-            // Binary or unknown content type: show info only.
-            output.push_str(&format!("\nContent: binary/unknown ({size_label})\n",));
-            if !content_type.is_empty() {
-                output.push_str(&format!("Content-Type: {content_type}\n"));
-            }
-            output.push_str(
-                "[Binary or unrecognized content — use mode: \"raw\" to view raw bytes]\n",
-            );
-        } else {
-            // Other structured content: return as text.
-            output.push_str(&format!("\nContent ({size_label}, {content_type}):\n",));
-            output.push_str(&String::from_utf8_lossy(body_display));
-        }
+        output.push_str(&format!("\nBody ({size_label}):\n",));
+        output.push_str(&String::from_utf8_lossy(body_display));
 
         if truncated {
             output.push_str(&format!(

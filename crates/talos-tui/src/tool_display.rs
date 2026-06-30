@@ -80,6 +80,7 @@ pub(crate) fn should_suppress_tool_result_content(display: &ToolResultDisplay) -
         "list_symbols",
         "find_symbol",
         "find_references",
+        "fetch_url",
         "http_request",
         "web_search",
     ];
@@ -114,6 +115,7 @@ pub(crate) fn suppressed_tool_result_summary(display: &ToolResultDisplay) -> Str
             format!("ls returned {line_count} {label}, {byte_count} bytes")
         }
         "list_imports" => summarize_symbol_results(&display.content, "imports"),
+        "fetch_url" => summarize_http_like_result("fetch_url", &display.content),
         "http_request" => summarize_http_request(&display.content),
         "web_search" => summarize_web_search(&display.content),
         _ => {
@@ -124,6 +126,10 @@ pub(crate) fn suppressed_tool_result_summary(display: &ToolResultDisplay) -> Str
 }
 
 fn summarize_http_request(content: &str) -> String {
+    summarize_http_like_result("http_request", content)
+}
+
+fn summarize_http_like_result(tool: &str, content: &str) -> String {
     let status = content
         .lines()
         .find(|l| l.starts_with("Status: "))
@@ -131,8 +137,13 @@ fn summarize_http_request(content: &str) -> String {
         .unwrap_or_else(|| "?".to_string());
     let content_type = content
         .lines()
-        .find(|l| l.trim().starts_with("content-type:"))
-        .map(|l| l.trim_start_matches("content-type:").trim().to_string())
+        .find(|line| line.trim().to_lowercase().starts_with("content-type:"))
+        .map(|line| {
+            line.trim()
+                .split_once(':')
+                .map(|(_, value)| value.trim().to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        })
         .unwrap_or_else(|| "unknown".to_string());
     let size = content
         .lines()
@@ -145,7 +156,7 @@ fn summarize_http_request(content: &str) -> String {
                 .to_string()
         })
         .unwrap_or_else(|| "? bytes".to_string());
-    format!("http_request: {status}, {size}, {content_type}")
+    format!("{tool}: {status}, {size}, {content_type}")
 }
 
 fn summarize_web_search(content: &str) -> String {

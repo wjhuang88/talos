@@ -151,6 +151,39 @@ struct BackendMockTool {
     execution_log: Arc<Mutex<Vec<String>>>,
 }
 
+struct AdvancedHttpDisclosureTool;
+
+#[async_trait]
+impl AgentTool for AdvancedHttpDisclosureTool {
+    fn name(&self) -> &str {
+        "fetch_url"
+    }
+
+    fn description(&self) -> &str {
+        "Fetch a URL"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "url": { "type": "string" }
+            },
+            "required": ["url"]
+        })
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Network
+    }
+
+    async fn execute(&self, _input: Value) -> ToolExecutionResult {
+        ToolExecutionResult::success("advanced HTTP required").with_continuation(
+            ToolContinuation::disclose_tool("http_request", "advanced_http_required"),
+        )
+    }
+}
+
 #[async_trait]
 impl AgentTool for BackendMockTool {
     fn name(&self) -> &str {
@@ -2169,6 +2202,71 @@ async fn test_tool_continuation_discloses_backend_for_next_provider_call() {
         .and_then(Value::as_array)
         .expect("second access enum");
     assert!(second_enum.iter().any(|value| value == "browser"));
+}
+
+#[tokio::test]
+async fn test_tool_continuation_discloses_tool_for_next_provider_call() {
+    let call = ToolCall {
+        id: "call-1".into(),
+        name: "fetch_url".into(),
+        input: serde_json::json!({
+            "url": "https://example.com/api"
+        }),
+    };
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call,
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+
+    let (model, captured_tools) = ToolDefinitionCapturingModel::new(responses);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(AdvancedHttpDisclosureTool));
+    registry.register(Arc::new(FamilyMockTool {
+        tool_name: "http_request".to_string(),
+        family: ToolFamily::AdvancedNetwork,
+        always_on: false,
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+
+    let agent = Agent::with_security(Arc::new(model), registry, None, None, PathBuf::from("/tmp"));
+
+    let response = agent
+        .run("fetch with advanced HTTP if needed".into())
+        .await
+        .unwrap();
+    assert_eq!(response, "done");
+
+    let captured = captured_tools.lock().expect("lock poisoned");
+    assert_eq!(captured.len(), 2, "provider should be called twice");
+    assert!(captured[0].iter().any(|tool| tool.name == "fetch_url"));
+    assert!(
+        !captured[0].iter().any(|tool| tool.name == "http_request"),
+        "advanced HTTP should not be visible before disclosure"
+    );
+    assert!(
+        captured[1].iter().any(|tool| tool.name == "http_request"),
+        "tool continuation should disclose http_request on the next call"
+    );
 }
 
 #[tokio::test]

@@ -702,14 +702,22 @@ impl Agent {
             .iter()
             .flat_map(|result| result.continuations.iter())
         {
-            if !policy.allows_backend(&continuation.tool, &continuation.backend) {
-                policy
-                    .backends
-                    .push(talos_core::tool::ToolBackendDisclosure::new(
-                        continuation.tool.clone(),
-                        continuation.backend.clone(),
-                    ));
-                changed = true;
+            if continuation.is_tool_disclosure() {
+                if !policy.tools.iter().any(|tool| tool == &continuation.tool) {
+                    policy.tools.push(continuation.tool.clone());
+                    changed = true;
+                }
+            } else {
+                let backend = &continuation.backend;
+                if !policy.allows_backend(&continuation.tool, backend) {
+                    policy
+                        .backends
+                        .push(talos_core::tool::ToolBackendDisclosure::new(
+                            continuation.tool.clone(),
+                            backend.clone(),
+                        ));
+                    changed = true;
+                }
             }
         }
 

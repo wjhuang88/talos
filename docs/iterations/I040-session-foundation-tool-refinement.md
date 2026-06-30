@@ -136,6 +136,8 @@ Phase 1 deepens http_request with content detection. Phase 1b adds the file-save
 | 2026-06-21 | Implementation | `save_url` tool: write-capable URL-to-file download, 10MB limit, SSRF guard reused, `ToolNature::Write`. |
 | 2026-06-22 | Scope change | TUI-006-A removed from I040 (already implemented; see commit `402d30d`); TUI-006 closed entirely per commit `aea9ddc`. |
 | 2026-06-22 | Verification | Final `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace` all clean. |
+| 2026-06-30 | Architecture correction | Later TOOL-014/WEB-005 review found that merging `fetch_url` into `http_request` blurred the unified read-context facade with the advanced HTTP tool. The I040 merge decision remains recorded as the execution fact, but the product architecture was corrected in a follow-up: `fetch_url` is restored as the model-visible URL context tool and `http_request` is narrowed to on-demand advanced HTTP/API inspection. |
+| 2026-06-30 | GitHub issue #5 | Included embeddable runtime prompt customization in this iteration follow-up: `RuntimeBuilder::custom_prompt(...)` replaces the default Talos identity and `RuntimeBuilder::append_prompt(...)` appends product-specific instructions before session execution. |
 
 ## Verification Evidence
 
@@ -148,6 +150,11 @@ Phase 1 deepens http_request with content detection. Phase 1b adds the file-save
 
 - **TUI-006-A removed**: Rounded code-block borders were already implemented via I023 arborium syntax highlighting; commit `402d30d` removed TUI-006-A from I040 scope.
 - **fetch_url merged into http_request**: Original plan had fetch_url as a separate tool; orthogonality review merged it into http_request with `extract_links` parameter. No user-facing capability lost.
+- **2026-06-30 correction**: TOOL-014/WEB-005 architecture review reversed this merge for naming,
+  prompt-surface, and future browser-page backend reasons. The correction is implemented as a new
+  follow-up, not by rewriting the I040 execution history.
+- **GitHub issue #5 included**: Runtime prompt customization was handled in the same follow-up
+  because it only exposes existing `Agent` prompt controls through the embeddable runtime facade.
 - **SESSION-001-B / SESSION-001-C explicitly out of scope**: Per the I040 plan, these are deferred to a separate iteration (I041 or later).
 - **clippy --all-targets residual**: pre-existing ARCH-007 (`unwrap_used` lint in test code); not introduced by I040.
 

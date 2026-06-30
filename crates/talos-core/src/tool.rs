@@ -41,15 +41,20 @@ pub enum ToolProvenance {
     McpRemote { server: String },
 }
 
-/// A structured request for the runtime to disclose a narrower tool backend.
+/// A structured request for the runtime to disclose a narrower tool backend or
+/// a specific tool on a later turn.
 ///
 /// Continuations are advisory presentation updates. They are not permission
 /// grants and must not cause a higher-risk backend to execute implicitly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ToolContinuation {
-    /// Tool whose backend should be disclosed on a later provider turn.
+    /// Tool that should be disclosed or whose backend should be disclosed on a later provider turn.
     pub tool: String,
     /// Backend id to disclose.
+    ///
+    /// Empty means disclose the tool itself, not a conditional backend. This
+    /// preserves the pre-existing field type while supporting tool-level
+    /// progressive disclosure.
     pub backend: String,
     /// Machine-readable reason, such as `login_redirect` or `js_rendered_empty`.
     pub reason: String,
@@ -72,6 +77,23 @@ impl ToolContinuation {
             reason: reason.into(),
             permission_preview: None,
         }
+    }
+
+    /// Creates a tool-disclosure continuation.
+    #[must_use]
+    pub fn disclose_tool(tool: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self {
+            tool: tool.into(),
+            backend: String::new(),
+            reason: reason.into(),
+            permission_preview: None,
+        }
+    }
+
+    /// Returns true when this continuation discloses a whole tool instead of a backend.
+    #[must_use]
+    pub fn is_tool_disclosure(&self) -> bool {
+        self.backend.is_empty()
     }
 
     /// Adds display-oriented permission preview text.
@@ -166,6 +188,8 @@ pub enum ToolFamily {
     Git,
     /// Network, web, and URL tools.
     Network,
+    /// Advanced network/API debugging tools that should be disclosed only when needed.
+    AdvancedNetwork,
     /// Shell or command execution tools.
     Shell,
     /// Tools supplied by extensions, MCP, or unknown sources.
@@ -229,6 +253,9 @@ pub struct ToolPresentationPolicy {
     /// Additional families to present.
     #[serde(default)]
     pub families: Vec<ToolFamily>,
+    /// Additional individual tools to present.
+    #[serde(default)]
+    pub tools: Vec<String>,
     /// Conditional backends to present for specific tools.
     #[serde(default)]
     pub backends: Vec<ToolBackendDisclosure>,
@@ -242,6 +269,7 @@ impl ToolPresentationPolicy {
             include_all: true,
             include_always_on: true,
             families: Vec::new(),
+            tools: Vec::new(),
             backends: Vec::new(),
         }
     }
@@ -253,6 +281,28 @@ impl ToolPresentationPolicy {
             include_all: false,
             include_always_on: true,
             families: Vec::new(),
+            tools: Vec::new(),
+            backends: Vec::new(),
+        }
+    }
+
+    /// Presents the default runtime surface while keeping advanced tools hidden
+    /// unless explicitly disclosed.
+    #[must_use]
+    pub fn runtime_default() -> Self {
+        Self {
+            include_all: false,
+            include_always_on: true,
+            families: vec![
+                ToolFamily::File,
+                ToolFamily::Search,
+                ToolFamily::CodeIntelligence,
+                ToolFamily::Git,
+                ToolFamily::Network,
+                ToolFamily::Shell,
+                ToolFamily::Extension,
+            ],
+            tools: Vec::new(),
             backends: Vec::new(),
         }
     }
@@ -264,6 +314,7 @@ impl ToolPresentationPolicy {
             include_all: false,
             include_always_on: true,
             families: families.into_iter().collect(),
+            tools: Vec::new(),
             backends: Vec::new(),
         }
     }
@@ -275,8 +326,28 @@ impl ToolPresentationPolicy {
             include_all: false,
             include_always_on: true,
             families: Vec::new(),
+            tools: Vec::new(),
             backends: vec![ToolBackendDisclosure::new(tool, backend)],
         }
+    }
+
+    /// Presents the always-on baseline plus one specific tool.
+    #[must_use]
+    pub fn with_tool(tool: impl Into<String>) -> Self {
+        Self {
+            include_all: false,
+            include_always_on: true,
+            families: Vec::new(),
+            tools: vec![tool.into()],
+            backends: Vec::new(),
+        }
+    }
+
+    /// Adds a tool disclosure entry to this policy.
+    #[must_use]
+    pub fn disclose_tool(mut self, tool: impl Into<String>) -> Self {
+        self.tools.push(tool.into());
+        self
     }
 
     /// Adds a backend disclosure entry to this policy.
@@ -293,6 +364,7 @@ impl ToolPresentationPolicy {
         self.include_all
             || (self.include_always_on && tool.is_always_on())
             || self.families.contains(&tool.family())
+            || self.tools.iter().any(|name| name == tool.name())
             || self.backends.iter().any(|entry| entry.tool == tool.name())
     }
 
@@ -841,7 +913,19 @@ mod tests {
 
         assert_eq!(result.continuations.len(), 1);
         assert_eq!(result.continuations[0].tool, "fetch_url");
-        assert_eq!(result.continuations[0].backend, "browser_page");
+        assert_eq!(result.continuations[0].backend, "browser_page".to_string());
+    }
+
+    #[test]
+    fn tool_continuation_can_disclose_tool_without_backend() {
+        let result = ToolResult::success("static fetch needs advanced HTTP").with_continuation(
+            ToolContinuation::disclose_tool("http_request", "advanced_http_required"),
+        );
+
+        assert_eq!(result.continuations[0].tool, "http_request");
+        assert_eq!(result.continuations[0].backend, "");
+        assert!(result.continuations[0].is_tool_disclosure());
+        assert_eq!(result.continuations[0].reason, "advanced_http_required");
     }
 
     #[test]

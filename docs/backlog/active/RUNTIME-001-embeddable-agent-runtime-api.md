@@ -127,6 +127,11 @@ consumers to Talos product internals, and weakens the runtime's long-term semver
   Missing handlers still deny `Ask` decisions, `ApproveOnce` executes one call, and
   `AlwaysApprove` installs in-memory allow rules for the current runtime without writing user
   configuration.
+- 2026-06-30: GitHub issue #5 added runtime prompt customization for embedders:
+  `RuntimeBuilder::custom_prompt(...)` replaces the default Talos identity and
+  `RuntimeBuilder::append_prompt(...)` appends product-specific instructions before the session
+  actor starts. Runtime request-preview coverage proves `initial_history` is no longer needed as an
+  ineffective prompt workaround.
 
 ## Required Reads
 
