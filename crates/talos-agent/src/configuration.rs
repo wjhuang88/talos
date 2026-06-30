@@ -259,7 +259,7 @@ impl Agent {
     }
 }
 
-fn describe_presented_tools(
+pub(crate) fn describe_presented_tools(
     tools: &ToolRegistry,
     policy: &ToolPresentationPolicy,
 ) -> (Vec<ToolDescription>, Vec<ToolDefinition>, HashSet<String>) {

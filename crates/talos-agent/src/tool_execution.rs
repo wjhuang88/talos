@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use futures_util::future::join_all;
 use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall};
-use talos_core::tool::{ToolProvenance, ToolRegistry, ToolResult as ToolExecutionResult};
+use talos_core::tool::{
+    ToolPresentationPolicy, ToolProvenance, ToolRegistry, ToolResult as ToolExecutionResult,
+};
 use talos_permission::PermissionDecision;
 use talos_plugin::{
     HookContext, HookEvent, HookOutcome, ToolObservation, TurnEndReason, TurnStatus,
@@ -21,10 +23,12 @@ impl Agent {
     /// sandbox execution (for bash tools), and direct execution.
     ///
     /// Results are returned in the same order as the input calls.
-    pub(crate) async fn execute_tools(
+    pub(crate) async fn execute_tools_with_presentation(
         &self,
         hook_ctx: &HookContext,
         calls: &[ToolCall],
+        policy: &ToolPresentationPolicy,
+        presented_tool_names: &std::collections::HashSet<String>,
     ) -> AgentResult<Vec<ToolExecutionResult>> {
         if calls.is_empty() {
             return Ok(Vec::new());
@@ -78,7 +82,15 @@ impl Agent {
                     let ctx = hook_ctx.clone();
                     async move {
                         let _permit = sem.acquire().await.expect("semaphore closed");
-                        let result = agent.execute_single_tool(&ctx, registry, call).await;
+                        let result = agent
+                            .execute_single_tool_with_presentation(
+                                &ctx,
+                                registry,
+                                call,
+                                policy,
+                                presented_tool_names,
+                            )
+                            .await;
                         (idx, result)
                     }
                 })
@@ -92,7 +104,13 @@ impl Agent {
         for idx in write_indices {
             let call = &calls[idx];
             let result = self
-                .execute_single_tool(hook_ctx, &self.tools, call)
+                .execute_single_tool_with_presentation(
+                    hook_ctx,
+                    &self.tools,
+                    call,
+                    policy,
+                    presented_tool_names,
+                )
                 .await?;
             results[idx] = Some(result);
         }
@@ -147,12 +165,14 @@ impl Agent {
             .collect()
     }
 
-    pub(crate) async fn execute_tools_for_ui(
+    pub(crate) async fn execute_tools_for_ui_with_presentation(
         &self,
         hook_ctx: &HookContext,
         calls: &[PendingToolCall],
         event_tx: &mpsc::UnboundedSender<AgentEvent>,
         messages: &mut Vec<Message>,
+        policy: &ToolPresentationPolicy,
+        presented_tool_names: &std::collections::HashSet<String>,
     ) -> AgentResult<Vec<ToolExecutionResult>> {
         let mut seen: std::collections::HashSet<(String, String)> =
             std::collections::HashSet::new();
@@ -169,7 +189,13 @@ impl Agent {
             let _ = event_tx.send(self.tool_call_event(&pending.call, &pending.provenance));
 
             let result = self
-                .execute_single_tool(hook_ctx, &self.tools, &pending.call)
+                .execute_single_tool_with_presentation(
+                    hook_ctx,
+                    &self.tools,
+                    &pending.call,
+                    policy,
+                    presented_tool_names,
+                )
                 .await?;
             let observation = ToolObservation {
                 call: pending.call.clone(),
@@ -216,11 +242,13 @@ impl Agent {
         Ok(results)
     }
 
-    async fn execute_single_tool(
+    async fn execute_single_tool_with_presentation(
         &self,
         hook_ctx: &HookContext,
         registry: &ToolRegistry,
         call: &ToolCall,
+        policy: &ToolPresentationPolicy,
+        presented_tool_names: &std::collections::HashSet<String>,
     ) -> AgentResult<ToolExecutionResult> {
         let effective_call = match self
             .run_hook(hook_ctx, HookEvent::BeforeToolCall { call })
@@ -242,8 +270,7 @@ impl Agent {
                 )));
             }
         };
-        if self.enforce_tool_presentation_policy && !self.presented_tool_names.contains(&call.name)
-        {
+        if self.enforce_tool_presentation_policy && !presented_tool_names.contains(&call.name) {
             return Ok(ToolExecutionResult::error(format!(
                 "tool family not loaded for '{}'; continue with a presented tool or request the relevant tool family",
                 call.name
@@ -251,9 +278,7 @@ impl Agent {
         }
         if self.enforce_tool_presentation_policy
             && let Some(backend) = tool.backend_for_input(&call.input)
-            && !self
-                .tool_presentation_policy
-                .allows_backend(&call.name, &backend)
+            && !policy.allows_backend(&call.name, &backend)
         {
             return Ok(ToolExecutionResult::error(format!(
                 "tool backend '{backend}' for '{}' is not loaded; continue with a disclosed backend or retry the base tool path",
@@ -446,6 +471,7 @@ impl Agent {
         ToolExecutionResult {
             content,
             is_error: result.exit_code != 0,
+            continuations: Vec::new(),
         }
     }
 }

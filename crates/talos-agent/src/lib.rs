@@ -43,6 +43,8 @@ use talos_sandbox::SandboxProvider;
 use thiserror::Error;
 use tokio::sync::mpsc;
 
+use crate::configuration::describe_presented_tools;
+
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 
 /// Maximum number of tool calls allowed per turn before budget exhaustion.
@@ -334,6 +336,9 @@ impl Agent {
 
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
+        let mut active_tool_presentation_policy = self.tool_presentation_policy.clone();
+        let (_, mut active_tool_definitions, mut active_presented_tool_names) =
+            describe_presented_tools(&self.tools, &active_tool_presentation_policy);
 
         if let Err(error) = self
             .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
@@ -363,7 +368,7 @@ impl Agent {
 
             let mut rx = match self
                 .provider
-                .stream_with_tools(provider_messages, &self.tool_definitions)
+                .stream_with_tools(provider_messages, &active_tool_definitions)
                 .await
             {
                 Ok(rx) => rx,
@@ -585,7 +590,14 @@ impl Agent {
                 let effective_pending =
                     self.pending_calls_with_provenance(&effective_tool_calls, &turn_tool_calls);
                 match self
-                    .execute_tools_for_ui(&hook_ctx, &effective_pending, tx, &mut messages)
+                    .execute_tools_for_ui_with_presentation(
+                        &hook_ctx,
+                        &effective_pending,
+                        tx,
+                        &mut messages,
+                        &active_tool_presentation_policy,
+                        &active_presented_tool_names,
+                    )
                     .await
                 {
                     Ok(results) => results,
@@ -594,7 +606,14 @@ impl Agent {
                     }
                 }
             } else {
-                let tool_results = match self.execute_tools(&hook_ctx, &effective_tool_calls).await
+                let tool_results = match self
+                    .execute_tools_with_presentation(
+                        &hook_ctx,
+                        &effective_tool_calls,
+                        &active_tool_presentation_policy,
+                        &active_presented_tool_names,
+                    )
+                    .await
                 {
                     Ok(results) => results,
                     Err(error) => {
@@ -650,6 +669,13 @@ impl Agent {
                 tool_results
             };
 
+            self.apply_tool_continuations(
+                &tool_results,
+                &mut active_tool_presentation_policy,
+                &mut active_tool_definitions,
+                &mut active_presented_tool_names,
+            );
+
             let _ = self
                 .run_hook(
                     &hook_ctx,
@@ -662,6 +688,36 @@ impl Agent {
 
         self.emit_turn_complete(&hook_ctx, final_status).await;
         result
+    }
+
+    fn apply_tool_continuations(
+        &self,
+        results: &[talos_core::tool::ToolResult],
+        policy: &mut ToolPresentationPolicy,
+        tool_definitions: &mut Vec<talos_core::provider::ToolDefinition>,
+        presented_tool_names: &mut HashSet<String>,
+    ) {
+        let mut changed = false;
+        for continuation in results
+            .iter()
+            .flat_map(|result| result.continuations.iter())
+        {
+            if !policy.allows_backend(&continuation.tool, &continuation.backend) {
+                policy
+                    .backends
+                    .push(talos_core::tool::ToolBackendDisclosure::new(
+                        continuation.tool.clone(),
+                        continuation.backend.clone(),
+                    ));
+                changed = true;
+            }
+        }
+
+        if changed {
+            let (_, definitions, names) = describe_presented_tools(&self.tools, policy);
+            *tool_definitions = definitions;
+            *presented_tool_names = names;
+        }
     }
 }
 

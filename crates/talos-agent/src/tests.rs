@@ -7,7 +7,7 @@ use serde_json::Value;
 use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::{
-    AgentTool, ToolBackend, ToolFamily, ToolPresentationPolicy, ToolRegistry,
+    AgentTool, ToolBackend, ToolContinuation, ToolFamily, ToolPresentationPolicy, ToolRegistry,
     ToolResult as ToolExecutionResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
@@ -224,6 +224,22 @@ impl AgentTool for BackendMockTool {
             .lock()
             .await
             .push(format!("fetch_url:{input}"));
+        if input
+            .get("needs_browser")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            return ToolExecutionResult::success("browser backend required").with_continuation(
+                ToolContinuation::disclose_backend(
+                    "fetch_url",
+                    "browser_page",
+                    "browser_context_required",
+                )
+                .with_permission_preview(
+                    "read visible text and links from an approved browser page",
+                ),
+            );
+        }
         ToolExecutionResult::success("executed")
     }
 }
@@ -2077,6 +2093,82 @@ async fn test_undisclosed_backend_returns_recoverable_error_without_execution() 
         execution_log.lock().await.is_empty(),
         "undisclosed backend must not execute"
     );
+}
+
+#[tokio::test]
+async fn test_tool_continuation_discloses_backend_for_next_provider_call() {
+    let call = ToolCall {
+        id: "call-1".into(),
+        name: "fetch_url".into(),
+        input: serde_json::json!({
+            "url": "https://example.com/private",
+            "needs_browser": true
+        }),
+    };
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call,
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+
+    let (model, captured_tools) = ToolDefinitionCapturingModel::new(responses);
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BackendMockTool {
+        execution_log: execution_log.clone(),
+    }));
+
+    let mut agent =
+        Agent::with_security(Arc::new(model), registry, None, None, PathBuf::from("/tmp"));
+    agent
+        .set_tool_presentation_policy(ToolPresentationPolicy::with_families([ToolFamily::Network]));
+
+    let response = agent.run("read private page".into()).await.unwrap();
+    assert_eq!(response, "done");
+    assert_eq!(execution_log.lock().await.len(), 1);
+
+    let captured = captured_tools.lock().expect("lock poisoned");
+    assert_eq!(captured.len(), 2, "provider should be called twice");
+    let first_fetch = captured[0]
+        .iter()
+        .find(|tool| tool.name == "fetch_url")
+        .expect("fetch_url first call");
+    let first_enum = first_fetch
+        .parameters
+        .pointer("/properties/access/enum")
+        .and_then(Value::as_array)
+        .expect("first access enum");
+    assert!(!first_enum.iter().any(|value| value == "browser"));
+
+    let second_fetch = captured[1]
+        .iter()
+        .find(|tool| tool.name == "fetch_url")
+        .expect("fetch_url second call");
+    let second_enum = second_fetch
+        .parameters
+        .pointer("/properties/access/enum")
+        .and_then(Value::as_array)
+        .expect("second access enum");
+    assert!(second_enum.iter().any(|value| value == "browser"));
 }
 
 #[tokio::test]

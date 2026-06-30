@@ -207,6 +207,7 @@ impl BashTool {
         ToolResult {
             content: output,
             is_error: !exit_status.success(),
+            continuations: Vec::new(),
         }
     }
 }

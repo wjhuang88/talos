@@ -4,7 +4,7 @@
 |---|---|
 | Type | Story |
 | Priority | P2 |
-| Status | Partial (backend disclosure core complete) |
+| Status | Partial (continuation/backend disclosure core complete) |
 | Depends On | TOOL-012; TOOL-013 |
 | Relates To | WEBFETCH-001; WEB-005; ARCH-006 |
 | Owner Boundary | H2 architect-owned tool presentation and permission boundary work |
@@ -95,8 +95,8 @@ Rules:
 - [x] Add tests proving undisclosed backends cannot execute.
 - [x] Add tests proving backend disclosure can expose a narrow schema branch without loading
       unrelated tools.
-- [ ] Define core types for conditional tool continuations.
-- [ ] Add tests proving continuations can disclose a narrow backend without loading unrelated
+- [x] Define core types for conditional tool continuations.
+- [x] Add tests proving continuations can disclose a narrow backend without loading unrelated
       tools.
 - [ ] Document how WEBFETCH-001 and WEB-005 use `fetch_url` as the unified model-visible read
       entry.
@@ -115,11 +115,18 @@ Rules:
   permission evaluation or execution.
 - 2026-06-30: Updated CLI/TUI permission-aware wrappers to preserve backend metadata from wrapped
   tools.
+- 2026-06-30: Added `ToolContinuation` metadata to `ToolResult` and a run-local continuation
+  handler that can disclose a backend for the next provider call without permanently mutating the
+  agent's configured presentation policy.
+- 2026-06-30: Added regression coverage proving a base tool result can disclose `fetch_url`'s
+  `browser_page` backend for the next provider call.
 
 ## Validation Notes
 
 - `cargo test -p talos-core tool_presentation_policy`
+- `cargo test -p talos-core continuation`
 - `cargo test -p talos-agent backend`
+- `cargo test -p talos-agent continuation`
 - `cargo test -p talos-cli registry`
 - `cargo check --workspace`
 - `cargo fmt --all -- --check`

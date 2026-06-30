@@ -41,6 +41,47 @@ pub enum ToolProvenance {
     McpRemote { server: String },
 }
 
+/// A structured request for the runtime to disclose a narrower tool backend.
+///
+/// Continuations are advisory presentation updates. They are not permission
+/// grants and must not cause a higher-risk backend to execute implicitly.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ToolContinuation {
+    /// Tool whose backend should be disclosed on a later provider turn.
+    pub tool: String,
+    /// Backend id to disclose.
+    pub backend: String,
+    /// Machine-readable reason, such as `login_redirect` or `js_rendered_empty`.
+    pub reason: String,
+    /// Optional human-readable permission preview.
+    #[serde(default)]
+    pub permission_preview: Option<String>,
+}
+
+impl ToolContinuation {
+    /// Creates a backend-disclosure continuation.
+    #[must_use]
+    pub fn disclose_backend(
+        tool: impl Into<String>,
+        backend: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            tool: tool.into(),
+            backend: backend.into(),
+            reason: reason.into(),
+            permission_preview: None,
+        }
+    }
+
+    /// Adds display-oriented permission preview text.
+    #[must_use]
+    pub fn with_permission_preview(mut self, preview: impl Into<String>) -> Self {
+        self.permission_preview = Some(preview.into());
+        self
+    }
+}
+
 /// The result of executing a tool.
 #[derive(Debug, Clone)]
 pub struct ToolResult {
@@ -48,6 +89,8 @@ pub struct ToolResult {
     pub content: String,
     /// Whether the execution resulted in an error.
     pub is_error: bool,
+    /// Runtime-only continuation hints for later tool presentation.
+    pub continuations: Vec<ToolContinuation>,
 }
 
 impl ToolResult {
@@ -56,6 +99,7 @@ impl ToolResult {
         Self {
             content: content.into(),
             is_error: false,
+            continuations: Vec::new(),
         }
     }
 
@@ -64,7 +108,15 @@ impl ToolResult {
         Self {
             content: content.into(),
             is_error: true,
+            continuations: Vec::new(),
         }
+    }
+
+    /// Adds one runtime continuation hint to this tool result.
+    #[must_use]
+    pub fn with_continuation(mut self, continuation: ToolContinuation) -> Self {
+        self.continuations.push(continuation);
+        self
     }
 }
 
@@ -773,10 +825,23 @@ mod tests {
         let success = ToolResult::success("ok");
         assert!(!success.is_error);
         assert_eq!(success.content, "ok");
+        assert!(success.continuations.is_empty());
 
         let error = ToolResult::error("failed");
         assert!(error.is_error);
         assert_eq!(error.content, "failed");
+    }
+
+    #[test]
+    fn test_tool_result_can_carry_continuation() {
+        let result = ToolResult::success("needs browser").with_continuation(
+            ToolContinuation::disclose_backend("fetch_url", "browser_page", "login_redirect")
+                .with_permission_preview("read visible browser page text"),
+        );
+
+        assert_eq!(result.continuations.len(), 1);
+        assert_eq!(result.continuations[0].tool, "fetch_url");
+        assert_eq!(result.continuations[0].backend, "browser_page");
     }
 
     #[test]
