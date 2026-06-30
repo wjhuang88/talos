@@ -52,6 +52,7 @@ impl Agent {
             tool_presentation_policy: ToolPresentationPolicy::full(),
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
+            bash_compression_enabled: false,
         }
     }
 
@@ -118,6 +119,7 @@ impl Agent {
             tool_presentation_policy,
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
+            bash_compression_enabled: false,
         }
     }
 
@@ -127,6 +129,19 @@ impl Agent {
     /// memory section string. When `None` is returned, no memory is injected.
     pub fn set_memory_provider(&mut self, provider: Arc<MemoryProviderCallback>) {
         self.memory_provider = Some(provider);
+    }
+
+    /// Enables or disables bash output compression for model context.
+    ///
+    /// When enabled, bash tool output exceeding 30 lines is compressed to the
+    /// last 30 lines plus a truncation marker before entering model context.
+    /// The raw output is preserved in the session JSONL log.
+    ///
+    /// Default: disabled (false).
+    #[must_use]
+    pub fn with_bash_compression(mut self, enabled: bool) -> Self {
+        self.bash_compression_enabled = enabled;
+        self
     }
 
     /// Sets the tool descriptions for the system prompt builder.

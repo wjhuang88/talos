@@ -13,6 +13,7 @@ use talos_sandbox::{SandboxConfig, SandboxError, SandboxProvider, SandboxResult}
 use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
 
+use crate::compression::BashOutputCompressor;
 use crate::{Agent, AgentError, AgentResult, MAX_CONCURRENT_READ_ONLY, PendingToolCall};
 
 impl Agent {
@@ -229,6 +230,12 @@ impl Agent {
                         "{}\n\n[Analyze the error above and try a different approach.]",
                         observed.result.content
                     ),
+                    ..ui_result.clone()
+                }
+            } else if self.bash_compression_enabled && observed.call.name == "bash" {
+                let compressed = BashOutputCompressor::new().compress(&observed.result.content);
+                MessageToolResult {
+                    content: compressed.content,
                     ..ui_result.clone()
                 }
             } else {

@@ -110,9 +110,9 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T21 | 4 | A | Month-1 closeout: validation summary, delivered items, blockers, next-month replan. | T00-T20 | `cargo test --workspace`; governance | Complete |
 | T22 | 5 | D | WEB-001 MVP design: loopback-only dashboard for status/history/governance/config read surfaces. | WEB-001 | Proposal update; threat model | Complete |
 | T23 | 5 | D | Define local web auth boundary: loopback constraints, startup token, no secret echo, no permission bypass. | T22 | Security checklist | Complete |
-| T24 | 5 | C | Harden `fetch_url`: redirect diagnostics, sparse HTML hints, content-type summary, continuation tests. | TOOL-014/WEBFETCH | `cargo test -p talos-tools -p talos-agent` | Planned |
+| T24 | 5 | C | Harden `fetch_url`: redirect diagnostics, sparse HTML hints, content-type summary, continuation tests. | TOOL-014/WEBFETCH | `cargo test -p talos-tools -p talos-agent` | Complete |
 | T25 | 5 | C | Document `fetch_url` vs `http_request` vs `save_url` in README and site capability pages. | T24 | Docs/site validators | Complete |
-| T26 | 5 | E | Implement MEM-007 minimal compression packet for one low-risk tool family, default off. | T20 | Raw output preserved; stable-prefix test | Planned |
+| T26 | 5 | E | Implement MEM-007 minimal compression packet for one low-risk tool family, default off. | T20 | Raw output preserved; stable-prefix test | Complete |
 | T27 | 5 | A | Add governance status command enhancement or report mode for active/blocked/planned disposition. | GOV-003 | CLI tests; governance fixture tests | Planned |
 | T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Planned |
 | T29 | 6 | D | WEB-005 prototype design for browser page record ingestion without automation. | T18/T19 | Mock tests; no real browser dependency unless approved | Planned |

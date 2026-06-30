@@ -59,6 +59,8 @@ fn default_mode() -> String {
 pub struct FetchUrlTool {
     client: reqwest::Client,
     max_body_bytes: usize,
+    #[cfg(test)]
+    skip_ssrf: bool,
 }
 
 impl FetchUrlTool {
@@ -78,6 +80,40 @@ impl FetchUrlTool {
         Self {
             client,
             max_body_bytes,
+            #[cfg(test)]
+            skip_ssrf: false,
+        }
+    }
+
+    /// Creates a [`FetchUrlTool`] that skips SSRF checks (test-only).
+    #[cfg(test)]
+    pub fn for_testing(max_body_bytes: usize, redirect_limit: usize) -> Self {
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::limited(redirect_limit))
+            .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .build()
+            .expect("reqwest Client builder should never fail with default config");
+
+        Self {
+            client,
+            max_body_bytes,
+            skip_ssrf: true,
+        }
+    }
+
+    /// Creates a [`FetchUrlTool`] that skips SSRF and does not follow redirects (test-only).
+    #[cfg(test)]
+    pub fn for_testing_no_redirect(max_body_bytes: usize) -> Self {
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .build()
+            .expect("reqwest Client builder should never fail with default config");
+
+        Self {
+            client,
+            max_body_bytes,
+            skip_ssrf: true,
         }
     }
 }
@@ -167,7 +203,15 @@ impl AgentTool for FetchUrlTool {
             None => return ToolResult::error(format!("URL has no host: {}", parsed.url)),
         };
 
-        if let Err(e) = check_ssrf_host(&host).await {
+        #[cfg(not(test))]
+        let ssrf_blocked = check_ssrf_host(&host).await.err();
+        #[cfg(test)]
+        let ssrf_blocked = if self.skip_ssrf {
+            None
+        } else {
+            check_ssrf_host(&host).await.err()
+        };
+        if let Some(e) = ssrf_blocked {
             return ToolResult::error(format!("SSRF guard blocked request to {host}: {e}"));
         }
 
@@ -191,6 +235,7 @@ impl AgentTool for FetchUrlTool {
 
         let status = response.status();
         let response_headers = response.headers().clone();
+        let final_url = response.url().clone();
         let body_bytes = match response.bytes().await {
             Ok(bytes) => bytes,
             Err(e) => return ToolResult::error(format!("failed to read response body: {e}")),
@@ -216,10 +261,19 @@ impl AgentTool for FetchUrlTool {
             format!("{} bytes", body_bytes.len())
         };
 
+        let redirected = final_url.as_str() != parsed.url;
+
         let mut output = String::new();
         output.push_str(&format!("URL: {}\n", parsed.url));
         output.push_str(&format!("Status: {status}\n"));
         output.push_str(&format!("Content-Type: {content_type}\n"));
+
+        if redirected {
+            output.push_str(&format!("[redirected: {} → {}]\n", parsed.url, final_url));
+        }
+        if !content_type.is_empty() {
+            output.push_str(&format!("[content-type: {content_type}]\n"));
+        }
 
         if parsed.mode == "raw" {
             output.push_str(&format!("\nBody ({size_label}):\n"));
@@ -227,7 +281,18 @@ impl AgentTool for FetchUrlTool {
         } else if content_type.contains("text/html") {
             output.push_str(&format!("\nContent ({size_label}, text/html):\n"));
             let html = String::from_utf8_lossy(body_display);
-            output.push_str(&extract_html_text(&html));
+            let extracted_text = extract_html_text(&html);
+            output.push_str(&extracted_text);
+
+            let html_body_len = html.len();
+            let text_len = extracted_text.chars().count();
+            if text_len < 100 && html_body_len > 2000 {
+                output.push_str(
+                    "\n\n[Sparse HTML: page may be client-rendered (JavaScript/SPA). \
+                     Use http_request with appropriate headers or a browser-based tool for full content.]",
+                );
+            }
+
             if parsed.extract_links {
                 let links = extract_links(&html, &parsed.url);
                 if !links.is_empty() {
@@ -288,6 +353,9 @@ impl AgentTool for FetchUrlTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
 
     #[test]
     fn fetch_url_tool_metadata() {
@@ -310,6 +378,299 @@ mod tests {
                 "example.com",
                 ToolResourceKind::Domain
             )]
+        );
+    }
+
+    #[test]
+    fn extract_html_text_returns_empty_for_script_only() {
+        let html = r#"<html><head><script>var x=1;</script></head><body></body></html>"#;
+        let text = extract_html_text(html);
+        assert!(text.len() < 100 || text.contains("No visible text"));
+    }
+
+    #[test]
+    fn extract_html_text_extracts_body_text() {
+        let html = r#"<html><body><h1>Hello</h1><p>World</p></body></html>"#;
+        let text = extract_html_text(html);
+        assert!(text.contains("Hello"));
+        assert!(text.contains("World"));
+    }
+
+    #[test]
+    fn extract_html_text_large_html_minimal_text() {
+        let mut html = String::from("<html><head>");
+        for i in 0..200 {
+            html.push_str(&format!("<script>var x{i}={i};</script>\n"));
+        }
+        html.push_str("</head><body><div id=\"app\"></div></body></html>");
+        assert!(html.len() > 2000);
+        let text = extract_html_text(&html);
+        assert!(text.chars().count() < 100);
+    }
+
+    fn serve_http(listener: &TcpListener, response: &str) {
+        let (mut stream, _) = listener.accept().expect("accept failed");
+        let mut buf = [0u8; 4096];
+        let _ = stream.read(&mut buf).unwrap();
+        stream.write_all(response.as_bytes()).expect("write failed");
+        stream.flush().expect("flush failed");
+    }
+
+    fn serve_two_responses(listener: &TcpListener, response1: &str, response2: &str) {
+        let (mut stream, _) = listener.accept().expect("accept failed");
+        let mut buf = [0u8; 4096];
+        let _ = stream.read(&mut buf).unwrap();
+        stream
+            .write_all(response1.as_bytes())
+            .expect("write failed");
+        stream.flush().expect("flush failed");
+        drop(stream);
+
+        let (mut stream, _) = listener.accept().expect("accept failed");
+        let _ = stream.read(&mut buf).unwrap();
+        stream
+            .write_all(response2.as_bytes())
+            .expect("write failed");
+        stream.flush().expect("flush failed");
+    }
+
+    #[tokio::test]
+    async fn redirect_diagnostics_shows_final_url() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
+        let port = listener.local_addr().unwrap().port();
+
+        let redirect_response = format!(
+            "HTTP/1.1 302 Found\r\n\
+             Location: http://127.0.0.1:{port}/final\r\n\
+             Content-Type: text/html\r\n\
+             Content-Length: 0\r\n\r\n"
+        );
+        let final_response = format!(
+            "HTTP/1.1 200 OK\r\n\
+             Content-Type: text/html\r\n\
+             Content-Length: 27\r\n\r\n\
+             <html><body>Hello World</body></html>"
+        );
+
+        let server = thread::spawn(move || {
+            serve_two_responses(&listener, &redirect_response, &final_response);
+        });
+
+        let tool = FetchUrlTool::for_testing(65536, 5);
+        let result = tool
+            .execute(serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/start")
+            }))
+            .await;
+
+        server.join().unwrap();
+
+        assert!(!result.is_error);
+        assert!(
+            result.content.contains("[redirected:"),
+            "expected redirect diagnostic, got: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("→"),
+            "expected redirect arrow, got: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn content_type_summary_in_output() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
+        let port = listener.local_addr().unwrap().port();
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\n\
+             Content-Type: text/html; charset=utf-8\r\n\
+             Content-Length: 27\r\n\r\n\
+             <html><body>Hello World</body></html>"
+        );
+
+        let server = thread::spawn(move || {
+            serve_http(&listener, &response);
+        });
+
+        let tool = FetchUrlTool::for_testing(65536, 0);
+        let result = tool
+            .execute(serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/")
+            }))
+            .await;
+
+        server.join().unwrap();
+
+        assert!(!result.is_error);
+        assert!(
+            result
+                .content
+                .contains("[content-type: text/html; charset=utf-8]"),
+            "expected content-type summary, got: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn sparse_html_hint_for_spa_content() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
+        let port = listener.local_addr().unwrap().port();
+
+        let mut html_body = String::from("<html><head>");
+        for i in 0..200 {
+            html_body.push_str(&format!("<script>var x{i}={i};</script>\n"));
+        }
+        html_body.push_str("</head><body><div id=\"app\"></div></body></html>");
+        let body_len = html_body.len();
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\n\
+             Content-Type: text/html\r\n\
+             Content-Length: {body_len}\r\n\r\n\
+             {html_body}"
+        );
+
+        let server = thread::spawn(move || {
+            serve_http(&listener, &response);
+        });
+
+        let tool = FetchUrlTool::for_testing(65536, 0);
+        let result = tool
+            .execute(serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/")
+            }))
+            .await;
+
+        server.join().unwrap();
+
+        assert!(!result.is_error);
+        assert!(
+            result.content.contains("[Sparse HTML:"),
+            "expected sparse HTML hint, got: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("client-rendered"),
+            "expected client-rendered mention, got: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn continuation_emitted_for_redirect_status() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
+        let port = listener.local_addr().unwrap().port();
+
+        let redirect_response = format!(
+            "HTTP/1.1 302 Found\r\n\
+             Location: http://127.0.0.1:{port}/final\r\n\
+             Content-Type: text/html\r\n\
+             Content-Length: 0\r\n\r\n"
+        );
+
+        let server = thread::spawn(move || {
+            serve_http(&listener, &redirect_response);
+        });
+
+        let tool = FetchUrlTool::for_testing_no_redirect(65536);
+        let result = tool
+            .execute(serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/start")
+            }))
+            .await;
+
+        server.join().unwrap();
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("302"));
+        assert_eq!(result.continuations.len(), 1);
+        let cont = &result.continuations[0];
+        assert_eq!(cont.tool, "http_request");
+        assert_eq!(cont.reason, "advanced_http_required");
+        assert!(cont.is_tool_disclosure());
+    }
+
+    #[tokio::test]
+    async fn continuation_emitted_for_sparse_html() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
+        let port = listener.local_addr().unwrap().port();
+
+        let mut html_body = String::from("<html><head>");
+        for i in 0..200 {
+            html_body.push_str(&format!("<script>var x{i}={i};</script>\n"));
+        }
+        html_body.push_str("</head><body><div id=\"app\"></div></body></html>");
+        let body_len = html_body.len();
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\n\
+             Content-Type: text/html\r\n\
+             Content-Length: {body_len}\r\n\r\n\
+             {html_body}"
+        );
+
+        let server = thread::spawn(move || {
+            serve_http(&listener, &response);
+        });
+
+        let tool = FetchUrlTool::for_testing(65536, 0);
+        let result = tool
+            .execute(serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/")
+            }))
+            .await;
+
+        server.join().unwrap();
+
+        assert!(!result.is_error);
+        assert!(
+            result.content.contains("[Sparse HTML:"),
+            "expected sparse HTML hint, got: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn no_continuation_for_normal_html() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind failed");
+        let port = listener.local_addr().unwrap().port();
+
+        let body = "<html><body><h1>Welcome to Our Website</h1>\
+                    <p>This is a normal page with enough text content to exceed the \
+                    two hundred character threshold that triggers the continuation \
+                    mechanism. We need sufficient body text here to ensure the output \
+                    string grows beyond the limit. Additional paragraph with more \
+                    details about the page content and its purpose for testing.</p>\
+                    </body></html>";
+        let body_len = body.len();
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\n\
+             Content-Type: text/html\r\n\
+             Content-Length: {body_len}\r\n\r\n\
+             {body}"
+        );
+
+        let server = thread::spawn(move || {
+            serve_http(&listener, &response);
+        });
+
+        let tool = FetchUrlTool::for_testing(65536, 0);
+        let result = tool
+            .execute(serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/")
+            }))
+            .await;
+
+        server.join().unwrap();
+
+        assert!(!result.is_error);
+        assert!(
+            result.continuations.is_empty(),
+            "expected no continuation for normal HTML, got: {:?}",
+            result.continuations
         );
     }
 }

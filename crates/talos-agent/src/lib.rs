@@ -16,6 +16,7 @@
 //! approval is handled by the CLI layer.
 
 pub mod compaction;
+pub mod compression;
 pub mod token;
 
 use std::collections::HashMap;
@@ -43,6 +44,7 @@ use talos_sandbox::SandboxProvider;
 use thiserror::Error;
 use tokio::sync::mpsc;
 
+use crate::compression::BashOutputCompressor;
 use crate::configuration::describe_presented_tools;
 
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
@@ -166,6 +168,9 @@ pub struct Agent {
     cached_stable_prefix: std::sync::Mutex<Option<String>>,
     /// Optional memory provider callback for injecting memory into prompts.
     memory_provider: Option<Arc<MemoryProviderCallback>>,
+    /// When true, bash tool output exceeding the line threshold is compressed
+    /// before entering model context. Default: false.
+    bash_compression_enabled: bool,
 }
 
 impl Agent {
@@ -658,6 +663,13 @@ impl Agent {
                                 "{}\n\n[Analyze the error above and try a different approach.]",
                                 observed.result.content
                             ),
+                            ..ui_result.clone()
+                        }
+                    } else if self.bash_compression_enabled && observed.call.name == "bash" {
+                        let compressed =
+                            BashOutputCompressor::new().compress(&observed.result.content);
+                        MessageToolResult {
+                            content: compressed.content,
                             ..ui_result.clone()
                         }
                     } else {
