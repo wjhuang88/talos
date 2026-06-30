@@ -98,11 +98,11 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T09 | 2 | C | Implement TUI-014 grep result summary rendering. | TOOL-011/TUI docs | TUI tests; snapshot-free rendering tests | Complete |
 | T10 | 2 | C | Implement TUI-015 head+tail truncation for long unsuppressed tool outputs. | TUI-014 | TUI tests; `/export` raw-output proof | Complete |
 | T11 | 2 | A | Add self-bootstrap session evidence template under docs/tasks or docs/reference. | REL-002 | Governance validation | Complete |
-| T12 | 3 | B | Add runtime SDK quickstart examples for provider/tool injection, approvals, custom/append prompt, preview, shutdown. | RUNTIME-001 | `cargo test -p talos-runtime`; docs compile where applicable | Planned |
-| T13 | 3 | B | Define `talos-runtime` SDK support contract and direct-use caveats for `talos-agent`. | ARCH-031/RUNTIME-001 | Docs updated; matrix updated | Planned |
+| T12 | 3 | B | Add runtime SDK quickstart examples for provider/tool injection, approvals, custom/append prompt, preview, shutdown. | RUNTIME-001 | `cargo test -p talos-runtime`; docs compile where applicable | In Progress |
+| T13 | 3 | B | Define `talos-runtime` SDK support contract and direct-use caveats for `talos-agent`. | ARCH-031/RUNTIME-001 | Docs updated; matrix updated | Complete |
 | T14 | 3 | C | Start TOOL-011 ripgrep-backed grep engine implementation behind a feature or internal engine boundary. | ADR-025 | Unit tests compare current grep behavior | Planned |
 | T15 | 3 | C | Add regression tests for search hidden-dir behavior, include filters, large output summary, and UTF-8 snippets. | T14 | `cargo test -p talos-tools` | Planned |
-| T16 | 3 | G | Update public site roadmap to reflect cargo install, SDK, and self-bootstrap positioning accurately. | T05 | Site validator | Planned |
+| T16 | 3 | G | Update public site roadmap to reflect cargo install, SDK, and self-bootstrap positioning accurately. | T05 | Site validator | Complete |
 | T17 | 4 | C | Finish first ripgrep-backed grep slice or record a precise blocker. | T14 | Parity tests; performance note | Planned |
 | T18 | 4 | D | WEB-005 design: browser-session continuity permission model, page record schema, and no-cookie-leak boundary. | WEB-005/BrowserSkill research | ADR/proposal update | Planned |
 | T19 | 4 | D | Define `browser_page_read` permission facet and how it composes with `fetch_url` continuation disclosure. | T18/TOOL-013 | Permission tests planned | Planned |

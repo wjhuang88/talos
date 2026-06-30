@@ -128,6 +128,18 @@
         <ul>
           <li>
             <span class="talos-pill talos-pill--planned">Planned</span>
+            <code>cargo install talos-cli --bin talos</code> as a validated
+            Cargo install path. The <code>--path</code> source install works
+            today; crates.io publication is separately gated by the
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/reference/CRATE-PUBLICATION-MATRIX.md"
+              rel="noopener"
+              >publication matrix</a
+            >
+            and requires explicit maintainer approval.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--planned">Planned</span>
             Stable 1.0 SDK guarantee for the
             <code>talos-runtime</code> facade. Gated by
             <a
@@ -135,7 +147,13 @@
               rel="noopener"
               >REL-002</a
             >, which requires Talos to perform 100% self-bootstrap
-            development as the primary runtime with recorded evidence.
+            development as the primary runtime with recorded evidence. A
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/tasks/2026-06-30-four-month-self-bootstrap-product-hardening-plan.md"
+              rel="noopener"
+              >four-month hardening plan</a
+            >
+            is underway to produce the prerequisites and evidence.
           </li>
           <li>
             <span class="talos-pill talos-pill--planned">Planned</span>
@@ -194,7 +212,16 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--research">Research</span>
-            WASM plugin runtime and plugin marketplace. Tracked under
+            WASM plugin runtime and plugin marketplace. Architecture
+            decisions are
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/027-plugin-runtime-boundary.md"
+              rel="noopener"
+              >accepted (ADR-027/028/029/030)</a
+            >
+            but runtime implementation remains gated by a focused
+            <code>wasmtime</code> dependency and security review. Tracked
+            under
             <a
               href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md"
               rel="noopener"
