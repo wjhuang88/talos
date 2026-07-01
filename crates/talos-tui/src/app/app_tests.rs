@@ -712,6 +712,42 @@ fn bash_over_threshold_renders_head_and_tail() {
 }
 
 #[test]
+fn tool_result_scrollback_styles_primary_and_detail_lines() {
+    let display = ToolResultDisplay {
+        tool_name: Some("write".to_string()),
+        is_error: false,
+        content: "wrote 11 bytes to new.txt\npreview:\nhello world".to_string(),
+    };
+    let lines =
+        tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
+
+    assert_eq!(lines.len(), 3);
+    assert!(lines[0].segments[0].attrs.bold);
+    assert!(!lines[0].segments[0].attrs.dim);
+    assert_eq!(lines[0].segments[0].fg, Some(CColor::Green));
+    assert!(!lines[1].segments[0].attrs.bold);
+    assert!(lines[1].segments[0].attrs.dim);
+    assert_ne!(lines[1].segments[0].fg, Some(CColor::Green));
+    assert!(lines[2].segments[0].attrs.dim);
+}
+
+#[test]
+fn tool_result_error_detail_lines_keep_error_style() {
+    let display = ToolResultDisplay {
+        tool_name: Some("write".to_string()),
+        is_error: true,
+        content: "failed\npermission denied".to_string(),
+    };
+    let lines = tool_display::build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red));
+
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].segments[0].attrs.bold);
+    assert!(lines[1].segments[0].attrs.bold);
+    assert!(!lines[1].segments[0].attrs.dim);
+    assert_eq!(lines[1].segments[0].fg, Some(CColor::Red));
+}
+
+#[test]
 fn head_tail_omitted_count_is_correct() {
     for total in [31usize, 32, 50, 100] {
         let content = (0..total)

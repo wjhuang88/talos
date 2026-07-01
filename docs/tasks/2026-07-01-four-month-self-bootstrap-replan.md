@@ -134,8 +134,8 @@ Planned, and Blocked/Paused work that affects this replan.
 | T101 | 1 | B | Fix PROVIDER-001 streaming usage: request `include_usage`, parse usage-only chunks. | Issue #12 | `cargo test -p talos-provider`; request-body tests | Review |
 | T102 | 1 | B | Implement TUI-018 million-unit context limit formatting. | TUI status docs | `cargo test -p talos-tui` targeted | Review |
 | T103 | 1 | B | Implement TUI-017 context usage percentage using accurate usage when available. | T101 | TUI compact/status tests | Review |
-| T104 | 2 | C | Implement TOOL-015 write/edit result visibility with bounded preview/diff. | TOOL-003 | `cargo test -p talos-tools -p talos-tui` | Planned |
-| T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Planned |
+| T104 | 2 | C | Implement TOOL-015 write/edit result visibility with bounded preview/diff. | TOOL-003 | `cargo test -p talos-tools -p talos-tui` | Review |
+| T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Review |
 | T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Planned |
 | T107 | 3 | A | Design autonomous validation loop: command/tool shape, security boundary, and no-hidden-pass rules. | REL-002/T52 evidence | ADR/proposal or owner-doc decision | Planned |
 | T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Planned |
@@ -257,3 +257,9 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - T102 implemented `M ctx` formatting for million-token context limits while preserving sub-million behavior.
 - T103 implemented context usage percentages in the status bar using input plus output tokens.
 - Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-provider`; `cargo test -p talos-tui status_bar`; `cargo test -p talos-tui`; `cargo check --workspace`; `cargo clippy -p talos-provider -p talos-tui -- -D warnings`; `scripts/validate_project_governance.sh .`.
+
+### I076 T104-T105 Review Checkpoint (2026-07-01)
+
+- T104 implemented bounded `write` previews and bounded `edit` replacement diffs in model-facing tool results.
+- T105 implemented primary/detail styling for tool result scrollback while preserving error-line prominence.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-tools file_tool_tests`; `cargo test -p talos-tui tool_result`; `cargo test -p talos-tools`; `cargo test -p talos-tui`; `cargo check --workspace`; `cargo clippy -p talos-tools -p talos-tui -- -D warnings`; `scripts/validate_project_governance.sh .`.

@@ -9,6 +9,9 @@ use talos_core::tool_parameters;
 
 use super::{FileToolError, resolve_workspace_path};
 
+const MAX_PREVIEW_LINES: usize = 20;
+const MAX_PREVIEW_CHARS: usize = 2_000;
+
 /// Input parameters for the [`WriteTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteInput {
@@ -44,9 +47,10 @@ impl WriteTool {
         tokio::fs::write(&path, &write_input.content).await?;
 
         Ok(format!(
-            "wrote {} bytes to {}",
+            "wrote {} bytes to {}\npreview:\n{}",
             write_input.content.len(),
-            write_input.path
+            write_input.path,
+            bounded_preview(&write_input.content)
         ))
     }
 }
@@ -129,7 +133,11 @@ impl EditTool {
 
         tokio::fs::write(&path, &new_content).await?;
 
-        Ok(format!("edited {}", edit_input.path))
+        Ok(format!(
+            "edited {}\ndiff:\n{}",
+            edit_input.path,
+            bounded_replacement_diff(&edit_input.old_string, &edit_input.new_string)
+        ))
     }
 }
 
@@ -165,4 +173,72 @@ impl AgentTool for EditTool {
     fn is_always_on(&self) -> bool {
         true
     }
+}
+
+fn bounded_preview(content: &str) -> String {
+    if content.is_empty() {
+        return "(empty)".to_string();
+    }
+
+    let total_lines = content.lines().count();
+    let mut rendered = String::new();
+    let mut used_chars = 0usize;
+    let mut truncated = false;
+
+    for (idx, line) in content.lines().enumerate() {
+        if idx >= MAX_PREVIEW_LINES {
+            truncated = true;
+            break;
+        }
+        if used_chars >= MAX_PREVIEW_CHARS {
+            truncated = true;
+            break;
+        }
+
+        let remaining = MAX_PREVIEW_CHARS - used_chars;
+        let line_chars = line.chars().count();
+        if line_chars > remaining {
+            rendered.push_str(&line.chars().take(remaining).collect::<String>());
+            used_chars = MAX_PREVIEW_CHARS;
+            truncated = true;
+            break;
+        }
+
+        if idx > 0 {
+            rendered.push('\n');
+            used_chars += 1;
+        }
+        rendered.push_str(line);
+        used_chars += line_chars;
+    }
+
+    if content.chars().count() > used_chars {
+        truncated = true;
+    }
+
+    if truncated {
+        if !rendered.is_empty() {
+            rendered.push('\n');
+        }
+        rendered.push_str(&format!(
+            "... preview truncated ({total_lines} lines, {} bytes total)",
+            content.len()
+        ));
+    }
+
+    rendered
+}
+
+fn bounded_replacement_diff(old: &str, new: &str) -> String {
+    let old_preview = prefixed_block("-", old);
+    let new_preview = prefixed_block("+", new);
+    format!("{old_preview}\n{new_preview}")
+}
+
+fn prefixed_block(prefix: &str, content: &str) -> String {
+    bounded_preview(content)
+        .lines()
+        .map(|line| format!("{prefix} {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }

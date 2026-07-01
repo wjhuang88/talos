@@ -228,7 +228,7 @@ pub(crate) fn build_tool_result_scrollback_lines(
             vec![HistorySegment::styled(
                 format!("   {icon} {}", suppressed_tool_result_summary(display)),
                 color,
-                HistoryAttrs::default(),
+                primary_result_attrs(),
             )],
             None,
         )];
@@ -239,7 +239,7 @@ pub(crate) fn build_tool_result_scrollback_lines(
             vec![HistorySegment::styled(
                 format!("   {icon} (no output)"),
                 color,
-                HistoryAttrs::default(),
+                primary_result_attrs(),
             )],
             None,
         )];
@@ -252,18 +252,19 @@ pub(crate) fn build_tool_result_scrollback_lines(
     // counter in between. This is scrollback-display only; `/export` writes the
     // raw `ToolResultDisplay::content` and never enters this path.
     if all_lines.len() > SUMMARIZE_OUTPUT_THRESHOLD_LINES {
-        return build_head_tail_scrollback_lines(&all_lines, icon, color);
+        return build_head_tail_scrollback_lines(display, &all_lines, icon, color);
     }
 
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
         let prefix = if idx == 0 { icon } else { " " };
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        let (line_color, attrs) = result_line_style(display, idx, color);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
                 format!("   {prefix} {truncated}"),
-                color,
-                HistoryAttrs::default(),
+                line_color,
+                attrs,
             )],
             None,
         ));
@@ -273,6 +274,7 @@ pub(crate) fn build_tool_result_scrollback_lines(
 }
 
 fn build_head_tail_scrollback_lines(
+    display: &ToolResultDisplay,
     all_lines: &[&str],
     icon: &str,
     color: Option<CColor>,
@@ -284,11 +286,12 @@ fn build_head_tail_scrollback_lines(
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
         let prefix = if idx == 0 { icon } else { " " };
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        let (line_color, attrs) = result_line_style(display, idx, color);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
                 format!("   {prefix} {truncated}"),
-                color,
-                HistoryAttrs::default(),
+                line_color,
+                attrs,
             )],
             None,
         ));
@@ -310,17 +313,51 @@ fn build_head_tail_scrollback_lines(
     let tail_start = all_lines.len().saturating_sub(TAIL_LINES);
     for line in all_lines.iter().skip(tail_start) {
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
+        let (line_color, attrs) = if display.is_error {
+            (color, primary_result_attrs())
+        } else {
+            (dim, secondary_result_attrs())
+        };
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
                 format!("     {truncated}"),
-                color,
-                HistoryAttrs::default(),
+                line_color,
+                attrs,
             )],
             None,
         ));
     }
 
     lines
+}
+
+fn result_line_style(
+    display: &ToolResultDisplay,
+    line_index: usize,
+    primary_color: Option<CColor>,
+) -> (Option<CColor>, HistoryAttrs) {
+    if line_index == 0 || display.is_error {
+        return (primary_color, primary_result_attrs());
+    }
+
+    (
+        to_crossterm_color(semantic::DIM_TEXT),
+        secondary_result_attrs(),
+    )
+}
+
+fn primary_result_attrs() -> HistoryAttrs {
+    HistoryAttrs {
+        bold: true,
+        ..HistoryAttrs::default()
+    }
+}
+
+fn secondary_result_attrs() -> HistoryAttrs {
+    HistoryAttrs {
+        dim: true,
+        ..HistoryAttrs::default()
+    }
 }
 
 pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {

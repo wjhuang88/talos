@@ -209,9 +209,33 @@ mod file_tool_tests {
 
         assert!(!result.is_error);
         assert!(result.content.contains("wrote"));
+        assert!(result.content.contains("11 bytes"));
+        assert!(result.content.contains("preview:"));
+        assert!(result.content.contains("hello world"));
 
         let content = fs::read_to_string(temp_dir.path().join("new.txt")).unwrap();
         assert_eq!(content, "hello world");
+    }
+
+    #[tokio::test]
+    async fn test_write_tool_large_preview_is_bounded() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let tool = WriteTool::new(temp_dir.path().to_path_buf());
+        let content = (0..40)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let result = tool
+            .execute(json!({ "path": "large.txt", "content": content }))
+            .await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("preview:"));
+        assert!(result.content.contains("line 0"));
+        assert!(result.content.contains("line 19"));
+        assert!(!result.content.contains("line 20"));
+        assert!(result.content.contains("preview truncated"));
     }
 
     #[tokio::test]
@@ -265,6 +289,10 @@ mod file_tool_tests {
             .await;
 
         assert!(!result.is_error);
+        assert!(result.content.contains("edited edit.txt"));
+        assert!(result.content.contains("diff:"));
+        assert!(result.content.contains("- foo"));
+        assert!(result.content.contains("+ qux"));
         let content = fs::read_to_string(&file).unwrap();
         assert_eq!(content, "qux bar foo baz");
     }
