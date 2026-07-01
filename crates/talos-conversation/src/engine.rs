@@ -330,7 +330,14 @@ impl ConversationEngine {
                 }));
             }
             "/plugins" => {
-                outputs.extend(self.handle_plugins_command());
+                let text = "[System] /plugins is reserved for future plugin packages.\n[System] Use /mcp to inspect MCP server status and tool provenance.\n".to_string();
+                outputs.push(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::System,
+                    stream: Box::pin(stream::once(async move { text })),
+                }));
+            }
+            "/mcp" => {
+                outputs.extend(self.handle_mcp_command());
             }
             "/skills" => {
                 outputs.extend(self.handle_skills_command(arg));
@@ -492,7 +499,7 @@ impl ConversationEngine {
         outputs
     }
 
-    fn handle_plugins_command(&mut self) -> Vec<UiOutput> {
+    fn handle_mcp_command(&mut self) -> Vec<UiOutput> {
         if self.mcp_servers.is_empty() && self.plugin_observations.is_empty() {
             let text = "[System] No MCP servers configured and no tool provenance observed yet.\n"
                 .to_string();

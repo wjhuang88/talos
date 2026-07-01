@@ -47,13 +47,12 @@ Slice 2, after PLUGIN-001 ships:
 
 ## Acceptance Criteria
 
-- [ ] `/mcp` shows MCP server status and observed MCP tool provenance.
-- [ ] `/plugins` is either reserved, aliased to `/mcp` during transition, or lists loaded plugins
-      (depending on whether PLUGIN-001 has shipped).
+- [x] `/mcp` shows MCP server status and observed MCP tool provenance.
+- [x] `/plugins` shows a transition notice (not aliased to `/mcp`) until plugin packages ship.
 - [ ] `/hooks` lists registered hooks once HOOK-001 ships.
-- [ ] `/skills` unchanged.
-- [ ] README, slash-command menu, and help text updated.
-- [ ] No command-name collision or silent override.
+- [x] `/skills` unchanged.
+- [x] README, slash-command menu, and help text updated.
+- [x] No command-name collision or silent override.
 
 ## Required Reads
 

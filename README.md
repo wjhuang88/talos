@@ -319,7 +319,8 @@ mode.
 | `/help` | Show available commands |
 | `/quit`, `/exit` | Exit Talos |
 | `/status` | Show session info (model, token usage) |
-| `/plugins` | List observed tool provenance and MCP server status |
+| `/plugins` | Plugin packages (not yet available — use /mcp for MCP status) |
+| `/mcp` | Show MCP server status and observed tool provenance |
 | `/skills` | List available runtime skills and active state |
 | `/skills activate <name>` | Activate one Skill body for subsequent provider requests |
 | `/skills reference <path>` | Load a bounded reference file for the active Skill |
@@ -372,7 +373,7 @@ Talos starts configured servers and discovers their tools before the first model
 print, inline, interactive, and RPC modes. Tool names use the
 `mcp:<server>:<tool>` form. Read-only annotations are honored; other MCP tools use the normal
 approval path and are denied when interactive approval is unavailable. Startup failures are
-reported without aborting the session, and each MCP request has a bounded timeout. Use `/plugins`
+reported without aborting the session, and each MCP request has a bounded timeout. Use `/mcp`
 in the TUI to inspect the startup connection snapshot and observed tool provenance.
 
 The MCP tool set is fixed for the lifetime of a session so the model-visible tool definitions and

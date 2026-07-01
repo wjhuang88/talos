@@ -283,7 +283,8 @@ TUI 中可用的斜杠命令：
 | `/help` | 显示可用命令 |
 | `/quit`、`/exit` | 退出 Talos |
 | `/status` | 显示会话信息（模型、token 用量） |
-| `/plugins` | 列出已观察的工具来源和 MCP 服务状态 |
+| `/plugins` | 插件包（暂不可用 — MCP 状态请使用 /mcp） |
+| `/mcp` | 显示 MCP 服务状态和已观察到的工具来源 |
 | `/skills` | 列出运行时可用技能和当前激活状态 |
 | `/skills activate <name>` | 激活一个 Skill 主体，加入后续模型请求上下文 |
 | `/skills reference <path>` | 为当前激活 Skill 加载一个有大小上限的引用文件 |
@@ -341,7 +342,7 @@ env = {}
 Talos 会在 TUI、print、inline、interactive 和 RPC 模式的首个模型回合前启动已配置的
 服务并发现工具。工具名称使用 `mcp:<server>:<tool>` 格式。只读标注会被保留，其他 MCP
 工具进入正常批准流程；无法交互批准时默认拒绝。单个服务启动失败不会中止会话，每个
-MCP 请求也有超时上限。TUI 中可使用 `/plugins` 查看启动连接快照和本会话已观察到的
+MCP 请求也有超时上限。TUI 中可使用 `/mcp` 查看启动连接快照和本会话已观察到的
 工具来源。
 
 会话期间 MCP 工具集保持不变，以维持模型可见工具定义和提示词缓存前缀稳定。修改 MCP

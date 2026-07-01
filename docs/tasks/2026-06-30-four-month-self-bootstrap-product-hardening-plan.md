@@ -127,7 +127,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T38 | 7 | A | First Talos-on-Talos rehearsal session: documentation-only change with full evidence template. | T11/GOV-003 | Evidence record; external assistance labeled | Complete |
 | T39 | 8 | A | Month-2 closeout and replan: decide whether WEB-001/WEB-005 are ready and whether ADR-027 dependency/security review clears plugin runtime work. | T22-T38 | Workspace tests; governance | Complete |
 | T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Complete |
-| T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Planned |
+| T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Complete |
 | T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Planned |
 | T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
 | T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Planned |
@@ -707,3 +707,26 @@ rendering paths.
 - `scripts/validate_project_governance.sh .` → 0 warnings.
 
 **Next task item**: T41 — implement `/mcp` command and `/plugins` transition notice (ADR-030).
+
+### Checkpoint T41 — Command Taxonomy /mcp + /plugins Transition (2026-07-01)
+
+**Task**: T41 — Implement `/mcp` command and `/plugins` transition notice.
+
+**Completed**:
+- Added `/mcp` to the command registry. The existing `handle_plugins_command` body (MCP server
+  startup snapshot + per-provenance tool call counts) is now dispatched through `/mcp`. Function
+  renamed to `handle_mcp_command` for clarity.
+- `/plugins` now emits a transition notice: "/plugins is reserved for future plugin packages. Use
+  /mcp to inspect MCP server status and tool provenance." It does NOT alias `/mcp` (per ADR-030).
+- Updated slash command descriptions, `/help` output, README (English + zh-CN), and MCP docs section.
+- 5 tests: 2 for `/plugins` transition notice (text + no MCP status leak), 3 for `/mcp` (observations,
+  empty state, startup snapshot). The `every_visible_slash_command_has_an_execution_path` meta-test
+  confirms both commands have working execution paths.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo clippy -p talos-conversation -- -D warnings` → no warnings.
+- `cargo test -p talos-conversation` → 78 passed, 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Next task item**: T42 — WEB-001 read-only loopback dashboard MVP (ADR-031).

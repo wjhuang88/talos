@@ -425,6 +425,7 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/quit"));
     assert!(text.contains("/status"));
     assert!(text.contains("/plugins"));
+    assert!(text.contains("/mcp"));
     assert!(text.contains("/skills"));
     assert!(text.contains("/copy"));
     assert!(text.contains("/export"));
@@ -488,11 +489,44 @@ async fn slash_status_shows_model_and_tokens() {
 }
 
 // ---------------------------------------------------------------------------
-// handle_slash_command: /plugins
+// handle_slash_command: /plugins (transition notice) and /mcp
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn slash_plugins_shows_observations() {
+async fn slash_plugins_shows_transition_notice() {
+    let mut engine = new_engine();
+    engine.plugin_observations.push(PluginObservation {
+        key: "native".to_string(),
+        count: 5,
+    });
+
+    let outputs = engine.handle_slash_command("/plugins");
+
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("reserved for future plugin packages"));
+    assert!(text.contains("Use /mcp"));
+    assert!(!text.contains("Observed tool provenance"));
+}
+
+#[tokio::test]
+async fn slash_plugins_notice_does_not_leak_mcp_status() {
+    let mut engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "github".to_string(),
+        connected: true,
+        tool_count: 3,
+        error: None,
+    }]);
+
+    let outputs = engine.handle_slash_command("/plugins");
+
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(!text.contains("MCP servers (startup snapshot)"));
+    assert!(!text.contains("github"));
+}
+
+#[tokio::test]
+async fn slash_mcp_shows_observations() {
     let mut engine = new_engine();
     engine.plugin_observations.push(PluginObservation {
         key: "native".to_string(),
@@ -503,7 +537,7 @@ async fn slash_plugins_shows_observations() {
         count: 2,
     });
 
-    let outputs = engine.handle_slash_command("/plugins");
+    let outputs = engine.handle_slash_command("/mcp");
 
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
@@ -513,10 +547,10 @@ async fn slash_plugins_shows_observations() {
 }
 
 #[tokio::test]
-async fn slash_plugins_empty_shows_no_tools_message() {
+async fn slash_mcp_empty_shows_no_tools_message() {
     let mut engine = new_engine();
 
-    let outputs = engine.handle_slash_command("/plugins");
+    let outputs = engine.handle_slash_command("/mcp");
 
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
@@ -524,7 +558,7 @@ async fn slash_plugins_empty_shows_no_tools_message() {
 }
 
 #[tokio::test]
-async fn slash_plugins_shows_startup_mcp_status_before_any_call() {
+async fn slash_mcp_shows_startup_mcp_status_before_any_call() {
     let mut engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
         name: "github".to_string(),
         connected: true,
@@ -532,7 +566,7 @@ async fn slash_plugins_shows_startup_mcp_status_before_any_call() {
         error: None,
     }]);
 
-    let outputs = engine.handle_slash_command("/plugins");
+    let outputs = engine.handle_slash_command("/mcp");
 
     let (_, text) = collect_stream(outputs).await.unwrap();
     assert!(text.contains("MCP servers (startup snapshot)"));
