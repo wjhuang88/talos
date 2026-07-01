@@ -134,7 +134,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Complete |
 | T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Complete |
 | T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Complete |
-| T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Planned |
+| T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Complete |
 | T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Planned |
 | T50 | 11 | E | Implement associative recall API default-off; no automatic prompt injection yet. | T43 | Unit tests; bounded multi-hop tests | Planned |
 | T51 | 11 | E | Add metrics for memory/context compression: tokens saved, retrieval hits, hidden-output drops. | T26/T50 | Metrics tests; docs | Planned |
@@ -903,3 +903,20 @@ T48 (runtime publish gate), T49 (zh-CN site translation). Then Month-3 closeout 
 - `scripts/check_publish_guard.sh .` → all guards verified.
 
 **Next task item**: T48 — talos-runtime publish gate preparation (Track B, Week 10).
+
+### Checkpoint T48 — Runtime Publish Gate Preparation (2026-07-01)
+
+**Task**: T48 — Prepare talos-runtime publish gate: dry-run dependency closure, SDK docs, support caveats.
+
+**Completed**:
+- `cargo publish --dry-run -p talos-runtime` fails: `talos-agent` not on crates.io.
+- Recorded 4 blockers: talos-agent, talos-core, talos-permission, talos-sandbox (all gate-before-publish).
+- Documented required publish order: talos-core → talos-permission → talos-sandbox → talos-agent → talos-runtime.
+- Updated CRATE-PUBLICATION-MATRIX §A5 with dry-run evidence and dependency closure table.
+- SDK docs (RUNTIME-SDK-CONTRACT.md) and quickstart examples (T12/T13) already in place — no gaps found.
+- No crate was published or `publish = false` removed — real publish requires maintainer approval (T56).
+
+**Validation**: Evidence recorded in CRATE-PUBLICATION-MATRIX.md §A5.
+
+**Next task item**: T49 — zh-CN site translation slice (Track G, Week 10). Then Week 11–12 tasks
+(T50–T54).
