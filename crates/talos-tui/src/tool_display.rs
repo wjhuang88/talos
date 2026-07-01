@@ -331,6 +331,11 @@ pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> Sc
     let provenance_marker = match &tool_call.provenance {
         ToolProvenance::Native => None,
         ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", server)),
+        ToolProvenance::Plugin {
+            name,
+            version,
+            carrier,
+        } => Some(format!("[plugin:{}@{}/{}]", name, version, carrier)),
     };
     let accent = to_crossterm_color(semantic::TEXT_ACCENT);
     let prefix_color = to_crossterm_color(semantic::PREFIX_ASSISTANT);
@@ -363,4 +368,47 @@ pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> Sc
         HistoryAttrs::default(),
     ));
     ScrollbackLine::styled(segments, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_conversation::ToolCallDisplay;
+
+    fn make_display(provenance: ToolProvenance) -> ToolCallDisplay {
+        ToolCallDisplay {
+            tool_name: "custom_tool".to_string(),
+            arguments: serde_json::json!({}),
+            provenance,
+            summary_fields: vec![],
+        }
+    }
+
+    #[test]
+    fn plugin_provenance_scrollback_marker() {
+        let display = make_display(ToolProvenance::Plugin {
+            name: "my-plugin".to_string(),
+            version: "0.1.0".to_string(),
+            carrier: "wasm".to_string(),
+        });
+        let line = build_tool_call_scrollback_line(&display);
+        assert!(line.text.contains("[plugin:my-plugin@0.1.0/wasm]"));
+    }
+
+    #[test]
+    fn native_provenance_has_no_marker() {
+        let display = make_display(ToolProvenance::Native);
+        let line = build_tool_call_scrollback_line(&display);
+        assert!(!line.text.contains("[mcp:"));
+        assert!(!line.text.contains("[plugin:"));
+    }
+
+    #[test]
+    fn mcp_provenance_scrollback_marker_unchanged() {
+        let display = make_display(ToolProvenance::McpRemote {
+            server: "github".to_string(),
+        });
+        let line = build_tool_call_scrollback_line(&display);
+        assert!(line.text.contains("[mcp:github]"));
+    }
 }

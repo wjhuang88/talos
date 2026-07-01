@@ -90,8 +90,9 @@ host calls, sandbox limits, compatibility, and failure behavior.
 
 1. Add plugin manifest parser and validation only; no executable artifact instantiation during
    discovery.
-2. Add `ToolProvenance::Plugin { name, version, carrier }` and render/serialize it through existing
-   tool-call paths.
+2. ~~Add `ToolProvenance::Plugin { name, version, carrier }` and render/serialize it through existing
+   tool-call paths.~~ **Complete (T40, 2026-07-01)**: variant added to `talos-core`; observation key,
+   scrollback badge, and TUI bubble rendering updated; 8 tests across core/conversation/TUI.
 3. Add local explicit plugin package loading behind config/CLI opt-in.
 4. Add one fixture WASM read-only tool through the existing `AgentTool`/permission pipeline.
 5. Cover success, malformed manifest, invalid module, trap, timeout, oversized output, and denied

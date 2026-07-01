@@ -126,7 +126,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T37 | 7 | B | Update CRATE-PUBLICATION-MATRIX with cargo install dry-run evidence and SDK publish blockers. | T07/T08/T13 | Matrix reviewed | Complete |
 | T38 | 7 | A | First Talos-on-Talos rehearsal session: documentation-only change with full evidence template. | T11/GOV-003 | Evidence record; external assistance labeled | Complete |
 | T39 | 8 | A | Month-2 closeout and replan: decide whether WEB-001/WEB-005 are ready and whether ADR-027 dependency/security review clears plugin runtime work. | T22-T38 | Workspace tests; governance | Complete |
-| T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Planned |
+| T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Complete |
 | T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Planned |
 | T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Planned |
 | T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
@@ -670,3 +670,40 @@ rereading WEB-005 and this closeout.
 - REL-002 remains blocked on real Talos-as-primary-runtime rehearsal evidence.
 - WEB-005 real browser connectors still need a connector-specific ADR; T47 mock backend remains
   allowed.
+
+### Checkpoint T40 — Plugin Tool Provenance Data Model (2026-07-01)
+
+**Task**: T40 — Implement minimal `ToolProvenance::Plugin { name, version, carrier }` data model and
+rendering paths.
+
+**Completed**:
+- Added `ToolProvenance::Plugin { name, version, carrier }` to `talos-core/src/tool.rs`. The variant
+  serializes as `{"type":"plugin",...}` via the existing serde tagged-enum derive. No `JsonSchema`
+  derive is present, so no schema registration needed.
+- Updated three exhaustive match sites: `plugin_observation_key()` in `talos-conversation` (key
+  format `plugin:<name>@<version>/<carrier>` with 24-char name truncation), scrollback badge in
+  `talos-tui/tool_display.rs` (`[plugin:<name>@<version>/<carrier>]`), and viewport bubble badge in
+  `talos-tui/widgets.rs` (refactored `if let` to `match` for exhaustiveness).
+- ADR-028 correction: the ADR claimed `ToolProvenance` was already `#[non_exhaustive]`; the actual
+  code has no such attribute. The correction is recorded in ADR-028's constraint decomposition
+  table. Exhaustive matches are safer for a pre-1.0 `publish = false` crate.
+- Scope note: provenance persistence across session reload is out of scope for T40. History
+  hydration (`app.rs`, `scrollback.rs`) hardcodes `Native` when reconstructing tool calls from
+  persisted messages. Plugin provenance will survive for the live session only until a separate
+  persistence slice extends the `Message` format.
+
+**Tests added** (8 total):
+- `talos-core`: `tool_provenance_plugin_serde_roundtrip`, `tool_provenance_all_variants_serde_roundtrip`.
+- `talos-conversation`: `provenance_plugin_key`, `provenance_truncates_long_plugin_names`,
+  `provenance_groups_plugin_packages_separately_from_mcp`.
+- `talos-tui`: `plugin_provenance_scrollback_marker`, `native_provenance_has_no_marker`,
+  `mcp_provenance_scrollback_marker_unchanged`.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo check --workspace` → pass.
+- `cargo clippy -p talos-core -p talos-conversation -p talos-tui -- -D warnings` → no warnings.
+- `cargo test -p talos-core -p talos-conversation -p talos-tui` → 33 + 76 + 174 passed, 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Next task item**: T41 — implement `/mcp` command and `/plugins` transition notice (ADR-030).

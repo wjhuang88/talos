@@ -27,6 +27,19 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
             };
             format!("mcp:{server}")
         }
+        ToolProvenance::Plugin {
+            name,
+            version,
+            carrier,
+        } => {
+            let name_display = if name.chars().count() > 24 {
+                let truncated: String = name.chars().take(23).collect();
+                format!("{truncated}…")
+            } else {
+                name.clone()
+            };
+            format!("plugin:{name_display}@{version}/{carrier}")
+        }
     }
 }
 

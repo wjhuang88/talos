@@ -76,9 +76,17 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
             Span::styled(" → ", prefix_style),
             Span::styled(self.tool_name.to_string(), tool_name_style),
         ];
-        if let ToolProvenance::McpRemote { server } = &self.provenance {
-            let server_display = truncate(server, 24);
-            spans.push(Span::styled(format!("[mcp:{}]", server_display), dim_style));
+        let provenance_badge: Option<String> = match &self.provenance {
+            ToolProvenance::Native => None,
+            ToolProvenance::McpRemote { server } => Some(format!("[mcp:{}]", truncate(server, 24))),
+            ToolProvenance::Plugin {
+                name,
+                version,
+                carrier,
+            } => Some(format!("[plugin:{}@{}/{}]", name, version, carrier)),
+        };
+        if let Some(badge) = provenance_badge {
+            spans.push(Span::styled(badge, dim_style));
         }
         spans.push(Span::raw(", "));
         spans.push(Span::styled(args_display, dim_style));

@@ -18,7 +18,7 @@ their source and weakening auditability.
 | Tool provenance must remain typed and auditable. | Hard | ADR-009 / safety model | No |
 | Plugin tools must not masquerade as native tools. | Hard | Permission/provenance boundary | No |
 | Public APIs are semver-bound. | Hard | AGENTS.md Hard Constraint #6 | No |
-| `ToolProvenance` is already `#[non_exhaustive]`. | Known | ADR-009 implementation | No |
+| ~~`ToolProvenance` is already `#[non_exhaustive]`.~~ | ~~Known~~ | ~~ADR-009 implementation~~ | Correction (2026-07-01, T40): `ToolProvenance` does **not** carry `#[non_exhaustive]` in the actual `talos-core/src/tool.rs` implementation. Adding the `Plugin` variant therefore produces compiler-enforced exhaustive-match updates at three callsites, which is safer for a pre-1.0 `publish = false` crate. The decision is unaffected; only the premise row is corrected. |
 
 ## Reasoning
 

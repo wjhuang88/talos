@@ -942,6 +942,100 @@ fn provenance_groups_mcp_servers() {
     assert_eq!(fs.count, 1);
 }
 
+#[test]
+fn provenance_plugin_key() {
+    let mut engine = new_engine();
+    let provenance = ToolProvenance::Plugin {
+        name: "my-plugin".to_string(),
+        version: "0.1.0".to_string(),
+        carrier: "wasm".to_string(),
+    };
+
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call("custom_tool", provenance.clone()),
+        provenance,
+        summary_fields: vec![],
+    });
+
+    assert_eq!(engine.plugin_observations.len(), 1);
+    assert_eq!(
+        engine.plugin_observations[0].key,
+        "plugin:my-plugin@0.1.0/wasm"
+    );
+    assert_eq!(engine.plugin_observations[0].count, 1);
+}
+
+#[test]
+fn provenance_truncates_long_plugin_names() {
+    let mut engine = new_engine();
+    let long_name = "a".repeat(30);
+    let provenance = ToolProvenance::Plugin {
+        name: long_name.clone(),
+        version: "0.1.0".to_string(),
+        carrier: "wasm".to_string(),
+    };
+
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call("tool", provenance.clone()),
+        provenance,
+        summary_fields: vec![],
+    });
+
+    assert_eq!(engine.plugin_observations.len(), 1);
+    let key = &engine.plugin_observations[0].key;
+    assert!(key.starts_with("plugin:"));
+    assert!(key.contains('…'));
+    assert!(key.ends_with("@0.1.0/wasm"));
+}
+
+#[test]
+fn provenance_groups_plugin_packages_separately_from_mcp() {
+    let mut engine = new_engine();
+
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call(
+            "search",
+            ToolProvenance::McpRemote {
+                server: "github".to_string(),
+            },
+        ),
+        provenance: ToolProvenance::McpRemote {
+            server: "github".to_string(),
+        },
+        summary_fields: vec![],
+    });
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call(
+            "custom",
+            ToolProvenance::Plugin {
+                name: "my-plugin".to_string(),
+                version: "0.1.0".to_string(),
+                carrier: "wasm".to_string(),
+            },
+        ),
+        provenance: ToolProvenance::Plugin {
+            name: "my-plugin".to_string(),
+            version: "0.1.0".to_string(),
+            carrier: "wasm".to_string(),
+        },
+        summary_fields: vec![],
+    });
+
+    assert_eq!(engine.plugin_observations.len(), 2);
+    assert!(
+        engine
+            .plugin_observations
+            .iter()
+            .any(|e| e.key == "mcp:github")
+    );
+    assert!(
+        engine
+            .plugin_observations
+            .iter()
+            .any(|e| e.key == "plugin:my-plugin@0.1.0/wasm")
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Transcript tests
 // ---------------------------------------------------------------------------

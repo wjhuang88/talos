@@ -39,6 +39,17 @@ pub enum ToolProvenance {
     Native,
     /// A tool provided by a remote MCP server.
     McpRemote { server: String },
+    /// A tool supplied by a plugin package (ADR-028).
+    ///
+    /// `carrier` is a free-form string (e.g. `"wasm"`) governed by ADR-027 so
+    /// future carriers can be introduced without forcing downstream exhaustive
+    /// updates. Plugin provenance is descriptive only and does not grant
+    /// permissions.
+    Plugin {
+        name: String,
+        version: String,
+        carrier: String,
+    },
 }
 
 /// A structured request for the runtime to disclose a narrower tool backend or
@@ -962,6 +973,41 @@ mod tests {
         assert!(policy.allows_backend("fetch_url", "browser_page"));
         assert!(!policy.allows_backend("fetch_url", "advanced_http"));
         assert!(policy.backend_set_for("fetch_url").contains("browser_page"));
+    }
+
+    #[test]
+    fn tool_provenance_plugin_serde_roundtrip() {
+        let provenance = ToolProvenance::Plugin {
+            name: "my-plugin".to_string(),
+            version: "0.1.0".to_string(),
+            carrier: "wasm".to_string(),
+        };
+        let json = serde_json::to_string(&provenance).unwrap();
+        assert!(json.contains("\"type\":\"plugin\""));
+        assert!(json.contains("\"name\":\"my-plugin\""));
+        assert!(json.contains("\"carrier\":\"wasm\""));
+        let back: ToolProvenance = serde_json::from_str(&json).unwrap();
+        assert_eq!(provenance, back);
+    }
+
+    #[test]
+    fn tool_provenance_all_variants_serde_roundtrip() {
+        let variants = [
+            ToolProvenance::Native,
+            ToolProvenance::McpRemote {
+                server: "test".to_string(),
+            },
+            ToolProvenance::Plugin {
+                name: "p".to_string(),
+                version: "1.0.0".to_string(),
+                carrier: "wasm".to_string(),
+            },
+        ];
+        for provenance in variants {
+            let json = serde_json::to_string(&provenance).unwrap();
+            let back: ToolProvenance = serde_json::from_str(&json).unwrap();
+            assert_eq!(provenance, back);
+        }
     }
 }
 
