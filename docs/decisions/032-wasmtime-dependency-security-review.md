@@ -15,6 +15,9 @@ This ADR performs that review for the first local explicit plugin MVP only. It d
 the runtime and does not approve remote plugin installation, automatic discovery, marketplace
 behavior, Lua, native dynamic libraries, or write-capable plugin tools.
 
+ADR-027 named wasmtime as "preferred" without a comparative evaluation of wasmer. This ADR
+retroactively documents that comparison (see Review Findings: Runtime Selection below).
+
 Checked current package discovery on 2026-07-01: `cargo search wasmtime --limit 1` reported
 `wasmtime = "46.0.1"`.
 
@@ -83,6 +86,30 @@ All plugin runtime failures are recoverable tool/plugin errors:
 None of these may panic the Talos process, abort the session, or bypass permission/provenance
 reporting.
 
+### Runtime Selection: wasmtime vs wasmer
+
+ADR-027 asserted wasmtime as preferred without evaluating wasmer. The comparison below documents
+the decision basis using public evidence as of 2026-07-01.
+
+| Dimension | wasmtime | wasmer |
+|---|---|---|
+| **Governance** | Bytecode Alliance (non-profit, multi-stakeholder: Mozilla, Fastly, Google). Formal SECURITY.md, 7-day advance disclosure list, 24/7 OSS-Fuzz. | Wasmer Inc. (VC-backed commercial company). security@wasmer.io contact; no public SECURITY.md found in repository. |
+| **Pure Rust (HC #1)** | Cranelift JIT and Winch basecompiler are both pure Rust. No C/C++ in the compilation pipeline. | Singlepass and Cranelift backends are pure Rust. LLVM backend (performance-optimal option) requires C/C++ — violates HC #1 if enabled. V8 backend requires C++. |
+| **Resource controls** | `store.set_fuel(N)` for deterministic per-instruction budget. `epoch_interruption` + `engine.increment_epoch()` for stable wall-clock timeout. `ResourceLimiter` trait for per-store memory/table limits. | Metering middleware for operator-point accounting. Tunables for static memory limits. `experimental-host-interrupt` feature exists but is not a stable first-class API. No documented equivalent of epoch interruption. |
+| **Security track record** | ~44 published advisories (2021–2026). Confirmed sandbox escapes limited to Winch (non-default backend; Cranelift unaffected). Patches released same-day as public disclosure. | CVE-2023-51661: filesystem sandbox not enforced (High). CVE-2024-38358: symlink bypasses filesystem sandbox (High). Three additional CVEs addressed in 2026. Filesystem sandbox bypasses affect core isolation, not optional backends. |
+| **Component model** | Tier 1 support for WASM component model. `wasm32-wasip2` as first-class target. Relevant if TOOL-008 Phase 3 loads tree-sitter grammars via component interfaces. | Documentation emphasizes WASIX/WASI. No equally explicit component-model maturity statement found. |
+| **Dependency footprint** | `default-features = false` allows minimal embed: only `cranelift`, `runtime`, `parallel-compilation`, `wat`. Talos T46 uses this exact configuration. | Default `wasmer` crate pulls in compiler + WASI + middlewares + sys. Optional backends (LLVM, V8) significantly expand the compile graph. |
+
+**Assessment**: wasmtime is the correct choice for Talos. The decisive factors are: (1) pure-Rust
+compilation pipeline aligns with Hard Constraint #1 without the temptation of an LLVM escape hatch;
+(2) Bytecode Alliance governance and formal security process align with the safety-first posture;
+(3) fuel + epoch interruption is exactly the two-layer resource control model ADR-032 requires, and
+both are stable APIs; (4) wasmer's filesystem sandbox bypass CVEs are a material concern for a
+project whose entire tool surface routes through permission gating.
+
+wasmer's advantages — multi-backend flexibility, WASIX, simpler default API — do not apply to
+Talos's use case (single sandbox backend, no WASIX needed, auditable API preferred over simple).
+
 ## Decision
 
 1. **ADR-027's focused `wasmtime` review gate is cleared for the first local MVP.**
@@ -121,6 +148,12 @@ reporting.
 
 ## Rejected Alternatives
 
+- **`wasmer` as the WASM runtime.** Rejected after comparative review (see Review Findings: Runtime
+  Selection). wasmer's filesystem sandbox bypass CVEs (CVE-2023-51661, CVE-2024-38358) affect core
+  isolation; wasmtime's sandbox escapes are limited to the non-default Winch backend. wasmer lacks
+  a stable epoch-interrupt API equivalent. wasmer's LLVM/V8 backends introduce C/C++ dependencies
+  that conflict with HC #1. wasmtime's Bytecode Alliance governance and formal security process
+  better match Talos's safety-first posture.
 - **Add `wasmtime` directly to `talos-core`.** Rejected; core must remain minimal and protocol-only.
 - **Enable WASI filesystem by default.** Rejected; capability-oriented access still requires Talos
   to pass preopened directories, and v1 does not need filesystem access.
