@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Talos">
   <title>Talos</title>
   <rect x="0" y="0" width="32" height="32" rx="6" fill="currentColor" opacity="0.08"/>
-  <polygon points="16,4 27,10 27,22 16,28 5,22 5,10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+  <polygon points="16,4 27,10 27,22 16,28 5,22 5,10" fill="none" stroke="#88c0d0" stroke-width="2" stroke-linejoin="round"/>
   <text x="16" y="20" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
         font-size="10" font-weight="700" letter-spacing="1.2"
-        text-anchor="middle" fill="currentColor">T</text>
+        text-anchor="middle" fill="#88c0d0">T</text>
 </svg>

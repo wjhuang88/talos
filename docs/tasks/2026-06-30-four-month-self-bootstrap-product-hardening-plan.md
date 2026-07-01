@@ -138,9 +138,9 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Complete |
 | T50 | 11 | E | Implement associative recall API default-off; no automatic prompt injection yet. | T43 | Unit tests; bounded multi-hop tests | Complete (via T43) |
 | T51 | 11 | E | Add metrics for memory/context compression: tokens saved, retrieval hits, hidden-output drops. | T26/T50 | Metrics tests; docs | Complete |
-| T52 | 11 | A | Second Talos-on-Talos rehearsal: small code change through Talos runtime if feasible. | T38/tooling readiness | Evidence record; validation | Planned |
-| T53 | 11 | G | WEB-004 site theme/branding optimization using Talos visual identity. | WEB-004 | Site validator; no external assets | Planned |
-| T54 | 12 | A | Month-3 closeout: self-bootstrap gap report against every REL-002 acceptance criterion. | T00-T53 | REL-002 checklist update | Planned |
+| T52 | 11 | A | Second Talos-on-Talos rehearsal: small code change through Talos runtime if feasible. | T38/tooling readiness | Evidence record; validation | Complete |
+| T53 | 11 | G | WEB-004 site theme/branding optimization using Talos visual identity. | WEB-004 | Site validator; no external assets | Complete |
+| T54 | 12 | A | Month-3 closeout: self-bootstrap gap report against every REL-002 acceptance criterion. | T00-T53 | REL-002 checklist update | Complete |
 | T55 | 13 | B | If explicitly approved, remove `publish = false` for `talos-cli` and publish/install smoke; otherwise keep as ready gate. | T07/T08/maintainer approval | Real publish or documented non-action | Planned |
 | T56 | 13 | B | If explicitly approved, publish or reserve `talos-runtime`; otherwise record exact blockers. | T48/maintainer approval | Real publish or documented non-action | Planned |
 | T57 | 13 | C | Tool reliability sweep: flaky tests, Windows/Unix command assumptions, shell naming residuals. | TOOL-006/tool docs | Targeted tests; issue list | Planned |

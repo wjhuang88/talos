@@ -1,8 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" role="img" aria-label="TALOS">
   <title>TALOS</title>
+  <defs>
+    <linearGradient id="nordGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#88c0d0"/>
+      <stop offset="50%" stop-color="#81a1c1"/>
+      <stop offset="100%" stop-color="#5e81ac"/>
+    </linearGradient>
+  </defs>
+  <polygon points="30,12 45.6,21 45.6,39 30,48 14.4,39 14.4,21" fill="none" stroke="url(#nordGradient)" stroke-width="4" stroke-linejoin="round"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
      font-size="38" font-weight="700" letter-spacing="6"
      text-anchor="middle" dominant-baseline="central">
-    <text x="120" y="30" fill="currentColor">TALOS</text>
+    <text x="140" y="32" fill="currentColor">TALOS</text>
   </g>
 </svg>
