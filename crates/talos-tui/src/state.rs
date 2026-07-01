@@ -223,7 +223,11 @@ impl BottomPanelState {
 
     pub(crate) fn open_approval(tool_name: &str, arguments: &str) -> Self {
         let args_short = if arguments.len() > 72 {
-            format!("{}...", &arguments[..72])
+            let mut end = 72;
+            while end > 0 && !arguments.is_char_boundary(end) {
+                end -= 1;
+            }
+            format!("{}...", &arguments[..end])
         } else {
             arguments.to_string()
         };
@@ -687,5 +691,22 @@ mod tests {
         state.input_paste("model");
 
         assert_eq!(state.input_buffer, "/model");
+    }
+
+    #[test]
+    fn approval_truncation_handles_multibyte_utf8() {
+        let cmd = "gh issue create --title \"feat: write 和 edit 工具应显示内容输出\" --label bug";
+        let state = BottomPanelState::open_approval("bash", cmd);
+        if let PanelKind::Approval { arguments, .. } = state.kind.as_ref().unwrap() {
+            assert!(arguments.ends_with("..."));
+        }
+    }
+
+    #[test]
+    fn approval_truncation_short_string_unchanged() {
+        let state = BottomPanelState::open_approval("bash", "ls -la");
+        if let PanelKind::Approval { arguments, .. } = state.kind.as_ref().unwrap() {
+            assert_eq!(arguments, "ls -la");
+        }
     }
 }

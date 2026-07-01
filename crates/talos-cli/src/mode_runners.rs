@@ -413,6 +413,17 @@ async fn handle_session_model_with_credential(
 }
 
 pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        eprintln!("\n\n--- TALOS PANIC ---");
+        eprintln!(
+            "Location: {}",
+            info.location().map(|l| l.to_string()).unwrap_or_default()
+        );
+        eprintln!("Message: {}\n", info);
+        original_hook(info);
+    }));
+
     let mut config = Config::load().context("failed to load configuration")?;
 
     if let Some(ref model) = cli.model {
