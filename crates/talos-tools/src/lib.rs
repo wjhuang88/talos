@@ -5,6 +5,7 @@
 //! AST-aware symbol queries.
 
 pub mod bash_tool;
+pub mod browser_page;
 pub mod diff_stat;
 pub mod document_extract;
 pub mod fetch_url;
@@ -19,6 +20,9 @@ pub mod tree;
 pub mod web_search;
 
 pub use bash_tool::{BashError, BashInput, BashTool};
+pub use browser_page::{
+    BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
+};
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
 pub use document_extract::{DocumentExtractError, DocumentExtractInput, DocumentExtractTool};
 pub use fetch_url::{FetchUrlError, FetchUrlInput, FetchUrlTool};

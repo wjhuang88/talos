@@ -133,7 +133,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Complete |
 | T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Complete |
 | T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Complete |
-| T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Planned |
+| T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Complete |
 | T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Planned |
 | T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Planned |
 | T50 | 11 | E | Implement associative recall API default-off; no automatic prompt injection yet. | T43 | Unit tests; bounded multi-hop tests | Planned |
@@ -877,3 +877,29 @@ T48 (runtime publish gate), T49 (zh-CN site translation). Then Month-3 closeout 
 - `cargo clippy -p talos-memory -- -D warnings` → no warnings.
 - `cargo test -p talos-memory` → 59 passed (48 existing + 11 new), 0 failed.
 - `scripts/validate_project_governance.sh .` → 0 warnings.
+
+### Checkpoint T47 — Browser-Page Mock Backend (2026-07-01)
+
+**Task**: T47 — Implement safe browser-page record mock backend for fetch_url (WEB-005 Phase 1).
+
+**Completed**:
+- Added `browser_page.rs` to `talos-tools`: `BrowserPageRecord` struct (record_id, url, final_url,
+  origin, title, visible_text_excerpt, selected_links, connector_kind, access_mode), `BrowserPageLink`,
+  `BrowserPageConnector` trait (async `read_page`), `MockBrowserPageConnector` (fixture-based).
+- No cookies, localStorage/sessionStorage, passwords, tokens, DOM dumps, screenshots, or browser
+  profile paths in the record — enforced by struct design and proven by 4 exclusion tests.
+- `record_serializes_to_clean_json` test asserts no unexpected fields exist in the JSON output.
+- Mock connector returns canned records from an in-memory map; errors on unknown URLs.
+- Added `uuid` dependency to talos-tools (pre-existing in workspace).
+- 8 tests: cookie exclusion, storage exclusion, credential exclusion, DOM/screenshot exclusion,
+  approved fields stored, mock connector returns record, mock connector errors on unknown URL,
+  clean JSON serialization.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo clippy -p talos-tools -- -D warnings` → no warnings.
+- `cargo test -p talos-tools browser_page` → 8 passed, 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+
+**Next task item**: T48 — talos-runtime publish gate preparation (Track B, Week 10).
