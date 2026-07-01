@@ -131,7 +131,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Complete |
 | T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
 | T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Planned |
-| T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Planned |
+| T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Complete |
 | T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Planned |
 | T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Planned |
 | T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Planned |
@@ -767,3 +767,31 @@ rendering paths.
 - `scripts/validate_project_governance.sh .` → 0 warnings.
 
 **Next task item**: T45 — plugin manifest parser (ADR-027/029). T46 follows after T45.
+
+### Checkpoint T45 — Plugin Manifest Parser (2026-07-01)
+
+**Task**: T45 — Implement plugin manifest parser only; no executable artifact instantiation.
+
+**Completed**:
+- Added `manifest` module to `talos-plugin` with `PluginManifest`, `PluginMetadata`, `PluginSkill`,
+  `PluginTool` structs (serde + TOML deserialization).
+- `parse_manifest()` parses TOML, validates: non-empty name/version/artifact, carrier must be "wasm"
+  (only accepted carrier per ADR-027), unique tool names, non-empty tool handlers/skill paths.
+- Permissions section in manifest is parsed but does NOT grant runtime permissions (ADR-027: manifest
+  declarations are requests, not permissions).
+- No executable artifact is loaded or instantiated — manifest parsing is pure data validation.
+- Added `serde`, `serde_json`, `toml` dependencies to `talos-plugin` (all pre-existing in workspace).
+- 13 tests: valid manifest (full + minimal), empty name/version/artifact rejection, non-wasm/dylib
+  carrier rejection, malformed TOML rejection, missing plugin section rejection, duplicate tool name
+  rejection, empty tool name/handler rejection, permissions section parsing without granting.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo clippy -p talos-plugin -- -D warnings` → no warnings.
+- `cargo test -p talos-plugin` → 23 passed (15 unit + 8 integration), 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+
+**Next task item**: T46 — local WASM plugin fixture (ADR-032). Requires adding `wasmtime` dependency
+behind a feature flag, implementing one read-only tool, and resource/failure tests (trap, timeout,
+fuel exhaustion, memory/output bounds, denied permission).
