@@ -6,16 +6,65 @@
 //! are stored or exposed.
 
 use async_trait::async_trait;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 fn extract_origin(url: &str) -> String {
-    let after_scheme = url.split("://").nth(1).unwrap_or(url);
-    after_scheme
-        .split('/')
-        .next()
-        .unwrap_or(after_scheme)
-        .to_string()
+    Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
+        .unwrap_or_else(|| {
+            let after_scheme = url.split("://").nth(1).unwrap_or(url);
+            after_scheme
+                .split('/')
+                .next()
+                .unwrap_or(after_scheme)
+                .to_string()
+        })
+}
+
+fn is_sensitive_query_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    key.contains("token")
+        || key.contains("secret")
+        || key.contains("password")
+        || key.contains("api_key")
+        || key == "key"
+        || key == "sig"
+        || key == "signature"
+        || key == "auth"
+}
+
+fn sanitize_url_for_record(url: &str) -> String {
+    let Ok(mut parsed) = Url::parse(url) else {
+        return url.split('?').next().unwrap_or(url).to_string();
+    };
+
+    let _ = parsed.set_username("");
+    let _ = parsed.set_password(None);
+
+    let pairs: Vec<(String, String)> = parsed
+        .query_pairs()
+        .map(|(key, value)| {
+            let value = if is_sensitive_query_key(&key) {
+                "***".to_string()
+            } else {
+                value.into_owned()
+            };
+            (key.into_owned(), value)
+        })
+        .collect();
+
+    parsed.set_query(None);
+    if !pairs.is_empty() {
+        let mut query = parsed.query_pairs_mut();
+        for (key, value) in pairs {
+            query.append_pair(&key, &value);
+        }
+    }
+
+    parsed.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,11 +88,12 @@ pub struct BrowserPageRecord {
 
 impl BrowserPageRecord {
     pub fn new_mock(url: &str, title: &str, text: &str) -> Self {
-        let origin = extract_origin(url);
+        let sanitized_url = sanitize_url_for_record(url);
+        let origin = extract_origin(&sanitized_url);
         Self {
             record_id: Uuid::new_v4().to_string(),
-            url: url.to_string(),
-            final_url: url.to_string(),
+            url: sanitized_url.clone(),
+            final_url: sanitized_url,
             origin,
             title: title.to_string(),
             visible_text_excerpt: text.to_string(),
@@ -120,12 +170,20 @@ mod tests {
 
     #[test]
     fn record_excludes_credentials() {
-        let record = BrowserPageRecord::new_mock("https://example.com", "Test", "text");
+        let record = BrowserPageRecord::new_mock(
+            "https://user:pass@example.com/path?token=abc&api_key=sk-test&ok=1",
+            "Test",
+            "text",
+        );
         let json = serde_json::to_string(&record).unwrap();
         assert!(!json.contains("password"));
-        assert!(!json.contains("token"));
-        assert!(!json.contains("api_key"));
+        assert!(!json.contains("abc"));
+        assert!(!json.contains("sk-test"));
+        assert!(!json.contains("user:pass"));
         assert!(!json.contains("secret"));
+        assert!(json.contains("token=***"));
+        assert!(json.contains("api_key=***"));
+        assert!(json.contains("ok=1"));
     }
 
     #[test]

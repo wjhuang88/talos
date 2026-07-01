@@ -1,6 +1,6 @@
 //! Runtime mode runner implementations for the Talos CLI.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -1583,12 +1583,102 @@ fn build_dashboard_snapshot(
         })
         .unwrap_or(serde_json::json!([]));
 
-    let governance = "Dashboard MVP — governance view pending.".to_string();
+    let governance = build_dashboard_governance_summary(Path::new(workspace_root));
 
     talos_dashboard::DashboardSnapshot {
         config_masked,
         status,
         history,
         governance,
+    }
+}
+
+fn build_dashboard_governance_summary(workspace_root: &Path) -> String {
+    let board_path = workspace_root.join("docs").join("BOARD.md");
+    let Ok(content) = std::fs::read_to_string(board_path) else {
+        return "Governance: docs/BOARD.md unavailable.".to_string();
+    };
+
+    let mut lines = vec!["Talos Governance".to_string()];
+    for heading in ["Now", "Blocked / Paused", "Next"] {
+        let items = parse_dashboard_board_section(&content, heading);
+        lines.push(format!("{heading}: {} item(s)", items.len()));
+        for (item, state) in items {
+            lines.push(format!("- {item} [{state}]"));
+        }
+    }
+    lines.join("\n")
+}
+
+fn parse_dashboard_board_section(content: &str, heading: &str) -> Vec<(String, String)> {
+    let target = format!("## {heading}");
+    let mut in_section = false;
+    let mut items = Vec::new();
+
+    for line in content.lines() {
+        if line.starts_with("## ") {
+            in_section = line.trim() == target;
+            continue;
+        }
+        if !in_section || !line.starts_with("| ") || line.starts_with("|---") {
+            continue;
+        }
+        let cols: Vec<&str> = line.split('|').collect();
+        if cols.len() < 4 || cols[1].trim() == "Item" {
+            continue;
+        }
+        let item = clean_dashboard_cell(cols[1]);
+        let state = clean_dashboard_cell(cols[2]);
+        if !item.is_empty() && !item.starts_with("_(no ") {
+            items.push((item, state));
+        }
+    }
+
+    items
+}
+
+fn clean_dashboard_cell(cell: &str) -> String {
+    cell.trim()
+        .trim_matches('`')
+        .replace('*', "")
+        .trim()
+        .to_string()
+}
+
+#[cfg(test)]
+mod dashboard_tests {
+    use super::*;
+
+    #[test]
+    fn parse_dashboard_board_section_extracts_items() {
+        let board = "# Board
+
+## Now
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| T57 Tool sweep | Active | [x](x.md) | Tests |
+
+## Blocked / Paused
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| T58 Dashboard review | Blocked | [x](x.md) | Security |
+
+## Next
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| T61 Rehearsal | Planned | [x](x.md) | Evidence |
+";
+
+        assert_eq!(
+            parse_dashboard_board_section(board, "Blocked / Paused"),
+            vec![("T58 Dashboard review".to_string(), "Blocked".to_string())]
+        );
+        assert_eq!(
+            parse_dashboard_board_section(board, "Next"),
+            vec![("T61 Rehearsal".to_string(), "Planned".to_string())]
+        );
     }
 }

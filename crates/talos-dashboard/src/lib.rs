@@ -74,6 +74,7 @@ impl DashboardServer {
             .route("/history", get(history_handler))
             .route("/governance", get(governance_handler))
             .route("/config", get(config_handler))
+            .route("/", get(root_handler))
             .route_layer(middleware::from_fn_with_state(
                 state.clone(),
                 auth_middleware,
@@ -108,6 +109,36 @@ fn apply_security_headers(resp: &mut Response, content_type: &'static str) {
         HeaderValue::from_static("nosniff"),
     );
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    if content_type.starts_with("text/html") {
+        headers.insert(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'"),
+        );
+    }
+}
+
+async fn root_handler() -> Response {
+    let body = r#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Talos Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
+    a { display: block; margin: .5rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Talos Dashboard</h1>
+  <a href="/status">Status</a>
+  <a href="/history">History</a>
+  <a href="/governance">Governance</a>
+  <a href="/config">Config</a>
+</body>
+</html>"#;
+    let mut resp = body.into_response();
+    apply_security_headers(&mut resp, "text/html; charset=utf-8");
+    resp
 }
 
 async fn status_handler(State(state): State<AppState>) -> Response {
@@ -213,6 +244,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn valid_token_returns_root_index() {
+        let (app, token) = build_test_app();
+        let (status, body) = request(&app, Method::GET, "/", Some(&token)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Talos Dashboard"));
+        assert!(body.contains("/governance"));
+    }
+
+    #[tokio::test]
+    async fn root_index_requires_token() {
+        let (app, _token) = build_test_app();
+        let (status, _) = request(&app, Method::GET, "/", None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
     async fn valid_token_returns_governance() {
         let (app, token) = build_test_app();
         let (status, body) = request(&app, Method::GET, "/governance", Some(&token)).await;
@@ -232,7 +279,7 @@ mod tests {
     async fn no_write_routes_registered() {
         let (app, token) = build_test_app();
         for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
-            for path in ["/status", "/history", "/governance", "/config"] {
+            for path in ["/", "/status", "/history", "/governance", "/config"] {
                 let (status, _) = request(&app, method.clone(), path, Some(&token)).await;
                 assert_eq!(
                     status,

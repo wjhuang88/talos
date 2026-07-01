@@ -6,6 +6,7 @@
 //! to recoverable errors; none may panic the host process (Hard Constraint #9).
 
 use std::sync::Arc;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
@@ -87,11 +88,14 @@ impl WasmModule {
         store.epoch_deadline_trap();
         store.set_epoch_deadline(1);
 
+        let (completion_tx, completion_rx) = mpsc::channel();
         let engine_for_timeout = engine.clone();
         let timeout = self.runtime.timeout;
-        let timeout_handle = thread::spawn(move || {
+        thread::spawn(move || {
             thread::sleep(timeout);
-            engine_for_timeout.increment_epoch();
+            if completion_tx.send(()).is_ok() {
+                engine_for_timeout.increment_epoch();
+            }
         });
 
         let instance = wasmtime::Instance::new(&mut store, &self.module, &[])
@@ -102,8 +106,7 @@ impl WasmModule {
             .map_err(|_| WasmError::MissingExport)?;
 
         let result = func.call(&mut store, ());
-        timeout_handle.thread().unpark();
-        let _ = timeout_handle.join();
+        drop(completion_rx);
 
         match result {
             Ok(val) => Ok(val),
@@ -124,6 +127,7 @@ impl WasmModule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     const FUEL: u64 = 100_000;
     const TIMEOUT_MS: u64 = 3_000;
@@ -141,6 +145,24 @@ mod tests {
         "#;
         let module = WasmModule::from_wat(runtime(), wat).expect("compile");
         assert_eq!(module.execute().unwrap(), 42);
+    }
+
+    #[test]
+    fn success_fixture_does_not_wait_for_timeout() {
+        let wat = r#"
+            (module
+              (func (export "run") (result i32)
+                i32.const 7))
+        "#;
+        let slow_timeout_runtime = Arc::new(WasmRuntime::new(FUEL, 1_000).expect("runtime"));
+        let module = WasmModule::from_wat(slow_timeout_runtime, wat).expect("compile");
+        let started = Instant::now();
+
+        assert_eq!(module.execute().unwrap(), 7);
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "successful WASM execution should not wait for the timeout watchdog"
+        );
     }
 
     #[test]
