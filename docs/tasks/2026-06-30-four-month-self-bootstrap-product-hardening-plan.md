@@ -936,3 +936,65 @@ No automatic injection occurs (T31 decision: default-off). 11 tests in T43 cover
 - Plus CRUD, empty seeds, and sorting tests
 
 T50 validation criteria ("Unit tests; bounded multi-hop tests") are fully satisfied by T43.
+
+### Checkpoint Month-3 Closeout (T00–T54) — Complete (2026-07-01)
+
+**Milestone M4 (Extensibility unblocked or deferred) — PASSED.**
+
+**Completed Month-3 task items**: T28 (via T42), T40, T41, T42, T43, T44, T45, T46, T47, T48, T49,
+T50 (via T43), T51, T52, T53, T54. Plus: ADR-032 wasmtime vs wasmer comparative analysis, Issue Sync
+Rule, UTF-8 approval truncation fix, TUI panic hook, two new GitHub issues synced (#7 TUI-016, #8
+TODO-001).
+
+**Delivered items by track**:
+
+| Track | Items | Key deliverables |
+|---|---|---|
+| A (Governance) | T28, T44, T52, T54 | T28 fulfilled by T42; T44 ripgrep parity closed; T52 real Talos-driven rehearsal (~45% coverage); Month-3 closeout |
+| B (Distribution) | T48 | talos-runtime publish dry-run evidence: 4 unpublished dep blockers documented |
+| C (Tooling) | T44 | (closed by existing T14 ripgrep engine) |
+| D (Web) | T28, T42, T47 | Loopback dashboard MVP (axum, 4 routes, token auth); BrowserPageRecord + mock connector |
+| E (Memory) | T43, T50, T51 | Weighted memory graph (SQLite, bounded multi-hop, decay); Associative recall API; Compression/retrieval metrics |
+| F (Extensibility) | T40, T41, T45, T46 | ToolProvenance::Plugin; /mcp command + /plugins transition; Manifest parser; WASM runtime adapter (wasmtime feature-gated) |
+| G (Docs) | T49, T53 | zh-CN site translation (7 pages); Nord theme branding |
+
+**New runtime dependencies added**: `axum 0.8.9` (+872 KB release), `wasmtime 29.0.1` (behind `wasm`
+feature, not compiled by default). No Node/Python/browser automation dependencies.
+
+**Bug fixes during Month 3**: UTF-8 panic in approval panel truncation (CJK character boundary);
+TUI panic hook added for future crash visibility.
+
+**Self-bootstrap rehearsal progress**:
+
+| Rehearsal | Coverage | Primary runtime | Key finding |
+|---|---|---|---|
+| T38 (1st) | ~10% | External (Codex) | Docs-only; Talos provided CLI smoke only |
+| T52 (2nd) | ~45% | **Talos** (code edits) | Multi-crate change correct; compiler-guided fix loop works; gaps in validation/tests/commit |
+
+**REL-002 gap assessment**:
+
+| Criterion | Status | Gap |
+|---|---|---|
+| Talos as primary development runtime | blocked | ~45% coverage; needs autonomous validation loop, test generation, commit workflow |
+| Governance-driven development cycle | partial | Owner docs + BOARD + governance validation work; agent cannot autonomously follow the cycle |
+| Tool reliability for self-development | partial | Core tools (read/write/edit/bash/grep) work; missing multi-file orchestration, compiler-error-driven fix loops |
+| Memory/context for long sessions | ready | Memory graph, compression, metrics implemented |
+| Extensibility for plugin/tooling | MVP ready | Provenance, manifest parser, WASM runtime, dashboard all have working MVPs |
+
+**Month-3 validation evidence**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo test --workspace` → **1347 passed**, 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+
+**Replan for Month 4 (Weeks 13–16)**:
+- T55/T56: Real publish requires explicit maintainer approval — out of scope unless approved.
+- T57: Tool reliability sweep — safe to proceed.
+- T58: WEB-001/WEB-005 security review — safe to proceed now that T42/T47 have MVPs.
+- T59: Plugin MVP security review — safe to proceed now that T46 has the runtime adapter.
+- T60: Automatic associative memory injection decision — safe; T31 recommends default-off.
+- T61: Third rehearsal — should target >60% coverage with autonomous validation.
+- T62–T65: Documentation consolidation, readiness report, final closeout, handoff.
+
+**Recovery or resume instruction**: All Month-3 commits on `origin/main` (`acde17a` through
+`4fc66de`). To resume Month 4: read this closeout, then start T57 or T58 (both independent).
