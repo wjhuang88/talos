@@ -128,6 +128,53 @@ impl Default for BashOutputCompressor {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct CompressionMetrics {
+    pub compression_events: u64,
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+}
+
+impl CompressionMetrics {
+    pub fn record(&mut self, output: &CompressedOutput) {
+        if output.strategy == "none" {
+            return;
+        }
+        self.compression_events += 1;
+        self.bytes_before += output.original_size as u64;
+        self.bytes_after += output.compressed_size as u64;
+    }
+
+    pub fn bytes_saved(&self) -> u64 {
+        self.bytes_before.saturating_sub(self.bytes_after)
+    }
+
+    pub fn estimated_tokens_saved(&self) -> u64 {
+        self.bytes_saved() / 4
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RetrievalMetrics {
+    pub recall_calls: u64,
+    pub results_returned: u64,
+}
+
+impl RetrievalMetrics {
+    pub fn record_recall(&mut self, result_count: usize) {
+        self.recall_calls += 1;
+        self.results_returned += result_count as u64;
+    }
+
+    pub fn avg_results_per_call(&self) -> f64 {
+        if self.recall_calls == 0 {
+            0.0
+        } else {
+            self.results_returned as f64 / self.recall_calls as f64
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,5 +299,64 @@ mod tests {
 
         assert_eq!(result.original_size, content.len());
         assert_eq!(result.compressed_size, result.content.len());
+    }
+
+    #[test]
+    fn metrics_accumulate_across_events() {
+        let compressor = BashOutputCompressor::new();
+        let mut metrics = CompressionMetrics::default();
+
+        let r1 = compressor.compress(&make_lines(50));
+        let r2 = compressor.compress(&make_lines(100));
+        let r3 = compressor.compress(&make_lines(10));
+
+        metrics.record(&r1);
+        metrics.record(&r2);
+        metrics.record(&r3);
+
+        assert_eq!(metrics.compression_events, 2);
+        assert!(metrics.bytes_saved() > 0);
+        assert!(metrics.bytes_before > metrics.bytes_after);
+    }
+
+    #[test]
+    fn metrics_skip_none_strategy() {
+        let compressor = BashOutputCompressor::new();
+        let mut metrics = CompressionMetrics::default();
+
+        let r = compressor.compress(&make_lines(10));
+        metrics.record(&r);
+
+        assert_eq!(metrics.compression_events, 0);
+        assert_eq!(metrics.bytes_saved(), 0);
+    }
+
+    #[test]
+    fn metrics_estimated_tokens_saved() {
+        let compressor = BashOutputCompressor::new();
+        let mut metrics = CompressionMetrics::default();
+
+        metrics.record(&compressor.compress(&make_lines(100)));
+
+        assert!(metrics.estimated_tokens_saved() > 0);
+    }
+
+    #[test]
+    fn retrieval_metrics_track_calls_and_results() {
+        let mut metrics = RetrievalMetrics::default();
+
+        metrics.record_recall(5);
+        metrics.record_recall(3);
+        metrics.record_recall(0);
+
+        assert_eq!(metrics.recall_calls, 3);
+        assert_eq!(metrics.results_returned, 8);
+        assert!((metrics.avg_results_per_call() - 2.666).abs() < 0.1);
+    }
+
+    #[test]
+    fn retrieval_metrics_empty_has_zero_avg() {
+        let metrics = RetrievalMetrics::default();
+        assert_eq!(metrics.avg_results_per_call(), 0.0);
     }
 }

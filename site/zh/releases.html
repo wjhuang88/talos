@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>发布 — Talos</title>
+    <meta
+      name="description"
+      content="Talos 当前 release、完整发布历史链接，以及维护者发布后更新清单。"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="stylesheet" href="../assets/styles.css" />
+    <script defer src="../assets/site.js"></script>
+  </head>
+  <body data-page="releases">
+    <a class="talos-skip" href="#main">跳转到正文</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">首页</a>
+          <a href="install.html" data-nav-slug="install">安装</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">能力</a>
+          <a href="safety.html" data-nav-slug="safety">安全</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">路线图</a>
+          <a href="releases.html" data-nav-slug="releases">发布</a>
+          <a href="../releases.html">EN</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>发布</h1>
+        <p>
+          Talos 当前 release tag、GitHub 上完整发布历史，以及用于保持本站与
+          公共 README 同步的发布后更新清单。
+        </p>
+      </header>
+
+      <section>
+        <h2>当前发布</h2>
+        <p>
+          <span class="talos-pill talos-pill--shipped">v0.2.0</span>
+          是当前已发布版本。它是第一条稳定的 pre-1.0 发布线。
+          API、命令能力面和存储格式可能随着产品加固继续变化，但 v0.2.0
+          已可用于本地开发者工作流。
+        </p>
+        <p>
+          安装说明见
+          <a href="install.html">安装</a>。历史发布说明见
+          <a
+            href="https://github.com/wjhuang88/talos/releases"
+            rel="noopener"
+            >GitHub Releases</a
+          >。
+        </p>
+      </section>
+
+      <section>
+        <h2>Release tag 方案</h2>
+        <p>
+          Release tags 驱动 GitHub release workflow。该 workflow 会在 macOS runner 上
+          构建 Linux、macOS 和 Windows 产物。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>通道</th>
+              <th>Tag 模式</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>稳定版</td>
+              <td><code>v0.1.0</code></td>
+            </tr>
+            <tr>
+              <td>预发布</td>
+              <td>
+                <code>v0.1.0-alpha.1</code>, <code>v0.1.0-beta.1</code>,
+                <code>v0.1.0-rc.1</code>, <code>v0.1.0-pre.1</code>,
+                <code>v0.1.0-dev.1</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          完整构建矩阵见
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/.github/workflows/release.yml"
+            rel="noopener"
+            >release workflow</a
+          >。
+        </p>
+      </section>
+
+      <section>
+        <h2>发布后更新清单</h2>
+        <p>
+          维护者打出新 release tag 后，公共材料必须按以下顺序更新，确保
+          <code>site/</code> 与仓库根目录
+          <code>README.md</code> / <code>README.zh-CN.md</code>
+          不发生漂移。
+        </p>
+        <ol>
+          <li>
+            更新 <code>README.md</code> 与 <code>README.zh-CN.md</code>：
+            版本提示、安装章节和
+            <em>当前发布边界</em>区块。
+          </li>
+          <li>
+            更新
+            <a href="index.html">首页</a> hero 区的版本字符串，
+            以及本页的
+            <em>当前发布</em>章节。
+          </li>
+          <li>
+            对齐 <a href="roadmap.html">路线图</a>：本次 release 已落地项必须从
+            <span class="talos-pill talos-pill--planned">计划中</span> /
+            <span class="talos-pill talos-pill--research">研究中</span>
+            移入
+            <span class="talos-pill talos-pill--shipped">已发布</span>。
+          </li>
+          <li>
+            运行静态校验 harness（任务项
+            <code>D8</code>）：所有内部链接可解析、所有
+            <code>href</code> 目标存在、且无声明与
+            <code>README.md</code> 冲突。
+          </li>
+          <li>
+            打开 PR，标题为
+            <code>docs(site): sync vX.Y.Z release notes</code>，并关联产生该变更的
+            iteration 或 release。
+          </li>
+          <li>
+            PR 合并后，GitHub Pages 按常规节奏发布；站点无需额外 release 动作。
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>公共 README</h2>
+        <p>
+          仓库根目录包含本站交叉引用的规范用户/开发者 README：
+        </p>
+        <ul>
+          <li>
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/README.md"
+              rel="noopener"
+              >README.md</a
+            >
+            &mdash; 英文用户与开发者 README。
+          </li>
+          <li>
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/README.zh-CN.md"
+              rel="noopener"
+              >README.zh-CN.md</a
+            >
+            &mdash; 用户与开发者 README 的中文翻译。
+          </li>
+        </ul>
+        <p>
+          如果你发现本站与根目录 README 存在冲突，在差异修复前以根 README 为准。
+          失败重试策略见
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/tasks/2026-06-29-delegable-product-site-docs-two-month-plan.md"
+            rel="noopener"
+            >可委派两个月计划</a
+          >。
+        </p>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >源文档</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

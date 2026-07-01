@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>路线图 — Talos</title>
+    <meta
+      name="description"
+      content="Talos 项目状态：v0.2.0 已发布内容、已规划内容，以及仍处于研究阶段的内容。"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="stylesheet" href="../assets/styles.css" />
+    <script defer src="../assets/site.js"></script>
+  </head>
+  <body data-page="roadmap">
+    <a class="talos-skip" href="#main">跳转到正文</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">首页</a>
+          <a href="install.html" data-nav-slug="install">安装</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">能力</a>
+          <a href="safety.html" data-nav-slug="safety">安全</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">路线图</a>
+          <a href="releases.html" data-nav-slug="releases">发布</a>
+          <a href="../roadmap.html">EN</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>路线图</h1>
+        <p>
+          Talos 的已发布、计划中与研究中边界。标记为
+          <span class="talos-pill talos-pill--shipped">已发布</span>
+          的属于 v0.2.0；标记为
+          <span class="talos-pill talos-pill--planned">计划中</span>
+          的已纳入范围；标记为
+          <span class="talos-pill talos-pill--research">研究中</span>
+          的属于探索项，暂无承诺时间线。
+        </p>
+      </header>
+
+      <section>
+        <h2>如何阅读本页</h2>
+        <p>
+          本路线图仅反映项目公共对外边界。详细工程状态在
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/BOARD.md"
+            rel="noopener"
+            >docs/BOARD.md</a
+          >、迭代记录和 backlog 中。
+          本页是简要且保守的公共摘要。若本页公共声明与实际已发布行为冲突，
+          在页面更新前以已发布行为为准。
+        </p>
+      </section>
+
+      <section>
+        <h2>已在 v0.2.0 发布</h2>
+        <p>
+          以下内容属于当前已发布 release。详见
+          <a href="capabilities.html">能力页面</a>和
+          <a href="safety.html">安全页面</a>。
+        </p>
+        <ul>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            TUI、inline 和 print 执行模式。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            按
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/023-inline-api-key-boundary.md"
+              rel="noopener"
+              >ADR-023</a
+            >
+            执行密钥脱敏的本地 provider 配置。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            带权限门控的内置编码工具（文件、搜索、代码智能、Git、
+            <code>http_request</code>、<code>web_search</code>、
+            <code>bash</code>）。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            会话存储、搜索、清理、维护、记忆固化与探索库导入。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            来自 <code>.talos/skills/</code>、
+            <code>~/.talos/skills/</code> 和继承父级
+            <code>.talos/skills/</code> 的运行时 Skills。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            MCP stdio 工具与 JSON-RPC 基础设施。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            初始 <code>talos-runtime</code> 可嵌入 facade
+            （pre-1.0；<a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/024-embeddable-runtime-api-boundary.md"
+              rel="noopener"
+              >ADR-024</a
+            >）。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>计划中</h2>
+        <p>
+          以下事项已纳入范围但尚未发布。下述顺序表示优先序偏好，不代表发布时间承诺。
+        </p>
+        <ul>
+          <li>
+            <span class="talos-pill talos-pill--planned">计划中</span>
+            将 <code>cargo install talos-cli --bin talos</code> 作为已验证的
+            Cargo 安装路径。当前 <code>--path</code> 源码安装可用；
+            crates.io 发布仍受
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/reference/CRATE-PUBLICATION-MATRIX.md"
+              rel="noopener"
+              >发布矩阵</a
+            >
+            约束，并且需要维护者显式批准。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--planned">计划中</span>
+            为 <code>talos-runtime</code> facade 提供稳定 1.0 SDK 保证。
+            该项受
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md"
+              rel="noopener"
+              >REL-002</a
+            >
+            门控，要求 Talos 作为主运行时完成 100% 自举开发并提供记录证据。
+            当前正在推进
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/tasks/2026-06-30-four-month-self-bootstrap-product-hardening-plan.md"
+              rel="noopener"
+              >四个月加固计划</a
+            >
+            以产出前置条件和证据。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--planned">计划中</span>
+            在当前 <code>http_request</code> / <code>web_search</code>
+            基础之上，提供有界的 PDF/Office 文档提取与保存工作流（见
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEBFETCH-001-web-and-document-fetch-tools.md"
+              rel="noopener"
+              >WEBFETCH-001</a
+            >）。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--planned">计划中</span>
+            在当前
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/026-multi-resource-tool-permissions.md"
+              rel="noopener"
+              >ADR-026</a
+            >
+            基础之上，扩展多资源工具权限配置能力。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>研究中</h2>
+        <p>
+          以下事项属于探索阶段。它们没有承诺时间线，也不会被描述为已发布。
+          其中一些作为独立产品差异化工作跟踪，可能不会进入 Talos 核心运行时。
+        </p>
+        <ul>
+          <li>
+            <span class="talos-pill talos-pill--research">研究中</span>
+            <code>~/.agents/skills/</code> dotagents 共享目录发现。
+            跟踪项：
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/AGENT-002-dotagents-protocol-support.md"
+              rel="noopener"
+              >AGENT-002</a
+            >。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">研究中</span>
+            嵌入式浏览器 / Web 控制面。
+            独立跟踪项：
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+              rel="noopener"
+              >WEB-001</a
+            >。
+            这是产品差异化轨道；在 v0.2.0 中
+            <strong>未启用</strong>，并且
+            <strong>不是</strong>安全边界。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">研究中</span>
+            WASM plugin runtime 与插件市场。相关架构决策
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/027-plugin-runtime-boundary.md"
+              rel="noopener"
+              >已接受（ADR-027/028/029/030）</a
+            >，
+            但运行时实现仍受聚焦的 <code>wasmtime</code> 依赖和安全审查门控。
+            跟踪项：
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/PLUGIN-001-wasm-runtime-plugins.md"
+              rel="noopener"
+              >PLUGIN-001</a
+            >。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">研究中</span>
+            远程或 P2P 会话控制。跟踪项：
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/REMOTE-001-remote-session-protocol.md"
+              rel="noopener"
+              >REMOTE-001</a
+            >。
+            远程会话控制面在任何原型工作前都需要 ADR 门控。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--research">研究中</span>
+            本地微模型决策层（设备端小模型用于提示）。
+            跟踪项：
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/MODEL-002-local-micro-model-decision-layer.md"
+              rel="noopener"
+              >MODEL-002</a
+            >。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>v0.2.0 非目标</h2>
+        <p>
+          以下为明确非目标，提前列出以避免用户通过试错获得这些结论。
+        </p>
+        <ul>
+          <li>
+            Talos <strong>不是</strong>远程多用户服务。
+            没有远程控制平面、托管会话路由器，也没有远程批准 UI。
+          </li>
+          <li>
+            Talos <strong>不是</strong> marketplace runtime。
+            WASM plugin runtime 和插件市场仅处于研究阶段。
+          </li>
+          <li>
+            Talos <strong>不是</strong>浏览器仪表盘。
+            嵌入式浏览器 / Web 控制面是独立研究轨道（<a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+              rel="noopener"
+              >WEB-001</a
+            >）。
+          </li>
+          <li>
+            Talos <strong>不是</strong>自主后台守护进程。
+            它以交互式或 print 模式运行，不会在后台等待触发。
+          </li>
+          <li>
+            Talos <strong>不会</strong>自动提交、自动发布或自动合并。
+            Git 写操作只会通过显式工具或用户动作发生。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>工程状态</h2>
+        <p>
+          当前工程运行视图（Now、Review、Blocked、Next、Done）请查看
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/BOARD.md"
+            rel="noopener"
+            >docs/BOARD.md</a
+          >
+          和
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/iterations/README.md"
+            rel="noopener"
+            >迭代记录</a
+          >。
+          它们是工程进展事实来源；本路线图是公共边界事实来源。
+        </p>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >源文档</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -47,6 +47,7 @@ use tokio::sync::mpsc;
 use crate::compression::BashOutputCompressor;
 use crate::configuration::describe_presented_tools;
 
+pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 
 /// Maximum number of tool calls allowed per turn before budget exhaustion.

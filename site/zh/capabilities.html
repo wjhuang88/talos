@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>能力 — Talos</title>
+    <meta
+      name="description"
+      content="Talos v0.2.0 已提供的内置编码工具、斜杠命令、运行时 Skills、MCP stdio 工具，以及 talos-runtime 可嵌入 facade。"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="stylesheet" href="../assets/styles.css" />
+    <script defer src="../assets/site.js"></script>
+  </head>
+  <body data-page="capabilities">
+    <a class="talos-skip" href="#main">跳转到正文</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">首页</a>
+          <a href="install.html" data-nav-slug="install">安装</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">能力</a>
+          <a href="safety.html" data-nav-slug="safety">安全</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">路线图</a>
+          <a href="releases.html" data-nav-slug="releases">发布</a>
+          <a href="../capabilities.html">EN</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>能力</h1>
+        <p>
+          Talos v0.2.0 当前已发布内容：内置编码工具、斜杠命令、
+          运行时 Skills、MCP stdio 工具，以及
+          <code>talos-runtime</code> 可嵌入 facade。
+        </p>
+      </header>
+
+      <section>
+        <h2>内置工具</h2>
+        <p>
+          Talos 内置了覆盖常见编码 Agent 工作流的工具。默认提示词会要求模型优先使用
+          内置工具，只有当原生工具无法覆盖任务时才回退到 shell 命令。
+        </p>
+        <h3>文件与目录</h3>
+        <ul>
+          <li><code>read</code></li>
+          <li><code>write</code></li>
+          <li><code>edit</code></li>
+          <li><code>delete</code></li>
+          <li><code>ls</code></li>
+          <li><code>tree</code></li>
+          <li><code>glob</code></li>
+        </ul>
+        <h3>搜索与检查</h3>
+        <ul>
+          <li><code>grep</code></li>
+          <li><code>diff</code></li>
+          <li><code>stat</code></li>
+        </ul>
+        <h3>代码智能</h3>
+        <ul>
+          <li><code>find_symbol</code></li>
+          <li><code>find_references</code></li>
+          <li><code>list_symbols</code></li>
+          <li><code>list_imports</code></li>
+        </ul>
+        <h3>Git</h3>
+        <ul>
+          <li><code>git_status</code></li>
+          <li><code>git_diff</code></li>
+          <li><code>git_log</code></li>
+          <li><code>git_show</code></li>
+          <li><code>git_branch_list</code></li>
+          <li><code>git_add</code></li>
+          <li><code>git_commit</code></li>
+          <li><code>git_push</code></li>
+          <li><code>git_pull</code></li>
+          <li><code>git_checkout</code></li>
+        </ul>
+        <h3>网络</h3>
+        <ul>
+          <li>
+            <code>http_request</code> &mdash; SSRF 防护，且受权限门控。
+          </li>
+          <li>
+            <code>web_search</code> &mdash; DuckDuckGo、Tavily、SearXNG
+            和 Wikipedia。
+          </li>
+        </ul>
+        <h3>Shell 兜底</h3>
+        <ul>
+          <li><code>bash</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>斜杠命令</h2>
+        <p>
+          在 TUI 中输入 <code>/</code> 打开命令菜单。继续输入可筛选命令，使用
+          <code>Up</code> / <code>Down</code> 移动选项，按
+          <code>Enter</code> 或 <code>Tab</code> 完成。<code>Backspace</code>
+          用于编辑筛选内容，<code>Esc</code> 关闭菜单且不清空输入区。
+          使用 <code>/help</code> 查看当前会话可用命令。Skill 命令在
+          inline 模式也可使用。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>命令</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>/help</code></td><td>显示可用命令</td></tr>
+            <tr><td><code>/quit</code>, <code>/exit</code></td><td>退出 Talos</td></tr>
+            <tr><td><code>/status</code></td><td>显示会话信息（模型、token 用量）</td></tr>
+            <tr><td><code>/plugins</code></td><td>列出已观察到的工具来源与 MCP server 状态</td></tr>
+            <tr><td><code>/skills</code></td><td>列出可用运行时 skills 及激活状态</td></tr>
+            <tr><td><code>/skills activate &lt;name&gt;</code></td><td>激活一个 Skill 主体，用于后续 provider 请求</td></tr>
+            <tr><td><code>/skills reference &lt;path&gt;</code></td><td>为激活 Skill 加载有界引用文件</td></tr>
+            <tr><td><code>/copy last</code></td><td>复制上一条助手消息到剪贴板</td></tr>
+            <tr><td><code>/copy all</code></td><td>复制完整对话记录到剪贴板</td></tr>
+            <tr><td><code>/export &lt;path&gt;</code></td><td>导出对话记录到文件（需权限批准）</td></tr>
+            <tr><td><code>/new</code></td><td>开始新会话（保留旧会话）</td></tr>
+            <tr><td><code>/resume</code></td><td>列出可恢复工作区会话；<code>/resume &lt;N&gt;</code> 按序号选择</td></tr>
+            <tr><td><code>/fork</code></td><td>分叉当前会话（克隆历史到子会话）</td></tr>
+            <tr><td><code>/delete</code></td><td>打开会话选择器（排除当前会话）；选中后删除</td></tr>
+            <tr><td><code>/model</code></td><td>打开模型选择器，在运行时浏览并切换模型</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>运行时 Skills</h2>
+        <p>
+          Talos 会在会话启动时发现 <code>SKILL.md</code> 文件，并在第一次模型回合前将
+          Level 0 元数据（skill 名称、描述和触发词）注入系统提示词。
+        </p>
+        <p>Skill 搜索路径（按优先级）：</p>
+        <ol>
+          <li>当前工作区的 <code>.talos/skills/</code></li>
+          <li><code>~/.talos/skills/</code></li>
+          <li>
+            向上至 Git 根目录过程中继承的父级 <code>.talos/skills/</code>
+            目录
+          </li>
+        </ol>
+        <p>
+          在 TUI 或 inline 模式使用 <code>/skills</code> 可查看运行时发现的 skills。
+          使用 <code>/skills activate &lt;name&gt;</code> 可显式加载一个 Skill 主体到
+          provider 上下文用于后续回合。Skill 激活后，可使用
+          <code>/skills reference &lt;relative-path&gt;</code> 从该 Skill 目录加载有界引用文件。
+        </p>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>渐进式上下文：</strong>激活的 Skill 主体和引用仅加入 provider
+            上下文。Talos 不会将完整内容打印到滚动历史、命令输出或
+            transcript 历史。引用路径必须保持在当前激活 Skill 目录内。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>MCP 工具</h2>
+        <p>
+          在 <code>~/.talos/config.toml</code> 中配置本地 stdio MCP servers：
+        </p>
+        <div class="talos-codeblock">
+          <pre><code>[[mcp.servers]]
+name = "filesystem"
+transport = "stdio"
+command = "/path/to/mcp-server"
+args = ["/path/to/workspace"]
+env = {}</code></pre>
+        </div>
+        <p>
+          Talos 会在 TUI、print、inline、interactive 和 RPC 模式首个模型回合前启动
+          已配置 server 并发现其工具。工具名称采用
+          <code>mcp:&lt;server&gt;:&lt;tool&gt;</code>
+          形式。只读标注会被保留；其他 MCP 工具会进入常规批准流程，
+          在无法交互批准时默认拒绝。启动失败会被报告但不会中止会话，
+          每个 MCP 请求也有超时上限。可在 TUI 中使用
+          <code>/plugins</code> 查看启动连接快照和已观察到的工具来源。
+        </p>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>稳定性：</strong>MCP 工具集合在会话生命周期内固定，
+            以保持模型可见工具定义和提示词缓存前缀稳定。修改 MCP 配置后请重启会话。
+            当前仅支持本地 stdio transport。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>在 Rust 中嵌入 Talos</h2>
+        <p>
+          Rust 应用可以依赖 <code>talos-runtime</code>
+          crate，在不链接 Talos CLI 或 TUI crates 的情况下嵌入核心 Agent 循环。
+          当前 pre-1.0 facade 提供
+          <code>RuntimeBuilder</code> 和 <code>RuntimeHandle</code>，用于
+          provider / tool 注入、类型化事件流、中断、关闭和显式请求预览。
+        </p>
+        <p>
+          已注册工具默认会经过权限包装。在 headless 嵌入中，未解决的
+          <code>Ask</code> 决策会被拒绝，除非 embedder 提供更窄的 allow-list 规则。
+        </p>
+        <div class="talos-callout talos-callout--warn">
+          <p>
+            <strong>pre-1.0 表面：</strong>这还不是稳定的 1.0 SDK 承诺。
+            当前公开嵌入表面是
+            <code>talos-runtime</code> 以及它从 <code>talos-core</code>
+            重新导出的协议与 trait 类型。更底层的
+            <code>talos-agent</code> 构造器仍属于实现表面，除非文档另有说明。
+            详见
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/024-embeddable-runtime-api-boundary.md"
+              rel="noopener"
+              >ADR-024</a
+            >
+            和用于 v1.0 自举门槛的
+            <a href="roadmap.html">路线图</a>。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>本页未包含的内容</h2>
+        <p>
+          公共站点仅记录已发布行为。<em>计划中</em>或<em>研究中</em>事项
+          &mdash; 包括 dotagents 共享目录
+          <code>~/.agents/skills/</code>、嵌入式浏览器或 Web 控制面、WASM plugin
+          runtime，以及远程或 P2P 会话控制 &mdash; 统一放在
+          <a href="roadmap.html">路线图</a> 页面。
+        </p>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >源文档</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

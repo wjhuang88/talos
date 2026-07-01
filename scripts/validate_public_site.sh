@@ -43,7 +43,7 @@ if [ ! -d "$site_root" ]; then
 fi
 
 # 2. Required files
-for required in index.html install.html capabilities.html safety.html roadmap.html releases.html 404.html assets/styles.css assets/site.js CNAME.example README.md; do
+for required in index.html install.html capabilities.html safety.html roadmap.html releases.html 404.html assets/styles.css assets/site.js CNAME.example README.md zh/index.html zh/install.html zh/capabilities.html zh/safety.html zh/roadmap.html zh/releases.html zh/404.html; do
   if [ ! -f "$site_root/$required" ]; then
     log_error "site/$required is missing"
   fi
@@ -117,11 +117,11 @@ fi
 # 6. Guardrail: every page must include the shared header assets
 for html in $(find "$site_root" -name '*.html' -type f | sort); do
   rel=${html#"$site_root"/}
-  if ! grep -q 'assets/styles.css' "$html"; then
-    log_error "site/$rel is missing <link rel=stylesheet href=assets/styles.css>"
+  if ! grep -q 'assets/styles.css' "$html" && ! grep -q '../assets/styles.css' "$html"; then
+    log_error "site/$rel is missing shared stylesheet reference"
   fi
-  if ! grep -q 'assets/site.js' "$html"; then
-    log_warn "site/$rel is missing <script src=assets/site.js> (allowed only on 404)"
+  if ! grep -q 'assets/site.js' "$html" && ! grep -q '../assets/site.js' "$html"; then
+    log_warn "site/$rel is missing shared site.js reference (allowed only on 404)"
   fi
 done
 

@@ -135,9 +135,9 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Complete |
 | T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Complete |
 | T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Complete |
-| T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Planned |
+| T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Complete |
 | T50 | 11 | E | Implement associative recall API default-off; no automatic prompt injection yet. | T43 | Unit tests; bounded multi-hop tests | Complete (via T43) |
-| T51 | 11 | E | Add metrics for memory/context compression: tokens saved, retrieval hits, hidden-output drops. | T26/T50 | Metrics tests; docs | Planned |
+| T51 | 11 | E | Add metrics for memory/context compression: tokens saved, retrieval hits, hidden-output drops. | T26/T50 | Metrics tests; docs | Complete |
 | T52 | 11 | A | Second Talos-on-Talos rehearsal: small code change through Talos runtime if feasible. | T38/tooling readiness | Evidence record; validation | Planned |
 | T53 | 11 | G | WEB-004 site theme/branding optimization using Talos visual identity. | WEB-004 | Site validator; no external assets | Planned |
 | T54 | 12 | A | Month-3 closeout: self-bootstrap gap report against every REL-002 acceptance criterion. | T00-T53 | REL-002 checklist update | Planned |

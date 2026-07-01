@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>安全 — Talos</title>
+    <meta
+      name="description"
+      content="Talos 安全模型：显式权限边界、密钥脱敏、sandbox 策略，以及 pre-1.0 发布线的边界限制。"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="stylesheet" href="../assets/styles.css" />
+    <script defer src="../assets/site.js"></script>
+  </head>
+  <body data-page="safety">
+    <a class="talos-skip" href="#main">跳转到正文</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">首页</a>
+          <a href="install.html" data-nav-slug="install">安装</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">能力</a>
+          <a href="safety.html" data-nav-slug="safety">安全</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">路线图</a>
+          <a href="releases.html" data-nav-slug="releases">发布</a>
+          <a href="../safety.html">EN</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <header class="talos-lead">
+        <h1>安全</h1>
+        <p>
+          Talos 在 v0.2.0 中承诺的权限策略、密钥脱敏边界与 sandbox
+          边界。
+        </p>
+      </header>
+
+      <section>
+        <h2>v0.2.0 已发布内容</h2>
+        <p>
+          Talos 是面向会审查其执行动作的开发者的本地编码 Agent。
+          安全模型建立在三个显式边界上：
+        </p>
+        <ul>
+          <li>
+            <strong>只读工作区工具可在无需批准的情况下运行。</strong>
+          </li>
+          <li>
+            <strong>文件写入、删除、Git 写操作和 shell 执行
+            全部通过权限流程。</strong>这些工具对工作区生效的唯一路径
+            就是权限管线。
+          </li>
+          <li>
+            <strong>工具展示聚焦关键参数</strong>，当工具定义提供摘要字段时，
+            不直接显示原始 JSON。这样可以一眼完成批准审查。
+          </li>
+        </ul>
+        <p>
+          本地密钥应存放在环境变量或私有配置文件中，不应写入源码。
+          Talos 不会自动提交变更 &mdash; Git 提交只会通过显式工具调用
+          或用户动作发生。
+        </p>
+      </section>
+
+      <section>
+        <h2>密钥脱敏边界</h2>
+        <p>
+          Provider API keys 可以作为 <code>api_key</code> 直接保存在
+          <code>~/.talos/config.toml</code>，也可以通过
+          <code>api_key_env</code> 从环境变量引用。
+          无论哪种方式，所有非文件持久化输出界面都会对 key 进行脱敏，
+          确保它不会出现在命令输出、日志、debug 打印、导出 transcript
+          或仓库文件中。
+        </p>
+        <p>脱敏覆盖面包括：</p>
+        <ul>
+          <li>
+            <code>talos --config-list</code> &mdash;
+            <code>mask_secrets()</code> 会将
+            <code>api_key</code> 替换为 <code>***</code>。
+          </li>
+          <li>
+            <code>talos --config-get providers.X.api_key</code> &mdash;
+            <code>is_secret_key()</code> 在值离开进程前输出
+            <code>***</code>。
+          </li>
+          <li>
+            <code>talos --config-set providers.X.api_key=...</code> &mdash;
+            在确认行回显 <code>***</code>。
+          </li>
+          <li>
+            <code>ProviderConfig</code>、<code>Credentials</code> 和
+            <code>CredentialResponseData</code> 的自定义
+            <code>Debug</code> 实现会输出 <code>***</code>，
+            不会输出原始 key。
+          </li>
+          <li>
+            Provider HTTP debug 快照使用
+            <code>redact_secret()</code>（first4 + <code>****</code> +
+            last4），让 key 在 debug 日志中可识别但不暴露。
+          </li>
+        </ul>
+        <p>
+          对于偏好环境变量凭据的用户，
+          <code>${ENV_VAR}</code> 替换仍然受支持。
+        </p>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            完整的设计理由、被否决的
+            <code>skip_serializing</code> 方案，以及反转触发条件
+            （例如接入 OS keychain）记录在
+            <a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/023-inline-api-key-boundary.md"
+              rel="noopener"
+              >ADR-023</a
+            >。
+            公共站点仅镜像边界；ADR 才是事实来源。
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>权限策略</h2>
+        <p>
+          Talos 不会给模型对本地机器的无限制访问。权限管线是唯一能够
+          触达工作区的路径。可用以下规则快速判断：
+        </p>
+        <ul>
+          <li>
+            只读工具（<code>read</code>、<code>ls</code>、
+            <code>tree</code>、<code>glob</code>、<code>grep</code>、
+            <code>diff</code>、<code>stat</code>、四个
+            <code>*_symbol*</code> / <code>find_references</code>
+            工具、只读 Git 工具、只读意图的 <code>http_request</code>
+            等）运行不需要批准。
+          </li>
+          <li>
+            可写工具（<code>write</code>、<code>edit</code>、
+            <code>delete</code>、写侧 Git 工具、
+            <code>bash</code>、写侧 MCP 工具）必须通过权限管线获得
+            显式批准。
+          </li>
+          <li>
+            <code>http_request</code> 有 SSRF 防护且受权限门控；
+            出站网络调用不会自动发生。
+          </li>
+          <li>
+            没有只读标注的 MCP 工具会进入同一批准路径。
+            如果没有交互式批准能力（例如 CI shell 中的
+            <code>talos -p</code>），MCP 工具默认拒绝。
+          </li>
+          <li>
+            Talos 永不自动提交。Git 写操作只会由操作者批准的
+            显式工具调用触发。
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Sandbox 策略</h2>
+        <p>
+          Talos 是本地进程，不是远程服务。在 v0.2.0 中，它不会为批准、日志或
+          会话控制开放网络端口，运行时设计目标是让默认核心保持本地且可审计。
+          加固细节（<code>talos-sandbox/hardening.rs</code> 中的四处生产
+          <code>unsafe</code>、<code>libc</code> FFI 约束、以及用于本地存储的
+          <code>rusqlite/bundled</code> 例外）都通过 ADR 跟踪；请参阅
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/007-process-hardening-unsafe.md"
+            rel="noopener"
+            >ADR-007</a
+          >、
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/008-sqlite-bundled-storage.md"
+            rel="noopener"
+            >ADR-008</a
+          >，以及完整的
+          <a
+            href="https://github.com/wjhuang88/talos/blob/main/docs/decisions/README.md"
+            rel="noopener"
+            >ADR 索引</a
+          >。
+        </p>
+        <p>
+          在 v0.2.0 中，Talos 也<strong>不是</strong>远程多用户服务、
+          marketplace runtime、浏览器仪表盘或自主后台守护进程。
+          已发布 / 计划中 / 研究中的边界划分见
+          <a href="roadmap.html">路线图</a>。
+        </p>
+      </section>
+
+      <section>
+        <h2>pre-1.0 阶段限制</h2>
+        <ul>
+          <li>
+            <code>talos-runtime</code> 可嵌入 facade
+            仍是 pre-1.0；在 <code>v1.0.0</code> 之前，SDK 表面仍可能变化。
+          </li>
+          <li>
+            <code>~/.agents/skills/</code> dotagents 共享目录是研究项，尚未发布。
+          </li>
+          <li>
+            嵌入式浏览器 / Web 控制面（<a
+              href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
+              rel="noopener"
+              >WEB-001</a
+            >）是独立的产品差异化轨道。它<strong>不是</strong>安全边界；
+            它是维护者尚未启用的产品能力面。
+          </li>
+          <li>
+            WASM plugin runtime 是研究项，尚未发布。网站会在
+            <a href="roadmap.html">路线图</a> 页面反映该状态。
+          </li>
+        </ul>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>问题报告：</strong>如果你发现运行时安全问题，请按项目治理文档中的
+            负责任披露流程处理。常规交接类工作的内部安全审查队列当前处于暂停，
+            但真实安全漏洞并不会暂停 &mdash; 请直接向维护者报告。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >源文档</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talos — 面向 Rust 开发者的安全优先本地编码 Agent</title>
+    <meta
+      name="description"
+      content="Talos 是一个 Rust 原生本地编码 Agent，提供安全优先运行时、显式权限、运行时 Skills、MCP/RPC 集成和可嵌入运行时 facade。基于 Apache-2.0 开源。"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="stylesheet" href="../assets/styles.css" />
+    <script defer src="../assets/site.js"></script>
+  </head>
+  <body data-page="home">
+    <a class="talos-skip" href="#main">跳转到正文</a>
+    <header class="talos-header">
+      <div class="talos-header__inner">
+        <a class="talos-brand" href="index.html">
+          <span class="talos-brand__mark" aria-hidden="true">&#x2B21;</span>
+          <span class="talos-brand__name">TALOS</span>
+        </a>
+        <nav class="talos-nav" aria-label="Primary">
+          <a href="index.html" data-nav-slug="home">首页</a>
+          <a href="install.html" data-nav-slug="install">安装</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">能力</a>
+          <a href="safety.html" data-nav-slug="safety">安全</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">路线图</a>
+          <a href="releases.html" data-nav-slug="releases">发布</a>
+          <a href="../index.html">EN</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="talos-main">
+      <section class="talos-hero">
+        <p class="talos-hero__eyebrow">v0.2.0 — pre-1.0 发布线</p>
+        <h1>一个安全优先的本地编码 Agent，使用 Rust 编写。</h1>
+        <p class="talos-hero__tagline">
+          Talos 是一个 Rust 原生本地编码 Agent，面向希望在自己机器上审查、扩展和运行
+          Agent 运行时的开发者。它提供交互式 TUI、显式权限、运行时 Skills、
+          MCP/RPC 集成和可嵌入运行时 facade &mdash; 同时默认核心保持本地且可审计。
+        </p>
+        <div class="talos-hero__cta">
+          <a class="talos-button talos-button--primary" href="install.html">
+            安装 Talos
+          </a>
+          <a
+            class="talos-button talos-button--secondary"
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+          >
+            在 GitHub 查看
+          </a>
+        </div>
+      </section>
+
+      <section>
+        <h2>核心亮点</h2>
+        <div class="talos-cards">
+          <article class="talos-card">
+            <h3>默认本地优先</h3>
+            <p>
+              支持交互式 TUI、inline 模式和用于脚本/冒烟测试的 print 模式。
+              启动无需依赖远程服务。
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>显式权限边界</h3>
+            <p>
+              文件写入、删除、Git 写操作、shell 执行、网络动作和 MCP 工具
+              全部通过权限管线。
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>Rust 原生核心</h3>
+            <p>
+              采用以 workspace 为中心的 crates，尽量减少运行时假设。
+              运行 Talos 不需要 Node.js 或 Python 运行时。
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>可嵌入运行时 facade</h3>
+            <p>
+              <code>talos-runtime</code> crate 让 Rust 项目可以构建
+              安全的进程内 Agent 运行时，而无需依赖 Talos
+              CLI/TUI crates。
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>持久会话与记忆</h3>
+            <p>
+              提供 SQLite 支撑的会话历史、搜索、分支/分叉支持、
+              语义记忆固化和保留策略预览。
+            </p>
+          </article>
+          <article class="talos-card">
+            <h3>可扩展能力面</h3>
+            <p>
+              MCP stdio 工具、hooks、JSON-RPC 和项目治理状态
+              已实现；plugin/WASM 和浏览器控制面仍处于研究阶段。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>当前发布边界</h2>
+        <p>
+          <span class="talos-pill talos-pill--shipped">已在 v0.2.0 发布</span>
+          TUI、inline 与 print 执行模式；本地 provider 配置与密钥脱敏；
+          带权限门控的内置编码工具；会话存储、搜索、清理、维护、记忆固化
+          与探索库导入；来自 <code>.talos/skills/</code>、
+          <code>~/.talos/skills/</code> 和继承父级 <code>.talos/skills/</code>
+          的运行时 Skills；MCP stdio 工具与 JSON-RPC 基础设施；以及初始
+          <code>talos-runtime</code> 可嵌入 facade。
+        </p>
+        <p>
+          <span class="talos-pill talos-pill--research">尚未发布</span>
+          可嵌入运行时 facade 的稳定 1.0 SDK 保证、
+          <code>~/.agents/skills/</code> dotagents 共享目录发现、
+          嵌入式浏览器或 Web 控制面、WASM plugin runtime 与插件市场、
+          超出当前 web/fetch 基础能力的 PDF/Office 文档解析、以及远程或
+          P2P 会话控制。完整的已发布 / 计划中 / 研究中划分请见
+          <a href="roadmap.html">路线图</a>。
+        </p>
+      </section>
+
+      <section>
+        <h2>接下来建议阅读</h2>
+        <ul>
+          <li>
+            <a href="install.html">安装</a> &mdash; 选择与你平台匹配的安装方式并验证压缩包布局。
+          </li>
+          <li>
+            <a href="capabilities.html">能力</a> &mdash; 查看内置工具、斜杠命令、Skills 与 MCP 集成。
+          </li>
+          <li>
+            <a href="safety.html">安全</a> &mdash; 查看权限策略、sandbox 边界与密钥脱敏边界。
+          </li>
+          <li>
+            <a href="releases.html">发布</a> &mdash; 查看当前 tag、发布后更新清单，以及 GitHub 上
+            的完整发布历史链接。
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="talos-footer">
+      <div class="talos-footer__inner">
+        <div>
+          &copy; <span data-site-year>2026</span> The Talos Authors. Licensed
+          under the
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" rel="noopener"
+            >Apache License 2.0</a
+          >.
+        </div>
+        <div>
+          <a
+            href="https://github.com/wjhuang88/talos"
+            rel="noopener"
+            >github.com/wjhuang88/talos</a
+          >
+          &middot;
+          <a
+            href="https://github.com/wjhuang88/talos/tree/main/docs"
+            rel="noopener"
+            >源文档</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

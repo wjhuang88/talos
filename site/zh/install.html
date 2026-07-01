@@ -1,22 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Install Talos</title>
+    <title>安装 Talos</title>
     <meta
       name="description"
-      content="Install Talos on macOS, Linux, or Windows. Download a release archive, or use the official shell and PowerShell installers."
+      content="在 macOS、Linux 或 Windows 上安装 Talos。可下载 release 压缩包，或使用官方 shell 与 PowerShell 安装器。"
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-    <link rel="stylesheet" href="assets/styles.css" />
-    <script defer src="assets/site.js"></script>
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+    <link rel="stylesheet" href="../assets/styles.css" />
+    <script defer src="../assets/site.js"></script>
   </head>
   <body data-page="install">
-    <a class="talos-skip" href="#main">Skip to content</a>
+    <a class="talos-skip" href="#main">跳转到正文</a>
     <header class="talos-header">
       <div class="talos-header__inner">
         <a class="talos-brand" href="index.html">
@@ -24,52 +24,52 @@
           <span class="talos-brand__name">TALOS</span>
         </a>
         <nav class="talos-nav" aria-label="Primary">
-          <a href="index.html" data-nav-slug="home">Home</a>
-          <a href="install.html" data-nav-slug="install">Install</a>
-          <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
-          <a href="safety.html" data-nav-slug="safety">Safety</a>
-          <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
-          <a href="releases.html" data-nav-slug="releases">Releases</a>
-          <a href="zh/install.html">中文</a>
+          <a href="index.html" data-nav-slug="home">首页</a>
+          <a href="install.html" data-nav-slug="install">安装</a>
+          <a href="capabilities.html" data-nav-slug="capabilities">能力</a>
+          <a href="safety.html" data-nav-slug="safety">安全</a>
+          <a href="roadmap.html" data-nav-slug="roadmap">路线图</a>
+          <a href="releases.html" data-nav-slug="releases">发布</a>
+          <a href="../install.html">EN</a>
         </nav>
       </div>
     </header>
 
     <main id="main" class="talos-main">
       <header class="talos-lead">
-        <h1>Install</h1>
+        <h1>安装</h1>
         <p>
-          Pick the install path for your platform. The official installers and
-          release archives are the only supported entrypoints for v0.2.0.
+          请选择与你平台匹配的安装方式。对于 v0.2.0，官方安装器和
+          release 压缩包是唯一受支持的入口。
         </p>
       </header>
 
       <section>
-        <h2>Download a release</h2>
-        <p>Install the latest release on macOS or Linux:</p>
+        <h2>下载 release</h2>
+        <p>在 macOS 或 Linux 上安装最新 release：</p>
         <div class="talos-codeblock">
           <pre><code>curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh | sh</code></pre>
         </div>
-        <p>Install the latest Windows x86_64 release from PowerShell:</p>
+        <p>在 PowerShell 中安装最新 Windows x86_64 release：</p>
         <div class="talos-codeblock">
           <pre><code>iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)</code></pre>
         </div>
         <p>
-          Installers live under <code>install/</code> in the repository because
-          they are user-facing release entrypoints. Development and governance
-          scripts live under <code>scripts/</code>; the old
-          <code>scripts/install.*</code> paths are intentionally not kept
-          after the pre-1.0 installer layout cleanup.
+          安装器位于仓库的 <code>install/</code> 下，因为它们是面向用户的
+          release 入口。开发和治理脚本位于 <code>scripts/</code>；
+          在 pre-1.0 安装器目录整理之后，旧的
+          <code>scripts/install.*</code> 路径被有意不再保留。
         </p>
 
-        <h3>Or download an archive</h3>
+        <h3>或下载压缩包</h3>
         <p>
-          Download the archive for your platform from
+          从
           <a
             href="https://github.com/wjhuang88/talos/releases"
             rel="noopener"
             >GitHub Releases</a
-          >, then unpack it:
+          >
+          下载你平台对应的压缩包，然后解压：
         </p>
         <div class="talos-codeblock">
           <pre><code>tar -xzf talos-aarch64-darwin.tar.gz
@@ -77,12 +77,12 @@ chmod +x talos
 ./talos --help</code></pre>
         </div>
 
-        <h3>Published archive names</h3>
+        <h3>已发布的压缩包名称</h3>
         <table>
           <thead>
             <tr>
-              <th>Platform</th>
-              <th>Archive</th>
+              <th>平台</th>
+              <th>压缩包</th>
             </tr>
           </thead>
           <tbody>
@@ -110,34 +110,31 @@ chmod +x talos
         </table>
         <div class="talos-callout talos-callout--info">
           <p>
-            <strong>Note:</strong> Windows ARM64 artifacts are not published
-            yet. The Windows installer script also refuses to run on ARM64
-            until a published artifact is available.
+            <strong>注意：</strong>Windows ARM64 产物尚未发布。
+            在发布可用产物之前，Windows 安装脚本也会拒绝在 ARM64 上运行。
           </p>
         </div>
       </section>
 
       <section>
-        <h2>First-run setup</h2>
+        <h2>首次运行设置</h2>
         <p>
-          When you start Talos without a model configured, the TUI opens with
-          a model picker instead of failing. Choose a model to get started. If
-          the provider needs credentials, Talos shows instructions for setting
-          the API key.
+          当你在未配置模型时启动 Talos，TUI 会打开模型选择器而不是直接失败。
+          选择一个模型即可开始。如果 provider 需要凭据，Talos 会显示 API key
+          的设置说明。
         </p>
-        <p>To skip the wizard in CI or non-interactive environments:</p>
+        <p>在 CI 或非交互环境中跳过向导：</p>
         <div class="talos-codeblock">
           <pre><code>talos --no-init -p "summarize this repo"</code></pre>
         </div>
       </section>
 
       <section>
-        <h2>Configuration management</h2>
+        <h2>配置管理</h2>
         <p>
-          View and edit configuration without hand-editing TOML. Secrets are
-          masked in every display surface; see the
-          <a href="safety.html">Safety page</a> for the full secret-masking
-          boundary.
+          无需手动编辑 TOML 即可查看和修改配置。密钥在所有显示面都会脱敏；
+          完整的密钥脱敏边界见
+          <a href="safety.html">安全页面</a>。
         </p>
         <div class="talos-codeblock">
           <pre><code>talos --config-list                          # print all settings (secrets masked)
@@ -148,44 +145,41 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
       </section>
 
       <section>
-        <h2>Build from source</h2>
-        <p>Requirements:</p>
+        <h2>从源码构建</h2>
+        <p>环境要求：</p>
         <ul>
-          <li>Rust 1.95 or newer</li>
+          <li>Rust 1.95 或更新版本</li>
           <li>Cargo</li>
         </ul>
         <div class="talos-codeblock">
           <pre><code>cargo build --release -p talos-cli
 ./target/release/talos --help</code></pre>
         </div>
-        <p>To build all release artifacts locally:</p>
+        <p>如需在本地构建全部 release 产物：</p>
         <div class="talos-codeblock">
           <pre><code>./build.sh</code></pre>
         </div>
         <p>
-          The multi-platform build writes archives and checksums to
-          <code>dist/</code>.
+          多平台构建会将压缩包和校验和写入
+          <code>dist/</code>。
         </p>
       </section>
 
       <section>
-        <h2>Verify your install</h2>
+        <h2>验证安装</h2>
         <p>
-          After install, run a one-shot prompt in print mode to confirm the
-          binary works end-to-end:
+          安装后，运行一次 print 模式单次提示，确认二进制端到端可用：
         </p>
         <div class="talos-codeblock">
           <pre><code>talos -p --mock "/mock-request summarize this repository"</code></pre>
         </div>
         <p>
-          The mock provider gives a deterministic local response without
-          touching a network provider. It is the same command the TUI smoke
-          tests use to verify the runtime path before connecting to a real
-          model.
+          mock provider 会返回确定性的本地响应，无需触发网络 provider。
+          这也是 TUI 冒烟测试在连接真实模型前验证运行时路径所使用的命令。
         </p>
         <p>
-          The full release history is on the
-          <a href="releases.html">Releases page</a>.
+          完整发布历史见
+          <a href="releases.html">发布页面</a>。
         </p>
       </section>
     </main>
@@ -209,7 +203,7 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
           <a
             href="https://github.com/wjhuang88/talos/tree/main/docs"
             rel="noopener"
-            >Source docs</a
+            >源文档</a
           >
         </div>
       </div>
