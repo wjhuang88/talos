@@ -136,6 +136,8 @@ decision context; executable details live in item files listed under Required Re
 | CODE-003 | Tree-sitter Usage Pattern Analysis | Research | P3 | Benchmark real-time vs cached vs indexed tree-sitter parsing for agent tool workloads. CODE-001 said "no cache" for TUI highlighting, but agent `find_symbol` across 500 files re-parses every turn. Define threshold heuristic for strategy switching. | `docs/backlog/active/CODE-003-tree-sitter-usage-pattern-analysis.md`; `docs/backlog/active/CODE-001-tree-sitter-code-analysis-research.md`; `docs/backlog/active/CODE-002-symbol-tools.md`; ADR-020 |
 | MEM-007 | Active Context Compression | Research | P2 | Deterministic pre-entry compression of tool outputs before they enter model context. Per-tool strategies (read→section extraction, grep→top-N, git_diff→hunk summary, bash→tail). Cross-turn dedup. **Hard constraint**: must not invalidate prompt cache / KV cache prefix. Raw output preserved for /export. Delays MEM-005 compaction triggers; may reduce MEM-003 urgency. | `docs/backlog/active/MEM-007-active-context-compression.md`; `docs/backlog/active/MEM-005-context-compaction-policy.md`; `docs/backlog/active/ARCH-006-prompt-cache-stability.md` |
 | MEM-008 | Weighted Associative Memory Graph | Research | P2 | Design a SQLite-backed weighted association graph for memory/entity/procedure nodes, impression strength, edge strength, bounded multi-hop recall, and a research gate for optional length-controlled associative memory injection on each turn. Default stance: automatic injection off until metrics justify it. | `docs/backlog/active/MEM-008-weighted-associative-memory-graph.md`; `docs/backlog/active/MEM-001-layered-memory-foundation.md`; `docs/backlog/active/MEM-006-memory-pattern-research-headroom.md`; `docs/backlog/active/MEM-007-active-context-compression.md`; `docs/backlog/active/TOOL-014-conditional-tool-backends.md`; ADR-016; `docs/backlog/active/ARCH-006-prompt-cache-stability.md` |
+| TODO-001 | Session-Level Todo List for Plan Orchestration | Planned | P2 | Structured task management within sessions. User slash commands are read-only (view/list/stats/export); agent tools handle all mutations (create/update/delete/dependency). SQLite-backed, session-scoped, with cyclic dependency detection and prompt injection of active items. Three-phase: data model + tools, TUI + commands, prompt integration. | [Issue #8](https://github.com/wjhuang88/talos/issues/8); `docs/backlog/active/TODO-001-session-todo-list.md`; `docs/backlog/active/SESSION-001-interactive-session-lifecycle.md`; `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md` |
+| TUI-016 | Slash Command Panel Smart Auto-Execute | Planned | P3 | Parameterless commands execute directly on Enter in slash panel; parameter commands fill input area. Execution mode classification based on existing command metadata. Visual hints for parameter requirements. | [Issue #7](https://github.com/wjhuang88/talos/issues/7); `docs/backlog/active/TUI-016-slash-panel-smart-auto-execute.md`; `docs/backlog/active/TUI-010-slash-command-menu.md`; `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md` |
 
 ## Blocked Items
 
@@ -173,3 +175,15 @@ For backlog-related work:
    story explicitly depends on archived rationale.
 5. Do not add long acceptance criteria or execution logs here; put them in the item file or
    iteration record.
+
+## Issue Sync Rule
+
+Backlog items sourced from GitHub issues (identified by a GitHub Issue link in Source or Required
+Reads) must sync status changes back to the originating issue. When a story transitions to
+In Progress, Review, Complete, Blocked, or Cancelled, add a comment to the GitHub issue with:
+
+- New status and the commit/PR that caused the transition.
+- A one-line summary of what was delivered or why it is blocked.
+
+This ensures external reporters and project watchers see progress without reading internal docs.
+Close the issue only when the story reaches Complete or Cancelled in the owner doc.

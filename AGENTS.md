@@ -159,7 +159,11 @@ Before ending a session, verify:
    orphaned changes?
 6. **README / Board sync**: Update README for user-visible changes; update `docs/BOARD.md` after
    owner docs when active/review/paused/next work changes.
-7. **Governance / long task recovery**: If governance files changed, run
+7. **Issue sync**: If any backlog item sourced from a GitHub issue changed status this session,
+   post a comment to the originating issue with the new status, commit reference, and one-line
+   summary. Close the issue only when the story reaches Complete or Cancelled in the owner doc.
+   See `docs/backlog/PRODUCT-BACKLOG.md` § Issue Sync Rule.
+8. **Governance / long task recovery**: If governance files changed, run
    `scripts/validate_project_governance.sh .`; run `scripts/assess_project_scale.sh .` when
    profile, branch mode, worktree mode, or governance depth changes. If a long task is active,
    append validation evidence, current state, next item, and recovery/resume instructions.
