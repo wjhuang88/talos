@@ -824,6 +824,20 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     }
 
+    if config.dashboard.enabled {
+        let snapshot = build_dashboard_snapshot(&config, &session_manager, &workspace_root_str);
+        let server = talos_dashboard::DashboardServer::new(snapshot);
+        let token = server.token().to_string();
+        match server.serve().await {
+            Ok((addr, _)) => {
+                eprintln!("Dashboard: http://{addr}/ (token: {token})");
+            }
+            Err(e) => {
+                eprintln!("Dashboard: failed to start: {e}");
+            }
+        }
+    }
+
     tui.run().await?;
     Ok(())
 }
@@ -1522,5 +1536,48 @@ async fn handle_session_fork(
             let text = format!("[Error] Failed to commit fork: {e}. Old session remains active.\n");
             send_stream(ui_tx, MessageSource::Error, text);
         }
+    }
+}
+
+fn build_dashboard_snapshot(
+    config: &Config,
+    session_manager: &talos_session::SessionManager,
+    workspace_root: &str,
+) -> talos_dashboard::DashboardSnapshot {
+    let config_toml = toml::to_string_pretty(config).unwrap_or_default();
+    let config_masked = crate::mask_secrets(&config_toml, config);
+
+    let status = serde_json::json!({
+        "model": config.model,
+        "provider": config.provider,
+        "workspace": workspace_root,
+    });
+
+    let history = session_manager
+        .list_recent(10)
+        .map(|sessions| {
+            serde_json::Value::Array(
+                sessions
+                    .iter()
+                    .map(|s| {
+                        serde_json::json!({
+                            "id": s.id.to_string(),
+                            "workspace": s.workspace_root,
+                            "messages": s.message_count,
+                            "preview": s.last_message_preview,
+                        })
+                    })
+                    .collect(),
+            )
+        })
+        .unwrap_or(serde_json::json!([]));
+
+    let governance = "Dashboard MVP — governance view pending.".to_string();
+
+    talos_dashboard::DashboardSnapshot {
+        config_masked,
+        status,
+        history,
+        governance,
     }
 }

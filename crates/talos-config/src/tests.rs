@@ -74,6 +74,7 @@ fn test_api_key_from_env_anthropic() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "env-key-anthropic");
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
@@ -93,6 +94,7 @@ fn test_api_key_from_env_openai() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "env-key-openai");
     unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -113,6 +115,7 @@ fn test_api_key_from_env_openai_compat() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "bailian-style-key");
     unsafe { env::remove_var("OPENAI_COMPAT_API_KEY") };
@@ -133,6 +136,7 @@ fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     assert_eq!(config.api_key().unwrap(), "real-openai-key");
     unsafe { env::remove_var("OPENAI_API_KEY") };
@@ -154,6 +158,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     let err = config.api_key().unwrap_err();
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -177,6 +182,7 @@ fn test_api_key_missing_error() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     let err = config.api_key().unwrap_err();
     assert!(matches!(err, ConfigError::MissingApiKey(_, _)));
@@ -205,6 +211,7 @@ fn test_base_url_getter() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     assert_eq!(config.base_url().as_deref(), Some("https://example.com/v1"));
 }
@@ -256,6 +263,7 @@ fn test_custom_provider_api_key_env() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
 
     assert_eq!(config.api_key().unwrap(), "dashscope-key");
@@ -276,6 +284,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     let (builtin_ctx, builtin_out) = builtin.resolve_model_limits();
     assert_eq!(builtin_ctx, 1_047_576);
@@ -307,6 +316,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     assert_eq!(custom.context_limit(), Some(202_752));
     assert_eq!(custom.output_limit(), Some(4096));
@@ -363,6 +373,7 @@ fn test_provider_serialization() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
     let config_openai = Config {
         provider: "openai".to_string(),
@@ -374,6 +385,7 @@ fn test_provider_serialization() {
         rpc: RpcConfig::default(),
         memory_prompt: MemoryPromptConfig::default(),
         skills: SkillConfig::default(),
+        dashboard: DashboardConfig::default(),
     };
 
     let a_str = toml::to_string(&config_anthropic).unwrap();

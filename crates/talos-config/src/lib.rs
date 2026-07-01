@@ -20,9 +20,9 @@ mod types;
 pub use credentials::Credentials;
 pub use error::ConfigError;
 pub use types::{
-    Config, HookConfig, LogConfig, LogFileConfig, LogFormat, LogRotation, McpConfig,
-    McpServerConfig, MemoryPromptConfig, ModelConfig, ProviderConfig, ProviderProtocol, RpcConfig,
-    SkillConfig,
+    Config, DashboardConfig, HookConfig, LogConfig, LogFileConfig, LogFormat, LogRotation,
+    McpConfig, McpServerConfig, MemoryPromptConfig, ModelConfig, ProviderConfig, ProviderProtocol,
+    RpcConfig, SkillConfig,
 };
 
 pub(crate) use builtin::builtin_provider_config;

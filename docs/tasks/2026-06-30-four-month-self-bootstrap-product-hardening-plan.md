@@ -128,7 +128,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T39 | 8 | A | Month-2 closeout and replan: decide whether WEB-001/WEB-005 are ready and whether ADR-027 dependency/security review clears plugin runtime work. | T22-T38 | Workspace tests; governance | Complete |
 | T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Complete |
 | T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Complete |
-| T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Planned |
+| T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Complete |
 | T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
 | T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Planned |
 | T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Planned |
@@ -730,3 +730,40 @@ rendering paths.
 - `scripts/validate_project_governance.sh .` → 0 warnings.
 
 **Next task item**: T42 — WEB-001 read-only loopback dashboard MVP (ADR-031).
+
+### Checkpoint T42 — WEB-001 Read-Only Loopback Dashboard MVP (2026-07-01)
+
+**Task**: T42 — Implement WEB-001 read-only status/history/governance/config subset.
+
+**Completed**:
+- Created `crates/talos-dashboard` with `axum 0.8.9` as the HTTP server. Dependency evidence:
+  `cargo tree -p talos-dashboard --depth 1` → axum, serde, serde_json, thiserror, tokio, uuid (all
+  pre-existing in workspace except axum). No Node/Python/browser automation dependency.
+- Server binds to `127.0.0.1:0` (OS-assigned port, hardcoded loopback, no `0.0.0.0` option).
+- Auth: per-process bearer token (`Uuid::new_v4().simple()`, 32 hex chars), generated at startup,
+  printed once to stderr, stored only in memory. Requests without/with incorrect token → 401.
+- Four GET-only routes: `/status` (model/provider/workspace JSON), `/history` (recent sessions JSON),
+  `/governance` (text), `/config` (masked TOML via existing `mask_secrets`). All routes return
+  `X-Content-Type-Options: nosniff` and `Cache-Control: no-store`.
+- No POST/PUT/DELETE/PATCH routes registered. Unknown paths → 404.
+- `DashboardConfig { enabled: bool }` added to `talos-config` with `#[serde(default)]` (disabled by
+  default, explicit opt-in via `[dashboard] enabled = true`).
+- Dashboard spawns in `run_tui_mode()` before `tui.run()`, gated on `config.dashboard.enabled`.
+- 10 tests: token rejection (no header, wrong token), valid token on all 4 routes, secret masking
+  (`api_key` → `***`), no write routes (POST/PUT/DELETE/PATCH → 405 on all paths), unknown path → 404,
+  loopback bind verification, crypto-random token uniqueness per instance.
+
+**Security boundary** (per ADR-031):
+- Read-only: no tool execution, approvals, config writes, or session mutation through the dashboard.
+- Loopback-only: binds to `127.0.0.1`, not reachable from other machines.
+- Token-gated: every request requires correct bearer token.
+- Secret-safe: `/config` masks `api_key` as `***`.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo clippy -p talos-dashboard -p talos-config -p talos-cli -- -D warnings` → no warnings.
+- `cargo test -p talos-dashboard -p talos-config` → 10 + 92 passed, 0 failed.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Next task item**: T45 — plugin manifest parser (ADR-027/029). T46 follows after T45.

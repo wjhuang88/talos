@@ -24,6 +24,7 @@ members = [
     "crates/talos-memory",
     "crates/talos-exploration",
     "crates/talos-runtime",
+    "crates/talos-dashboard",
 ]
 
 [workspace.package]

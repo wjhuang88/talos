@@ -98,6 +98,14 @@ pub struct SkillConfig {
     pub discover_shared: bool,
 }
 
+/// Configuration for the read-only loopback dashboard (ADR-031).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct DashboardConfig {
+    /// When true, start the loopback dashboard server on TUI launch.
+    pub enabled: bool,
+}
+
 /// Talos configuration.
 ///
 /// Contains the model provider, model name, and optional API key.
@@ -139,6 +147,10 @@ pub struct Config {
     /// Skill discovery configuration.
     #[serde(default)]
     pub skills: SkillConfig,
+
+    /// Loopback dashboard configuration (ADR-031).
+    #[serde(default)]
+    pub dashboard: DashboardConfig,
 }
 
 fn default_provider_name() -> String {
@@ -157,6 +169,7 @@ impl Default for Config {
             rpc: RpcConfig::default(),
             memory_prompt: MemoryPromptConfig::default(),
             skills: SkillConfig::default(),
+            dashboard: DashboardConfig::default(),
         }
     }
 }
