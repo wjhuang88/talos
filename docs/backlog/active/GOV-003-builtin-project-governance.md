@@ -205,6 +205,25 @@ Sources:
 - `docs/decisions/` — ADRs
 - `scripts/validate_project_governance.sh` — harness output
 
+## Implementation Notes
+
+### Phase 1 Status Report Enhancement (2026-07-01)
+
+T27 of the four-month self-bootstrap product hardening plan enhanced the existing
+`talos --governance-status` command as a read-only report mode:
+
+- Adds a `Board Disposition` section grouped by `Now`, `Blocked / Paused`, and `Next`, sourced from
+  `docs/BOARD.md`.
+- Keeps the command read-only: it parses local governance documents and runs the existing
+  validation harness, but does not mutate owner docs.
+- Narrows open-iteration parsing to the `docs/iterations/README.md` `Current Iterations` table, so
+  historical execution-round rows are not reported as active/planned iterations.
+- Adds fixture tests for Board disposition parsing and open-iteration filtering.
+
+Validation evidence: `cargo test -p talos-cli`, `cargo clippy -p talos-cli -- -D warnings`,
+`cargo fmt --all -- --check`, and `cargo run -p talos-cli -- --governance-status` all passed on
+2026-07-01.
+
 ## Non-Goals
 
 - Do not replace `AGENTS.md` — this adds project *state* context, not behavior rules.

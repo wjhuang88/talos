@@ -7,8 +7,8 @@ use serde_json::Value;
 use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::{
-    AgentTool, ToolBackend, ToolContinuation, ToolFamily, ToolPresentationPolicy, ToolRegistry,
-    ToolResult as ToolExecutionResult,
+    AgentTool, ToolBackend, ToolContinuation, ToolFamily, ToolNature, ToolPermissionFacet,
+    ToolPresentationPolicy, ToolRegistry, ToolResourceKind, ToolResult as ToolExecutionResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_plugin::{
@@ -210,6 +210,27 @@ impl AgentTool for BackendMockTool {
 
     fn family(&self) -> ToolFamily {
         ToolFamily::Network
+    }
+
+    fn nature(&self) -> ToolNature {
+        ToolNature::Network
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        if let Some(url) = input.get("url").and_then(Value::as_str)
+            && let Some(host) = url
+                .strip_prefix("https://")
+                .or_else(|| url.strip_prefix("http://"))
+                .and_then(|rest| rest.split('/').next())
+            && !host.is_empty()
+        {
+            return vec![ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                host.to_lowercase(),
+                ToolResourceKind::Domain,
+            )];
+        }
+        vec![ToolPermissionFacet::new(ToolNature::Network)]
     }
 
     fn conditional_backends(&self) -> Vec<ToolBackend> {
@@ -2067,6 +2088,78 @@ async fn test_disclosed_backend_updates_provider_schema() {
         .and_then(Value::as_array)
         .expect("access enum");
     assert!(access_enum.iter().any(|value| value == "browser"));
+}
+
+#[tokio::test]
+async fn test_disclosed_browser_backend_still_requires_permission_allow() {
+    let call = ToolCall {
+        id: "call-1".into(),
+        name: "fetch_url".into(),
+        input: serde_json::json!({
+            "url": "https://example.com/private",
+            "access": "browser"
+        }),
+    };
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call,
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+
+    let execution_log = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BackendMockTool {
+        execution_log: execution_log.clone(),
+    }));
+
+    let mut engine = PermissionEngine {
+        rules: Vec::new(),
+        workspace_root: None,
+    };
+    engine.add_rule(talos_permission::PermissionRule::new_nature(
+        ToolNature::Network,
+        None,
+        None,
+        PermissionDecision::Deny("network blocked".into()),
+    ));
+
+    let mut agent = Agent::with_security(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        Some(Arc::new(engine)),
+        None,
+        PathBuf::from("/tmp"),
+    );
+    agent.set_tool_presentation_policy(
+        ToolPresentationPolicy::with_families([ToolFamily::Network])
+            .disclose_backend("fetch_url", "browser_page"),
+    );
+
+    let response = agent.run("read browser page".into()).await.unwrap();
+    assert_eq!(response, "done");
+    assert!(
+        execution_log.lock().await.is_empty(),
+        "backend disclosure must not bypass permission denial"
+    );
 }
 
 #[tokio::test]

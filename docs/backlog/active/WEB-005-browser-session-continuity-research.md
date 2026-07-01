@@ -139,6 +139,13 @@ Rules:
   BrowserSkill-compatible bridge.
 - Decide record storage location and retention policy.
 
+Phase 0 audit note (2026-07-01): T36 added permission/profile regression coverage before any
+browser connector implementation. The tests prove current URL tools keep distinct facets
+(`fetch_url` and `http_request` Network-only with host-scoped Domain resources; `save_url`
+Network+Write), `save_url` write denial is not masked by network allow, and a disclosed
+`fetch_url` `browser_page` mock backend still cannot execute when permission is denied. This does
+not implement `browser_page_read`; that facet remains a Phase 1 design/implementation item.
+
 ### Phase 1: Read-Only Browser Page Backend
 
 - Add core browser-page types and connector traits in the appropriate crate boundary.

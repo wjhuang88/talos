@@ -113,8 +113,8 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T24 | 5 | C | Harden `fetch_url`: redirect diagnostics, sparse HTML hints, content-type summary, continuation tests. | TOOL-014/WEBFETCH | `cargo test -p talos-tools -p talos-agent` | Complete |
 | T25 | 5 | C | Document `fetch_url` vs `http_request` vs `save_url` in README and site capability pages. | T24 | Docs/site validators | Complete |
 | T26 | 5 | E | Implement MEM-007 minimal compression packet for one low-risk tool family, default off. | T20 | Raw output preserved; stable-prefix test | Complete |
-| T27 | 5 | A | Add governance status command enhancement or report mode for active/blocked/planned disposition. | GOV-003 | CLI tests; governance fixture tests | Planned |
-| T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Blocked |
+| T27 | 5 | A | Add governance status command enhancement or report mode for active/blocked/planned disposition. | GOV-003 | CLI tests; governance fixture tests | Complete |
+| T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Unblocked by ADR-031; implement via T42 |
 | T29 | 6 | D | WEB-005 prototype design for browser page record ingestion without automation. | T18/T19 | Mock tests; no real browser dependency unless approved | Complete |
 | T30 | 6 | E | MEM-008 schema spike for weighted association graph: nodes, edge weights, decay, multi-hop bounds. | MEM-008 | SQLite migration prototype tests | Complete |
 | T31 | 6 | E | Research automatic associative memory injection: budget, triggers, default-off policy, evaluation metrics. | T30 | Decision note; no default enable | Complete |
@@ -122,10 +122,10 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T33 | 6 | F | Plugin provenance ADR for future `ToolProvenance::Plugin`. | T32 | ADR-028 accepted | Complete |
 | T34 | 7 | F | Atomic component model ADR for skill/mcp/hook and plugin package declarations. | plugin proposal | ADR-029 accepted | Complete |
 | T35 | 7 | F | Command taxonomy ADR: `/mcp`, `/plugins`, `/hooks`, and transition notice policy. | CMD-002 | ADR-030 accepted | Complete |
-| T36 | 7 | C | Add permission/profile audit tests for `fetch_url`, `http_request`, `save_url`, and future browser-page facet. | T19/T24 | Permission boundary tests | Planned |
+| T36 | 7 | C | Add permission/profile audit tests for `fetch_url`, `http_request`, `save_url`, and future browser-page facet. | T19/T24 | Permission boundary tests | Complete |
 | T37 | 7 | B | Update CRATE-PUBLICATION-MATRIX with cargo install dry-run evidence and SDK publish blockers. | T07/T08/T13 | Matrix reviewed | Complete |
-| T38 | 7 | A | First Talos-on-Talos rehearsal session: documentation-only change with full evidence template. | T11/GOV-003 | Evidence record; external assistance labeled | Planned |
-| T39 | 8 | A | Month-2 closeout and replan: decide whether WEB-001/WEB-005 are ready and whether ADR-027 dependency/security review clears plugin runtime work. | T22-T38 | Workspace tests; governance | Planned |
+| T38 | 7 | A | First Talos-on-Talos rehearsal session: documentation-only change with full evidence template. | T11/GOV-003 | Evidence record; external assistance labeled | Complete |
+| T39 | 8 | A | Month-2 closeout and replan: decide whether WEB-001/WEB-005 are ready and whether ADR-027 dependency/security review clears plugin runtime work. | T22-T38 | Workspace tests; governance | Complete |
 | T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Planned |
 | T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Planned |
 | T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Planned |
@@ -519,15 +519,154 @@ This decision is recorded as a default-off policy. T60 (Month 4) will revisit wi
 **Commands/checks**: `cargo test -p talos-tools -p talos-agent` → 191 + 180 passed.
 Governance → 0 warnings.
 
-**Remaining Month-2 items** (T27, T36, T38, T39): deferred to next session.
-- T27 (governance status enhancement): CLI implementation, moderate effort.
+**Remaining Month-2 items at this checkpoint** (T27, T36, T38, T39): deferred to next session.
+- T27 (governance status enhancement): completed in the 2026-07-01 checkpoint below.
 - T36 (permission audit tests): test-only, depends on T19/T24 design.
 - T38 (first Talos-on-Talos rehearsal): evidence recording using T11 template.
 - T39 (Month-2 closeout): workspace test + replan.
 
-**Natural block assessment**: T28 is blocked (no WEB-001 ADR). T27/T36/T38/T39 remain but are
-not blocked — they are deferred due to session scope, not plan constraints. The next session
-should start with T27 or T38.
+**Natural block assessment**: T28 is blocked (no WEB-001 ADR). T36/T38/T39 remain but are not
+blocked — they are deferred due to session scope, not plan constraints.
 
 **Recovery or resume instruction**: All commits through `abf1dff` on `origin/main`. To resume:
-read this checkpoint, then start T27 (governance status enhancement) or T38 (first rehearsal).
+read this checkpoint and the T27 checkpoint below, then start T36 or T38.
+
+### Checkpoint T27 — Governance Status Report Enhancement (2026-07-01)
+
+**Task**: T27 — Add governance status command enhancement or report mode for active/blocked/planned
+disposition.
+
+**Completed**:
+- `talos --governance-status` now prints a `Board Disposition` section with `Now`,
+  `Blocked / Paused`, and `Next` groups sourced from `docs/BOARD.md`.
+- The open-iteration parser is now scoped to the `Current Iterations` table only, so historical
+  `Next Execution Rounds` rows no longer appear as open iterations.
+- Fixture tests cover Board disposition parsing and open-iteration filtering.
+
+**Runtime evidence**:
+- `cargo run -p talos-cli -- --governance-status` → prints `Board Disposition` with 3 Now items,
+  1 Blocked / Paused item, 16 Next items, and an `Open Iterations` list limited to I018, I019,
+  I020, I028, and I075. Governance validation reports PASS with 0 warnings.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo test -p talos-cli governance` → 6 passed.
+- `cargo test -p talos-cli` → 99 passed across unit and integration tests.
+- `cargo clippy -p talos-cli -- -D warnings` → no warnings.
+
+**Remaining Month-2 items after T27**: T36, T38, T39. T28 was still blocked at this checkpoint on
+the WEB-001 ADR/design gate; ADR-031 later accepted the gate.
+
+### Checkpoint T36 — Permission/Profile Audit Tests (2026-07-01)
+
+**Task**: T36 — Add permission/profile audit tests for `fetch_url`, `http_request`, `save_url`, and
+future browser-page facet.
+
+**Completed**:
+- Added least-privilege profile audit coverage for `fetch_url`, `http_request`, and `save_url`.
+- Fixed the audit finding that `http_request` used a generic Network facet instead of a
+  host-scoped Domain facet.
+- Added a regression proving `save_url` remains denied when the Network facet is allowed but the
+  Write facet is denied.
+- Added an agent-level browser-page backend regression proving backend disclosure does not bypass
+  permission denial. This uses the existing TOOL-014 mock backend only; no browser connector or
+  browser automation was implemented.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo check --workspace` → pass.
+- `cargo test -p talos-tools --test document_boundaries` → 15 passed.
+- `cargo test -p talos-agent browser_backend` → 1 passed.
+- `cargo test -p talos-agent permission` → 4 passed.
+- `cargo test -p talos-tools -p talos-agent` → 191 `talos-tools` unit tests, 15
+  `document_boundaries` tests, 3 integration hardening tests, 181 `talos-agent` unit tests, 12
+  `talos-agent` doctests; all passed, with 1 existing ignored timing-sensitive test.
+- `cargo clippy -p talos-tools -p talos-agent -- -D warnings` → no warnings.
+- `scripts/check_publish_guard.sh .` → all publication guards verified.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Remaining Month-2 items after T36**: T38 and T39. T28 was still blocked at this checkpoint on
+the WEB-001 ADR/design gate; ADR-031 later accepted the gate.
+
+### Checkpoint T38 — First Self-Bootstrap Rehearsal Evidence (2026-07-01)
+
+**Task**: T38 — First Talos-on-Talos rehearsal session: documentation-only change with full
+evidence template.
+
+**Completed**:
+- Created `docs/tasks/2026-07-01-self-bootstrap-rehearsal-t38.md` from the T11 evidence template.
+- Labeled external assistance explicitly: this session was orchestrated by an external Codex coding
+  agent, while Talos was used only as a CLI/runtime under test.
+- Recorded this as useful negative evidence rather than REL-002 compliance.
+
+**Validation**:
+- `cargo run -p talos-cli -- --version` → `talos 0.2.0`.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+
+**Remaining Month-2 items**: T39 closeout and replan. T28 was still blocked at this checkpoint on
+the WEB-001 ADR/design gate; ADR-031 later accepted the gate.
+
+### Checkpoint Month-2 Closeout (T22–T39) — Complete With T28 Blocked (2026-07-01)
+
+**Completed Month-2 task items**: T22, T23, T24, T25, T26, T27, T29, T30, T31, T32, T33, T34,
+T35, T36, T37, T38, T39.
+
+**Formerly blocked Month-2 task item**: T28 was blocked at Month-2 closeout because the WEB-001
+loopback dashboard design was ready, but no WEB-001 ADR/design gate had been accepted for a new
+local HTTP server runtime capability. ADR-031 accepted the read-only loopback MVP boundary on
+2026-07-01; implement through T42 rather than rewriting the historical T28 checkpoint.
+
+**Closeout decisions**:
+- WEB-001 was **not ready for implementation at closeout**. ADR-031 later accepted the
+  loopback-only, token-authenticated, read-only MVP boundary; T42 may now implement within that
+  boundary.
+- WEB-005 is **ready for the next mock-backend slice**, not a real browser connector. The permission
+  model, page record design, mock connector design, and T36 permission audit tests are in place.
+  T47 may implement a safe mock browser-page record backend without browser automation if the
+  planned permission boundary remains intact.
+- ADR-027 did **not yet clear plugin runtime implementation at closeout**. ADR-032 later accepted
+  the focused `wasmtime` dependency/security review for the first local explicit read-only WASM MVP
+  after T45 manifest parsing.
+- Automatic associative memory injection remains **default-off** until Month-4 evaluation (T60).
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo check --workspace` → pass.
+- `cargo test --workspace` → exit 0. One existing timing-sensitive test remains ignored; test
+  output included existing `talos-runtime` example dead-code warnings.
+- `cargo clippy -p talos-tools -p talos-agent -- -D warnings` → no warnings for touched code
+  crates.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+- `scripts/check_publish_guard.sh .` → all publication guards verified.
+- `cargo run -p talos-cli -- --version` → `talos 0.2.0`.
+
+**Replan for Month 3 entry**:
+- Start with T40/T41 only if plugin runtime execution remains out of scope: plugin provenance data
+  model and command taxonomy can proceed without `wasmtime`.
+- T42 is unblocked by ADR-031 for the read-only loopback MVP only.
+- T43/T50 memory graph work can proceed only behind feature/config defaults with no automatic
+  injection.
+- T47 can proceed as a mock browser-page backend only; no extension, browser automation, cookies,
+  or browser profile access.
+- T48 runtime publish gate and T49 site i18n are safe non-runtime-dependency slices.
+
+**Recovery or resume instruction**: Resume Month 3 from T40 or T41 if staying on extensibility
+metadata/command taxonomy. T42 may now proceed within ADR-031. T46 may proceed only after T45
+manifest parsing and within ADR-032. If prioritizing web/context, resume at T47 mock backend after
+rereading WEB-005 and this closeout.
+
+### Checkpoint Gate Unlocks — WEB-001 and Wasmtime Review (2026-07-01)
+
+**Completed prerequisite actions**:
+- ADR-031 accepted the WEB-001 loopback dashboard boundary. This unlocks T42 for a read-only,
+  explicit opt-in, loopback-only, token-authenticated dashboard MVP.
+- ADR-032 accepted the ADR-027 focused `wasmtime` dependency/security review. This unlocks T46
+  after T45 manifest parsing for a local explicit read-only WASM plugin fixture with resource and
+  failure tests.
+
+**Still not unlocked**:
+- Real publish actions (T55/T56) still need explicit maintainer approval for the exact crate and
+  version.
+- REL-002 remains blocked on real Talos-as-primary-runtime rehearsal evidence.
+- WEB-005 real browser connectors still need a connector-specific ADR; T47 mock backend remains
+  allowed.

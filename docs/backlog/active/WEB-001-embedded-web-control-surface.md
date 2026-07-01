@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | Research |
+| Status | Planned — ADR-031 accepted; read-only loopback MVP unblocked |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | Browser dashboard; live log viewer; web config editor |
@@ -22,6 +22,13 @@ This is no longer treated as a distant novelty. WEB-001 is a product differentia
 Talos should study existing browser control surfaces such as the omp.sh/EXT-002 reference, then
 define a narrow loopback-only MVP that preserves the same permission, config, session, and
 governance boundaries as the TUI.
+
+## Gate Status
+
+ADR-031 accepted the WEB-001 MVP boundary on 2026-07-01. The first implementation slice is now
+unblocked only for an explicit opt-in, loopback-only, token-authenticated, read-only dashboard.
+Remote access, web approvals, config writes, browser automation, WebSocket control, and any
+write/session-mutating route remain out of scope until a later security review.
 
 ## Target Model
 
@@ -63,6 +70,7 @@ governance state model and data sources.
 
 ## Required Reads
 
+- `docs/decisions/031-web-loopback-dashboard-boundary.md`
 - `docs/proposals/embedded-web-control-surface.md`
 - `docs/backlog/active/EXT-002-oh-my-pi-feature-analysis.md`
 - `crates/talos-rpc/src/` (existing JSON-RPC infrastructure)

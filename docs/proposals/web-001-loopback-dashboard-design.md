@@ -1,14 +1,15 @@
 # WEB-001 Embedded Web Control Surface — MVP Design Proposal
 
 Created: 2026-06-30 (T22+T23 of the four-month plan)
-Status: Design (pre-ADR); no implementation without WEB-001 ADR gate
+Status: Accepted for MVP by ADR-031 (2026-07-01); implementation limited to read-only loopback
+dashboard constraints
 
 ## Scope
 
 This proposal defines the WEB-001 MVP: a loopback-only read-only dashboard for status, history,
-governance, and config surfaces (T22), and the local web auth boundary (T23). It is a design
-artifact — implementation requires the WEB-001 ADR to pass and is gated by the Month-2 closeout
-(T39).
+governance, and config surfaces (T22), and the local web auth boundary (T23). ADR-031 accepts this
+as the implementation boundary for the first MVP slice; any write/action route or remote access
+still requires a later security review.
 
 Source backlog: `docs/backlog/active/WEB-001-embedded-web-control-surface.md`.
 

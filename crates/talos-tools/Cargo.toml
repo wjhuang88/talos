@@ -43,6 +43,7 @@ scraper = "0.27"
 libc = "1.0.0-alpha.3"
 
 [dev-dependencies]
+talos-permission = { version = "0.2.0", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1", features = ["fs", "macros", "rt"] }
 

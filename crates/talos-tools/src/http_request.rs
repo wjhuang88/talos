@@ -13,7 +13,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------
@@ -379,6 +381,20 @@ impl AgentTool for HttpRequestTool {
 
     fn family(&self) -> ToolFamily {
         ToolFamily::AdvancedNetwork
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        if let Some(url) = input.get("url").and_then(Value::as_str)
+            && let Ok(parsed) = reqwest::Url::parse(url)
+            && let Some(host) = parsed.host_str()
+        {
+            return vec![ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                host.to_lowercase(),
+                ToolResourceKind::Domain,
+            )];
+        }
+        vec![ToolPermissionFacet::new(ToolNature::Network)]
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

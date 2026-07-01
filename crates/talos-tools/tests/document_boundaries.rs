@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use talos_core::tool::{AgentTool, ToolNature, ToolResourceKind};
-use talos_tools::{DocumentExtractTool, HttpRequestTool, SaveUrlTool};
+use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+use talos_tools::{DocumentExtractTool, FetchUrlTool, HttpRequestTool, SaveUrlTool};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -137,6 +138,91 @@ fn test_http_request_has_only_network_facet() {
     assert!(
         !has_write,
         "http_request permission profile must NOT include Write facet"
+    );
+}
+
+#[test]
+fn test_web_tool_permission_profiles_are_least_privilege() {
+    let fetch = FetchUrlTool::new();
+    let http = HttpRequestTool::new();
+    let save = SaveUrlTool::new();
+
+    for (name, tool) in [
+        ("fetch_url", &fetch as &dyn AgentTool),
+        ("http_request", &http as &dyn AgentTool),
+    ] {
+        let profile = tool.permission_profile(&serde_json::json!({
+            "url": "https://Example.com/path",
+            "method": "GET"
+        }));
+
+        assert_eq!(profile.len(), 1, "{name} must have one network facet");
+        assert_eq!(profile[0].nature, ToolNature::Network);
+        assert_eq!(profile[0].resource_kind, Some(ToolResourceKind::Domain));
+        assert_eq!(profile[0].resource.as_deref(), Some("example.com"));
+        assert!(
+            !profile
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Write),
+            "{name} must not request write permission"
+        );
+    }
+
+    let save_profile = save.permission_profile(&serde_json::json!({
+        "url": "https://Example.com/archive.zip",
+        "destination": "downloads/archive.zip"
+    }));
+    assert_eq!(save_profile.len(), 2);
+    assert!(save_profile.iter().any(|facet| {
+        facet.nature == ToolNature::Network
+            && facet.resource_kind == Some(ToolResourceKind::Domain)
+            && facet.resource.as_deref() == Some("example.com")
+    }));
+    assert!(save_profile.iter().any(|facet| {
+        facet.nature == ToolNature::Write
+            && facet.resource_kind == Some(ToolResourceKind::Path)
+            && facet.resource.as_deref() == Some("downloads/archive.zip")
+    }));
+}
+
+#[test]
+fn test_permission_profile_denies_save_url_when_write_facet_is_denied() {
+    let save = SaveUrlTool::new();
+    let profile = save.permission_profile(&serde_json::json!({
+        "url": "https://example.com/archive.zip",
+        "destination": "downloads/archive.zip"
+    }));
+
+    let mut engine = PermissionEngine {
+        rules: Vec::new(),
+        workspace_root: None,
+    };
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Network,
+        None,
+        None,
+        PermissionDecision::Allow,
+    ));
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Write,
+        None,
+        None,
+        PermissionDecision::Deny("write blocked".to_string()),
+    ));
+
+    let decision = engine.evaluate_profile(
+        "save_url",
+        &profile,
+        &serde_json::json!({
+            "url": "https://example.com/archive.zip",
+            "destination": "downloads/archive.zip"
+        }),
+    );
+
+    assert_eq!(
+        decision,
+        PermissionDecision::Deny("write blocked".to_string()),
+        "network allow must not mask save_url write denial"
     );
 }
 
