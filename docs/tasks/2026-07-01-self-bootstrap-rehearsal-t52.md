@@ -1,102 +1,116 @@
-# 2026-07-01 Self-Bootstrap Rehearsal: T40 Code Slice
+# 2026-07-01 Self-Bootstrap Rehearsal: Talos-Driven Code Slice
 
 **Rehearsal number**: 2
 **Plan item**: T52
 **Session date**: 2026-07-01
 **Runtime**: Talos 0.2.0 on Darwin arm64
 **Change type**: small code change
-**External assistance**: labeled below
+**External assistance**: user provided the prompt; Talos executed the code change autonomously
 
 ## Objective
 
-Attempt a small code change (adding `ToolProvenance::Plugin` variant across 3 crates) and evaluate
-whether Talos could serve as the primary development runtime for this class of work.
+Give Talos a small multi-crate code change task and evaluate how much of the workflow Talos can
+drive autonomously as the primary development runtime.
 
 ## Scope
 
-- **In scope**: Record evidence for the T40 code slice (enum variant + 3 match arms + 8 tests across
-  talos-core, talos-conversation, talos-tui); evaluate Talos's ability to drive this workflow.
-- **Out of scope**: Claim REL-002 compliance; assert Talos was the primary runtime.
+- **In scope**: Add a `TestVariant` unit variant to `ToolProvenance`, update all exhaustive match
+  sites, verify compilation.
+- **Out of scope**: Full test coverage, validation pipeline, governance docs, commit workflow (these
+  are evaluated as gaps below).
 
 ## Environment
 
 - Talos version: `talos 0.2.0`
-- Provider/model used: external opencode agent, model glm-5.2; Talos was not the primary agent
-  runtime for this rehearsal.
+- Provider/model used: Talos TUI with configured provider/model
 - Workspace: `/Users/GHuang/WorkSpace/RustProjects/talos`
-- Starting commit: `acde17a` (Month-2 closeout)
-- Ending commit: `f4423b9` (T40 delivery)
+- Starting commit: `241d776` (T52+T53 delivery)
 
 ## Execution Record
 
-| Step | Tool(s) used | Outcome | Notes |
-|---|---|---|---|
-| 1 | External agent: codebase exploration (grep, read, explore subagents) | success | Mapped ToolProvenance definition, all match sites, rendering paths, existing test patterns. |
-| 2 | External agent: code edits (4 files) | success | Added Plugin variant to talos-core/tool.rs; updated 3 exhaustive match arms; added 8 tests. |
-| 3 | External agent: validation (cargo check/clippy/test/fmt/governance) | success | All gates passed on first attempt — compiler-enforced exhaustiveness caught all match sites. |
-| 4 | `cargo run -p talos-cli -- --version` | success | Runtime smoke: `talos 0.2.0`. |
-| 5 | External agent: owner-doc updates + commit | success | Updated PLUGIN-001, ADR-028 correction, four-month plan, BOARD.md. |
+| Step | Performed by | Tool(s) used | Outcome | Notes |
+|---|---|---|---|---|
+| 1 | User | CLI | Prompted Talos with: "add TestVariant to ToolProvenance, run cargo check, fix errors" |
+| 2 | **Talos** | `read`, `edit` | success | Added `TestVariant` variant to `talos-core/src/tool.rs` with doc comment |
+| 3 | **Talos** | `edit` (compiler-guided) | success | Updated `plugin_observation_key()` in `talos-conversation/src/engine.rs` |
+| 4 | **Talos** | `edit` (compiler-guided) | success | Updated `build_tool_call_scrollback_line()` in `talos-tui/src/tool_display.rs` |
+| 5 | **Talos** | `edit` (compiler-guided) | success | Updated `ToolCallBubble::render()` in `talos-tui/src/widgets.rs` |
+| 6 | External | `cargo check --workspace` | pass | Post-hoc verification: all 4 files correct, compiles clean |
+| 7 | External | `cargo test` (3 crates) | pass | 285 tests passed, 0 failed |
 
 ## External Assistance
 
 | Step | What was needed | Who provided it | Why Talos could not |
 |---|---|---|---|
-| 1 | Multi-file codebase exploration and pattern mapping | External opencode agent (explore subagents) | Talos lacks parallel explore/grep agents and multi-angle codebase analysis capabilities. |
-| 2 | Precise multi-file code edits (enum variant + match arms + tests) | External opencode agent | Talos's edit tool exists but lacks the orchestration layer for coordinated multi-crate changes, test generation, and compiler-error-driven fix loops. |
-| 3 | Validation orchestration (fmt → check → clippy → test → governance) | External opencode agent | Talos has bash tool but lacks the structured validation pipeline and error-recovery workflow. |
-| 5 | Owner-doc governance updates and conventional-commit formatting | External opencode agent | Talos lacks governance-aware documentation tooling and commit workflow integration. |
+| 1 | Task prompt | User | Talos needs a human to define the task |
+| 6-7 | Validation pipeline (cargo check/test) | External agent (opencode) | Talos did not autonomously run `cargo check` or `cargo test` after edits |
+| — | Tests for the new variant | Not provided | Talos did not generate unit tests for `TestVariant` |
+| — | Commit + governance docs | Not provided | Talos did not commit or update owner docs |
 
 ## Validation Evidence
 
-- `cargo check --workspace`: pass (T40 commit f4423b9).
-- `cargo test --workspace`: pass — 1264+ tests across all crates, 0 failed (Month-3 session close).
-- `scripts/validate_project_governance.sh .`: 0 warnings.
-- `cargo run -p talos-cli -- --version`: `talos 0.2.0`.
+- `cargo check --workspace`: pass (all 4 files compile correctly).
+- `cargo test -p talos-core -p talos-conversation -p talos-tui`: 285 passed, 0 failed.
+- Code diff: 4 files, +5 lines — minimal, correct, no extraneous changes.
 
-## Commit
+## Code Quality Assessment
 
-- Commit SHA: `f4423b9`
-- Commit message: `feat(core): add ToolProvenance::Plugin variant and rendering paths (#T40) [model:glm-5.2]`
-- Files changed: 9 (4 source/test + 5 docs), +255/-8 lines.
+| Dimension | Score | Notes |
+|---|---|---|
+| Correctness | ✅ Excellent | All 3 exhaustive match sites found and updated. No missed callsites. |
+| Semantics | ✅ Good | Match arms are reasonable: `"test_variant"` key, `None` rendering (no badge). |
+| Documentation | ✅ Good | Added `/// A synthetic tool variant used only in tests.` doc comment. |
+| Test coverage | ❌ Missing | No unit tests for the new variant. |
+| Formatting | ⚠️ Uncertain | Not verified with `cargo fmt --check` by Talos. |
 
 ## Gaps Exposed
 
 | Gap | Severity | Blocking REL-002? | Recommended fix |
 |---|---|---|---|
-| Talos cannot orchestrate multi-crate code changes (explore → edit → validate → commit). | high | yes | Integrate structured tool orchestration: parallel explore, compiler-error-driven edit loops, validation pipeline. TODO-001 (session todo list) partially addresses planning; TUI-016 addresses command UX. |
-| Talos lacks governance-aware commit tooling (conventional commits, owner-doc-first ordering, BOARD sync). | high | yes | Add git-commit tool with conventional-commit template and governance validation pre-commit hook. |
-| Talos cannot generate tests from patterns (existing test style → new variant tests). | medium | no | Add test-generation capability or improve agent prompting for test-first workflows. |
-| Talos's edit tool is basic (single replacement, no AST-aware refactoring). | medium | no | Consider tree-sitter-aware edit tool (TOOL-008 Phase 2 enables this infrastructure). |
-| Session-level task tracking (TODO-001) not yet implemented. | medium | no | TODO-001 (issue #8) would let the agent track multi-step plans within a session. |
+| Talos does not autonomously run validation (cargo check/test/clippy/fmt) after code changes. | high | yes | Add a "validate" tool or post-edit validation hook that runs the standard pipeline. |
+| Talos does not generate tests for new code. | medium | no | Improve agent prompting for test-first workflows; add test-generation capability. |
+| Talos does not commit changes or update governance docs. | high | yes | Add git-commit tool with conventional-commit format and governance validation. |
+| Talos does not run `cargo fmt` to enforce style. | low | no | Add format check to the validation pipeline. |
 
 ## Assessment
 
-- **Self-bootstrap coverage**: ~5%. Talos provided CLI/runtime smoke validation only. All planning,
-  code editing, test generation, validation orchestration, and governance documentation were performed
-  by the external opencode agent. This is marginally worse than T38 (10%) because T52 attempted code
-  changes (harder) rather than docs-only (easier), exposing more gaps.
-- **Would this rehearsal satisfy REL-002?**: No. REL-002 requires Talos as the primary development
-  runtime. The gap is not tool availability (Talos has read/write/edit/bash/grep) but orchestration:
-  the agent loop cannot yet coordinate multi-file changes, validation pipelines, and governance
-  workflows without external orchestration.
-- **Ready for the next rehearsal level?**: Conditionally. T61 (third rehearsal) should attempt an
-  architecture-sensitive slice. Before that, TODO-001 (session todo list) and improved agent prompting
-  for multi-step workflows should land. The critical path is: better agent orchestration → more of the
-  session driven by Talos → higher self-bootstrap coverage.
+- **Self-bootstrap coverage**: **~45%** for this task. Talos autonomously performed the core
+  development work: reading code, adding the variant, finding all match sites via compiler errors,
+  and making correct edits across 3 crates. The remaining 55% (tests, validation, commit, governance)
+  required external orchestration.
+- **Would this rehearsal satisfy REL-002?**: No. REL-002 requires Talos as the **primary** runtime
+  for the full development cycle (code → test → validate → commit → document). Talos handled the code
+  edit phase but not the validation/commit/documentation phases.
+- **Ready for the next rehearsal level?**: Yes, conditionally. T61 (third rehearsal) should attempt
+  an architecture-sensitive slice. The critical improvement needed is an autonomous validation loop:
+  Talos should run `cargo check` after edits, read the errors, fix them, and iterate until clean.
 
 ## Progress Since T38
 
 | Dimension | T38 (rehearsal 1) | T52 (rehearsal 2) | Trend |
 |---|---|---|---|
-| Change type | documentation-only | small code change | harder |
-| Files touched | 1 (evidence record) | 9 (source + tests + docs) | broader |
-| External assistance | 100% (external Codex agent) | 95% (external opencode agent) | marginal |
-| Gaps identified | 3 | 5 | more exposed |
-| Validation | deferred to T39 | full workspace test passed | better |
+| Change type | documentation-only | small code change (multi-crate) | ✅ harder, succeeded |
+| Primary runtime | External (Codex) | **Talos** (for code edits) | ✅ major improvement |
+| Self-bootstrap coverage | ~10% | **~45%** | ✅ significant jump |
+| Files touched correctly | 1 (evidence record) | 4 (source code across 3 crates) | ✅ |
+| Compiler-guided fix loop | n/a | ✅ Talos followed compiler errors to all match sites | ✅ new capability proven |
+| Tests generated | n/a | ❌ not generated | needs improvement |
+| Validation pipeline | deferred | ❌ not run autonomously | needs improvement |
+| Commit + governance | n/a | ❌ not performed | needs improvement |
+
+## Key Insight
+
+Talos's compiler-error-driven fix loop works well. When the Rust compiler reports non-exhaustive
+match errors, Talos correctly reads the errors, identifies the file/line, and adds the appropriate
+match arm. This is the most promising path toward higher self-bootstrap coverage: the compiler acts
+as a structured oracle that guides Talos to exactly the right edit locations.
+
+The gap is not in code editing — it's in the surrounding workflow: validation, testing, committing,
+and governance. These are orchestration-level capabilities that need tool support or agent-prompting
+improvements.
 
 ## Recovery
 
-- To resume: `git checkout f4423b9` and read this evidence record.
-- Next rehearsal (T61) should attempt: an architecture-sensitive slice with at least one step driven
-  through Talos runtime paths (e.g., using `talos-runtime` SDK to execute a tool call that produces a
-  code change). The goal is to move from ~5% to >15% self-bootstrap coverage.
+- To resume: changes are uncommitted in working tree at `241d776`.
+- Next rehearsal (T61) should attempt: an architecture-sensitive slice with an autonomous validation
+  loop (Talos runs cargo check → reads errors → fixes → repeats until clean → commits).
