@@ -136,7 +136,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Complete |
 | T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Complete |
 | T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Planned |
-| T50 | 11 | E | Implement associative recall API default-off; no automatic prompt injection yet. | T43 | Unit tests; bounded multi-hop tests | Planned |
+| T50 | 11 | E | Implement associative recall API default-off; no automatic prompt injection yet. | T43 | Unit tests; bounded multi-hop tests | Complete (via T43) |
 | T51 | 11 | E | Add metrics for memory/context compression: tokens saved, retrieval hits, hidden-output drops. | T26/T50 | Metrics tests; docs | Planned |
 | T52 | 11 | A | Second Talos-on-Talos rehearsal: small code change through Talos runtime if feasible. | T38/tooling readiness | Evidence record; validation | Planned |
 | T53 | 11 | G | WEB-004 site theme/branding optimization using Talos visual identity. | WEB-004 | Site validator; no external assets | Planned |
@@ -920,3 +920,19 @@ T48 (runtime publish gate), T49 (zh-CN site translation). Then Month-3 closeout 
 
 **Next task item**: T49 — zh-CN site translation slice (Track G, Week 10). Then Week 11–12 tasks
 (T50–T54).
+
+### Checkpoint T50 — Associative Recall API (2026-07-01)
+
+**Task**: T50 — Implement associative recall API default-off; no automatic prompt injection.
+
+**Fulfilled by T43**: The `MemoryStore::graph_recall()` method is the associative recall API. It
+takes seed node IDs, max hops, min edge weight, and fanout — all explicitly called by the consumer.
+No automatic injection occurs (T31 decision: default-off). 11 tests in T43 cover:
+- `recall_multi_hop_traverses_graph` — bounded multi-hop traversal
+- `recall_respects_max_hops` — hop limit enforcement
+- `recall_respects_min_edge_weight` — weight threshold
+- `recall_deterministic_for_same_graph_state` — deterministic scoring
+- `recency_decay_decreases_over_time` — exponential decay correctness
+- Plus CRUD, empty seeds, and sorting tests
+
+T50 validation criteria ("Unit tests; bounded multi-hop tests") are fully satisfied by T43.
