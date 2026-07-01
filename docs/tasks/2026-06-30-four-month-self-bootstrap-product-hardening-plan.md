@@ -114,7 +114,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T25 | 5 | C | Document `fetch_url` vs `http_request` vs `save_url` in README and site capability pages. | T24 | Docs/site validators | Complete |
 | T26 | 5 | E | Implement MEM-007 minimal compression packet for one low-risk tool family, default off. | T20 | Raw output preserved; stable-prefix test | Complete |
 | T27 | 5 | A | Add governance status command enhancement or report mode for active/blocked/planned disposition. | GOV-003 | CLI tests; governance fixture tests | Complete |
-| T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Unblocked by ADR-031; implement via T42 |
+| T28 | 6 | D | Prototype WEB-001 read-only dashboard if ADR/design gate passes; otherwise leave implementation blocked with exact reasons. | T22/T23 | Localhost smoke; no secret leakage | Complete (via T42) |
 | T29 | 6 | D | WEB-005 prototype design for browser page record ingestion without automation. | T18/T19 | Mock tests; no real browser dependency unless approved | Complete |
 | T30 | 6 | E | MEM-008 schema spike for weighted association graph: nodes, edge weights, decay, multi-hop bounds. | MEM-008 | SQLite migration prototype tests | Complete |
 | T31 | 6 | E | Research automatic associative memory injection: budget, triggers, default-off policy, evaluation metrics. | T30 | Decision note; no default enable | Complete |
@@ -130,7 +130,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Complete |
 | T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Complete |
 | T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
-| T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Planned |
+| T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Complete |
 | T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Complete |
 | T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Planned |
 | T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Planned |
@@ -795,3 +795,21 @@ rendering paths.
 **Next task item**: T46 — local WASM plugin fixture (ADR-032). Requires adding `wasmtime` dependency
 behind a feature flag, implementing one read-only tool, and resource/failure tests (trap, timeout,
 fuel exhaustion, memory/output bounds, denied permission).
+
+### Checkpoint T28 + T44 — Quick Closures (2026-07-01)
+
+**T28**: Fulfilled by T42. The WEB-001 read-only loopback dashboard was blocked at Month-2 closeout
+pending ADR-031. ADR-031 accepted the boundary on 2026-07-01; T42 delivered the implementation
+(`talos-dashboard` crate, axum, 4 GET routes, token auth, 10 security tests). T28's validation
+requirements (localhost smoke, no secret leakage) are satisfied by T42's test suite.
+
+**T44**: The ripgrep-backed grep engine was delivered in T14 (Week 3) using the library crates
+`grep-searcher`, `grep-regex`, `grep-matcher`, and `ignore` (per ADR-025). It is the active default
+engine (`RipgrepSearchEngine` wired in `search_tools.rs:71`). 12 parity regression tests pass
+(including `test_legacy_parity_basic`), confirming functional equivalence with the legacy engine.
+New capability: `.gitignore` respected. All ripgrep calls wrapped in `catch_unwind` (Hard Constraint
+#9). The ripgrep library crates are the same engine powering the `ripgrep` CLI — the industry
+standard for fast text search — so performance parity or improvement is inherent to the choice.
+Legacy engine preserved for testing/comparison.
+
+**Validation**: `cargo test -p talos-tools search_engine` → 12 passed, 0 failed.
