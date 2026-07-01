@@ -138,7 +138,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Review |
 | T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Review |
 | T107 | 3 | A | Design autonomous validation loop: command/tool shape, security boundary, and no-hidden-pass rules. | REL-002/T52 evidence | ADR/proposal or owner-doc decision | Review |
-| T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Planned |
+| T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Review |
 | T109 | 4 | A | Month-1 closeout: provider/status/tool/session fixes and validation-loop decision. | T100-T108 | `cargo test --workspace`; governance | Planned |
 | T110 | 5 | E | Plugin MVP security review: WASM adapter, timeout, host calls, permission/provenance gap. | T46/ADR-032 | Review document; threat model | Planned |
 | T111 | 5-6 | E | Implement read-only WASM plugin `AgentTool` registration path if T110 clears. | T110 | permission/provenance/trap tests | Planned |
@@ -275,3 +275,9 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - T107 produced `docs/proposals/autonomous-validation-loop.md`.
 - Decision for T108: implement only a read-only validation plan/report surface first. It may inspect governance docs, Cargo metadata, scripts, and Git state, but it must not spawn validation commands, mutate files, install dependencies, push, publish, or tag.
 - The proposal records the security boundary, no-hidden-pass rules, initial profiles, evidence fields, and the open question about whether `talos governance status` should stop executing validation directly.
+
+### I076 T108 Review Checkpoint (2026-07-01)
+
+- T108 implemented `talos validate plan` with `governance`, `i076`, and `workspace` profiles plus text and JSON output.
+- The implementation is read-only: it builds a validation matrix from static profile definitions and filesystem prerequisite checks, and tests prove a present governance script is not executed.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-cli validation`; `cargo test -p talos-cli`; `cargo clippy -p talos-cli -- -D warnings`; `cargo run -p talos-cli -- validate plan --profile i076`; `cargo check --workspace`; `cargo run -p talos-cli -- validate plan --profile governance --json`; `scripts/validate_project_governance.sh .`.

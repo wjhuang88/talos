@@ -23,7 +23,7 @@
 | T105 | TUI-019 | Planned | T104 | Primary/secondary tool output style |
 | T106 | SESSION-003 | Planned | SESSION-001 | Model-switch context marker |
 | T107 | REL-002 | Review | T52 evidence | Validation-loop design |
-| T108 | REL-002 | Planned | T107 | First safe validation surface if approved |
+| T108 | REL-002 | Review | T107 | First safe validation surface if approved |
 | T109 | Replan | Planned | T100-T108 | Month-1 closeout |
 
 ### Scope
@@ -76,6 +76,7 @@
 | 2026-07-01 | Review | T104-T105 implemented and moved to Review after file-tool and TUI result-rendering validation. |
 | 2026-07-01 | Review | T106 implemented and moved to Review after model-switch marker, JSONL round-trip, and request-preview validation. |
 | 2026-07-01 | Review | T107 design completed as `docs/proposals/autonomous-validation-loop.md`; T108 is constrained to a read-only validation plan/report surface. |
+| 2026-07-01 | Review | T108 implemented `talos validate plan` as a read-only profile report with text/JSON output and no command execution. |
 
 ## Verification Evidence
 
@@ -95,11 +96,19 @@
 - 2026-07-01: `cargo test -p talos-cli` passed: 95 unit tests and 8 integration tests.
 - 2026-07-01: `cargo clippy -p talos-cli -- -D warnings` passed.
 - 2026-07-01: `scripts/validate_project_governance.sh .` passed after T107 design sync with 0 warnings.
+- 2026-07-01: `cargo test -p talos-cli validation` passed: 4 validation-plan tests.
+- 2026-07-01: `cargo test -p talos-cli` passed after T108: 99 unit tests and 8 integration tests.
+- 2026-07-01: `cargo clippy -p talos-cli -- -D warnings` passed after T108.
+- 2026-07-01: `cargo run -p talos-cli -- validate plan --profile i076` printed the read-only I076 validation matrix without executing checks.
+- 2026-07-01: `cargo check --workspace` passed after T108.
+- 2026-07-01: `cargo run -p talos-cli -- validate plan --profile governance --json` printed structured read-only profile output.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed after T108 with 0 warnings.
 
 ## Variance And Residuals
 
 - T107 selected a Phase 1 read-only validation plan/report before any validation execution surface.
-- T108 remains planned next and must not spawn validation commands or bypass permissions.
+- T108 implemented Phase 1 only; validation execution remains out of scope until a separate permission-gated decision.
+- T109 remains planned next for Month-1 closeout and full workspace validation.
 
 ## Retrospective
 

@@ -19,8 +19,8 @@ acceptance criteria, verification evidence, or iteration state.
 | R27 High-Risk Governance Gate | In Progress | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | T2/I058 moved to Review with full validation and real binary proof. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
-| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue I076/T108 read-only validation plan/report after T107 design commit; no real publish, validation execution, or permission-default change without explicit gate. |
-| I076 Provider/Tooling/Validation Loop | Active | [I076](iterations/I076-month1-provider-tooling-validation.md) | T100-T107 are in Review; next packet is T108 read-only validation plan/report, with no process execution. |
+| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue I076/T109 Month-1 closeout after T108 commit; no real publish, validation execution, or permission-default change without explicit gate. |
+| I076 Provider/Tooling/Validation Loop | Active | [I076](iterations/I076-month1-provider-tooling-validation.md) | T100-T108 are in Review; next packet is T109 closeout and full workspace validation. |
 
 ## Review
 
@@ -33,6 +33,7 @@ acceptance criteria, verification evidence, or iteration state.
 | TUI-019 Tool Output Visual Hierarchy | Review | [TUI-019](backlog/active/TUI-019-tool-output-visual-hierarchy.md) / [Issue #14](https://github.com/wjhuang88/talos/issues/14) | Commit and push T105, then sync issue with commit reference; close only after owner doc reaches Complete. |
 | SESSION-003 Model Switch Context Marker | Review | [SESSION-003](backlog/active/SESSION-003-model-switch-context-marker.md) / [Issue #10](https://github.com/wjhuang88/talos/issues/10) | Commit and push T106, then sync issue with commit reference; close only after owner doc reaches Complete. |
 | T107 Autonomous Validation Loop Design | Review | [proposal](proposals/autonomous-validation-loop.md) / [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Commit and push T107; T108 may implement only the read-only validation plan/report surface unless a new decision approves execution. |
+| T108 Validation Plan Surface | Review | [I076](iterations/I076-month1-provider-tooling-validation.md) / [proposal](proposals/autonomous-validation-loop.md) | Commit and push T108; Month-1 closeout must run full workspace validation before T109 can complete. |
 
 ## Blocked / Paused
 

@@ -34,6 +34,7 @@ mod session_transition;
 mod skill_runtime;
 mod storage;
 mod tui_bridge;
+mod validation;
 
 use std::io::{self, IsTerminal};
 use std::path::PathBuf;
@@ -91,6 +92,11 @@ pub(crate) enum TalosCommand {
     Explore {
         #[command(subcommand)]
         command: exploration_cli::ExploreCommand,
+    },
+    /// Validation planning.
+    Validate {
+        #[command(subcommand)]
+        command: validation::ValidateCommand,
     },
     /// Configuration operations.
     Config {
@@ -307,6 +313,10 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Explore { command }) = &cli.command {
         return crate::exploration_cli::run_explore_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Validate { command }) = &cli.command {
+        return crate::validation::run_validate_command(command.clone());
     }
 
     if let Some(TalosCommand::Config { command }) = &cli.command {

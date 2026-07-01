@@ -223,6 +223,19 @@ Use the mock provider for deterministic local smoke tests:
 talos -p --mock "/mock-request summarize this repository"
 ```
 
+### Validation Plans
+
+Preview the commands Talos expects for a validation profile without running them:
+
+```bash
+talos validate plan --profile workspace
+talos validate plan --profile i076
+talos validate plan --profile governance --json
+```
+
+The validation plan surface is read-only. It lists required checks and missing prerequisites, but it
+does not execute commands, install dependencies, edit files, push, publish, or tag releases.
+
 ### Manage Local Storage
 
 Check local storage usage (read-only):
