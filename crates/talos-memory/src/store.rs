@@ -1,7 +1,7 @@
 use crate::entities::extract_entities;
 use crate::{
-    EntityKind, EvidenceLink, MemoryItem, MemoryKind, MemoryStatus, MemoryStoreError,
-    RetentionCandidate, RetentionPolicy, RetrievalResult,
+    AssociationResult, EntityKind, EvidenceLink, GraphEdge, GraphNode, MemoryItem, MemoryKind,
+    MemoryStatus, MemoryStoreError, RetentionCandidate, RetentionPolicy, RetrievalResult,
 };
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
@@ -94,6 +94,8 @@ impl MemoryStore {
             "#,
         )?;
 
+        crate::graph::migrate_graph(&self.conn)?;
+
         // Initialize schema_version if empty (new database).
         let version_count: i64 =
             self.conn
@@ -101,17 +103,15 @@ impl MemoryStore {
         if version_count == 0 {
             let _ = self
                 .conn
-                .execute("INSERT INTO schema_version (version) VALUES (2)", []);
+                .execute("INSERT INTO schema_version (version) VALUES (3)", []);
         } else {
-            // Migrate from version 1 to 2: entity tables are created above with
-            // IF NOT EXISTS, so they are idempotent. Just bump the version.
             let current_version: i64 =
                 self.conn
                     .query_row("SELECT version FROM schema_version", [], |row| row.get(0))?;
-            if current_version < 2 {
+            if current_version < 3 {
                 let _ = self
                     .conn
-                    .execute("UPDATE schema_version SET version = 2", []);
+                    .execute("UPDATE schema_version SET version = 3", []);
             }
         }
 
@@ -595,6 +595,35 @@ impl MemoryStore {
                 })
             })
             .collect()
+    }
+
+    pub fn graph_upsert_node(&self, node: &GraphNode) -> Result<(), MemoryStoreError> {
+        crate::graph::upsert_node(&self.conn, node)
+    }
+
+    pub fn graph_upsert_edge(&self, edge: &GraphEdge) -> Result<(), MemoryStoreError> {
+        crate::graph::upsert_edge(&self.conn, edge)
+    }
+
+    pub fn graph_get_node(&self, id: &str) -> Result<Option<GraphNode>, MemoryStoreError> {
+        crate::graph::get_node(&self.conn, id)
+    }
+
+    pub fn graph_recall(
+        &self,
+        seed_ids: &[&str],
+        max_hops: usize,
+        min_edge_weight: f64,
+        fanout: usize,
+    ) -> Result<Vec<AssociationResult>, MemoryStoreError> {
+        crate::graph::recall_associative(
+            &self.conn,
+            seed_ids,
+            max_hops,
+            min_edge_weight,
+            fanout,
+            Utc::now(),
+        )
     }
 }
 

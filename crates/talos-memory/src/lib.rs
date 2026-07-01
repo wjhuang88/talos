@@ -20,6 +20,7 @@
 pub mod consolidation;
 
 mod entities;
+mod graph;
 mod prompt;
 mod store;
 #[cfg(test)]
@@ -31,6 +32,7 @@ pub use consolidation::{
     RuleBasedExtractor, SessionEpisode, consolidate_episodes,
 };
 pub use entities::extract_entities;
+pub use graph::{AssociationResult, GraphEdge, GraphNode};
 pub use prompt::{MemoryPromptConfig, format_memory_prompt};
 pub use store::MemoryStore;
 pub use types::{

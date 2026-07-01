@@ -129,7 +129,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T40 | 9 | F | Implement minimal `ToolProvenance::Plugin` data model and rendering paths. | T33 | Core/conversation/TUI tests | Complete |
 | T41 | 9 | F | Implement `/mcp` command and `/plugins` transition notice; `/plugins` no longer silently means MCP. | T35/CMD-002 | Conversation/TUI command tests | Complete |
 | T42 | 9 | D | Implement WEB-001 read-only status/history/governance page subset if Month-2 gate passed. | T28 | Browser/local smoke; no secret echo | Complete |
-| T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
+| T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Complete |
 | T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Complete |
 | T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Complete |
 | T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Complete |
@@ -854,3 +854,26 @@ Legacy engine preserved for testing/comparison.
 
 **Next task item**: Remaining Week 9–10 items: T43 (memory graph), T47 (browser-page mock),
 T48 (runtime publish gate), T49 (zh-CN site translation). Then Month-3 closeout (T54).
+
+### Checkpoint T43 — Weighted-Memory Graph Storage (2026-07-01)
+
+**Task**: T43 — Implement weighted-memory graph storage behind a feature/config flag.
+
+**Completed**:
+- Added `graph.rs` module to `talos-memory` with `GraphNode`, `GraphEdge`, `AssociationResult`
+  types and SQLite-backed storage (3 new tables: `memory_graph_nodes`, `memory_graph_edges`, plus
+  indexes). Schema migration bumps to version 3; tables are additive — no existing data touched.
+- Deterministic bounded multi-hop retrieval: BFS with multiplicative scoring
+  (`activation * edge_weight * impression_strength * recency_decay`), max 3 hops, min edge weight
+  0.3, fanout top-k 10 (all configurable per call). Exponential decay with 7-day half-life.
+- Public API on `MemoryStore`: `graph_upsert_node`, `graph_upsert_edge`, `graph_get_node`,
+  `graph_recall`. No automatic prompt injection (T31 decision: default-off).
+- 11 tests: schema migration, node CRUD + idempotency, edge idempotency, direct neighbor sorting,
+  multi-hop traversal, min edge weight filtering, max hops boundary, empty seeds, deterministic
+  retrieval across separate stores, recency decay correctness.
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo clippy -p talos-memory -- -D warnings` → no warnings.
+- `cargo test -p talos-memory` → 59 passed (48 existing + 11 new), 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
