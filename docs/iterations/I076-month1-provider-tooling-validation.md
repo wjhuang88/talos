@@ -22,7 +22,7 @@
 | T104 | TOOL-015 | Planned | TOOL-003 | Bounded write/edit result visibility |
 | T105 | TUI-019 | Planned | T104 | Primary/secondary tool output style |
 | T106 | SESSION-003 | Planned | SESSION-001 | Model-switch context marker |
-| T107 | REL-002 | Planned | T52 evidence | Validation-loop design |
+| T107 | REL-002 | Review | T52 evidence | Validation-loop design |
 | T108 | REL-002 | Planned | T107 | First safe validation surface if approved |
 | T109 | Replan | Planned | T100-T108 | Month-1 closeout |
 
@@ -75,6 +75,7 @@
 | 2026-07-01 | Review | T100 complete; T101-T103 implemented and moved to Review after provider/TUI/check/clippy/governance validation. |
 | 2026-07-01 | Review | T104-T105 implemented and moved to Review after file-tool and TUI result-rendering validation. |
 | 2026-07-01 | Review | T106 implemented and moved to Review after model-switch marker, JSONL round-trip, and request-preview validation. |
+| 2026-07-01 | Review | T107 design completed as `docs/proposals/autonomous-validation-loop.md`; T108 is constrained to a read-only validation plan/report surface. |
 
 ## Verification Evidence
 
@@ -93,10 +94,12 @@
 - 2026-07-01: `cargo test -p talos-cli model_switch_marker` passed: 3 tests.
 - 2026-07-01: `cargo test -p talos-cli` passed: 95 unit tests and 8 integration tests.
 - 2026-07-01: `cargo clippy -p talos-cli -- -D warnings` passed.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed after T107 design sync with 0 warnings.
 
 ## Variance And Residuals
 
-- T107 validation-loop design remains planned next after T106 commit/push and issue sync.
+- T107 selected a Phase 1 read-only validation plan/report before any validation execution surface.
+- T108 remains planned next and must not spawn validation commands or bypass permissions.
 
 ## Retrospective
 

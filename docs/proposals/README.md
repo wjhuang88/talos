@@ -43,6 +43,8 @@ docs/proposals/
 
 ## Current Proposals
 
+- [Autonomous Validation Loop](autonomous-validation-loop.md) — proposed Phase 1/2/3 boundary for
+  self-bootstrap validation planning, evidence, and no-hidden-pass rules.
 - [Built-in Workspace Search Tools](builtin-workspace-search-tools.md) — detailed design for
   I012 `find_files` / `grep` tools and fff-inspired ranking/indexing follow-ups.
 - [Provider Plugin Architecture](provider-plugin-architecture.md) — long-term provider config
