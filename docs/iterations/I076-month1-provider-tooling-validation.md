@@ -1,0 +1,85 @@
+# Iteration I076: Month 1 — Provider, Tooling, And Validation Loop
+
+> Document status: Planned
+> Published plan date: 2026-07-01
+> Planned objective: Execute weeks 1-4 of the 2026-07-01 four-month replan: provider usage
+> accounting, status-bar correctness, write/edit output visibility, model-switch context markers,
+> and autonomous validation-loop design.
+> Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
+> MVP deliverable: accurate OpenAI-compatible usage accounting plus a validated self-bootstrap
+> validation-loop decision.
+
+## Published Baseline
+
+### Selected Stories
+
+| Story | Parent | Status At Selection | Depends On | Outcome |
+|---|---|---|---|---|
+| T100 | Replan | Ready | Board/backlog inventory | Replan and I076-I079 published |
+| T101 | PROVIDER-001 | Planned | Issue #12 | Streaming usage parsed |
+| T102 | TUI-018 | Planned | TUI status bar | Million-unit context limit display |
+| T103 | TUI-017 | Planned | T101 | Context usage percentage |
+| T104 | TOOL-015 | Planned | TOOL-003 | Bounded write/edit result visibility |
+| T105 | TUI-019 | Planned | T104 | Primary/secondary tool output style |
+| T106 | SESSION-003 | Planned | SESSION-001 | Model-switch context marker |
+| T107 | REL-002 | Planned | T52 evidence | Validation-loop design |
+| T108 | REL-002 | Planned | T107 | First safe validation surface if approved |
+| T109 | Replan | Planned | T100-T108 | Month-1 closeout |
+
+### Scope
+
+- Provider usage accounting and dependent status bar display.
+- Tool result transparency for write/edit.
+- Model-switch context marker persistence.
+- Design and optional first implementation of autonomous validation loop.
+
+### Non-Goals
+
+- No plugin execution work.
+- No direct exec tool.
+- No release or publish action.
+
+### Acceptance
+
+- Given an OpenAI-compatible streaming usage-only chunk, when parsed, then token usage is retained.
+- Given a known context limit, when status renders, then usage percentage and million-unit format are correct.
+- Given write/edit completes, when displayed, then bounded verification output is visible.
+- Given `/model` switches, when later context is built, then a persisted switch marker is visible.
+- Given validation loop design clears, when a safe validation surface is implemented, then it cannot bypass permissions or hide failures.
+
+### Planned Validation
+
+- `cargo fmt --all -- --check`
+- `cargo check --workspace`
+- Targeted provider/TUI/tools/session tests
+- `cargo test --workspace` at T109
+- `scripts/validate_project_governance.sh .`
+
+### Documentation To Update
+
+- `docs/tasks/2026-07-01-four-month-self-bootstrap-replan.md`
+- Issue comments for #9-#14 as statuses change
+- `docs/BOARD.md`
+
+### Risks And Rollback
+
+- Risk: provider-specific usage formats vary. Rollback: keep request change isolated and tolerate missing usage.
+- Risk: validation loop becomes an execution bypass. Rollback: keep design-only and require explicit user-run validation.
+
+## Actual Activation And Execution
+
+| Date | Type | Record |
+|---|---|---|
+| 2026-07-01 | Planning | Created as Month 1 shell for the replan. |
+
+## Verification Evidence
+
+- Pending.
+
+## Variance And Residuals
+
+- Pending.
+
+## Retrospective
+
+- Pending.

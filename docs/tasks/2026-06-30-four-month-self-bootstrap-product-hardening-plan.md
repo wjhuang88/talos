@@ -1,6 +1,6 @@
 # 2026-06-30 Four-Month Self-Bootstrap Product Hardening Plan
 
-**Status**: Ready for delegated execution
+**Status**: Month 1-3 complete; Month 4 superseded by 2026-07-01 replan
 **Owner area**: Product hardening, self-bootstrap readiness, distribution, tool quality, web/context
 ingestion, memory/context reliability, and extensibility gates
 **Primary release marker**: `REL-002` v1.0 self-bootstrap gate
@@ -236,6 +236,22 @@ If work is interrupted:
 ---
 
 ## Execution Log
+
+### Supersession Checkpoint — Month 4 Replanned (2026-07-01)
+
+Months 1-3 completed through T54. The remaining Month 4 tasks T55-T65 are no longer the active
+execution schedule. They are preserved as historical planned items above and remapped into
+`docs/tasks/2026-07-01-four-month-self-bootstrap-replan.md`:
+
+- T55/T56 publish gates -> new publish gate packet T133.
+- T57 tool reliability -> T130 plus earlier provider/tool-output fixes.
+- T58 WEB security review -> T112/T113.
+- T59 plugin security review -> T110/T111.
+- T60 memory injection decision -> T131.
+- T61 rehearsal -> T123/T132.
+- T62-T65 docs/readiness/closeout/handoff -> T134-T137.
+
+Resume future work from the 2026-07-01 replan, not from T55.
 
 ### Approved Startup Contract (2026-06-30)
 

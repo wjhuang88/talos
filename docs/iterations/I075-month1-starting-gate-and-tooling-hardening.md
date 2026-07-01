@@ -1,6 +1,6 @@
 # Iteration I075: Month 1 — Starting Gate and Tooling Hardening
 
-> Document status: Planned
+> Document status: Complete (historical baseline; Month 4 superseded by 2026-07-01 replan)
 > Published plan date: 2026-06-30
 > Planned objective: Execute the first four weeks (T00–T21) of the four-month self-bootstrap
 > product hardening plan: starting-gate inventory, cargo-install gate design, tool-surface audit,
@@ -117,3 +117,11 @@
 ## Retrospective
 
 - (to be appended at Month-1 closeout)
+
+## Supersession Note
+
+2026-07-01: The original four-month self-bootstrap plan completed Months 1-3 through T54. Its
+remaining Month 4 tasks (T55-T65) are superseded into
+`docs/tasks/2026-07-01-four-month-self-bootstrap-replan.md` and the new monthly shells I076-I079.
+This preserves I075's published baseline while moving unfinished future work into a current owner
+plan.

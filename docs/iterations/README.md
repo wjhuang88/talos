@@ -111,7 +111,11 @@ docs/iterations/
 | I072 | Conversation Command Registry Decomposition | **Complete (2026-06-27)** | ARCH-027 split command registry metadata/completion into `command_registry.rs`; `engine.rs` 960→739 lines; workspace gates pass. See `I072-conversation-command-registry-decomposition.md`. |
 | I073 | OpenAI Request Assembly Decomposition | **Complete (2026-06-28)** | ARCH-028 split OpenAI request DTOs/body assembly/redaction into `openai_request.rs`; `openai.rs` 1001→848 lines; workspace gates pass. See `I073-openai-request-assembly-decomposition.md`. |
 | I074 | Exploration Types Decomposition | **Complete (2026-06-28)** | ARCH-029 split exploration domain entities into `types.rs`; `lib.rs` 1070→958 lines; workspace gates pass. See `I074-exploration-types-decomposition.md`. |
-| I075 | Month 1 — Starting Gate and Tooling Hardening | **Planned (2026-06-30)** | First four weeks (T00–T21) of the four-month self-bootstrap plan. See `I075-month1-starting-gate-and-tooling-hardening.md`. |
+| I075 | Month 1 — Starting Gate and Tooling Hardening | **Complete (2026-07-01)** | Original self-bootstrap plan executed through Month-3 closeout; its Month-4 future work is superseded by the 2026-07-01 replan. See `I075-month1-starting-gate-and-tooling-hardening.md` and `../tasks/2026-07-01-four-month-self-bootstrap-replan.md`. |
+| I076 | Month 1 — Provider, Tooling, And Validation Loop | **Planned (2026-07-01)** | Weeks 1-4 of the 2026-07-01 replan: provider usage, status display, write/edit output, model-switch markers, validation-loop design. See `I076-month1-provider-tooling-validation.md`. |
+| I077 | Month 2 — Plugin, Exec, And Web Security | **Planned (2026-07-01)** | Weeks 5-8 of the 2026-07-01 replan: plugin security, web/browser security, direct exec policy and implementation if cleared. See `I077-month2-plugin-exec-web-security.md`. |
+| I078 | Month 3 — Session Orchestration, Todo, Memory, And Thinking | **Planned (2026-07-01)** | Weeks 9-12 of the 2026-07-01 replan: slash auto-execute, session todo foundations, thinking separation, validation-backed rehearsal. See `I078-month3-session-todo-memory-thinking.md`. |
+| I079 | Month 4 — Release Readiness And Handoff | **Planned (2026-07-01)** | Weeks 13-16 of the 2026-07-01 replan: reliability sweep, memory injection decision, publish gate packet, REL-002 readiness, closeout, and handoff. See `I079-month4-release-readiness-handoff.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -140,6 +144,11 @@ rewrite published iteration baselines.
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
+| I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |
+| I076 | Planned | Next activation candidate. Start only after reading `docs/tasks/2026-07-01-four-month-self-bootstrap-replan.md` and recording activation evidence. |
+| I077 | Planned | Planned Month 2 shell for high-risk plugin/web/exec work; wait for I076 closeout or explicit replan. |
+| I078 | Planned | Planned Month 3 shell for orchestration/todo/thinking work; wait for I077 closeout or explicit replan. |
+| I079 | Planned | Planned Month 4 shell for release readiness/handoff; wait for I078 closeout or explicit replan. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
