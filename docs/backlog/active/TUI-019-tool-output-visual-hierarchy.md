@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-019 |
 | Priority | P3 |
-| Status | Review |
+| Status | Complete |
 | Source | [GitHub Issue #14](https://github.com/wjhuang88/talos/issues/14) |
 | Relates To | TUI-007, TOOL-015 |
 
@@ -28,6 +28,7 @@ Tool output rendering should distinguish primary result lines from secondary det
 ## Execution Notes
 
 - 2026-07-01: Implemented in I076/T105. Tool result first lines now use primary result styling; non-error detail/preview lines use the existing dim semantic style.
+- 2026-07-01: Moved to Complete during I076/T109 closeout after full workspace validation passed.
 
 ## Verification Evidence
 
@@ -36,6 +37,8 @@ Tool output rendering should distinguish primary result lines from secondary det
 - 2026-07-01: `cargo test -p talos-tui` passed: 182 unit tests, 2 doc tests.
 - 2026-07-01: `cargo check --workspace` passed.
 - 2026-07-01: `cargo clippy -p talos-tools -p talos-tui -- -D warnings` passed.
+- 2026-07-01: `cargo test --workspace` passed during I076/T109 closeout.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed with 0 warnings during I076/T109 closeout.
 
 ## Required Reads
 

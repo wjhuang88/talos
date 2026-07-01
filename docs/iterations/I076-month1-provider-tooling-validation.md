@@ -1,6 +1,6 @@
 # Iteration I076: Month 1 — Provider, Tooling, And Validation Loop
 
-> Document status: Active (2026-07-01)
+> Document status: Complete (2026-07-01)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 1-4 of the 2026-07-01 four-month replan: provider usage
 > accounting, status-bar correctness, write/edit output visibility, model-switch context markers,
@@ -15,16 +15,16 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| T100 | Replan | Ready | Board/backlog inventory | Replan and I076-I079 published |
-| T101 | PROVIDER-001 | Planned | Issue #12 | Streaming usage parsed |
-| T102 | TUI-018 | Planned | TUI status bar | Million-unit context limit display |
-| T103 | TUI-017 | Planned | T101 | Context usage percentage |
-| T104 | TOOL-015 | Planned | TOOL-003 | Bounded write/edit result visibility |
-| T105 | TUI-019 | Planned | T104 | Primary/secondary tool output style |
-| T106 | SESSION-003 | Planned | SESSION-001 | Model-switch context marker |
-| T107 | REL-002 | Review | T52 evidence | Validation-loop design |
-| T108 | REL-002 | Review | T107 | First safe validation surface if approved |
-| T109 | Replan | Planned | T100-T108 | Month-1 closeout |
+| T100 | Replan | Complete | Board/backlog inventory | Replan and I076-I079 published |
+| T101 | PROVIDER-001 | Complete | Issue #12 | Streaming usage parsed |
+| T102 | TUI-018 | Complete | TUI status bar | Million-unit context limit display |
+| T103 | TUI-017 | Complete | T101 | Context usage percentage |
+| T104 | TOOL-015 | Complete | TOOL-003 | Bounded write/edit result visibility |
+| T105 | TUI-019 | Complete | T104 | Primary/secondary tool output style |
+| T106 | SESSION-003 | Complete | SESSION-001 | Model-switch context marker |
+| T107 | REL-002 | Complete | T52 evidence | Validation-loop design |
+| T108 | REL-002 | Complete | T107 | First safe validation surface if approved |
+| T109 | Replan | Complete | T100-T108 | Month-1 closeout |
 
 ### Scope
 
@@ -77,6 +77,7 @@
 | 2026-07-01 | Review | T106 implemented and moved to Review after model-switch marker, JSONL round-trip, and request-preview validation. |
 | 2026-07-01 | Review | T107 design completed as `docs/proposals/autonomous-validation-loop.md`; T108 is constrained to a read-only validation plan/report surface. |
 | 2026-07-01 | Review | T108 implemented `talos validate plan` as a read-only profile report with text/JSON output and no command execution. |
+| 2026-07-01 | Closeout | T109 completed Month-1 closeout. T101-T108 moved to Complete after full workspace validation and governance validation passed. |
 
 ## Verification Evidence
 
@@ -103,13 +104,22 @@
 - 2026-07-01: `cargo check --workspace` passed after T108.
 - 2026-07-01: `cargo run -p talos-cli -- validate plan --profile governance --json` printed structured read-only profile output.
 - 2026-07-01: `scripts/validate_project_governance.sh .` passed after T108 with 0 warnings.
+- 2026-07-01: `cargo fmt --all -- --check` passed during T109 closeout.
+- 2026-07-01: `cargo test --workspace` passed during T109 closeout. The run reported existing `talos-runtime` example dead-code warnings, but no test failures.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed during T109 closeout with 0 warnings.
 
 ## Variance And Residuals
 
 - T107 selected a Phase 1 read-only validation plan/report before any validation execution surface.
 - T108 implemented Phase 1 only; validation execution remains out of scope until a separate permission-gated decision.
-- T109 remains planned next for Month-1 closeout and full workspace validation.
+- Month 2 starts at I077/T110 plugin MVP security review; no validation execution, direct exec, publish, tag, or permission-default change is authorized by this closeout.
 
 ## Retrospective
 
-- Pending.
+- Provider usage, TUI status display, tool result transparency, model-switch context persistence, and
+  the first validation-loop surface all landed in one month slice.
+- The validation loop deliberately stopped at read-only planning. This is the correct boundary for
+  the first surface because `talos governance status` still mixes status reporting with process
+  execution, and broadening that pattern would make self-bootstrap evidence less auditable.
+- Next month should start with security review before code for plugin, dashboard/browser, or direct
+  exec work.

@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | PROVIDER-001 |
 | Priority | P1 |
-| Status | Review |
+| Status | Complete |
 | Source | [GitHub Issue #12](https://github.com/wjhuang88/talos/issues/12) |
 | Relates To | TUI-017, MODEL-004 |
 
@@ -31,12 +31,15 @@ exit summaries, and cost estimates are non-zero when the provider returns usage.
 
 - 2026-07-01: Activated in I076/T101. Implementation is in progress; verification pending.
 - 2026-07-01: Moved to Review. `parse_sse_stream_retains_usage_only_chunk` verifies usage-only chunks survive the empty-choices path and reach `TurnEnd` usage.
+- 2026-07-01: Moved to Complete during I076/T109 closeout after full workspace validation passed.
 
 ## Verification Evidence
 
 - 2026-07-01: `cargo test -p talos-provider` passed: 48 unit tests, 4 integration tests, 2 doc tests.
 - 2026-07-01: `cargo check --workspace` passed.
 - 2026-07-01: `cargo clippy -p talos-provider -p talos-tui -- -D warnings` passed.
+- 2026-07-01: `cargo test --workspace` passed during I076/T109 closeout.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed with 0 warnings during I076/T109 closeout.
 
 ## Required Reads
 

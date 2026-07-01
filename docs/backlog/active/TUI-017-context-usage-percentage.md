@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-017 |
 | Priority | P2 |
-| Status | Review |
+| Status | Complete |
 | Source | [GitHub Issue #9](https://github.com/wjhuang88/talos/issues/9) |
 | Relates To | TUI-011, PROVIDER-001 |
 
@@ -34,12 +34,15 @@ providers will continue reporting zero tokens.
 
 - 2026-07-01: Activated in I076/T103 after PROVIDER-001 implementation started. Status bar implementation is in progress; verification pending.
 - 2026-07-01: Moved to Review. Status bar now renders context usage percentage from input plus output token counts when `context_limit` is known.
+- 2026-07-01: Moved to Complete during I076/T109 closeout after full workspace validation passed.
 
 ## Verification Evidence
 
 - 2026-07-01: `cargo test -p talos-tui status_bar` passed: 14 status-bar tests.
 - 2026-07-01: `cargo test -p talos-tui` passed: 180 unit tests, 2 doc tests.
 - 2026-07-01: `cargo clippy -p talos-provider -p talos-tui -- -D warnings` passed.
+- 2026-07-01: `cargo test --workspace` passed during I076/T109 closeout.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed with 0 warnings during I076/T109 closeout.
 
 ## Required Reads
 

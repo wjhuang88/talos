@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | SESSION-003 |
 | Priority | P2 |
-| Status | Review |
+| Status | Complete |
 | Source | [GitHub Issue #10](https://github.com/wjhuang88/talos/issues/10) |
 | Relates To | SESSION-001, CMD-001 |
 
@@ -36,6 +36,7 @@ requests can see the switch boundary and current model identity.
 ## Execution Notes
 
 - 2026-07-01: Implemented in I076/T106. Successful model rebuilds now append a system marker containing previous and new provider/model identity, inject it into the rebuilt agent history, and persist it to session JSONL after commit.
+- 2026-07-01: Moved to Complete during I076/T109 closeout after full workspace validation passed.
 
 ## Verification Evidence
 
@@ -43,6 +44,8 @@ requests can see the switch boundary and current model identity.
 - 2026-07-01: `cargo test -p talos-cli` passed: 95 unit tests and 8 integration tests.
 - 2026-07-01: `cargo check --workspace` passed.
 - 2026-07-01: `cargo clippy -p talos-cli -- -D warnings` passed.
+- 2026-07-01: `cargo test --workspace` passed during I076/T109 closeout.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed with 0 warnings during I076/T109 closeout.
 
 ## Required Reads
 

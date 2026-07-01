@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TOOL-015 |
 | Priority | P2 |
-| Status | Review |
+| Status | Complete |
 | Source | [GitHub Issue #13](https://github.com/wjhuang88/talos/issues/13) |
 | Relates To | TOOL-003, TUI-019 |
 
@@ -31,6 +31,7 @@ changes without opening the file manually.
 ## Execution Notes
 
 - 2026-07-01: Implemented in I076/T104. `write` now returns path, byte count, and bounded preview; `edit` now returns a bounded replacement diff.
+- 2026-07-01: Moved to Complete during I076/T109 closeout after full workspace validation passed.
 
 ## Verification Evidence
 
@@ -39,6 +40,8 @@ changes without opening the file manually.
 - 2026-07-01: `cargo test -p talos-tui tool_result` passed: 4 tests.
 - 2026-07-01: `cargo check --workspace` passed.
 - 2026-07-01: `cargo clippy -p talos-tools -p talos-tui -- -D warnings` passed.
+- 2026-07-01: `cargo test --workspace` passed during I076/T109 closeout.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed with 0 warnings during I076/T109 closeout.
 
 ## Required Reads
 

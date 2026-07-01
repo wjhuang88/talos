@@ -19,21 +19,13 @@ acceptance criteria, verification evidence, or iteration state.
 | R27 High-Risk Governance Gate | In Progress | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | T2/I058 moved to Review with full validation and real binary proof. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
-| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue I076/T109 Month-1 closeout after T108 commit; no real publish, validation execution, or permission-default change without explicit gate. |
-| I076 Provider/Tooling/Validation Loop | Active | [I076](iterations/I076-month1-provider-tooling-validation.md) | T100-T108 are in Review; next packet is T109 closeout and full workspace validation. |
+| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I077/T110 plugin MVP security review; no real publish, validation execution, direct exec, or permission-default change without explicit gate. |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| PROVIDER-001 OpenAI Streaming Usage | Review | [PROVIDER-001](backlog/active/PROVIDER-001-openai-streaming-usage.md) / [Issue #12](https://github.com/wjhuang88/talos/issues/12) | Commit and push T101, then sync issue with commit reference; close only after owner doc reaches Complete. |
-| TUI-017 Context Usage Percentage | Review | [TUI-017](backlog/active/TUI-017-context-usage-percentage.md) / [Issue #9](https://github.com/wjhuang88/talos/issues/9) | Commit and push T103, then sync issue with commit reference; close only after owner doc reaches Complete. |
-| TUI-018 Context Limit Million Format | Review | [TUI-018](backlog/active/TUI-018-context-limit-million-format.md) / [Issue #11](https://github.com/wjhuang88/talos/issues/11) | Commit and push T102, then sync issue with commit reference; close only after owner doc reaches Complete. |
-| TOOL-015 Write/Edit Result Visibility | Review | [TOOL-015](backlog/active/TOOL-015-write-edit-result-visibility.md) / [Issue #13](https://github.com/wjhuang88/talos/issues/13) | Commit and push T104, then sync issue with commit reference; close only after owner doc reaches Complete. |
-| TUI-019 Tool Output Visual Hierarchy | Review | [TUI-019](backlog/active/TUI-019-tool-output-visual-hierarchy.md) / [Issue #14](https://github.com/wjhuang88/talos/issues/14) | Commit and push T105, then sync issue with commit reference; close only after owner doc reaches Complete. |
-| SESSION-003 Model Switch Context Marker | Review | [SESSION-003](backlog/active/SESSION-003-model-switch-context-marker.md) / [Issue #10](https://github.com/wjhuang88/talos/issues/10) | Commit and push T106, then sync issue with commit reference; close only after owner doc reaches Complete. |
-| T107 Autonomous Validation Loop Design | Review | [proposal](proposals/autonomous-validation-loop.md) / [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Commit and push T107; T108 may implement only the read-only validation plan/report surface unless a new decision approves execution. |
-| T108 Validation Plan Surface | Review | [I076](iterations/I076-month1-provider-tooling-validation.md) / [proposal](proposals/autonomous-validation-loop.md) | Commit and push T108; Month-1 closeout must run full workspace validation before T109 can complete. |
+| _(no active review items)_ | - | - | - |
 
 ## Blocked / Paused
 
@@ -73,6 +65,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I076 Provider/Tooling/Validation Loop | Complete | [I076](iterations/I076-month1-provider-tooling-validation.md) / [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | T100-T109 complete; full workspace and governance closeout passed. Next work is I077/T110. |
 | EXT-001 TUI Provenance + `/plugins` | Complete (status drift corrected 2026-06-30) | [EXT-001](backlog/active/EXT-001-tui-provenance-plugins.md) | Delivered via I014: provenance markers, `/plugins` (MCP snapshot + provenance counts), missing-provenance degradation, TUI tests. Only residual is the `/plugins` command *naming* → tracked by CMD-002. |
 | PROV-001 Provider Schema | Complete (status drift corrected 2026-06-30) | [PROV-001](backlog/active/PROV-001-provider-schema.md) | Delivered via I015: typed provider/model schema, built-in defaults, opencode import, ADR-013. All 5 acceptance [x]. Dynamic provider loading is a separate future-ADR item. |
 | I011 Open Providers | Complete (closed 2026-06-30) | [I011](iterations/I011-open-providers.md) | S1 (OpenAI `base_url` override) shipped. S2 (provider plugin arch) superseded by I015. Removed from non-terminal inventory. |

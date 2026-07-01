@@ -131,15 +131,15 @@ Planned, and Blocked/Paused work that affects this replan.
 | ID | Week | Track | Deliverable | Dependencies | Validation | Status |
 |---|---:|---|---|---|---|---|
 | T100 | 1 | A | Publish this replan, I076-I079 iteration shells, and starting disposition. | Board/backlog inventory | Governance validator | Complete |
-| T101 | 1 | B | Fix PROVIDER-001 streaming usage: request `include_usage`, parse usage-only chunks. | Issue #12 | `cargo test -p talos-provider`; request-body tests | Review |
-| T102 | 1 | B | Implement TUI-018 million-unit context limit formatting. | TUI status docs | `cargo test -p talos-tui` targeted | Review |
-| T103 | 1 | B | Implement TUI-017 context usage percentage using accurate usage when available. | T101 | TUI compact/status tests | Review |
-| T104 | 2 | C | Implement TOOL-015 write/edit result visibility with bounded preview/diff. | TOOL-003 | `cargo test -p talos-tools -p talos-tui` | Review |
-| T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Review |
-| T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Review |
-| T107 | 3 | A | Design autonomous validation loop: command/tool shape, security boundary, and no-hidden-pass rules. | REL-002/T52 evidence | ADR/proposal or owner-doc decision | Review |
-| T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Review |
-| T109 | 4 | A | Month-1 closeout: provider/status/tool/session fixes and validation-loop decision. | T100-T108 | `cargo test --workspace`; governance | Planned |
+| T101 | 1 | B | Fix PROVIDER-001 streaming usage: request `include_usage`, parse usage-only chunks. | Issue #12 | `cargo test -p talos-provider`; request-body tests | Complete |
+| T102 | 1 | B | Implement TUI-018 million-unit context limit formatting. | TUI status docs | `cargo test -p talos-tui` targeted | Complete |
+| T103 | 1 | B | Implement TUI-017 context usage percentage using accurate usage when available. | T101 | TUI compact/status tests | Complete |
+| T104 | 2 | C | Implement TOOL-015 write/edit result visibility with bounded preview/diff. | TOOL-003 | `cargo test -p talos-tools -p talos-tui` | Complete |
+| T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Complete |
+| T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Complete |
+| T107 | 3 | A | Design autonomous validation loop: command/tool shape, security boundary, and no-hidden-pass rules. | REL-002/T52 evidence | ADR/proposal or owner-doc decision | Complete |
+| T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Complete |
+| T109 | 4 | A | Month-1 closeout: provider/status/tool/session fixes and validation-loop decision. | T100-T108 | `cargo test --workspace`; governance | Complete |
 | T110 | 5 | E | Plugin MVP security review: WASM adapter, timeout, host calls, permission/provenance gap. | T46/ADR-032 | Review document; threat model | Planned |
 | T111 | 5-6 | E | Implement read-only WASM plugin `AgentTool` registration path if T110 clears. | T110 | permission/provenance/trap tests | Planned |
 | T112 | 6 | D | WEB-001/WEB-005 security review: loopback auth, token display, logs, browser-page fields. | T42/T47 | Review document; no secret leakage tests | Planned |
@@ -281,3 +281,10 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - T108 implemented `talos validate plan` with `governance`, `i076`, and `workspace` profiles plus text and JSON output.
 - The implementation is read-only: it builds a validation matrix from static profile definitions and filesystem prerequisite checks, and tests prove a present governance script is not executed.
 - Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-cli validation`; `cargo test -p talos-cli`; `cargo clippy -p talos-cli -- -D warnings`; `cargo run -p talos-cli -- validate plan --profile i076`; `cargo check --workspace`; `cargo run -p talos-cli -- validate plan --profile governance --json`; `scripts/validate_project_governance.sh .`.
+
+### I076 T109 Closeout Checkpoint (2026-07-01)
+
+- T109 completed Month-1 closeout. T100-T109 and I076 are Complete.
+- Full closeout validation passed: `cargo fmt --all -- --check`; `cargo test --workspace`; `scripts/validate_project_governance.sh .`.
+- `cargo test --workspace` reported existing `talos-runtime` example dead-code warnings but exited 0 with no test failures.
+- Next planned work is I077/T110 plugin MVP security review. This closeout does not authorize validation execution, direct exec, publish, tag, or permission-default changes.
