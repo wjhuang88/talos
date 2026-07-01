@@ -316,6 +316,11 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 Err(_) => continue,
             };
 
+            if let Some((input, output)) = extract_openai_usage(&data) {
+                input_tokens = input;
+                output_tokens = output;
+            }
+
             if chunk.choices.is_empty() {
                 continue;
             }
@@ -389,18 +394,6 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             })
                             .await;
                     }
-                }
-
-                // Extract usage if present
-                if let Some(usage_data) = data.get("usage") {
-                    input_tokens = usage_data
-                        .get("prompt_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
-                    output_tokens = usage_data
-                        .get("completion_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
                 }
 
                 let text_calls = parse_text_tool_calls(&text_accumulator);
@@ -491,6 +484,19 @@ fn extract_event_data(event_text: &str) -> Value {
     Value::Null
 }
 
+fn extract_openai_usage(data: &Value) -> Option<(u32, u32)> {
+    let usage_data = data.get("usage").filter(|usage| !usage.is_null())?;
+    let input_tokens = usage_data
+        .get("prompt_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    let output_tokens = usage_data
+        .get("completion_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    Some((input_tokens, output_tokens))
+}
+
 fn exponential_backoff(attempt: u32) -> Duration {
     let delay_ms = BASE_RETRY_DELAY_MS * 2_u64.pow(attempt);
     Duration::from_millis(delay_ms)
@@ -515,8 +521,17 @@ mod tests {
 
         assert_eq!(body["model"], "gpt-4o");
         assert_eq!(body["stream"], true);
+        assert_eq!(body["stream_options"]["include_usage"], true);
         assert_eq!(body["messages"][0]["role"], "user");
         assert_eq!(body["messages"][0]["content"], "Hello");
+    }
+
+    #[test]
+    fn build_request_body_requests_streaming_usage() {
+        let body = build_request_body("gpt-4o", &[], &[]);
+
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["stream_options"]["include_usage"], true);
     }
 
     #[test]
@@ -812,6 +827,66 @@ mod tests {
         }"#;
         let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
         assert!(chunk.choices.is_empty());
+    }
+
+    #[test]
+    fn extract_openai_usage_reads_usage_only_chunk() {
+        let data = json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion.chunk",
+            "choices": [],
+            "usage": {
+                "prompt_tokens": 123,
+                "completion_tokens": 45,
+                "total_tokens": 168
+            }
+        });
+
+        assert_eq!(extract_openai_usage(&data), Some((123, 45)));
+    }
+
+    #[test]
+    fn extract_openai_usage_ignores_null_usage() {
+        let data = json!({
+            "choices": [],
+            "usage": null
+        });
+
+        assert_eq!(extract_openai_usage(&data), None);
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_retains_usage_only_chunk() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":123,\"completion_tokens\":45,\"total_tokens\":168}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(8);
+
+        parse_sse_stream(response, tx).await;
+
+        let mut final_usage = None;
+        while let Some(event) = rx.recv().await {
+            if let AgentEvent::TurnEnd { usage, .. } = event {
+                final_usage = Some(usage);
+            }
+        }
+
+        let usage = final_usage.unwrap();
+        assert_eq!(usage.input_tokens, 123);
+        assert_eq!(usage.output_tokens, 45);
     }
 
     #[test]

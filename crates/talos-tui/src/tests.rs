@@ -670,6 +670,114 @@ mod tests {
     }
 
     #[test]
+    fn test_status_bar_formats_million_context_limit() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage::default(),
+            context_limit: Some(1_000_000),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("1M ctx"));
+        assert!(!content.contains("1000k ctx"));
+
+        let two_million_status = StatusSnapshot {
+            context_limit: Some(2_000_000),
+            ..status
+        };
+        let two_million_content = format!("{:?}", build_status_text(&two_million_status, 120));
+        assert!(two_million_content.contains("2M ctx"));
+        assert!(!two_million_content.contains("2000k ctx"));
+    }
+
+    #[test]
+    fn test_status_bar_preserves_sub_million_context_formats() {
+        let raw_status = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage::default(),
+            context_limit: Some(999),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+        let kilo_status = StatusSnapshot {
+            context_limit: Some(200_000),
+            ..raw_status.clone()
+        };
+        let missing_status = StatusSnapshot {
+            context_limit: None,
+            ..raw_status.clone()
+        };
+
+        let raw_content = format!("{:?}", build_status_text(&raw_status, 120));
+        let kilo_content = format!("{:?}", build_status_text(&kilo_status, 120));
+        let missing_content = format!("{:?}", build_status_text(&missing_status, 120));
+
+        assert!(raw_content.contains("999 ctx"));
+        assert!(kilo_content.contains("200k ctx"));
+        assert!(!missing_content.contains("ctx"));
+    }
+
+    #[test]
+    fn test_status_bar_shows_context_usage_percentage() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage {
+                input_tokens: 50_000,
+                output_tokens: 10_000,
+                ..Default::default()
+            },
+            context_limit: Some(200_000),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("200k ctx"));
+        assert!(content.contains("30%"));
+    }
+
+    #[test]
+    fn test_status_bar_compact_mode_keeps_context_percentage_readable() {
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4-20250514".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage {
+                input_tokens: 40_000,
+                output_tokens: 25_000,
+                ..Default::default()
+            },
+            context_limit: Some(100_000),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+        let text = build_status_text(&status, 60);
+        let content = format!("{:?}", text);
+        assert!(content.contains("100k ctx"));
+        assert!(content.contains("65%"));
+    }
+
+    #[test]
     fn test_status_bar_compact_mode_at_narrow_width() {
         let status = StatusSnapshot {
             model_name: "claude-sonnet-4-20250514".to_string(),

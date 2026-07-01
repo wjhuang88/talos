@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-017 |
 | Priority | P2 |
-| Status | Planned |
+| Status | Review |
 | Source | [GitHub Issue #9](https://github.com/wjhuang88/talos/issues/9) |
 | Relates To | TUI-011, PROVIDER-001 |
 
@@ -25,10 +25,21 @@ providers will continue reporting zero tokens.
 
 ## Acceptance Criteria
 
-- [ ] Status bar shows percentage when context limit is known.
-- [ ] Percentage uses input plus output token usage.
-- [ ] Compact mode remains readable.
-- [ ] Unit tests cover normal, missing-limit, and compact cases.
+- [x] Status bar shows percentage when context limit is known.
+- [x] Percentage uses input plus output token usage.
+- [x] Compact mode remains readable.
+- [x] Unit tests cover normal, missing-limit, and compact cases.
+
+## Execution Notes
+
+- 2026-07-01: Activated in I076/T103 after PROVIDER-001 implementation started. Status bar implementation is in progress; verification pending.
+- 2026-07-01: Moved to Review. Status bar now renders context usage percentage from input plus output token counts when `context_limit` is known.
+
+## Verification Evidence
+
+- 2026-07-01: `cargo test -p talos-tui status_bar` passed: 14 status-bar tests.
+- 2026-07-01: `cargo test -p talos-tui` passed: 180 unit tests, 2 doc tests.
+- 2026-07-01: `cargo clippy -p talos-provider -p talos-tui -- -D warnings` passed.
 
 ## Required Reads
 

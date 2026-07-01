@@ -120,6 +120,9 @@ pub(crate) fn build_request_body(
         "model": model,
         "messages": openai_messages,
         "stream": true,
+        "stream_options": {
+            "include_usage": true,
+        },
     });
 
     if !tools.is_empty() {

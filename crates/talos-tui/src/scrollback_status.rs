@@ -17,7 +17,7 @@ pub(crate) fn build_status_text(
     let workspace = &status.workspace_path;
     let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
     let queue_total = status.steering_count + status.followup_count;
-    let context_label = format_context_limit(status.context_limit);
+    let context_label = format_context_label(status.context_limit, total_tokens);
 
     if compact {
         return build_compact_status(
@@ -44,6 +44,10 @@ pub(crate) fn build_status_text(
 
 fn format_context_limit(limit: Option<u32>) -> String {
     match limit {
+        Some(tokens) if tokens >= 1_000_000 => {
+            let m = tokens / 1_000_000;
+            format!("{m}M ctx")
+        }
         Some(tokens) if tokens >= 1000 => {
             let k = tokens / 1000;
             format!("{k}k ctx")
@@ -51,6 +55,27 @@ fn format_context_limit(limit: Option<u32>) -> String {
         Some(tokens) => format!("{tokens} ctx"),
         None => String::new(),
     }
+}
+
+fn format_context_label(limit: Option<u32>, total_tokens: u64) -> String {
+    let limit_label = format_context_limit(limit);
+    if limit_label.is_empty() {
+        return limit_label;
+    }
+
+    match context_usage_percent(limit, total_tokens) {
+        Some(percent) => format!("{limit_label} · {percent}%"),
+        None => limit_label,
+    }
+}
+
+fn context_usage_percent(limit: Option<u32>, total_tokens: u64) -> Option<u64> {
+    let limit = u64::from(limit?);
+    if limit == 0 {
+        return None;
+    }
+
+    Some((total_tokens.saturating_mul(100) + (limit / 2)) / limit)
 }
 
 fn build_compact_status(

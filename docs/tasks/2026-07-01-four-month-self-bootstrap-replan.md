@@ -130,10 +130,10 @@ Planned, and Blocked/Paused work that affects this replan.
 
 | ID | Week | Track | Deliverable | Dependencies | Validation | Status |
 |---|---:|---|---|---|---|---|
-| T100 | 1 | A | Publish this replan, I076-I079 iteration shells, and starting disposition. | Board/backlog inventory | Governance validator | Planned |
-| T101 | 1 | B | Fix PROVIDER-001 streaming usage: request `include_usage`, parse usage-only chunks. | Issue #12 | `cargo test -p talos-provider`; request-body tests | Planned |
-| T102 | 1 | B | Implement TUI-018 million-unit context limit formatting. | TUI status docs | `cargo test -p talos-tui` targeted | Planned |
-| T103 | 1 | B | Implement TUI-017 context usage percentage using accurate usage when available. | T101 | TUI compact/status tests | Planned |
+| T100 | 1 | A | Publish this replan, I076-I079 iteration shells, and starting disposition. | Board/backlog inventory | Governance validator | Complete |
+| T101 | 1 | B | Fix PROVIDER-001 streaming usage: request `include_usage`, parse usage-only chunks. | Issue #12 | `cargo test -p talos-provider`; request-body tests | Review |
+| T102 | 1 | B | Implement TUI-018 million-unit context limit formatting. | TUI status docs | `cargo test -p talos-tui` targeted | Review |
+| T103 | 1 | B | Implement TUI-017 context usage percentage using accurate usage when available. | T101 | TUI compact/status tests | Review |
 | T104 | 2 | C | Implement TOOL-015 write/edit result visibility with bounded preview/diff. | TOOL-003 | `cargo test -p talos-tools -p talos-tui` | Planned |
 | T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Planned |
 | T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Planned |
@@ -244,3 +244,16 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   security/rehearsal work.
 - New issue demand #7-#16 included.
 - I076-I079 created as the next four monthly execution shells.
+
+### I076 Activation Checkpoint (2026-07-01)
+
+- Activated I076 for unattended execution.
+- First implementation packet selected: T100-T103.
+- Owner status changed to In Progress for PROVIDER-001, TUI-017, and TUI-018; verification and issue comments remain pending until tests pass.
+
+### I076 T100-T103 Review Checkpoint (2026-07-01)
+
+- T101 implemented OpenAI-compatible `stream_options.include_usage` and usage-only chunk parsing through `TurnEnd` usage.
+- T102 implemented `M ctx` formatting for million-token context limits while preserving sub-million behavior.
+- T103 implemented context usage percentages in the status bar using input plus output tokens.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-provider`; `cargo test -p talos-tui status_bar`; `cargo test -p talos-tui`; `cargo check --workspace`; `cargo clippy -p talos-provider -p talos-tui -- -D warnings`; `scripts/validate_project_governance.sh .`.

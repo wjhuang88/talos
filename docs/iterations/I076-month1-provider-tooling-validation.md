@@ -1,6 +1,6 @@
 # Iteration I076: Month 1 — Provider, Tooling, And Validation Loop
 
-> Document status: Planned
+> Document status: Active (2026-07-01)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 1-4 of the 2026-07-01 four-month replan: provider usage
 > accounting, status-bar correctness, write/edit output visibility, model-switch context markers,
@@ -71,14 +71,22 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-01 | Planning | Created as Month 1 shell for the replan. |
+| 2026-07-01 | Activation | Activated for unattended execution. First packet is T100-T103: replan activation, OpenAI-compatible streaming usage, context million-unit display, and context usage percentage. |
+| 2026-07-01 | Review | T100 complete; T101-T103 implemented and moved to Review after provider/TUI/check/clippy/governance validation. |
 
 ## Verification Evidence
 
-- Pending.
+- 2026-07-01: `cargo fmt --all -- --check` passed.
+- 2026-07-01: `cargo test -p talos-provider` passed: 48 unit tests, 4 integration tests, 2 doc tests.
+- 2026-07-01: `cargo test -p talos-tui status_bar` passed: 14 status-bar tests.
+- 2026-07-01: `cargo test -p talos-tui` passed: 180 unit tests, 2 doc tests.
+- 2026-07-01: `cargo check --workspace` passed.
+- 2026-07-01: `cargo clippy -p talos-provider -p talos-tui -- -D warnings` passed.
+- 2026-07-01: `scripts/validate_project_governance.sh .` passed with 0 warnings.
 
 ## Variance And Residuals
 
-- Pending.
+- T104-T106 remain planned next after T100-T103 commit/push and issue sync.
 
 ## Retrospective
 
