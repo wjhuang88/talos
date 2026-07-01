@@ -6,6 +6,8 @@ pub mod event;
 pub mod handler;
 pub mod manifest;
 pub mod registry;
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 pub use builtin::LoggingHandler;
 pub use error::HookError;

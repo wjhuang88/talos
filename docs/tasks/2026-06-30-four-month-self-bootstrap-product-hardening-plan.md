@@ -132,7 +132,7 @@ the prerequisites and evidence needed before `REL-002` can become a real release
 | T43 | 9 | E | Implement weighted-memory graph storage behind a feature/config flag if spike accepted. | T30/T31 | SQLite tests; retrieval deterministic | Planned |
 | T44 | 9 | C | Complete ripgrep-backed grep engine or keep current engine with recorded rejection/blocker. | T17 | Parity/performance evidence | Complete |
 | T45 | 10 | F | Implement plugin manifest parser only; no executable artifact instantiation during discovery. | T32/T34 | Parser tests; schema validation | Complete |
-| T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Planned |
+| T46 | 10 | F | After ADR-027 dependency/security review, implement one local WASM plugin package fixture with a read-only tool behind permission gate. | T45 | Trap/timeout/error tests | Complete |
 | T47 | 10 | D | Implement safe browser-page record mock backend for `fetch_url` if WEB-005 gate passed. | T29/T36 | No cookie/storage exposure; continuation tests | Planned |
 | T48 | 10 | B | Prepare `talos-runtime` publish gate: dry-run dependency closure, SDK docs, examples, support caveats. | T13/T37 | `cargo publish --dry-run -p talos-runtime` or blocker | Planned |
 | T49 | 10 | G | WEB-003 zh-CN site translation slice. | WEB-003 | Site validator; link checks | Planned |
@@ -813,3 +813,44 @@ standard for fast text search — so performance parity or improvement is inhere
 Legacy engine preserved for testing/comparison.
 
 **Validation**: `cargo test -p talos-tools search_engine` → 12 passed, 0 failed.
+
+### Checkpoint T46 — Local WASM Plugin Fixture (2026-07-01)
+
+**Task**: T46 — Implement one local WASM plugin package fixture with a read-only tool.
+
+**Completed**:
+- Added `wasmtime v29.0.1` to `talos-plugin` behind a `wasm` Cargo feature
+  (`default-features = false, features = ["cranelift", "runtime", "parallel-compilation", "wat"]`).
+  Default workspace build is unaffected — wasmtime is not compiled unless `--features wasm` is used.
+- Created `WasmRuntime` (engine config: fuel + epoch interruption) and `WasmModule` (compile from
+  WAT/bytes, execute with resource limits).
+- Resource controls per ADR-032: deterministic fuel budget, epoch interruption as wall-clock timeout
+  guard (background thread increments epoch after timeout), no host imports (full sandbox isolation).
+- All execution wrapped in `catch_unwind` (Hard Constraint #9) — no trap, panic, or failure may crash
+  the host process. All failures degrade to `WasmError` enum variants.
+- 8 tests covering all ADR-032 mandatory categories:
+  1. Success fixture (valid module returns i32)
+  2. Invalid module (garbage bytes → Compile error)
+  3. Trap (`unreachable` instruction → Trap error)
+  4. Fuel exhaustion (infinite loop + low fuel → Timeout error)
+  5. Wall-clock timeout (infinite loop + 200ms epoch → Timeout error)
+  6. Memory access bounds (OOB load → Trap error)
+  7. Missing export (no `run` function → MissingExport error)
+  8. No host imports (module with import → compile/instantiate error)
+
+**Dependency evidence** (`cargo tree -p talos-plugin --features wasm --depth 1`):
+- `wasmtime v29.0.1` is the only new top-level dependency
+- Transitive deps: cranelift (JIT compiler), wasmtime-environ, wat (WAT parser), wasmparser
+- All pure Rust or Rust-with-optional-C; no Python/Node runtime dependency
+
+**Validation**:
+- `cargo fmt --all -- --check` → pass.
+- `cargo clippy -p talos-plugin --features wasm -- -D warnings` → no warnings.
+- `cargo clippy -p talos-plugin -- -D warnings` → no warnings (default build).
+- `cargo test -p talos-plugin --features wasm` → 23 passed (15 existing + 8 WASM), 0 failed.
+- `cargo test -p talos-plugin` → 23 passed (default, no WASM), 0 failed.
+- `scripts/validate_project_governance.sh .` → 0 warnings.
+- `scripts/check_publish_guard.sh .` → all guards verified.
+
+**Next task item**: Remaining Week 9–10 items: T43 (memory graph), T47 (browser-page mock),
+T48 (runtime publish gate), T49 (zh-CN site translation). Then Month-3 closeout (T54).
