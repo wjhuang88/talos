@@ -136,7 +136,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T103 | 1 | B | Implement TUI-017 context usage percentage using accurate usage when available. | T101 | TUI compact/status tests | Review |
 | T104 | 2 | C | Implement TOOL-015 write/edit result visibility with bounded preview/diff. | TOOL-003 | `cargo test -p talos-tools -p talos-tui` | Review |
 | T105 | 2 | C | Implement TUI-019 visual hierarchy for primary vs secondary tool output. | T104/TUI-007 | TUI style tests | Review |
-| T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Planned |
+| T106 | 2 | B | Implement SESSION-003 model-switch context marker with persistence. | SESSION-001/CMD-001 | session JSONL/request-preview tests | Review |
 | T107 | 3 | A | Design autonomous validation loop: command/tool shape, security boundary, and no-hidden-pass rules. | REL-002/T52 evidence | ADR/proposal or owner-doc decision | Planned |
 | T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Planned |
 | T109 | 4 | A | Month-1 closeout: provider/status/tool/session fixes and validation-loop decision. | T100-T108 | `cargo test --workspace`; governance | Planned |
@@ -263,3 +263,9 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - T104 implemented bounded `write` previews and bounded `edit` replacement diffs in model-facing tool results.
 - T105 implemented primary/detail styling for tool result scrollback while preserving error-line prominence.
 - Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-tools file_tool_tests`; `cargo test -p talos-tui tool_result`; `cargo test -p talos-tools`; `cargo test -p talos-tui`; `cargo check --workspace`; `cargo clippy -p talos-tools -p talos-tui -- -D warnings`; `scripts/validate_project_governance.sh .`.
+
+### I076 T106 Review Checkpoint (2026-07-01)
+
+- T106 implemented a persisted model-switch system marker after successful rebuild commit.
+- The marker records previous and new provider/model identity, is injected into rebuilt agent history, and is visible in request preview context.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-cli model_switch_marker`; `cargo test -p talos-cli`; `cargo check --workspace`; `cargo clippy -p talos-cli -- -D warnings`; `scripts/validate_project_governance.sh .`.

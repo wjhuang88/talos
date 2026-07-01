@@ -74,6 +74,7 @@
 | 2026-07-01 | Activation | Activated for unattended execution. First packet is T100-T103: replan activation, OpenAI-compatible streaming usage, context million-unit display, and context usage percentage. |
 | 2026-07-01 | Review | T100 complete; T101-T103 implemented and moved to Review after provider/TUI/check/clippy/governance validation. |
 | 2026-07-01 | Review | T104-T105 implemented and moved to Review after file-tool and TUI result-rendering validation. |
+| 2026-07-01 | Review | T106 implemented and moved to Review after model-switch marker, JSONL round-trip, and request-preview validation. |
 
 ## Verification Evidence
 
@@ -89,10 +90,13 @@
 - 2026-07-01: `cargo test -p talos-tools` passed: 200 unit tests, 15 document-boundary tests, 3 integration-hardening tests.
 - 2026-07-01: `cargo test -p talos-tui` passed after T104-T105: 182 unit tests, 2 doc tests.
 - 2026-07-01: `cargo clippy -p talos-tools -p talos-tui -- -D warnings` passed.
+- 2026-07-01: `cargo test -p talos-cli model_switch_marker` passed: 3 tests.
+- 2026-07-01: `cargo test -p talos-cli` passed: 95 unit tests and 8 integration tests.
+- 2026-07-01: `cargo clippy -p talos-cli -- -D warnings` passed.
 
 ## Variance And Residuals
 
-- T106 remains planned next after T104-T105 commit/push and issue sync.
+- T107 validation-loop design remains planned next after T106 commit/push and issue sync.
 
 ## Retrospective
 

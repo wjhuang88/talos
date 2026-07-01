@@ -271,6 +271,8 @@ async fn handle_session_model(
         return None;
     }
 
+    let previous_model = config.model.clone();
+    let previous_provider = config.provider.clone();
     let mut model_config = config.clone();
     if let Err(e) = model_config.set_active_model(&model_id) {
         let text = format!("[Error] Unknown model '{model_id}': {e}\n");
@@ -316,6 +318,8 @@ async fn handle_session_model(
         bridge_rx_update_tx,
         session_watch_rx,
         api_key,
+        previous_model,
+        previous_provider,
         model_id: model_id.clone(),
         provider_for_status: provider_name,
         success_message: format!("[System] Switched to model {model_id}.\n"),
@@ -351,6 +355,8 @@ async fn handle_session_model_with_credential(
     cred: talos_conversation::CredentialResponseData,
     mock: bool,
 ) -> Option<Config> {
+    let previous_model = config.model.clone();
+    let previous_provider = config.provider.clone();
     let mut model_config = config.clone();
     model_config.set_provider_credential(&cred.provider, &cred.api_key);
     if let Err(e) = model_config.save() {
@@ -395,6 +401,8 @@ async fn handle_session_model_with_credential(
         bridge_rx_update_tx,
         session_watch_rx,
         api_key,
+        previous_model,
+        previous_provider,
         model_id: model_id.clone(),
         provider_for_status,
         success_message: format!("[System] Credentials saved. Switched to model {model_id}.\n"),

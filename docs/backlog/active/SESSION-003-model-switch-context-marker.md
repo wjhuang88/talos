@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | SESSION-003 |
 | Priority | P2 |
-| Status | Planned |
+| Status | Review |
 | Source | [GitHub Issue #10](https://github.com/wjhuang88/talos/issues/10) |
 | Relates To | SESSION-001, CMD-001 |
 
@@ -27,11 +27,22 @@ requests can see the switch boundary and current model identity.
 
 ## Acceptance Criteria
 
-- [ ] Successful model switches add a system/context marker.
-- [ ] Marker contains the new model and provider.
-- [ ] Marker is persisted in session JSONL.
-- [ ] Subsequent API request context includes the marker.
-- [ ] Tests cover switch, persistence, and request-preview visibility.
+- [x] Successful model switches add a system/context marker.
+- [x] Marker contains the new model and provider.
+- [x] Marker is persisted in session JSONL.
+- [x] Subsequent API request context includes the marker.
+- [x] Tests cover switch, persistence, and request-preview visibility.
+
+## Execution Notes
+
+- 2026-07-01: Implemented in I076/T106. Successful model rebuilds now append a system marker containing previous and new provider/model identity, inject it into the rebuilt agent history, and persist it to session JSONL after commit.
+
+## Verification Evidence
+
+- 2026-07-01: `cargo test -p talos-cli model_switch_marker` passed: 3 tests.
+- 2026-07-01: `cargo test -p talos-cli` passed: 95 unit tests and 8 integration tests.
+- 2026-07-01: `cargo check --workspace` passed.
+- 2026-07-01: `cargo clippy -p talos-cli -- -D warnings` passed.
 
 ## Required Reads
 

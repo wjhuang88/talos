@@ -9,6 +9,7 @@ use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_conversation::{ModelPickerData, ModelPickerItem, ProviderSetupItem};
+use talos_core::message::Message;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
 use talos_session::Session;
@@ -143,6 +144,8 @@ pub(crate) struct RebuildSessionParams<'a> {
         &'a mpsc::UnboundedSender<(Session, mpsc::UnboundedReceiver<SessionEvent>)>,
     pub session_watch_rx: &'a watch::Receiver<Session>,
     pub api_key: String,
+    pub previous_model: String,
+    pub previous_provider: String,
     pub model_id: String,
     pub provider_for_status: String,
     pub success_message: String,
@@ -173,6 +176,8 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         bridge_rx_update_tx,
         session_watch_rx,
         api_key,
+        previous_model,
+        previous_provider,
         model_id,
         provider_for_status,
         success_message,
@@ -187,7 +192,14 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
         return false;
     }
-    let history = current_session.read_messages().unwrap_or_default();
+    let mut history = current_session.read_messages().unwrap_or_default();
+    let switch_marker = model_switch_marker(
+        &previous_provider,
+        &previous_model,
+        &model_config.provider,
+        &model_config.model,
+    );
+    history.push(switch_marker.clone());
 
     let session_config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
@@ -262,6 +274,13 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
                 talos_conversation::MessageSource::System,
                 success_message,
             );
+            let marker_metadata = crate::mode_runtime::session_metadata_for_model(
+                &model_config.model,
+                &model_config.provider,
+            );
+            if let Err(e) = current_session.append_with_metadata(&switch_marker, marker_metadata) {
+                eprintln!("Warning: failed to persist model switch marker: {e}");
+            }
             let (ctx_limit, _) = model_config.resolve_model_limits();
             let all_models = model_config.all_models();
             let meta = talos_config::model::find_model_by_provider(
@@ -293,6 +312,20 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     }
 }
 
+fn model_switch_marker(
+    previous_provider: &str,
+    previous_model: &str,
+    new_provider: &str,
+    new_model: &str,
+) -> Message {
+    Message::System {
+        content: format!(
+            "[System] Model switch: {previous_provider}/{previous_model} -> {new_provider}/{new_model}.\n[System] Active model for subsequent requests: {new_provider}/{new_model}."
+        ),
+        cache_markers: Vec::new(),
+    }
+}
+
 fn send_stream(
     ui_tx: &mpsc::UnboundedSender<talos_conversation::UiOutput>,
     source: talos_conversation::MessageSource,
@@ -311,6 +344,9 @@ fn send_stream(
 mod tests {
     use super::*;
     use talos_config::ProviderConfig;
+    use talos_core::tool::ToolRegistry;
+    use talos_provider::mock::MockProvider;
+    use uuid::Uuid;
 
     #[test]
     fn ready_models_have_correct_provider_and_context_limit() {
@@ -344,6 +380,84 @@ mod tests {
                 m.model_id
             );
         }
+    }
+
+    #[test]
+    fn model_switch_marker_includes_previous_and_new_identity() {
+        let marker = model_switch_marker("anthropic", "claude-old", "openai", "gpt-new");
+        let Message::System { content, .. } = marker else {
+            panic!("model switch marker must be a system message");
+        };
+
+        assert!(content.contains("anthropic/claude-old"));
+        assert!(content.contains("openai/gpt-new"));
+        assert!(content.contains("Active model for subsequent requests"));
+    }
+
+    #[test]
+    fn model_switch_marker_survives_session_jsonl_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let session = talos_session::Session::new(
+            Uuid::new_v4(),
+            "test".into(),
+            String::new(),
+            dir.path().join("session.jsonl"),
+        );
+        let marker = model_switch_marker("anthropic", "claude-old", "openai", "gpt-new");
+
+        session
+            .append_with_metadata(
+                &marker,
+                talos_session::SessionMetadata {
+                    provider: Some("openai".into()),
+                    model: Some("gpt-new".into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let messages = session.read_messages().unwrap();
+        assert_eq!(messages.len(), 1);
+        let Message::System { content, .. } = &messages[0] else {
+            panic!("round-tripped marker must remain a system message");
+        };
+        assert!(content.contains("anthropic/claude-old"));
+        assert!(content.contains("openai/gpt-new"));
+
+        let entries = session.read_entries().unwrap();
+        assert_eq!(entries[0].metadata.provider, Some("openai".into()));
+        assert_eq!(entries[0].metadata.model, Some("gpt-new".into()));
+    }
+
+    #[tokio::test]
+    async fn model_switch_marker_is_visible_in_request_preview() {
+        let marker = model_switch_marker("anthropic", "claude-old", "openai", "gpt-new");
+        let provider = MockProvider::new().with_request_debug_builder(|messages| {
+            let system_messages: Vec<_> = messages
+                .iter()
+                .filter_map(|message| match message {
+                    Message::System { content, .. } => Some(content.clone()),
+                    _ => None,
+                })
+                .collect();
+            serde_json::json!({ "systems": system_messages }).to_string()
+        });
+        let agent = Agent::with_security(
+            Arc::new(provider),
+            ToolRegistry::new(),
+            Some(Arc::new(talos_permission::PermissionEngine::new())),
+            None,
+            std::path::PathBuf::from("/tmp"),
+        );
+
+        let preview = agent
+            .preview_request("continue".to_string(), vec![marker])
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(preview.contains("Model switch"));
+        assert!(preview.contains("openai/gpt-new"));
     }
 
     #[test]

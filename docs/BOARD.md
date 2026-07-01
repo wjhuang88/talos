@@ -19,8 +19,8 @@ acceptance criteria, verification evidence, or iteration state.
 | R27 High-Risk Governance Gate | In Progress | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | T2/I058 moved to Review with full validation and real binary proof. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
-| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue I076/T106 after T104-T105 commit and issue sync; no real publish or permission-default change without explicit gate. |
-| I076 Provider/Tooling/Validation Loop | Active | [I076](iterations/I076-month1-provider-tooling-validation.md) | T100-T105 are in Review; next packet is T106 model-switch context marker after commit/push and issue sync. |
+| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue I076/T107 validation-loop design after T106 commit and issue sync; no real publish or permission-default change without explicit gate. |
+| I076 Provider/Tooling/Validation Loop | Active | [I076](iterations/I076-month1-provider-tooling-validation.md) | T100-T106 are in Review; next packet is T107 validation-loop design after commit/push and issue sync. |
 
 ## Review
 
@@ -31,6 +31,7 @@ acceptance criteria, verification evidence, or iteration state.
 | TUI-018 Context Limit Million Format | Review | [TUI-018](backlog/active/TUI-018-context-limit-million-format.md) / [Issue #11](https://github.com/wjhuang88/talos/issues/11) | Commit and push T102, then sync issue with commit reference; close only after owner doc reaches Complete. |
 | TOOL-015 Write/Edit Result Visibility | Review | [TOOL-015](backlog/active/TOOL-015-write-edit-result-visibility.md) / [Issue #13](https://github.com/wjhuang88/talos/issues/13) | Commit and push T104, then sync issue with commit reference; close only after owner doc reaches Complete. |
 | TUI-019 Tool Output Visual Hierarchy | Review | [TUI-019](backlog/active/TUI-019-tool-output-visual-hierarchy.md) / [Issue #14](https://github.com/wjhuang88/talos/issues/14) | Commit and push T105, then sync issue with commit reference; close only after owner doc reaches Complete. |
+| SESSION-003 Model Switch Context Marker | Review | [SESSION-003](backlog/active/SESSION-003-model-switch-context-marker.md) / [Issue #10](https://github.com/wjhuang88/talos/issues/10) | Commit and push T106, then sync issue with commit reference; close only after owner doc reaches Complete. |
 
 ## Blocked / Paused
 
@@ -54,7 +55,6 @@ acceptance criteria, verification evidence, or iteration state.
 | I077 Plugin/Exec/Web Security | Planned | [I077](iterations/I077-month2-plugin-exec-web-security.md) | Wait for I076 closeout or explicit replan; high-risk work requires security gates before code. |
 | I078 Session/Todo/Thinking | Planned | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | Wait for I077 closeout or explicit replan; prompt/history changes require persistence tests. |
 | I079 Release Readiness/Handoff | Planned | [I079](iterations/I079-month4-release-readiness-handoff.md) | Wait for I078 closeout or explicit replan; no publish/tag unless explicitly approved. |
-| SESSION-003 Model Switch Context Marker | Planned | [SESSION-003](backlog/active/SESSION-003-model-switch-context-marker.md) / [Issue #10](https://github.com/wjhuang88/talos/issues/10) | Persist model-switch context marker after successful `/model` rebuild; verify request-preview visibility. |
 | TUI-020 Thinking Preview Without History Pollution | Planned | [TUI-020](backlog/active/TUI-020-thinking-preview-not-history.md) / [Issue #15](https://github.com/wjhuang88/talos/issues/15) | Decide transient-message vs streaming-state approach before implementation; protect session history integrity. |
 | TOOL-016 Direct Exec Tool | Planned | [TOOL-016](backlog/active/TOOL-016-direct-exec-tool.md) / [Issue #16](https://github.com/wjhuang88/talos/issues/16) | Define command allowlist/default permission policy before implementation; process execution remains permission-gated. |
 | TODO-001 Session-Level Todo List | Planned | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | Session-scoped task management: user views via slash commands, agent writes via tools. SQLite-backed with dependency cycle detection and prompt injection. Three-phase implementation. |
