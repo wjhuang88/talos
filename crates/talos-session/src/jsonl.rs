@@ -22,6 +22,9 @@ impl Session {
     }
 
     pub fn append_event(&self, event: &AgentEvent) -> Result<(), SessionError> {
+        if matches!(event, AgentEvent::ThinkingDelta { .. }) {
+            return Ok(());
+        }
         let content =
             serde_json::to_string(event).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
         let entry = self.build_entry("system", &content, SessionMetadata::default())?;

@@ -60,6 +60,49 @@ fn append_and_read_messages() {
 }
 
 #[test]
+fn append_event_ignores_transient_thinking_delta() {
+    let manager = test_manager();
+    let session = manager.create_session("test-project", "").unwrap();
+
+    session
+        .append_event(&AgentEvent::ThinkingDelta {
+            delta: "private reasoning".to_string(),
+        })
+        .unwrap();
+
+    let entries = session.read_entries().unwrap();
+    assert!(entries.is_empty());
+}
+
+#[test]
+fn resume_history_excludes_transient_thinking_delta() {
+    let manager = test_manager();
+    let session = manager.create_session("test-project", "").unwrap();
+
+    session
+        .append_event(&AgentEvent::ThinkingDelta {
+            delta: "private reasoning".to_string(),
+        })
+        .unwrap();
+    session
+        .append(&Message::Assistant {
+            content: "Final answer".to_string(),
+            tool_calls: vec![],
+        })
+        .unwrap();
+
+    let resumed = manager.get_session(&session.id).unwrap();
+    let messages = resumed.read_messages().unwrap();
+    assert_eq!(
+        messages,
+        vec![Message::Assistant {
+            content: "Final answer".to_string(),
+            tool_calls: vec![],
+        }]
+    );
+}
+
+#[test]
 fn append_and_read_events() {
     let manager = test_manager();
     let session = manager.create_session("test-project", "").unwrap();

@@ -151,7 +151,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T121 | 9-10 | F | TODO-001 Phase 1: session todo data model and agent tool API behind permission pipeline. | TODO-001 | storage/tool tests; cycle detection | Planned |
 | T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | Review |
 | T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Review |
-| T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Planned |
+| T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Review |
 | T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Planned |
 | T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Planned |
 | T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Planned |
@@ -450,3 +450,19 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   matrix, but Codex remained the primary executor for implementation, validation execution, docs,
   commit, push, and issue sync.
 - Recovery: commit/push this evidence, then continue to T124 thinking-preview history boundary.
+
+### I078 T124 Implementation Checkpoint (2026-07-02)
+
+- T124 implemented the thinking-preview history boundary.
+- Added transient `AgentEvent::ThinkingDelta` and `UiOutput::ThinkingPreview` paths. The TUI shows
+  active thinking in the live processing preview, while the conversation engine keeps it separate
+  from finalized assistant text.
+- Session JSONL append ignores `ThinkingDelta`; resume history reads only durable messages and does
+  not replay old thinking content.
+- Validation passed: `cargo fmt --all -- --check`; `cargo test -p talos-core`;
+  `cargo test -p talos-conversation`; `cargo test -p talos-session`;
+  `cargo test -p talos-agent`; `cargo test -p talos-cli`; `cargo test -p talos-tui`;
+  `cargo clippy -p talos-core -p talos-agent -p talos-conversation -p talos-session -p talos-cli -p talos-tui -- -D warnings`;
+  `cargo check --workspace`.
+- Recovery: commit/push, sync issue #15, run governance validation, then continue to T125 bounded
+  todo prompt integration.

@@ -1345,6 +1345,33 @@ fn slash_todo_export_json_produces_read_only_request() {
     }
 }
 
+#[test]
+fn thinking_delta_updates_preview_without_history() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+
+    let outputs = engine.handle_agent_event(&AgentEvent::ThinkingDelta {
+        delta: "checking constraints".to_string(),
+    });
+
+    assert!(matches!(
+        &outputs[0],
+        UiOutput::ThinkingPreview { text: Some(text) } if text == "checking constraints"
+    ));
+    assert!(engine.messages.is_empty());
+
+    let outputs = engine.handle_agent_event(&AgentEvent::TurnEnd {
+        usage: Usage::default(),
+        stop_reason: StopReason::EndTurn,
+    });
+    assert!(
+        outputs
+            .iter()
+            .any(|output| matches!(output, UiOutput::ThinkingPreview { text: None }))
+    );
+    assert!(engine.messages.is_empty());
+}
+
 // ---------------------------------------------------------------------------
 // Status snapshot
 // ---------------------------------------------------------------------------

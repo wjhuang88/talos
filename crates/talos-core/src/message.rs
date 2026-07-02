@@ -121,6 +121,14 @@ pub enum AgentEvent {
         /// The text chunk.
         delta: String,
     },
+    /// A transient thinking/reasoning delta was received from the provider.
+    ///
+    /// Thinking deltas are live UI preview data. They must not be persisted as normal
+    /// conversation history or included in the final assistant text.
+    ThinkingDelta {
+        /// The thinking text chunk.
+        delta: String,
+    },
     /// Tool call detected: parameters still streaming.
     ToolCallStarted {
         /// Name of the tool being called.

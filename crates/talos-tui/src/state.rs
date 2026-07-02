@@ -374,6 +374,7 @@ pub(crate) struct TuiState {
     pub pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
     pub tip: Option<Tip>,
     pub status: StatusSnapshot,
+    pub thinking_preview: Option<String>,
     pub slash_menu: BottomPanelState,
 }
 

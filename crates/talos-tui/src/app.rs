@@ -528,6 +528,9 @@ impl Tui {
                 self.pending_scrollback
                     .extend(build_todo_panel_lines(&data));
             }
+            UiOutput::ThinkingPreview { text } => {
+                self.state.thinking_preview = text;
+            }
             UiOutput::ToolApprovalRequest {
                 tool_name,
                 arguments,
@@ -701,6 +704,11 @@ impl Tui {
                 crate::scrollback::animated_hold_preview_text(status, self.processing_frame)
             })
             .unwrap_or_else(|| {
+                if let Some(thinking) = self.state.thinking_preview.as_ref()
+                    && self.state.status.is_processing
+                {
+                    return format!("thinking: {thinking}");
+                }
                 let preview = self.stream_render.preview();
                 if status.is_processing && preview.is_empty() {
                     crate::scrollback::idle_processing_preview_text(self.processing_frame)

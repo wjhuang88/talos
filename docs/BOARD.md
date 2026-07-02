@@ -20,7 +20,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
 | Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I078 Session/Todo/Thinking after I077 closeout commit; no real publish, tag, release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call expansion. |
-| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T123 validation-backed rehearsal is in Review; next packet is T124 thinking-preview history boundary. |
+| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T124 thinking-preview history boundary is in Review; next packet is T125 bounded todo prompt integration. |
 | TUI-016 Slash Panel Smart Auto-Execute | Review | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | T120 implemented, validated, pushed, and issue-synced; remains open until owner doc reaches Complete. |
 | TODO-001 Session Todo Tools | In Progress | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | I078/T122 read-only slash/TUI views implemented and validated; user-facing mutations remain out of scope. |
 
@@ -28,6 +28,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| TUI-020 Thinking Preview Without History Pollution | Review | [TUI-020](backlog/active/TUI-020-thinking-preview-not-history.md) / [Issue #15](https://github.com/wjhuang88/talos/issues/15) | T124 implemented transient preview and validated stream/finalization/persistence/resume boundaries; remains open until owner doc reaches Complete. |
 
 ## Blocked / Paused
 
@@ -49,7 +50,6 @@ acceptance criteria, verification evidence, or iteration state.
 | PLUGIN-001 Plugin Encapsulation System | In Progress | [PLUGIN-001](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Provenance data model complete (T40); manifest parser complete (T45); WASM runtime adapter complete (T46, behind `wasm` feature); T111 read-only tool integration is in Review. No broad protocol, host calls, auto-discovery, remote install, or write-capable plugin tools. |
 | CMD-002 Command Taxonomy Realignment | In Progress | [CMD-002](backlog/active/CMD-002-command-taxonomy-realignment.md) | Slice 1 complete (T41): `/mcp` shows MCP status; `/plugins` shows transition notice. Slice 2 (`/hooks` + plugin listing) waits for HOOK-001/PLUGIN-001 runtime. |
 | I079 Release Readiness/Handoff | Planned | [I079](iterations/I079-month4-release-readiness-handoff.md) | Wait for I078 closeout or explicit replan; no publish/tag unless explicitly approved. |
-| TUI-020 Thinking Preview Without History Pollution | Planned | [TUI-020](backlog/active/TUI-020-thinking-preview-not-history.md) / [Issue #15](https://github.com/wjhuang88/talos/issues/15) | Decide transient-message vs streaming-state approach before implementation; protect session history integrity. |
 | HOOK-001 Config-Introduced Hooks | Planned | [HOOK-001](backlog/active/HOOK-001-config-introduced-hooks.md) | ADR-029 accepted. First slice is hook config schema and diagnostics; executable hook carriers remain gated by ADR-027/plugin runtime. |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Complete | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input; Esc no longer clears composer; exit prints session summary with model, duration, turns, tokens, cost |

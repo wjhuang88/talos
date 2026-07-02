@@ -537,6 +537,48 @@ async fn test_run_streaming_forwards_events() {
 
 #[tokio::test]
 #[allow(deprecated)] // Agent::new is correct for unit tests
+async fn test_run_streaming_keeps_thinking_out_of_final_history() {
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::ThinkingDelta {
+            delta: "private reasoning".into(),
+        },
+        AgentEvent::TextDelta {
+            delta: "Final answer".into(),
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let agent = Agent::new(
+        Arc::new(MockModel::new(vec![events.clone()])),
+        ToolRegistry::new(),
+    );
+    let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
+
+    let (response, new_messages) = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
+    assert_eq!(response, "Final answer");
+    assert!(!response.contains("private reasoning"));
+    assert!(matches!(
+        new_messages.last(),
+        Some(Message::Assistant { content, .. }) if content == "Final answer"
+    ));
+
+    let mut received = Vec::new();
+    while let Ok(event) = rx.try_recv() {
+        received.push(event);
+    }
+    assert!(
+        received
+            .iter()
+            .any(|event| matches!(event, AgentEvent::ThinkingDelta { .. }))
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)] // Agent::new is correct for unit tests
 async fn test_tool_execution_loop_single_call() {
     let responses = vec![
         vec![

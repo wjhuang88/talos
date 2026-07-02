@@ -175,6 +175,11 @@ pub enum UiOutput {
     },
     ToolCall(ToolCallDisplay),
     ToolResult(ToolResultDisplay),
+    /// Replace or clear transient thinking preview text.
+    ThinkingPreview {
+        /// Current thinking preview text; `None` clears it.
+        text: Option<String>,
+    },
     ToolApprovalRequest {
         tool_name: String,
         arguments: serde_json::Value,

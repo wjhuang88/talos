@@ -131,6 +131,7 @@ pub struct ConversationEngine {
     pub(crate) steering_queue: Vec<String>,
     pub(crate) followup_queue: Vec<String>,
     pub(crate) usage: Usage,
+    pub(crate) current_thinking_text: String,
     pub(crate) model_name: String,
     pub(crate) provider_name: String,
     pub(crate) branch_id: Option<String>,
@@ -162,6 +163,7 @@ impl ConversationEngine {
             steering_queue: Vec::new(),
             followup_queue: Vec::new(),
             usage: Usage::default(),
+            current_thinking_text: String::new(),
             model_name,
             provider_name,
             branch_id: None,
@@ -240,13 +242,20 @@ impl ConversationEngine {
         self.close_stream();
         self.is_processing = false;
         self.current_turn_text.clear();
-        vec![
+        let had_thinking = !self.current_thinking_text.is_empty();
+        self.current_thinking_text.clear();
+        let mut outputs = Vec::new();
+        if had_thinking {
+            outputs.push(UiOutput::ThinkingPreview { text: None });
+        }
+        outputs.extend([
             UiOutput::Tip {
                 text: "Turn cancellation requested.".into(),
                 kind: TipKind::ExitHint,
             },
             UiOutput::Status(self.status_snapshot()),
-        ]
+        ]);
+        outputs
     }
 
     pub fn handle_agent_event(&mut self, event: &AgentEvent) -> Vec<UiOutput> {
@@ -256,6 +265,7 @@ impl ConversationEngine {
             AgentEvent::TurnStart => {
                 self.is_processing = true;
                 self.current_turn_text.clear();
+                self.current_thinking_text.clear();
 
                 let (tx, rx) = mpsc::unbounded_channel::<String>();
                 self.stream_tx = Some(tx);
@@ -271,6 +281,12 @@ impl ConversationEngine {
                     let _ = tx.send(delta.clone());
                 }
                 outputs.push(UiOutput::Status(self.status_snapshot()));
+            }
+            AgentEvent::ThinkingDelta { delta } => {
+                self.current_thinking_text.push_str(delta);
+                outputs.push(UiOutput::ThinkingPreview {
+                    text: Some(self.current_thinking_text.clone()),
+                });
             }
             AgentEvent::ToolCallStarted { name } => {
                 self.close_stream();
@@ -322,14 +338,24 @@ impl ConversationEngine {
                 self.finalize_turn();
                 self.usage = usage.clone();
                 self.last_flushed_message = self.messages.len();
+                let had_thinking = !self.current_thinking_text.is_empty();
+                self.current_thinking_text.clear();
 
+                if had_thinking {
+                    outputs.push(UiOutput::ThinkingPreview { text: None });
+                }
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::Error { message } => {
                 self.close_stream();
                 self.is_processing = false;
                 self.current_turn_text.clear();
+                let had_thinking = !self.current_thinking_text.is_empty();
+                self.current_thinking_text.clear();
 
+                if had_thinking {
+                    outputs.push(UiOutput::ThinkingPreview { text: None });
+                }
                 outputs.push(UiOutput::Tip {
                     text: message.clone(),
                     kind: TipKind::Error,
