@@ -76,10 +76,9 @@ impl SessionManager {
     ///
     /// # Errors
     ///
-    /// Returns an error if `$HOME` is unavailable.
+    /// Returns an error if no user home directory environment variable is available.
     pub fn default_sessions_dir() -> Result<PathBuf, SessionError> {
-        let home =
-            std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
+        let home = home_dir_from_env()?;
         Ok(PathBuf::from(home).join(".talos").join("sessions"))
     }
 
@@ -689,10 +688,89 @@ struct CleanupSession {
 
 impl Default for SessionManager {
     fn default() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+        let home = home_dir_from_env()
+            .unwrap_or_else(|_| std::env::temp_dir().to_string_lossy().into_owned());
         Self {
             sessions_dir: PathBuf::from(home).join(".talos").join("sessions"),
             index: Arc::new(Mutex::new(None)),
         }
+    }
+}
+
+/// Resolve home directory env vars in cross-platform precedence.
+///
+/// Order:
+/// 1. `HOME`
+/// 2. `USERPROFILE`
+/// 3. `HOMEDRIVE` + `HOMEPATH`
+fn home_dir_from_env() -> Result<String, SessionError> {
+    // Empty env vars should behave as unset vars so Windows fallback order still applies.
+    home_dir_from_getter(|key| std::env::var(key).ok().filter(|value| !value.is_empty()))
+}
+
+fn home_dir_from_getter<F>(mut get_var: F) -> Result<String, SessionError>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    if let Some(home) = get_var("HOME") {
+        return Ok(home);
+    }
+    if let Some(profile) = get_var("USERPROFILE") {
+        return Ok(profile);
+    }
+    let drive = get_var("HOMEDRIVE").unwrap_or_default();
+    let path = get_var("HOMEPATH").unwrap_or_default();
+    if !drive.is_empty() && !path.is_empty() {
+        return Ok(format!("{drive}{path}"));
+    }
+    Err(SessionError::IoError(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "home directory environment variable not found",
+    )))
+}
+
+#[cfg(test)]
+mod manager_env_tests {
+    use super::home_dir_from_getter;
+
+    #[test]
+    fn home_dir_prefers_home() {
+        let value = home_dir_from_getter(|key| match key {
+            "HOME" => Some("/home/test".to_string()),
+            "USERPROFILE" => Some("C:\\Users\\test".to_string()),
+            _ => None,
+        })
+        .expect("HOME should be used");
+        assert_eq!(value, "/home/test");
+    }
+
+    #[test]
+    fn home_dir_falls_back_to_userprofile() {
+        let value = home_dir_from_getter(|key| match key {
+            "HOME" => None,
+            "USERPROFILE" => Some("C:\\Users\\test".to_string()),
+            _ => None,
+        })
+        .expect("USERPROFILE should be used");
+        assert_eq!(value, "C:\\Users\\test");
+    }
+
+    #[test]
+    fn home_dir_falls_back_to_drive_and_path() {
+        let value = home_dir_from_getter(|key| match key {
+            "HOME" => None,
+            "USERPROFILE" => None,
+            "HOMEDRIVE" => Some("C:".to_string()),
+            "HOMEPATH" => Some("\\Users\\test".to_string()),
+            _ => None,
+        })
+        .expect("HOMEDRIVE/HOMEPATH should be used");
+        assert_eq!(value, "C:\\Users\\test");
+    }
+
+    #[test]
+    fn home_dir_errors_when_all_missing() {
+        let err = home_dir_from_getter(|_| None).expect_err("missing vars should error");
+        assert!(matches!(err, crate::SessionError::IoError(_)));
     }
 }
