@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | Planned |
+| Status | In Progress — I078/T121-A data model and repository |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -74,6 +74,11 @@ delete, dependency) are **agent tools** that go through the permission pipeline.
 - Agent tools (todo_create, todo_update_status, todo_query)
 - Cyclic dependency detection
 - Tests
+
+I078/T121-A activation (2026-07-02): start with `talos-session` data model, SQLite repository,
+CRUD, query, and dependency cycle detection. Agent tool registration is intentionally left to the
+next packet after the crate boundary is confirmed, because `talos-tools` does not currently depend
+on `talos-session`.
 
 ### Phase 2: TUI + Slash Commands
 - TodoPanel component (read-only)

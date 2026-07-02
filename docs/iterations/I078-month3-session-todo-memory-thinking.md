@@ -16,7 +16,8 @@
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
 | T120 | TUI-016 | Review | TUI-010/CMD-001 | Slash smart auto-execute |
-| T121 | TODO-001 | Planned | SESSION-001 | Todo data model + agent tool API |
+| T121-A | TODO-001 | In Progress | SESSION-001 | Todo data model + repository |
+| T121-B | TODO-001 | Planned | T121-A | Agent todo tool API |
 | T122 | TODO-001 | Planned | T121 | Read-only slash/TUI views |
 | T123 | REL-002 | Planned | T108/T122 | Validation-backed rehearsal |
 | T124 | TUI-020 | Planned | TUI-004/session docs | Thinking preview separated from history |
@@ -68,6 +69,7 @@
 | 2026-07-02 | Activation | Activated after I077/T116 closeout. First packet is T120 slash smart auto-execute. |
 | 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I078 Planned -> activated; I079 Planned -> remains planned; I058/I047/I057 Review -> legacy review rows left untouched; I046 Planned -> legacy stale row left untouched. |
 | 2026-07-02 | T120 Implementation | Slash panel Enter now runs DirectExecution commands and fills the composer for RequireInput commands; Tab remains completion-only. |
+| 2026-07-02 | T121-A Activation | Started TODO-001 Phase 1 with `talos-session` data model/repository first; agent tool registration deferred to T121-B to avoid an unreviewed `talos-tools` -> `talos-session` dependency. |
 
 ## Verification Evidence
 

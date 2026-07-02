@@ -375,3 +375,12 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   `cargo clippy -p talos-tui -p talos-conversation -- -D warnings`; `cargo check --workspace`;
   `scripts/validate_project_governance.sh .`.
 - Recovery: review diff, commit, push, sync issue #7, then continue to I078/T121.
+
+### I078 T121-A Activation Checkpoint (2026-07-02)
+
+- TODO-001 moved to In Progress for T121-A.
+- T121 split into two packets: T121-A `talos-session` todo model/repository/CRUD/dependency cycle
+  detection; T121-B agent todo tool API and registration.
+- Rationale: `talos-tools` currently does not depend on `talos-session`, so tool placement needs a
+  separate boundary decision after the session repository exists.
+- Recovery: commit/push activation docs, sync issue #8, then implement `crates/talos-session/src/todo.rs`.
