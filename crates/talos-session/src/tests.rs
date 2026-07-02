@@ -65,7 +65,10 @@ fn default_sessions_dir_falls_back_to_userprofile() {
     }
 
     let dir = result.expect("default sessions dir should use USERPROFILE fallback");
-    assert_eq!(dir, PathBuf::from("/tmp/talos-userprofile-home/.talos/sessions"));
+    assert_eq!(
+        dir,
+        PathBuf::from("/tmp/talos-userprofile-home/.talos/sessions")
+    );
 }
 
 #[test]
