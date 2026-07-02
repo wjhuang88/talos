@@ -1,5 +1,6 @@
 use crate::jsonl::scan_file;
 use crate::sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
+use crate::todo::{TodoError, TodoRepository};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
 use crate::{Session, SessionError, SessionInfo};
 use chrono::{DateTime, Duration, Utc};
@@ -85,6 +86,20 @@ impl SessionManager {
     #[must_use]
     pub fn sessions_dir(&self) -> &Path {
         &self.sessions_dir
+    }
+
+    /// Open the colocated session todo repository and initialize its schema.
+    ///
+    /// The repository is session-scoped by data, not by database file: all todo rows carry a
+    /// `session_id` and share one SQLite file under the sessions directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the SQLite database cannot be opened or initialized.
+    pub fn todo_repository(&self) -> Result<TodoRepository, TodoError> {
+        let repo = TodoRepository::new(&self.sessions_dir.join("todos.sqlite"))?;
+        repo.init_schema()?;
+        Ok(repo)
     }
 
     /// Create a new session for the given project and workspace.

@@ -20,9 +20,9 @@ acceptance criteria, verification evidence, or iteration state.
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
 | Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I078 Session/Todo/Thinking after I077 closeout commit; no real publish, tag, release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call expansion. |
-| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T121-A todo data model/repository is active after T120 moved to Review. |
+| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T121-A todo repository is in Review; next packet is T121-B agent todo tool API boundary and registration. |
 | TUI-016 Slash Panel Smart Auto-Execute | Review | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | T120 implemented, validated, pushed, and issue-synced; remains open until owner doc reaches Complete. |
-| TODO-001 Session Todo Data Model | In Progress | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | I078/T121-A: implement `talos-session` todo model, SQLite repository, CRUD/query, and dependency cycle detection before tool registration. |
+| TODO-001 Session Todo Data Model | Review | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | I078/T121-A implemented `talos-session` todo model, SQLite repository, CRUD/query, and dependency cycle detection; T121-B tools remain pending. |
 
 ## Review
 

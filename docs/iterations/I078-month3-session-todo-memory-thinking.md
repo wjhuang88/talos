@@ -16,7 +16,7 @@
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
 | T120 | TUI-016 | Review | TUI-010/CMD-001 | Slash smart auto-execute |
-| T121-A | TODO-001 | In Progress | SESSION-001 | Todo data model + repository |
+| T121-A | TODO-001 | Review | SESSION-001 | Todo data model + repository |
 | T121-B | TODO-001 | Planned | T121-A | Agent todo tool API |
 | T122 | TODO-001 | Planned | T121 | Read-only slash/TUI views |
 | T123 | REL-002 | Planned | T108/T122 | Validation-backed rehearsal |
@@ -70,6 +70,7 @@
 | 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I078 Planned -> activated; I079 Planned -> remains planned; I058/I047/I057 Review -> legacy review rows left untouched; I046 Planned -> legacy stale row left untouched. |
 | 2026-07-02 | T120 Implementation | Slash panel Enter now runs DirectExecution commands and fills the composer for RequireInput commands; Tab remains completion-only. |
 | 2026-07-02 | T121-A Activation | Started TODO-001 Phase 1 with `talos-session` data model/repository first; agent tool registration deferred to T121-B to avoid an unreviewed `talos-tools` -> `talos-session` dependency. |
+| 2026-07-02 | T121-A Implementation | Added `talos_session::todo` repository, SQLite schema, CRUD/query, dependency edge management, cycle detection, and `SessionManager::todo_repository()`. |
 
 ## Verification Evidence
 
@@ -80,6 +81,12 @@
 - T120 lint: `cargo clippy -p talos-tui -p talos-conversation -- -D warnings` passed.
 - T120 workspace compile: `cargo check --workspace` passed.
 - Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings.
+- T121-A targeted: `cargo test -p talos-session todo` passed.
+- T121-A crate validation: `cargo test -p talos-session` passed.
+- T121-A lint: `cargo clippy -p talos-session -- -D warnings` passed.
+- T121-A format: `cargo fmt --all -- --check` passed.
+- T121-A workspace compile: `cargo check --workspace` passed.
+- Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings after T121-A.
 
 ## Variance And Residuals
 

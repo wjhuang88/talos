@@ -32,6 +32,7 @@ mod error;
 mod jsonl;
 mod manager;
 pub mod sqlite;
+pub mod todo;
 mod topology;
 mod types;
 
@@ -40,6 +41,10 @@ pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
+pub use todo::{
+    CreateTodo, TodoDependency, TodoError, TodoItem, TodoPriority, TodoQuery, TodoRepository,
+    TodoStatus, TodoUpdate,
+};
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 
 #[cfg(test)]

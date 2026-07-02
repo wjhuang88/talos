@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | In Progress — I078/T121-A data model and repository |
+| Status | In Progress — I078/T121-A repository implemented, T121-B tools pending |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -79,6 +79,20 @@ I078/T121-A activation (2026-07-02): start with `talos-session` data model, SQLi
 CRUD, query, and dependency cycle detection. Agent tool registration is intentionally left to the
 next packet after the crate boundary is confirmed, because `talos-tools` does not currently depend
 on `talos-session`.
+
+T121-A implementation (2026-07-02): added `talos_session::todo` with `TodoRepository`,
+`TodoItem`, status/priority enums, query/update structs, SQLite schema initialization,
+session-scoped CRUD/query, dependency edge management, and cycle detection. `SessionManager` now
+opens the colocated todo repository through `todo_repository()`.
+
+Validation:
+
+- `cargo test -p talos-session todo`
+- `cargo test -p talos-session`
+- `cargo clippy -p talos-session -- -D warnings`
+- `cargo fmt --all -- --check`
+- `cargo check --workspace`
+- `scripts/validate_project_governance.sh .`
 
 ### Phase 2: TUI + Slash Commands
 - TodoPanel component (read-only)

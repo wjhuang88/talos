@@ -384,3 +384,14 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Rationale: `talos-tools` currently does not depend on `talos-session`, so tool placement needs a
   separate boundary decision after the session repository exists.
 - Recovery: commit/push activation docs, sync issue #8, then implement `crates/talos-session/src/todo.rs`.
+
+### I078 T121-A Implementation Checkpoint (2026-07-02)
+
+- Implemented `crates/talos-session/src/todo.rs` with todo item types, status/priority enums,
+  SQLite schema, session-scoped CRUD/query, dependency edge management, and cycle detection.
+- Added `SessionManager::todo_repository()` as the stable opener for the colocated todo database.
+- Targeted validation passed: `cargo test -p talos-session todo`; `cargo test -p talos-session`;
+  `cargo clippy -p talos-session -- -D warnings`.
+- Full packet validation passed: `cargo fmt --all -- --check`; `cargo check --workspace`;
+  `scripts/validate_project_governance.sh .`.
+- Recovery: review diff, commit/push, sync issue #8, then continue to T121-B agent todo tool API.
