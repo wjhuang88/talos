@@ -14,7 +14,7 @@ root="${1:-.}"
 errors=0
 
 # Product-only crates that MUST have publish = false.
-product_only_crates="talos-cli talos-tui talos-evolution"
+product_only_crates="talos-cli talos-tui talos-evolution talos-dashboard"
 
 # Gate-before-publish crates that must NOT have publish = false
 # (they are manifest-ready; the gate is the review process, not a manifest flag).

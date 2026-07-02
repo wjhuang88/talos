@@ -46,6 +46,7 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | `talos-evolution` | No exact match | P3 | Product-specific until external use case is proven. |
 | `talos-tui` | No exact match | P3 | Product/UI surface; likely not first-wave library crate. |
 | `talos-cli` | No exact match | P2 | Binary/product package candidate for `cargo install talos-cli --bin talos`; library API remains unsupported. |
+| `talos-dashboard` | Not checked | N/A | Product-only loopback control surface; no crates.io reservation planned. |
 
 ## Publication Matrix
 
@@ -67,9 +68,10 @@ Checked with `cargo search <name> --limit 3` on 2026-06-29.
 | 14 | `talos-runtime` | SDK facade | Gate-before-publish | Manifest-ready; SDK contract defined (T13) | Publish after dependency closure is safe or runtime is decoupled. SDK support contract: [RUNTIME-SDK-CONTRACT.md](RUNTIME-SDK-CONTRACT.md). Quickstart examples: `crates/talos-runtime/examples/` (T12). |
 | 15 | `talos-mcp` | Protocol transport | Gate-before-publish | Manifest-ready; protocol boundary sensitive | ADR/support boundary before dry-run or real publish. |
 | 16 | `talos-rpc` | JSON-RPC transport | Published integration wave | `talos-rpc 0.2.0` published | Keep support boundary to local stdio; remote semantics still need ADR. |
-| 17 | `talos-evolution` | Product learning | Product-only | `publish = false` | Do not publish until external reusable API is proven. |
-| 18 | `talos-tui` | Product UI | Product-only | `publish = false` | Do not publish unless Talos intentionally offers a reusable TUI library. |
-| 19 | `talos-cli` | Binary product | Cargo-install candidate | `publish = false` today; requires binary package gate | Design and validate `cargo install talos-cli --bin talos`; do not expose or promise a stable library API. |
+| 17 | `talos-dashboard` | Product control surface | Product-only | `publish = false` | Do not publish; loopback dashboard remains a product assembly/control surface under ADR-031. |
+| 18 | `talos-evolution` | Product learning | Product-only | `publish = false` | Do not publish until external reusable API is proven. |
+| 19 | `talos-tui` | Product UI | Product-only | `publish = false` | Do not publish unless Talos intentionally offers a reusable TUI library. |
+| 20 | `talos-cli` | Binary product | Cargo-install candidate | `publish = false` today; requires binary package gate | Design and validate `cargo install talos-cli --bin talos`; do not expose or promise a stable library API. |
 
 ## Current Manifest Readiness
 
@@ -120,7 +122,8 @@ Remaining manifest work before broad publish:
 - Add feature gates for heavy tool/UI/provider capabilities before broad public consumption.
 - Keep `publish = false` on product-only crates unless a future story changes their distribution
   model. `talos-cli` is now a binary package candidate, so removing its guard requires a dedicated
-  install-package gate rather than a reusable-library gate.
+  install-package gate rather than a reusable-library gate. `talos-dashboard` is product-only and
+  remains outside crate publication/name-reservation planning.
 
 ## Remaining Publication Gates
 
@@ -133,6 +136,7 @@ These crates are intentionally not published yet:
 | `talos-agent` | Candidate, transitional | Decide whether public consumers should depend on `talos-agent` directly or only through `talos-runtime`; publish only after sandbox/tools/memory/session dependency support is clear. |
 | `talos-runtime` | Candidate, SDK facade | Resolve dependency closure: either publish required implementation crates or decouple runtime from unpublished implementation surfaces; document pre-1.0 SDK support contract. |
 | `talos-mcp` | Candidate, protocol sensitive | MCP support boundary ADR or equivalent doc, server opt-in/conflict policy, transport/auth non-goals, dry-run after `talos-tools` decision. |
+| `talos-dashboard` | Product-only now | Keep `publish = false`; no remote/control-surface package publication without a new dashboard distribution decision. |
 | `talos-evolution` | Product-only now | Prove an external reusable API; remove `publish = false` only through a new story/decision. |
 | `talos-tui` | Product-only now | Decide to offer reusable TUI library; otherwise keep product UI out of crates.io. |
 | `talos-cli` | Binary package candidate | Add package metadata/readme for crates.io, ensure the `talos` bin target is included, verify `cargo install --path crates/talos-cli --bin talos` and `cargo publish --dry-run -p talos-cli`, document that only the binary is supported, then remove `publish = false` through an explicit release gate. |
@@ -152,7 +156,7 @@ Recommended reservation sequence if the maintainer explicitly authorizes real pu
 5. Reserve `talos-cli` for the CLI binary package only after the install-package gate passes;
    install docs should use `cargo install talos-cli --bin talos` unless a later decision chooses a
    different package name.
-6. Keep `talos-tui` and `talos-evolution` product-only with `publish = false`.
+6. Keep `talos-dashboard`, `talos-tui`, and `talos-evolution` product-only with `publish = false`.
 7. Do not plan around the `talos` package name; it is already taken by an unrelated crate.
 8. Defer remaining high-risk names until docs, feature gates, and API support boundaries are
    complete.
@@ -171,8 +175,28 @@ boundary), `talos-core`/`talos-plugin` (minimal). Missing for `talos-config`, `t
 ## A2: Product-Only Guard (2026-06-29)
 
 `scripts/check_publish_guard.sh` verifies `publish = false` on product-only crates
-(`talos-cli`, `talos-tui`, `talos-evolution`) and its absence on gate crates
+(`talos-cli`, `talos-tui`, `talos-evolution`, `talos-dashboard`) and its absence on gate crates
 (`talos-sandbox`, `talos-tools`, `talos-agent`, `talos-runtime`, `talos-mcp`). All checks pass.
+
+T133 update, 2026-07-02: added `talos-dashboard` to the product-only guard after the publish gate
+packet found the crate in workspace metadata but not in the guard/matrix.
+
+## A8: T133 Publish Gate Packet (`talos-cli` and `talos-runtime`) (2026-07-02)
+
+T133 produced `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md`.
+
+Key results:
+
+- `scripts/check_publish_guard.sh .` passes and now checks `talos-dashboard`.
+- `cargo metadata --no-deps --format-version 1` confirms `talos-runtime` is a manifest-ready
+  gate crate and `talos-cli`/`talos-dashboard` are `publish = false` product crates.
+- `cargo package --list -p talos-runtime` includes SDK examples.
+- `cargo package --list -p talos-cli` includes the `talos` binary target source.
+- `cargo publish --dry-run -p talos-cli` is intentionally blocked by `publish = false`.
+- `cargo publish --dry-run -p talos-runtime` is blocked by the unpublished `talos-agent`
+  dependency.
+
+No crate was published, no `publish = false` guard was removed, and no release tag was created.
 
 ## A3-A6: Gate Analysis (2026-06-29)
 

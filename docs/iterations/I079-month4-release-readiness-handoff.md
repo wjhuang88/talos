@@ -73,6 +73,7 @@
 | 2026-07-02 | T130 | Completed tool reliability sweep. Fixed the one active ignored agent test by synchronizing on session completion events, suppressed intentional example-helper dead-code warning noise, and recorded shell naming / Windows support as TOOL-006 residual rather than changing tool contracts in this slice. Evidence: `docs/tasks/2026-07-02-t130-tool-reliability-sweep.md`. |
 | 2026-07-02 | T131 | Completed associative memory injection decision. ADR-033 rejects default-on associative injection for v1 readiness, keeps graph recall explicit, and requires any future automatic associative prompt section to be a separate default-disabled experiment with benchmark evidence. |
 | 2026-07-02 | T132 | Completed third self-bootstrap rehearsal as gap evidence. Talos generated workspace/governance validation plans for the architecture-sensitive ADR-033 slice, but remained read-only; estimated self-bootstrap coverage was 20%, so the >60% target was missed and REL-002 remains unsatisfied. Evidence: `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md`. |
+| 2026-07-02 | T133 | Completed publish gate packet for `talos-cli` and `talos-runtime`. Dry-runs remain blocked by intended guards/dependency closure, and `talos-dashboard` was added to the product-only publish guard. Evidence: `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md`. |
 
 ## Verification Evidence
 
@@ -81,12 +82,15 @@
 - T131 governance validation: `scripts/validate_project_governance.sh .`.
 - T132 Talos rehearsal commands: `./target/debug/talos validate plan --profile workspace`; `./target/debug/talos validate plan --profile workspace --json`; `./target/debug/talos validate plan --profile governance`.
 - T132 governance validation: `scripts/validate_project_governance.sh .`.
+- T133 publish gate validation: `scripts/check_publish_guard.sh .`; `cargo metadata --no-deps --format-version 1`; `cargo package --list -p talos-runtime`; `cargo package --list -p talos-cli`; `cargo publish --dry-run -p talos-cli` (blocked as intended); `cargo publish --dry-run -p talos-runtime` (blocked by unpublished `talos-agent`).
+- T133 governance validation: `scripts/validate_project_governance.sh .`.
 
 ## Variance And Residuals
 
 - T130 scope variance: shell naming and Windows command support were inventoried but left to TOOL-006 because they require user-facing schema, permission, and compatibility decisions.
 - T131 scope variance: no automatic associative injection code was added; the task closed as an ADR-backed decision because the available evidence does not justify new model-facing automation.
 - T132 target variance: the planned >60% autonomous validation target was missed; current Talos participation remains read-only validation planning.
+- T133 guard variance: publish guard drift was found and fixed by adding `talos-dashboard` to the product-only guard/matrix.
 - Real publish/tag/release remains explicitly out of scope without maintainer approval.
 - REL-002 is not satisfied by I078/T132; T135 must report the remaining Talos-primary execution gap.
 

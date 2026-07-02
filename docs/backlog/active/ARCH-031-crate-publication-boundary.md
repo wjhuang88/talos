@@ -162,6 +162,16 @@ unclear and lets product-layer coupling hide inside internal dependencies.
   unsupported. Removing `publish = false` requires a dedicated install-package release gate, not a
   reusable-library publication gate.
 
+2026-07-02:
+
+- T133 produced `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md` for `talos-cli` and
+  `talos-runtime`.
+- `cargo publish --dry-run -p talos-cli` is intentionally blocked by `publish = false`.
+- `cargo publish --dry-run -p talos-runtime` remains blocked by unpublished `talos-agent`.
+- `talos-dashboard` was added to the publication matrix and publish guard as a product-only
+  `publish = false` crate.
+- No crate was published, no `publish = false` guard was removed, and no release tag was created.
+
 ## Required Reads
 
 - `docs/tasks/2026-06-29-crate-distribution-hardening-two-month-plan.md`

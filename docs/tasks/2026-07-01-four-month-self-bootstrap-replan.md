@@ -157,7 +157,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Complete |
 | T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Complete |
 | T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Complete — target missed |
-| T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Planned |
+| T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Complete |
 | T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Planned |
 | T135 | 15 | A | Produce REL-002 readiness report and next-quarter residual owner list. | T132/T134 | governance validation | Planned |
 | T136 | 16 | A | Final closeout: validation matrix, commits, unreleased changes, issue sync status. | T100-T135 | `cargo test --workspace`; governance; publish guard | Planned |
@@ -554,3 +554,20 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Verification passed: `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push T132, then continue to T133 publish gate packet. Do not publish, tag, or
   release without explicit approval.
+
+### I079 T133 Publish Gate Checkpoint (2026-07-02)
+
+- T133 produced `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md`.
+- Publish guard passed and was expanded to include `talos-dashboard` as a product-only
+  `publish = false` crate after the gate packet found it missing from the guard/matrix.
+- `cargo publish --dry-run -p talos-cli` is intentionally blocked by `publish = false`.
+- `cargo publish --dry-run -p talos-runtime` remains blocked by unpublished `talos-agent`, which in
+  turn depends on high-risk `talos-tools`/`talos-sandbox` gate work.
+- `cargo package --list -p talos-runtime` confirmed SDK examples are packaged; `cargo package
+  --list -p talos-cli` confirmed the `talos` binary source is packaged.
+- Verification passed: `scripts/check_publish_guard.sh .`; `cargo metadata --no-deps
+  --format-version 1`; `cargo package --list -p talos-runtime`; `cargo package --list -p
+  talos-cli`; the two intentional dry-run blockers above; `scripts/validate_project_governance.sh
+  .`.
+- Recovery: commit/push T133, then continue to T134 release/user docs consolidation. Do not
+  publish, tag, or release without explicit approval.
