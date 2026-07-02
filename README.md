@@ -134,7 +134,7 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 # Subcommand form (equivalent to the flags above):
 talos config list                                # print all settings (secrets masked)
 talos config get model                           # get a single value
-talos config set model=claude-sonnet-4-20250514  # set and persist
+talos config set model claude-sonnet-4-20250514  # set and persist
 ```
 
 ## Development

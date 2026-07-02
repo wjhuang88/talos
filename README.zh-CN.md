@@ -126,7 +126,7 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
 # 子命令形式（与上面的 flag 等价）：
 talos config list
 talos config get model
-talos config set model=claude-sonnet-4-20250514
+talos config set model claude-sonnet-4-20250514
 ```
 
 ## 开发
