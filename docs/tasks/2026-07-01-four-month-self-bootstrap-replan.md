@@ -149,7 +149,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T116 | 8 | A | Second closeout: plugin/web/exec security posture and residual gates. | T110-T115 | `cargo test --workspace`; governance | Planned |
 | T120 | 9 | F | Implement TUI-016 slash-panel smart auto-execute. | TUI-010/CMD-001 | command classification and Enter-branch tests | Planned |
 | T121 | 9-10 | F | TODO-001 Phase 1: session todo data model and agent tool API behind permission pipeline. | TODO-001 | storage/tool tests; cycle detection | Planned |
-| T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | Planned |
+| T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | In Progress |
 | T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Planned |
 | T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Planned |
 | T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Planned |
@@ -418,3 +418,11 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   `cargo fmt --all -- --check`; `cargo check --workspace`;
   `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push, sync issue #8, then continue to T122 read-only slash/TUI views.
+
+### I078 T122 Activation Checkpoint (2026-07-02)
+
+- T122 activated after T121-A/B/C were pushed and issue-synced.
+- Scope remains read-only user views: `/todo`, `/todo list`, `/todo show`, `/todo stats`, and
+  `/todo export`; no user-facing mutations.
+- Implementation must read the active session todo store through session/runtime state rather than
+  duplicating session identity in the conversation layer.

@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | In Progress — I078/T121-A/B/C in Review, T122 read-only views pending |
+| Status | In Progress — I078/T122 read-only slash/TUI views active |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -127,6 +127,11 @@ Validation:
 - TodoPanel component (read-only)
 - /todo slash commands (view/list/show/stats/export)
 - Session lifecycle integration
+
+T122 activation (2026-07-02): implement read-only user views after T121-A/B/C completed the
+repository and agent-side tool surface. Slash commands remain view-only and must read the active
+session todo repository through the session runtime layer; no user-facing mutation command is in
+scope.
 
 ### Phase 3: Prompt Integration
 - Inject active todo items into agent system prompt
