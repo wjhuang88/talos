@@ -926,7 +926,7 @@ impl Tui {
                         self.state.slash_menu.select_next(&query);
                     }
                     KeyCode::Tab if self.state.slash_menu.is_open => {
-                        let action = self.state.accept_selected_panel_item();
+                        let action = self.state.complete_selected_panel_item();
                         self.dispatch_panel_action(action);
                     }
                     KeyCode::Enter if self.state.slash_menu.is_open => {

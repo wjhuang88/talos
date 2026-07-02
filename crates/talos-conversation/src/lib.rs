@@ -22,8 +22,8 @@ mod engine_tests;
 mod types;
 
 pub use command_registry::{
-    AvailabilityPredicate, CommandDefinition, CommandOrigin, CommandRegistry, always_available,
-    command_registry,
+    AvailabilityPredicate, CommandDefinition, CommandExecutionMode, CommandOrigin, CommandRegistry,
+    always_available, command_registry,
 };
 pub use engine::ConversationEngine;
 pub use types::{

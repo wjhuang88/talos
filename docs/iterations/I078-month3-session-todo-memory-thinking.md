@@ -15,7 +15,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| T120 | TUI-016 | In Progress | TUI-010/CMD-001 | Slash smart auto-execute |
+| T120 | TUI-016 | Review | TUI-010/CMD-001 | Slash smart auto-execute |
 | T121 | TODO-001 | Planned | SESSION-001 | Todo data model + agent tool API |
 | T122 | TODO-001 | Planned | T121 | Read-only slash/TUI views |
 | T123 | REL-002 | Planned | T108/T122 | Validation-backed rehearsal |
@@ -67,10 +67,17 @@
 | 2026-07-01 | Planning | Created as Month 3 shell for the replan. |
 | 2026-07-02 | Activation | Activated after I077/T116 closeout. First packet is T120 slash smart auto-execute. |
 | 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I078 Planned -> activated; I079 Planned -> remains planned; I058/I047/I057 Review -> legacy review rows left untouched; I046 Planned -> legacy stale row left untouched. |
+| 2026-07-02 | T120 Implementation | Slash panel Enter now runs DirectExecution commands and fills the composer for RequireInput commands; Tab remains completion-only. |
 
 ## Verification Evidence
 
-- Pending for T120.
+- T120 targeted: `cargo test -p talos-tui slash_menu` passed.
+- T120 targeted: `cargo test -p talos-conversation complete_slash_command` passed.
+- T120 crate validation: `cargo test -p talos-tui` passed.
+- T120 crate validation: `cargo test -p talos-conversation` passed.
+- T120 lint: `cargo clippy -p talos-tui -p talos-conversation -- -D warnings` passed.
+- T120 workspace compile: `cargo check --workspace` passed.
+- Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings.
 
 ## Variance And Residuals
 

@@ -302,9 +302,11 @@ talos explore search --query "session management" --limit 10
 ### Interactive Commands
 
 In the interactive TUI, type `/` at the start of the composer to open the command menu. Continue
-typing to filter commands, use `Up`/`Down` to move the selection, and press `Enter` or `Tab` to
-complete it. `Backspace` edits the filter and `Esc` closes the menu without clearing the composer.
-Use `/help` to list the commands available in the current session.
+typing to filter commands and use `Up`/`Down` to move the selection. `Enter` runs commands that do
+not need inline arguments and fills the composer for commands that need more input. `Tab` always
+completes the selected command into the composer. `Backspace` edits the filter and `Esc` closes the
+menu without clearing the composer. Use `/help` to list the commands available in the current
+session.
 
 ## Built-In Capabilities
 

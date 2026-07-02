@@ -21,7 +21,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
 | Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I078 Session/Todo/Thinking after I077 closeout commit; no real publish, tag, release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call expansion. |
 | I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T120 slash smart auto-execute is active; preserve manual command typing and existing command execution semantics. |
-| TUI-016 Slash Panel Smart Auto-Execute | In Progress | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | Implement T120 only: parameterless panel Enter executes, parameterized commands fill input, visual hints distinguish modes. |
+| TUI-016 Slash Panel Smart Auto-Execute | Review | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | T120 implemented and validated; pending commit, push, and issue sync. |
 
 ## Review
 

@@ -411,7 +411,7 @@ mod tests {
         let menu = BottomPanelState::open_slash(registry);
         let item = &menu.items[menu.selected_index];
         match &item.action {
-            crate::state::PanelItemAction::SlashCommand { command } => {
+            crate::state::PanelItemAction::SlashCommand { command, .. } => {
                 assert!(command.starts_with('/'));
             }
             _ => panic!("expected SlashCommand action"),
@@ -443,7 +443,9 @@ mod tests {
             label: "/export".to_string(),
             description: "Export transcript [path]".to_string(),
             action: crate::state::PanelItemAction::SlashCommand {
-                command: "/export ".to_string(),
+                command: "/export".to_string(),
+                arg_hint: Some("<path>".to_string()),
+                execution_mode: talos_conversation::CommandExecutionMode::RequireInput,
             },
             is_current: false,
         };
@@ -535,7 +537,81 @@ mod tests {
             state.append_slash_query_char(ch);
         }
         state.accept_selected_panel_item();
-        assert_eq!(state.input_buffer, "/export");
+        assert_eq!(state.input_buffer, "/export ");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_slash_menu_enter_executes_parameterless_command() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "help".chars() {
+            state.append_slash_query_char(ch);
+        }
+
+        let action = state.accept_selected_panel_item();
+
+        assert_eq!(
+            action,
+            crate::state::PanelAction::SendMessage("/help".to_string())
+        );
+        assert!(state.input_buffer.is_empty());
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_slash_menu_uses_registry_execution_mode() {
+        let registry = talos_conversation::command_registry();
+        let menu = BottomPanelState::open_slash(registry);
+
+        let help = menu
+            .items
+            .iter()
+            .find(|item| item.label == "/help")
+            .expect("/help item");
+        let export = menu
+            .items
+            .iter()
+            .find(|item| item.label == "/export")
+            .expect("/export item");
+
+        match &help.action {
+            crate::state::PanelItemAction::SlashCommand { execution_mode, .. } => assert_eq!(
+                *execution_mode,
+                talos_conversation::CommandExecutionMode::DirectExecution
+            ),
+            other => panic!("expected SlashCommand action, got {other:?}"),
+        }
+        match &export.action {
+            crate::state::PanelItemAction::SlashCommand {
+                execution_mode,
+                arg_hint,
+                ..
+            } => {
+                assert_eq!(
+                    *execution_mode,
+                    talos_conversation::CommandExecutionMode::RequireInput
+                );
+                assert_eq!(arg_hint.as_deref(), Some("<path>"));
+            }
+            other => panic!("expected SlashCommand action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_slash_menu_tab_completes_parameterless_command_without_execution() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "help".chars() {
+            state.append_slash_query_char(ch);
+        }
+
+        let action = state.complete_selected_panel_item();
+
+        assert_eq!(action, crate::state::PanelAction::None);
+        assert_eq!(state.input_buffer, "/help");
         assert!(!state.slash_menu.is_open);
     }
 

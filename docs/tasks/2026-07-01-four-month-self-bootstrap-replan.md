@@ -363,3 +363,15 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Pre-activation inventory recorded in `docs/iterations/I078-month3-session-todo-memory-thinking.md`.
 - Owner status changed to In Progress for TUI-016; issue #7 status sync remains pending until this
   activation commit is pushed.
+
+### I078 T120 Implementation Checkpoint (2026-07-02)
+
+- T120 implemented in code: slash panel `Enter` runs parameterless commands and completes commands
+  with `arg_hint`; `Tab` remains completion-only.
+- Status moved to Review for TUI-016/T120 pending commit, push, and issue #7 status sync.
+- Targeted validation passed: `cargo test -p talos-tui slash_menu`;
+  `cargo test -p talos-conversation complete_slash_command`.
+- Full packet validation passed: `cargo test -p talos-tui`; `cargo test -p talos-conversation`;
+  `cargo clippy -p talos-tui -p talos-conversation -- -D warnings`; `cargo check --workspace`;
+  `scripts/validate_project_governance.sh .`.
+- Recovery: review diff, commit, push, sync issue #7, then continue to I078/T121.

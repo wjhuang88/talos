@@ -37,6 +37,31 @@ pub struct CommandDefinition {
     pub available: AvailabilityPredicate,
 }
 
+/// How a slash command should behave when accepted from an interactive command picker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandExecutionMode {
+    /// The command is complete as selected and can be submitted immediately.
+    DirectExecution,
+    /// The command needs or accepts inline arguments before submission.
+    RequireInput,
+}
+
+impl CommandDefinition {
+    /// Returns `true` when accepting the command needs the user to finish inline arguments first.
+    pub fn accepts_inline_arguments(&self) -> bool {
+        self.arg_hint.is_some()
+    }
+
+    /// Returns the interactive picker execution mode derived from command metadata.
+    pub fn execution_mode(&self) -> CommandExecutionMode {
+        if self.accepts_inline_arguments() {
+            CommandExecutionMode::RequireInput
+        } else {
+            CommandExecutionMode::DirectExecution
+        }
+    }
+}
+
 /// Ordered registry of built-in slash commands.
 pub struct CommandRegistry {
     commands: Vec<CommandDefinition>,

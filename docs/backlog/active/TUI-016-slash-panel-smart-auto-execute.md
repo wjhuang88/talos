@@ -1,10 +1,10 @@
-# TUI-013: Slash Command Panel Smart Auto-Execute
+# TUI-016: Slash Command Panel Smart Auto-Execute
 
 | Field | Value |
 |-------|-------|
 | Story ID | TUI-016 |
 | Priority | P3 |
-| Status | In Progress — selected into I078/T120 |
+| Status | Review — implemented in I078/T120 |
 | Source | [GitHub Issue #7](https://github.com/wjhuang88/talos/issues/7) |
 | Relates To | TUI-010, CMD-001, CMD-002 |
 
@@ -16,8 +16,8 @@ two modes.
 
 ## Scope
 
-- Extend `CommandDefinition` with execution mode classification (DirectExecution / RequireInput /
-  SpecialInteraction) based on existing `arg_hint` metadata.
+- Extend `CommandDefinition` with execution mode classification (DirectExecution / RequireInput)
+  based on existing `arg_hint` metadata.
 - Modify slash panel Enter behavior: DirectExecution commands trigger immediately; RequireInput
   commands fill the composer.
 - Add UI hints in the panel showing parameter requirements.
@@ -33,11 +33,28 @@ implementation must preserve manual command typing and only change slash panel E
 
 ## Acceptance Criteria
 
-- [ ] Parameterless commands (/help, /status, /quit, /mcp, /new) execute on Enter in panel.
-- [ ] Parameter commands (/skills, /resume, /export) fill input area on Enter.
-- [ ] Panel visually distinguishes direct-execute vs input-required commands.
-- [ ] Manual typing path unchanged.
-- [ ] Unit tests for execution mode classification and Enter branching.
+- [x] Parameterless commands (/help, /status, /quit, /mcp, /new) execute on Enter in panel.
+- [x] Parameter commands (/skills, /resume, /export) fill input area on Enter.
+- [x] Panel visually distinguishes direct-execute vs input-required commands.
+- [x] Manual typing path unchanged.
+- [x] Unit tests for execution mode classification and Enter branching.
+
+## Implementation Notes
+
+- `CommandDefinition::execution_mode()` derives the picker behavior from `arg_hint`.
+- Slash panel `Enter` sends DirectExecution commands through the existing message dispatch path.
+- Slash panel `Enter` fills the composer for RequireInput commands; `Tab` always completes without
+  execution.
+
+## Verification
+
+- `cargo test -p talos-tui slash_menu`
+- `cargo test -p talos-conversation complete_slash_command`
+- `cargo test -p talos-tui`
+- `cargo test -p talos-conversation`
+- `cargo clippy -p talos-tui -p talos-conversation -- -D warnings`
+- `cargo check --workspace`
+- `scripts/validate_project_governance.sh .`
 
 ## Required Reads
 

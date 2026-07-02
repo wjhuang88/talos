@@ -427,20 +427,27 @@ impl ViewportComponent for BottomPanelComponent<'_> {
 
             let (name, desc) = if self.menu.is_slash() {
                 let command_name = item.label.strip_prefix('/').unwrap_or(&item.label);
-                let has_arg = item.description.contains('[') || item.description.contains('<');
-                let name = if has_arg {
-                    format!(
-                        "  /{command_name} {}",
-                        item.description
-                            .split_once('[')
-                            .or_else(|| item.description.split_once('<'))
-                            .map(|(_, b)| format!("[{b}"))
-                            .unwrap_or_default()
-                    )
+                let name = if let crate::state::PanelItemAction::SlashCommand {
+                    arg_hint: Some(arg_hint),
+                    ..
+                } = &item.action
+                {
+                    format!("  /{command_name} {arg_hint}")
                 } else {
                     format!("  /{command_name}")
                 };
-                let desc = format!("  —  {}", item.description);
+                let mode = if matches!(
+                    &item.action,
+                    crate::state::PanelItemAction::SlashCommand {
+                        execution_mode: talos_conversation::CommandExecutionMode::DirectExecution,
+                        ..
+                    }
+                ) {
+                    "  —  Enter to run"
+                } else {
+                    "  —  Enter to complete"
+                };
+                let desc = format!("{mode}; {}", item.description);
                 (name, desc)
             } else {
                 let marker = if item.is_current { "▶ " } else { "  " };

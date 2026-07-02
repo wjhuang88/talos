@@ -6,7 +6,8 @@
 use std::time::{Duration, Instant};
 
 use talos_conversation::{
-    CredentialResponseData, ModelPickerData, SessionPickerItem, StatusSnapshot, TipKind,
+    CommandExecutionMode, CredentialResponseData, ModelPickerData, SessionPickerItem,
+    StatusSnapshot, TipKind,
 };
 use talos_core::ApprovalChoice;
 
@@ -23,9 +24,12 @@ pub(crate) enum PanelAction {
 /// What happens when a [`PanelItem`] is accepted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PanelItemAction {
-    /// Slash command — inserted into the input buffer on accept.
-    /// `command` includes a trailing space when the command takes an argument.
-    SlashCommand { command: String },
+    /// Slash command selected from the command menu.
+    SlashCommand {
+        command: String,
+        arg_hint: Option<String>,
+        execution_mode: CommandExecutionMode,
+    },
     /// Picker selection — sends `"{command} {value}"` as a message.
     Select { command: String, value: String },
     /// Unauthenticated provider — triggers provider-level credential entry.
@@ -71,19 +75,15 @@ impl BottomPanelState {
         let items = registry
             .available_commands()
             .into_iter()
-            .map(|cmd| {
-                let has_arg = cmd.description.contains('[') || cmd.description.contains('<');
-                let command = if has_arg {
-                    format!("{} ", cmd.name)
-                } else {
-                    cmd.name.to_string()
-                };
-                PanelItem {
-                    label: cmd.name.to_string(),
-                    description: cmd.description.to_string(),
-                    action: PanelItemAction::SlashCommand { command },
-                    is_current: false,
-                }
+            .map(|cmd| PanelItem {
+                label: cmd.name.to_string(),
+                description: cmd.description.to_string(),
+                action: PanelItemAction::SlashCommand {
+                    command: cmd.name.to_string(),
+                    arg_hint: cmd.arg_hint.map(str::to_string),
+                    execution_mode: cmd.execution_mode(),
+                },
+                is_current: false,
             })
             .collect();
         Self {
@@ -533,6 +533,14 @@ impl TuiState {
     }
 
     pub(crate) fn accept_selected_panel_item(&mut self) -> PanelAction {
+        self.accept_selected_panel_item_with_mode(PanelAcceptMode::Enter)
+    }
+
+    pub(crate) fn complete_selected_panel_item(&mut self) -> PanelAction {
+        self.accept_selected_panel_item_with_mode(PanelAcceptMode::Complete)
+    }
+
+    fn accept_selected_panel_item_with_mode(&mut self, mode: PanelAcceptMode) -> PanelAction {
         let query = self.slash_query().to_string();
         let filtered = self.slash_menu.filtered_items(&query);
         if filtered.is_empty() {
@@ -543,8 +551,24 @@ impl TuiState {
 
         match action {
             PanelItemAction::Header => PanelAction::None,
-            PanelItemAction::SlashCommand { command } => {
-                self.input_insert_command(&command);
+            PanelItemAction::SlashCommand {
+                command,
+                arg_hint,
+                execution_mode,
+            } => {
+                if mode == PanelAcceptMode::Enter
+                    && execution_mode == CommandExecutionMode::DirectExecution
+                {
+                    self.input_clear();
+                    self.slash_menu.close();
+                    return PanelAction::SendMessage(command);
+                }
+                let inserted = if arg_hint.is_some() {
+                    format!("{command} ")
+                } else {
+                    command
+                };
+                self.input_insert_command(&inserted);
                 self.slash_menu.close();
                 PanelAction::None
             }
@@ -625,6 +649,12 @@ impl TuiState {
             self.tip = None;
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PanelAcceptMode {
+    Enter,
+    Complete,
 }
 
 #[cfg(test)]
