@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use talos_core::message::{Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderResult};
-use talos_core::session::{RuntimePolicy, TurnCompletionStatus};
+use talos_core::session::{RuntimePolicy, SessionEvent, TurnCompletionStatus};
 use talos_core::tool::ToolRegistry;
 use tokio::sync::mpsc;
 
@@ -673,7 +673,6 @@ async fn test_multi_turn_with_history() {
 }
 
 #[tokio::test]
-#[ignore = "timing-sensitive: depends on async scheduling between interrupt and turn completion"]
 async fn test_interrupt_after_success_preserves_history() {
     use talos_core::message::Message;
 
@@ -719,6 +718,7 @@ async fn test_interrupt_after_success_preserves_history() {
     let (handle, mut actor) = AppServerSession::new(agent, config);
 
     let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
 
     sq_tx
@@ -727,7 +727,21 @@ async fn test_interrupt_after_success_preserves_history() {
         })
         .await
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while let Some(event) = eq_rx.recv().await {
+            if matches!(
+                event,
+                SessionEvent::TurnCompleted {
+                    status: TurnCompletionStatus::Success { .. },
+                    ..
+                }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("first turn should complete before timeout");
 
     sq_tx.send(SessionOp::Interrupt).await.unwrap();
 
@@ -737,7 +751,21 @@ async fn test_interrupt_after_success_preserves_history() {
         })
         .await
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while let Some(event) = eq_rx.recv().await {
+            if matches!(
+                event,
+                SessionEvent::TurnCompleted {
+                    status: TurnCompletionStatus::Success { .. },
+                    ..
+                }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("second turn should complete before timeout");
 
     sq_tx.send(SessionOp::Shutdown).await.unwrap();
     let _ = actor_task.await;

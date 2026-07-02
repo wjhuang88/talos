@@ -20,7 +20,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
 | Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I079 Release Readiness/Handoff after I078 closeout commit; no real publish, tag, release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call expansion. |
-| I079 Release Readiness/Handoff | Active | [I079](iterations/I079-month4-release-readiness-handoff.md) | First packet is T130 tool reliability sweep; start with flaky-test, shell naming, and Windows/Unix assumption inventory. |
+| I079 Release Readiness/Handoff | Active | [I079](iterations/I079-month4-release-readiness-handoff.md) | T130 reliability sweep complete; continue to T131 associative memory injection decision. |
 
 ## Review
 

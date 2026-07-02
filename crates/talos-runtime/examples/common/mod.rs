@@ -1,5 +1,7 @@
 //! Shared helpers for talos-runtime examples.
 
+#![allow(dead_code)]
+
 pub use talos_provider::mock::MockProvider;
 
 use talos_core::message::AgentEvent;

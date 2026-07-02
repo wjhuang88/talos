@@ -154,7 +154,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Complete |
 | T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Complete |
 | T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Complete |
-| T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Planned |
+| T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Complete |
 | T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Planned |
 | T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Planned |
 | T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Planned |
@@ -502,3 +502,22 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   connector, web write route, or plugin host-call expansion without explicit approval.
 - Recovery: commit/push activation docs, then start T130 with an inventory of flaky tests, shell
   naming residuals, and Windows/Unix command assumptions.
+
+### I079 T130 Implementation Checkpoint (2026-07-02)
+
+- T130 produced `docs/tasks/2026-07-02-t130-tool-reliability-sweep.md`.
+- Fixed the one active ignored source test by converting
+  `test_interrupt_after_success_preserves_history` from sleep-based timing to event-queue
+  synchronization on `SessionEvent::TurnCompleted`.
+- Fixed runtime example warning noise by marking the example-only shared helper module as allowing
+  dead code.
+- Shell naming and Windows `cmd`/PowerShell support remain deferred to TOOL-006 because changing the
+  `bash` tool contract would affect schemas, permissions, and compatibility aliases.
+- Verification passed: `cargo fmt --all -- --check`;
+  `cargo test -p talos-agent test_interrupt_after_success_preserves_history`;
+  `cargo test -p talos-runtime --examples`;
+  `cargo clippy -p talos-agent -p talos-runtime -- -D warnings`;
+  `rg -n "#\\[ignore\\]" crates docs`; `cargo test -p talos-agent`;
+  `scripts/validate_project_governance.sh .`.
+- Recovery: commit/push T130, then continue to T131 associative memory injection decision. Do not
+  publish, tag, or release without explicit approval.
