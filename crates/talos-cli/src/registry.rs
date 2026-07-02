@@ -16,7 +16,10 @@ use talos_core::tool::{
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
-use talos_session::{SessionManager, TodoCreateTool, TodoQueryTool, TodoUpdateStatusTool};
+use talos_session::{
+    SessionManager, TodoAddDependencyTool, TodoCreateTool, TodoDeleteTool, TodoQueryTool,
+    TodoRemoveDependencyTool, TodoUpdateStatusTool, TodoUpdateTool,
+};
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -130,6 +133,10 @@ fn default_todo_tools() -> Vec<Arc<dyn AgentTool>> {
     vec![
         Arc::new(TodoCreateTool::from_sessions_dir(&sessions_dir)),
         Arc::new(TodoUpdateStatusTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoUpdateTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoDeleteTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoAddDependencyTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoRemoveDependencyTool::from_sessions_dir(&sessions_dir)),
         Arc::new(TodoQueryTool::from_sessions_dir(&sessions_dir)),
     ]
 }
@@ -778,6 +785,10 @@ mod tests {
         let print_registry = build_print_tool_registry();
         assert!(print_registry.get("todo_create").is_some());
         assert!(print_registry.get("todo_update_status").is_some());
+        assert!(print_registry.get("todo_update").is_some());
+        assert!(print_registry.get("todo_delete").is_some());
+        assert!(print_registry.get("todo_add_dependency").is_some());
+        assert!(print_registry.get("todo_remove_dependency").is_some());
         assert!(print_registry.get("todo_query").is_some());
 
         let (tx, _rx) = mpsc::unbounded_channel();
@@ -785,6 +796,10 @@ mod tests {
         let tui_registry = build_tui_tool_registry(approval, PathBuf::from("."));
         assert!(tui_registry.get("todo_create").is_some());
         assert!(tui_registry.get("todo_update_status").is_some());
+        assert!(tui_registry.get("todo_update").is_some());
+        assert!(tui_registry.get("todo_delete").is_some());
+        assert!(tui_registry.get("todo_add_dependency").is_some());
+        assert!(tui_registry.get("todo_remove_dependency").is_some());
         assert!(tui_registry.get("todo_query").is_some());
     }
 }

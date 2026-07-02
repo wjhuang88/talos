@@ -239,6 +239,56 @@ pub struct TodoUpdateStatusInput {
     pub status: TodoStatus,
 }
 
+/// Input for the `todo_update` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoUpdateInput {
+    /// Owning session id.
+    pub session_id: String,
+    /// Todo item id.
+    pub id: String,
+    /// New title.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// New description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Clear the existing description.
+    #[serde(default)]
+    pub clear_description: bool,
+    /// New priority.
+    #[serde(default)]
+    pub priority: Option<TodoPriority>,
+    /// New turn assignment.
+    #[serde(default)]
+    pub assigned_to_turn: Option<String>,
+    /// Clear the existing turn assignment.
+    #[serde(default)]
+    pub clear_assigned_to_turn: bool,
+    /// Replace tags with this complete set.
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+}
+
+/// Input for the `todo_delete` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoDeleteInput {
+    /// Owning session id.
+    pub session_id: String,
+    /// Todo item id.
+    pub id: String,
+}
+
+/// Input for todo dependency mutation tools.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoDependencyInput {
+    /// Owning session id.
+    pub session_id: String,
+    /// Parent todo that must be handled before the child.
+    pub parent_id: String,
+    /// Child todo that depends on the parent.
+    pub child_id: String,
+}
+
 /// Input for the `todo_query` tool.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TodoQueryInput {
@@ -768,6 +818,297 @@ impl AgentTool for TodoUpdateStatusTool {
     }
 }
 
+/// Agent tool that updates mutable fields on a session todo item.
+#[derive(Debug, Clone)]
+pub struct TodoUpdateTool {
+    db_path: PathBuf,
+}
+
+impl TodoUpdateTool {
+    /// Create a todo update tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo update tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoUpdateTool {
+    fn name(&self) -> &str {
+        "todo_update"
+    }
+
+    fn description(&self) -> &str {
+        "Update mutable fields on a session-scoped todo item"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoUpdateInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoUpdateInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => return ToolResult::error(format!("Invalid todo_update input: {err}")),
+        };
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let session_id = match parse_tool_uuid("session_id", &input.session_id) {
+            Ok(session_id) => session_id,
+            Err(err) => return ToolResult::error(err),
+        };
+        let id = match parse_tool_uuid("id", &input.id) {
+            Ok(id) => id,
+            Err(err) => return ToolResult::error(err),
+        };
+        let update = TodoUpdate {
+            title: input.title,
+            description: if input.clear_description {
+                Some(None)
+            } else {
+                input.description.map(Some)
+            },
+            priority: input.priority,
+            assigned_to_turn: if input.clear_assigned_to_turn {
+                Some(None)
+            } else {
+                input.assigned_to_turn.map(Some)
+            },
+            tags: input.tags,
+        };
+        match repo.update(session_id, id, update) {
+            Ok(item) => json_tool_result(&item),
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Write, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "id", "title", "priority"]
+    }
+}
+
+/// Agent tool that deletes a session todo item.
+#[derive(Debug, Clone)]
+pub struct TodoDeleteTool {
+    db_path: PathBuf,
+}
+
+impl TodoDeleteTool {
+    /// Create a todo delete tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo delete tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoDeleteTool {
+    fn name(&self) -> &str {
+        "todo_delete"
+    }
+
+    fn description(&self) -> &str {
+        "Delete a session-scoped todo item and its dependency edges"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoDeleteInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoDeleteInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => return ToolResult::error(format!("Invalid todo_delete input: {err}")),
+        };
+        let mut repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let session_id = match parse_tool_uuid("session_id", &input.session_id) {
+            Ok(session_id) => session_id,
+            Err(err) => return ToolResult::error(err),
+        };
+        let id = match parse_tool_uuid("id", &input.id) {
+            Ok(id) => id,
+            Err(err) => return ToolResult::error(err),
+        };
+        match repo.delete(session_id, id) {
+            Ok(deleted) => json_tool_result(&serde_json::json!({ "deleted": deleted })),
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Write, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "id"]
+    }
+}
+
+/// Agent tool that adds a dependency edge between session todo items.
+#[derive(Debug, Clone)]
+pub struct TodoAddDependencyTool {
+    db_path: PathBuf,
+}
+
+impl TodoAddDependencyTool {
+    /// Create a todo dependency-add tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo dependency-add tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoAddDependencyTool {
+    fn name(&self) -> &str {
+        "todo_add_dependency"
+    }
+
+    fn description(&self) -> &str {
+        "Add an acyclic dependency edge between two session-scoped todo items"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoDependencyInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoDependencyInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => {
+                return ToolResult::error(format!("Invalid todo_add_dependency input: {err}"));
+            }
+        };
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let ids = match parse_dependency_input(&input) {
+            Ok(ids) => ids,
+            Err(err) => return ToolResult::error(err),
+        };
+        match repo.add_dependency(ids.session_id, ids.parent_id, ids.child_id) {
+            Ok(dep) => json_tool_result(&dep),
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Write, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "parent_id", "child_id"]
+    }
+}
+
+/// Agent tool that removes a dependency edge between session todo items.
+#[derive(Debug, Clone)]
+pub struct TodoRemoveDependencyTool {
+    db_path: PathBuf,
+}
+
+impl TodoRemoveDependencyTool {
+    /// Create a todo dependency-remove tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo dependency-remove tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoRemoveDependencyTool {
+    fn name(&self) -> &str {
+        "todo_remove_dependency"
+    }
+
+    fn description(&self) -> &str {
+        "Remove a dependency edge between two session-scoped todo items"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoDependencyInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoDependencyInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => {
+                return ToolResult::error(format!("Invalid todo_remove_dependency input: {err}"));
+            }
+        };
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let ids = match parse_dependency_input(&input) {
+            Ok(ids) => ids,
+            Err(err) => return ToolResult::error(err),
+        };
+        match repo.remove_dependency(ids.session_id, ids.parent_id, ids.child_id) {
+            Ok(removed) => json_tool_result(&serde_json::json!({ "removed": removed })),
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Write, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "parent_id", "child_id"]
+    }
+}
+
 /// Agent tool that queries session todo items.
 #[derive(Debug, Clone)]
 pub struct TodoQueryTool {
@@ -853,6 +1194,20 @@ fn open_tool_repo(db_path: &Path) -> Result<TodoRepository, TodoError> {
 
 fn parse_tool_uuid(field: &str, value: &str) -> Result<Uuid, String> {
     Uuid::parse_str(value).map_err(|err| format!("Invalid {field} UUID: {err}"))
+}
+
+struct ParsedDependencyInput {
+    session_id: Uuid,
+    parent_id: Uuid,
+    child_id: Uuid,
+}
+
+fn parse_dependency_input(input: &TodoDependencyInput) -> Result<ParsedDependencyInput, String> {
+    Ok(ParsedDependencyInput {
+        session_id: parse_tool_uuid("session_id", &input.session_id)?,
+        parent_id: parse_tool_uuid("parent_id", &input.parent_id)?,
+        child_id: parse_tool_uuid("child_id", &input.child_id)?,
+    })
 }
 
 fn json_tool_result(value: &impl Serialize) -> ToolResult {
@@ -1147,6 +1502,10 @@ mod tests {
         let db_path = dir.path().join("todos.sqlite");
         let create_tool = TodoCreateTool::new(db_path.clone());
         let query_tool = TodoQueryTool::new(db_path.clone());
+        let update_fields_tool = TodoUpdateTool::new(db_path.clone());
+        let add_dep_tool = TodoAddDependencyTool::new(db_path.clone());
+        let remove_dep_tool = TodoRemoveDependencyTool::new(db_path.clone());
+        let delete_tool = TodoDeleteTool::new(db_path.clone());
         let update_tool = TodoUpdateStatusTool::new(db_path);
         let session_id = Uuid::new_v4();
 
@@ -1183,6 +1542,69 @@ mod tests {
         let item: TodoItem = serde_json::from_str(&updated.content).expect("updated item");
         assert_eq!(item.status, TodoStatus::Completed);
         assert!(item.completed_at.is_some());
+
+        let field_updated = update_fields_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "id": item.id.to_string(),
+                "title": "renamed",
+                "clear_description": true,
+                "priority": "critical",
+                "tags": ["next"]
+            }))
+            .await;
+        assert!(!field_updated.is_error, "{}", field_updated.content);
+        let item: TodoItem = serde_json::from_str(&field_updated.content).expect("field item");
+        assert_eq!(item.title, "renamed");
+        assert_eq!(item.priority, TodoPriority::Critical);
+        assert_eq!(item.tags, vec!["next"]);
+
+        let child = create_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "title": "child"
+            }))
+            .await;
+        assert!(!child.is_error, "{}", child.content);
+        let child: TodoItem = serde_json::from_str(&child.content).expect("child item");
+
+        let dep = add_dep_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "parent_id": item.id.to_string(),
+                "child_id": child.id.to_string()
+            }))
+            .await;
+        assert!(!dep.is_error, "{}", dep.content);
+
+        let cycle = add_dep_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "parent_id": child.id.to_string(),
+                "child_id": item.id.to_string()
+            }))
+            .await;
+        assert!(cycle.is_error);
+        assert!(cycle.content.contains("cycle"));
+
+        let removed = remove_dep_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "parent_id": item.id.to_string(),
+                "child_id": child.id.to_string()
+            }))
+            .await;
+        assert!(!removed.is_error, "{}", removed.content);
+        assert!(removed.content.contains("\"removed\": true"));
+
+        let deleted = delete_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "id": child.id.to_string()
+            }))
+            .await;
+        assert!(!deleted.is_error, "{}", deleted.content);
+        assert!(deleted.content.contains("\"deleted\": true"));
     }
 
     #[test]

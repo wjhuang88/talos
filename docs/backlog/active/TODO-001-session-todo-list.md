@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | In Progress — I078/T121-A/B in Review, remaining mutation tools pending |
+| Status | In Progress — I078/T121-A/B/C in Review, T122 read-only views pending |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -109,8 +109,19 @@ Validation:
 - `cargo check --workspace`
 - `scripts/validate_project_governance.sh .`
 
-Residual for next packet: implement `todo_update`, `todo_delete`, and dependency mutation tools
-before claiming all TODO-001 agent write operations are complete.
+T121-C implementation (2026-07-02): completed the agent-side mutation surface with `todo_update`,
+`todo_delete`, `todo_add_dependency`, and `todo_remove_dependency`. The tool tests cover field
+updates, deletion, dependency add/remove, and dependency cycle rejection.
+
+Validation:
+
+- `cargo test -p talos-session todo_tools`
+- `cargo test -p talos-session`
+- `cargo test -p talos-cli registry`
+- `cargo clippy -p talos-session -p talos-cli -- -D warnings`
+- `cargo fmt --all -- --check`
+- `cargo check --workspace`
+- `scripts/validate_project_governance.sh .`
 
 ### Phase 2: TUI + Slash Commands
 - TodoPanel component (read-only)

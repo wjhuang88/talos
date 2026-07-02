@@ -407,3 +407,14 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Residual: T121-C must add `todo_update`, `todo_delete`, and dependency mutation tools before
   TODO-001 can claim complete agent-side write coverage.
 - Recovery: commit/push, sync issue #8, then continue to T121-C.
+
+### I078 T121-C Implementation Checkpoint (2026-07-02)
+
+- Implemented remaining agent todo mutation tools: `todo_update`, `todo_delete`,
+  `todo_add_dependency`, and `todo_remove_dependency`.
+- Expanded registry coverage to include all todo tools in print and TUI registries.
+- Validation passed: `cargo test -p talos-session todo_tools`; `cargo test -p talos-session`;
+  `cargo test -p talos-cli registry`; `cargo clippy -p talos-session -p talos-cli -- -D warnings`;
+  `cargo fmt --all -- --check`; `cargo check --workspace`;
+  `scripts/validate_project_governance.sh .`.
+- Recovery: commit/push, sync issue #8, then continue to T122 read-only slash/TUI views.
