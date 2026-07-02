@@ -342,3 +342,16 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-tools exec_tool`;
   `cargo test -p talos-tools`; `cargo test -p talos-cli registry`;
   `cargo clippy -p talos-tools -p talos-cli -- -D warnings`; `cargo check --workspace`.
+
+### I077 T116 Closeout Checkpoint (2026-07-02)
+
+- T116 completed I077. T110-T116 are Complete.
+- Full closeout validation passed: `cargo fmt --all -- --check`; `cargo test --workspace`;
+  `cargo clippy --workspace -- -D warnings`; `scripts/validate_project_governance.sh .`.
+- `cargo test --workspace` exited 0 with no failures. It reported existing `talos-runtime`
+  example dead-code warnings and one existing timing-sensitive ignored agent test.
+- Issue #16 may be closed after this closeout commit is pushed because TOOL-016 is Complete in the
+  owner doc.
+- Next planned work is I078 Session/Todo/Thinking. This closeout does not authorize publish, tag,
+  real release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call
+  expansion.

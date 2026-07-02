@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TOOL-016 |
 | Priority | P2 |
-| Status | In Progress — I077/T115 implementation in Review |
+| Status | Complete — delivered in I077/T115; closed in T116 |
 | Source | [GitHub Issue #16](https://github.com/wjhuang88/talos/issues/16) |
 | Relates To | TOOL-005, TOOL-006, PERM-001 |
 
@@ -49,6 +49,9 @@ T115 implementation update (2026-07-02): `ExecTool` landed in `talos-tools` and 
 CLI print, TUI, and MCP registries. It uses `tokio::process::Command` directly, exposes command/cwd
 permission facets, denies sensitive env names before spawn, redacts env values in output metadata,
 keeps shell metacharacters as literal argv data, bounds stdout/stderr, and kills timed-out children.
+
+T116 closeout (2026-07-02): full workspace validation passed and Issue #16 may be closed after the
+closeout commit is pushed.
 
 ## Required Reads
 

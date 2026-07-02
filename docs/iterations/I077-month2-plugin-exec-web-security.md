@@ -1,6 +1,6 @@
 # Iteration I077: Month 2 — Plugin, Exec, And Web Security
 
-> Document status: Active (2026-07-01)
+> Document status: Complete (2026-07-02)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 5-8 of the 2026-07-01 replan: plugin MVP security review,
 > read-only plugin tool integration if cleared, WEB-001/WEB-005 security review, and direct exec
@@ -16,12 +16,12 @@
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
 | T110 | PLUGIN-001 | Complete | T46/ADR-032 | Plugin MVP security review |
-| T111 | PLUGIN-001 | Review | T110 | Read-only plugin AgentTool if cleared |
+| T111 | PLUGIN-001 | Complete | T110 | Read-only plugin AgentTool if cleared |
 | T112 | WEB-001/WEB-005 | Complete | T42/T47 | Web/browser security review |
-| T113 | WEB-001/WEB-005 | Review | T112 | Hardening fixes |
+| T113 | WEB-001/WEB-005 | Complete | T112 | Hardening fixes |
 | T114 | TOOL-016/PERM-001 | Complete | Issue #16 | Exec permission policy |
-| T115 | TOOL-016 | Review | T114 | Direct exec tool if cleared |
-| T116 | Replan | Planned | T110-T115 | Month-2 closeout |
+| T115 | TOOL-016 | Complete | T114 | Direct exec tool if cleared |
+| T116 | Replan | Complete | T110-T115 | Month-2 closeout |
 
 ### Scope
 
@@ -70,6 +70,7 @@
 | 2026-07-02 | Review | T112 produced `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`; T113 fixed dashboard boundary redaction, authenticated fallback coverage, and browser-page selected-link URL sanitization. |
 | 2026-07-02 | Review | T114 produced `docs/reference/EXEC-TOOL-PERMISSION-POLICY-2026-07-02.md`, clearing only a structured argv-based `exec` implementation for T115. |
 | 2026-07-02 | Review | T115 implemented `ExecTool` as a permission-gated argv-only single-process tool with command/cwd facets, env-name denial, bounded output, timeout kill, and CLI/TUI/MCP registration. |
+| 2026-07-02 | Closeout | T116 completed I077. Full workspace test, clippy, formatting, and governance validation passed. |
 
 ## Verification Evidence
 
@@ -92,6 +93,12 @@
 - 2026-07-02: `cargo test -p talos-cli registry` passed: 2 selected registry tests plus filtered integration suites.
 - 2026-07-02: `cargo clippy -p talos-tools -p talos-cli -- -D warnings` passed.
 - 2026-07-02: `cargo check --workspace` passed after T115.
+- 2026-07-02: `cargo fmt --all -- --check` passed for T116 closeout.
+- 2026-07-02: `cargo test --workspace` passed for T116 closeout. It reported existing
+  `talos-runtime` example dead-code warnings and one existing timing-sensitive ignored agent test,
+  with 0 test failures.
+- 2026-07-02: `cargo clippy --workspace -- -D warnings` passed for T116 closeout.
+- 2026-07-02: `scripts/validate_project_governance.sh .` passed for T116 closeout.
 
 ## Variance And Residuals
 
@@ -100,7 +107,12 @@
 - The current per-call timeout watchdog still leaves a sleeping thread until timeout after successful execution. This remains acceptable only for bounded fixture use; broader plugin presentation must replace or cap it.
 - T113 fixed review findings without authorizing remote dashboard access, web writes/actions, browser connectors, browser automation, standalone browser tools, or permission-default changes.
 - T115 implemented only the structured argv direct exec slice. Guardian approval, exec DSL, shell parsing, and command allowlist DSL remain deferred.
+- I078 is the next planned iteration. No publish, tag, real release, Guardian approval, exec DSL,
+  browser connector, web write route, or plugin host-call expansion is authorized by this closeout.
 
 ## Retrospective
 
-- Pending.
+- Security gates worked as intended: plugin, web/browser, and exec each moved through an explicit
+  review or policy step before implementation.
+- The remaining risk is not hidden in I077 scope; broader plugin protocol, browser connector,
+  Guardian approval, exec DSL, and release actions all remain separately gated.
