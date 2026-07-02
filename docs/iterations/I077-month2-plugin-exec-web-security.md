@@ -19,7 +19,7 @@
 | T111 | PLUGIN-001 | Review | T110 | Read-only plugin AgentTool if cleared |
 | T112 | WEB-001/WEB-005 | Complete | T42/T47 | Web/browser security review |
 | T113 | WEB-001/WEB-005 | Review | T112 | Hardening fixes |
-| T114 | TOOL-016/PERM-001 | Planned | Issue #16 | Exec permission policy |
+| T114 | TOOL-016/PERM-001 | Review | Issue #16 | Exec permission policy |
 | T115 | TOOL-016 | Planned | T114 | Direct exec tool if cleared |
 | T116 | Replan | Planned | T110-T115 | Month-2 closeout |
 
@@ -68,6 +68,7 @@
 | 2026-07-01 | Review | T110 completed `docs/reference/PLUGIN-MVP-SECURITY-REVIEW-2026-07-01.md`. T111 is cleared only for a local explicit read-only fixture plugin tool with package-root confinement, provenance, permission pipeline, and bounded output tests. |
 | 2026-07-02 | Review | T111 implemented a feature-gated local explicit read-only WASM plugin `AgentTool` registration path with plugin provenance, package-root confinement, read permission facets, output bounds, collision rejection, and no host calls. |
 | 2026-07-02 | Review | T112 produced `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`; T113 fixed dashboard boundary redaction, authenticated fallback coverage, and browser-page selected-link URL sanitization. |
+| 2026-07-02 | Review | T114 produced `docs/reference/EXEC-TOOL-PERMISSION-POLICY-2026-07-02.md`, clearing only a structured argv-based `exec` implementation for T115. |
 
 ## Verification Evidence
 
@@ -84,6 +85,7 @@
 - 2026-07-02: `cargo test -p talos-tools browser_page` passed after T113: 9 selected unit tests.
 - 2026-07-02: `cargo test -p talos-tools fetch_url` passed: 11 selected unit tests.
 - 2026-07-02: `cargo clippy -p talos-dashboard -p talos-tools -- -D warnings` passed.
+- 2026-07-02: `scripts/validate_project_governance.sh .` passed after T114 policy docs.
 
 ## Variance And Residuals
 
@@ -91,7 +93,7 @@
 - T111 implemented artifact/handler package-root confinement for the local fixture path.
 - The current per-call timeout watchdog still leaves a sleeping thread until timeout after successful execution. This remains acceptable only for bounded fixture use; broader plugin presentation must replace or cap it.
 - T113 fixed review findings without authorizing remote dashboard access, web writes/actions, browser connectors, browser automation, standalone browser tools, or permission-default changes.
-- T114 remains planned next for direct exec permission policy.
+- T114 clears only T115's structured argv direct exec slice. Guardian approval and exec DSL remain deferred.
 
 ## Retrospective
 

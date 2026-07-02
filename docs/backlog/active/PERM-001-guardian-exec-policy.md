@@ -7,7 +7,8 @@ permission boundary.
 
 ## Status
 
-Deferred. Not selected into an active implementation iteration.
+In Progress — I077/T114 selected only the direct `exec` policy slice. Guardian approval and exec
+DSL implementation remain deferred.
 
 ## Priority
 
@@ -32,3 +33,9 @@ P2.
 Implementation requires a dedicated iteration activation after current portability/provider/TUI work
 is resolved or reprioritized.
 
+## I077/T114 Direct Exec Policy Slice
+
+`docs/reference/EXEC-TOOL-PERMISSION-POLICY-2026-07-02.md` defines the policy for TOOL-016's
+direct `exec` tool. This does not activate Guardian approval or the exec DSL. It only clears a
+structured argv-based tool implementation that defaults to `Ask`, denies sensitive env names before
+spawn, avoids shell parsing, and exposes command/cwd facets through the existing permission profile.

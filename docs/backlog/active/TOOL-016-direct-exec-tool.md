@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TOOL-016 |
 | Priority | P2 |
-| Status | Planned |
+| Status | In Progress — I077/T114 permission policy in Review |
 | Source | [GitHub Issue #16](https://github.com/wjhuang88/talos/issues/16) |
 | Relates To | TOOL-005, TOOL-006, PERM-001 |
 
@@ -25,6 +25,12 @@ parsing for common command execution.
 This is a process-execution tool. Before implementation, define the permission policy for command
 allowlists/defaults and environment handling. If that policy changes existing approval semantics,
 record or update an ADR.
+
+T114 policy update (2026-07-02): `docs/reference/EXEC-TOOL-PERMISSION-POLICY-2026-07-02.md`
+accepts only a narrow T115 implementation. `exec` must be an argv-only single-process tool, default
+to `Ask`, expose an `Execute` command facet and optional `Read` cwd facet, deny sensitive env names
+before spawn, avoid echoing env values, clamp timeout, bound stdout/stderr, and never invoke
+`sh -c`.
 
 ## Non-Goals
 

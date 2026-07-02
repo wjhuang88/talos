@@ -321,3 +321,12 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-dashboard`;
   `cargo test -p talos-tools browser_page`; `cargo test -p talos-tools fetch_url`;
   `cargo clippy -p talos-dashboard -p talos-tools -- -D warnings`.
+
+### I077 T114 Review Checkpoint (2026-07-02)
+
+- T114 produced `docs/reference/EXEC-TOOL-PERMISSION-POLICY-2026-07-02.md`.
+- The policy clears only a structured argv-based T115 `exec` tool: default `Ask`, `Execute`
+  command facet, optional `Read` cwd facet, sensitive env-name denial, env-value redaction,
+  bounded stdout/stderr, timeout kill, and no `sh -c`.
+- Guardian approval and the ADR-012 exec DSL remain deferred.
+- Verification passed: `scripts/validate_project_governance.sh .`.
