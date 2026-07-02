@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-020 |
 | Priority | P2 |
-| Status | Review — I078/T124 |
+| Status | Complete — I078/T124/T126 |
 | Source | [GitHub Issue #15](https://github.com/wjhuang88/talos/issues/15) |
 | Relates To | TUI-004, SESSION-002 |
 

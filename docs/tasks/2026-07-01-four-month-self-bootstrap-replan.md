@@ -147,13 +147,13 @@ Planned, and Blocked/Paused work that affects this replan.
 | T114 | 7 | C | TOOL-016 exec permission policy: allowlist/default/env/cwd/audit decision. | PERM-001/Issue #16 | ADR or owner-doc gate; permission tests planned | Planned |
 | T115 | 7-8 | C | Implement direct `exec` tool only if T114 clears. | T114 | success/non-zero/timeout/denial tests | Planned |
 | T116 | 8 | A | Second closeout: plugin/web/exec security posture and residual gates. | T110-T115 | `cargo test --workspace`; governance | Planned |
-| T120 | 9 | F | Implement TUI-016 slash-panel smart auto-execute. | TUI-010/CMD-001 | command classification and Enter-branch tests | Planned |
-| T121 | 9-10 | F | TODO-001 Phase 1: session todo data model and agent tool API behind permission pipeline. | TODO-001 | storage/tool tests; cycle detection | Planned |
-| T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | Review |
-| T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Review |
-| T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Review |
-| T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Review |
-| T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Planned |
+| T120 | 9 | F | Implement TUI-016 slash-panel smart auto-execute. | TUI-010/CMD-001 | command classification and Enter-branch tests | Complete |
+| T121 | 9-10 | F | TODO-001 Phase 1: session todo data model and agent tool API behind permission pipeline. | TODO-001 | storage/tool tests; cycle detection | Complete |
+| T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | Complete |
+| T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Complete — gap evidence only |
+| T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Complete |
+| T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Complete |
+| T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Complete |
 | T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Planned |
 | T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Planned |
 | T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Planned |
@@ -481,3 +481,15 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   `cargo clippy -p talos-agent -p talos-cli -p talos-session -- -D warnings`;
   `cargo check --workspace`; `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push, sync issue #8, then continue to T126 Month-3 closeout.
+
+### I078 T126 Closeout Checkpoint (2026-07-02)
+
+- I078 closed with T120-T126 implemented and validated.
+- Full closeout validation passed: `cargo fmt --all -- --check`; `cargo test --workspace`;
+  `cargo clippy --workspace -- -D warnings`; `scripts/validate_project_governance.sh .`.
+- TODO-001, TUI-016, and TUI-020 owner docs moved to Complete and their linked issues are ready to
+  close after this checkpoint is committed and pushed.
+- REL-002 remains open: T123 produced useful validation-loop evidence, but it was not a qualifying
+  Talos-primary self-bootstrap session because Codex remained the primary executor.
+- Recovery: commit/push T126 closeout, close issues #7/#8/#15, then continue to I079 release
+  readiness/handoff. Do not publish, tag, or release without explicit approval.

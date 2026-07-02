@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | Review — I078/T125 bounded prompt integration |
+| Status | Complete — I078/T121-T126 |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 

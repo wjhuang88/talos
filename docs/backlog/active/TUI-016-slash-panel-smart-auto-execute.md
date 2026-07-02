@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-016 |
 | Priority | P3 |
-| Status | Review — implemented in I078/T120 |
+| Status | Complete — I078/T120/T126 |
 | Source | [GitHub Issue #7](https://github.com/wjhuang88/talos/issues/7) |
 | Relates To | TUI-010, CMD-001, CMD-002 |
 

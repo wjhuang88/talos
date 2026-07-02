@@ -1,6 +1,6 @@
 # Iteration I078: Month 3 — Session Orchestration, Todo, Memory, And Thinking
 
-> Document status: Active (2026-07-02)
+> Document status: Complete (2026-07-02)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 9-12 of the 2026-07-01 replan: slash panel auto-execute,
 > session todo foundations, self-bootstrap rehearsal with validation loop, thinking preview without
@@ -15,15 +15,15 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| T120 | TUI-016 | Review | TUI-010/CMD-001 | Slash smart auto-execute |
-| T121-A | TODO-001 | Review | SESSION-001 | Todo data model + repository |
-| T121-B | TODO-001 | Review | T121-A | Initial agent todo tool API |
-| T121-C | TODO-001 | Review | T121-B | Remaining todo mutation tools |
-| T122 | TODO-001 | Review | T121-C | Read-only slash/TUI views |
+| T120 | TUI-016 | Complete | TUI-010/CMD-001 | Slash smart auto-execute |
+| T121-A | TODO-001 | Complete | SESSION-001 | Todo data model + repository |
+| T121-B | TODO-001 | Complete | T121-A | Initial agent todo tool API |
+| T121-C | TODO-001 | Complete | T121-B | Remaining todo mutation tools |
+| T122 | TODO-001 | Complete | T121-C | Read-only slash/TUI views |
 | T123 | REL-002 | Review | T108/T122 | Validation-backed rehearsal |
-| T124 | TUI-020 | Review | TUI-004/session docs | Thinking preview separated from history |
-| T125 | TODO-001 | Review | T121/T122 | Bounded todo prompt integration |
-| T126 | Replan | Planned | T120-T125 | Month-3 closeout |
+| T124 | TUI-020 | Complete | TUI-004/session docs | Thinking preview separated from history |
+| T125 | TODO-001 | Complete | T121/T122 | Bounded todo prompt integration |
+| T126 | Replan | Complete | T120-T125 | Month-3 closeout |
 
 ### Scope
 
@@ -79,6 +79,7 @@
 | 2026-07-02 | T123 Rehearsal | Recorded `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md`. Talos generated a workspace validation plan, but Codex remained the primary executor; this is gap evidence, not a REL-002 qualifying session. |
 | 2026-07-02 | T124 Implementation | Added transient `ThinkingDelta`/`ThinkingPreview` flow so active thinking is visible in the live preview but excluded from finalized assistant text, scrollback history, JSONL persistence, and resume history. |
 | 2026-07-02 | T125 Implementation | Added bounded active todo prompt integration outside the stable cacheable prefix for TUI/inline session actors, including new/resume/fork/model-switch actor rebuilds. |
+| 2026-07-02 | T126 Closeout | Full workspace tests, workspace clippy, format, and governance validation passed. I078 is complete; REL-002 remains incomplete because T123 was validation-backed evidence, not a Talos-primary development session. |
 
 ## Verification Evidence
 
@@ -137,21 +138,31 @@
 - T125 lint: `cargo clippy -p talos-agent -p talos-cli -p talos-session -- -D warnings` passed.
 - T125 workspace compile: `cargo check --workspace` passed.
 - Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings after T125.
+- T126 format: `cargo fmt --all -- --check` passed.
+- T126 full workspace tests: `cargo test --workspace` passed.
+- T126 workspace lint: `cargo clippy --workspace -- -D warnings` passed.
+- T126 governance: `scripts/validate_project_governance.sh .` passed with 0 warnings.
 
 ## Variance And Residuals
 
 - No scope variance at activation.
 - T121 residual resolved: agent-side write tools now cover create, update status, update fields,
   delete, add dependency, remove dependency, and query.
-- T122 is in Review for read-only user views.
+- T122 completed read-only user views.
 - T123 is in Review as a validation-backed rehearsal evidence record. It explicitly does not
   satisfy REL-002 because Codex remained the primary executor and Talos only generated a read-only
   validation plan.
-- T124 is in Review for the thinking-preview history boundary. No provider-specific reasoning
+- T124 completed the thinking-preview history boundary. No provider-specific reasoning
   parser was added; this slice only handles the internal event/UI/session boundary.
-- T125 is in Review for bounded todo prompt integration. Print mode remains out of scope because it
+- T125 completed bounded todo prompt integration. Print mode remains out of scope because it
   does not own a durable session in this slice.
+- REL-002 remains open. The self-bootstrap coverage delta is improved by validation planning, but
+  still below the release gate because Codex remained the primary executor for I078.
 
 ## Retrospective
 
-- Pending.
+- Small, issue-linked packets kept validation and rollback boundaries clear.
+- The todo feature is now complete for the scoped session-local implementation: repository, tools,
+  read-only views, and bounded prompt context.
+- The main residual for the long plan is not feature coverage; it is Talos-primary execution
+  evidence for REL-002.
