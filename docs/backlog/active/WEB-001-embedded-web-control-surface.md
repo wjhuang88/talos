@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | Planned — ADR-031 accepted; read-only loopback MVP unblocked |
+| Status | In Progress — I077/T112 security review complete; T113 hardening fixes in Review |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | Browser dashboard; live log viewer; web config editor |
@@ -29,6 +29,11 @@ ADR-031 accepted the WEB-001 MVP boundary on 2026-07-01. The first implementatio
 unblocked only for an explicit opt-in, loopback-only, token-authenticated, read-only dashboard.
 Remote access, web approvals, config writes, browser automation, WebSocket control, and any
 write/session-mutating route remain out of scope until a later security review.
+
+T112/T113 security review update (2026-07-02): `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`
+recorded the dashboard/browser boundary review. T113 added dashboard output-boundary redaction for
+snapshot data and regression coverage proving unknown paths without a token are rejected before
+returning route information.
 
 ## Target Model
 

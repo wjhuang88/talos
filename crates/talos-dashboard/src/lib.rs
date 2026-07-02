@@ -48,7 +48,7 @@ impl DashboardServer {
         Self {
             state: AppState {
                 token: Uuid::new_v4().simple().to_string(),
-                snapshot: Arc::new(snapshot),
+                snapshot: Arc::new(redact_snapshot(snapshot)),
             },
         }
     }
@@ -75,7 +75,8 @@ impl DashboardServer {
             .route("/governance", get(governance_handler))
             .route("/config", get(config_handler))
             .route("/", get(root_handler))
-            .route_layer(middleware::from_fn_with_state(
+            .fallback(not_found_handler)
+            .layer(middleware::from_fn_with_state(
                 state.clone(),
                 auth_middleware,
             ))
@@ -163,6 +164,130 @@ async fn config_handler(State(state): State<AppState>) -> Response {
     let mut resp = state.snapshot.config_masked.clone().into_response();
     apply_security_headers(&mut resp, "text/plain; charset=utf-8");
     resp
+}
+
+async fn not_found_handler() -> StatusCode {
+    StatusCode::NOT_FOUND
+}
+
+fn redact_snapshot(snapshot: DashboardSnapshot) -> DashboardSnapshot {
+    DashboardSnapshot {
+        config_masked: redact_text(&snapshot.config_masked),
+        status: redact_value(snapshot.status),
+        history: redact_value(snapshot.history),
+        governance: redact_text(&snapshot.governance),
+    }
+}
+
+fn redact_value(value: Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(key, value)| {
+                    if is_sensitive_key(&key) {
+                        (key, Value::String("***".to_string()))
+                    } else {
+                        (key, redact_value(value))
+                    }
+                })
+                .collect(),
+        ),
+        Value::Array(values) => Value::Array(values.into_iter().map(redact_value).collect()),
+        Value::String(value) => Value::String(redact_text(&value)),
+        other => other,
+    }
+}
+
+fn is_sensitive_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    key.contains("api_key")
+        || key.contains("token")
+        || key.contains("secret")
+        || key.contains("password")
+        || key.contains("authorization")
+        || key.contains("credential")
+        || key.contains("cookie")
+        || key == "auth"
+        || key == "key"
+}
+
+fn redact_text(input: &str) -> String {
+    const KEYS: &[&str] = &[
+        "api_key",
+        "access_token",
+        "refresh_token",
+        "token",
+        "secret",
+        "password",
+        "auth",
+        "sig",
+        "signature",
+        "key",
+    ];
+
+    let mut output = input.to_string();
+    for key in KEYS {
+        output = redact_assignment_values(&output, key);
+    }
+    output
+}
+
+fn redact_assignment_values(input: &str, key: &str) -> String {
+    let lower = input.to_ascii_lowercase();
+    let mut output = String::with_capacity(input.len());
+    let mut cursor = 0;
+
+    while let Some(offset) = lower[cursor..].find(key) {
+        let start = cursor + offset;
+        let key_start_ok = start == 0
+            || matches!(
+                input.as_bytes().get(start - 1),
+                Some(b'?' | b'&' | b';' | b' ' | b'\n' | b'\t' | b'"' | b'\'')
+            );
+        let key_end = start + key.len();
+        let Some(eq_relative) = input[key_end..].find('=') else {
+            output.push_str(&input[cursor..key_end]);
+            cursor = key_end;
+            continue;
+        };
+        let eq_pos = key_end + eq_relative;
+        let only_space_before_equals = input[key_end..eq_pos]
+            .chars()
+            .all(|c| matches!(c, ' ' | '\t'));
+
+        if !key_start_ok {
+            output.push_str(&input[cursor..key_end]);
+            cursor = key_end;
+            continue;
+        }
+        if !only_space_before_equals {
+            output.push_str(&input[cursor..eq_pos + 1]);
+            cursor = eq_pos + 1;
+            continue;
+        }
+
+        let value_prefix_start = eq_pos + 1;
+        let value_start = value_prefix_start
+            + input[value_prefix_start..]
+                .find(|c: char| !matches!(c, ' ' | '\t'))
+                .unwrap_or(0);
+        let value_mask_start = if matches!(input.as_bytes().get(value_start), Some(b'"' | b'\'')) {
+            value_start + 1
+        } else {
+            value_start
+        };
+        let value_end = input[value_mask_start..]
+            .find(['&', ';', '"', '\'', '\n', '\r', '\t', ' '])
+            .map(|end| value_mask_start + end)
+            .unwrap_or(input.len());
+
+        output.push_str(&input[cursor..value_mask_start]);
+        output.push_str("***");
+        cursor = value_end;
+    }
+
+    output.push_str(&input[cursor..]);
+    output
 }
 
 #[cfg(test)]
@@ -295,6 +420,55 @@ mod tests {
         let (app, token) = build_test_app();
         let (status, _) = request(&app, Method::GET, "/admin", Some(&token)).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn unknown_path_without_token_is_rejected() {
+        let (app, _token) = build_test_app();
+        let (status, _) = request(&app, Method::GET, "/admin", None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn snapshot_outputs_are_redacted_at_boundary() {
+        let snapshot = DashboardSnapshot {
+            config_masked: "api_key = \"sk-live\"\ntoken=abc".to_string(),
+            status: serde_json::json!({
+                "model": "test",
+                "api_key": "sk-live",
+                "url": "https://example.com/?token=abc&ok=1",
+            }),
+            history: serde_json::json!([
+                {
+                    "tool": "http_request",
+                    "headers": {
+                        "Authorization": "Bearer secret",
+                        "Cookie": "sid=secret"
+                    },
+                    "url": "https://example.com/?api_key=sk-live&ok=1"
+                }
+            ]),
+            governance: "refresh_token=abc status=ok".to_string(),
+        };
+        let server = DashboardServer::new(snapshot);
+        let token = server.token().to_string();
+        let app = server.build_router();
+
+        for path in ["/status", "/history", "/governance", "/config"] {
+            let (status, body) = request(&app, Method::GET, path, Some(&token)).await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(!body.contains("sk-live"), "{path} leaked api key: {body}");
+            assert!(
+                !body.contains("Bearer secret"),
+                "{path} leaked bearer: {body}"
+            );
+            assert!(!body.contains("sid=secret"), "{path} leaked cookie: {body}");
+            assert!(
+                !body.contains("token=abc"),
+                "{path} leaked token query: {body}"
+            );
+            assert!(body.contains("***"), "{path} did not redact: {body}");
+        }
     }
 
     #[tokio::test]

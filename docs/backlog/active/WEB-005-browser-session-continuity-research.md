@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-005 |
 | Priority | P2 |
-| Status | Planned |
+| Status | In Progress — I077/T112 security review complete; T113 hardening fixes in Review |
 | Depends On | WEBFETCH-001; TOOL-012; TOOL-013; TOOL-014 |
 | Relates To | WEB-001; REMOTE-001; PLUGIN-001 |
 | Blocks | Authenticated-page context ingestion; browser page access record design; browser connector ADR |
@@ -145,6 +145,12 @@ browser connector implementation. The tests prove current URL tools keep distinc
 Network+Write), `save_url` write denial is not masked by network allow, and a disclosed
 `fetch_url` `browser_page` mock backend still cannot execute when permission is denied. This does
 not implement `browser_page_read`; that facet remains a Phase 1 design/implementation item.
+
+T112/T113 security review update (2026-07-02): `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`
+kept WEB-005 mock-only and found that selected link URLs needed the same credential/query-token
+sanitization as page record URLs. T113 fixed `BrowserPageRecord::with_links` to sanitize selected
+link URLs. No real connector, browser automation, `browser_page_read` permission facet, or
+standalone browser tool was authorized.
 
 ### Phase 1: Read-Only Browser Page Backend
 

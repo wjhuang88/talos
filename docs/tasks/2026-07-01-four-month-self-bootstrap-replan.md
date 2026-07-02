@@ -309,3 +309,15 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-plugin --features wasm`;
   `cargo test -p talos-core`; `cargo clippy -p talos-plugin -p talos-core --features
   talos-plugin/wasm -- -D warnings`; `cargo tree -p talos-plugin --features wasm`.
+
+### I077 T112-T113 Review Checkpoint (2026-07-02)
+
+- T112 produced `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`.
+- T113 implemented the review fixes: dashboard snapshot output redaction at the web boundary,
+  authenticated fallback coverage for unknown paths, and selected-link URL sanitization for
+  `BrowserPageRecord`.
+- Scope remains unchanged: no remote dashboard access, web approvals, config writes, browser
+  automation, browser connectors, standalone browser tools, or permission-default changes.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-dashboard`;
+  `cargo test -p talos-tools browser_page`; `cargo test -p talos-tools fetch_url`;
+  `cargo clippy -p talos-dashboard -p talos-tools -- -D warnings`.

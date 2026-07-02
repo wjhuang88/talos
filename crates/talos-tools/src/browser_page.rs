@@ -104,7 +104,13 @@ impl BrowserPageRecord {
     }
 
     pub fn with_links(mut self, links: Vec<BrowserPageLink>) -> Self {
-        self.selected_links = links;
+        self.selected_links = links
+            .into_iter()
+            .map(|link| BrowserPageLink {
+                text: link.text,
+                url: sanitize_url_for_record(&link.url),
+            })
+            .collect();
         self
     }
 }
@@ -213,6 +219,23 @@ mod tests {
         assert!(record.visible_text_excerpt.contains("Welcome"));
         assert_eq!(record.selected_links.len(), 1);
         assert_eq!(record.connector_kind, "mock");
+    }
+
+    #[test]
+    fn record_sanitizes_selected_link_urls() {
+        let record =
+            BrowserPageRecord::new_mock("https://example.com", "Test", "text").with_links(vec![
+                BrowserPageLink {
+                    text: "Account".to_string(),
+                    url: "https://user:pass@example.com/account?token=abc&ok=1".to_string(),
+                },
+            ]);
+        let json = serde_json::to_string(&record).unwrap();
+
+        assert!(!json.contains("user:pass"));
+        assert!(!json.contains("abc"));
+        assert!(json.contains("token=***"));
+        assert!(json.contains("ok=1"));
     }
 
     #[tokio::test]
