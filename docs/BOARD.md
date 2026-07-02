@@ -20,14 +20,14 @@ acceptance criteria, verification evidence, or iteration state.
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
 | Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I078 Session/Todo/Thinking after I077 closeout commit; no real publish, tag, release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call expansion. |
-| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T124 thinking-preview history boundary is in Review; next packet is T125 bounded todo prompt integration. |
+| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T125 bounded todo prompt integration is in Review; next packet is T126 Month-3 closeout. |
 | TUI-016 Slash Panel Smart Auto-Execute | Review | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | T120 implemented, validated, pushed, and issue-synced; remains open until owner doc reaches Complete. |
-| TODO-001 Session Todo Tools | In Progress | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | I078/T122 read-only slash/TUI views implemented and validated; user-facing mutations remain out of scope. |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| TODO-001 Session Todo Tools | Review | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | I078/T125 implemented repository, agent tools, read-only slash/TUI views, and bounded active todo prompt integration; remains open until owner doc reaches Complete. |
 | TUI-020 Thinking Preview Without History Pollution | Review | [TUI-020](backlog/active/TUI-020-thinking-preview-not-history.md) / [Issue #15](https://github.com/wjhuang88/talos/issues/15) | T124 implemented transient preview and validated stream/finalization/persistence/resume boundaries; remains open until owner doc reaches Complete. |
 
 ## Blocked / Paused

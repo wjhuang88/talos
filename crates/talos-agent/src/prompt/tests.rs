@@ -580,3 +580,21 @@ fn prompt_builder_without_memory_section() {
         "Should not contain Memory header when no section set"
     );
 }
+
+#[test]
+fn prompt_builder_with_todo_section_is_dynamic() {
+    let builder = SystemPromptBuilder::new()
+        .with_todo_section(Some("- [in_progress][high] abc123 Fix issue".to_string()));
+
+    let (prompt, markers) = builder.build_with_cache_markers();
+
+    assert!(prompt.contains("# Session Todos"));
+    assert!(prompt.contains("Fix issue"));
+    for marker in markers {
+        let marked = &prompt[marker.offset..marker.offset + marker.length];
+        assert!(
+            !marked.contains("# Session Todos"),
+            "todo section must not be marked cacheable"
+        );
+    }
+}

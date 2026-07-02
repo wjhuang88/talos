@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | In Progress — I078/T122 read-only slash/TUI views in Review |
+| Status | Review — I078/T125 bounded prompt integration |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -49,13 +49,13 @@ delete, dependency) are **agent tools** that go through the permission pipeline.
 
 ## Acceptance Criteria
 
-- [ ] TUI displays todo list (read-only)
-- [ ] Agent can create/update/delete todos via tools
-- [ ] Todo list persists with session
-- [ ] Priority and dependency support with cycle detection
-- [ ] Slash commands are view-only
-- [ ] JSON and Markdown export
-- [ ] Unit + integration tests (>80% coverage target)
+- [x] TUI displays todo list (read-only)
+- [x] Agent can create/update/delete todos via tools
+- [x] Todo list persists with session
+- [x] Priority and dependency support with cycle detection
+- [x] Slash commands are view-only
+- [x] JSON and Markdown export
+- [x] Unit + integration tests (>80% coverage target)
 
 ## Required Reads
 
@@ -151,3 +151,20 @@ Validation:
 ### Phase 3: Prompt Integration
 - Inject active todo items into agent system prompt
 - Budget-bounded, cache-stable
+
+T125 implementation (2026-07-02): added bounded active todo prompt integration for interactive
+session actors. `talos-agent` exposes a dynamic todo section provider and renders it as
+`# Session Todos` outside the stable cacheable prefix. `talos-cli` formats active, non-completed
+session todos from the current `SessionManager`, caps the section at 12 items / 2400 characters,
+and installs the provider for TUI, inline, model-switch, resume, new-session, and forked-session
+actors. Print mode remains out of scope because it does not own a durable session in this slice.
+
+Validation:
+
+- `cargo fmt --all -- --check`
+- `cargo test -p talos-agent`
+- `cargo test -p talos-cli`
+- `cargo test -p talos-session`
+- `cargo clippy -p talos-agent -p talos-cli -p talos-session -- -D warnings`
+- `cargo check --workspace`
+- `scripts/validate_project_governance.sh .`

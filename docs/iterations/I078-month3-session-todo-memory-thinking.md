@@ -22,7 +22,7 @@
 | T122 | TODO-001 | Review | T121-C | Read-only slash/TUI views |
 | T123 | REL-002 | Review | T108/T122 | Validation-backed rehearsal |
 | T124 | TUI-020 | Review | TUI-004/session docs | Thinking preview separated from history |
-| T125 | TODO-001 | Planned | T121/T122 | Bounded todo prompt integration |
+| T125 | TODO-001 | Review | T121/T122 | Bounded todo prompt integration |
 | T126 | Replan | Planned | T120-T125 | Month-3 closeout |
 
 ### Scope
@@ -78,6 +78,7 @@
 | 2026-07-02 | T122 Implementation | Added typed read-only `/todo` slash requests, active-session repository rendering in CLI runtime, JSON/Markdown export text, and TUI todo panel scrollback rendering. |
 | 2026-07-02 | T123 Rehearsal | Recorded `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md`. Talos generated a workspace validation plan, but Codex remained the primary executor; this is gap evidence, not a REL-002 qualifying session. |
 | 2026-07-02 | T124 Implementation | Added transient `ThinkingDelta`/`ThinkingPreview` flow so active thinking is visible in the live preview but excluded from finalized assistant text, scrollback history, JSONL persistence, and resume history. |
+| 2026-07-02 | T125 Implementation | Added bounded active todo prompt integration outside the stable cacheable prefix for TUI/inline session actors, including new/resume/fork/model-switch actor rebuilds. |
 
 ## Verification Evidence
 
@@ -129,6 +130,13 @@
 - T124 crate validation: `cargo test -p talos-tui` passed.
 - T124 lint: `cargo clippy -p talos-core -p talos-agent -p talos-conversation -p talos-session -p talos-cli -p talos-tui -- -D warnings` passed.
 - T124 workspace compile: `cargo check --workspace` passed.
+- T125 format: `cargo fmt --all -- --check` passed.
+- T125 crate validation: `cargo test -p talos-agent` passed.
+- T125 crate validation: `cargo test -p talos-cli` passed.
+- T125 crate validation: `cargo test -p talos-session` passed.
+- T125 lint: `cargo clippy -p talos-agent -p talos-cli -p talos-session -- -D warnings` passed.
+- T125 workspace compile: `cargo check --workspace` passed.
+- Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings after T125.
 
 ## Variance And Residuals
 
@@ -141,6 +149,8 @@
   validation plan.
 - T124 is in Review for the thinking-preview history boundary. No provider-specific reasoning
   parser was added; this slice only handles the internal event/UI/session boundary.
+- T125 is in Review for bounded todo prompt integration. Print mode remains out of scope because it
+  does not own a durable session in this slice.
 
 ## Retrospective
 

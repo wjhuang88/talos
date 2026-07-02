@@ -152,7 +152,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | Review |
 | T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Review |
 | T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Review |
-| T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Planned |
+| T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Review |
 | T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Planned |
 | T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Planned |
 | T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Planned |
@@ -466,3 +466,18 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   `cargo check --workspace`.
 - Recovery: commit/push, sync issue #15, run governance validation, then continue to T125 bounded
   todo prompt integration.
+
+### I078 T125 Implementation Checkpoint (2026-07-02)
+
+- T125 implemented bounded active todo prompt integration for durable interactive sessions.
+- `talos-agent` now supports a dynamic todo section provider and renders `# Session Todos` outside
+  the stable cacheable prefix.
+- `talos-cli` formats active, non-completed todos from the current session repository, caps the
+  prompt section at 12 items / 2400 characters, and installs the provider for TUI/inline actors,
+  including new, resume, fork, and model-switch rebuilds.
+- Print mode remains out of scope because it does not own a durable session in this slice.
+- Validation passed: `cargo fmt --all -- --check`; `cargo test -p talos-agent`;
+  `cargo test -p talos-cli`; `cargo test -p talos-session`;
+  `cargo clippy -p talos-agent -p talos-cli -p talos-session -- -D warnings`;
+  `cargo check --workspace`; `scripts/validate_project_governance.sh .`.
+- Recovery: commit/push, sync issue #8, then continue to T126 Month-3 closeout.

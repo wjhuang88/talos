@@ -75,7 +75,9 @@ pub enum TodoStatus {
 }
 
 impl TodoStatus {
-    fn as_str(self) -> &'static str {
+    /// Return the stable snake_case representation used in storage and prompts.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             TodoStatus::Todo => "todo",
             TodoStatus::InProgress => "in_progress",
@@ -109,7 +111,9 @@ pub enum TodoPriority {
 }
 
 impl TodoPriority {
-    fn as_str(self) -> &'static str {
+    /// Return the stable snake_case representation used in storage and prompts.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             TodoPriority::Low => "low",
             TodoPriority::Medium => "medium",

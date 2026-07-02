@@ -17,6 +17,7 @@ use crate::approval::ApprovalPrompt;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
+    set_todo_prompt_provider,
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
@@ -104,6 +105,8 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         ResumeSelection::Disabled,
         false,
     )?;
+
+    set_todo_prompt_provider(&mut agent, &session_manager, &session);
 
     let initial_history = session.read_messages().unwrap_or_default();
 

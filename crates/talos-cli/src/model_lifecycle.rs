@@ -12,7 +12,7 @@ use talos_conversation::{ModelPickerData, ModelPickerItem, ProviderSetupItem};
 use talos_core::message::Message;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
-use talos_session::Session;
+use talos_session::{Session, SessionManager};
 use tokio::sync::{Mutex, mpsc, watch};
 
 use crate::mcp_runtime::McpSessionRuntime;
@@ -143,6 +143,7 @@ pub(crate) struct RebuildSessionParams<'a> {
     pub bridge_rx_update_tx:
         &'a mpsc::UnboundedSender<(Session, mpsc::UnboundedReceiver<SessionEvent>)>,
     pub session_watch_rx: &'a watch::Receiver<Session>,
+    pub session_manager: &'a SessionManager,
     pub api_key: String,
     pub previous_model: String,
     pub previous_provider: String,
@@ -175,6 +176,7 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         sq_tx_watch_tx,
         bridge_rx_update_tx,
         session_watch_rx,
+        session_manager,
         api_key,
         previous_model,
         previous_provider,
@@ -239,6 +241,8 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     {
         apply_runtime_skills(&mut agent, &skills);
     }
+    crate::mode_runtime::maybe_set_memory_provider(&mut agent, model_config);
+    crate::mode_runtime::set_todo_prompt_provider(&mut agent, session_manager, &current_session);
     match crate::mode_runners::context_files_for_agent(model_config, workspace_root, true) {
         Ok(files) => agent.set_context_files(files),
         Err(e) => {

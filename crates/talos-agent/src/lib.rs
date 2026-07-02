@@ -104,6 +104,8 @@ pub type AgentResult<T> = Result<T, AgentError>;
 
 // Callback type for memory prompt injection.
 type MemoryProviderCallback = dyn Fn(&str) -> Option<String> + Send + Sync;
+// Callback type for bounded session todo prompt injection.
+type TodoSectionProviderCallback = dyn Fn() -> Option<String> + Send + Sync;
 
 /// The agent orchestrates a conversation turn: takes a user message, calls the
 /// LLM provider, streams events, executes tool calls when requested, and feeds
@@ -169,6 +171,8 @@ pub struct Agent {
     cached_stable_prefix: std::sync::Mutex<Option<String>>,
     /// Optional memory provider callback for injecting memory into prompts.
     memory_provider: Option<Arc<MemoryProviderCallback>>,
+    /// Optional provider callback for injecting bounded active session todos.
+    todo_section_provider: Option<Arc<TodoSectionProviderCallback>>,
     /// When true, bash tool output exceeding the line threshold is compressed
     /// before entering model context. Default: false.
     bash_compression_enabled: bool,
@@ -247,7 +251,7 @@ impl Agent {
         history: Vec<Message>,
         hook_ctx: &HookContext,
     ) -> AgentResult<(Vec<Message>, usize)> {
-        let prompt_builder = if let Some(ref mem_provider) = self.memory_provider {
+        let mut prompt_builder = if let Some(ref mem_provider) = self.memory_provider {
             let memory_section = mem_provider(&user_message);
             self.prompt_builder
                 .clone()
@@ -255,6 +259,9 @@ impl Agent {
         } else {
             self.prompt_builder.clone()
         };
+        if let Some(ref todo_provider) = self.todo_section_provider {
+            prompt_builder = prompt_builder.with_todo_section(todo_provider());
+        }
 
         let stable_prefix = {
             let mut cache = self

@@ -1897,6 +1897,37 @@ fn test_set_append_prompt_opt_none() {
     );
 }
 
+#[tokio::test]
+async fn test_todo_section_provider_reaches_system_prompt() {
+    let response_events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta { delta: "OK".into() },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ];
+    let (model, captured_prompts) = CapturingModel::new(vec![response_events]);
+    let mut agent = Agent::with_security(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    );
+    agent.set_todo_section_provider(Arc::new(|| {
+        Some("- [in_progress][high] abc123 Finish bounded todo prompt".to_string())
+    }));
+
+    let response = agent.run("continue".into()).await.unwrap();
+    assert_eq!(response, "OK");
+
+    let prompts = captured_prompts.lock().expect("lock poisoned");
+    assert_eq!(prompts.len(), 1);
+    assert!(prompts[0].contains("# Session Todos"));
+    assert!(prompts[0].contains("Finish bounded todo prompt"));
+}
+
 /// Mock model that captures the system prompt from each stream call.
 struct CapturingModel {
     responses: Arc<Mutex<Vec<Vec<AgentEvent>>>>,

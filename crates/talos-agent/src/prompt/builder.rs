@@ -53,6 +53,8 @@ pub struct SystemPromptBuilder {
     append_prompt: Option<String>,
     /// Bounded memory injection section (advisory, never authoritative).
     memory_section: Option<String>,
+    /// Bounded session todo section (advisory orchestration context).
+    todo_section: Option<String>,
     tool_call_format: &'static str,
     /// Runtime template values used for `{{slot}}` substitution.
     template_vars: HashMap<String, String>,
@@ -85,6 +87,7 @@ impl SystemPromptBuilder {
             custom_prompt: None,
             append_prompt: None,
             memory_section: None,
+            todo_section: None,
             tool_call_format: "",
             template_vars,
         }
@@ -174,6 +177,16 @@ impl SystemPromptBuilder {
     #[must_use]
     pub fn with_memory_section(mut self, section: Option<String>) -> Self {
         self.memory_section = section;
+        self
+    }
+
+    /// Sets a bounded session todo section for inclusion in the dynamic prompt suffix.
+    ///
+    /// Todo context is advisory orchestration state. It is intentionally not part of the
+    /// stable cached prefix because it can change between turns.
+    #[must_use]
+    pub fn with_todo_section(mut self, section: Option<String>) -> Self {
+        self.todo_section = section;
         self
     }
 
@@ -358,6 +371,13 @@ impl SystemPromptBuilder {
         if let Some(ref memory) = self.memory_section {
             sections.push(PromptSection {
                 text: format!("# Memory\n{memory}\n"),
+                kind: PromptSectionKind::Dynamic,
+            });
+        }
+
+        if let Some(ref todos) = self.todo_section {
+            sections.push(PromptSection {
+                text: format!("# Session Todos\n{todos}\n"),
                 kind: PromptSectionKind::Dynamic,
             });
         }

@@ -13,7 +13,7 @@ use talos_skill::SkillIndex;
 use tokio_util::sync::CancellationToken;
 
 use crate::prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
-use crate::{Agent, MemoryProviderCallback, prompt};
+use crate::{Agent, MemoryProviderCallback, TodoSectionProviderCallback, prompt};
 
 impl Agent {
     /// Creates a new agent with the given language model provider and tool
@@ -52,6 +52,7 @@ impl Agent {
             tool_presentation_policy: ToolPresentationPolicy::full(),
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
+            todo_section_provider: None,
             bash_compression_enabled: false,
         }
     }
@@ -119,6 +120,7 @@ impl Agent {
             tool_presentation_policy,
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
+            todo_section_provider: None,
             bash_compression_enabled: false,
         }
     }
@@ -129,6 +131,14 @@ impl Agent {
     /// memory section string. When `None` is returned, no memory is injected.
     pub fn set_memory_provider(&mut self, provider: Arc<MemoryProviderCallback>) {
         self.memory_provider = Some(provider);
+    }
+
+    /// Sets a callback for injecting bounded active session todos into the dynamic prompt suffix.
+    ///
+    /// The callback returns already-formatted advisory text. It is evaluated once per provider
+    /// request and does not invalidate the stable prompt prefix cache.
+    pub fn set_todo_section_provider(&mut self, provider: Arc<TodoSectionProviderCallback>) {
+        self.todo_section_provider = Some(provider);
     }
 
     /// Enables or disables bash output compression for model context.

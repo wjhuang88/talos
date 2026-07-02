@@ -35,7 +35,7 @@ use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
-    session_metadata_for_model,
+    session_metadata_for_model, set_todo_prompt_provider,
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
@@ -263,6 +263,7 @@ async fn handle_session_model(
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
     session_watch_rx: &watch::Receiver<talos_session::Session>,
+    session_manager: &talos_session::SessionManager,
     model_id: String,
     mock: bool,
 ) -> Option<Config> {
@@ -318,6 +319,7 @@ async fn handle_session_model(
         sq_tx_watch_tx,
         bridge_rx_update_tx,
         session_watch_rx,
+        session_manager,
         api_key,
         previous_model,
         previous_provider,
@@ -353,6 +355,7 @@ async fn handle_session_model_with_credential(
         mpsc::UnboundedReceiver<SessionEvent>,
     )>,
     session_watch_rx: &watch::Receiver<talos_session::Session>,
+    session_manager: &talos_session::SessionManager,
     cred: talos_conversation::CredentialResponseData,
     mock: bool,
 ) -> Option<Config> {
@@ -401,6 +404,7 @@ async fn handle_session_model_with_credential(
         sq_tx_watch_tx,
         bridge_rx_update_tx,
         session_watch_rx,
+        session_manager,
         api_key,
         previous_model,
         previous_provider,
@@ -501,6 +505,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_runtime_skills(&mut agent, &runtime_skills);
     let runtime_skills = Arc::new(Mutex::new(runtime_skills));
     maybe_set_memory_provider(&mut agent, &config);
+    set_todo_prompt_provider(&mut agent, &session_manager, &session);
 
     agent.set_context_files(context_files_for_agent(
         &config,
@@ -661,6 +666,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
                         &session_watch_rx_for_handler,
+                        &session_manager_for_handler,
                         req.model_id,
                         cli.mock,
                     )
@@ -682,6 +688,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &sq_tx_watch_tx_for_handler,
                         &bridge_rx_update_tx_for_handler,
                         &session_watch_rx_for_handler,
+                        &session_manager_for_handler,
                         resp,
                         cli.mock,
                     )
@@ -1016,6 +1023,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
+    set_todo_prompt_provider(&mut agent, &session_manager, &session);
 
     if !cli.no_context {
         let context = ContextLoader::new(workspace_root.to_path_buf())
@@ -1147,6 +1155,7 @@ async fn handle_session_new(
         apply_runtime_skills(&mut agent, &skills);
     }
     maybe_set_memory_provider(&mut agent, config);
+    set_todo_prompt_provider(&mut agent, &session_manager, &new_session);
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
@@ -1368,6 +1377,7 @@ async fn handle_session_resume(
         apply_runtime_skills(&mut agent, &skills);
     }
     maybe_set_memory_provider(&mut agent, &resume_config);
+    set_todo_prompt_provider(&mut agent, session_manager, &target_session);
     match context_files_for_agent(&resume_config, workspace_root, true) {
         Ok(files) => agent.set_context_files(files),
         Err(e) => {
@@ -1530,6 +1540,7 @@ async fn handle_session_fork(
         apply_runtime_skills(&mut agent, &skills);
     }
     maybe_set_memory_provider(&mut agent, config);
+    set_todo_prompt_provider(&mut agent, session_manager, &child_session);
 
     let (handle, actor) = AppServerSession::new(agent, session_config);
 
