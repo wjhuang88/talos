@@ -60,9 +60,7 @@ pub struct SessionManager {
 impl SessionManager {
     /// Create a new `SessionManager` with the default sessions directory (`~/.talos/sessions/`).
     pub fn new() -> Result<Self, SessionError> {
-        let home =
-            std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
-        let dir = PathBuf::from(home).join(".talos").join("sessions");
+        let dir = Self::default_sessions_dir()?;
         let manager = Self {
             sessions_dir: dir,
             index: Arc::new(Mutex::new(None)),
@@ -72,6 +70,17 @@ impl SessionManager {
         // index will surface a precise cause.
         let _ = manager.reconcile_index();
         Ok(manager)
+    }
+
+    /// Return the default sessions directory without opening indexes or reconciling state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `$HOME` is unavailable.
+    pub fn default_sessions_dir() -> Result<PathBuf, SessionError> {
+        let home =
+            std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
+        Ok(PathBuf::from(home).join(".talos").join("sessions"))
     }
 
     /// Create a new `SessionManager` with a custom sessions directory.

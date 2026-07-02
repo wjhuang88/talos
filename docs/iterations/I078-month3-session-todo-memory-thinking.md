@@ -17,8 +17,9 @@
 |---|---|---|---|---|
 | T120 | TUI-016 | Review | TUI-010/CMD-001 | Slash smart auto-execute |
 | T121-A | TODO-001 | Review | SESSION-001 | Todo data model + repository |
-| T121-B | TODO-001 | Planned | T121-A | Agent todo tool API |
-| T122 | TODO-001 | Planned | T121 | Read-only slash/TUI views |
+| T121-B | TODO-001 | Review | T121-A | Initial agent todo tool API |
+| T121-C | TODO-001 | Planned | T121-B | Remaining todo mutation tools |
+| T122 | TODO-001 | Planned | T121-C | Read-only slash/TUI views |
 | T123 | REL-002 | Planned | T108/T122 | Validation-backed rehearsal |
 | T124 | TUI-020 | Planned | TUI-004/session docs | Thinking preview separated from history |
 | T125 | TODO-001 | Planned | T121/T122 | Bounded todo prompt integration |
@@ -71,6 +72,7 @@
 | 2026-07-02 | T120 Implementation | Slash panel Enter now runs DirectExecution commands and fills the composer for RequireInput commands; Tab remains completion-only. |
 | 2026-07-02 | T121-A Activation | Started TODO-001 Phase 1 with `talos-session` data model/repository first; agent tool registration deferred to T121-B to avoid an unreviewed `talos-tools` -> `talos-session` dependency. |
 | 2026-07-02 | T121-A Implementation | Added `talos_session::todo` repository, SQLite schema, CRUD/query, dependency edge management, cycle detection, and `SessionManager::todo_repository()`. |
+| 2026-07-02 | T121-B Implementation | Added initial agent todo tools (`todo_create`, `todo_update_status`, `todo_query`) in `talos-session` and registered them in print/TUI registries through permission-aware wrappers. |
 
 ## Verification Evidence
 
@@ -87,10 +89,18 @@
 - T121-A format: `cargo fmt --all -- --check` passed.
 - T121-A workspace compile: `cargo check --workspace` passed.
 - Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings after T121-A.
+- T121-B targeted: `cargo test -p talos-session todo` passed.
+- T121-B registry: `cargo test -p talos-cli registry` passed.
+- T121-B lint: `cargo clippy -p talos-session -p talos-cli -- -D warnings` passed.
+- T121-B format: `cargo fmt --all -- --check` passed.
+- T121-B workspace compile: `cargo check --workspace` passed.
+- Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings after T121-B.
 
 ## Variance And Residuals
 
 - No scope variance at activation.
+- T121 residual: `todo_update`, `todo_delete`, and dependency mutation tools remain for T121-C
+  before TODO-001 can claim all agent write operations.
 
 ## Retrospective
 

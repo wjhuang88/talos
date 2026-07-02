@@ -395,3 +395,15 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Full packet validation passed: `cargo fmt --all -- --check`; `cargo check --workspace`;
   `scripts/validate_project_governance.sh .`.
 - Recovery: review diff, commit/push, sync issue #8, then continue to T121-B agent todo tool API.
+
+### I078 T121-B Implementation Checkpoint (2026-07-02)
+
+- Implemented initial agent todo tools in `talos-session`: `todo_create`, `todo_update_status`,
+  and `todo_query`.
+- Registered todo tools in print and TUI registries through the existing permission-aware wrappers.
+- Validation passed: `cargo test -p talos-session todo`; `cargo test -p talos-cli registry`;
+  `cargo clippy -p talos-session -p talos-cli -- -D warnings`; `cargo fmt --all -- --check`;
+  `cargo check --workspace`; `scripts/validate_project_governance.sh .`.
+- Residual: T121-C must add `todo_update`, `todo_delete`, and dependency mutation tools before
+  TODO-001 can claim complete agent-side write coverage.
+- Recovery: commit/push, sync issue #8, then continue to T121-C.

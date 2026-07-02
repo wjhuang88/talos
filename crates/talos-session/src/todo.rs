@@ -4,11 +4,18 @@
 //! session-owned planning data in SQLite so later TUI views, tools, and prompt integration can share
 //! one durable source of truth.
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, Result as RusqliteResult, params};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
+use talos_core::tool_parameters;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -54,7 +61,7 @@ impl From<serde_json::Error> for TodoError {
 }
 
 /// Status for a session todo item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TodoStatus {
     /// Not started.
@@ -88,7 +95,7 @@ impl TodoStatus {
 }
 
 /// Priority for a session todo item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TodoPriority {
     /// Low priority.
@@ -158,7 +165,7 @@ pub struct TodoDependency {
 }
 
 /// Parameters for creating a todo item.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTodo {
     /// Owning session id.
     pub session_id: Uuid,
@@ -175,7 +182,7 @@ pub struct CreateTodo {
 }
 
 /// Parameters for updating todo item fields.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TodoUpdate {
     /// New title.
     pub title: Option<String>,
@@ -190,7 +197,7 @@ pub struct TodoUpdate {
 }
 
 /// Filter for querying todos.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TodoQuery {
     /// Restrict to one status.
     pub status: Option<TodoStatus>,
@@ -198,6 +205,58 @@ pub struct TodoQuery {
     pub priority: Option<TodoPriority>,
     /// Require one tag.
     pub tag: Option<String>,
+}
+
+/// Input for the `todo_create` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoCreateInput {
+    /// Owning session id.
+    pub session_id: String,
+    /// Short title.
+    pub title: String,
+    /// Optional longer description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Planning priority. Defaults to medium when omitted.
+    #[serde(default = "default_priority")]
+    pub priority: TodoPriority,
+    /// Optional turn id assignment.
+    #[serde(default)]
+    pub assigned_to_turn: Option<String>,
+    /// Tags for filtering.
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// Input for the `todo_update_status` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoUpdateStatusInput {
+    /// Owning session id.
+    pub session_id: String,
+    /// Todo item id.
+    pub id: String,
+    /// New status.
+    pub status: TodoStatus,
+}
+
+/// Input for the `todo_query` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoQueryInput {
+    /// Owning session id.
+    pub session_id: String,
+    /// Restrict to one status.
+    #[serde(default)]
+    pub status: Option<TodoStatus>,
+    /// Restrict to one priority.
+    #[serde(default)]
+    pub priority: Option<TodoPriority>,
+    /// Require one tag.
+    #[serde(default)]
+    pub tag: Option<String>,
+}
+
+fn default_priority() -> TodoPriority {
+    TodoPriority::Medium
 }
 
 /// SQLite repository for session todo state.
@@ -563,6 +622,259 @@ impl TodoRepository {
     }
 }
 
+/// Agent tool that creates a session todo item.
+#[derive(Debug, Clone)]
+pub struct TodoCreateTool {
+    db_path: PathBuf,
+}
+
+impl TodoCreateTool {
+    /// Create a todo creation tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo creation tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoCreateTool {
+    fn name(&self) -> &str {
+        "todo_create"
+    }
+
+    fn description(&self) -> &str {
+        "Create a session-scoped todo item for agent planning"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoCreateInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoCreateInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => return ToolResult::error(format!("Invalid todo_create input: {err}")),
+        };
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let session_id = match parse_tool_uuid("session_id", &input.session_id) {
+            Ok(session_id) => session_id,
+            Err(err) => return ToolResult::error(err),
+        };
+        let created = match repo.create(CreateTodo {
+            session_id,
+            title: input.title,
+            description: input.description,
+            priority: input.priority,
+            assigned_to_turn: input.assigned_to_turn,
+            tags: input.tags,
+        }) {
+            Ok(item) => item,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        json_tool_result(&created)
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Write, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "title", "priority"]
+    }
+}
+
+/// Agent tool that updates a session todo status.
+#[derive(Debug, Clone)]
+pub struct TodoUpdateStatusTool {
+    db_path: PathBuf,
+}
+
+impl TodoUpdateStatusTool {
+    /// Create a todo status update tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo status update tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoUpdateStatusTool {
+    fn name(&self) -> &str {
+        "todo_update_status"
+    }
+
+    fn description(&self) -> &str {
+        "Update the status of a session-scoped todo item"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoUpdateStatusInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoUpdateStatusInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => {
+                return ToolResult::error(format!("Invalid todo_update_status input: {err}"));
+            }
+        };
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let session_id = match parse_tool_uuid("session_id", &input.session_id) {
+            Ok(session_id) => session_id,
+            Err(err) => return ToolResult::error(err),
+        };
+        let id = match parse_tool_uuid("id", &input.id) {
+            Ok(id) => id,
+            Err(err) => return ToolResult::error(err),
+        };
+        match repo.update_status(session_id, id, input.status) {
+            Ok(item) => json_tool_result(&item),
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Write, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "id", "status"]
+    }
+}
+
+/// Agent tool that queries session todo items.
+#[derive(Debug, Clone)]
+pub struct TodoQueryTool {
+    db_path: PathBuf,
+}
+
+impl TodoQueryTool {
+    /// Create a todo query tool backed by a SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    /// Create a todo query tool using the standard database under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"))
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoQueryTool {
+    fn name(&self) -> &str {
+        "todo_query"
+    }
+
+    fn description(&self) -> &str {
+        "Query session-scoped todo items without modifying them"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoQueryInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoQueryInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => return ToolResult::error(format!("Invalid todo_query input: {err}")),
+        };
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let session_id = match parse_tool_uuid("session_id", &input.session_id) {
+            Ok(session_id) => session_id,
+            Err(err) => return ToolResult::error(err),
+        };
+        match repo.list(
+            session_id,
+            TodoQuery {
+                status: input.status,
+                priority: input.priority,
+                tag: input.tag,
+            },
+        ) {
+            Ok(items) => json_tool_result(&items),
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(ToolNature::Read, input)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["session_id", "status", "priority", "tag"]
+    }
+}
+
+fn open_tool_repo(db_path: &Path) -> Result<TodoRepository, TodoError> {
+    let repo = TodoRepository::new(db_path)?;
+    repo.init_schema()?;
+    Ok(repo)
+}
+
+fn parse_tool_uuid(field: &str, value: &str) -> Result<Uuid, String> {
+    Uuid::parse_str(value).map_err(|err| format!("Invalid {field} UUID: {err}"))
+}
+
+fn json_tool_result(value: &impl Serialize) -> ToolResult {
+    match serde_json::to_string_pretty(value) {
+        Ok(json) => ToolResult::success(json),
+        Err(err) => ToolResult::error(format!("Failed to serialize todo result: {err}")),
+    }
+}
+
+fn todo_permission_facet(nature: ToolNature, input: &Value) -> ToolPermissionFacet {
+    let session = input
+        .get("session_id")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    ToolPermissionFacet::with_resource(
+        nature,
+        format!("session:{session}:todos"),
+        ToolResourceKind::Remote,
+    )
+    .with_description("session todo list")
+}
+
 fn params_for_item(item: &TodoItem) -> Result<[String; 10], TodoError> {
     Ok([
         item.id.to_string(),
@@ -638,6 +950,7 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use talos_core::tool::AgentTool;
     use tempfile::tempdir;
 
     fn repo() -> TodoRepository {
@@ -826,5 +1139,70 @@ mod tests {
 
         assert_eq!(repo.db_path(), &dir.path().join("todos.sqlite"));
         assert!(repo.get(session_id, item.id).expect("get").is_some());
+    }
+
+    #[tokio::test]
+    async fn todo_tools_create_query_and_update_status() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let create_tool = TodoCreateTool::new(db_path.clone());
+        let query_tool = TodoQueryTool::new(db_path.clone());
+        let update_tool = TodoUpdateStatusTool::new(db_path);
+        let session_id = Uuid::new_v4();
+
+        let created = create_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "title": "tool item",
+                "priority": "high",
+                "tags": ["tool"]
+            }))
+            .await;
+        assert!(!created.is_error, "{}", created.content);
+        let item: TodoItem = serde_json::from_str(&created.content).expect("created item");
+
+        let queried = query_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "tag": "tool"
+            }))
+            .await;
+        assert!(!queried.is_error, "{}", queried.content);
+        let items: Vec<TodoItem> = serde_json::from_str(&queried.content).expect("query items");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, item.id);
+
+        let updated = update_tool
+            .execute(serde_json::json!({
+                "session_id": session_id.to_string(),
+                "id": item.id.to_string(),
+                "status": "completed"
+            }))
+            .await;
+        assert!(!updated.is_error, "{}", updated.content);
+        let item: TodoItem = serde_json::from_str(&updated.content).expect("updated item");
+        assert_eq!(item.status, TodoStatus::Completed);
+        assert!(item.completed_at.is_some());
+    }
+
+    #[test]
+    fn todo_tools_expose_permission_profiles() {
+        let dir = tempdir().expect("temp dir");
+        let session_id = Uuid::new_v4();
+        let create_tool = TodoCreateTool::from_sessions_dir(dir.path());
+        let query_tool = TodoQueryTool::from_sessions_dir(dir.path());
+
+        let write_profile =
+            create_tool.permission_profile(&serde_json::json!({ "session_id": session_id }));
+        let read_profile =
+            query_tool.permission_profile(&serde_json::json!({ "session_id": session_id }));
+
+        assert_eq!(write_profile[0].nature, ToolNature::Write);
+        assert_eq!(read_profile[0].nature, ToolNature::Read);
+        let expected = format!("session:{session_id}:todos");
+        assert_eq!(
+            write_profile[0].resource.as_deref(),
+            Some(expected.as_str())
+        );
     }
 }

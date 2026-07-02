@@ -16,6 +16,7 @@ use talos_core::tool::{
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
+use talos_session::{SessionManager, TodoCreateTool, TodoQueryTool, TodoUpdateStatusTool};
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -120,6 +121,17 @@ fn default_resource_kind(nature: talos_core::tool::ToolNature) -> ResourceKind {
             ResourceKind::Path
         }
     }
+}
+
+fn default_todo_tools() -> Vec<Arc<dyn AgentTool>> {
+    let Ok(sessions_dir) = SessionManager::default_sessions_dir() else {
+        return Vec::new();
+    };
+    vec![
+        Arc::new(TodoCreateTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoUpdateStatusTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoQueryTool::from_sessions_dir(&sessions_dir)),
+    ]
 }
 
 /// Permission-aware tool wrapper for TUI mode.
@@ -502,6 +514,13 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
         approval: approval.clone(),
         print_mode: true,
     }));
+    for tool in default_todo_tools() {
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: tool,
+            approval: approval.clone(),
+            print_mode: true,
+        }));
+    }
 
     registry
 }
@@ -617,6 +636,12 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(WebSearchTool::new()),
         approval: approval_handler.clone(),
     }));
+    for tool in default_todo_tools() {
+        registry.register(Arc::new(TuiPermissionAwareTool {
+            inner: tool,
+            approval: approval_handler.clone(),
+        }));
+    }
     registry
 }
 
@@ -746,5 +771,20 @@ mod tests {
                 server: "test".to_string()
             }
         );
+    }
+
+    #[test]
+    fn print_and_tui_registries_include_todo_tools() {
+        let print_registry = build_print_tool_registry();
+        assert!(print_registry.get("todo_create").is_some());
+        assert!(print_registry.get("todo_update_status").is_some());
+        assert!(print_registry.get("todo_query").is_some());
+
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
+        let tui_registry = build_tui_tool_registry(approval, PathBuf::from("."));
+        assert!(tui_registry.get("todo_create").is_some());
+        assert!(tui_registry.get("todo_update_status").is_some());
+        assert!(tui_registry.get("todo_query").is_some());
     }
 }

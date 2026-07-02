@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | In Progress — I078/T121-A repository implemented, T121-B tools pending |
+| Status | In Progress — I078/T121-A/B in Review, remaining mutation tools pending |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -93,6 +93,24 @@ Validation:
 - `cargo fmt --all -- --check`
 - `cargo check --workspace`
 - `scripts/validate_project_governance.sh .`
+
+T121-B implementation (2026-07-02): added initial agent tools in `talos-session`:
+`todo_create`, `todo_update_status`, and `todo_query`. Registered them in print and TUI tool
+registries through the existing permission-aware wrappers. The tools open the repository by path
+per execution so they do not share a SQLite connection across threads. Write tools expose Write
+permission facets; query is read-only.
+
+Validation:
+
+- `cargo test -p talos-session todo`
+- `cargo test -p talos-cli registry`
+- `cargo clippy -p talos-session -p talos-cli -- -D warnings`
+- `cargo fmt --all -- --check`
+- `cargo check --workspace`
+- `scripts/validate_project_governance.sh .`
+
+Residual for next packet: implement `todo_update`, `todo_delete`, and dependency mutation tools
+before claiming all TODO-001 agent write operations are complete.
 
 ### Phase 2: TUI + Slash Commands
 - TodoPanel component (read-only)
