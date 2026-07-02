@@ -113,9 +113,13 @@ docs/iterations/
 | I074 | Exploration Types Decomposition | **Complete (2026-06-28)** | ARCH-029 split exploration domain entities into `types.rs`; `lib.rs` 1070→958 lines; workspace gates pass. See `I074-exploration-types-decomposition.md`. |
 | I075 | Month 1 — Starting Gate and Tooling Hardening | **Complete (2026-07-01)** | Original self-bootstrap plan executed through Month-3 closeout; its Month-4 future work is superseded by the 2026-07-01 replan. See `I075-month1-starting-gate-and-tooling-hardening.md` and `../tasks/2026-07-01-four-month-self-bootstrap-replan.md`. |
 | I076 | Month 1 — Provider, Tooling, And Validation Loop | **Complete (2026-07-01)** | Weeks 1-4 of the 2026-07-01 replan delivered: provider usage, status display, write/edit output, model-switch markers, validation-loop design, and read-only validation plan surface. Full workspace and governance closeout passed. See `I076-month1-provider-tooling-validation.md`. |
-| I077 | Month 2 — Plugin, Exec, And Web Security | **Active (2026-07-01)** | Weeks 5-8 of the 2026-07-01 replan: plugin security, web/browser security, direct exec policy and implementation if cleared. T110 plugin MVP security review is in Review. See `I077-month2-plugin-exec-web-security.md`. |
-| I078 | Month 3 — Session Orchestration, Todo, Memory, And Thinking | **Planned (2026-07-01)** | Weeks 9-12 of the 2026-07-01 replan: slash auto-execute, session todo foundations, thinking separation, validation-backed rehearsal. See `I078-month3-session-todo-memory-thinking.md`. |
-| I079 | Month 4 — Release Readiness And Handoff | **Planned (2026-07-01)** | Weeks 13-16 of the 2026-07-01 replan: reliability sweep, memory injection decision, publish gate packet, REL-002 readiness, closeout, and handoff. See `I079-month4-release-readiness-handoff.md`. |
+| I077 | Month 2 — Plugin, Exec, And Web Security | **Complete (2026-07-02)** | Weeks 5-8 of the 2026-07-01 replan delivered plugin security review/tool integration, web/dashboard security review/fixes, and direct exec policy/implementation. See `I077-month2-plugin-exec-web-security.md`. |
+| I078 | Month 3 — Session Orchestration, Todo, Memory, And Thinking | **Complete (2026-07-02)** | Weeks 9-12 of the 2026-07-01 replan delivered slash auto-execute, session todo foundations, thinking separation, and self-bootstrap gap evidence. See `I078-month3-session-todo-memory-thinking.md`. |
+| I079 | Month 4 — Release Readiness And Handoff | **Complete (2026-07-02)** | Weeks 13-16 of the 2026-07-01 replan delivered reliability sweep, memory injection decision, publish gate packet, REL-002 readiness report, closeout, handoff, and maintainer feedback fixes. See `I079-month4-release-readiness-handoff.md`. |
+| I080 | Frontline Month 1 — Config And Governance Visibility | **Planned (2026-07-02)** | Weeks 1-4 of the 2026-07-02 frontline plan: config subcommands, composer navigation shortcuts, read-only governance command/dashboard surfaces, and closeout. See `I080-frontline-config-governance-visibility.md`. |
+| I081 | Frontline Month 2 — Extension And Distribution Discipline | **Planned (2026-07-02)** | Weeks 5-8 of the 2026-07-02 frontline plan: plugin diagnostics, hook listing, read-only plugin polish, local opt-in UX, asset distribution design, and closeout. See `I081-frontline-extension-distribution.md`. |
+| I082 | Frontline Month 3 — Document Ingestion And Parser Footprint | **Planned (2026-07-02)** | Weeks 9-12 of the 2026-07-02 frontline plan: document extraction, HTML/link extraction, link references, parser feature gates, and closeout. See `I082-frontline-ingestion-footprint.md`. |
+| I083 | Frontline Month 4 — Ecosystem Compatibility And Release Posture | **Planned (2026-07-02)** | Weeks 13-16 of the 2026-07-02 frontline plan: shared skills policy/implementation, REL-002 rehearsal evidence, docs sweep, release posture, closeout, and handoff. See `I083-frontline-ecosystem-release-posture.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -145,10 +149,14 @@ rewrite published iteration baselines.
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |
-| I076 | Active | Activated 2026-07-01 for T100-T103. Continue from current packet evidence in `docs/iterations/I076-month1-provider-tooling-validation.md`. |
-| I077 | Planned | Planned Month 2 shell for high-risk plugin/web/exec work; wait for I076 closeout or explicit replan. |
-| I078 | Planned | Planned Month 3 shell for orchestration/todo/thinking work; wait for I077 closeout or explicit replan. |
-| I079 | Planned | Planned Month 4 shell for release readiness/handoff; wait for I078 closeout or explicit replan. |
+| I076 | Complete | Closed 2026-07-01. Removed from non-terminal inventory. |
+| I077 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
+| I078 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
+| I079 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
+| I080 | Planned | First monthly shell for the 2026-07-02 frontline development plan; activate when execution begins from F100. |
+| I081 | Planned | Second monthly shell for the 2026-07-02 frontline development plan; wait for I080 closeout or explicit replan. |
+| I082 | Planned | Third monthly shell for the 2026-07-02 frontline development plan; wait for I081 closeout or explicit replan. |
+| I083 | Planned | Fourth monthly shell for the 2026-07-02 frontline development plan; wait for I082 closeout or explicit replan. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |
