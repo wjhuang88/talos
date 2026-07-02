@@ -82,6 +82,7 @@ Each qualifying self-bootstrap session must record:
 | Date | Plan Item | Record | REL-002 Qualification |
 |---|---|---|---|
 | 2026-07-02 | T123 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md` | Does not qualify. Talos generated a read-only validation plan, but Codex remained the primary executor for implementation, validation execution, docs, git, push, and issue sync. |
+| 2026-07-02 | T132 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md` | Does not qualify. Talos generated workspace/governance validation plans for an architecture-sensitive ADR slice, but Codex remained the primary executor and the >60% autonomous coverage target was missed. |
 
 ## Relationship To Other Work
 

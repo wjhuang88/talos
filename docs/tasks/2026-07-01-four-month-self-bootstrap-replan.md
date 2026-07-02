@@ -156,7 +156,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Complete |
 | T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Complete |
 | T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Complete |
-| T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Planned |
+| T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Complete — target missed |
 | T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Planned |
 | T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Planned |
 | T135 | 15 | A | Produce REL-002 readiness report and next-quarter residual owner list. | T132/T134 | governance validation | Planned |
@@ -535,4 +535,22 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   still open, but its automatic-injection policy acceptance item is complete.
 - Verification passed: `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push T131, then continue to T132 third rehearsal. Do not publish, tag, or
+  release without explicit approval.
+
+### I079 T132 Rehearsal Checkpoint (2026-07-02)
+
+- T132 produced
+  `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md`.
+- Rehearsal slice: T131/ADR-033 associative memory injection policy, an architecture-sensitive
+  model-facing memory decision.
+- Talos executed Phase 1 validation planning only:
+  `./target/debug/talos validate plan --profile workspace`;
+  `./target/debug/talos validate plan --profile workspace --json`;
+  `./target/debug/talos validate plan --profile governance`.
+- Result: useful gap evidence, not a REL-002 qualifying session. Estimated Talos participation was
+  20%; the >60% autonomous validation target was missed because Talos could not execute validation,
+  capture command evidence, edit docs, commit, push, or sync issues.
+- REL-002 rehearsal evidence was updated with the T132 non-qualification record.
+- Verification passed: `scripts/validate_project_governance.sh .`.
+- Recovery: commit/push T132, then continue to T133 publish gate packet. Do not publish, tag, or
   release without explicit approval.

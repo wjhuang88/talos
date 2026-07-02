@@ -72,19 +72,23 @@
 | 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I079 Planned -> activated; R27 high-risk gate remains In Progress; Architect-owned high-risk work group remains Paused; legacy review/planned rows remain untouched unless selected by T130-T137. |
 | 2026-07-02 | T130 | Completed tool reliability sweep. Fixed the one active ignored agent test by synchronizing on session completion events, suppressed intentional example-helper dead-code warning noise, and recorded shell naming / Windows support as TOOL-006 residual rather than changing tool contracts in this slice. Evidence: `docs/tasks/2026-07-02-t130-tool-reliability-sweep.md`. |
 | 2026-07-02 | T131 | Completed associative memory injection decision. ADR-033 rejects default-on associative injection for v1 readiness, keeps graph recall explicit, and requires any future automatic associative prompt section to be a separate default-disabled experiment with benchmark evidence. |
+| 2026-07-02 | T132 | Completed third self-bootstrap rehearsal as gap evidence. Talos generated workspace/governance validation plans for the architecture-sensitive ADR-033 slice, but remained read-only; estimated self-bootstrap coverage was 20%, so the >60% target was missed and REL-002 remains unsatisfied. Evidence: `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md`. |
 
 ## Verification Evidence
 
 - Activation governance: `scripts/validate_project_governance.sh .` passed with 0 warnings before activation.
 - T130 targeted validation: `cargo fmt --all -- --check`; `cargo test -p talos-agent test_interrupt_after_success_preserves_history`; `cargo test -p talos-runtime --examples`; `cargo clippy -p talos-agent -p talos-runtime -- -D warnings`; `rg -n "#\\[ignore\\]" crates docs`; `cargo test -p talos-agent`; `scripts/validate_project_governance.sh .`.
 - T131 governance validation: `scripts/validate_project_governance.sh .`.
+- T132 Talos rehearsal commands: `./target/debug/talos validate plan --profile workspace`; `./target/debug/talos validate plan --profile workspace --json`; `./target/debug/talos validate plan --profile governance`.
+- T132 governance validation: `scripts/validate_project_governance.sh .`.
 
 ## Variance And Residuals
 
 - T130 scope variance: shell naming and Windows command support were inventoried but left to TOOL-006 because they require user-facing schema, permission, and compatibility decisions.
 - T131 scope variance: no automatic associative injection code was added; the task closed as an ADR-backed decision because the available evidence does not justify new model-facing automation.
+- T132 target variance: the planned >60% autonomous validation target was missed; current Talos participation remains read-only validation planning.
 - Real publish/tag/release remains explicitly out of scope without maintainer approval.
-- REL-002 is not satisfied by I078; T132/T135 must report the remaining Talos-primary execution gap.
+- REL-002 is not satisfied by I078/T132; T135 must report the remaining Talos-primary execution gap.
 
 ## Retrospective
 
