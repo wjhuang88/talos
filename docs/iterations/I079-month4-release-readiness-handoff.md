@@ -1,6 +1,6 @@
 # Iteration I079: Month 4 — Release Readiness And Handoff
 
-> Document status: Planned
+> Document status: Active (2026-07-02)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 13-16 of the 2026-07-01 replan: final tool reliability sweep,
 > associative memory injection decision, third self-bootstrap rehearsal, publish gate packet,
@@ -68,14 +68,18 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-01 | Planning | Created as Month 4 shell for the replan. |
+| 2026-07-02 | Activation | Activated after I078/T126 closeout was pushed and issues #7/#8/#15 were closed. First packet is T130 tool reliability sweep. |
+| 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I079 Planned -> activated; R27 high-risk gate remains In Progress; Architect-owned high-risk work group remains Paused; legacy review/planned rows remain untouched unless selected by T130-T137. |
 
 ## Verification Evidence
 
-- Pending.
+- Activation governance: `scripts/validate_project_governance.sh .` passed with 0 warnings before activation.
 
 ## Variance And Residuals
 
-- Pending.
+- No scope variance at activation.
+- Real publish/tag/release remains explicitly out of scope without maintainer approval.
+- REL-002 is not satisfied by I078; T132/T135 must report the remaining Talos-primary execution gap.
 
 ## Retrospective
 

@@ -493,3 +493,12 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   Talos-primary self-bootstrap session because Codex remained the primary executor.
 - Recovery: commit/push T126 closeout, close issues #7/#8/#15, then continue to I079 release
   readiness/handoff. Do not publish, tag, or release without explicit approval.
+
+### I079 Activation Checkpoint (2026-07-02)
+
+- I079 activated after I078/T126 was pushed and issues #7/#8/#15 were closed.
+- First packet selected: T130 tool reliability sweep.
+- Scope guard remains unchanged: no publish, tag, release, Guardian approval, exec DSL, browser
+  connector, web write route, or plugin host-call expansion without explicit approval.
+- Recovery: commit/push activation docs, then start T130 with an inventory of flaky tests, shell
+  naming residuals, and Windows/Unix command assumptions.
