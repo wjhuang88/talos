@@ -355,7 +355,11 @@ fn secondary_result_attrs() -> HistoryAttrs {
 }
 
 fn secondary_result_color() -> Option<CColor> {
-    Some(CColor::Grey)
+    Some(CColor::Rgb {
+        r: 0x9A,
+        g: 0xA4,
+        b: 0xB2,
+    })
 }
 
 pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {

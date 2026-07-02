@@ -773,9 +773,23 @@ fn tool_result_scrollback_styles_primary_and_detail_lines() {
     assert_eq!(lines[0].segments[0].fg, Some(CColor::Green));
     assert!(!lines[1].segments[0].attrs.bold);
     assert!(!lines[1].segments[0].attrs.dim);
-    assert_eq!(lines[1].segments[0].fg, Some(CColor::Grey));
+    assert_eq!(
+        lines[1].segments[0].fg,
+        Some(CColor::Rgb {
+            r: 0x9A,
+            g: 0xA4,
+            b: 0xB2,
+        })
+    );
     assert!(!lines[2].segments[0].attrs.dim);
-    assert_eq!(lines[2].segments[0].fg, Some(CColor::Grey));
+    assert_eq!(
+        lines[2].segments[0].fg,
+        Some(CColor::Rgb {
+            r: 0x9A,
+            g: 0xA4,
+            b: 0xB2,
+        })
+    );
 }
 
 #[test]
