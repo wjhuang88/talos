@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | MEM-008 |
 | Priority | P2 |
-| Status | Research |
+| Status | Research — injection policy decided |
 | Depends On | MEM-001; MEM-006 |
 | Relates To | MEM-004; MEM-005; MEM-007; TOOL-014 |
 | Blocks | Associative recall; memory activation graph; optional associative memory prompt injection |
@@ -143,6 +143,17 @@ Questions to answer before implementation:
 Default stance until proven otherwise: automatic associative injection is **off**. The first
 implementation should prefer explicit or runtime-triggered associative recall.
 
+### T131 Decision Update (2026-07-02)
+
+ADR-033 decides the automatic associative memory injection policy:
+
+- default-on associative injection is rejected for v1 readiness;
+- no new config-gated automatic associative injection implementation is added in T131;
+- associative graph recall remains explicit through `MemoryStore::graph_recall()`;
+- any future automatic associative prompt section must be a separate default-disabled experiment
+  with benchmark evidence, stable-prefix tests, independent budgets, advisory labelling, path/score
+  provenance, and hidden-output filtering.
+
 ## Implementation Phases
 
 ### Phase 0: Research And Metrics
@@ -187,8 +198,9 @@ implementation should prefer explicit or runtime-triggered associative recall.
 - [ ] Produce a design note comparing weighted graph recall with current FTS/entity retrieval.
 - [ ] Define schema and migration strategy for weighted nodes/edges/traces.
 - [ ] Define deterministic bounded association scoring with tests.
-- [ ] Decide whether automatic associative memory injection should be rejected, opt-in, or
-      implemented as default-off experimental behavior.
+- [x] Decide whether automatic associative memory injection should be rejected, opt-in, or
+      implemented as default-off experimental behavior. ADR-033 keeps graph recall explicit and
+      rejects default-on behavior for v1 readiness.
 - [ ] If implemented, prove associative memory injection does not modify the stable prompt prefix.
 - [ ] Demonstrate at least three agent workflows where associative recall improves useful context
       without overwhelming the model.

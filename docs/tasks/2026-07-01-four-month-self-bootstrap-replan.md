@@ -155,7 +155,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Complete |
 | T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Complete |
 | T130 | 13 | C | Tool reliability sweep: flaky tests, shell naming residuals, Windows/Unix assumptions. | T104/T115 | issue list + targeted fixes | Complete |
-| T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Planned |
+| T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Complete |
 | T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Planned |
 | T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Planned |
 | T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Planned |
@@ -521,3 +521,18 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push T130, then continue to T131 associative memory injection decision. Do not
   publish, tag, or release without explicit approval.
+
+### I079 T131 Decision Checkpoint (2026-07-02)
+
+- T131 produced ADR-033 (`docs/decisions/033-associative-memory-injection-policy.md`).
+- Decision: reject default-on associative memory injection for v1 readiness; keep graph recall
+  explicit through `MemoryStore::graph_recall()`; do not add a new automatic associative injection
+  config implementation in T131.
+- Future automatic associative prompt injection must be a separate default-disabled experiment with
+  benchmark evidence, stable-prefix tests, independent budgets, advisory labelling, path/score
+  provenance, and hidden-output filtering.
+- MEM-008 remains Research because schema/migration and workflow demonstration acceptance items are
+  still open, but its automatic-injection policy acceptance item is complete.
+- Verification passed: `scripts/validate_project_governance.sh .`.
+- Recovery: commit/push T131, then continue to T132 third rehearsal. Do not publish, tag, or
+  release without explicit approval.

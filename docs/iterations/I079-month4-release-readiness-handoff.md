@@ -71,15 +71,18 @@
 | 2026-07-02 | Activation | Activated after I078/T126 closeout was pushed and issues #7/#8/#15 were closed. First packet is T130 tool reliability sweep. |
 | 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I079 Planned -> activated; R27 high-risk gate remains In Progress; Architect-owned high-risk work group remains Paused; legacy review/planned rows remain untouched unless selected by T130-T137. |
 | 2026-07-02 | T130 | Completed tool reliability sweep. Fixed the one active ignored agent test by synchronizing on session completion events, suppressed intentional example-helper dead-code warning noise, and recorded shell naming / Windows support as TOOL-006 residual rather than changing tool contracts in this slice. Evidence: `docs/tasks/2026-07-02-t130-tool-reliability-sweep.md`. |
+| 2026-07-02 | T131 | Completed associative memory injection decision. ADR-033 rejects default-on associative injection for v1 readiness, keeps graph recall explicit, and requires any future automatic associative prompt section to be a separate default-disabled experiment with benchmark evidence. |
 
 ## Verification Evidence
 
 - Activation governance: `scripts/validate_project_governance.sh .` passed with 0 warnings before activation.
 - T130 targeted validation: `cargo fmt --all -- --check`; `cargo test -p talos-agent test_interrupt_after_success_preserves_history`; `cargo test -p talos-runtime --examples`; `cargo clippy -p talos-agent -p talos-runtime -- -D warnings`; `rg -n "#\\[ignore\\]" crates docs`; `cargo test -p talos-agent`; `scripts/validate_project_governance.sh .`.
+- T131 governance validation: `scripts/validate_project_governance.sh .`.
 
 ## Variance And Residuals
 
 - T130 scope variance: shell naming and Windows command support were inventoried but left to TOOL-006 because they require user-facing schema, permission, and compatibility decisions.
+- T131 scope variance: no automatic associative injection code was added; the task closed as an ADR-backed decision because the available evidence does not justify new model-facing automation.
 - Real publish/tag/release remains explicitly out of scope without maintainer approval.
 - REL-002 is not satisfied by I078; T132/T135 must report the remaining Talos-primary execution gap.
 
