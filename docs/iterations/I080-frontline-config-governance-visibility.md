@@ -106,10 +106,22 @@
 
 - F101: README doc inconsistency was the only gap; subcommands were already shipped in I045.
 - F102: Added `Config::validate()` to `run_config_set` before save (was missing at CLI path).
-- F103: **Deferred.** TUI `/config` write UI remains future work. CLI config commands + `/model` picker cover current needs.
+- F103: **Deferred with UX spec.** TUI `/config` write UI remains future work.
+  - **Current coverage**: `talos config list/get/set` CLI subcommands (I045+F102) handle all
+    editing needs; `/model` picker handles runtime model switching; `/status` shows model/provider
+    at a glance.
+  - **Gap**: No in-TUI config editing without dropping to a terminal. Users who live in the TUI
+    full-screen must exit or open a second terminal to change config.
+  - **Deferral rationale**: A TUI config editor requires careful UX design (inline form vs.
+    command-driven), permission considerations (writing config from within the agent loop), and
+    test infrastructure for multi-field form interactions. These exceed Month-1 scope.
+  - **Reactivation trigger**: User demand for in-TUI config editing, or when the model picker
+    proves insufficient for provider/credential management.
+  - **Recommended future slice**: Read-only `/config` that dumps the masked config (same as
+    `talos config list`) as a first step. Write-capable `/config set key value` as a second step.
 - F104: Evolution panel toggle moved from `Ctrl+E` to `Ctrl+G`.
-- F105: Implemented as a `governance_summary` module inside `talos-conversation` (not via `talos-cli`'s governance.rs) to avoid cross-crate coupling. Reads BOARD.md, iterations/README.md, and manifest.yaml directly.
-- F106: **Verified** — dashboard `/governance` route already shipped, auth-gated (or loopback-only per F108), and redacted.
+- F105: Implemented as a `governance_summary` module inside `talos-conversation` (not via `talos-cli`'s governance.rs) to avoid cross-crate coupling. Reads manifest, board disposition, open iterations, active backlog items, and validation harness status. Dashboard governance route (F106) enriched with manifest + iteration data.
+- F106: **Enriched** — dashboard `/governance` route now includes manifest summary, board disposition, and open iteration IDs (previously board-only). Auth-gated or loopback-only per F108, and redacted at the response boundary.
 - F108: `loopback_only` default changed from `false` to `true` per maintainer direction (second commit). ADR-031 amended.
 
 ## Retrospective

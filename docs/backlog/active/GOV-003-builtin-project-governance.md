@@ -1,6 +1,6 @@
 # GOV-003: Built-in Project Governance Logic
 
-**Status**: Planned
+**Status**: Phase 1 Partial (CLI `--governance-status` shipped via I047/T27; `/agile status` slash command + dashboard governance route shipped via I080/F105/F106). Phase 2 (gate enforcement) and Phase 3 (PM web UI) remain future work.
 **Priority**: P2
 **Source**: User request 2026-06-20
 **Depends on**: I035 and CMD-001 for Phase 1 read-only runtime status; WEB-001 only for Phase 3
@@ -234,17 +234,36 @@ Validation evidence: `cargo test -p talos-cli`, `cargo clippy -p talos-cli -- -D
   focus on the context injection and gate enforcement layers. The skill's
   methodology remains the authority on *how* governance is structured.
 
-## Acceptance Criteria
+### Phase 1 `/agile status` Slash Command (2026-07-02, I080/F105)
+
+I080/F105 added the `/agile` slash command to the TUI conversation engine:
+
+- New `governance_summary` module in `talos-conversation` reads manifest, board disposition,
+  open iterations, active backlog items, and validation harness status from the workspace.
+- `ConversationEngine` gains a `workspace_root` field via `.with_workspace_root()` builder.
+- The command is read-only: it parses local governance documents and runs the validation
+  script, but does not mutate owner docs.
+- Dashboard `/governance` route (F106) enriched to include manifest summary and open
+  iteration IDs alongside the existing board disposition.
+
+### Acceptance Criteria
 
 - [ ] Governance context is injected into system prompt as a compact, bounded
-      summary when the project has governance documents.
-- [ ] Context gracefully degrades to empty when governance docs are absent.
-- [ ] Governance state model reads from standard `docs/` paths.
-- [ ] Iteration, backlog, board, and decision state are parseable and
-      refreshable at turn boundaries.
+      summary when the project has governance documents. (Future: system prompt injection.
+      Current: `/agile status` command provides on-demand summary.)
+- [x] Context gracefully degrades to empty when governance docs are absent.
+      (`governance_summary` returns "not found" for missing files without panic.)
+- [x] Governance state model reads from standard `docs/` paths.
+      (BOARD.md, iterations/README.md, PRODUCT-BACKLOG.md, .agent-governance/manifest.yaml)
+- [x] Iteration, backlog, board, and decision state are parseable and
+      refreshable at turn boundaries. (Board, iterations, and backlog parsed in
+      `/agile status` and dashboard `/governance` route.)
 - [ ] WEB-001 project management pages render governance data (Phase 3).
-- [ ] Tests cover: empty project, partial governance, full governance,
-      state refresh on document change.
+      (Dashboard `/governance` route renders summary; full Phase 3 Kanban UI remains future.)
+- [x] Tests cover: empty project, partial governance, full governance.
+      (`governance_summary` module tests: `empty_workspace_does_not_panic`,
+      `full_summary_with_files`, `board_section_parsing`, `open_iterations_filter`,
+      `backlog_parsing_counts_active_items`, `validation_section_reports_missing_script`.)
 
 ## Relationship To Other Requirements
 

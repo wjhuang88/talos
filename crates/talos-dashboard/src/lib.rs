@@ -1,9 +1,11 @@
 //! Read-only loopback dashboard server for Talos (ADR-031).
 //!
-//! Binds to `127.0.0.1:0` (OS-assigned port), authenticates every request with
-//! a per-process bearer token, and serves four GET-only routes from a
-//! pre-computed [`DashboardSnapshot`]. No write, action, or tool-execution
-//! routes are registered.
+//! Binds to `127.0.0.1:0` (OS-assigned port) and serves GET-only routes from a
+//! pre-computed [`DashboardSnapshot`]. By default (`loopback_only = true`) the
+//! per-process bearer token is skipped and the loopback bind is the only access
+//! control. Set `loopback_only = false` to require `Authorization: Bearer
+//! <token>` on every request. No write, action, or tool-execution routes are
+//! registered.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
