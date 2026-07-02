@@ -153,7 +153,7 @@ rewrite published iteration baselines.
 | I077 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I078 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I079 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I080 | Planned | First monthly shell for the 2026-07-02 frontline development plan; activate when execution begins from F100. |
+| I080 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I081 | Planned | Second monthly shell for the 2026-07-02 frontline development plan; wait for I080 closeout or explicit replan. |
 | I082 | Planned | Third monthly shell for the 2026-07-02 frontline development plan; wait for I081 closeout or explicit replan. |
 | I083 | Planned | Fourth monthly shell for the 2026-07-02 frontline development plan; wait for I082 closeout or explicit replan. |
