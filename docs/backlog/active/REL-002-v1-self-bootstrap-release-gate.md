@@ -77,6 +77,12 @@ Each qualifying self-bootstrap session must record:
 - residual work;
 - whether external agent assistance was used and why.
 
+## Rehearsal Evidence
+
+| Date | Plan Item | Record | REL-002 Qualification |
+|---|---|---|---|
+| 2026-07-02 | T123 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md` | Does not qualify. Talos generated a read-only validation plan, but Codex remained the primary executor for implementation, validation execution, docs, git, push, and issue sync. |
+
 ## Relationship To Other Work
 
 | Item | Relationship |

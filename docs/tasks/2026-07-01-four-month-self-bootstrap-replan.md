@@ -150,7 +150,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T120 | 9 | F | Implement TUI-016 slash-panel smart auto-execute. | TUI-010/CMD-001 | command classification and Enter-branch tests | Planned |
 | T121 | 9-10 | F | TODO-001 Phase 1: session todo data model and agent tool API behind permission pipeline. | TODO-001 | storage/tool tests; cycle detection | Planned |
 | T122 | 10 | F | TODO-001 Phase 2: read-only slash/TUI views. | T121/CMD-001 | TUI/command tests | Review |
-| T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Planned |
+| T123 | 10 | A | Self-bootstrap rehearsal using validation loop on a real doc/code slice. | T108/T122 | evidence record; validation run by Talos where feasible | Review |
 | T124 | 11 | B | TUI-020 thinking preview without durable history pollution. | TUI-004/session docs | stream/finalize/persistence/resume tests | Planned |
 | T125 | 11 | F | TODO-001 Phase 3: bounded prompt integration for active todos. | T121/T122 | cache-stability and budget tests | Planned |
 | T126 | 12 | A | Month-3 closeout: self-bootstrap coverage delta and TODO/thinking residuals. | T120-T125 | workspace tests; governance | Planned |
@@ -439,3 +439,14 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   talos-cli -p talos-tui -- -D warnings`; `cargo check --workspace`;
   `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push, sync issue #8, then continue to T123 rehearsal.
+
+### I078 T123 Rehearsal Checkpoint (2026-07-02)
+
+- T123 produced `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md`.
+- Talos executed the Phase 1 validation planning surface:
+  `./target/debug/talos validate plan --profile workspace` and
+  `./target/debug/talos validate plan --profile workspace --json`.
+- Result: useful gap evidence, not a REL-002 qualifying session. Talos generated the validation
+  matrix, but Codex remained the primary executor for implementation, validation execution, docs,
+  commit, push, and issue sync.
+- Recovery: commit/push this evidence, then continue to T124 thinking-preview history boundary.

@@ -20,7 +20,7 @@
 | T121-B | TODO-001 | Review | T121-A | Initial agent todo tool API |
 | T121-C | TODO-001 | Review | T121-B | Remaining todo mutation tools |
 | T122 | TODO-001 | Review | T121-C | Read-only slash/TUI views |
-| T123 | REL-002 | Planned | T108/T122 | Validation-backed rehearsal |
+| T123 | REL-002 | Review | T108/T122 | Validation-backed rehearsal |
 | T124 | TUI-020 | Planned | TUI-004/session docs | Thinking preview separated from history |
 | T125 | TODO-001 | Planned | T121/T122 | Bounded todo prompt integration |
 | T126 | Replan | Planned | T120-T125 | Month-3 closeout |
@@ -76,6 +76,7 @@
 | 2026-07-02 | T121-C Implementation | Added remaining mutation tools (`todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`) with registry coverage and dependency cycle test coverage. |
 | 2026-07-02 | T122 Activation | Started read-only todo slash/TUI views. Slash commands must route through the active session runtime and remain view/export only. |
 | 2026-07-02 | T122 Implementation | Added typed read-only `/todo` slash requests, active-session repository rendering in CLI runtime, JSON/Markdown export text, and TUI todo panel scrollback rendering. |
+| 2026-07-02 | T123 Rehearsal | Recorded `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md`. Talos generated a workspace validation plan, but Codex remained the primary executor; this is gap evidence, not a REL-002 qualifying session. |
 
 ## Verification Evidence
 
@@ -115,6 +116,9 @@
 - T122 format: `cargo fmt --all -- --check` passed.
 - T122 workspace compile: `cargo check --workspace` passed.
 - Governance: `scripts/validate_project_governance.sh .` passed with 0 warnings after T122.
+- T123 Talos validation plan: `./target/debug/talos validate plan --profile workspace` passed.
+- T123 Talos validation plan JSON: `./target/debug/talos validate plan --profile workspace --json`
+  passed.
 
 ## Variance And Residuals
 
@@ -122,6 +126,9 @@
 - T121 residual resolved: agent-side write tools now cover create, update status, update fields,
   delete, add dependency, remove dependency, and query.
 - T122 is in Review for read-only user views.
+- T123 is in Review as a validation-backed rehearsal evidence record. It explicitly does not
+  satisfy REL-002 because Codex remained the primary executor and Talos only generated a read-only
+  validation plan.
 
 ## Retrospective
 
