@@ -108,7 +108,8 @@ acceptance criteria, ADRs, or iteration records.
 | F104 | 3 | I080 | C | TUI composer command-line navigation shortcuts: `Ctrl+A` line start and `Ctrl+E` line end. | TUI-021/TUI-009 | TUI keyboard tests | Planned |
 | F105 | 3 | I080 | A | GOV-003 `/agile status` read-only command backed by board/backlog/iteration parsing. | GOV-003/CMD-001 | CLI/TUI command tests | Planned |
 | F106 | 4 | I080 | A | Dashboard governance read-only page or JSON route for board/backlog/validation status. | WEB-001/GOV-003/F105 | dashboard route tests; redaction tests | Planned |
-| F107 | 4 | I080 | F | Month-1 closeout: config/governance/input evidence and residuals. | F100-F106 | `cargo test --workspace`; governance | Planned |
+| F108 | 4 | I080 | A | Opt-in `[dashboard] loopback_only` config (default false keeps token auth; when true, bind loopback only and skip token gate). | WEB-001/ADR-031 | config tests; dashboard route tests | Planned |
+| F107 | 4 | I080 | F | Month-1 closeout: config/governance/input evidence and residuals. | F100-F108 | `cargo test --workspace`; governance | Planned |
 | F110 | 5 | I081 | B | Plugin package diagnostics: list configured local packages, manifests, capabilities, and validation errors. | PLUGIN-001/CMD-002 | plugin manifest tests; `/plugins` tests | Planned |
 | F111 | 5 | I081 | C | `/hooks` builtin-hook listing and config-introduced hook diagnostics without executable carriers. | HOOK-001/CMD-002 | command registry tests; hook diagnostics tests | Planned |
 | F112 | 6 | I081 | B | Read-only plugin fixture polish: examples, failure fixtures, bounded output/provenance tests, docs. | PLUGIN-001 | `cargo test -p talos-plugin -p talos-tools` | Planned |
@@ -220,3 +221,14 @@ Begin with F100-F104. At each month closeout, run cargo test --workspace, cargo 
 - Prior 2026-07-01 self-bootstrap replan remains Complete and historical.
 - New iteration shells I080-I083 define the monthly execution containers.
 - No backlog owner status is changed by this planning checkpoint.
+
+### I080 Execution Checkpoint (2026-07-02)
+
+- F100 plan publication landed in `docs/tasks/2026-07-02-frontline-four-month-development-plan.md`.
+- F101 config-subcommand README doc inconsistency fixed (two positional args form). Subcommands were already shipped in I045.
+- F102 added `Config::validate()` to `run_config_set` and 9 CLI evidence tests (schema rejection, env var name round-trip, masking round-trip, TOML round-trip).
+- F104 added TUI composer `Ctrl+A` (line start) and `Ctrl+E` (line end) navigation; evolution panel toggle re-keyed from `Ctrl+E` to `Ctrl+G`. 11 unit tests added.
+- F108 added opt-in `[dashboard] loopback_only` config (default `false`); 5 new dashboard tests for no-token access path.
+- F105 (`/agile` slash command) and F103 (TUI `/config` decision) remain for the next activation.
+- Validation: `cargo test --workspace` clean, `cargo clippy --workspace -- -D warnings` clean, `cargo fmt --all -- --check` clean, `scripts/validate_project_governance.sh .` reports 0 warnings.
+- Next task: F105 `/agile status` slash command. Recovery: `git log --oneline -5` and resume from `docs/iterations/I080-frontline-config-governance-visibility.md`.

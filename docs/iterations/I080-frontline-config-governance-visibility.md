@@ -24,6 +24,7 @@
 | F105 | GOV-003 | Planned | CMD-001 | Read-only `/agile status` |
 | F106 | GOV-003/WEB-001 | Planned/In Progress | F105/ADR-031 | Read-only dashboard governance route/page |
 | F107 | Frontline plan | Planned | F100-F106 | Month-1 closeout |
+| F108 | WEB-001 | Planned | ADR-031 | Opt-in `[dashboard] loopback_only` config (default false keeps token auth) |
 
 ### Scope
 
@@ -85,6 +86,29 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-02 | Planning | Created as Month 1 shell for the frontline development plan. |
+| 2026-07-02 | Execution | F101 config-subcommand README doc inconsistency fixed (two positional args form, not KEY=VALUE). F102 added `Config::validate()` call in `run_config_set` before save and added 9 CLI-level evidence tests for schema rejection, env var name round-trip, secret masking round-trip, and TOML serialize/parse round-trip. F104 added TUI composer `Ctrl+A` (line start) and `Ctrl+E` (line end) cursor navigation with 11 unit tests; evolution panel toggle re-keyed from `Ctrl+E` to `Ctrl+G` to free `Ctrl+E`; hint text and evolution panel title updated. F108 added opt-in `[dashboard] loopback_only` config (default `false` keeps token auth); `DashboardServer::with_loopback_only()` skips auth middleware when set; 5 new dashboard tests verify no-token access and redaction still applies. |
+
+## Verification Evidence
+
+- `cargo test --workspace` — all green (no failures across all crates).
+- `cargo test -p talos-tui` — 199/199 pass.
+- `cargo test -p talos-config` — dashboard loopback_only tests pass (4 dashboard tests, 96 total).
+- `cargo test -p talos-dashboard` — 19/19 pass (5 new loopback_only tests added).
+- `cargo test -p talos-cli` — config + wizard + governance tests pass (88 filtered, 0 failed).
+- `cargo clippy --workspace -- -D warnings` — clean.
+- `cargo fmt --all -- --check` — clean.
+- `scripts/validate_project_governance.sh .` — 0 warnings.
+
+## Variance And Residuals
+
+- F101: README doc inconsistency was the only implementation gap; the subcommand form and flag form were both already shipped in I045.
+- F102: Added `Config::validate()` call to `run_config_set` to satisfy "schema validation rejects invalid values before save" (was previously missing at the CLI path; `Config::load()` already validated on read).
+- F104: Evolution panel toggle moved from `Ctrl+E` to `Ctrl+G` to make room for the standard readline line-end shortcut. The bind change is reflected in the composer hint text and the evolution panel title.
+- F105: Not yet implemented. `/agile` slash command still missing from the command registry; the reusable governance parsing logic exists in `talos-cli/src/governance.rs` and is duplicated in `mode_runners.rs`.
+- F106: Verification only — the dashboard `/governance` route already exists, is auth-gated, and applies `redact_snapshot` at the response boundary.
+- F108: New opt-in config `[dashboard] loopback_only = true` skips the per-process bearer token. Default `false` keeps token auth as the safe baseline.
+- F103: Deferred. TUI `/config` write UI remains a future slice. The CLI config commands cover the editing need, and the `/model` picker covers runtime model switching. A narrow read-only TUI `/config` slice could be added in a later iteration if demand appears.
+- Month-1 closeout (F107) will be recorded after F105 lands or is formally deferred.
 
 ## Verification Evidence
 
