@@ -76,10 +76,9 @@ impl SessionManager {
     ///
     /// # Errors
     ///
-    /// Returns an error if `$HOME` is unavailable.
+    /// Returns an error if no user home directory environment variable is available.
     pub fn default_sessions_dir() -> Result<PathBuf, SessionError> {
-        let home =
-            std::env::var("HOME").map_err(|e| SessionError::IoError(std::io::Error::other(e)))?;
+        let home = home_dir_from_env()?;
         Ok(PathBuf::from(home).join(".talos").join("sessions"))
     }
 
@@ -689,10 +688,32 @@ struct CleanupSession {
 
 impl Default for SessionManager {
     fn default() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+        let home = home_dir_from_env().unwrap_or_else(|_| "/tmp".to_string());
         Self {
             sessions_dir: PathBuf::from(home).join(".talos").join("sessions"),
             index: Arc::new(Mutex::new(None)),
         }
     }
+}
+
+fn home_dir_from_env() -> Result<String, SessionError> {
+    if let Ok(home) = std::env::var("HOME")
+        && !home.is_empty()
+    {
+        return Ok(home);
+    }
+    if let Ok(profile) = std::env::var("USERPROFILE")
+        && !profile.is_empty()
+    {
+        return Ok(profile);
+    }
+    let drive = std::env::var("HOMEDRIVE").unwrap_or_default();
+    let path = std::env::var("HOMEPATH").unwrap_or_default();
+    if !drive.is_empty() && !path.is_empty() {
+        return Ok(format!("{drive}{path}"));
+    }
+    Err(SessionError::IoError(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "home directory environment variable not found",
+    )))
 }

@@ -32,6 +32,43 @@ fn create_session_uses_correct_directory() {
 }
 
 #[test]
+fn default_sessions_dir_falls_back_to_userprofile() {
+    let prev_home = std::env::var_os("HOME");
+    let prev_userprofile = std::env::var_os("USERPROFILE");
+    let prev_homedrive = std::env::var_os("HOMEDRIVE");
+    let prev_homepath = std::env::var_os("HOMEPATH");
+
+    unsafe {
+        std::env::remove_var("HOME");
+        std::env::set_var("USERPROFILE", "/tmp/talos-userprofile-home");
+        std::env::remove_var("HOMEDRIVE");
+        std::env::remove_var("HOMEPATH");
+    }
+
+    let result = SessionManager::default_sessions_dir();
+
+    match prev_home {
+        Some(v) => unsafe { std::env::set_var("HOME", v) },
+        None => unsafe { std::env::remove_var("HOME") },
+    }
+    match prev_userprofile {
+        Some(v) => unsafe { std::env::set_var("USERPROFILE", v) },
+        None => unsafe { std::env::remove_var("USERPROFILE") },
+    }
+    match prev_homedrive {
+        Some(v) => unsafe { std::env::set_var("HOMEDRIVE", v) },
+        None => unsafe { std::env::remove_var("HOMEDRIVE") },
+    }
+    match prev_homepath {
+        Some(v) => unsafe { std::env::set_var("HOMEPATH", v) },
+        None => unsafe { std::env::remove_var("HOMEPATH") },
+    }
+
+    let dir = result.expect("default sessions dir should use USERPROFILE fallback");
+    assert_eq!(dir, PathBuf::from("/tmp/talos-userprofile-home/.talos/sessions"));
+}
+
+#[test]
 fn append_and_read_messages() {
     let manager = test_manager();
     let session = manager.create_session("test-project", "").unwrap();
