@@ -8,6 +8,7 @@ pub mod bash_tool;
 pub mod browser_page;
 pub mod diff_stat;
 pub mod document_extract;
+pub mod exec_tool;
 pub mod fetch_url;
 pub mod file_tools;
 pub mod git;
@@ -25,6 +26,7 @@ pub use browser_page::{
 };
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
 pub use document_extract::{DocumentExtractError, DocumentExtractInput, DocumentExtractTool};
+pub use exec_tool::{ExecError, ExecInput, ExecTool};
 pub use fetch_url::{FetchUrlError, FetchUrlInput, FetchUrlTool};
 pub use file_tools::is_skip_dir;
 pub use file_tools::{

@@ -330,3 +330,15 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   bounded stdout/stderr, timeout kill, and no `sh -c`.
 - Guardian approval and the ADR-012 exec DSL remain deferred.
 - Verification passed: `scripts/validate_project_governance.sh .`.
+
+### I077 T115 Review Checkpoint (2026-07-02)
+
+- T115 implemented `ExecTool` in `talos-tools` and registered it in CLI print, TUI, and MCP tool
+  registries.
+- The implementation uses `tokio::process::Command` directly, never `sh -c`; passes args as argv
+  elements; denies sensitive env names before spawn; removes inherited dangerous env vars through
+  safe `Command::env_remove`; redacts env values in output metadata; exposes `Execute` command and
+  optional `Read` cwd facets; bounds stdout/stderr; and kills timed-out children.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-tools exec_tool`;
+  `cargo test -p talos-tools`; `cargo test -p talos-cli registry`;
+  `cargo clippy -p talos-tools -p talos-cli -- -D warnings`; `cargo check --workspace`.

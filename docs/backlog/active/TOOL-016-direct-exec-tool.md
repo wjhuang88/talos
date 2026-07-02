@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TOOL-016 |
 | Priority | P2 |
-| Status | In Progress — I077/T114 permission policy in Review |
+| Status | In Progress — I077/T115 implementation in Review |
 | Source | [GitHub Issue #16](https://github.com/wjhuang88/talos/issues/16) |
 | Relates To | TOOL-005, TOOL-006, PERM-001 |
 
@@ -39,11 +39,16 @@ before spawn, avoid echoing env values, clamp timeout, bound stdout/stderr, and 
 
 ## Acceptance Criteria
 
-- [ ] `exec` runs a single command with argv arguments.
-- [ ] Timeout terminates the subprocess.
-- [ ] stdout/stderr are bounded.
-- [ ] Permission checks run before execution.
-- [ ] Tests cover success, non-zero exit, timeout, permission denial, and argument safety.
+- [x] `exec` runs a single command with argv arguments.
+- [x] Timeout terminates the subprocess.
+- [x] stdout/stderr are bounded.
+- [x] Permission checks run before execution.
+- [x] Tests cover success, non-zero exit, timeout, permission denial, and argument safety.
+
+T115 implementation update (2026-07-02): `ExecTool` landed in `talos-tools` and is registered in
+CLI print, TUI, and MCP registries. It uses `tokio::process::Command` directly, exposes command/cwd
+permission facets, denies sensitive env names before spawn, redacts env values in output metadata,
+keeps shell metacharacters as literal argv data, bounds stdout/stderr, and kills timed-out children.
 
 ## Required Reads
 

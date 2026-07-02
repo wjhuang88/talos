@@ -22,9 +22,9 @@ use talos_tools::git::{
 };
 use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, ListSymbolsTool};
 use talos_tools::{
-    BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, FetchUrlTool, GlobTool,
-    GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool, WebSearchTool,
-    WriteTool,
+    BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
+    GlobTool, GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool,
+    WebSearchTool, WriteTool,
 };
 use tokio::sync::mpsc;
 
@@ -393,6 +393,11 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
+        inner: Arc::new(ExecTool::new(PathBuf::from("."))),
+        approval: approval.clone(),
+        print_mode: true,
+    }));
+    registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(ReadTool::new(PathBuf::from("."))),
         approval: approval.clone(),
         print_mode: true,
@@ -511,6 +516,10 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
+        inner: Arc::new(ExecTool::new(workspace_root.clone())),
+        approval: approval_handler.clone(),
+    }));
+    registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(ReadTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
     }));
@@ -614,6 +623,7 @@ pub(crate) fn build_tui_tool_registry(
 pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(BashTool::new(PathBuf::from("."))));
+    registry.register(Arc::new(ExecTool::new(PathBuf::from("."))));
     registry.register(Arc::new(ReadTool::new(PathBuf::from("."))));
     registry.register(Arc::new(DocumentExtractTool::new(PathBuf::from("."))));
     registry.register(Arc::new(WriteTool::new(PathBuf::from("."))));
