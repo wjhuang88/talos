@@ -823,7 +823,8 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let skill_diagnostics = runtime_skills.lock().await.diagnostics();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(skill_diagnostics)
-        .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
+        .with_mcp_servers(mcp_runtime.diagnostics().to_vec())
+        .with_workspace_root(workspace_root.clone());
     let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
     let ui_output_tx_for_dashboard = ui_output_tx.clone();

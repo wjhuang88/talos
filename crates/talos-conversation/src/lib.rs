@@ -19,6 +19,7 @@ mod command_registry;
 mod engine;
 #[cfg(test)]
 mod engine_tests;
+mod governance_summary;
 mod types;
 
 pub use command_registry::{

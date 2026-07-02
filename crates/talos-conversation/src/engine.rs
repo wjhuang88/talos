@@ -143,6 +143,7 @@ pub struct ConversationEngine {
     pub(crate) context_limit: Option<u32>,
     pub(crate) input_price_per_million: Option<f64>,
     pub(crate) output_price_per_million: Option<f64>,
+    pub(crate) workspace_root: Option<PathBuf>,
     last_flushed_message: usize,
     stream_tx: Option<mpsc::UnboundedSender<String>>,
 }
@@ -175,9 +176,15 @@ impl ConversationEngine {
             context_limit: None,
             input_price_per_million: None,
             output_price_per_million: None,
+            workspace_root: None,
             last_flushed_message: 0,
             stream_tx: None,
         }
+    }
+
+    pub fn with_workspace_root(mut self, workspace_root: PathBuf) -> Self {
+        self.workspace_root = Some(workspace_root);
+        self
     }
 
     pub fn with_skills(mut self, skills: Vec<SkillDiagnostic>) -> Self {
@@ -528,6 +535,9 @@ impl ConversationEngine {
             "/todo" => {
                 outputs.extend(self.handle_todo_command(arg));
             }
+            "/agile" => {
+                outputs.extend(self.handle_agile_command(arg));
+            }
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
@@ -549,6 +559,22 @@ impl ConversationEngine {
                 stream: Box::pin(stream::once(async move { format!("[Error] {message}\n") })),
             })],
         }
+    }
+
+    fn handle_agile_command(&self, _arg: &str) -> Vec<UiOutput> {
+        let Some(ref ws) = self.workspace_root else {
+            return vec![UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(stream::once(async move {
+                    "[System] /agile is unavailable — no workspace path set.\n".to_string()
+                })),
+            })];
+        };
+        let text = crate::governance_summary::format_governance_summary(ws);
+        vec![UiOutput::Stream(StreamMessage {
+            source: MessageSource::System,
+            stream: Box::pin(stream::once(async move { text })),
+        })]
     }
 
     fn handle_copy_command(&self, scope: &str) -> Vec<UiOutput> {

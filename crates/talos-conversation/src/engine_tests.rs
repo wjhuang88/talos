@@ -1373,6 +1373,46 @@ fn thinking_delta_updates_preview_without_history() {
 }
 
 // ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn slash_agile_without_workspace_returns_unavailable() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/agile status");
+    assert_eq!(outputs.len(), 1);
+    if let Some((_, text)) = collect_stream(outputs).await {
+        assert!(text.contains("unavailable") || text.contains("no workspace"));
+    }
+}
+
+#[tokio::test]
+async fn slash_agile_with_workspace_returns_governance_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let docs_dir = dir.path().join("docs");
+    std::fs::create_dir_all(docs_dir.join("iterations")).unwrap();
+    std::fs::write(
+        docs_dir.join("BOARD.md"),
+        "# Board\n\n## Now\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| I080 Test | Active | [x](x.md) | Gate |\n\n## Next\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| I081 Next | Planned | [x](x.md) | Evidence |\n",
+    )
+    .unwrap();
+    std::fs::write(
+        docs_dir.join("iterations").join("README.md"),
+        "## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I080 | Frontline | Planned | no |\n",
+    )
+    .unwrap();
+
+    let mut engine = ConversationEngine::new("test".to_string(), "test".to_string())
+        .with_workspace_root(dir.path().to_path_buf());
+    let outputs = engine.handle_slash_command("/agile status");
+    assert_eq!(outputs.len(), 1);
+    if let Some((_, text)) = collect_stream(outputs).await {
+        assert!(text.contains("Governance Status"));
+        assert!(text.contains("I080 Test"));
+        assert!(text.contains("I081 Next"));
+        assert!(text.contains("Frontline"));
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Status snapshot
 // ---------------------------------------------------------------------------
 

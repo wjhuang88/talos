@@ -259,6 +259,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
+        CommandDefinition {
+            name: "/agile",
+            aliases: &[],
+            usage: "/agile [status]",
+            description: "Show governance board/iteration status",
+            arg_hint: Some("[status]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
     ])
 });
 
