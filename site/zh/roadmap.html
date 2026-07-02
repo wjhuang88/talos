@@ -6,7 +6,7 @@
     <title>路线图 — Talos</title>
     <meta
       name="description"
-      content="Talos 项目状态：v0.2.0 已发布内容、已规划内容，以及仍处于研究阶段的内容。"
+      content="Talos 项目状态：v0.2.1 已发布内容、已规划内容，以及仍处于研究阶段的内容。"
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
@@ -41,7 +41,7 @@
         <p>
           Talos 的已发布、计划中与研究中边界。标记为
           <span class="talos-pill talos-pill--shipped">已发布</span>
-          的属于 v0.2.0；标记为
+          的属于 v0.2.1；标记为
           <span class="talos-pill talos-pill--planned">计划中</span>
           的已纳入范围；标记为
           <span class="talos-pill talos-pill--research">研究中</span>
@@ -64,7 +64,7 @@
       </section>
 
       <section>
-        <h2>已在 v0.2.0 发布</h2>
+        <h2>已在 v0.2.1 发布</h2>
         <p>
           以下内容属于当前已发布 release。详见
           <a href="capabilities.html">能力页面</a>和
@@ -104,6 +104,10 @@
           <li>
             <span class="talos-pill talos-pill--shipped">已发布</span>
             MCP stdio 工具与 JSON-RPC 基础设施。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
+            TUI 模式下的只读 loopback dashboard，启动时提示本地 URL 和 token。
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">已发布</span>
@@ -195,16 +199,15 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--research">研究中</span>
-            嵌入式浏览器 / Web 控制面。
+            只读 dashboard MVP 之外的 Web 控制面扩展。
             独立跟踪项：
             <a
               href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
               rel="noopener"
               >WEB-001</a
             >。
-            这是产品差异化轨道；在 v0.2.0 中
-            <strong>未启用</strong>，并且
-            <strong>不是</strong>安全边界。
+            远程访问、浏览器自动化、Web 批准和 Web 写操作/动作路由尚未发布，
+            也<strong>不是</strong>安全边界。
           </li>
           <li>
             <span class="talos-pill talos-pill--research">研究中</span>
@@ -246,7 +249,7 @@
       </section>
 
       <section>
-        <h2>v0.2.0 非目标</h2>
+        <h2>v0.2.1 非目标</h2>
         <p>
           以下为明确非目标，提前列出以避免用户通过试错获得这些结论。
         </p>
@@ -260,8 +263,8 @@
             WASM plugin runtime 和插件市场仅处于研究阶段。
           </li>
           <li>
-            Talos <strong>不是</strong>浏览器仪表盘。
-            嵌入式浏览器 / Web 控制面是独立研究轨道（<a
+            Talos <strong>不是</strong>远程 Web 控制平面或浏览器自动化产品。
+            已发布 dashboard 仅限本地、只读、loopback-only、token-gated；更广泛的 Web 控制仍是独立研究轨道（<a
               href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
               rel="noopener"
               >WEB-001</a

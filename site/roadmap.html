@@ -6,7 +6,7 @@
     <title>Roadmap — Talos</title>
     <meta
       name="description"
-      content="Talos project status: what is shipped in v0.2.0, what is planned, and what remains research."
+      content="Talos project status: what is shipped in v0.2.1, what is planned, and what remains research."
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
@@ -41,7 +41,7 @@
         <p>
           The shipped, planned, and research split for Talos. Items marked
           <span class="talos-pill talos-pill--shipped">Shipped</span>
-          are part of v0.2.0; items marked
+          are part of v0.2.1; items marked
           <span class="talos-pill talos-pill--planned">Planned</span>
           are scoped; items marked
           <span class="talos-pill talos-pill--research">Research</span>
@@ -66,7 +66,7 @@
       </section>
 
       <section>
-        <h2>Shipped in v0.2.0</h2>
+        <h2>Shipped in v0.2.1</h2>
         <p>
           The following are part of the current published release. They are
           documented in detail on the
@@ -107,6 +107,11 @@
           <li>
             <span class="talos-pill talos-pill--shipped">Shipped</span>
             MCP stdio tools and JSON-RPC infrastructure.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
+            Read-only loopback dashboard in TUI mode with startup URL/token
+            visibility.
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">Shipped</span>
@@ -201,15 +206,15 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--research">Research</span>
-            Embedded browser / web control surface. Tracked separately
-            under
+            Web control expansion beyond the read-only dashboard MVP.
+            Tracked separately under
             <a
               href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
               rel="noopener"
               >WEB-001</a
-            >. This is a product-differentiation track; it is
-            <strong>not</strong> enabled in v0.2.0 and it is
-            <strong>not</strong> a safety boundary.
+            >. Remote access, browser automation, web approvals, and web
+            write/action routes are not shipped and are not safety
+            boundaries.
           </li>
           <li>
             <span class="talos-pill talos-pill--research">Research</span>
@@ -253,7 +258,7 @@
       </section>
 
       <section>
-        <h2>Non-goals for v0.2.0</h2>
+        <h2>Non-goals for v0.2.1</h2>
         <p>
           These are explicit non-goals. They are listed so users do not
           have to discover them by experiment.
@@ -269,9 +274,10 @@
             WASM plugin runtime and plugin marketplace are research only.
           </li>
           <li>
-            Talos is <strong>not</strong> a browser dashboard. The
-            embedded browser / web control surface is a separate research
-            track (<a
+            Talos is <strong>not</strong> a remote web control plane or
+            browser automation product. The shipped dashboard is local,
+            read-only, loopback-only, and token-gated; broader web control
+            remains a separate research track (<a
               href="https://github.com/wjhuang88/talos/blob/main/docs/backlog/active/WEB-001-embedded-web-control-surface.md"
               rel="noopener"
               >WEB-001</a

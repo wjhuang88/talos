@@ -13,10 +13,10 @@ session history, built-in coding tools, explicit permissions, runtime Skills, MC
 and project-governance support while keeping the default core local and auditable.
 
 Talos has published its first stable pre-1.0 release line. The current release version in this
-workspace is `v0.2.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+workspace is `v0.2.1`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
-user-facing behavior; research tracks such as the embedded web control surface, dotagents shared
-Skills, WASM plugins, and advanced document ingestion are tracked separately under
+user-facing behavior; research tracks such as web control expansion beyond the read-only loopback
+dashboard, dotagents shared Skills, WASM plugins, and advanced document ingestion are tracked separately under
 [Project Status](#project-status).
 
 ## Highlights
@@ -33,7 +33,7 @@ Skills, WASM plugins, and advanced document ingestion are tracked separately und
 
 ## Current Release Boundary
 
-`v0.2.0` is suitable for local developer use where the operator reviews tool actions and keeps
+`v0.2.1` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
 automation surface, or autonomous background daemon.
 
@@ -52,7 +52,7 @@ Not shipped yet:
 
 - Stable 1.0 SDK guarantees for the embedded runtime facade.
 - `~/.agents/skills/` discovery from the dotagents shared directory.
-- Embedded browser/web control surface.
+- Remote web control, browser automation, web approvals, and web write/action routes.
 - WASM plugin runtime and plugin marketplace.
 - PDF/Office document extraction beyond the current web/fetch foundations.
 - Remote or P2P session control.
@@ -456,9 +456,9 @@ Release tags drive the GitHub release workflow:
 
 The release workflow builds Linux, macOS, and Windows artifacts from a macOS runner.
 
-Post-v0.2.0 release-note material is collected in
-[RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). It is a draft,
-not a release announcement or tag authorization.
+The post-v0.2.0 hardening notes that fed this patch release are collected in
+[RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). GitHub Releases
+is the source of truth for the published `v0.2.1` release announcement and downloads.
 
 ## Project Status
 
