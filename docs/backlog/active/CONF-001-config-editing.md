@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | CONF-001 |
 | Priority | P2 |
-| Status | Partial (flag surface complete via I045; subcommand/validation hardening selected into crate distribution hardening two-month plan) |
+| Status | Partial (CLI surface complete via I045+F102; TUI `/config` deferred per F103) |
 | Depends On | None |
 | Estimate | M |
 | Origin | User request 2026-06-17 — no in-app way to edit config; users must hand-edit `~/.talos/config.toml` |
@@ -39,14 +39,16 @@ subcommand/compatibility design, validation evidence, UX hardening, and TUI read
 
 ## Acceptance Criteria
 
-- [ ] `talos config get/set/list` read and write through the `talos-config` API and JSON-Schema
-      validation rejects invalid values with a clear error.
-- [ ] Changes persist to `~/.talos/config.toml` and `${ENV_VAR}` substitution semantics survive a
-      set/get round-trip.
-- [ ] Secret fields (e.g. persisted inline `api_key`) are never echoed in plaintext by
-      `get`/`list`; `set` accepts them but masks on redisplay.
-- [ ] TUI `/config` can view and edit model + provider settings inline.
-- [ ] No regression for env-var-driven config or for existing config files on load.
+- [x] `talos config get/set/list` read and write through the `talos-config` API and JSON-Schema
+      validation rejects invalid values with a clear error. (I045 shipped subcommands; I080/F102
+      added `Config::validate()` before save.)
+- [x] Changes persist to `~/.talos/config.toml` and `${ENV_VAR}` substitution semantics survive a
+      set/get round-trip. (I080/F102 evidence tests.)
+- [x] Secret fields (e.g. persisted inline `api_key`) are never echoed in plaintext by
+      `get`/`list`; `set` accepts them but masks on redisplay. (I045 + I080/F102 masking tests.)
+- [ ] TUI `/config` can view and edit model + provider settings inline. (Deferred per I080/F103;
+      CLI config commands and `/model` picker cover current needs.)
+- [x] No regression for env-var-driven config or for existing config files on load. (I080/F102.)
 
 ## Execution Baseline
 

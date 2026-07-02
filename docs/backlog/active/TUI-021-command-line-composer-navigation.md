@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-021 |
 | Priority | P3 |
-| Status | Planned |
+| Status | Complete (I080/F104) |
 | Source | User feedback 2026-07-02 — input area should support command-line style cursor navigation such as `Ctrl+A` and `Ctrl+E` |
 | Depends On | TUI-009, TUI-010 |
 
@@ -34,12 +34,15 @@ Add command-line style cursor navigation shortcuts to the TUI composer:
 
 ## Acceptance Criteria
 
-- [ ] In normal composer mode, `Ctrl+A` moves the cursor to the start of the current line.
-- [ ] In normal composer mode, `Ctrl+E` moves the cursor to the end of the current line.
-- [ ] Empty input and single-character input do not panic.
-- [ ] Multi-line input uses the current logical line, not always the full buffer start/end.
-- [ ] Slash command and approval panels keep their existing key handling priority.
-- [ ] TUI keyboard tests cover the shortcuts and priority behavior.
+- [x] In normal composer mode, `Ctrl+A` moves the cursor to the start of the current line.
+- [x] In normal composer mode, `Ctrl+E` moves the cursor to the end of the current line.
+- [x] Empty input and single-character input do not panic.
+- [x] Multi-line input uses the current logical line, not always the full buffer start/end.
+- [x] Slash command and approval panels keep their existing key handling priority.
+- [x] TUI keyboard tests cover the shortcuts and priority behavior.
+
+Note: Evolution panel toggle was re-keyed from `Ctrl+E` to `Ctrl+G` to free `Ctrl+E`
+for the standard readline line-end shortcut.
 
 ## Required Reads
 

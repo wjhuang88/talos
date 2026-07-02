@@ -224,11 +224,19 @@ Begin with F100-F104. At each month closeout, run cargo test --workspace, cargo 
 
 ### I080 Execution Checkpoint (2026-07-02)
 
-- F100 plan publication landed in `docs/tasks/2026-07-02-frontline-four-month-development-plan.md`.
-- F101 config-subcommand README doc inconsistency fixed (two positional args form). Subcommands were already shipped in I045.
-- F102 added `Config::validate()` to `run_config_set` and 9 CLI evidence tests (schema rejection, env var name round-trip, masking round-trip, TOML round-trip).
-- F104 added TUI composer `Ctrl+A` (line start) and `Ctrl+E` (line end) navigation; evolution panel toggle re-keyed from `Ctrl+E` to `Ctrl+G`. 11 unit tests added.
-- F108 added opt-in `[dashboard] loopback_only` config (default `false`); 5 new dashboard tests for no-token access path.
-- F105 (`/agile` slash command) and F103 (TUI `/config` decision) remain for the next activation.
-- Validation: `cargo test --workspace` clean, `cargo clippy --workspace -- -D warnings` clean, `cargo fmt --all -- --check` clean, `scripts/validate_project_governance.sh .` reports 0 warnings.
-- Next task: F105 `/agile status` slash command. Recovery: `git log --oneline -5` and resume from `docs/iterations/I080-frontline-config-governance-visibility.md`.
+- F100 plan publication landed.
+- F101 config-subcommand README doc inconsistency fixed. Subcommands were already shipped in I045.
+- F102 added `Config::validate()` to `run_config_set` and 9 CLI evidence tests.
+- F104 added TUI composer `Ctrl+A`/`Ctrl+E` navigation; evolution panel toggle re-keyed to `Ctrl+G`. 11 unit tests.
+- F108 added `[dashboard] loopback_only` config; default flipped to `true` per maintainer direction; ADR-031 amended.
+- F105 implemented `/agile status` slash command via `governance_summary` module in `talos-conversation` + `workspace_root` field on `ConversationEngine`. 6 tests.
+- F103 deferred (TUI `/config` write UI). F106 verified (dashboard route already shipped).
+- F107 Month-1 closeout: all workspace gates pass, owner docs updated.
+
+### I080 Closeout Checkpoint (2026-07-02)
+
+- Completed task items: F100, F101, F102, F104, F105, F106 (verified), F108. F103 deferred.
+- Current state: I080 is Complete. All commits pushed to `origin/main`.
+- Commands/checks: `cargo test --workspace` (0 failures), `cargo clippy --workspace -- -D warnings` (clean), `cargo fmt --all -- --check` (clean), `scripts/validate_project_governance.sh .` (0 warnings).
+- Next task item: I081 Month-2 activation (plugin diagnostics, hook listing, asset distribution design).
+- Recovery: `git log --oneline -10` and resume from `docs/iterations/I081-frontline-extension-distribution.md`.
