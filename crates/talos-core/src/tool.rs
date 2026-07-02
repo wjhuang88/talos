@@ -205,6 +205,8 @@ pub enum ToolFamily {
     Shell,
     /// Tools supplied by extensions, MCP, or unknown sources.
     Extension,
+    /// Plugin tools that must be explicitly disclosed before model presentation.
+    Plugin,
 }
 
 /// A named conditional backend behind a model-visible tool.
@@ -973,6 +975,16 @@ mod tests {
         assert!(policy.allows_backend("fetch_url", "browser_page"));
         assert!(!policy.allows_backend("fetch_url", "advanced_http"));
         assert!(policy.backend_set_for("fetch_url").contains("browser_page"));
+    }
+
+    #[test]
+    fn runtime_default_does_not_present_plugin_family() {
+        let plugin = MockTool::new("plugin.demo", "Plugin demo").with_family(ToolFamily::Plugin);
+
+        let policy = ToolPresentationPolicy::runtime_default();
+
+        assert!(!policy.allows_tool(&plugin));
+        assert!(ToolPresentationPolicy::with_tool("plugin.demo").allows_tool(&plugin));
     }
 
     #[test]

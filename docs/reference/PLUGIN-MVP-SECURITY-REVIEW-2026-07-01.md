@@ -1,6 +1,6 @@
 # Plugin MVP Security Review
 
-**Status**: Review complete for I077/T110
+**Status**: Review complete for I077/T110; T111 controls implemented
 **Date**: 2026-07-01
 **Scope**: `PLUGIN-001` first local explicit read-only WASM plugin MVP
 **Related**: ADR-027, ADR-028, ADR-029, ADR-030, ADR-032, I077/T110-T111
@@ -27,9 +27,9 @@ This review does not authorize:
 - `talos-plugin` keeps `wasmtime` behind optional feature `wasm`.
 - `cargo test -p talos-plugin --features wasm` passed on 2026-07-01: 24 unit tests, 8 integration
   tests, 0 doc tests.
-- `cargo tree -p talos-plugin --features wasm` was recorded on 2026-07-01. Actual dependency uses
-  `wasmtime v29.0.1` with `default-features = false` and features `cranelift`, `runtime`,
-  `parallel-compilation`, and `wat`.
+- `cargo tree -p talos-plugin --features wasm` was recorded on 2026-07-01 and again during T111.
+  T111 upgraded the actual dependency to `wasmtime v46.0.1` with `default-features = false` and
+  features `cranelift`, `runtime`, `parallel-compilation`, and `wat`.
 - Existing WASM tests cover success, invalid module, trap, fuel exhaustion, timeout, memory access
   trap, missing export, and denied imports.
 - Existing manifest tests cover malformed TOML, missing plugin section, non-WASM and dylib carrier
@@ -41,7 +41,7 @@ This review does not authorize:
 | Finding | Severity | Assessment | Required T111 Action |
 |---|---|---|---|
 | Optional feature boundary is correct. | Low | `wasmtime` is not in the default feature set. | Preserve feature gate; do not add `wasmtime` to `talos-core`, CLI default paths, or always-on builds. |
-| Runtime version differs from ADR discovery. | Medium | ADR-032 recorded current discovery as `wasmtime = "46.0.1"`, while code uses `wasmtime v29.0.1`. This may be acceptable for MSRV or compile-cost reasons, but the rationale is not recorded. | Before T111 closeout, either update to the reviewed target version or record why `29.0.1` is intentionally selected. Include `cargo tree` evidence. |
+| Runtime version differs from ADR discovery. | Resolved | ADR-032 recorded current discovery as `wasmtime = "46.0.1"`, while code used `wasmtime v29.0.1` at review time. | T111 upgraded the actual dependency to `wasmtime v46.0.1` and reran feature-gated plugin tests. |
 | No host imports are available. | Low | Current adapter instantiates modules with an empty import list. This matches ADR-032 for the first slice. | Keep all host calls denied. If any host call appears, stop and create a follow-up ADR/test gate. |
 | Timeout guard creates a sleeping thread per execution. | Medium | Successful execution does not wait for timeout, but the watchdog thread sleeps until timeout after each call. This is acceptable for a low-volume fixture, not for unbounded plugin execution. | T111 must cap plugin execution concurrency or replace the per-call sleeping thread before presenting plugin tools broadly. |
 | Artifact paths are not yet confined. | High | Manifest parser validates strings but does not resolve or confine `plugin.artifact` or `tools[].handler` to a package root. Loading paths without confinement would allow path traversal or absolute-path surprises. | Reject absolute paths and `..` escapes before loading any artifact. Add tests for path escape, absolute paths, missing files, and package-root confinement. |

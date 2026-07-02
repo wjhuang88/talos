@@ -295,3 +295,17 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - T111 is cleared only for a local explicit read-only fixture plugin tool registered through `AgentTool`/`ToolRegistry`.
 - Required T111 controls: package-root path confinement, tool-name collision rejection, plugin provenance, permission pipeline denial tests, bounded output, no host calls, and `wasmtime` version rationale or update.
 - Verification passed: `cargo tree -p talos-plugin --features wasm`; `cargo test -p talos-plugin --features wasm`.
+
+### I077 T111 Review Checkpoint (2026-07-02)
+
+- T111 implemented a feature-gated local explicit read-only WASM plugin `AgentTool` registration
+  path.
+- Controls implemented: package-root confinement for artifact/handler paths, plugin tool-name
+  collision rejection, `ToolProvenance::Plugin` propagation, read-only permission facets, bounded
+  model-facing output, and default runtime presentation exclusion through `ToolFamily::Plugin`.
+- `wasmtime` was upgraded from the old `29` constraint to `46.0.1` after `cargo search wasmtime
+  --limit 1` confirmed `46.0.1` as the current crate version. The old version had no documented
+  product reason and conflicted with ADR-032's dependency review discovery.
+- Verification passed: `cargo fmt --all -- --check`; `cargo test -p talos-plugin --features wasm`;
+  `cargo test -p talos-core`; `cargo clippy -p talos-plugin -p talos-core --features
+  talos-plugin/wasm -- -D warnings`; `cargo tree -p talos-plugin --features wasm`.

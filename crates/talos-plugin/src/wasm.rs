@@ -5,12 +5,23 @@
 //! provided — the module runs in full sandbox isolation. All failures degrade
 //! to recoverable errors; none may panic the host process (Hard Constraint #9).
 
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+use async_trait::async_trait;
+use serde_json::{Value, json};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolProvenance, ToolRegistry,
+    ToolResourceKind, ToolResult,
+};
 use thiserror::Error;
+
+use crate::{PluginManifest, PluginTool};
+
+const MAX_PLUGIN_TOOL_OUTPUT: usize = 2_000;
 
 #[derive(Debug, Error)]
 pub enum WasmError {
@@ -24,6 +35,12 @@ pub enum WasmError {
     Trap(String),
     #[error("execution timed out after {timeout_ms}ms")]
     Timeout { timeout_ms: u64 },
+    #[error("plugin path escapes package root: {0}")]
+    PathEscape(String),
+    #[error("plugin artifact I/O failed: {0}")]
+    Io(String),
+    #[error("plugin tool name collides with registered tool: {0}")]
+    ToolCollision(String),
 }
 
 pub struct WasmRuntime {
@@ -124,9 +141,172 @@ impl WasmModule {
     }
 }
 
+/// Read-only `AgentTool` adapter for one explicitly loaded local WASM plugin tool.
+///
+/// This adapter is intentionally narrow: it loads a handler from a package-confined path, exposes
+/// no host calls, reports plugin provenance, and stays out of runtime-default model presentation.
+pub struct WasmPluginTool {
+    name: String,
+    description: String,
+    module: WasmModule,
+    provenance: ToolProvenance,
+    package_root: String,
+}
+
+impl WasmPluginTool {
+    /// Builds a read-only plugin tool from one validated manifest tool entry.
+    pub fn from_manifest_tool(
+        runtime: Arc<WasmRuntime>,
+        package_root: &Path,
+        manifest: &PluginManifest,
+        tool: &PluginTool,
+    ) -> Result<Self, WasmError> {
+        let _plugin_artifact = confined_package_path(package_root, &manifest.plugin.artifact)?;
+        let handler = confined_package_path(package_root, &tool.handler)?;
+        let bytes = std::fs::read(&handler).map_err(|e| WasmError::Io(e.to_string()))?;
+        let module = WasmModule::from_bytes(runtime, &bytes)?;
+        let name = plugin_tool_name(&manifest.plugin.name, &tool.name);
+        Ok(Self {
+            description: format!(
+                "Run read-only WASM plugin tool '{}' from plugin '{}'",
+                tool.name, manifest.plugin.name
+            ),
+            name,
+            module,
+            provenance: ToolProvenance::Plugin {
+                name: manifest.plugin.name.clone(),
+                version: manifest.plugin.version.clone(),
+                carrier: manifest.plugin.carrier.clone(),
+            },
+            package_root: package_root.display().to_string(),
+        })
+    }
+}
+
+#[async_trait]
+impl AgentTool for WasmPluginTool {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn parameters(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(&self, _input: Value) -> ToolResult {
+        match self.module.execute() {
+            Ok(value) => {
+                let output = format!("plugin tool '{}' returned {value}", self.name);
+                ToolResult::success(bound_plugin_output(&output))
+            }
+            Err(e) => ToolResult::error(bound_plugin_output(&e.to_string())),
+        }
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Plugin
+    }
+
+    fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                self.package_root.clone(),
+                ToolResourceKind::Path,
+            )
+            .with_description("read-only local plugin package"),
+        ]
+    }
+
+    fn provenance(&self) -> ToolProvenance {
+        self.provenance.clone()
+    }
+}
+
+/// Registers all read-only WASM tools declared by a local explicit plugin manifest.
+///
+/// Tool names are namespaced as `{plugin}.{tool}`. Existing registry entries with the same name
+/// are rejected before any new tool is registered.
+pub fn register_read_only_wasm_tools(
+    registry: &mut ToolRegistry,
+    runtime: Arc<WasmRuntime>,
+    package_root: &Path,
+    manifest: &PluginManifest,
+) -> Result<usize, WasmError> {
+    let mut registered = 0;
+    for tool in &manifest.tools {
+        let name = plugin_tool_name(&manifest.plugin.name, &tool.name);
+        if registry.get(&name).is_some() {
+            return Err(WasmError::ToolCollision(name));
+        }
+        let plugin_tool =
+            WasmPluginTool::from_manifest_tool(runtime.clone(), package_root, manifest, tool)?;
+        registry.register(Arc::new(plugin_tool));
+        registered += 1;
+    }
+    Ok(registered)
+}
+
+fn plugin_tool_name(plugin_name: &str, tool_name: &str) -> String {
+    format!("{plugin_name}.{tool_name}")
+}
+
+fn confined_package_path(package_root: &Path, relative: &str) -> Result<PathBuf, WasmError> {
+    let path = Path::new(relative);
+    if path.is_absolute() {
+        return Err(WasmError::PathEscape(relative.to_string()));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(WasmError::PathEscape(relative.to_string())),
+        }
+    }
+    let candidate = package_root.join(path);
+    if candidate.exists() {
+        let root = package_root
+            .canonicalize()
+            .map_err(|e| WasmError::Io(e.to_string()))?;
+        let real = candidate
+            .canonicalize()
+            .map_err(|e| WasmError::Io(e.to_string()))?;
+        if !real.starts_with(root) {
+            return Err(WasmError::PathEscape(relative.to_string()));
+        }
+    }
+    Ok(candidate)
+}
+
+fn bound_plugin_output(output: &str) -> String {
+    if output.len() <= MAX_PLUGIN_TOOL_OUTPUT {
+        return output.to_string();
+    }
+    const MARKER: &str = "...[truncated]";
+    let mut end = MAX_PLUGIN_TOOL_OUTPUT.saturating_sub(MARKER.len());
+    while !output.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}{}", &output[..end], MARKER)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manifest::parse_manifest;
+    use serde_json::json;
+    use std::fs;
     use std::time::Instant;
 
     const FUEL: u64 = 100_000;
@@ -134,6 +314,45 @@ mod tests {
 
     fn runtime() -> Arc<WasmRuntime> {
         Arc::new(WasmRuntime::new(FUEL, TIMEOUT_MS).expect("runtime"))
+    }
+
+    fn wasm_i32_const(value: u8) -> Vec<u8> {
+        vec![
+            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x01, 0x60, 0x00, 0x01,
+            0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03, b'r', b'u', b'n', 0x00, 0x00,
+            0x0a, 0x06, 0x01, 0x04, 0x00, 0x41, value, 0x0b,
+        ]
+    }
+
+    fn temp_package() -> PathBuf {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "talos-plugin-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("time")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&path).expect("temp package");
+        path
+    }
+
+    fn manifest_with_handler(handler: &str) -> PluginManifest {
+        parse_manifest(&format!(
+            r#"
+[plugin]
+name = "demo"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "plugin.wasm"
+
+[[tools]]
+name = "answer"
+handler = "{handler}"
+"#
+        ))
+        .expect("manifest")
     }
 
     #[test]
@@ -249,5 +468,100 @@ mod tests {
         "#;
         let result = WasmModule::from_wat(runtime(), wat);
         assert!(result.is_err() || result.unwrap().execute().is_err());
+    }
+
+    #[tokio::test]
+    async fn register_valid_local_package_registers_read_only_plugin_tool() {
+        let package = temp_package();
+        fs::write(package.join("plugin.wasm"), wasm_i32_const(7)).expect("artifact");
+        fs::write(package.join("tool.wasm"), wasm_i32_const(42)).expect("handler");
+        let manifest = manifest_with_handler("tool.wasm");
+        let mut registry = ToolRegistry::new();
+
+        let count =
+            register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest).unwrap();
+
+        assert_eq!(count, 1);
+        let tool = registry.get("demo.answer").expect("tool registered");
+        assert!(tool.is_read_only());
+        assert_eq!(tool.family(), ToolFamily::Plugin);
+        assert_eq!(
+            tool.provenance(),
+            ToolProvenance::Plugin {
+                name: "demo".to_string(),
+                version: "0.1.0".to_string(),
+                carrier: "wasm".to_string(),
+            }
+        );
+        let profile = tool.permission_profile(&json!({}));
+        assert_eq!(profile[0].nature, ToolNature::Read);
+
+        let result = tool.execute(json!({})).await;
+        assert!(!result.is_error);
+        assert!(result.content.contains("returned 42"));
+    }
+
+    #[test]
+    fn absolute_handler_path_is_rejected_before_loading() {
+        let package = temp_package();
+        fs::write(package.join("plugin.wasm"), wasm_i32_const(7)).expect("artifact");
+        let manifest = manifest_with_handler("/tmp/tool.wasm");
+
+        let result =
+            WasmPluginTool::from_manifest_tool(runtime(), &package, &manifest, &manifest.tools[0]);
+
+        assert!(matches!(result, Err(WasmError::PathEscape(_))));
+    }
+
+    #[test]
+    fn parent_dir_handler_path_is_rejected_before_loading() {
+        let package = temp_package();
+        fs::write(package.join("plugin.wasm"), wasm_i32_const(7)).expect("artifact");
+        let manifest = manifest_with_handler("../tool.wasm");
+
+        let result =
+            WasmPluginTool::from_manifest_tool(runtime(), &package, &manifest, &manifest.tools[0]);
+
+        assert!(matches!(result, Err(WasmError::PathEscape(_))));
+    }
+
+    #[test]
+    fn tool_name_collision_is_rejected() {
+        let package = temp_package();
+        fs::write(package.join("plugin.wasm"), wasm_i32_const(7)).expect("artifact");
+        fs::write(package.join("tool.wasm"), wasm_i32_const(42)).expect("handler");
+        let manifest = manifest_with_handler("tool.wasm");
+        let mut registry = ToolRegistry::new();
+        register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest).unwrap();
+
+        let result = register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest);
+
+        assert!(matches!(result, Err(WasmError::ToolCollision(name)) if name == "demo.answer"));
+    }
+
+    #[test]
+    fn plugin_output_is_bounded_on_utf8_boundary() {
+        let output = "a".repeat(MAX_PLUGIN_TOOL_OUTPUT + 10);
+
+        let bounded = bound_plugin_output(&output);
+
+        assert!(bounded.len() <= MAX_PLUGIN_TOOL_OUTPUT);
+        assert!(bounded.ends_with("...[truncated]"));
+    }
+
+    #[test]
+    fn runtime_default_does_not_present_registered_plugin_tool() {
+        let package = temp_package();
+        fs::write(package.join("plugin.wasm"), wasm_i32_const(7)).expect("artifact");
+        fs::write(package.join("tool.wasm"), wasm_i32_const(42)).expect("handler");
+        let manifest = manifest_with_handler("tool.wasm");
+        let mut registry = ToolRegistry::new();
+        register_read_only_wasm_tools(&mut registry, runtime(), &package, &manifest).unwrap();
+        let tool = registry.get("demo.answer").expect("tool registered");
+
+        assert!(!talos_core::tool::ToolPresentationPolicy::runtime_default().allows_tool(tool));
+        assert!(
+            talos_core::tool::ToolPresentationPolicy::with_tool("demo.answer").allows_tool(tool)
+        );
     }
 }

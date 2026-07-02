@@ -21,6 +21,10 @@ retroactively documents that comparison (see Review Findings: Runtime Selection 
 Checked current package discovery on 2026-07-01: `cargo search wasmtime --limit 1` reported
 `wasmtime = "46.0.1"`.
 
+Implementation evidence update, 2026-07-02: T111 upgraded the actual `talos-plugin` optional
+`wasm` dependency from `wasmtime = "29"` to `wasmtime = "46.0.1"` to match this review. The
+feature-gated plugin tests passed after the upgrade.
+
 Primary documentation references used for this review:
 
 - Wasmtime introduction and embedding model: <https://docs.wasmtime.dev/>

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | PLUGIN-001 |
-| Status | **In Progress — I077/T110 security review complete**. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools. ADR-027/028/029/030 accepted; ADR-032 cleared the focused `wasmtime` dependency/security review for the first local explicit read-only WASM plugin MVP after manifest parsing. T110 clears only a bounded local explicit read-only fixture plugin tool slice and records required T111 controls. |
+| Status | **In Progress — I077/T111 read-only tool slice in Review**. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools. ADR-027/028/029/030 accepted; ADR-032 cleared the focused `wasmtime` dependency/security review for the first local explicit read-only WASM plugin MVP after manifest parsing. T110 cleared only a bounded local explicit read-only fixture plugin tool slice; T111 implemented that slice with confinement, provenance, permission facets, bounded output, collision rejection, no host calls, and `wasmtime v46.0.1`. |
 | Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
 | Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
 | Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
@@ -105,6 +105,17 @@ T110 security review (2026-07-01):
 - T111 blockers to address before closeout: package-root confinement for artifact/handler paths,
   tool-name collision rejection, plugin provenance, permission pipeline denial tests, bounded
   output, and `wasmtime` version rationale or update.
+
+T111 implementation review (2026-07-02):
+- T111 implemented `register_read_only_wasm_tools` for local explicit package manifests only.
+- Plugin tools are namespaced as `{plugin}.{tool}`, reject registry collisions, carry
+  `ToolProvenance::Plugin`, expose read-only permission facets, and stay out of runtime-default
+  tool presentation through the `Plugin` tool family.
+- Manifest artifact and tool handler paths are confined to the package root and reject absolute
+  paths or parent-directory traversal before module loading.
+- Model-facing plugin output is bounded; host calls, write tools, automatic discovery, remote
+  install, broad plugin protocol handling, and default presentation remain out of scope.
+- `wasmtime` is now `46.0.1`, matching the current crate discovery recorded by ADR-032.
 
 ADR-032 implementation constraints:
 - add `wasmtime` only in the focused plugin runtime slice;
