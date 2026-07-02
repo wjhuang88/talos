@@ -40,7 +40,8 @@
         <h1>安装</h1>
         <p>
           请选择与你平台匹配的安装方式。对于 v0.2.0，官方安装器和
-          release 压缩包是唯一受支持的入口。
+          release 压缩包是受支持的二进制入口。crates.io 上的 Cargo install
+          形态已经规划，但尚未发布。
         </p>
       </header>
 
@@ -163,6 +164,14 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
           多平台构建会将压缩包和校验和写入
           <code>dist/</code>。
         </p>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>Cargo install 状态：</strong>
+            <code>cargo install talos-cli --bin talos</code> 是计划中的
+            crates.io 二进制安装形态，但仍被发布门禁阻塞。本地源码测试可使用
+            <code>cargo install --path crates/talos-cli --bin talos --locked</code>。
+          </p>
+        </div>
       </section>
 
       <section>

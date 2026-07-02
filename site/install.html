@@ -40,7 +40,8 @@
         <h1>Install</h1>
         <p>
           Pick the install path for your platform. The official installers and
-          release archives are the only supported entrypoints for v0.2.0.
+          release archives are the supported binary entrypoints for v0.2.0.
+          Cargo install from crates.io is planned, but not published yet.
         </p>
       </header>
 
@@ -166,6 +167,15 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
           The multi-platform build writes archives and checksums to
           <code>dist/</code>.
         </p>
+        <div class="talos-callout talos-callout--info">
+          <p>
+            <strong>Cargo install status:</strong>
+            <code>cargo install talos-cli --bin talos</code> is the planned
+            crates.io binary-install shape, but it is still blocked by the
+            publish gate. For local source testing, use
+            <code>cargo install --path crates/talos-cli --bin talos --locked</code>.
+          </p>
+        </div>
       </section>
 
       <section>

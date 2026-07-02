@@ -91,6 +91,16 @@ chmod +x talos
 
 Windows ARM64 产物暂未发布。
 
+### Cargo Install 状态
+
+`cargo install talos-cli --bin talos` 是计划中的 crates.io 二进制安装形态，但目前尚未发布。
+当前请使用上面的 release 安装器/压缩包，或通过 `cargo build --release -p talos-cli` 从源码构建。
+本地源码 checkout 可用于测试 Cargo 安装：
+
+```bash
+cargo install --path crates/talos-cli --bin talos --locked
+```
+
 ### 首次启动设置
 
 未配置模型时启动 Talos，TUI 会打开模型选择器而不是直接报错。选择一个模型即可开始。
@@ -111,6 +121,11 @@ talos --config-list                          # 打印所有设置（密钥已脱
 talos --config-get model                     # 查询单个值
 talos --config-set model=claude-sonnet-4-20250514  # 设置并持久化
 talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY
+
+# 子命令形式（与上面的 flag 等价）：
+talos config list
+talos config get model
+talos config set model=claude-sonnet-4-20250514
 ```
 
 ## 开发
@@ -206,6 +221,19 @@ talos --workspace /path/to/project "analyze the current architecture"
 ```bash
 talos -p --mock "/mock-request summarize this repository"
 ```
+
+### 验证计划
+
+预览 Talos 对某个验证 profile 期望执行的命令，但不实际运行它们：
+
+```bash
+talos validate plan --profile workspace
+talos validate plan --profile i076
+talos validate plan --profile governance --json
+```
+
+验证计划是只读表面。它只列出必需检查和缺失前置条件，不会执行命令、安装依赖、编辑文件、
+push、publish 或打 tag。
 
 ### 管理本地存储
 
@@ -362,6 +390,10 @@ Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI c
 `talos-core` 重新导出的协议和 trait 类型；低层 `talos-agent` 构造器仍视为实现表面，
 除非文档另行声明。
 
+当前 release gate 尚未发布 `talos-runtime` SDK crate。它处于 manifest-ready 状态，但仍被
+依赖闭包阻塞；详见 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) 和
+[publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md)。
+
 ## 安全模型
 
 - 只读工作区工具可以免批准执行。
@@ -387,6 +419,10 @@ GitHub Release 工作流由 tag 触发：
 - 预发布版本：`v0.1.0-alpha.1`、`v0.1.0-beta.1`、`v0.1.0-rc.1`、`v0.1.0-pre.1`、`v0.1.0-dev.1`
 
 Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
+
+post-v0.2.0 release note 素材集中在
+[RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md)。它只是草稿，
+不是 release 公告，也不授权 tag。
 
 ## 项目状态
 

@@ -74,6 +74,7 @@
 | 2026-07-02 | T131 | Completed associative memory injection decision. ADR-033 rejects default-on associative injection for v1 readiness, keeps graph recall explicit, and requires any future automatic associative prompt section to be a separate default-disabled experiment with benchmark evidence. |
 | 2026-07-02 | T132 | Completed third self-bootstrap rehearsal as gap evidence. Talos generated workspace/governance validation plans for the architecture-sensitive ADR-033 slice, but remained read-only; estimated self-bootstrap coverage was 20%, so the >60% target was missed and REL-002 remains unsatisfied. Evidence: `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md`. |
 | 2026-07-02 | T133 | Completed publish gate packet for `talos-cli` and `talos-runtime`. Dry-runs remain blocked by intended guards/dependency closure, and `talos-dashboard` was added to the product-only publish guard. Evidence: `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md`. |
+| 2026-07-02 | T134 | Consolidated release/user docs across README, README.zh-CN, public install pages, reference index, and draft release notes. Cargo install and `talos-runtime` publication remain documented as blocked, not shipped. |
 
 ## Verification Evidence
 
@@ -84,6 +85,7 @@
 - T132 governance validation: `scripts/validate_project_governance.sh .`.
 - T133 publish gate validation: `scripts/check_publish_guard.sh .`; `cargo metadata --no-deps --format-version 1`; `cargo package --list -p talos-runtime`; `cargo package --list -p talos-cli`; `cargo publish --dry-run -p talos-cli` (blocked as intended); `cargo publish --dry-run -p talos-runtime` (blocked by unpublished `talos-agent`).
 - T133 governance validation: `scripts/validate_project_governance.sh .`.
+- T134 docs validation: `scripts/validate_public_site.sh`; `scripts/validate_project_governance.sh .`.
 
 ## Variance And Residuals
 

@@ -158,7 +158,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T131 | 13 | F | Decide automatic associative memory injection: reject, default-off, or config-gated. | MEM-008/T51 metrics | ADR/proposal update | Complete |
 | T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Complete — target missed |
 | T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Complete |
-| T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Planned |
+| T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Complete |
 | T135 | 15 | A | Produce REL-002 readiness report and next-quarter residual owner list. | T132/T134 | governance validation | Planned |
 | T136 | 16 | A | Final closeout: validation matrix, commits, unreleased changes, issue sync status. | T100-T135 | `cargo test --workspace`; governance; publish guard | Planned |
 | T137 | 16 | G | Final handoff artifacts: release posture, install posture, SDK posture, self-bootstrap posture. | T136 | handoff doc | Planned |
@@ -571,3 +571,18 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   .`.
 - Recovery: commit/push T133, then continue to T134 release/user docs consolidation. Do not
   publish, tag, or release without explicit approval.
+
+### I079 T134 Release Docs Checkpoint (2026-07-02)
+
+- T134 produced `docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md`.
+- README and README.zh-CN now state the planned Cargo install shape while making clear it is not
+  published on crates.io; both point to local source install for testing.
+- README.zh-CN now includes the config subcommand form and read-only validation plan surface.
+- Public install pages now distinguish supported binary release entrypoints from the still-blocked
+  crates.io Cargo install path.
+- `talos-runtime` SDK docs remain pre-1.0 and blocked by dependency closure; README links to the SDK
+  contract and publish gate packet.
+- Verification passed: `scripts/validate_public_site.sh`; `scripts/validate_project_governance.sh
+  .`.
+- Recovery: commit/push T134, then continue to T135 REL-002 readiness report. Do not publish, tag,
+  or release without explicit approval.

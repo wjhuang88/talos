@@ -97,6 +97,17 @@ Published archive names:
 
 Windows ARM64 artifacts are not published yet.
 
+### Cargo Install Status
+
+`cargo install talos-cli --bin talos` is the planned crates.io binary-install shape, but it is not
+published yet. For now, use the release installers/archives above or build from source with
+`cargo build --release -p talos-cli`. A local source checkout can be installed with Cargo for
+testing:
+
+```bash
+cargo install --path crates/talos-cli --bin talos --locked
+```
+
 ### First-Run Setup
 
 When you start Talos without a model configured, the TUI opens with a model
@@ -413,6 +424,11 @@ This is not a stable 1.0 SDK guarantee yet. The public embedding surface is `tal
 plus the protocol and trait types it re-exports from `talos-core`; lower-level `talos-agent`
 constructors remain implementation surface unless documented otherwise.
 
+`talos-runtime` is not yet published as an SDK crate in the current release gate. It remains
+manifest-ready but blocked by dependency closure; see
+[RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) and the
+[publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md).
+
 ## Safety Model
 
 - Read-only workspace tools can run without approval.
@@ -438,6 +454,10 @@ Release tags drive the GitHub release workflow:
 - Pre-release: `v0.1.0-alpha.1`, `v0.1.0-beta.1`, `v0.1.0-rc.1`, `v0.1.0-pre.1`, `v0.1.0-dev.1`
 
 The release workflow builds Linux, macOS, and Windows artifacts from a macOS runner.
+
+Post-v0.2.0 release-note material is collected in
+[RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). It is a draft,
+not a release announcement or tag authorization.
 
 ## Project Status
 
