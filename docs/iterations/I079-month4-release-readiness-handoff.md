@@ -75,6 +75,7 @@
 | 2026-07-02 | T132 | Completed third self-bootstrap rehearsal as gap evidence. Talos generated workspace/governance validation plans for the architecture-sensitive ADR-033 slice, but remained read-only; estimated self-bootstrap coverage was 20%, so the >60% target was missed and REL-002 remains unsatisfied. Evidence: `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md`. |
 | 2026-07-02 | T133 | Completed publish gate packet for `talos-cli` and `talos-runtime`. Dry-runs remain blocked by intended guards/dependency closure, and `talos-dashboard` was added to the product-only publish guard. Evidence: `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md`. |
 | 2026-07-02 | T134 | Consolidated release/user docs across README, README.zh-CN, public install pages, reference index, and draft release notes. Cargo install and `talos-runtime` publication remain documented as blocked, not shipped. |
+| 2026-07-02 | T135 | Completed REL-002 readiness report. Verdict: not ready for `v1.0.0`; pre-1.0 releases may continue only with explicit posture and residual owner list. Evidence: `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md`. |
 
 ## Verification Evidence
 
@@ -86,6 +87,7 @@
 - T133 publish gate validation: `scripts/check_publish_guard.sh .`; `cargo metadata --no-deps --format-version 1`; `cargo package --list -p talos-runtime`; `cargo package --list -p talos-cli`; `cargo publish --dry-run -p talos-cli` (blocked as intended); `cargo publish --dry-run -p talos-runtime` (blocked by unpublished `talos-agent`).
 - T133 governance validation: `scripts/validate_project_governance.sh .`.
 - T134 docs validation: `scripts/validate_public_site.sh`; `scripts/validate_project_governance.sh .`.
+- T135 governance validation: `scripts/validate_project_governance.sh .`.
 
 ## Variance And Residuals
 
@@ -93,8 +95,9 @@
 - T131 scope variance: no automatic associative injection code was added; the task closed as an ADR-backed decision because the available evidence does not justify new model-facing automation.
 - T132 target variance: the planned >60% autonomous validation target was missed; current Talos participation remains read-only validation planning.
 - T133 guard variance: publish guard drift was found and fixed by adding `talos-dashboard` to the product-only guard/matrix.
+- T135 readiness variance: REL-002 is a no-go for `v1.0.0`; only pre-1.0 releases remain in scope.
 - Real publish/tag/release remains explicitly out of scope without maintainer approval.
-- REL-002 is not satisfied by I078/T132; T135 must report the remaining Talos-primary execution gap.
+- REL-002 is not satisfied by I078/T132; T135 records the remaining Talos-primary execution gap.
 
 ## Retrospective
 

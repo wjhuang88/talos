@@ -159,7 +159,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T132 | 14 | A | Third rehearsal: architecture-sensitive slice with autonomous validation target >60%. | T123/T131 | evidence record; gap list | Complete — target missed |
 | T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Complete |
 | T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Complete |
-| T135 | 15 | A | Produce REL-002 readiness report and next-quarter residual owner list. | T132/T134 | governance validation | Planned |
+| T135 | 15 | A | Produce REL-002 readiness report and next-quarter residual owner list. | T132/T134 | governance validation | Complete |
 | T136 | 16 | A | Final closeout: validation matrix, commits, unreleased changes, issue sync status. | T100-T135 | `cargo test --workspace`; governance; publish guard | Planned |
 | T137 | 16 | G | Final handoff artifacts: release posture, install posture, SDK posture, self-bootstrap posture. | T136 | handoff doc | Planned |
 
@@ -586,3 +586,16 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
   .`.
 - Recovery: commit/push T134, then continue to T135 REL-002 readiness report. Do not publish, tag,
   or release without explicit approval.
+
+### I079 T135 Readiness Report Checkpoint (2026-07-02)
+
+- T135 produced `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md`.
+- Verdict: REL-002 is not ready for `v1.0.0`; Talos remains pre-1.0 because Codex is still the
+  primary executor in recorded rehearsals.
+- The report names residual owners for Phase 2 validation execution, Talos-primary editing,
+  architecture-risk review, governance sync, git/issue parity, release authority, and
+  `talos-runtime` publication closure.
+- REL-002 owner doc now records the readiness report and not-ready status.
+- Verification passed: `scripts/validate_project_governance.sh .`.
+- Recovery: commit/push T135, then continue to T136 final closeout. Do not publish, tag, or release
+  without explicit approval.

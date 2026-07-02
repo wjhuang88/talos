@@ -1,6 +1,6 @@
 # REL-002: v1.0 Self-Bootstrap Release Gate
 
-**Status**: Planned
+**Status**: Planned — not ready for v1.0
 **Priority**: P1
 **Created**: 2026-06-28
 **Source**: User-defined v1.0 target marker
@@ -83,6 +83,12 @@ Each qualifying self-bootstrap session must record:
 |---|---|---|---|
 | 2026-07-02 | T123 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md` | Does not qualify. Talos generated a read-only validation plan, but Codex remained the primary executor for implementation, validation execution, docs, git, push, and issue sync. |
 | 2026-07-02 | T132 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md` | Does not qualify. Talos generated workspace/governance validation plans for an architecture-sensitive ADR slice, but Codex remained the primary executor and the >60% autonomous coverage target was missed. |
+
+## Readiness Reports
+
+| Date | Record | Verdict |
+|---|---|---|
+| 2026-07-02 | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` | Not ready for `v1.0.0`; pre-1.0 releases may continue with explicit posture. |
 
 ## Relationship To Other Work
 
