@@ -7,7 +7,7 @@ use crossterm::{
     terminal::enable_raw_mode,
 };
 use futures::{Stream, StreamExt};
-use talos_conversation::{CopyScope, TipKind, UiOutput, UserInput};
+use talos_conversation::{CopyScope, TipKind, TodoPanelData, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
@@ -524,6 +524,10 @@ impl Tui {
                     crate::tool_display::build_tool_result_scrollback_lines(&display, icon, color),
                 );
             }
+            UiOutput::TodoPanel(data) => {
+                self.pending_scrollback
+                    .extend(build_todo_panel_lines(&data));
+            }
             UiOutput::ToolApprovalRequest {
                 tool_name,
                 arguments,
@@ -616,6 +620,7 @@ impl Tui {
             | UiOutput::SessionResume(_)
             | UiOutput::SessionFork(_)
             | UiOutput::SessionDelete(_)
+            | UiOutput::TodoCommand(_)
             | UiOutput::ModelSwitchRequest(_)
             | UiOutput::SkillCommand(_)
             | UiOutput::CredentialResponse(_) => {
@@ -992,6 +997,88 @@ impl Tui {
     fn restore(&self) {
         self.terminal.restore();
     }
+}
+
+pub(crate) fn build_todo_panel_lines(data: &TodoPanelData) -> Vec<ScrollbackLine> {
+    let header = ScrollbackLine::styled(
+        vec![
+            HistorySegment::styled(
+                "   TODO ",
+                to_crossterm_color(semantic::TEXT_ACCENT),
+                HistoryAttrs {
+                    bold: true,
+                    ..HistoryAttrs::default()
+                },
+            ),
+            HistorySegment::styled(
+                data.title.clone(),
+                to_crossterm_color(semantic::TEXT_PRIMARY),
+                HistoryAttrs {
+                    bold: true,
+                    ..HistoryAttrs::default()
+                },
+            ),
+        ],
+        None,
+    );
+    let mut lines = vec![header];
+
+    if data.rows.is_empty() {
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                "      (no todo rows)",
+                to_crossterm_color(semantic::DIM_TEXT),
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+    } else {
+        for row in &data.rows {
+            let mut segments = vec![
+                HistorySegment::styled(
+                    format!("   {} ", row.id),
+                    to_crossterm_color(semantic::DIM_TEXT),
+                    HistoryAttrs::default(),
+                ),
+                HistorySegment::styled(
+                    format!("[{}]", row.status),
+                    to_crossterm_color(semantic::TEXT_ACCENT),
+                    HistoryAttrs::default(),
+                ),
+                HistorySegment::styled(
+                    format!("[{}] ", row.priority),
+                    to_crossterm_color(semantic::DIM_TEXT),
+                    HistoryAttrs::default(),
+                ),
+                HistorySegment::styled(
+                    row.title.clone(),
+                    to_crossterm_color(semantic::TEXT_PRIMARY),
+                    HistoryAttrs::default(),
+                ),
+            ];
+            if let Some(detail) = &row.detail {
+                segments.push(HistorySegment::styled(
+                    format!(" — {detail}"),
+                    to_crossterm_color(semantic::DIM_TEXT),
+                    HistoryAttrs::default(),
+                ));
+            }
+            lines.push(ScrollbackLine::styled(segments, None));
+        }
+    }
+
+    if let Some(footer) = &data.footer {
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("      {footer}"),
+                to_crossterm_color(semantic::DIM_TEXT),
+                HistoryAttrs::default(),
+            )],
+            None,
+        ));
+    }
+
+    lines
 }
 
 impl Drop for Tui {

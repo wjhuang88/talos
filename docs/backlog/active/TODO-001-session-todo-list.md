@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TODO-001 |
 | Priority | P2 |
-| Status | In Progress — I078/T122 read-only slash/TUI views active |
+| Status | In Progress — I078/T122 read-only slash/TUI views in Review |
 | Source | [GitHub Issue #8](https://github.com/wjhuang88/talos/issues/8) |
 | Relates To | SESSION-001, MEM-001, CMD-001, TOOL-012 |
 
@@ -132,6 +132,21 @@ T122 activation (2026-07-02): implement read-only user views after T121-A/B/C co
 repository and agent-side tool surface. Slash commands remain view-only and must read the active
 session todo repository through the session runtime layer; no user-facing mutation command is in
 scope.
+
+T122 implementation (2026-07-02): added typed read-only `/todo` slash requests for list, show,
+stats, and export; CLI/TUI runtime handling reads the active session todo repository and renders a
+read-only TUI todo panel plus system text. Export supports JSON and Markdown text output. User
+slash commands still do not mutate todo state.
+
+Validation:
+
+- `cargo fmt --all -- --check`
+- `cargo test -p talos-conversation`
+- `cargo test -p talos-cli`
+- `cargo test -p talos-tui`
+- `cargo clippy -p talos-conversation -p talos-cli -p talos-tui -- -D warnings`
+- `cargo check --workspace`
+- `scripts/validate_project_governance.sh .`
 
 ### Phase 3: Prompt Integration
 - Inject active todo items into agent system prompt

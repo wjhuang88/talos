@@ -54,6 +54,7 @@ use crate::session_setup::{
 };
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
+use crate::todo_view;
 use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
 use crate::{Cli, build_hook_registry, event_loop};
 use tokio::sync::Mutex;
@@ -639,6 +640,14 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         req.selection,
                     )
                     .await;
+                }
+                SessionLifecycleRequest::Todo(req) => {
+                    todo_view::handle_todo_command(
+                        &ui_tx_for_handler,
+                        &session_manager_for_handler,
+                        &session_watch_rx_for_handler,
+                        req,
+                    );
                 }
                 SessionLifecycleRequest::ModelSwitch(req) => {
                     if let Some(new_config) = handle_session_model(

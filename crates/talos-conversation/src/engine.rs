@@ -11,8 +11,8 @@ use crate::types::{
     ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
     ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, UiOutput,
+    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
+    TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
 };
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -41,6 +41,88 @@ fn plugin_observation_key(provenance: &ToolProvenance) -> String {
             format!("plugin:{name_display}@{version}/{carrier}")
         }
     }
+}
+
+fn parse_todo_command(arg: &str) -> Result<TodoCommandRequest, String> {
+    let mut tokens = arg.split_whitespace();
+    let subcommand = tokens.next().unwrap_or("list");
+    let mut request = TodoCommandRequest {
+        action: match subcommand {
+            "" | "list" => TodoCommandAction::List,
+            "show" => {
+                let id = tokens
+                    .next()
+                    .ok_or_else(|| "Usage: /todo show <id>".to_string())?;
+                TodoCommandAction::Show { id: id.to_string() }
+            }
+            "stats" => TodoCommandAction::Stats,
+            "export" => {
+                let format = match tokens.next() {
+                    None | Some("markdown") | Some("md") => TodoExportFormat::Markdown,
+                    Some("json") => TodoExportFormat::Json,
+                    Some(other) => {
+                        return Err(format!("Unknown todo export format: {other}"));
+                    }
+                };
+                TodoCommandAction::Export { format }
+            }
+            other if other.starts_with("--") => TodoCommandAction::List,
+            other => {
+                return Err(format!(
+                    "Unknown todo command: {other}. Usage: /todo [list|show|stats|export]"
+                ));
+            }
+        },
+        status_filter: None,
+        priority_filter: None,
+        tag_filter: None,
+        sort: None,
+    };
+
+    let mut pending = if subcommand.starts_with("--") {
+        Some(subcommand)
+    } else {
+        None
+    };
+    while let Some(token) = pending.take().or_else(|| tokens.next()) {
+        match token {
+            "--status" => {
+                request.status_filter = Some(
+                    tokens
+                        .next()
+                        .ok_or_else(|| "Missing value for --status".to_string())?
+                        .to_string(),
+                );
+            }
+            "--priority" => {
+                request.priority_filter = Some(
+                    tokens
+                        .next()
+                        .ok_or_else(|| "Missing value for --priority".to_string())?
+                        .to_string(),
+                );
+            }
+            "--tag" => {
+                request.tag_filter = Some(
+                    tokens
+                        .next()
+                        .ok_or_else(|| "Missing value for --tag".to_string())?
+                        .to_string(),
+                );
+            }
+            "--sort" => {
+                request.sort = Some(
+                    tokens
+                        .next()
+                        .ok_or_else(|| "Missing value for --sort".to_string())?
+                        .to_string(),
+                );
+            }
+            other => return Err(format!("Unknown todo option: {other}")),
+        }
+    }
+
+    Ok(request)
 }
 
 pub struct ConversationEngine {
@@ -417,6 +499,9 @@ impl ConversationEngine {
                     }));
                 }
             }
+            "/todo" => {
+                outputs.extend(self.handle_todo_command(arg));
+            }
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
@@ -428,6 +513,16 @@ impl ConversationEngine {
         }
 
         outputs
+    }
+
+    fn handle_todo_command(&self, arg: &str) -> Vec<UiOutput> {
+        match parse_todo_command(arg) {
+            Ok(request) => vec![UiOutput::TodoCommand(request)],
+            Err(message) => vec![UiOutput::Stream(StreamMessage {
+                source: MessageSource::Error,
+                stream: Box::pin(stream::once(async move { format!("[Error] {message}\n") })),
+            })],
+        }
     }
 
     fn handle_copy_command(&self, scope: &str) -> Vec<UiOutput> {

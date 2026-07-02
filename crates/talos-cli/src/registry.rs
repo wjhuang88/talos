@@ -4,7 +4,7 @@
 //! and functions that build tool registries for different runtime modes.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -130,14 +130,18 @@ fn default_todo_tools() -> Vec<Arc<dyn AgentTool>> {
     let Ok(sessions_dir) = SessionManager::default_sessions_dir() else {
         return Vec::new();
     };
+    todo_tools_for_sessions_dir(&sessions_dir)
+}
+
+fn todo_tools_for_sessions_dir(sessions_dir: &Path) -> Vec<Arc<dyn AgentTool>> {
     vec![
-        Arc::new(TodoCreateTool::from_sessions_dir(&sessions_dir)),
-        Arc::new(TodoUpdateStatusTool::from_sessions_dir(&sessions_dir)),
-        Arc::new(TodoUpdateTool::from_sessions_dir(&sessions_dir)),
-        Arc::new(TodoDeleteTool::from_sessions_dir(&sessions_dir)),
-        Arc::new(TodoAddDependencyTool::from_sessions_dir(&sessions_dir)),
-        Arc::new(TodoRemoveDependencyTool::from_sessions_dir(&sessions_dir)),
-        Arc::new(TodoQueryTool::from_sessions_dir(&sessions_dir)),
+        Arc::new(TodoCreateTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoUpdateStatusTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoUpdateTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoDeleteTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoAddDependencyTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoRemoveDependencyTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoQueryTool::from_sessions_dir(sessions_dir)),
     ]
 }
 
@@ -782,7 +786,13 @@ mod tests {
 
     #[test]
     fn print_and_tui_registries_include_todo_tools() {
-        let print_registry = build_print_tool_registry();
+        let dir = tempfile::tempdir().unwrap();
+        let sessions_dir = dir.path().join("sessions");
+
+        let mut print_registry = ToolRegistry::new();
+        for tool in todo_tools_for_sessions_dir(&sessions_dir) {
+            print_registry.register(tool);
+        }
         assert!(print_registry.get("todo_create").is_some());
         assert!(print_registry.get("todo_update_status").is_some());
         assert!(print_registry.get("todo_update").is_some());
@@ -792,8 +802,14 @@ mod tests {
         assert!(print_registry.get("todo_query").is_some());
 
         let (tx, _rx) = mpsc::unbounded_channel();
-        let approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
-        let tui_registry = build_tui_tool_registry(approval, PathBuf::from("."));
+        let tui_approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
+        let mut tui_registry = ToolRegistry::new();
+        for tool in todo_tools_for_sessions_dir(&sessions_dir) {
+            tui_registry.register(Arc::new(TuiPermissionAwareTool {
+                inner: tool,
+                approval: tui_approval.clone(),
+            }));
+        }
         assert!(tui_registry.get("todo_create").is_some());
         assert!(tui_registry.get("todo_update_status").is_some());
         assert!(tui_registry.get("todo_update").is_some());

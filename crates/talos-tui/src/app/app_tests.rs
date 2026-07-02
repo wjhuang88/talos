@@ -1,8 +1,8 @@
 use crossterm::style::Color as CColor;
-use talos_conversation::{MessageSource, ToolResultDisplay};
+use talos_conversation::{MessageSource, TodoPanelData, TodoPanelRow, ToolResultDisplay};
 use talos_core::message::Message;
 
-use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState};
+use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
 use crate::scrollback;
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
@@ -69,6 +69,27 @@ fn tool_result_scrollback_keeps_multiple_lines() {
     assert_eq!(lines[0].text, "   ✓ ├── backend/");
     assert_eq!(lines[1].text, "     ├── frontend/");
     assert_eq!(lines[2].text, "     └── docs/");
+}
+
+#[test]
+fn todo_panel_renders_read_only_history_lines() {
+    let lines = build_todo_panel_lines(&TodoPanelData {
+        title: "Session Todos".to_string(),
+        rows: vec![TodoPanelRow {
+            id: "abc12345".to_string(),
+            status: "in_progress".to_string(),
+            priority: "high".to_string(),
+            title: "Wire slash view".to_string(),
+            detail: Some("read-only".to_string()),
+        }],
+        footer: Some("1 item".to_string()),
+    });
+
+    assert_eq!(lines[0].text, "   TODO Session Todos");
+    assert!(lines[1].text.contains("abc12345"));
+    assert!(lines[1].text.contains("[in_progress]"));
+    assert!(lines[1].text.contains("Wire slash view"));
+    assert_eq!(lines[2].text, "      1 item");
 }
 
 #[test]

@@ -70,6 +70,45 @@ pub enum SkillCommandRequest {
     Reference { path: String },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TodoCommandAction {
+    List,
+    Show { id: String },
+    Stats,
+    Export { format: TodoExportFormat },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TodoExportFormat {
+    Markdown,
+    Json,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TodoCommandRequest {
+    pub action: TodoCommandAction,
+    pub status_filter: Option<String>,
+    pub priority_filter: Option<String>,
+    pub tag_filter: Option<String>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TodoPanelData {
+    pub title: String,
+    pub rows: Vec<TodoPanelRow>,
+    pub footer: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TodoPanelRow {
+    pub id: String,
+    pub status: String,
+    pub priority: String,
+    pub title: String,
+    pub detail: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ScrollbackState {
     pub scrolled_line_count: usize,
@@ -174,6 +213,10 @@ pub enum UiOutput {
     ModelSwitchRequest(ModelSwitchRequest),
     /// Request runtime Skill activation or reference loading.
     SkillCommand(SkillCommandRequest),
+    /// Request a read-only todo list/status/export view for the active session.
+    TodoCommand(TodoCommandRequest),
+    /// Read-only todo panel data rendered by TUI/bridges.
+    TodoPanel(TodoPanelData),
     /// Ask the TUI to collect an API key for the named provider.
     CredentialRequest(CredentialRequestData),
     /// TUI returns a collected API key to the lifecycle handler.

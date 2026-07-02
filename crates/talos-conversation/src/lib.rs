@@ -32,5 +32,6 @@ pub use types::{
     ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
     SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,
-    TipKind, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
+    TipKind, TodoCommandAction, TodoCommandRequest, TodoExportFormat, TodoPanelData, TodoPanelRow,
+    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput, UserInput,
 };

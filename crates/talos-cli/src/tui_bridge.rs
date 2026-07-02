@@ -12,7 +12,7 @@ use talos_conversation::MessageSource;
 use talos_conversation::{
     ConversationEngine, CredentialResponseData, ModelInfo, ModelSwitchRequest,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest,
-    SkillCommandRequest, StreamMessage, UiOutput, UserInput,
+    SkillCommandRequest, StreamMessage, TodoCommandRequest, UiOutput, UserInput,
 };
 use talos_core::message::AgentEvent;
 
@@ -95,6 +95,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     }
                                     UiOutput::SessionDelete(req) => {
                                         let _ = session_tx.send(SessionLifecycleRequest::Delete(req));
+                                    }
+                                    UiOutput::TodoCommand(req) => {
+                                        let _ = session_tx.send(SessionLifecycleRequest::Todo(req));
                                     }
                                     UiOutput::ModelSwitchRequest(req) => {
                                         let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(req));
@@ -214,6 +217,7 @@ pub(crate) enum SessionLifecycleRequest {
     Resume(SessionResumeRequest),
     Fork(SessionForkRequest),
     Delete(SessionDeleteRequest),
+    Todo(TodoCommandRequest),
     ModelSwitch(ModelSwitchRequest),
     ModelSwitchWithCredential(CredentialResponseData),
     ProviderSetup(String),

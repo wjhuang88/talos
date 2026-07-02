@@ -349,6 +349,7 @@ mode.
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
 | `/model` | Open the model picker to browse and switch models at runtime |
+| `/todo`, `/todo list`, `/todo show <id>`, `/todo stats`, `/todo export [json|markdown]` | View or export active-session todos; user slash commands are read-only |
 
 ## Skills
 

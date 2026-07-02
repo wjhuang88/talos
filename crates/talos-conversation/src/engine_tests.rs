@@ -6,8 +6,8 @@ use talos_core::tool::ToolProvenance;
 use crate::engine::ConversationEngine;
 use crate::types::{
     ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, ModelPickerItem,
-    PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind, ToolCallDisplay,
-    ToolResultDisplay, UiOutput,
+    PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind, TodoCommandAction,
+    TodoExportFormat, ToolCallDisplay, ToolResultDisplay, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -1286,6 +1286,62 @@ async fn every_visible_slash_command_has_an_execution_path() {
                 "{command} is only a placeholder"
             );
         }
+    }
+}
+
+#[test]
+fn slash_todo_list_produces_read_only_request() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/todo list --status blocked --sort created");
+
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::TodoCommand(req) => {
+            assert_eq!(req.action, TodoCommandAction::List);
+            assert_eq!(req.status_filter.as_deref(), Some("blocked"));
+            assert_eq!(req.sort.as_deref(), Some("created"));
+        }
+        _ => panic!("expected todo command request"),
+    }
+}
+
+#[test]
+fn slash_todo_show_produces_read_only_request() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/todo show abc123");
+
+    match &outputs[0] {
+        UiOutput::TodoCommand(req) => {
+            assert_eq!(
+                req.action,
+                TodoCommandAction::Show {
+                    id: "abc123".to_string()
+                }
+            );
+        }
+        _ => panic!("expected todo command request"),
+    }
+}
+
+#[test]
+fn slash_todo_export_json_produces_read_only_request() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/todo export json --priority high");
+
+    match &outputs[0] {
+        UiOutput::TodoCommand(req) => {
+            assert_eq!(
+                req.action,
+                TodoCommandAction::Export {
+                    format: TodoExportFormat::Json
+                }
+            );
+            assert_eq!(req.priority_filter.as_deref(), Some("high"));
+        }
+        _ => panic!("expected todo command request"),
     }
 }
 

@@ -250,6 +250,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
+        CommandDefinition {
+            name: "/todo",
+            aliases: &[],
+            usage: "/todo [list|show|stats|export]",
+            description: "Show session todos",
+            arg_hint: Some("[list|show|stats|export]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
     ])
 });
 
