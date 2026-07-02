@@ -26,15 +26,17 @@ governance boundaries as the TUI.
 ## Gate Status
 
 ADR-031 accepted the WEB-001 MVP boundary on 2026-07-01 and was amended on 2026-07-02 for a
-default-on TUI lifecycle with config opt-out. The first implementation slice is now unblocked only
-for a loopback-only, token-authenticated, read-only dashboard.
+default-on TUI lifecycle with config opt-out. The first implementation slice is now unblocked for
+a loopback-only, read-only dashboard. The per-process bearer token is opt-in via
+`[dashboard] loopback_only = false`; the default is loopback-bind-only for the common single-user
+case.
 Remote access, web approvals, config writes, browser automation, WebSocket control, and any
 write/session-mutating route remain out of scope until a later security review.
 
 T112/T113 security review update (2026-07-02): `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`
 recorded the dashboard/browser boundary review. T113 added dashboard output-boundary redaction for
-snapshot data and regression coverage proving unknown paths without a token are rejected before
-returning route information.
+snapshot data and regression coverage proving that, when `loopback_only = false`, unknown paths
+without a token are rejected before returning route information.
 
 ## Target Model
 

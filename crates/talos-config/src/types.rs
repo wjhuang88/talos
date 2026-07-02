@@ -105,7 +105,9 @@ pub struct DashboardConfig {
     /// When true, start the loopback dashboard server on TUI launch.
     pub enabled: bool,
     /// When true, skip the per-process bearer token and rely on loopback bind only.
-    /// Defaults to false. Only enable on trusted single-user machines.
+    /// Defaults to true: the dashboard binds 127.0.0.1, so loopback is the
+    /// only network surface. Set to false to require a per-process bearer token
+    /// for additional defense-in-depth on shared or multi-user machines.
     pub loopback_only: bool,
 }
 
@@ -113,7 +115,7 @@ impl Default for DashboardConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            loopback_only: false,
+            loopback_only: true,
         }
     }
 }

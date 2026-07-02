@@ -87,11 +87,11 @@ fn test_dashboard_enabled_by_default() {
 }
 
 #[test]
-fn test_dashboard_loopback_only_defaults_false() {
+fn test_dashboard_loopback_only_defaults_true() {
     let config = Config::default();
     assert!(
-        !config.dashboard.loopback_only,
-        "loopback_only must default to false to keep token auth as the safe default"
+        config.dashboard.loopback_only,
+        "loopback_only must default to true so the loopback bind is the only access control by default"
     );
 }
 
@@ -120,7 +120,7 @@ model = "test"
 enabled = true
 "#;
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(!config.dashboard.loopback_only);
+    assert!(config.dashboard.loopback_only);
 }
 
 #[test]
