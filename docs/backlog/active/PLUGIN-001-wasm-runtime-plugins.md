@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | PLUGIN-001 |
-| Status | **Planned — architecture and dependency review unblocked**. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools. ADR-027/028/029/030 accepted; ADR-032 cleared the focused `wasmtime` dependency/security review for the first local explicit read-only WASM plugin MVP after manifest parsing. |
+| Status | **In Progress — I077/T110 security review complete**. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools. ADR-027/028/029/030 accepted; ADR-032 cleared the focused `wasmtime` dependency/security review for the first local explicit read-only WASM plugin MVP after manifest parsing. T110 clears only a bounded local explicit read-only fixture plugin tool slice and records required T111 controls. |
 | Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
 | Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
 | Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
@@ -97,6 +97,14 @@ host calls, sandbox limits, compatibility, and failure behavior.
 4. Add one fixture WASM read-only tool through the existing `AgentTool`/permission pipeline.
 5. Cover success, malformed manifest, invalid module, trap, timeout, oversized output, and denied
    permission.
+
+T110 security review (2026-07-01):
+- Review artifact: `docs/reference/PLUGIN-MVP-SECURITY-REVIEW-2026-07-01.md`.
+- T111 may proceed only as a local explicit read-only fixture plugin tool registered through
+  `AgentTool`/`ToolRegistry`.
+- T111 blockers to address before closeout: package-root confinement for artifact/handler paths,
+  tool-name collision rejection, plugin provenance, permission pipeline denial tests, bounded
+  output, and `wasmtime` version rationale or update.
 
 ADR-032 implementation constraints:
 - add `wasmtime` only in the focused plugin runtime slice;

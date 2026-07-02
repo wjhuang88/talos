@@ -140,7 +140,7 @@ Planned, and Blocked/Paused work that affects this replan.
 | T107 | 3 | A | Design autonomous validation loop: command/tool shape, security boundary, and no-hidden-pass rules. | REL-002/T52 evidence | ADR/proposal or owner-doc decision | Complete |
 | T108 | 3 | A | Implement first safe validation surface if design clears: bounded read-only validation command or explicit tool. | T107 | targeted tests; no permission bypass | Complete |
 | T109 | 4 | A | Month-1 closeout: provider/status/tool/session fixes and validation-loop decision. | T100-T108 | `cargo test --workspace`; governance | Complete |
-| T110 | 5 | E | Plugin MVP security review: WASM adapter, timeout, host calls, permission/provenance gap. | T46/ADR-032 | Review document; threat model | Planned |
+| T110 | 5 | E | Plugin MVP security review: WASM adapter, timeout, host calls, permission/provenance gap. | T46/ADR-032 | Review document; threat model | Review |
 | T111 | 5-6 | E | Implement read-only WASM plugin `AgentTool` registration path if T110 clears. | T110 | permission/provenance/trap tests | Planned |
 | T112 | 6 | D | WEB-001/WEB-005 security review: loopback auth, token display, logs, browser-page fields. | T42/T47 | Review document; no secret leakage tests | Planned |
 | T113 | 6 | D | Apply dashboard/browser-page hardening from T112. | T112 | dashboard/tools tests; localhost smoke | Planned |
@@ -288,3 +288,10 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Full closeout validation passed: `cargo fmt --all -- --check`; `cargo test --workspace`; `scripts/validate_project_governance.sh .`.
 - `cargo test --workspace` reported existing `talos-runtime` example dead-code warnings but exited 0 with no test failures.
 - Next planned work is I077/T110 plugin MVP security review. This closeout does not authorize validation execution, direct exec, publish, tag, or permission-default changes.
+
+### I077 T110 Security Review Checkpoint (2026-07-01)
+
+- T110 produced `docs/reference/PLUGIN-MVP-SECURITY-REVIEW-2026-07-01.md`.
+- T111 is cleared only for a local explicit read-only fixture plugin tool registered through `AgentTool`/`ToolRegistry`.
+- Required T111 controls: package-root path confinement, tool-name collision rejection, plugin provenance, permission pipeline denial tests, bounded output, no host calls, and `wasmtime` version rationale or update.
+- Verification passed: `cargo tree -p talos-plugin --features wasm`; `cargo test -p talos-plugin --features wasm`.

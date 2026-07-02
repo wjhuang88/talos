@@ -1,6 +1,6 @@
 # Iteration I077: Month 2 — Plugin, Exec, And Web Security
 
-> Document status: Planned
+> Document status: Active (2026-07-01)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 5-8 of the 2026-07-01 replan: plugin MVP security review,
 > read-only plugin tool integration if cleared, WEB-001/WEB-005 security review, and direct exec
@@ -15,7 +15,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| T110 | PLUGIN-001 | In Progress | T46/ADR-032 | Plugin MVP security review |
+| T110 | PLUGIN-001 | Review | T46/ADR-032 | Plugin MVP security review |
 | T111 | PLUGIN-001 | Planned | T110 | Read-only plugin AgentTool if cleared |
 | T112 | WEB-001/WEB-005 | Planned | T42/T47 | Web/browser security review |
 | T113 | WEB-001/WEB-005 | Planned | T112 | Hardening fixes |
@@ -64,14 +64,20 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-01 | Planning | Created as Month 2 shell for the replan. |
+| 2026-07-01 | Activation | Activated after I076/T109 closeout. First packet is T110 plugin MVP security review. |
+| 2026-07-01 | Review | T110 completed `docs/reference/PLUGIN-MVP-SECURITY-REVIEW-2026-07-01.md`. T111 is cleared only for a local explicit read-only fixture plugin tool with package-root confinement, provenance, permission pipeline, and bounded output tests. |
 
 ## Verification Evidence
 
-- Pending.
+- 2026-07-01: `cargo tree -p talos-plugin --features wasm` recorded the actual optional dependency tree. It uses `wasmtime v29.0.1`, which T111 must reconcile against ADR-032's current-version discovery.
+- 2026-07-01: `cargo test -p talos-plugin --features wasm` passed: 24 unit tests, 8 integration tests, 0 doc tests.
 
 ## Variance And Residuals
 
-- Pending.
+- T110 found that T111 must resolve or record the `wasmtime` version choice before closeout.
+- T110 found that artifact/handler path confinement is a blocker for executable plugin loading.
+- T110 found that the current per-call timeout watchdog leaves a sleeping thread until timeout after successful execution; T111 may keep this only for bounded fixture use or must replace/cap it before broader presentation.
+- T111 remains planned next and is limited to a local explicit read-only fixture plugin tool. No host calls, write-capable tools, remote install, automatic discovery, or default presentation are authorized.
 
 ## Retrospective
 

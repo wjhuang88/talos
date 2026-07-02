@@ -19,13 +19,14 @@ acceptance criteria, verification evidence, or iteration state.
 | R27 High-Risk Governance Gate | In Progress | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | T2/I058 moved to Review with full validation and real binary proof. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
-| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I077/T110 plugin MVP security review; no real publish, validation execution, direct exec, or permission-default change without explicit gate. |
+| Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I077/T111 local explicit read-only plugin tool only under T110 controls; no real publish, validation execution, direct exec, host calls, or permission-default change without explicit gate. |
+| I077 Plugin/Exec/Web Security | Active | [I077](iterations/I077-month2-plugin-exec-web-security.md) | T110 is in Review; T111 may proceed only as a local explicit read-only fixture plugin tool with package-root confinement, provenance, permission, and bounded-output tests. |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| _(no active review items)_ | - | - | - |
+| T110 Plugin MVP Security Review | Review | [review](reference/PLUGIN-MVP-SECURITY-REVIEW-2026-07-01.md) / [I077](iterations/I077-month2-plugin-exec-web-security.md) | Commit and push T110; T111 must satisfy every required control in the review before closeout. |
 
 ## Blocked / Paused
 
@@ -46,7 +47,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Plugin Encapsulation Architecture | Accepted baseline | [proposal](proposals/plugin-encapsulation-format.md) / [ADR-027](decisions/027-plugin-runtime-boundary.md) / [ADR-028](decisions/028-plugin-tool-provenance-extension.md) / [ADR-029](decisions/029-extensibility-atomic-component-model.md) / [ADR-030](decisions/030-extensibility-command-taxonomy.md) / [ADR-032](decisions/032-wasmtime-dependency-security-review.md) | Architecture and initial `wasmtime` dependency/security review accepted. First runtime slice remains local explicit read-only WASM only; no dylib, Lua, marketplace, remote install, auto-discovery, or write-capable plugin tools. |
 | PLUGIN-001 Plugin Encapsulation System | In Progress | [PLUGIN-001](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Provenance data model complete (T40); manifest parser complete (T45); WASM runtime adapter complete (T46, behind `wasm` feature). Next: permission-gated tool integration and security review (T59). |
 | CMD-002 Command Taxonomy Realignment | In Progress | [CMD-002](backlog/active/CMD-002-command-taxonomy-realignment.md) | Slice 1 complete (T41): `/mcp` shows MCP status; `/plugins` shows transition notice. Slice 2 (`/hooks` + plugin listing) waits for HOOK-001/PLUGIN-001 runtime. |
-| I077 Plugin/Exec/Web Security | Planned | [I077](iterations/I077-month2-plugin-exec-web-security.md) | Wait for I076 closeout or explicit replan; high-risk work requires security gates before code. |
+| I077 Plugin/Exec/Web Security | Active | [I077](iterations/I077-month2-plugin-exec-web-security.md) | T110 security review complete; continue with T111 only under the review's local explicit read-only plugin tool constraints. |
 | I078 Session/Todo/Thinking | Planned | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | Wait for I077 closeout or explicit replan; prompt/history changes require persistence tests. |
 | I079 Release Readiness/Handoff | Planned | [I079](iterations/I079-month4-release-readiness-handoff.md) | Wait for I078 closeout or explicit replan; no publish/tag unless explicitly approved. |
 | TUI-020 Thinking Preview Without History Pollution | Planned | [TUI-020](backlog/active/TUI-020-thinking-preview-not-history.md) / [Issue #15](https://github.com/wjhuang88/talos/issues/15) | Decide transient-message vs streaming-state approach before implementation; protect session history integrity. |
