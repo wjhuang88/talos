@@ -97,7 +97,7 @@ The two likely share a common session-query/command handler backbone.
   tradeoff** to record in an ADR (preferred: keep the UI vanilla / single-file to avoid it).
 - Adding any web-framework dependency requires an ADR per dependency discipline (ADR-010).
 - Web-driven actions are not privileged — they go through the same permission pipeline as the TUI.
-- Localhost-only by default; no background network listener without explicit opt-in.
+- Loopback-only by default; no LAN, tunnel, remote, or write/action listener without a new ADR.
 - No new global event bus (ADR-006); the web surface is a subscriber/view, not a new backplane.
 
 ## Recommended Research Path

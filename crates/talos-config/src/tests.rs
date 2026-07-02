@@ -81,6 +81,12 @@ fn test_api_key_from_env_anthropic() {
 }
 
 #[test]
+fn test_dashboard_enabled_by_default() {
+    let config = Config::default();
+    assert!(config.dashboard.enabled);
+}
+
+#[test]
 fn test_api_key_from_env_openai() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::set_var("OPENAI_API_KEY", "env-key-openai") };

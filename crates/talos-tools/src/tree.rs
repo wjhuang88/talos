@@ -1,6 +1,6 @@
 //! Tree visualization tool for directory structure rendering.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -74,27 +74,49 @@ impl TreeTool {
             None => self.workspace_root.clone(),
         };
 
-        let canonical_root = self
-            .workspace_root
-            .canonicalize()
-            .unwrap_or_else(|_| self.workspace_root.clone());
-
         if !root.exists() {
             return Err(format!("path not found: {}", root.display()));
         }
 
         let mut output = String::new();
-        let name = root
-            .strip_prefix(&canonical_root)
-            .unwrap_or(&root)
-            .to_string_lossy()
-            .to_string();
-        output.push_str(&format!("{name}\n"));
+        output.push_str(&format!(
+            "{}\n",
+            display_root_name(&root, &self.workspace_root)
+        ));
 
         build_tree(&root, "", 0, max_depth, &mut output);
 
         Ok(output.trim_end().to_string())
     }
+}
+
+fn display_root_name(root: &Path, workspace_root: &Path) -> String {
+    let canonical_workspace = workspace_root
+        .canonicalize()
+        .unwrap_or_else(|_| workspace_root.to_path_buf());
+    let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+
+    if let Ok(relative) = canonical_root.strip_prefix(&canonical_workspace) {
+        if relative.as_os_str().is_empty() {
+            return format_path_name(&canonical_workspace);
+        }
+        return format!("{}{}", relative.display(), trailing_slash(&canonical_root));
+    }
+
+    format_path_name(&canonical_root)
+}
+
+fn format_path_name(path: &Path) -> String {
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| path.display().to_string());
+    format!("{name}{}", trailing_slash(path))
+}
+
+fn trailing_slash(path: &Path) -> &'static str {
+    if path.is_dir() { "/" } else { "" }
 }
 
 fn build_tree(
@@ -147,5 +169,43 @@ fn build_tree(
                 output,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn tree_root_first_line_uses_workspace_directory_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(tmp.path().join("src")).unwrap();
+        let tool = TreeTool::new(tmp.path().to_path_buf());
+
+        let result = tool
+            .execute_inner(serde_json::json!({ "max_depth": 1 }))
+            .await
+            .unwrap();
+
+        let first_line = result.lines().next().unwrap();
+        assert!(!first_line.trim().is_empty());
+        assert_eq!(
+            first_line,
+            format!("{}/", tmp.path().file_name().unwrap().to_string_lossy())
+        );
+    }
+
+    #[tokio::test]
+    async fn tree_subdir_first_line_uses_target_relative_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(tmp.path().join("src")).unwrap();
+        let tool = TreeTool::new(tmp.path().to_path_buf());
+
+        let result = tool
+            .execute_inner(serde_json::json!({ "path": "src", "max_depth": 1 }))
+            .await
+            .unwrap();
+
+        assert_eq!(result.lines().next().unwrap(), "src/");
     }
 }

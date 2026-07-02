@@ -818,6 +818,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_model_name(config.model.clone());
     tui.set_provider(config.provider.clone());
     tui.set_workspace_path(workspace_path_display(&workspace_root));
+    tui.set_session_id(session.id.to_string());
 
     let skill_diagnostics = runtime_skills.lock().await.diagnostics();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
@@ -825,6 +826,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec());
     let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
+    let ui_output_tx_for_dashboard = ui_output_tx.clone();
     tokio::spawn(async move {
         run_conversation_loop(
             engine,
@@ -867,10 +869,21 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         let token = server.token().to_string();
         match server.serve().await {
             Ok((addr, _)) => {
-                eprintln!("Dashboard: http://{addr}/ (token: {token})");
+                let url = format!("http://{addr}/");
+                eprintln!("Dashboard: {url} (token: {token})");
+                send_stream(
+                    &ui_output_tx_for_dashboard,
+                    MessageSource::System,
+                    format!("[System] Dashboard available at {url} with bearer token {token}.\n"),
+                );
             }
             Err(e) => {
                 eprintln!("Dashboard: failed to start: {e}");
+                send_stream(
+                    &ui_output_tx_for_dashboard,
+                    MessageSource::Error,
+                    format!("[Error] Dashboard failed to start: {e}\n"),
+                );
             }
         }
     }
@@ -1180,6 +1193,9 @@ async fn handle_session_new(
                     "[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed."
                 );
             }
+            let _ = ui_tx.send(UiOutput::SessionIdentity {
+                id: new_session_for_watch.id.to_string(),
+            });
             let text = "[System] New session started. Previous session preserved.\n".to_string();
             send_stream(ui_tx, MessageSource::System, text);
         }
@@ -1411,9 +1427,12 @@ async fn handle_session_resume(
                 );
             }
             let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
+            let _ = ui_tx.send(UiOutput::SessionIdentity {
+                id: target_session_for_watch.id.to_string(),
+            });
             let text = format!(
                 "[System] Resumed session {}.\n",
-                session_id.unwrap_or_default()
+                target_session_for_watch.id
             );
             send_stream(ui_tx, MessageSource::System, text);
             Some(resume_config)
@@ -1565,6 +1584,9 @@ async fn handle_session_fork(
                     "[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed."
                 );
             }
+            let _ = ui_tx.send(UiOutput::SessionIdentity {
+                id: child_session_for_watch.id.to_string(),
+            });
             let text = format!(
                 "[System] Forked session {child_id} (source: {}).\n",
                 result.old_session.id

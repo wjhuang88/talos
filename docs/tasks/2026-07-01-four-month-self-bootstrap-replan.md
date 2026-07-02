@@ -160,8 +160,8 @@ Planned, and Blocked/Paused work that affects this replan.
 | T133 | 14 | G | Publish gate packet for `talos-cli` and `talos-runtime`; no real publish unless approved. | ARCH-031/T55/T56 | publish guard; dry-run/blocker matrix | Complete |
 | T134 | 15 | G | Consolidate release/user docs: README, site, crate docs, SDK examples, changelog draft. | all tracks | link/site validators | Complete |
 | T135 | 15 | A | Produce REL-002 readiness report and next-quarter residual owner list. | T132/T134 | governance validation | Complete |
-| T136 | 16 | A | Final closeout: validation matrix, commits, unreleased changes, issue sync status. | T100-T135 | `cargo test --workspace`; governance; publish guard | Planned |
-| T137 | 16 | G | Final handoff artifacts: release posture, install posture, SDK posture, self-bootstrap posture. | T136 | handoff doc | Planned |
+| T136 | 16 | A | Final closeout: validation matrix, commits, unreleased changes, issue sync status. | T100-T135 | `cargo test --workspace`; governance; publish guard | Complete |
+| T137 | 16 | G | Final handoff artifacts: release posture, install posture, SDK posture, self-bootstrap posture. | T136 | handoff doc | Complete |
 
 ## Milestones
 
@@ -599,3 +599,39 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Verification passed: `scripts/validate_project_governance.sh .`.
 - Recovery: commit/push T135, then continue to T136 final closeout. Do not publish, tag, or release
   without explicit approval.
+
+### I079 T136 Closeout Checkpoint (2026-07-02)
+
+- T136 produced `docs/reference/I079-CLOSEOUT-MATRIX-2026-07-02.md`.
+- Commit range closed: T130 `d8cce76`, T131 `e43dd3c`, T132 `74faba3`, T133 `09ac4e0`, T134
+  `d98730f`, T135 `d3b4a3a`.
+- Full closeout validation passed: `cargo fmt --all -- --check`; `cargo test --workspace`;
+  `cargo clippy --workspace -- -D warnings`; `scripts/validate_project_governance.sh .`;
+  `scripts/check_publish_guard.sh .`; `scripts/validate_public_site.sh`.
+- Issue sync status: no new GitHub issue-linked owner docs changed status in T130-T136. Issues
+  #7/#8/#15 were already closed at T126; REL-002 remains open/not ready.
+- No crate was published, no `publish = false` guard was removed, no release tag was created, and
+  no GitHub Release was created.
+- Recovery: commit/push T136, then continue to T137 final handoff artifacts. Do not publish, tag,
+  or release without explicit approval.
+
+### I079 T137 Handoff And Maintainer Feedback Checkpoint (2026-07-02)
+
+- T137 produced `docs/reference/I079-HANDOFF-2026-07-02.md`.
+- Maintainer feedback closed:
+  - `tree` root output now uses a target directory first line instead of a blank line.
+  - Tool result detail rows use readable grey styling on dark backgrounds.
+  - Unterminated assistant code fences degrade to inline markdown so headings/tables/lists after a
+    malformed fence recover at stream finish.
+  - Exit summary includes the current session id and tracks `/new`, `/resume`, and `/fork`.
+  - Dashboard is default-on in TUI mode, prints a visible startup URL/token message, and can be
+    disabled with `[dashboard] enabled = false`.
+- ADR-031, WEB-001 owner docs, dashboard proposal/security review, README, config reference, and
+  Board were synced to the default-on local dashboard lifecycle.
+- Validation passed: `cargo fmt --all -- --check`; `cargo check --workspace`;
+  `cargo clippy --workspace -- -D warnings`; `cargo test -p talos-tools tree_`;
+  `cargo test -p talos-config test_dashboard_enabled_by_default`; `cargo test -p talos-tui`;
+  `cargo test --workspace`; `scripts/validate_project_governance.sh .`.
+- Issue sync status: no GitHub issue-linked owner doc changed to Complete or Cancelled in T137.
+- Recovery: I079 is complete. Resume only from explicit maintainer direction; no publish, tag,
+  GitHub Release, remote dashboard, browser automation, or web write/action route is authorized.

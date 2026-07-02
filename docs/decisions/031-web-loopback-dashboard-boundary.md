@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted; amended 2026-07-02 to make the loopback dashboard enabled by default with a visible
+startup URL and an explicit config opt-out.
 
 ## Context
 
@@ -33,16 +34,19 @@ loopback-only, token-authenticated, read-only dashboard satisfies the product go
 the runtime boundaries:
 
 - bind only to `127.0.0.1`;
-- start only through explicit opt-in;
+- start by default in TUI mode with an explicit config opt-out;
 - generate a per-process startup token;
+- print the access URL and token at startup;
 - expose GET-only status/history/governance/config views;
 - mask credentials using the same secret-display boundary as CLI/config surfaces;
 - HTML-escape user-controlled content;
 - provide no tool execution, approval, config-write, file-write, or session-mutating endpoint.
 
 Loopback does not protect against a compromised local process. That is acceptable for an MVP only
-because the server is read-only, token-gated, and disabled by default. Remote access, tunnels,
-browser connectors, and write actions require separate decisions.
+because the server is read-only, token-gated, and confined to the local machine. The 2026-07-02
+amendment changes the lifecycle default from opt-in to default-on so the dashboard becomes a
+visible product surface; it does not change the route, auth, bind, or write/action boundaries.
+Remote access, tunnels, browser connectors, and write actions require separate decisions.
 
 ## Decision
 
@@ -51,9 +55,10 @@ browser connectors, and write actions require separate decisions.
    - T28 remains a historical blocked checkpoint; new implementation should proceed through the
      current planned T42/T58 path.
 
-2. **Dashboard startup is explicit opt-in.**
-   - A future implementation may use a CLI flag or config flag.
-   - No background dashboard starts by default.
+2. **Dashboard startup is default-on in TUI mode, with config opt-out.**
+   - TUI startup starts the loopback dashboard unless `[dashboard] enabled = false` is configured.
+   - Startup prints the local access URL and the per-process token.
+   - No remote or background daemon mode is approved.
 
 3. **The MVP binds only to loopback.**
    - Bind address is hardcoded to `127.0.0.1`.

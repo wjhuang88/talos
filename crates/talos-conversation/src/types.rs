@@ -166,6 +166,10 @@ pub struct StreamMessage {
 pub enum UiOutput {
     Stream(StreamMessage),
     Status(StatusSnapshot),
+    /// Current durable session identity for UI summary surfaces.
+    SessionIdentity {
+        id: String,
+    },
     Tip {
         text: String,
         kind: TipKind,

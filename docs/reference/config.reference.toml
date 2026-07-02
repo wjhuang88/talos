@@ -37,6 +37,12 @@ model = "claude-sonnet-4-20250514"
 # methods_allowlist = []                # allowed RPC method names
 # max_concurrent = 1                    # concurrent RPC requests (MVP: serialized)
 
+# ── Loopback Dashboard ────────────────────────────────────────────────────────
+# [dashboard]
+# enabled = true                        # start read-only 127.0.0.1 dashboard in TUI mode
+# Set enabled = false to disable the local dashboard. Startup prints the URL and
+# per-process bearer token; the token is not persisted in this config file.
+
 # ── Provider Definitions ──────────────────────────────────────────────────────
 # Each [providers.<name>] section defines a named provider.
 #

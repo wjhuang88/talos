@@ -76,6 +76,8 @@
 | 2026-07-02 | T133 | Completed publish gate packet for `talos-cli` and `talos-runtime`. Dry-runs remain blocked by intended guards/dependency closure, and `talos-dashboard` was added to the product-only publish guard. Evidence: `docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md`. |
 | 2026-07-02 | T134 | Consolidated release/user docs across README, README.zh-CN, public install pages, reference index, and draft release notes. Cargo install and `talos-runtime` publication remain documented as blocked, not shipped. |
 | 2026-07-02 | T135 | Completed REL-002 readiness report. Verdict: not ready for `v1.0.0`; pre-1.0 releases may continue only with explicit posture and residual owner list. Evidence: `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md`. |
+| 2026-07-02 | T136 | Completed final closeout matrix for T130-T135. Full workspace tests, clippy, governance, publish guard, and site validation passed; issue sync had no new required actions. Evidence: `docs/reference/I079-CLOSEOUT-MATRIX-2026-07-02.md`. |
+| 2026-07-02 | T137 | Completed final handoff and maintainer feedback corrections. Fixed `tree` root output, tool detail contrast, malformed-fence markdown recovery, exit-summary session id, and default-on dashboard startup messaging. Evidence: `docs/reference/I079-HANDOFF-2026-07-02.md`. |
 
 ## Verification Evidence
 
@@ -88,6 +90,11 @@
 - T133 governance validation: `scripts/validate_project_governance.sh .`.
 - T134 docs validation: `scripts/validate_public_site.sh`; `scripts/validate_project_governance.sh .`.
 - T135 governance validation: `scripts/validate_project_governance.sh .`.
+- T136 closeout validation: `cargo fmt --all -- --check`; `cargo test --workspace`; `cargo clippy --workspace -- -D warnings`; `scripts/validate_project_governance.sh .`; `scripts/check_publish_guard.sh .`; `scripts/validate_public_site.sh`.
+- T137 validation: `cargo fmt --all -- --check`; `cargo check --workspace`;
+  `cargo clippy --workspace -- -D warnings`; `cargo test -p talos-tools tree_`;
+  `cargo test -p talos-config test_dashboard_enabled_by_default`; `cargo test -p talos-tui`;
+  `cargo test --workspace`; `scripts/validate_project_governance.sh .`.
 
 ## Variance And Residuals
 
@@ -96,6 +103,9 @@
 - T132 target variance: the planned >60% autonomous validation target was missed; current Talos participation remains read-only validation planning.
 - T133 guard variance: publish guard drift was found and fixed by adding `talos-dashboard` to the product-only guard/matrix.
 - T135 readiness variance: REL-002 is a no-go for `v1.0.0`; only pre-1.0 releases remain in scope.
+- T136 issue-sync variance: no additional GitHub issue-linked owner docs changed status in T130-T136, so no issue comments/closes were required.
+- T137 scope variance: maintainer-visible product fixes were completed before the pure handoff close;
+  default-on dashboard required ADR-031 and WEB-001 documentation amendments.
 - Real publish/tag/release remains explicitly out of scope without maintainer approval.
 - REL-002 is not satisfied by I078/T132; T135 records the remaining Talos-primary execution gap.
 

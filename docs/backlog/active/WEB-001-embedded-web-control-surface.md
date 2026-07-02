@@ -25,8 +25,9 @@ governance boundaries as the TUI.
 
 ## Gate Status
 
-ADR-031 accepted the WEB-001 MVP boundary on 2026-07-01. The first implementation slice is now
-unblocked only for an explicit opt-in, loopback-only, token-authenticated, read-only dashboard.
+ADR-031 accepted the WEB-001 MVP boundary on 2026-07-01 and was amended on 2026-07-02 for a
+default-on TUI lifecycle with config opt-out. The first implementation slice is now unblocked only
+for a loopback-only, token-authenticated, read-only dashboard.
 Remote access, web approvals, config writes, browser automation, WebSocket control, and any
 write/session-mutating route remain out of scope until a later security review.
 

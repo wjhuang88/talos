@@ -3,7 +3,9 @@ use talos_conversation::MessageSource;
 
 use crate::highlight::HighlightEngine;
 use crate::inline_terminal::{HistoryAttrs, HistorySegment};
-use crate::stream_markdown::{BlockDecision, HoldStatus, MarkdownBlockKind, StreamBlockClassifier};
+use crate::stream_markdown::{
+    BlockDecision, FallbackReason, HoldStatus, MarkdownBlockKind, StreamBlockClassifier,
+};
 
 pub(crate) const SPINNER_FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -361,16 +363,38 @@ impl StreamRenderState {
                 BlockDecision::FallbackImmediate {
                     status: _,
                     kind,
-                    reason: _,
+                    reason,
                     lines: rendered,
                 } => {
                     self.hold_status = None;
                     self.preview = self.buffer.clone();
-                    lines.extend(self.render_block_lines(&kind, rendered));
+                    if kind == MarkdownBlockKind::CodeFence
+                        && reason == FallbackReason::UnterminatedCodeFence
+                    {
+                        lines.extend(self.render_inline_fallback_lines(rendered));
+                    } else {
+                        lines.extend(self.render_block_lines(&kind, rendered));
+                    }
                 }
             }
         }
         lines
+    }
+
+    fn render_inline_fallback_lines(&mut self, block_lines: Vec<String>) -> Vec<ScrollbackLine> {
+        block_lines
+            .into_iter()
+            .map(|line| {
+                let trimmed = line.trim_start();
+                let rendered = if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                    self.render_plain_line(self.line_count, &line)
+                } else {
+                    self.render_line(self.line_count, &line, None)
+                };
+                self.line_count += 1;
+                rendered
+            })
+            .collect()
     }
 
     fn bg(&self) -> Option<CColor> {

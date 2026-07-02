@@ -29,7 +29,7 @@ Talos runtime
 
 - The dashboard server binds to `127.0.0.1` only. It is not reachable from other machines.
 - The port is random (OS-assigned) to avoid port-conflict attacks and predictable endpoints.
-- The server starts only when explicitly enabled (config flag or CLI flag `--dashboard`).
+- The server starts by default in TUI mode and can be disabled with `[dashboard] enabled = false`.
 - The server has no write endpoints. All routes are GET-only.
 
 ### Dashboard surfaces
@@ -49,7 +49,8 @@ All surfaces are read-only. No POST/PUT/DELETE routes. No configuration editing 
 
 - When the dashboard server starts, it generates a cryptographically random token (32 bytes,
   hex-encoded).
-- The token is printed once to stdout/stderr: `Dashboard: http://127.0.0.1:{port}?token={token}`.
+- The token is printed once on startup with the access URL:
+  `Dashboard: http://127.0.0.1:{port}/ (token: {token})`.
 - Every request must include `Authorization: Bearer {token}`.
 - Requests without or with an incorrect token receive `401 Unauthorized`.
 - The token is NOT stored in any file, config, or environment variable. It exists only in the

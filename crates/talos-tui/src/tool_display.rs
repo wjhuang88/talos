@@ -280,7 +280,7 @@ fn build_head_tail_scrollback_lines(
     color: Option<CColor>,
 ) -> Vec<ScrollbackLine> {
     const MAX_RESULT_LINE_CHARS: usize = 120;
-    let dim = to_crossterm_color(semantic::DIM_TEXT);
+    let secondary = secondary_result_color();
     let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
 
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
@@ -304,8 +304,8 @@ fn build_head_tail_scrollback_lines(
     lines.push(ScrollbackLine::styled(
         vec![HistorySegment::styled(
             format!("   ⋯ {omitted} lines omitted"),
-            dim,
-            HistoryAttrs::default(),
+            secondary,
+            secondary_result_attrs(),
         )],
         None,
     ));
@@ -316,7 +316,7 @@ fn build_head_tail_scrollback_lines(
         let (line_color, attrs) = if display.is_error {
             (color, primary_result_attrs())
         } else {
-            (dim, secondary_result_attrs())
+            (secondary, secondary_result_attrs())
         };
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
@@ -340,10 +340,7 @@ fn result_line_style(
         return (primary_color, primary_result_attrs());
     }
 
-    (
-        to_crossterm_color(semantic::DIM_TEXT),
-        secondary_result_attrs(),
-    )
+    (secondary_result_color(), secondary_result_attrs())
 }
 
 fn primary_result_attrs() -> HistoryAttrs {
@@ -354,10 +351,11 @@ fn primary_result_attrs() -> HistoryAttrs {
 }
 
 fn secondary_result_attrs() -> HistoryAttrs {
-    HistoryAttrs {
-        dim: true,
-        ..HistoryAttrs::default()
-    }
+    HistoryAttrs::default()
+}
+
+fn secondary_result_color() -> Option<CColor> {
+    Some(CColor::Grey)
 }
 
 pub(crate) fn build_tool_call_scrollback_line(tool_call: &ToolCallDisplay) -> ScrollbackLine {

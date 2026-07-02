@@ -1024,8 +1024,17 @@ mod tests {
             input_price_per_million: Some(3.0),
             output_price_per_million: Some(15.0),
         };
-        let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5);
+        let lines = build_exit_summary_lines(
+            &status,
+            Duration::from_secs(60),
+            5,
+            Some("5a570406-d49e-48d6-9dc9-dde3548a3287"),
+        );
         let text: String = lines.iter().map(|l| l.text.as_str()).collect();
+        assert!(
+            text.contains("session 5a570406-d49e-48d6-9dc9-dde3548a3287"),
+            "exit summary should include session id, got: {text}"
+        );
         assert!(
             text.contains("Est") && !text.contains("default"),
             "exit summary should use catalog pricing, got: {text}"
@@ -1059,7 +1068,7 @@ mod tests {
             input_price_per_million: None,
             output_price_per_million: None,
         };
-        let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5);
+        let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5, None);
         let text: String = lines.iter().map(|l| l.text.as_str()).collect();
         assert!(
             !text.contains("cost") && !text.contains("default"),

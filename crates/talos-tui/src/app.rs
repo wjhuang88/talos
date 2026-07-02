@@ -40,6 +40,7 @@ pub struct Tui {
     processing_frame: usize,
     processing_tick: usize,
     stream_count: usize,
+    session_id: Option<String>,
     last_total_height: u16,
 }
 
@@ -78,6 +79,7 @@ impl Tui {
             processing_frame: 0,
             processing_tick: 0,
             stream_count: 0,
+            session_id: None,
             last_total_height: 0,
         })
     }
@@ -100,6 +102,10 @@ impl Tui {
 
     pub fn set_workspace_path(&mut self, path: String) {
         self.state.status.workspace_path = path;
+    }
+
+    pub fn set_session_id(&mut self, id: String) {
+        self.session_id = Some(id);
     }
 
     fn dispatch_panel_action(&mut self, action: PanelAction) {
@@ -443,6 +449,7 @@ impl Tui {
             &self.state.status,
             elapsed,
             self.stream_count,
+            self.session_id.as_deref(),
         ) {
             let _ = self.terminal.insert_history(&line.text, line.bg);
         }
@@ -553,6 +560,9 @@ impl Tui {
                 if self.state.status.workspace_path.is_empty() {
                     self.state.status.workspace_path = workspace_path;
                 }
+            }
+            UiOutput::SessionIdentity { id } => {
+                self.session_id = Some(id);
             }
             UiOutput::Tip { text, kind } => {
                 self.state.tip = Some(Tip {

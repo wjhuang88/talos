@@ -680,6 +680,10 @@ rereading WEB-005 and this closeout.
   after T45 manifest parsing for a local explicit read-only WASM plugin fixture with resource and
   failure tests.
 
+2026-07-02 amendment: ADR-031 later changed the dashboard lifecycle from explicit opt-in to
+default-on in TUI mode with `[dashboard] enabled = false` opt-out. The loopback-only, token-auth,
+read-only, no-remote, and no-write/action boundaries remain unchanged.
+
 **Still not unlocked**:
 - Real publish actions (T55/T56) still need explicit maintainer approval for the exact crate and
   version.
@@ -768,6 +772,9 @@ rendering paths.
 - 10 tests: token rejection (no header, wrong token), valid token on all 4 routes, secret masking
   (`api_key` → `***`), no write routes (POST/PUT/DELETE/PATCH → 405 on all paths), unknown path → 404,
   loopback bind verification, crypto-random token uniqueness per instance.
+
+2026-07-02 amendment: the config default changed to `enabled = true`, startup now prints a visible
+dashboard URL/token message, and users can opt out with `[dashboard] enabled = false`.
 
 **Security boundary** (per ADR-031):
 - Read-only: no tool execution, approvals, config writes, or session mutation through the dashboard.

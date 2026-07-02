@@ -288,6 +288,31 @@ fn stream_render_state_renders_code_fence_on_finish() {
 }
 
 #[test]
+fn stream_render_state_recovers_markdown_after_unterminated_code_fence() {
+    let mut state = StreamRenderState::default();
+    assert!(state.start(MessageSource::Assistant).is_empty());
+
+    assert!(
+        state
+            .push_chunk("```\n│ diagram line │\n## Recovered Heading\n")
+            .is_empty()
+    );
+    let lines = state.finish();
+
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0].text, " ● ```");
+    assert_eq!(lines[2].text, "   Recovered Heading");
+    assert!(
+        lines[2]
+            .segments
+            .iter()
+            .any(|segment| segment.text == "Recovered Heading"
+                && segment.attrs.bold
+                && segment.fg == to_crossterm_color(semantic::MARKDOWN_HEADING))
+    );
+}
+
+#[test]
 fn render_code_block_produces_header_and_line_numbers() {
     let block_lines = vec![
         "```rust".to_string(),
@@ -747,9 +772,10 @@ fn tool_result_scrollback_styles_primary_and_detail_lines() {
     assert!(!lines[0].segments[0].attrs.dim);
     assert_eq!(lines[0].segments[0].fg, Some(CColor::Green));
     assert!(!lines[1].segments[0].attrs.bold);
-    assert!(lines[1].segments[0].attrs.dim);
-    assert_ne!(lines[1].segments[0].fg, Some(CColor::Green));
-    assert!(lines[2].segments[0].attrs.dim);
+    assert!(!lines[1].segments[0].attrs.dim);
+    assert_eq!(lines[1].segments[0].fg, Some(CColor::Grey));
+    assert!(!lines[2].segments[0].attrs.dim);
+    assert_eq!(lines[2].segments[0].fg, Some(CColor::Grey));
 }
 
 #[test]

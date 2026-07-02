@@ -35,11 +35,12 @@ Skills, WASM plugins, and advanced document ingestion are tracked separately und
 
 `v0.2.0` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
-dashboard, or autonomous background daemon.
+automation surface, or autonomous background daemon.
 
 Currently shipped:
 
 - TUI, inline, and print execution modes.
+- Read-only loopback dashboard in TUI mode; startup prints the local URL and bearer token.
 - Local provider configuration with masked secrets.
 - Built-in coding tools with permission gating.
 - Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.
@@ -467,7 +468,7 @@ developer experience. The next research priorities are:
 - `AGENT-002-B`: dotagents `~/.agents/skills/` compatibility.
 - `TOOL-004`: search engine direction before broader tool-set redesign.
 - `TOOL-007`: holistic tool-set audit, including WEBFETCH Phase 2+ planning.
-- `WEB-001`: embedded local web control surface as a product differentiation track.
+- `WEB-001`: local loopback web surface expansion beyond the read-only dashboard MVP.
 
 For current engineering status, use the project governance docs instead of this README:
 

@@ -12,6 +12,7 @@ pub(crate) fn build_exit_summary_lines(
     status: &StatusSnapshot,
     elapsed: Duration,
     stream_count: usize,
+    session_id: Option<&str>,
 ) -> Vec<ScrollbackLine> {
     let elapsed_secs = elapsed.as_secs();
     let usage = &status.usage;
@@ -66,6 +67,17 @@ pub(crate) fn build_exit_summary_lines(
                     HistoryAttrs::default(),
                 ),
             ],
+            None,
+        ));
+    }
+
+    if let Some(session_id) = session_id.filter(|id| !id.is_empty()) {
+        lines.push(ScrollbackLine::styled(
+            vec![HistorySegment::styled(
+                format!("  session {session_id}"),
+                to_crossterm_color(semantic::DIM_TEXT),
+                HistoryAttrs::default(),
+            )],
             None,
         ));
     }

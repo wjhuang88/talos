@@ -9,13 +9,15 @@
 
 This review keeps the existing product boundary:
 
-- dashboard remains explicit opt-in, loopback-only, token-authenticated, and read-only;
+- dashboard remains loopback-only, token-authenticated, read-only, and default-on only in TUI mode
+  with `[dashboard] enabled = false` opt-out per the 2026-07-02 ADR-031 amendment;
 - browser-page support remains mock/record-only, with no real connector, cookies, storage, DOM,
   screenshot, profile path, click, fill, upload, download, or automation support;
 - `fetch_url` remains the unified model-facing web/page ingestion entry.
 
 This review does not authorize remote dashboard access, web approvals, config writes, browser
-automation, browser connectors, standalone browser tools, or permission-default changes.
+automation, browser connectors, standalone browser tools, or permission-default changes beyond the
+default-on local dashboard lifecycle amendment recorded in ADR-031.
 
 ## Findings
 

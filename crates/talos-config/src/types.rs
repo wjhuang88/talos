@@ -99,11 +99,17 @@ pub struct SkillConfig {
 }
 
 /// Configuration for the read-only loopback dashboard (ADR-031).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct DashboardConfig {
     /// When true, start the loopback dashboard server on TUI launch.
     pub enabled: bool,
+}
+
+impl Default for DashboardConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 /// Talos configuration.
