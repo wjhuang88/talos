@@ -86,7 +86,7 @@ impl EvolutionPanel {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(" Evolution Insights (Ctrl+E to toggle) ")
+                    .title(" Evolution Insights (Ctrl+G to toggle) ")
                     .style(Style::default().fg(semantic::TEXT_SPECIAL)),
             )
             .wrap(Wrap { trim: false });

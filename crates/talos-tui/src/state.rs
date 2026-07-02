@@ -440,6 +440,25 @@ impl TuiState {
         }
     }
 
+    pub(crate) fn input_cursor_to_line_start(&mut self) {
+        let chars: Vec<char> = self.input_buffer.chars().collect();
+        let mut pos = self.cursor_pos;
+        while pos > 0 && chars[pos - 1] != '\n' {
+            pos -= 1;
+        }
+        self.cursor_pos = pos;
+    }
+
+    pub(crate) fn input_cursor_to_line_end(&mut self) {
+        let total = self.input_buffer.chars().count();
+        let chars: Vec<char> = self.input_buffer.chars().collect();
+        let mut pos = self.cursor_pos;
+        while pos < total && chars[pos] != '\n' {
+            pos += 1;
+        }
+        self.cursor_pos = pos;
+    }
+
     pub(crate) fn input_clear(&mut self) {
         self.input_buffer.clear();
         self.cursor_pos = 0;

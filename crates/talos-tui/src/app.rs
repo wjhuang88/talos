@@ -927,7 +927,17 @@ impl Tui {
                         }
                         return should_exit;
                     }
+                    KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.slash_menu.close();
+                        self.state.input_cursor_to_line_start();
+                    }
                     KeyCode::Char('e') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.slash_menu.close();
+                        self.state.input_cursor_to_line_end();
+                    }
+                    KeyCode::Char('g') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.state.slash_menu.close();
                         self.toggle_evolution_panel();

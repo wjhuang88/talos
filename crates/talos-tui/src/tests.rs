@@ -101,6 +101,138 @@ mod tests {
     }
 
     #[test]
+    fn test_input_cursor_to_line_start_single_line() {
+        let mut state = TuiState::new();
+        state.input_append_str("hello world");
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_start_mid_line() {
+        let mut state = TuiState::new();
+        state.input_append_str("hello world");
+        state.input_cursor_left();
+        state.input_cursor_left();
+        assert_eq!(state.cursor_pos, 9);
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_start_multiline() {
+        let mut state = TuiState::new();
+        state.input_append_str("first\nsecond line");
+        state.cursor_pos = state.input_buffer.chars().count();
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 6);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_start_already_at_start() {
+        let mut state = TuiState::new();
+        state.input_append_str("hello");
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_end_single_line() {
+        let mut state = TuiState::new();
+        state.input_append_str("hello world");
+        state.input_cursor_to_line_start();
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 11);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_end_mid_line() {
+        let mut state = TuiState::new();
+        state.input_append_str("hello world");
+        state.input_cursor_to_line_start();
+        state.input_cursor_right();
+        state.input_cursor_right();
+        state.input_cursor_right();
+        assert_eq!(state.cursor_pos, 3);
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 11);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_end_multiline() {
+        let mut state = TuiState::new();
+        state.input_append_str("first\nsecond");
+        let total = state.input_buffer.chars().count();
+        state.input_cursor_to_line_start();
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, total);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_end_from_second_line() {
+        let mut state = TuiState::new();
+        state.input_append_str("first\nsecond\nthird");
+        state.cursor_pos = 12;
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 6);
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 12);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_end_already_at_end() {
+        let mut state = TuiState::new();
+        state.input_append_str("hello");
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 5);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_start_empty() {
+        let mut state = TuiState::new();
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_end_empty() {
+        let mut state = TuiState::new();
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_input_cursor_to_line_boundaries_idempotent() {
+        let mut state = TuiState::new();
+        state.input_append_str("line one\nline two\nline three");
+        state.cursor_pos = 0;
+
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 0);
+
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 8);
+
+        state.input_cursor_right();
+        assert_eq!(state.cursor_pos, 9);
+
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 9);
+
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 17);
+
+        state.input_cursor_right();
+        assert_eq!(state.cursor_pos, 18);
+
+        state.input_cursor_to_line_start();
+        assert_eq!(state.cursor_pos, 18);
+
+        state.input_cursor_to_line_end();
+        assert_eq!(state.cursor_pos, 28);
+    }
+
+    #[test]
     fn test_input_clear() {
         let mut state = TuiState::new();
         state.input_append_char('h');
