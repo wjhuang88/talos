@@ -492,6 +492,9 @@ fn run_config_set(kv: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("invalid format: expected KEY=VALUE (got '{kv}')"))?;
     let mut config = Config::load().context("failed to load configuration")?;
     config_set_dotted(&mut config, key.trim(), value.trim())?;
+    config
+        .validate()
+        .context("configuration validation failed — value not saved")?;
     config.save().context("failed to save configuration")?;
     println!(
         "Set {key} = {}",

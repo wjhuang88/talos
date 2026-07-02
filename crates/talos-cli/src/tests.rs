@@ -845,4 +845,147 @@ api_key_env = "ANTHROPIC_API_KEY"
         let masked = mask_secrets(&toml_str, &config);
         assert!(masked.contains("model = \"claude-sonnet-4\""));
     }
+
+    // === F102: Config Validation Evidence Tests (CONF-001) ===
+
+    #[test]
+    fn config_validate_rejects_empty_provider() {
+        let mut config = talos_config::Config::default();
+        config.model = "test".to_string();
+        config.provider = "".to_string();
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("provider"));
+    }
+
+    #[test]
+    fn config_validate_rejects_empty_model() {
+        let mut config = talos_config::Config::default();
+        config.provider = "anthropic".to_string();
+        config.model = "".to_string();
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("model"));
+    }
+
+    #[test]
+    fn config_validate_rejects_configured_provider_without_credentials() {
+        let config = talos_config::Config {
+            provider: "custom-gw".to_string(),
+            model: "test-model".to_string(),
+            providers: std::collections::HashMap::from([(
+                "custom-gw".to_string(),
+                talos_config::ProviderConfig {
+                    protocol: talos_config::ProviderProtocol::OpenAIChat,
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("api_key or api_key_env"));
+    }
+
+    #[test]
+    fn config_validate_accepts_valid_config() {
+        let config = talos_config::Config {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn config_set_dotted_rejects_invalid_protocol() {
+        let mut config = talos_config::Config::default();
+        let err = config_set_dotted(&mut config, "providers.gw.protocol", "bogus").unwrap_err();
+        assert!(err.to_string().contains("unknown protocol"));
+    }
+
+    #[test]
+    fn config_set_dotted_rejects_non_integer_limit() {
+        let mut config = talos_config::Config::default();
+        let err = config_set_dotted(
+            &mut config,
+            "providers.gw.models.m.context_limit",
+            "not-a-number",
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("context_limit"));
+    }
+
+    #[test]
+    fn config_env_var_name_survives_roundtrip() {
+        let mut config = talos_config::Config::default();
+        config_set_dotted(
+            &mut config,
+            "providers.anthropic.api_key_env",
+            "ANTHROPIC_API_KEY",
+        )
+        .unwrap();
+        assert_eq!(
+            config_get_dotted(&config, "providers.anthropic.api_key_env").unwrap(),
+            "ANTHROPIC_API_KEY"
+        );
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let reloaded: talos_config::Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(
+            config_get_dotted(&reloaded, "providers.anthropic.api_key_env").unwrap(),
+            "ANTHROPIC_API_KEY"
+        );
+    }
+
+    #[test]
+    fn config_secret_masking_survives_roundtrip() {
+        let mut config = talos_config::Config::default();
+        config.set_provider_credential("anthropic", "sk-secret-roundtrip");
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let masked = mask_secrets(&toml_str, &config);
+        assert!(!masked.contains("sk-secret-roundtrip"));
+        assert!(masked.contains("api_key = ***"));
+
+        assert!(is_secret_key("providers.anthropic.api_key"));
+        assert!(is_secret_key("providers.openai.api_key"));
+        assert!(!is_secret_key("providers.anthropic.base_url"));
+    }
+
+    #[test]
+    fn config_save_load_roundtrip_preserves_fields() {
+        let mut config = talos_config::Config::default();
+        config.provider = "my-gw".to_string();
+        config.model = "glm-5".to_string();
+        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-chat").unwrap();
+        config_set_dotted(
+            &mut config,
+            "providers.my-gw.base_url",
+            "https://gw.example/v1",
+        )
+        .unwrap();
+        config_set_dotted(&mut config, "providers.my-gw.api_key_env", "GW_API_KEY").unwrap();
+        config_set_dotted(
+            &mut config,
+            "providers.my-gw.models.glm-5.context_limit",
+            "200000",
+        )
+        .unwrap();
+        config.validate().unwrap();
+
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let reloaded: talos_config::Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(reloaded.provider, "my-gw");
+        assert_eq!(reloaded.model, "glm-5");
+        assert_eq!(
+            config_get_dotted(&reloaded, "providers.my-gw.base_url").unwrap(),
+            "https://gw.example/v1"
+        );
+        assert_eq!(
+            config_get_dotted(&reloaded, "providers.my-gw.api_key_env").unwrap(),
+            "GW_API_KEY"
+        );
+        assert_eq!(
+            config_get_dotted(&reloaded, "providers.my-gw.models.glm-5.context_limit").unwrap(),
+            "200000"
+        );
+    }
 }
