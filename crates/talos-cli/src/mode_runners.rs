@@ -865,17 +865,33 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
 
     if config.dashboard.enabled {
         let snapshot = build_dashboard_snapshot(&config, &session_manager, &workspace_root_str);
-        let server = talos_dashboard::DashboardServer::new(snapshot);
+        let server = talos_dashboard::DashboardServer::with_loopback_only(
+            snapshot,
+            config.dashboard.loopback_only,
+        );
         let token = server.token().to_string();
         match server.serve().await {
             Ok((addr, _)) => {
                 let url = format!("http://{addr}/");
-                eprintln!("Dashboard: {url} (token: {token})");
-                send_stream(
-                    &ui_output_tx_for_dashboard,
-                    MessageSource::System,
-                    format!("[System] Dashboard available at {url} with bearer token {token}.\n"),
-                );
+                if config.dashboard.loopback_only {
+                    eprintln!("Dashboard: {url} (loopback-only, no token)");
+                    send_stream(
+                        &ui_output_tx_for_dashboard,
+                        MessageSource::System,
+                        format!(
+                            "[System] Dashboard available at {url} (loopback-only, no token).\n"
+                        ),
+                    );
+                } else {
+                    eprintln!("Dashboard: {url} (token: {token})");
+                    send_stream(
+                        &ui_output_tx_for_dashboard,
+                        MessageSource::System,
+                        format!(
+                            "[System] Dashboard available at {url} with bearer token {token}.\n"
+                        ),
+                    );
+                }
             }
             Err(e) => {
                 eprintln!("Dashboard: failed to start: {e}");

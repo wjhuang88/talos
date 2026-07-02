@@ -37,6 +37,7 @@ pub struct DashboardSnapshot {
 struct AppState {
     token: String,
     snapshot: Arc<DashboardSnapshot>,
+    loopback_only: bool,
 }
 
 pub struct DashboardServer {
@@ -45,10 +46,21 @@ pub struct DashboardServer {
 
 impl DashboardServer {
     pub fn new(snapshot: DashboardSnapshot) -> Self {
+        Self::with_loopback_only(snapshot, false)
+    }
+
+    /// Create a dashboard server with explicit loopback-only control.
+    ///
+    /// When `loopback_only` is `true`, the bearer token middleware is skipped
+    /// and the server relies on the `127.0.0.1` bind as the only access
+    /// control. Callers should set this to `true` only when the user has
+    /// explicitly opted in via `[dashboard] loopback_only = true` in config.
+    pub fn with_loopback_only(snapshot: DashboardSnapshot, loopback_only: bool) -> Self {
         Self {
             state: AppState {
                 token: Uuid::new_v4().simple().to_string(),
                 snapshot: Arc::new(redact_snapshot(snapshot)),
+                loopback_only,
             },
         }
     }
@@ -69,18 +81,23 @@ impl DashboardServer {
 
     fn build_router(&self) -> Router {
         let state = self.state.clone();
-        Router::new()
+        let router = Router::new()
             .route("/status", get(status_handler))
             .route("/history", get(history_handler))
             .route("/governance", get(governance_handler))
             .route("/config", get(config_handler))
             .route("/", get(root_handler))
-            .fallback(not_found_handler)
-            .layer(middleware::from_fn_with_state(
-                state.clone(),
-                auth_middleware,
-            ))
-            .with_state(state)
+            .fallback(not_found_handler);
+        if state.loopback_only {
+            router.with_state(state)
+        } else {
+            router
+                .layer(middleware::from_fn_with_state(
+                    state.clone(),
+                    auth_middleware,
+                ))
+                .with_state(state)
+        }
     }
 }
 
@@ -485,5 +502,54 @@ mod tests {
         let s2 = DashboardServer::new(test_snapshot());
         assert_ne!(s1.token(), s2.token());
         assert_eq!(s1.token().len(), 32);
+    }
+
+    fn build_loopback_only_app() -> Router {
+        let server = DashboardServer::with_loopback_only(test_snapshot(), true);
+        server.build_router()
+    }
+
+    #[tokio::test]
+    async fn loopback_only_no_token_required() {
+        let app = build_loopback_only_app();
+        for path in ["/status", "/history", "/governance", "/config", "/"] {
+            let (status, _) = request(&app, Method::GET, path, None).await;
+            assert_eq!(
+                status,
+                StatusCode::OK,
+                "GET {path} should succeed without token"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn loopback_only_token_header_ignored() {
+        let app = build_loopback_only_app();
+        let (status, body) = request(&app, Method::GET, "/status", Some("any-value")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("test-model"));
+    }
+
+    #[tokio::test]
+    async fn loopback_only_still_serves_governance() {
+        let app = build_loopback_only_app();
+        let (status, body) = request(&app, Method::GET, "/governance", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Now: test item"));
+    }
+
+    #[tokio::test]
+    async fn loopback_only_binds_loopback() {
+        let server = DashboardServer::with_loopback_only(test_snapshot(), true);
+        let (addr, handle) = server.serve().await.unwrap();
+        assert_eq!(addr.ip().to_string(), "127.0.0.1");
+        handle.abort();
+    }
+
+    #[tokio::test]
+    async fn token_mode_still_rejects_without_token() {
+        let (app, _token) = build_test_app();
+        let (status, _) = request(&app, Method::GET, "/status", None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
 }

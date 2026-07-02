@@ -87,6 +87,43 @@ fn test_dashboard_enabled_by_default() {
 }
 
 #[test]
+fn test_dashboard_loopback_only_defaults_false() {
+    let config = Config::default();
+    assert!(
+        !config.dashboard.loopback_only,
+        "loopback_only must default to false to keep token auth as the safe default"
+    );
+}
+
+#[test]
+fn test_dashboard_loopback_only_deserializes() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+
+[dashboard]
+enabled = true
+loopback_only = true
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.dashboard.enabled);
+    assert!(config.dashboard.loopback_only);
+}
+
+#[test]
+fn test_dashboard_loopback_only_absent_keeps_default() {
+    let toml_str = r#"
+provider = "anthropic"
+model = "test"
+
+[dashboard]
+enabled = true
+"#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(!config.dashboard.loopback_only);
+}
+
+#[test]
 fn test_api_key_from_env_openai() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::set_var("OPENAI_API_KEY", "env-key-openai") };

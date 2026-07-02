@@ -104,11 +104,17 @@ pub struct SkillConfig {
 pub struct DashboardConfig {
     /// When true, start the loopback dashboard server on TUI launch.
     pub enabled: bool,
+    /// When true, skip the per-process bearer token and rely on loopback bind only.
+    /// Defaults to false. Only enable on trusted single-user machines.
+    pub loopback_only: bool,
 }
 
 impl Default for DashboardConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            loopback_only: false,
+        }
     }
 }
 
