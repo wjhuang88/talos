@@ -20,12 +20,13 @@ acceptance criteria, verification evidence, or iteration state.
 | Architect-Owned High-Risk Work Group | Paused | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Paused by maintainer direction on 2026-06-29. Resume only with explicit direction; current delegable focus is WEB-002 product site and user-doc sync. |
 | Two-Month Architecture Optimization | Complete (fulfilled) | [task](tasks/2026-06-27-two-month-architecture-optimization-plan.md) | M0-M11 complete; remaining production roots registered under ARCH-030. Remaining ARCH slices (I069–I074) all Complete. |
 | Four-Month Self-Bootstrap Replan | In Progress | [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Continue with I078 Session/Todo/Thinking after I077 closeout commit; no real publish, tag, release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call expansion. |
+| I078 Session/Todo/Thinking | Active | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | T120 slash smart auto-execute is active; preserve manual command typing and existing command execution semantics. |
+| TUI-016 Slash Panel Smart Auto-Execute | In Progress | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | Implement T120 only: parameterless panel Enter executes, parameterized commands fill input, visual hints distinguish modes. |
 
 ## Review
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I077 Plugin/Exec/Web Security | Complete | [I077](iterations/I077-month2-plugin-exec-web-security.md) / [replan](tasks/2026-07-01-four-month-self-bootstrap-replan.md) | Commit and push T116 closeout; close Issue #16 after push. |
 
 ## Blocked / Paused
 
@@ -46,11 +47,9 @@ acceptance criteria, verification evidence, or iteration state.
 | Plugin Encapsulation Architecture | Accepted baseline | [proposal](proposals/plugin-encapsulation-format.md) / [ADR-027](decisions/027-plugin-runtime-boundary.md) / [ADR-028](decisions/028-plugin-tool-provenance-extension.md) / [ADR-029](decisions/029-extensibility-atomic-component-model.md) / [ADR-030](decisions/030-extensibility-command-taxonomy.md) / [ADR-032](decisions/032-wasmtime-dependency-security-review.md) | Architecture and initial `wasmtime` dependency/security review accepted. First runtime slice remains local explicit read-only WASM only; no dylib, Lua, marketplace, remote install, auto-discovery, or write-capable plugin tools. |
 | PLUGIN-001 Plugin Encapsulation System | In Progress | [PLUGIN-001](backlog/active/PLUGIN-001-wasm-runtime-plugins.md) | Provenance data model complete (T40); manifest parser complete (T45); WASM runtime adapter complete (T46, behind `wasm` feature); T111 read-only tool integration is in Review. No broad protocol, host calls, auto-discovery, remote install, or write-capable plugin tools. |
 | CMD-002 Command Taxonomy Realignment | In Progress | [CMD-002](backlog/active/CMD-002-command-taxonomy-realignment.md) | Slice 1 complete (T41): `/mcp` shows MCP status; `/plugins` shows transition notice. Slice 2 (`/hooks` + plugin listing) waits for HOOK-001/PLUGIN-001 runtime. |
-| I078 Session/Todo/Thinking | Planned | [I078](iterations/I078-month3-session-todo-memory-thinking.md) | Wait for I077 closeout or explicit replan; prompt/history changes require persistence tests. |
 | I079 Release Readiness/Handoff | Planned | [I079](iterations/I079-month4-release-readiness-handoff.md) | Wait for I078 closeout or explicit replan; no publish/tag unless explicitly approved. |
 | TUI-020 Thinking Preview Without History Pollution | Planned | [TUI-020](backlog/active/TUI-020-thinking-preview-not-history.md) / [Issue #15](https://github.com/wjhuang88/talos/issues/15) | Decide transient-message vs streaming-state approach before implementation; protect session history integrity. |
 | TODO-001 Session-Level Todo List | Planned | [TODO-001](backlog/active/TODO-001-session-todo-list.md) / [Issue #8](https://github.com/wjhuang88/talos/issues/8) | Session-scoped task management: user views via slash commands, agent writes via tools. SQLite-backed with dependency cycle detection and prompt injection. Three-phase implementation. |
-| TUI-016 Slash Panel Smart Auto-Execute | Planned | [TUI-016](backlog/active/TUI-016-slash-panel-smart-auto-execute.md) / [Issue #7](https://github.com/wjhuang88/talos/issues/7) | Parameterless commands execute on Enter in panel; parameter commands fill input. Execution mode classification from existing command metadata. |
 | HOOK-001 Config-Introduced Hooks | Planned | [HOOK-001](backlog/active/HOOK-001-config-introduced-hooks.md) | ADR-029 accepted. First slice is hook config schema and diagnostics; executable hook carriers remain gated by ADR-027/plugin runtime. |
 | TUI-008 Approval Dialog UX | Planned | [TUI-008 Approval Dialog UX](backlog/active/TUI-008-approval-dialog-ux.md) | Move approval from bottom-right to prominent position; easy to miss currently |
 | TUI-009 Input Clear And Session Exit Summary | Complete | [TUI-009 Input Clear And Session Exit Summary](backlog/active/TUI-009-input-and-session-exit-polish.md) | Ctrl+C clears idle input; Esc no longer clears composer; exit prints session summary with model, duration, turns, tokens, cost |

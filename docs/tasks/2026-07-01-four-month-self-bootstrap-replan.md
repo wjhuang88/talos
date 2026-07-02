@@ -355,3 +355,11 @@ scripts/validate_project_governance.sh ., then append a checkpoint to the plan.
 - Next planned work is I078 Session/Todo/Thinking. This closeout does not authorize publish, tag,
   real release, Guardian approval, exec DSL, browser connector, web write route, or plugin host-call
   expansion.
+
+### I078 Activation Checkpoint (2026-07-02)
+
+- I078 activated after I077 closeout.
+- First packet selected: T120/TUI-016 slash panel smart auto-execute.
+- Pre-activation inventory recorded in `docs/iterations/I078-month3-session-todo-memory-thinking.md`.
+- Owner status changed to In Progress for TUI-016; issue #7 status sync remains pending until this
+  activation commit is pushed.

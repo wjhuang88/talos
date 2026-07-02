@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-016 |
 | Priority | P3 |
-| Status | Planned |
+| Status | In Progress — selected into I078/T120 |
 | Source | [GitHub Issue #7](https://github.com/wjhuang88/talos/issues/7) |
 | Relates To | TUI-010, CMD-001, CMD-002 |
 
@@ -22,6 +22,9 @@ two modes.
   commands fill the composer.
 - Add UI hints in the panel showing parameter requirements.
 - Maintain backward compatibility with manual command input.
+
+I078/T120 activation (2026-07-02): selected as the first Month 3 packet after I077 closeout. The
+implementation must preserve manual command typing and only change slash panel Enter behavior.
 
 ## Non-Goals
 

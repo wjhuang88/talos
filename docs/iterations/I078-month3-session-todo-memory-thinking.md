@@ -1,6 +1,6 @@
 # Iteration I078: Month 3 — Session Orchestration, Todo, Memory, And Thinking
 
-> Document status: Planned
+> Document status: Active (2026-07-02)
 > Published plan date: 2026-07-01
 > Planned objective: Execute weeks 9-12 of the 2026-07-01 replan: slash panel auto-execute,
 > session todo foundations, self-bootstrap rehearsal with validation loop, thinking preview without
@@ -15,7 +15,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| T120 | TUI-016 | Planned | TUI-010/CMD-001 | Slash smart auto-execute |
+| T120 | TUI-016 | In Progress | TUI-010/CMD-001 | Slash smart auto-execute |
 | T121 | TODO-001 | Planned | SESSION-001 | Todo data model + agent tool API |
 | T122 | TODO-001 | Planned | T121 | Read-only slash/TUI views |
 | T123 | REL-002 | Planned | T108/T122 | Validation-backed rehearsal |
@@ -65,14 +65,16 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-01 | Planning | Created as Month 3 shell for the replan. |
+| 2026-07-02 | Activation | Activated after I077/T116 closeout. First packet is T120 slash smart auto-execute. |
+| 2026-07-02 | Inventory | Non-terminal iteration inventory before activation: I078 Planned -> activated; I079 Planned -> remains planned; I058/I047/I057 Review -> legacy review rows left untouched; I046 Planned -> legacy stale row left untouched. |
 
 ## Verification Evidence
 
-- Pending.
+- Pending for T120.
 
 ## Variance And Residuals
 
-- Pending.
+- No scope variance at activation.
 
 ## Retrospective
 
