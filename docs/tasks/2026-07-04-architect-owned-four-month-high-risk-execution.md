@@ -48,8 +48,8 @@ is not suitable for routine frontline delegation.
 |---|---|---|---|---|---|---|
 | A0 | Establish execution contract | This task record plus I090-I093 planned iteration shells exist; Board and iteration index point to the track. | User request | `scripts/validate_project_governance.sh .` and `git diff --check` pass. | Keep task in Planned if governance fails. | In Progress |
 | A1 | Close or pause I085 | MC107 disposition recorded: README depth and real TUI `/model`/`/connect` verification either complete or explicitly paused. Catalog.db first-run creation semantics must be correct before closeout. | A0 | I085 owner docs and Board agree; workspace checks pass if code changes. | Pause I085 with exact residual owner before activating I090. | Complete |
-| A2 | Activate I090 | Start the month-1 high-risk tool/ingestion boundary iteration. | A1 | Iteration README, Board, and relevant backlog owners mark I090 Active/In Progress. | Keep I090 Planned and record blocker. | Planned |
-| A3 | WEBFETCH bounded extraction decision | Decide the first Rust-native bounded extraction slice and explicit unsupported formats. | A2 | Proposal/ADR if needed; permission and size/time budgets named. | Keep WEBFETCH Phase 2+ design-only. | Planned |
+| A2 | Activate I090 | Start the month-1 high-risk tool/ingestion boundary iteration. | A1 | Iteration README, Board, and relevant backlog owners mark I090 Active/In Progress. | Keep I090 Planned and record blocker. | Complete |
+| A3 | WEBFETCH bounded extraction decision | Decide the first Rust-native bounded extraction slice and explicit unsupported formats. | A2 | Proposal/ADR if needed; permission and size/time budgets named. | Keep WEBFETCH Phase 2+ design-only. | In Progress |
 | A4 | Implement first bounded extraction slice | A local `document_extract` or equivalent bounded extractor for safe text/HTML/JSON/CSV/Markdown-like inputs, no PDF/Office/OCR/browser. | A3 | Tool tests, permission tests, runtime smoke, docs. | Ship design only; no runtime tool. | Planned |
 | A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | Planned |
 | A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Planned |
@@ -267,3 +267,40 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Continue with MC107 manual TUI/README disposition.
+
+### A2 — I090 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I090 after I085 was explicitly paused with only MC107 real-terminal `/connect`
+  walkthrough remaining.
+- Preserved I086-I089 as planned product-hardening shells and I091-I093 as planned direct-owner
+  shells.
+- Started A3 with an audit-first stance because local evidence shows `document_extract`,
+  `fetch_url`/`save_url`, and ripgrep-backed `grep` already exist.
+
+Current state and artifacts:
+
+- `docs/iterations/I090-high-risk-ingestion-search-boundary.md` is Active.
+- Board, iteration index, WEBFETCH-001, and TOOL-011 are synchronized in the same phase change.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- Need to distinguish already-landed implementation from unmet I090 acceptance before writing code.
+- No browser/PDF/Office/OCR/crawler scope is authorized.
+
+Next task item:
+
+- A3: audit WEBFETCH/document extraction/search acceptance and decide whether code or docs-only
+  closeout is needed.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I090, WEBFETCH-001, TOOL-011, `crates/talos-tools/src/document_extract.rs`,
+  `crates/talos-tools/src/search_tools.rs`, and `crates/talos-tools/src/search_engine.rs`.

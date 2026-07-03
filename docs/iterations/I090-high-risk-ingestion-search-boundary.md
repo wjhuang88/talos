@@ -1,6 +1,6 @@
 # Iteration I090: High-Risk Ingestion And Search Boundary
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: define and implement the first safe, bounded ingestion/search slice without
 > weakening permission, dependency, or prompt-cache boundaries.
@@ -67,10 +67,11 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated after I085 was explicitly paused with only MC107 real terminal `/connect` walkthrough remaining. Non-terminal inventory disposition: I085 Paused; I086-I089 remain planned product-hardening shells; I091-I093 remain planned direct-owner shells. Initial evidence scan shows `document_extract`, `fetch_url`/`save_url`, and ripgrep-backed `grep` implementation already exist, so A3 starts with acceptance audit before adding code. |
 
 ## Verification Evidence
 
-- Pending.
+- Activation governance pending.
 
 ## Variance And Residuals
 

@@ -19,6 +19,11 @@ text/HTML/JSON/CSV/Markdown-like resources, then fetch/save/extract integration.
 browser automation remain out of scope without a separate dependency gate. PLUGIN-001 WASM remains
 the likely delivery path for heavy format handlers.
 
+I090 activated 2026-07-04 to audit the already-present `document_extract`, `fetch_url`/`save_url`,
+and permission-boundary implementation before adding more code. The first I090 decision is whether
+WEBFETCH Phase 2+ is already satisfied for local text/HTML/JSON/CSV/Markdown/XML resources or
+whether a bounded implementation gap remains.
+
 ## Priority
 
 P2 research/planning for Phase 2+. Next phases: HTML extraction, link ranking, markdown conversion,

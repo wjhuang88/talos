@@ -4,7 +4,7 @@
 |---|---|
 | Type | Story |
 | Priority | P2 |
-| Status | Planned |
+| Status | Selected into I090 audit |
 | Depends On | `TOOL-004`; ADR-025; current `GrepTool` tests |
 | Owner Boundary | H2 architect-owned tool-family work |
 
@@ -12,6 +12,13 @@
 
 Talos `grep` uses ripgrep's library components for ignore-aware, bounded, streaming-friendly
 workspace search while preserving the existing read-only, permission-aware tool contract.
+
+## Current Selection
+
+I090 activated 2026-07-04 to audit the existing `crates/talos-tools/src/search_engine.rs` and
+`search_tools.rs` implementation against this acceptance list before adding code. If the existing
+ripgrep-backed path already satisfies the safe slice, I090 should close this story as delivered or
+record only precise residual gaps.
 
 ## Scope
 
