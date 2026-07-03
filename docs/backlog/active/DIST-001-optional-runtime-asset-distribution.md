@@ -8,7 +8,11 @@ or other bulky capabilities after installation.
 
 ## Status
 
-Research. Candidate input to I036.
+Research. Selected into I091 policy audit on 2026-07-04.
+
+I091 scope is policy-only unless a narrow local diagnostic gap is found. Do not implement online
+asset installation, marketplace behavior, remote plugin package fetching, automatic prompts, or
+runtime download paths in this iteration.
 
 ## Priority
 

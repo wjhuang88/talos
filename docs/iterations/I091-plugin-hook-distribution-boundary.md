@@ -1,6 +1,6 @@
 # Iteration I091: Plugin, Hook, And Distribution Boundary
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: harden local plugin/hook diagnostics and optional distribution policy without
 > enabling remote install, write-capable plugin tools, or unsafe package behavior.
@@ -66,14 +66,18 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated after I090 completed bounded extraction and ripgrep-backed search stabilization with full workspace/governance closeout. Non-terminal inventory disposition: I085 remains Paused with MC107 manual `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells; I092-I093 remain planned direct-owner shells. I091 starts with diagnostics/policy only: audit existing plugin/hook/distribution docs and code before adding runtime behavior. |
 
 ## Verification Evidence
 
-- Pending.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
 
 ## Variance And Residuals
 
-- Pending.
+- No runtime expansion has started. Remote install, marketplace behavior, write-capable plugin
+  tools, automatic discovery, Lua, dynamic library loading, and executable standalone hook carriers
+  remain out of scope.
 
 ## Retrospective
 

@@ -8,6 +8,13 @@
 | Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
 | Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
 
+## Current Selection
+
+I091 activated 2026-07-04 to audit the local explicit plugin diagnostics/runtime state after the
+T111 read-only WASM slice. The I091 scope is diagnostics/provenance/confinement visibility only:
+no remote install, marketplace, automatic discovery, write-capable plugin tools, Lua, dynamic
+library support, or broader host-call surface.
+
 ## Requirement
 
 Design a protocol specification and runtime architecture for loading Talos plugins.

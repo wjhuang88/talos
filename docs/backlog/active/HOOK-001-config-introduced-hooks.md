@@ -8,6 +8,12 @@
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | PLUGIN-001, CMD-002, `talos-plugin`, I009 |
 
+## Current Selection
+
+I091 activated 2026-07-04 to audit and close the first diagnostics slice for hooks. The selected
+work is schema/diagnostics/state visibility only. Do not add Lua, dynamic libraries, standalone
+executable hook carriers, remote plugin installation, or hidden hook execution.
+
 ## Requirement
 
 Promote **hook** from a code-only-registered capability to a first-class config-introduced atomic

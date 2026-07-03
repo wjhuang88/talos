@@ -52,8 +52,8 @@ is not suitable for routine frontline delegation.
 | A3 | WEBFETCH bounded extraction decision | Decide the first Rust-native bounded extraction slice and explicit unsupported formats. | A2 | Proposal/ADR if needed; permission and size/time budgets named. | Keep WEBFETCH Phase 2+ design-only. | Complete |
 | A4 | Implement first bounded extraction slice | A local `document_extract` or equivalent bounded extractor for safe text/HTML/JSON/CSV/Markdown-like inputs, no PDF/Office/OCR/browser. | A3 | Tool tests, permission tests, runtime smoke, docs. | Ship design only; no runtime tool. | Complete |
 | A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | Complete |
-| A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Planned |
-| A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Planned |
+| A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Complete |
+| A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | In Progress |
 | A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Planned |
 | A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Planned |
 | A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Planned |
@@ -394,3 +394,38 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I090, I091, TOOL-011, and this task's A5 checkpoint.
+
+### A6 — I091 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I091 after I090 completed full workspace/governance closeout.
+- Preserved I085 as Paused with only MC107 real-terminal `/connect` walkthrough residual.
+- Preserved I086-I089 as planned product-hardening shells and I092-I093 as planned direct-owner
+  shells.
+- Confirmed I091 starts with audit-first diagnostics/policy work, not runtime expansion.
+
+Current state and artifacts:
+
+- `docs/iterations/I091-plugin-hook-distribution-boundary.md` is Active.
+- PLUGIN-001, HOOK-001, DIST-001, Board, and iteration index are synchronized in this phase.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- No remote install, marketplace, automatic plugin discovery, standalone executable hook carrier,
+  write-capable plugin tool, Lua, or dynamic library support is authorized.
+
+Next task item:
+
+- A7: audit local plugin/hook diagnostics and implement only the minimum state/provenance visibility
+  gaps needed for I091 acceptance.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I091, PLUGIN-001, HOOK-001, DIST-001, and this task's A6 checkpoint.
