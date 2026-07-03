@@ -575,6 +575,7 @@ fn messages_to_text(messages: &[Message]) -> String {
             Message::Assistant {
                 content,
                 tool_calls,
+                ..
             } => {
                 let mut text = format!("Assistant: {content}");
                 for tc in tool_calls {

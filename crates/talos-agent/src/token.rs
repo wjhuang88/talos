@@ -44,7 +44,7 @@ pub struct ModelPricing {
 /// // Estimate tokens for a set of messages
 /// let messages = vec![
 ///     Message::User { content: "Hello, world!".into() },
-///     Message::Assistant { content: "Hi there!".into(), tool_calls: vec![] },
+///     Message::Assistant { content: "Hi there!".into(), tool_calls: vec![], reasoning: None },
 /// ];
 /// let estimated = estimator.estimate(&messages);
 ///
@@ -118,6 +118,7 @@ impl TokenEstimator {
                 Message::Assistant {
                     content,
                     tool_calls,
+                    ..
                 } => {
                     let text_tokens = Self::estimate_text(content);
                     let tool_tokens: u32 = tool_calls
@@ -210,6 +211,7 @@ impl TokenEstimator {
     ///     output_tokens: 50,
     ///     cache_read_tokens: 80,
     ///     cache_write_tokens: 20,
+    ///     reasoning_tokens: 0,
     /// });
     ///
     /// let total = estimator.total_usage();
@@ -221,6 +223,7 @@ impl TokenEstimator {
         self.total.output_tokens += turn_usage.output_tokens;
         self.total.cache_read_tokens += turn_usage.cache_read_tokens;
         self.total.cache_write_tokens += turn_usage.cache_write_tokens;
+        self.total.reasoning_tokens += turn_usage.reasoning_tokens;
     }
 
     /// Returns the cumulative usage across all tracked turns.
@@ -241,12 +244,14 @@ impl TokenEstimator {
     ///     output_tokens: 50,
     ///     cache_read_tokens: 0,
     ///     cache_write_tokens: 0,
+    ///     reasoning_tokens: 0,
     /// });
     /// estimator.track_usage(Usage {
     ///     input_tokens: 200,
     ///     output_tokens: 75,
     ///     cache_read_tokens: 100,
     ///     cache_write_tokens: 50,
+    ///     reasoning_tokens: 0,
     /// });
     ///
     /// let total = estimator.total_usage();
@@ -284,6 +289,7 @@ impl TokenEstimator {
     ///     output_tokens: 500,
     ///     cache_read_tokens: 800,
     ///     cache_write_tokens: 200,
+    ///     reasoning_tokens: 0,
     /// });
     ///
     /// let pricing = ModelPricing {
@@ -399,6 +405,7 @@ mod tests {
         let messages = vec![Message::Assistant {
             content: "Hi there!".into(),
             tool_calls: vec![],
+            reasoning: None,
         }];
         // "Hi there!" = 9 ASCII chars → ceil(9/4) = 3 tokens
         let tokens = estimator.estimate(&messages);
@@ -432,6 +439,7 @@ mod tests {
             Message::Assistant {
                 content: "Hi!".into(),
                 tool_calls: vec![],
+                reasoning: None,
             },
         ];
         // "Hello!" = 6 → ceil(6/4) = 2
@@ -451,6 +459,7 @@ mod tests {
                 name: "read_file".into(),
                 input: serde_json::json!({"path": "src/main.rs"}),
             }],
+            reasoning: None,
         }];
         // Content: "Let me read that file." = 22 ASCII → ceil(22/4) = 6
         // Tool name: "read_file" = 9 → ceil(9/4) = 3
@@ -468,6 +477,7 @@ mod tests {
             output_tokens: 50,
             cache_read_tokens: 80,
             cache_write_tokens: 20,
+            reasoning_tokens: 0,
         });
 
         let total = estimator.total_usage();
@@ -486,6 +496,7 @@ mod tests {
             output_tokens: 50,
             cache_read_tokens: 0,
             cache_write_tokens: 0,
+            reasoning_tokens: 0,
         });
 
         estimator.track_usage(Usage {
@@ -493,6 +504,7 @@ mod tests {
             output_tokens: 75,
             cache_read_tokens: 100,
             cache_write_tokens: 50,
+            reasoning_tokens: 0,
         });
 
         estimator.track_usage(Usage {
@@ -500,6 +512,7 @@ mod tests {
             output_tokens: 25,
             cache_read_tokens: 30,
             cache_write_tokens: 10,
+            reasoning_tokens: 0,
         });
 
         let total = estimator.total_usage();
@@ -541,6 +554,7 @@ mod tests {
             output_tokens: 500,
             cache_read_tokens: 0,
             cache_write_tokens: 0,
+            reasoning_tokens: 0,
         });
 
         let pricing = ModelPricing {
@@ -563,6 +577,7 @@ mod tests {
             output_tokens: 500,
             cache_read_tokens: 800,
             cache_write_tokens: 200,
+            reasoning_tokens: 0,
         });
 
         let pricing = ModelPricing {
@@ -587,6 +602,7 @@ mod tests {
             output_tokens: 10_000,
             cache_read_tokens: 40_000,
             cache_write_tokens: 10_000,
+            reasoning_tokens: 0,
         });
 
         let pricing = ModelPricing {

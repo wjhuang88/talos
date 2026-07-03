@@ -806,6 +806,7 @@ async fn test_initial_history_from_jsonl_resume() {
         .append(&Message::Assistant {
             content: "prior answer".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
     let resumed = manager.resume_session(&session_id).unwrap();

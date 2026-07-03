@@ -34,6 +34,7 @@ fn assistant_msg(content: &str) -> Message {
     Message::Assistant {
         content: content.into(),
         tool_calls: vec![],
+        reasoning: None,
     }
 }
 
@@ -42,6 +43,7 @@ fn assistant_with_tools(content: &str, tools: Vec<ToolCall>) -> Message {
     Message::Assistant {
         content: content.into(),
         tool_calls: tools,
+        reasoning: None,
     }
 }
 
