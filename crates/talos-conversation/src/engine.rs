@@ -388,6 +388,7 @@ impl ConversationEngine {
 
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
+            AgentEvent::ReasoningComplete { .. } => {}
             _ => {}
         }
 
