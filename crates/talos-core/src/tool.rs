@@ -165,6 +165,8 @@ pub enum ToolNature {
     Execute,
     /// Makes network requests (HTTP, API calls).
     Network,
+    /// Session-internal plumbing (todo list, scratch state). Always allowed.
+    Internal,
 }
 
 /// Stable presentation family for a tool.

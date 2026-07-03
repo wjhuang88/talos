@@ -129,12 +129,11 @@ fn render_todo_list(items: &[talos_session::TodoItem]) -> RenderedTodoView {
     } else {
         for item in items {
             text.push_str(&format!(
-                "[System]   {} [{}|{}] {} ({})\n",
-                short_id(item.id),
-                todo_status_label(item.status),
-                todo_priority_label(item.priority),
+                "[System]   {} {} ({}) — {}\n",
+                talos_session::status_icon(item.status),
                 item.title,
-                item.id
+                todo_priority_label(item.priority),
+                short_id(item.id),
             ));
         }
     }
@@ -163,9 +162,10 @@ fn render_todo_show(
         .map(|dep| dep.child_id.to_string())
         .collect();
     let mut text = format!(
-        "[System] Todo {}\n[System]   title: {}\n[System]   status: {}\n[System]   priority: {}\n",
-        item.id,
+        "[System] Todo {} {}\n[System]   id: {}\n[System]   status: {}\n[System]   priority: {}\n",
+        talos_session::status_icon(item.status),
         item.title,
+        item.id,
         todo_status_label(item.status),
         todo_priority_label(item.priority)
     );
@@ -382,6 +382,11 @@ mod tests {
 
         assert!(rendered.text.contains("high item"));
         assert!(!rendered.text.contains("medium item"));
+        assert!(
+            rendered.text.contains("[ ] high item (high)"),
+            "expected checkbox-style rendering, got: {}",
+            rendered.text
+        );
         assert_eq!(rendered.panel.rows.len(), 1);
         assert_eq!(rendered.panel.rows[0].id, short_id(high.id));
     }

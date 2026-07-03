@@ -179,6 +179,7 @@ impl ResourceExtractor {
                         .ok()
                         .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
                 }),
+            ToolNature::Internal => None,
         }
     }
 }
@@ -373,6 +374,7 @@ impl PermissionEngine {
     /// - Write → Ask
     /// - Execute → Ask
     /// - Network → Ask
+    /// - Internal → Allow (session plumbing, not user-visible)
     fn add_default_rules(&mut self) {
         self.rules.push(PermissionRule::new_nature(
             ToolNature::Read,
@@ -397,6 +399,12 @@ impl PermissionEngine {
             None,
             None,
             PermissionDecision::Ask,
+        ));
+        self.rules.push(PermissionRule::new_nature(
+            ToolNature::Internal,
+            None,
+            None,
+            PermissionDecision::Allow,
         ));
     }
 
@@ -495,7 +503,9 @@ impl PermissionEngine {
         }
 
         match nature {
-            talos_core::tool::ToolNature::Read => PermissionDecision::Allow,
+            talos_core::tool::ToolNature::Read | talos_core::tool::ToolNature::Internal => {
+                PermissionDecision::Allow
+            }
             talos_core::tool::ToolNature::Write
             | talos_core::tool::ToolNature::Execute
             | talos_core::tool::ToolNature::Network => PermissionDecision::Ask,
@@ -567,6 +577,11 @@ impl PermissionEngine {
 /// workspace-relative auto-approval.
 fn infer_nature(tool_name: &str) -> talos_core::tool::ToolNature {
     let name_lower = tool_name.to_lowercase();
+    if name_lower.starts_with("todo_") {
+        // Safety net: todo tools always set Internal via permission_profile,
+        // but `evaluate` (which uses this heuristic) must agree.
+        return talos_core::tool::ToolNature::Internal;
+    }
     if name_lower.contains("read")
         || name_lower.contains("list")
         || name_lower == "grep"
@@ -1394,14 +1409,25 @@ mod tests {
     #[test]
     fn test_default_ruleset_is_nature_form() {
         let engine = PermissionEngine::new();
-        // Default ruleset should have exactly 4 rules (one per nature)
-        assert_eq!(engine.rules.len(), 4);
+        // Default ruleset should have exactly 5 rules (one per ToolNature variant)
+        assert_eq!(engine.rules.len(), 5);
         for rule in &engine.rules {
             assert!(
                 rule.nature.is_some(),
                 "default rules should use nature form"
             );
         }
+    }
+
+    #[test]
+    fn test_default_internal_tool_allowed() {
+        let engine = PermissionEngine::new();
+        let decision = engine.evaluate_with_nature(
+            "todo_create",
+            ToolNature::Internal,
+            &serde_json::json!({}),
+        );
+        assert_eq!(decision, PermissionDecision::Allow);
     }
 
     #[test]

@@ -31,6 +31,7 @@ use talos_tools::{
     WebSearchTool, WriteTool,
 };
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 use crate::approval::ApprovalPrompt;
 use crate::colors;
@@ -123,25 +124,35 @@ fn default_resource_kind(nature: talos_core::tool::ToolNature) -> ResourceKind {
         talos_core::tool::ToolNature::Read | talos_core::tool::ToolNature::Write => {
             ResourceKind::Path
         }
+        talos_core::tool::ToolNature::Internal => ResourceKind::Remote,
     }
 }
 
-fn default_todo_tools() -> Vec<Arc<dyn AgentTool>> {
+fn default_todo_tools(session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
     let Ok(sessions_dir) = SessionManager::default_sessions_dir() else {
         return Vec::new();
     };
-    todo_tools_for_sessions_dir(&sessions_dir)
+    todo_tools_for_sessions_dir(&sessions_dir, session_id)
 }
 
-fn todo_tools_for_sessions_dir(sessions_dir: &Path) -> Vec<Arc<dyn AgentTool>> {
+fn todo_tools_for_sessions_dir(sessions_dir: &Path, session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
     vec![
-        Arc::new(TodoCreateTool::from_sessions_dir(sessions_dir)),
-        Arc::new(TodoUpdateStatusTool::from_sessions_dir(sessions_dir)),
-        Arc::new(TodoUpdateTool::from_sessions_dir(sessions_dir)),
-        Arc::new(TodoDeleteTool::from_sessions_dir(sessions_dir)),
-        Arc::new(TodoAddDependencyTool::from_sessions_dir(sessions_dir)),
-        Arc::new(TodoRemoveDependencyTool::from_sessions_dir(sessions_dir)),
-        Arc::new(TodoQueryTool::from_sessions_dir(sessions_dir)),
+        Arc::new(TodoCreateTool::from_sessions_dir(sessions_dir, session_id)),
+        Arc::new(TodoUpdateStatusTool::from_sessions_dir(
+            sessions_dir,
+            session_id,
+        )),
+        Arc::new(TodoUpdateTool::from_sessions_dir(sessions_dir, session_id)),
+        Arc::new(TodoDeleteTool::from_sessions_dir(sessions_dir, session_id)),
+        Arc::new(TodoAddDependencyTool::from_sessions_dir(
+            sessions_dir,
+            session_id,
+        )),
+        Arc::new(TodoRemoveDependencyTool::from_sessions_dir(
+            sessions_dir,
+            session_id,
+        )),
+        Arc::new(TodoQueryTool::from_sessions_dir(sessions_dir, session_id)),
     ]
 }
 
@@ -406,8 +417,14 @@ impl AgentTool for StatusTool {
     }
 }
 
+/// Builds the tool registry for print/inline/RPC modes.
+///
+/// These modes construct a registry before any durable [`talos_session::Session`]
+/// exists, so todo tools are bound to a fresh in-process session id — scoped to
+/// this one run and discarded on exit, not persisted across invocations.
 pub(crate) fn build_print_tool_registry() -> ToolRegistry {
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
+    let ephemeral_session_id = Uuid::new_v4();
 
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(PermissionAwareTool {
@@ -525,7 +542,7 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
         approval: approval.clone(),
         print_mode: true,
     }));
-    for tool in default_todo_tools() {
+    for tool in default_todo_tools(ephemeral_session_id) {
         registry.register(Arc::new(PermissionAwareTool {
             inner: tool,
             approval: approval.clone(),
@@ -539,6 +556,7 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
 pub(crate) fn build_tui_tool_registry(
     approval_handler: Arc<TuiApprovalHandler>,
     workspace_root: PathBuf,
+    session_id: Uuid,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -647,7 +665,7 @@ pub(crate) fn build_tui_tool_registry(
         inner: Arc::new(WebSearchTool::new()),
         approval: approval_handler.clone(),
     }));
-    for tool in default_todo_tools() {
+    for tool in default_todo_tools(session_id) {
         registry.register(Arc::new(TuiPermissionAwareTool {
             inner: tool,
             approval: approval_handler.clone(),
@@ -788,9 +806,10 @@ mod tests {
     fn print_and_tui_registries_include_todo_tools() {
         let dir = tempfile::tempdir().unwrap();
         let sessions_dir = dir.path().join("sessions");
+        let session_id = Uuid::new_v4();
 
         let mut print_registry = ToolRegistry::new();
-        for tool in todo_tools_for_sessions_dir(&sessions_dir) {
+        for tool in todo_tools_for_sessions_dir(&sessions_dir, session_id) {
             print_registry.register(tool);
         }
         assert!(print_registry.get("todo_create").is_some());
@@ -804,7 +823,7 @@ mod tests {
         let (tx, _rx) = mpsc::unbounded_channel();
         let tui_approval = Arc::new(TuiApprovalHandler::new(tx, PathBuf::from(".")));
         let mut tui_registry = ToolRegistry::new();
-        for tool in todo_tools_for_sessions_dir(&sessions_dir) {
+        for tool in todo_tools_for_sessions_dir(&sessions_dir, session_id) {
             tui_registry.register(Arc::new(TuiPermissionAwareTool {
                 inner: tool,
                 approval: tui_approval.clone(),
@@ -817,5 +836,35 @@ mod tests {
         assert!(tui_registry.get("todo_add_dependency").is_some());
         assert!(tui_registry.get("todo_remove_dependency").is_some());
         assert!(tui_registry.get("todo_query").is_some());
+    }
+
+    #[tokio::test]
+    async fn todo_items_survive_registry_rebuild_with_same_session_id() {
+        // Simulates a /model switch: rebuild_session_for_model constructs a
+        // brand-new registry (new Agent, new tool instances) but passes the
+        // SAME session.id as before. A todo created through the "before"
+        // registry must be visible through the "after" registry.
+        let dir = tempfile::tempdir().unwrap();
+        let sessions_dir = dir.path().join("sessions");
+        let session_id = Uuid::new_v4();
+
+        let before_tools = todo_tools_for_sessions_dir(&sessions_dir, session_id);
+        let create_tool = before_tools
+            .iter()
+            .find(|t| t.name() == "todo_create")
+            .unwrap();
+        let created = create_tool
+            .execute(serde_json::json!({ "title": "survive model switch" }))
+            .await;
+        assert!(!created.is_error, "{}", created.content);
+
+        // "After" registry: same session_id, entirely new tool instances.
+        let after_tools = todo_tools_for_sessions_dir(&sessions_dir, session_id);
+        let query_tool = after_tools
+            .iter()
+            .find(|t| t.name() == "todo_query")
+            .unwrap();
+        let queried = query_tool.execute(serde_json::json!({})).await;
+        assert!(queried.content.contains("survive model switch"));
     }
 }

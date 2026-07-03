@@ -434,6 +434,7 @@ fn default_resource_kind(nature: ToolNature) -> ResourceKind {
         ToolNature::Network => ResourceKind::Domain,
         ToolNature::Execute => ResourceKind::Command,
         ToolNature::Read | ToolNature::Write => ResourceKind::Path,
+        ToolNature::Internal => ResourceKind::Remote,
     }
 }
 

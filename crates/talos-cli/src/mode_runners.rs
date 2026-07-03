@@ -488,8 +488,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry =
-        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry = build_tui_tool_registry(
+        approval_handler.clone(),
+        workspace_root.to_path_buf(),
+        session.id,
+    );
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -1168,8 +1171,11 @@ async fn handle_session_new(
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry =
-        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry = build_tui_tool_registry(
+        approval_handler.clone(),
+        workspace_root.to_path_buf(),
+        new_session.id,
+    );
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -1391,8 +1397,11 @@ async fn handle_session_resume(
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry =
-        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry = build_tui_tool_registry(
+        approval_handler.clone(),
+        workspace_root.to_path_buf(),
+        target_session.id,
+    );
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -1559,8 +1568,11 @@ async fn handle_session_fork(
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry =
-        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry = build_tui_tool_registry(
+        approval_handler.clone(),
+        workspace_root.to_path_buf(),
+        child_session.id,
+    );
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(

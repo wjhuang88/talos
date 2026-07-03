@@ -224,8 +224,11 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
     };
     mcp_runtime.report_startup_failures();
-    let mut registry =
-        build_tui_tool_registry(approval_handler.clone(), workspace_root.to_path_buf());
+    let mut registry = build_tui_tool_registry(
+        approval_handler.clone(),
+        workspace_root.to_path_buf(),
+        current_session.id,
+    );
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
