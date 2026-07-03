@@ -33,6 +33,8 @@ mod session_setup;
 mod session_transition;
 mod skill_runtime;
 mod storage;
+#[cfg(test)]
+mod test_support;
 mod todo_view;
 mod tui_bridge;
 mod validation;
