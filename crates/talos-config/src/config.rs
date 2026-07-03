@@ -17,10 +17,20 @@ impl Config {
 
     /// Loads configuration from the default path `~/.talos/config.toml`.
     ///
-    /// If the file exists, it is read, environment variable substitution is
-    /// performed, and the result is validated against the JSON Schema.
+    /// If the file exists, it is read and environment variable substitution
+    /// is performed. If the file does not exist, returns a default config
+    /// (env-only mode).
     ///
-    /// If the file does not exist, returns a default config (env-only mode).
+    /// Does **not** enforce [`Config::validate`]'s "must be runnable" rules
+    /// (non-empty `model`/`provider`, credential presence). An on-disk config
+    /// with an empty `model` is a legitimate, expected state — for example,
+    /// before the first-run setup wizard runs, or before `talos config set`
+    /// has a chance to populate it. Callers that need a fully-configured,
+    /// runnable session (interactive TUI/print/RPC modes) check
+    /// `config.model.is_empty()` themselves and route to the setup wizard or
+    /// a helpful error. Callers that persist an edit (`talos config set`)
+    /// call [`Config::validate`] explicitly after applying the edit, before
+    /// saving.
     pub fn load() -> Result<Self, ConfigError> {
         let path = Self::default_path();
         if !path.exists() {
@@ -36,7 +46,6 @@ impl Config {
             config.merge_credentials(&creds);
         }
 
-        config.validate()?;
         Ok(config)
     }
 

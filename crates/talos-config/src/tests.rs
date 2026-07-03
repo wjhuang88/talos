@@ -406,6 +406,79 @@ fn test_load_nonexistent_file() {
     assert!(config.model.is_empty());
 }
 
+/// Regression test: an on-disk `config.toml` with an empty `model` field
+/// must load successfully so callers (TUI/print/RPC mode setup-wizard
+/// logic) can detect the empty model and route to first-run setup or a
+/// helpful message. Before this fix, `Config::load()` called `validate()`
+/// internally and hard-failed with `ConfigError::InvalidConfig` whenever
+/// the file existed with an empty model — making the on-disk state
+/// unrecoverable via `talos config set` too, since that command's own
+/// `Config::load()` call would fail identically.
+#[test]
+fn test_load_existing_file_with_empty_model_succeeds() {
+    let _lock = ENV_MUTEX.lock().unwrap();
+    let tmp_dir = env::temp_dir().join("talos_test_load_empty_model");
+    let _ = fs::remove_dir_all(&tmp_dir);
+    fs::create_dir_all(tmp_dir.join(".talos")).unwrap();
+    let prev_home = std::env::var_os("HOME");
+    unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
+
+    let config_toml = r#"
+provider = "anthropic"
+model = ""
+"#;
+    fs::write(Config::default_path(), config_toml).unwrap();
+
+    let result = Config::load();
+    assert!(
+        result.is_ok(),
+        "loading a config.toml with an empty model must succeed, not error: {:?}",
+        result.err()
+    );
+    let config = result.unwrap();
+    assert!(config.model.is_empty());
+    assert_eq!(config.provider, "anthropic");
+
+    match prev_home {
+        Some(value) => unsafe { env::set_var("HOME", value) },
+        None => unsafe { env::remove_var("HOME") },
+    }
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
+/// Companion regression test: `talos config set` must remain able to fix
+/// an on-disk config that currently has an empty model, i.e. loading it
+/// (to then apply an edit) must not fail before the edit has a chance to
+/// run.
+#[test]
+fn test_load_then_set_model_recovers_from_empty_model_on_disk() {
+    let _lock = ENV_MUTEX.lock().unwrap();
+    let tmp_dir = env::temp_dir().join("talos_test_recover_empty_model");
+    let _ = fs::remove_dir_all(&tmp_dir);
+    fs::create_dir_all(tmp_dir.join(".talos")).unwrap();
+    let prev_home = std::env::var_os("HOME");
+    unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
+
+    fs::write(
+        Config::default_path(),
+        "provider = \"anthropic\"\nmodel = \"\"\n",
+    )
+    .unwrap();
+
+    let mut config = Config::load().expect("load must succeed even with empty model on disk");
+    config.model = "claude-sonnet-4-5-20250929".to_string();
+    assert!(
+        config.validate().is_ok(),
+        "config must be valid after the user sets a model"
+    );
+
+    match prev_home {
+        Some(value) => unsafe { env::set_var("HOME", value) },
+        None => unsafe { env::remove_var("HOME") },
+    }
+    let _ = fs::remove_dir_all(&tmp_dir);
+}
+
 #[test]
 fn test_provider_serialization() {
     let config_anthropic = Config {
