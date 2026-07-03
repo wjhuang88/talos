@@ -74,6 +74,15 @@ pub struct ProviderTimeoutConfig {
     /// Maximum seconds between stream events after the first packet.
     /// Default: 90 seconds.
     pub stream_idle_timeout_secs: u64,
+    /// Maximum number of retry attempts for retryable provider failures.
+    /// Default: 3 attempts.
+    pub max_attempts: u32,
+    /// Base delay in milliseconds for exponential backoff.
+    /// Default: 500ms.
+    pub backoff_base_ms: u64,
+    /// Maximum delay in milliseconds for exponential backoff before jitter.
+    /// Default: 8000ms.
+    pub backoff_max_ms: u64,
 }
 
 impl Default for ProviderTimeoutConfig {
@@ -81,6 +90,9 @@ impl Default for ProviderTimeoutConfig {
         Self {
             first_packet_timeout_secs: 30,
             stream_idle_timeout_secs: 90,
+            max_attempts: 3,
+            backoff_base_ms: 500,
+            backoff_max_ms: 8_000,
         }
     }
 }

@@ -1173,6 +1173,9 @@ fn test_provider_timeout_config_defaults() {
     let timeout = ProviderTimeoutConfig::default();
     assert_eq!(timeout.first_packet_timeout_secs, 30);
     assert_eq!(timeout.stream_idle_timeout_secs, 90);
+    assert_eq!(timeout.max_attempts, 3);
+    assert_eq!(timeout.backoff_base_ms, 500);
+    assert_eq!(timeout.backoff_max_ms, 8_000);
 }
 
 #[test]
@@ -1188,6 +1191,9 @@ fn test_provider_timeout_config_parsed_from_toml() {
             [providers.openai.timeout]
             first_packet_timeout_secs = 12
             stream_idle_timeout_secs = 34
+            max_attempts = 4
+            backoff_base_ms = 250
+            backoff_max_ms = 2000
         "#,
     )
     .unwrap();
@@ -1195,4 +1201,7 @@ fn test_provider_timeout_config_parsed_from_toml() {
     let timeout = &config.providers["openai"].timeout;
     assert_eq!(timeout.first_packet_timeout_secs, 12);
     assert_eq!(timeout.stream_idle_timeout_secs, 34);
+    assert_eq!(timeout.max_attempts, 4);
+    assert_eq!(timeout.backoff_base_ms, 250);
+    assert_eq!(timeout.backoff_max_ms, 2000);
 }
