@@ -16,6 +16,9 @@ pub(crate) fn build_status_text(
     let provider = &status.provider;
     let workspace = &status.workspace_path;
     let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
+    let output_tokens = status.usage.output_tokens;
+    let reasoning_tokens = status.usage.reasoning_tokens;
+    let output_usage_label = format_output_usage(output_tokens, reasoning_tokens);
     let queue_total = status.steering_count + status.followup_count;
     let context_label = format_context_label(status.context_limit, total_tokens);
 
@@ -25,7 +28,7 @@ pub(crate) fn build_status_text(
             &context_label,
             status_provider_for_display(model_name, provider),
             workspace,
-            total_tokens,
+            &output_usage_label,
             queue_total,
             width,
         );
@@ -36,10 +39,20 @@ pub(crate) fn build_status_text(
         &context_label,
         status_provider_for_display(model_name, provider),
         workspace,
-        total_tokens,
+        &output_usage_label,
         queue_total,
         width,
     )
+}
+
+fn format_output_usage(output_tokens: u32, reasoning_tokens: u32) -> String {
+    let out = crate::formatting::format_tokens(output_tokens as u64);
+    if reasoning_tokens > 0 {
+        let thinking = crate::formatting::format_tokens(reasoning_tokens as u64);
+        format!("{out} out ({thinking} thinking)")
+    } else {
+        format!("{out} out")
+    }
 }
 
 fn format_context_limit(limit: Option<u32>) -> String {
@@ -83,7 +96,7 @@ fn build_compact_status(
     context_label: &str,
     provider: &str,
     workspace: &str,
-    total_tokens: u64,
+    output_usage_label: &str,
     queue_total: usize,
     width: u16,
 ) -> Text<'static> {
@@ -91,7 +104,7 @@ fn build_compact_status(
     let accent = Style::default().fg(semantic::TEXT_ACCENT);
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
-    let tokens_part = format!(" {}t", crate::formatting::format_tokens(total_tokens));
+    let tokens_part = format!(" {output_usage_label}");
     let queue_part = if queue_total > 0 {
         format!(" · ⬡{queue_total}")
     } else {
@@ -149,7 +162,7 @@ fn build_expanded_status(
     context_label: &str,
     provider: &str,
     workspace: &str,
-    total_tokens: u64,
+    output_usage_label: &str,
     queue_total: usize,
     width: u16,
 ) -> Text<'static> {
@@ -157,7 +170,7 @@ fn build_expanded_status(
     let accent = Style::default().fg(semantic::TEXT_ACCENT);
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
-    let tokens_part = format!("{} tokens", crate::formatting::format_tokens(total_tokens));
+    let tokens_part = output_usage_label.to_string();
     let queue_part = if queue_total > 0 {
         format!(" · ⬡ {} queued", queue_total)
     } else {

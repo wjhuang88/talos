@@ -873,8 +873,33 @@ mod tests {
         };
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
-        assert!(content.contains("21.2k"));
+        assert!(content.contains("8.9k out"));
         assert!(!content.contains("21245 tokens"));
+    }
+
+    #[test]
+    fn test_status_bar_shows_reasoning_token_breakdown_when_present() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage {
+                input_tokens: 12_345,
+                output_tokens: 8_900,
+                reasoning_tokens: 1_200,
+                ..Default::default()
+            },
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+
+        let text = build_status_text(&status, 120);
+        let content = format!("{:?}", text);
+        assert!(content.contains("8.9k out"));
+        assert!(content.contains("(1.2k thinking)"));
     }
 
     #[test]
@@ -1069,7 +1094,7 @@ mod tests {
         assert!(content.contains("zhipu-coding-plan/glm"));
         assert!(!content.contains("(zhipu-coding"));
         assert!(content.contains("talos"));
-        assert!(content.contains("0 tokens"));
+        assert!(content.contains("0 out"));
     }
 
     #[test]
@@ -1206,5 +1231,32 @@ mod tests {
             !text.contains("cost") && !text.contains("default"),
             "exit summary must omit cost line when no pricing, got: {text}"
         );
+    }
+
+    #[test]
+    fn test_exit_summary_shows_thinking_line_when_reasoning_tokens_present() {
+        use crate::app_summary::build_exit_summary_lines;
+
+        let status = StatusSnapshot {
+            model_name: "claude-sonnet-4".to_string(),
+            provider: "anthropic".to_string(),
+            workspace_path: String::new(),
+            usage: Usage {
+                input_tokens: 1_000,
+                output_tokens: 500,
+                reasoning_tokens: 200,
+                ..Default::default()
+            },
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            context_limit: Some(200_000),
+            ..Default::default()
+        };
+
+        let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 1, None);
+        let text: String = lines.iter().map(|l| l.text.as_str()).collect();
+        assert!(text.contains("200 thinking"));
     }
 }

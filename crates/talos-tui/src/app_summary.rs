@@ -116,6 +116,19 @@ pub(crate) fn build_exit_summary_lines(
             )],
             None,
         ));
+        if usage.reasoning_tokens > 0 {
+            lines.push(ScrollbackLine::styled(
+                vec![HistorySegment::styled(
+                    format!(
+                        "  {} thinking",
+                        crate::formatting::format_tokens(usage.reasoning_tokens as u64)
+                    ),
+                    to_crossterm_color(semantic::DIM_TEXT),
+                    HistoryAttrs::default(),
+                )],
+                None,
+            ));
+        }
     }
 
     let (cost, label) = estimate_cost(status);
