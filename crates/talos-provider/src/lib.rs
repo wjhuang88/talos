@@ -22,7 +22,7 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
-use talos_config::ReasoningOptions;
+use talos_config::{ProviderTimeoutConfig, ReasoningOptions};
 use talos_core::message::ToolCall;
 use talos_core::message::{
     AgentEvent, AssistantReasoning, Message, ReasoningBlock, StopReason, SystemCacheMarker,
@@ -49,6 +49,7 @@ pub struct AnthropicProvider {
     client: Client,
     reasoning: Option<ReasoningOptions>,
     output_limit: Option<u32>,
+    timeout_config: ProviderTimeoutConfig,
 }
 
 impl AnthropicProvider {
@@ -66,6 +67,7 @@ impl AnthropicProvider {
             client: Client::new(),
             reasoning: None,
             output_limit: None,
+            timeout_config: ProviderTimeoutConfig::default(),
         }
     }
 
@@ -83,6 +85,12 @@ impl AnthropicProvider {
     ) -> Self {
         self.reasoning = reasoning;
         self.output_limit = output_limit;
+        self
+    }
+
+    /// Set provider stream timeout configuration.
+    pub fn with_timeout_config(mut self, config: ProviderTimeoutConfig) -> Self {
+        self.timeout_config = config;
         self
     }
 
@@ -171,7 +179,13 @@ impl LanguageModel for AnthropicProvider {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
         let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(parse_sse_stream(response, tx));
+        let timeout_config = self.timeout_config.clone();
+        tokio::spawn(parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+        ));
         Ok(rx)
     }
 
@@ -182,7 +196,13 @@ impl LanguageModel for AnthropicProvider {
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request_with_tools(messages, tools).await?;
         let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(parse_sse_stream(response, tx));
+        let timeout_config = self.timeout_config.clone();
+        tokio::spawn(parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+        ));
         Ok(rx)
     }
 
@@ -499,7 +519,12 @@ struct ThinkingBlockState {
     signature: String,
 }
 
-async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEvent>) {
+async fn parse_sse_stream(
+    response: reqwest::Response,
+    tx: mpsc::Sender<AgentEvent>,
+    first_packet_timeout: Duration,
+    idle_timeout: Duration,
+) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
     let mut stream = response.bytes_stream();
@@ -514,8 +539,36 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
         std::collections::HashMap::new();
     let mut current_thinking: Option<ThinkingBlockState> = None;
     let mut reasoning_blocks: Vec<ReasoningBlock> = Vec::new();
+    let mut saw_first_packet = false;
 
-    while let Some(chunk_result) = stream.next().await {
+    while let Some(chunk_result) = {
+        let next_chunk = stream.next();
+        let wait_result = if saw_first_packet {
+            tokio::time::timeout(idle_timeout, next_chunk).await
+        } else {
+            tokio::time::timeout(first_packet_timeout, next_chunk).await
+        };
+
+        match wait_result {
+            Ok(next) => next,
+            Err(_) => {
+                let message = if saw_first_packet {
+                    format!(
+                        "stream-idle timeout: provider stopped sending data for {}s",
+                        idle_timeout.as_secs()
+                    )
+                } else {
+                    format!(
+                        "first-packet timeout: no response from provider within {}s",
+                        first_packet_timeout.as_secs()
+                    )
+                };
+                let _ = tx.send(AgentEvent::Error { message }).await;
+                return;
+            }
+        }
+    } {
+        saw_first_packet = true;
         let chunk = match chunk_result {
             Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
                 Ok(s) => s,
@@ -929,6 +982,48 @@ fn exponential_backoff(attempt: u32) -> Duration {
 mod tests {
     use super::*;
 
+    async fn spawn_chunked_sse_server(
+        chunks: Vec<(Duration, String)>,
+        close_after: Option<Duration>,
+    ) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut req_buf = [0_u8; 1024];
+            let _ = socket.read(&mut req_buf).await;
+
+            let headers = concat!(
+                "HTTP/1.1 200 OK\r\n",
+                "Content-Type: text/event-stream\r\n",
+                "Transfer-Encoding: chunked\r\n",
+                "Connection: close\r\n\r\n"
+            );
+            socket.write_all(headers.as_bytes()).await.unwrap();
+            socket.flush().await.unwrap();
+
+            for (delay, payload) in chunks {
+                tokio::time::sleep(delay).await;
+                let frame = format!("{:X}\r\n{}\r\n", payload.len(), payload);
+                socket.write_all(frame.as_bytes()).await.unwrap();
+                socket.flush().await.unwrap();
+            }
+
+            if let Some(delay) = close_after {
+                tokio::time::sleep(delay).await;
+            }
+
+            let _ = socket.write_all(b"0\r\n\r\n").await;
+            let _ = socket.flush().await;
+        });
+
+        format!("http://{addr}")
+    }
+
     fn sse_event(event_type: &str, data: &Value) -> String {
         format!("event: {event_type}\ndata: {}\n\n", data)
     }
@@ -1105,7 +1200,13 @@ mod tests {
             .await
             .unwrap();
         let (tx, mut rx) = mpsc::channel(32);
-        parse_sse_stream(response, tx).await;
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
 
         let mut thinking_deltas = Vec::new();
         let mut reasoning_complete = None;
@@ -1180,7 +1281,13 @@ mod tests {
             .await
             .unwrap();
         let (tx, mut rx) = mpsc::channel(32);
-        parse_sse_stream(response, tx).await;
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
 
         let mut reasoning_complete = None;
         while let Some(event) = rx.recv().await {
@@ -1285,5 +1392,131 @@ mod tests {
 
         let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, Some(8192));
         assert_eq!(body["max_tokens"], 8192);
+    }
+
+    #[tokio::test]
+    async fn test_first_packet_timeout() {
+        let url = spawn_chunked_sse_server(vec![], Some(Duration::from_secs(3))).await;
+        let response = reqwest::get(url).await.unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(2)).await;
+
+        let mut timeout_error = None;
+        while let Some(event) = rx.recv().await {
+            if let AgentEvent::Error { message } = event {
+                timeout_error = Some(message);
+                break;
+            }
+        }
+
+        assert_eq!(
+            timeout_error.as_deref(),
+            Some("first-packet timeout: no response from provider within 1s")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stream_idle_timeout() {
+        let start_event = sse_event(
+            "message_start",
+            &json!({
+                "message": {
+                    "usage": {
+                        "input_tokens": 1,
+                        "output_tokens": 0,
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    }
+                }
+            }),
+        );
+        let url = spawn_chunked_sse_server(
+            vec![(Duration::from_millis(0), start_event)],
+            Some(Duration::from_secs(3)),
+        )
+        .await;
+        let response = reqwest::get(url).await.unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(1)).await;
+
+        let mut timeout_error = None;
+        while let Some(event) = rx.recv().await {
+            if let AgentEvent::Error { message } = event {
+                timeout_error = Some(message);
+                break;
+            }
+        }
+
+        assert_eq!(
+            timeout_error.as_deref(),
+            Some("stream-idle timeout: provider stopped sending data for 1s")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_normal_stream_not_timed_out() {
+        let stream = vec![
+            (
+                Duration::from_millis(0),
+                sse_event(
+                    "message_start",
+                    &json!({
+                        "message": {
+                            "usage": {
+                                "input_tokens": 1,
+                                "output_tokens": 0,
+                                "cache_read_input_tokens": 0,
+                                "cache_creation_input_tokens": 0
+                            }
+                        }
+                    }),
+                ),
+            ),
+            (
+                Duration::from_millis(150),
+                sse_event(
+                    "content_block_delta",
+                    &json!({
+                        "index": 0,
+                        "delta": {
+                            "type": "text_delta",
+                            "text": "hello"
+                        }
+                    }),
+                ),
+            ),
+            (
+                Duration::from_millis(150),
+                sse_event(
+                    "message_delta",
+                    &json!({
+                        "delta": {"stop_reason": "end_turn"},
+                        "usage": {"output_tokens": 2}
+                    }),
+                ),
+            ),
+        ];
+        let url = spawn_chunked_sse_server(stream, None).await;
+        let response = reqwest::get(url).await.unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(response, tx, Duration::from_secs(1), Duration::from_secs(1)).await;
+
+        let mut saw_turn_end = false;
+        let mut saw_timeout_error = false;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TurnEnd { .. } => saw_turn_end = true,
+                AgentEvent::Error { message } if message.contains("timeout") => {
+                    saw_timeout_error = true
+                }
+                _ => {}
+            }
+        }
+
+        assert!(saw_turn_end);
+        assert!(!saw_timeout_error);
     }
 }
