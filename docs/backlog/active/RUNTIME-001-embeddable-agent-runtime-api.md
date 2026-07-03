@@ -10,6 +10,11 @@ pipeline stability; session protocol cleanup; ADR-024
 I093 activation note (2026-07-04): selected for self-bootstrap readiness audit only. The current
 status remains "Complete (pre-1.0 facade)", not a stable 1.0 SDK guarantee.
 
+I093 A13 readiness result (2026-07-04): `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md`
+keeps RUNTIME-001 at pre-1.0. Minimum gaps before REL-002 qualification are Talos-primary edit
+loop evidence, autonomous validation evidence capture, git/issue sync policy, and stable SDK
+surface classification.
+
 ## Problem
 
 Talos's core turn loop is mostly isolated in `talos-agent`, and CLI/TUI crates do not own the

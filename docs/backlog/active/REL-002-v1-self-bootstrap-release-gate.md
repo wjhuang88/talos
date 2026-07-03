@@ -21,6 +21,10 @@ I093 activation note (2026-07-04): selected for readiness audit only. This does 
 track remains non-qualifying for REL-002 unless a later Talos-primary rehearsal explicitly proves
 otherwise.
 
+I093 A13 result (2026-07-04): `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md` updates the
+runtime/governance/architecture readiness audit. Verdict remains not ready for `v1.0.0`; the
+minimum next packet is a controlled Talos-primary rehearsal.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent
@@ -94,6 +98,7 @@ Each qualifying self-bootstrap session must record:
 | Date | Record | Verdict |
 |---|---|---|
 | 2026-07-02 | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` | Not ready for `v1.0.0`; pre-1.0 releases may continue with explicit posture. |
+| 2026-07-04 | `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md` | Not ready for `v1.0.0`; runtime/governance/architecture prerequisites improved, but no qualifying Talos-primary sessions exist. |
 
 ## Relationship To Other Work
 

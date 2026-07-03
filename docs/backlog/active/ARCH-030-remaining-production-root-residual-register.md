@@ -9,6 +9,10 @@
 I093 activation note (2026-07-04): selected for release-readiness audit only. The residual roots
 remain watchlist items; no decomposition slice is activated by I093 activation alone.
 
+I093 A13 readiness result (2026-07-04): `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md`
+classifies REL-002 risk by residual root. Session SQLite and Git tool roots are the highest
+self-bootstrap risks before Talos-primary continuity/git workflows expand.
+
 ## Problem
 
 The 2026-06-27/28 architecture optimization cycle reduced several production roots, but a small set
