@@ -7,7 +7,7 @@ use crossterm::{
     terminal::enable_raw_mode,
 };
 use futures::{Stream, StreamExt};
-use talos_conversation::{CopyScope, TipKind, TodoPanelData, UiOutput, UserInput};
+use talos_conversation::{CopyScope, TipKind, TodoPanelData, TurnPhase, UiOutput, UserInput};
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
@@ -709,25 +709,14 @@ impl Tui {
             ("   ".to_string(), None)
         };
         let hold_status = self.stream_render.hold_status().cloned();
-        let preview_text = hold_status
-            .as_ref()
-            .map(|status| {
-                crate::scrollback::animated_hold_preview_text(status, self.processing_frame)
-            })
-            .unwrap_or_else(|| {
-                if let Some(thinking) = self.state.thinking_preview.as_ref()
-                    && self.state.status.is_processing
-                {
-                    return format!("thinking: {thinking}");
-                }
-                let preview = self.stream_render.preview();
-                if status.is_processing && preview.is_empty() {
-                    crate::scrollback::idle_processing_preview_text(self.processing_frame)
-                        .to_string()
-                } else {
-                    preview.to_string()
-                }
-            });
+        let preview_text = preview_text_for_state(
+            hold_status.as_ref(),
+            status.phase.as_ref(),
+            self.state.thinking_preview.as_deref(),
+            status.is_processing,
+            self.stream_render.preview(),
+            self.processing_frame,
+        );
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));
@@ -1026,6 +1015,48 @@ impl Tui {
     fn restore(&self) {
         self.terminal.restore();
     }
+}
+
+pub(crate) fn preview_text_for_state(
+    hold_status: Option<&crate::stream_markdown::HoldStatus>,
+    phase: Option<&TurnPhase>,
+    thinking_preview: Option<&str>,
+    is_processing: bool,
+    stream_preview: &str,
+    processing_frame: usize,
+) -> String {
+    if let Some(status) = hold_status {
+        return crate::scrollback::animated_hold_preview_text(status, processing_frame);
+    }
+
+    if matches!(phase, Some(TurnPhase::TimedOut)) {
+        return "⏱ timed out".to_string();
+    }
+    if matches!(phase, Some(TurnPhase::Failed)) {
+        return "✗ failed".to_string();
+    }
+    if matches!(phase, Some(TurnPhase::Cancelled)) {
+        return "cancelled".to_string();
+    }
+    if let Some(TurnPhase::Retrying { attempt }) = phase {
+        return format!("retrying (attempt {attempt})...");
+    }
+
+    if let Some(thinking) = thinking_preview
+        && is_processing
+    {
+        return format!("thinking: {thinking}");
+    }
+
+    if matches!(phase, Some(TurnPhase::Connecting)) && is_processing {
+        return "connecting...".to_string();
+    }
+
+    if is_processing && stream_preview.is_empty() {
+        return crate::scrollback::idle_processing_preview_text(processing_frame).to_string();
+    }
+
+    stream_preview.to_string()
 }
 
 pub(crate) fn build_todo_panel_lines(data: &TodoPanelData) -> Vec<ScrollbackLine> {

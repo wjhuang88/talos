@@ -6,6 +6,11 @@ use ratatui::{
 use crate::scrollback::truncate_end_to_width;
 use crate::theme::semantic;
 
+struct StatusFlags<'a> {
+    queue_total: usize,
+    phase_label: Option<&'a str>,
+}
+
 pub(crate) fn build_status_text(
     status: &talos_conversation::StatusSnapshot,
     width: u16,
@@ -19,7 +24,10 @@ pub(crate) fn build_status_text(
     let output_tokens = status.usage.output_tokens;
     let reasoning_tokens = status.usage.reasoning_tokens;
     let output_usage_label = format_output_usage(output_tokens, reasoning_tokens);
-    let queue_total = status.steering_count + status.followup_count;
+    let flags = StatusFlags {
+        queue_total: status.steering_count + status.followup_count,
+        phase_label: phase_status_label(status),
+    };
     let context_label = format_context_label(status.context_limit, total_tokens);
 
     if compact {
@@ -29,7 +37,7 @@ pub(crate) fn build_status_text(
             status_provider_for_display(model_name, provider),
             workspace,
             &output_usage_label,
-            queue_total,
+            &flags,
             width,
         );
     }
@@ -40,7 +48,7 @@ pub(crate) fn build_status_text(
         status_provider_for_display(model_name, provider),
         workspace,
         &output_usage_label,
-        queue_total,
+        &flags,
         width,
     )
 }
@@ -97,7 +105,7 @@ fn build_compact_status(
     provider: &str,
     workspace: &str,
     output_usage_label: &str,
-    queue_total: usize,
+    flags: &StatusFlags<'_>,
     width: u16,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
@@ -105,17 +113,25 @@ fn build_compact_status(
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
     let tokens_part = format!(" {output_usage_label}");
-    let queue_part = if queue_total > 0 {
-        format!(" · ⬡{queue_total}")
+    let queue_part = if flags.queue_total > 0 {
+        format!(" · ⬡{}", flags.queue_total)
     } else {
         String::new()
     };
+    let phase_part = flags
+        .phase_label
+        .map(|label| format!(" · {label}"))
+        .unwrap_or_default();
     let ctx_len = if context_label.is_empty() {
         0
     } else {
         context_label.chars().count() + 2
     };
-    let reserved = tokens_part.chars().count() + queue_part.chars().count() + ctx_len + 1;
+    let reserved = tokens_part.chars().count()
+        + queue_part.chars().count()
+        + phase_part.chars().count()
+        + ctx_len
+        + 1;
     let available = (width as usize).saturating_sub(reserved);
     let model_limit = if workspace.is_empty() {
         available.saturating_sub(2).clamp(8, 20)
@@ -154,6 +170,7 @@ fn build_compact_status(
         Span::styled("", dim),
         Span::styled(tokens_part, val),
         Span::styled(queue_part, dim),
+        Span::styled(phase_part, dim),
     ]))
 }
 
@@ -163,7 +180,7 @@ fn build_expanded_status(
     provider: &str,
     workspace: &str,
     output_usage_label: &str,
-    queue_total: usize,
+    flags: &StatusFlags<'_>,
     width: u16,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
@@ -171,18 +188,22 @@ fn build_expanded_status(
     let val = Style::default().fg(semantic::STATUS_VALUE);
 
     let tokens_part = output_usage_label.to_string();
-    let queue_part = if queue_total > 0 {
-        format!(" · ⬡ {} queued", queue_total)
+    let queue_part = if flags.queue_total > 0 {
+        format!(" · ⬡ {} queued", flags.queue_total)
     } else {
         String::new()
     };
+    let phase_part = flags
+        .phase_label
+        .map(|label| format!(" · {label}"))
+        .unwrap_or_default();
 
     let ctx_len = if context_label.is_empty() {
         0
     } else {
         context_label.chars().count() + 2
     };
-    let right_part = format!("{tokens_part}{queue_part}");
+    let right_part = format!("{tokens_part}{queue_part}{phase_part}");
     let reserved = 1 + right_part.chars().count() + 5 + ctx_len;
     let available = (width as usize).saturating_sub(reserved);
     let provider_budget = if provider.is_empty() {
@@ -250,4 +271,13 @@ pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {
     }
     let truncated: String = chars[..max_len - 1].iter().collect();
     format!("{truncated}…")
+}
+
+fn phase_status_label(status: &talos_conversation::StatusSnapshot) -> Option<&'static str> {
+    match status.phase.as_ref() {
+        Some(talos_conversation::TurnPhase::TimedOut) => Some("timed out"),
+        Some(talos_conversation::TurnPhase::Failed) => Some("failed"),
+        Some(talos_conversation::TurnPhase::Cancelled) => Some("cancelled"),
+        _ => None,
+    }
 }

@@ -3,7 +3,9 @@
 #[allow(warnings)]
 mod tests {
     use std::time::{Duration, Instant};
-    use talos_conversation::{MessageSource, SessionPickerItem, StatusSnapshot, TipKind};
+    use talos_conversation::{
+        MessageSource, SessionPickerItem, StatusSnapshot, TipKind, TurnPhase,
+    };
     use talos_core::ApprovalChoice;
     use talos_core::message::Usage;
 
@@ -855,6 +857,38 @@ mod tests {
     }
 
     #[test]
+    fn test_status_bar_shows_terminal_phase_labels() {
+        let base = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+
+        let timed_out = StatusSnapshot {
+            phase: Some(TurnPhase::TimedOut),
+            ..base.clone()
+        };
+        let failed = StatusSnapshot {
+            phase: Some(TurnPhase::Failed),
+            ..base.clone()
+        };
+        let cancelled = StatusSnapshot {
+            phase: Some(TurnPhase::Cancelled),
+            ..base
+        };
+
+        assert!(format!("{:?}", build_status_text(&timed_out, 120)).contains("timed out"));
+        assert!(format!("{:?}", build_status_text(&failed, 120)).contains("failed"));
+        assert!(format!("{:?}", build_status_text(&cancelled, 120)).contains("cancelled"));
+    }
+
+    #[test]
     fn test_status_bar_uses_human_readable_tokens() {
         let status = StatusSnapshot {
             model_name: "test".to_string(),
@@ -1177,6 +1211,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            phase: None,
             context_limit: Some(200_000),
             input_price_per_million: Some(3.0),
             output_price_per_million: Some(15.0),
@@ -1221,6 +1256,7 @@ mod tests {
             steering_count: 0,
             followup_count: 0,
             is_processing: false,
+            phase: None,
             context_limit: Some(128_000),
             input_price_per_million: None,
             output_price_per_million: None,

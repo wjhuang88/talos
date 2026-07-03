@@ -2,11 +2,13 @@ use crossterm::style::Color as CColor;
 use talos_conversation::{MessageSource, TodoPanelData, TodoPanelRow, ToolResultDisplay};
 use talos_core::message::Message;
 
+use crate::app::preview_text_for_state;
 use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
 use crate::scrollback;
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
+use talos_conversation::TurnPhase;
 
 fn state_line(text: &str) -> ScrollbackLine {
     ScrollbackLine::plain(text, None)
@@ -854,4 +856,48 @@ fn head_tail_truncation_does_not_affect_export_content() {
     let _ = tool_display::build_tool_result_scrollback_lines(&display, "✓", Some(CColor::Green));
     assert_eq!(display.content, original);
     assert!(display.content.contains("line 25"));
+}
+
+#[test]
+fn preview_text_uses_phase_priority_states() {
+    assert_eq!(
+        preview_text_for_state(None, Some(&TurnPhase::TimedOut), None, false, "stream", 0),
+        "⏱ timed out"
+    );
+    assert_eq!(
+        preview_text_for_state(None, Some(&TurnPhase::Failed), None, false, "stream", 0),
+        "✗ failed"
+    );
+    assert_eq!(
+        preview_text_for_state(None, Some(&TurnPhase::Cancelled), None, false, "stream", 0),
+        "cancelled"
+    );
+    assert_eq!(
+        preview_text_for_state(
+            None,
+            Some(&TurnPhase::Retrying { attempt: 2 }),
+            None,
+            true,
+            "stream",
+            0,
+        ),
+        "retrying (attempt 2)..."
+    );
+    assert_eq!(
+        preview_text_for_state(None, Some(&TurnPhase::Connecting), None, true, "", 0),
+        "connecting..."
+    );
+}
+
+#[test]
+fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
+    assert_eq!(
+        preview_text_for_state(None, None, Some("draft"), true, "", 0),
+        "thinking: draft"
+    );
+    assert_eq!(preview_text_for_state(None, None, None, true, "", 6), "...");
+    assert_eq!(
+        preview_text_for_state(None, None, None, false, "generated", 0),
+        "generated"
+    );
 }
