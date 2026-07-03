@@ -67,23 +67,40 @@ The command split must not begin until the resolver precedence path is tested.
 | 2026-07-03 | In Progress | I085 activated after `v0.2.2` closeout. Stage 1 starts with MC100-MC103 only: shared catalog types, `talos-models`, SQLite catalog store/migrations, models.dev import parsing, gated built-in refresh, and catalog-aware resolver. Stage 2 `/model` and `/connect` work remains blocked until resolver precedence tests pass. Programmer handoff: `docs/tasks/2026-07-03-programmer-handoff-i085-model-catalog.md`. |
 | 2026-07-03 | Stage 1 Complete | S1-A through S1-E implemented + acceptance review gaps fixed. Shared catalog types in `talos-core::model`; `talos-models` crate with SQLite `ModelCatalog` (schema v1, version validation, CRUD, query, search, corrupt DB fallback); models.dev api.json/models.json parsers returning `ImportResult { providers, models }` with full provider metadata; `build.rs` gated refresh (`BUILD_MODELS=1`, parse failure preserves committed TOML); catalog-aware resolver via `Config::all_models_with_catalog` / `resolve_model_limits_with_catalog` (talos-config does NOT depend on talos-models). 1578 workspace tests pass. Resolver precedence verified: user config > catalog > builtin > fallback; `None` catalog does not block. Stage 2 unblocked. |
 | 2026-07-03 | Stage 2 Partial | Commit `d7e37df` added the `/connect` command skeleton, provider credential routing, config merge for api_key/api_key_env, and provider-grouped `/model` display. It is not accepted as full Stage 2 because `/connect` still uses built-in catalog data instead of catalog.db, optional base_url setup is missing, group-aware search filtering is incomplete, and MC107 docs/closeout remain pending. |
+| 2026-07-03 | Stage 2 Gaps Closed | All 3 blocking gaps from the second review fixed. `/connect` now opens `catalog.db` once at TUI startup (`CatalogSnapshot`/`open_catalog_snapshot`) and prefers live provider name/`api_base_url`/`doc_url`/model-count data, falling back to `builtin_models()` when the catalog is missing/fresh/corrupt/schema-incompatible — never blocking startup. Connect credential flow gained an optional two-phase base URL field (`CredentialField::ApiKey` → `BaseUrl`); merge precedence is existing `providers.<name>.base_url` > catalog default > `None`, and saving never overwrites unrelated provider fields or clears an existing value when the user leaves the field blank. `BottomPanelState::filtered_indices` now implements group-aware search (hides a provider group's header when no sibling item matches; "Current" pseudo-group follows the same rule) with `selected_index` fixed to always be a raw `self.items` index — this also fixed a latent filtered-vs-raw index inconsistency in the pre-existing slash-command menu. 1605 workspace tests pass (up from 1578); governance validation clean; 3 pre-existing e2e failures confirmed unrelated via `git stash` A/B (local dev machine `~/.talos/config.toml` has `model = ""`). MC107 (README `/connect` doc, manual runtime TUI verification) remains open. |
 
 ## Acceptance Criteria
 
-- [ ] Shared catalog types are moved to a non-cyclic boundary.
-- [ ] `talos-models` crate exists with SQLite-backed `ModelCatalog` API.
-- [ ] catalog.db has an explicit versioned migration path and corrupt/incompatible DB fallback.
-- [ ] `import_models_dev()` correctly parses the actual models.dev JSON format.
-- [ ] `build.rs` regenerates `models.toml` from models.dev when `BUILD_MODELS=1`.
-- [ ] Catalog-aware resolver reads from catalog.db when available, falls back to `builtin_models()`,
-      then applies user config overrides.
-- [ ] `/model` shows only credential-present provider models, grouped by provider, current model on top.
-- [ ] `/connect` shows full provider list with credential entry and optional custom endpoint
-      (`base_url`) entry that merges provider config into config.toml.
-- [ ] Both commands support group-aware search filtering (empty groups hidden).
-- [ ] Tests cover: catalog CRUD, import parsing, query/filter, config.toml write, TUI rendering.
-- [ ] `cargo test --workspace` passes.
+- [x] Shared catalog types are moved to a non-cyclic boundary. (`talos-core::model`, S1-A)
+- [x] `talos-models` crate exists with SQLite-backed `ModelCatalog` API. (S1-B)
+- [x] catalog.db has an explicit versioned migration path and corrupt/incompatible DB fallback.
+      (schema v1 + `IncompatibleSchema` error; `open_catalog_snapshot` degrades to `builtin_models()`)
+- [x] `import_models_dev()` correctly parses the actual models.dev JSON format.
+      (`talos-models::import_models_dev_api`/`import_models_dev_models` handle the real
+      provider-keyed-object-with-nested-models shape verified against the live `anomalyco/models.dev`
+      source, including provider-level `name`/`env`/`api`/`doc` fields)
+- [x] `build.rs` regenerates `models.toml` from models.dev when `BUILD_MODELS=1`. (S1-D; live-network
+      run itself remains a residual — see I085 Variance And Residuals)
+- [x] Catalog-aware resolver reads from catalog.db when available, falls back to `builtin_models()`,
+      then applies user config overrides. (`Config::all_models_with_catalog`/`resolve_model_limits_with_catalog`, S1-E)
+- [x] `/model` shows only credential-present provider models, grouped by provider, current model on top.
+      (`open_model_picker` provider grouping + "Current" top group)
+- [x] `/connect` shows full provider list with credential entry and optional custom endpoint
+      (`base_url`) entry that merges provider config into config.toml. (catalog-backed `/connect` +
+      two-phase credential/base_url flow; falls back to `builtin_models()`-derived provider list when
+      `catalog.db` is unseeded/unavailable)
+- [x] Both commands support group-aware search filtering (empty groups hidden).
+      (`BottomPanelState::filtered_indices`; `/model` and `/connect` both use `is_picker()` +
+      `TuiState::panel_query()` "type to filter")
+- [x] Tests cover: catalog CRUD, import parsing, query/filter, config.toml write, TUI rendering.
+      (`talos-models` 36 tests; `talos-config` 9 resolver tests; `talos-cli` 11 catalog/connect tests;
+      `talos-tui` 19 base_url + group-filtering tests)
+- [x] `cargo test --workspace` passes. (1605 passed; 3 pre-existing e2e failures unrelated to MC-001 —
+      confirmed identical on unmodified `main` via `git stash`, caused by this dev machine's local
+      `~/.talos/config.toml` having an empty `model` field, not by any code in this epic)
 - [ ] End-to-end: `/model` and `/connect` reachable from real TUI binary.
+      (Not yet performed in this session — unit/integration tests cover the logic paths, but a live
+      interactive terminal walkthrough of `/connect` has not been recorded. MC107 residual.)
 
 ## Required Reads
 

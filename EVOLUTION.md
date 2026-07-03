@@ -44,8 +44,62 @@ repeating known mistakes.
 | 32 | Governance | 共享数据集变更后必须重新验证, closeout 证据必须反映最终提交状态 | I046 |
 | 33 | Agent | Agent 收到新需求时不应立即中断当前任务, 通过 todo 工具捕获并规划执行节奏 | I045 |
 | 34 | Config | 静态目录数据必须对照上游实况核验；"格式看起来合理"的条目 ID 不是证据 | 2026-07-03 |
+| 35 | Testing | 触及 `Config::save()`/`$HOME` 的测试必须从第一次编写起就重定向 HOME，且必须用跨模块共享的单一 Mutex，不能各模块各建私有锁 | 2026-07-03 |
+| 36 | Config | `Config::load()` 不应做"可执行性"校验；否则损坏的磁盘配置会挡住向导/`config set` 自我修复路径 | 2026-07-03 |
 
 ## Lessons
+
+### 36. 2026-07-03 - `Config::load()` 混淆了"可解析"和"可执行"两层校验
+
+- Trigger: 修复 I085 Stage 2 gap-fix 引入的测试数据污染真实 `~/.talos/config.toml`
+  后，用户运行 `talos` 命中 "invalid configuration: 'model' is required" 硬崩溃，
+  质疑"没有 model 难道不该打开交互向导？"
+- Symptom: 三个模式入口（TUI/print/RPC）在 `Config::load()` 之后都各自写好了
+  `config.model.is_empty()` 的优雅处理（首次设置向导 / 友好提示），但只要磁盘上的
+  `config.toml` 文件存在且 `model` 为空，这些逻辑永远无法触达——`Config::load()`
+  内部无条件调用 `self.validate()?`，在返回给调用方之前就已经因为 model 为空而
+  `Err`。文件不存在时才会走 `Config::default()` 跳过校验，因此该缺陷只在"文件
+  存在但不完整"这一具体状态下才会现形。更严重的是，`talos config set` 修复命令
+  本身也先调用 `Config::load()`，所以用户一旦落入这个状态，连命令行都无法自救，
+  只能手动改文件或删除它。
+- Root cause: 把"这段 TOML 能否解析成 Config 结构体"（`load()` 的职责）和"这份
+  配置能否被用来跑一次真实会话"（`validate()` 的职责）合并成了一个不可分割的
+  调用链，而调用方的分级处理逻辑假设了前者一定成功。
+- Fix: `Config::load()` 不再调用 `self.validate()`；三个模式入口既有的
+  `needs_model_setup`/`needs_api_key` 检查保持不变、开始生效；`talos config set`
+  在应用编辑后仍显式调用 `.validate()` 作为保存前的把关点。
+- Prevention: 任何"加载/解析"函数如果被多个调用方在校验失败后要做不同的降级
+  处理，就不能在内部预先做硬性校验——校验应该留给真正需要"完整可用"保证的那个
+  调用点（这里是保存前）。新增了两个回归测试锁定这一行为边界。
+- Promoted to rule/check: `crates/talos-config/src/tests.rs`
+  (`test_load_existing_file_with_empty_model_succeeds`,
+  `test_load_then_set_model_recovers_from_empty_model_on_disk`).
+
+### 35. 2026-07-03 - HOME 隔离测试需要跨模块共享同一把锁，而不是各建私有锁
+
+- Trigger: 为 I085 Stage 2 `/connect` 新增的 `handle_connect_with_credential_*`
+  测试调用了会执行 `Config::save()` 的生产函数；最初没有做任何 HOME 隔离，直接
+  把测试固件数据写进了开发机真实的 `~/.talos/config.toml`，覆盖掉了用户的真实
+  配置（含一个看起来有效的真实 API key）。
+- Symptom: 补上"重定向 HOME 到临时目录 + 本模块私有 `Mutex`"的隔离方案后，单独
+  跑该测试文件没问题，但跑整个 `talos-cli` 二进制的完整测试集时，`init_wizard.rs`
+  里另一组同样会重定向 `HOME` 的既有测试开始随机失败，报的是 `PoisonError` 或
+  "config.model 不该为空"这类看似无关的断言失败。
+  该 crate 早已有 lesson #3（"环境变量测试必须用 Mutex 防止并行干扰"），但这次
+  的坑不是"忘了加锁"，而是"两处各自都加了锁，却是两把不同的锁"。
+- Root cause: `HOME` 是进程级全局状态，`cargo test` 默认在同一进程的多个线程里
+  并行跑测试。`init_wizard.rs` 的既有 `ENV_MUTEX` 和新增 `mode_runners.rs` 的
+  `HOME_MUTEX` 是两个完全独立的 `static Mutex` 实例——各自内部确实互斥，但两把
+  锁之间毫无关联，因此一个模块的测试线程可以在另一个模块的测试线程"以为自己
+  独占 HOME"期间把 `HOME` 改到别的临时目录，造成读写目标错位。
+- Fix: 新增 `crates/talos-cli/src/test_support.rs`，导出唯一一个
+  `pub(crate) static HOME_ENV_MUTEX`；`init_wizard.rs` 和 `mode_runners.rs`
+  的所有 HOME 重定向测试改为锁这一把共享实例。
+- Prevention: 任何测试如果要修改进程级全局状态（环境变量、当前目录等），必须
+  在整个二进制（而不是模块）范围内使用同一把锁；引入新的 HOME/env 变更测试前，
+  先搜索 crate 内是否已有类似锁，复用而不是新建。
+- Promoted to rule/check: `crates/talos-cli/src/test_support.rs` (doc comment
+  states the shared-mutex requirement explicitly for future test authors).
 
 ### 27. 2026-06-19 - 工具装饰器必须透传安全与来源元数据
 

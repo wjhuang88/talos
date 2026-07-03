@@ -362,7 +362,8 @@ mode.
 | `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
-| `/model` | Open the model picker to browse and switch models at runtime |
+| `/model` | Open the model picker to browse and switch models at runtime; models are grouped by provider with the current model in a top group, and typing filters by group |
+| `/connect` | Open the provider picker to connect a new provider (credential and optional custom endpoint/`base_url`), or a specific `/connect <provider>` to connect it directly |
 | `/todo`, `/todo list`, `/todo show <id>`, `/todo stats`, `/todo export [json|markdown]` | View or export active-session todos; user slash commands are read-only |
 | `/agile [status]` | Show read-only governance status: board disposition, open iterations, manifest, and Rust validation findings |
 
