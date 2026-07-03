@@ -1,6 +1,6 @@
 # Iteration I084: Experience Reliability — Thinking, Timeout, Retry, And Status
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-07-03
 > Planned objective: Execute the first UX reliability series: provider thinking compatibility,
 > first-packet and stream-idle timeout detection, retry/backoff, and clear TUI model-call status.
@@ -114,4 +114,13 @@
 
 ## Retrospective
 
-- Pending.
+- Completed as the release-facing UX reliability closeout for 2026-07-03.
+- The high-risk reasoning persistence decision was correctly forced through ADR-034 before code:
+  the initial transient-only design was rejected after provider-ground-truth review, and the final
+  implementation persisted structured, origin-gated reasoning blocks instead.
+- Timeout/retry/status work landed as a coherent user-facing slice rather than isolated provider
+  internals; this is the right shape for release readiness because users see bounded progress and
+  failure states.
+- Residuals are explicitly non-release-blocking follow-ups: richer thinking UI, age-based reasoning
+  compaction, gateway-specific replay overrides, Gemini native support, OpenAI Responses API, retry
+  attempt status events, and cumulative TUI usage plumbing.

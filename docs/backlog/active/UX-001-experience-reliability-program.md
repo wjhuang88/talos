@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | UX-001 |
 | Priority | P1 |
-| Status | Planned |
+| Status | Complete (I084, 2026-07-03) |
 | Origin | Maintainer feedback 2026-07-03 — thinking compatibility, long waits, timeout detection, and retry behavior directly affect daily experience |
 | Owns | MODEL-003, PROVIDER-002, TUI reliability status surfaces |
 

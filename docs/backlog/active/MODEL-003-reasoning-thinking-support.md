@@ -1,6 +1,6 @@
 # MODEL-003: Reasoning / Thinking Field Support
 
-**Status**: In Progress (UX100 ADR-034 accepted v3 2026-07-03; UX101-UX106 implementation pending)
+**Status**: Complete (I084/UX100-UX106, 2026-07-03)
 **Priority**: P1
 **Source**: MODEL-001 split (2026-06-20); original proposal `docs/proposals/reasoning-thinking-field.md` (2026-06-02)
 **Depends on**: MODEL-001 catalog (model metadata schema for reasoning capability flags); ADR gate
@@ -32,9 +32,9 @@ pipeline.
 
 Maintainer feedback elevated this story from P2 to P1 and grouped it under
 `UX-001: Experience Reliability Program`. The first implementation container is
-`I084: Experience Reliability`, with UX100-UX102 covering ADR, stream normalization, and request-side
-reasoning configuration. The previous ADR gate still stands; elevation changes sequencing, not the
-requirement to decide provider request schema and persistence boundaries before code.
+`I084: Experience Reliability`, with UX100-UX102 covering ADR, stream normalization, request-side
+reasoning configuration, structured persistence, and origin-gated replay. The previous ADR gate was
+resolved by ADR-034 v3 before implementation.
 
 ### ADR gate (RESOLVED — ADR-034 v3 accepted 2026-07-03)
 
@@ -100,7 +100,7 @@ per-model `limit` fields. Adding `options.thinking` follows the same pattern.
 - Once text content arrives, switches to showing text (answer phase).
 - Status bar: "Thinking..." → "Generating..." transition.
 
-### Implementation (post-ADR)
+### Implementation (I084 complete)
 
 - Request body construction per provider:
   - Anthropic `thinking: {type: "enabled", budget_tokens: N}`
@@ -112,7 +112,8 @@ per-model `limit` fields. Adding `options.thinking` follows the same pattern.
   - provider-marked hidden reasoning must not be exposed by default
 - Normalize provider chunks into Talos's transient thinking preview boundary.
 - Keep final assistant text separate from thinking preview text.
-- Decide whether any reasoning is persisted before changing JSONL/session schema.
+- Reasoning persistence follows ADR-034 v3: structured `AssistantReasoning` blocks are persisted
+  for provider replay, while display remains transient.
 - Usage/cost display in status bar and exit summary where provider metadata supports reasoning token
   accounting.
 

@@ -120,7 +120,12 @@ docs/iterations/
 | I081 | Frontline Month 2 — Extension And Distribution Discipline | **Planned (2026-07-02)** | Weeks 5-8 of the 2026-07-02 frontline plan: plugin diagnostics, hook listing, read-only plugin polish, local opt-in UX, asset distribution design, and closeout. See `I081-frontline-extension-distribution.md`. |
 | I082 | Frontline Month 3 — Document Ingestion And Parser Footprint | **Planned (2026-07-02)** | Weeks 9-12 of the 2026-07-02 frontline plan: document extraction, HTML/link extraction, link references, parser feature gates, and closeout. See `I082-frontline-ingestion-footprint.md`. |
 | I083 | Frontline Month 4 — Ecosystem Compatibility And Release Posture | **Planned (2026-07-02)** | Weeks 13-16 of the 2026-07-02 frontline plan: shared skills policy/implementation, REL-002 rehearsal evidence, docs sweep, release posture, closeout, and handoff. See `I083-frontline-ecosystem-release-posture.md`. |
-| I084 | Experience Reliability — Thinking, Timeout, Retry, And Status | **Planned (2026-07-03)** | Maintainer reprioritization: provider thinking compatibility, first-packet/idle timeout, retry/backoff, and clear TUI model-call states move ahead of plugin/distribution work unless explicitly restored. See `I084-experience-reliability.md`. |
+| I084 | Experience Reliability — Thinking, Timeout, Retry, And Status | **Complete (2026-07-03)** | UX100-UX106 complete: ADR-034 v3, structured reasoning persistence, Anthropic/OpenAI reasoning paths, timeout detection, retry/backoff, TUI status states. Evidence recorded: 1497 workspace tests, clippy, fmt, governance validation. See `I084-experience-reliability.md`. |
+| I085 | Model Catalog Modernization — talos-models, /model, /connect | **Planned (2026-07-03; post-release candidate)** | Catalog pipeline broken: import format mismatch, write-only cache, auth-gated picker. Needs talos-models SQLite crate, correct models.dev parsing, `/model` selection, `/connect` provider setup with optional endpoint, build.rs gated refresh. See `I085-model-catalog-modernization.md`. |
+| I086 | Experience Polish And Retry Visibility | **Planned (2026-07-03)** | Weeks 3-4 of the 2026-07-03 hardening plan: retry status events, thinking preview policy, validation, and residual closeout. See `I086-experience-polish-and-retry-visibility.md`. |
+| I087 | Site Install Distribution Entrypoints | **Planned (2026-07-03)** | Weeks 5-8 of the 2026-07-03 hardening plan: decide and validate `talos.hwj.zone` installer entrypoints before changing install docs. See `I087-site-install-distribution-entrypoints.md`. |
+| I088 | Extension And Ingestion Risk Bounding | **Planned (2026-07-03)** | Weeks 9-12 of the 2026-07-03 hardening plan: local plugin/hook diagnostics, asset policy, and bounded document/HTML extraction. See `I088-extension-ingestion-risk-bounding.md`. |
+| I089 | Ecosystem, Self-Bootstrap, And Closeout | **Planned (2026-07-03)** | Weeks 13-16 of the 2026-07-03 hardening plan: opt-in shared Skills decision, REL-002 rehearsal evidence, docs sweep, and handoff. See `I089-ecosystem-self-bootstrap-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -155,10 +160,15 @@ rewrite published iteration baselines.
 | I078 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I079 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I080 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I081 | Planned | Second monthly shell for the 2026-07-02 frontline development plan; wait for I080 closeout or explicit replan. |
-| I082 | Planned | Third monthly shell for the 2026-07-02 frontline development plan; wait for I081 closeout or explicit replan. |
-| I083 | Planned | Fourth monthly shell for the 2026-07-02 frontline development plan; wait for I082 closeout or explicit replan. |
-| I084 | Planned | UX reliability reprioritization from 2026-07-03 maintainer feedback; activate ahead of I081 unless maintainer explicitly restores the prior frontline order. |
+| I081 | Planned (superseded remainder) | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
+| I082 | Planned (superseded remainder) | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
+| I083 | Planned (superseded remainder) | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
+| I084 | Complete | UX100-UX106 complete and release-facing validation evidence recorded. Removed from non-terminal inventory after this release closeout. |
+| I085 | Planned | Model catalog modernization: talos-models crate, `/model` + `/connect`, models.dev fix, build.rs. Post-release candidate; activate only after release closeout or explicit replan. |
+| I086 | Planned | Experience polish and retry visibility follow-up from the 2026-07-03 hardening plan. |
+| I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
+| I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
+| I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |

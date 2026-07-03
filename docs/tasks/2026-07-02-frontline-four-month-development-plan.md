@@ -1,10 +1,12 @@
 # 2026-07-02 Frontline Four-Month Development Plan
 
-**Status**: Planned
+**Status**: Superseded for unexecuted remainder (2026-07-03)
 **Owner area**: Post-v0.2.1 delegated development for frontline engineers.
 **Created**: 2026-07-02
 **Timebox**: 16 weeks / roughly 4 months
 **Primary release marker**: Continue pre-1.0 hardening without claiming `REL-002` readiness.
+**Superseded by**: `docs/tasks/2026-07-03-four-month-product-hardening-plan.md` for work after
+I080/I084 reprioritization.
 **Supersedes**: No completed baseline. This plan starts after the completed
 `docs/tasks/2026-07-01-four-month-self-bootstrap-replan.md`.
 

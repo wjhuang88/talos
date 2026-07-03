@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | PROVIDER-002 |
 | Priority | P1 |
-| Status | Planned |
+| Status | Complete (I084/UX103-UX105, 2026-07-03) |
 | Origin | UX-001, maintainer feedback 2026-07-03 |
 | Relates To | UX-001, MODEL-003, PROVIDER-001, TUI-020 |
 
