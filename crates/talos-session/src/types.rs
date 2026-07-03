@@ -27,6 +27,10 @@ pub struct SessionMetadata {
     /// Working directory at the time of this entry.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<String>,
+
+    /// Provider-native reasoning blocks for request-history replay (ADR-034).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<talos_core::message::AssistantReasoning>,
 }
 
 impl SessionMetadata {
@@ -36,6 +40,7 @@ impl SessionMetadata {
             && self.model.is_none()
             && self.token_count.is_none()
             && self.working_directory.is_none()
+            && self.reasoning.is_none()
     }
 }
 

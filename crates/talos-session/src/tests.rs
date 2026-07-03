@@ -42,6 +42,7 @@ fn append_and_read_messages() {
     let msg2 = Message::Assistant {
         content: "Hi there!".into(),
         tool_calls: vec![],
+        reasoning: None,
     };
 
     session.append(&msg1).unwrap();
@@ -55,6 +56,7 @@ fn append_and_read_messages() {
         Message::Assistant {
             content: "Hi there!".into(),
             tool_calls: vec![],
+            reasoning: None,
         }
     );
 }
@@ -88,6 +90,7 @@ fn resume_history_excludes_transient_thinking_delta() {
         .append(&Message::Assistant {
             content: "Final answer".to_string(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 
@@ -98,6 +101,7 @@ fn resume_history_excludes_transient_thinking_delta() {
         vec![Message::Assistant {
             content: "Final answer".to_string(),
             tool_calls: vec![],
+            reasoning: None,
         }]
     );
 }
@@ -318,6 +322,7 @@ fn session_with_tool_calls() {
             name: "read_file".into(),
             input: serde_json::json!({"path": "src/main.rs"}),
         }],
+        reasoning: None,
     };
 
     session.append(&msg).unwrap();
@@ -328,6 +333,7 @@ fn session_with_tool_calls() {
         Message::Assistant {
             content,
             tool_calls,
+            ..
         } => {
             assert_eq!(content, "Let me check that file.");
             assert_eq!(tool_calls.len(), 1);
@@ -383,6 +389,7 @@ fn session_entry_with_parent_child_relationship() {
     let msg2 = Message::Assistant {
         content: "Hi".into(),
         tool_calls: vec![],
+        reasoning: None,
     };
 
     session.append(&msg1).unwrap();
@@ -412,6 +419,7 @@ fn fork_creates_new_branch_with_correct_parent_id() {
         .append(&Message::Assistant {
             content: "reply1".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
     session
@@ -475,6 +483,7 @@ fn resume_session_loads_existing_jsonl_file() {
         .append(&Message::Assistant {
             content: "Hi there".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 
@@ -595,6 +604,7 @@ fn session_metadata_serialization() {
         model: Some("claude-sonnet-4".into()),
         token_count: Some(1500),
         working_directory: Some("/home/user/project".into()),
+        reasoning: None,
     };
 
     let json = serde_json::to_string(&metadata).unwrap();
@@ -619,6 +629,7 @@ fn session_entry_serialization() {
             model: Some("claude".into()),
             token_count: None,
             working_directory: None,
+            reasoning: None,
         },
     };
 
@@ -708,6 +719,7 @@ fn list_sessions_scans_directory_correctly() {
     s2.append(&Message::Assistant {
         content: "Reply in beta".into(),
         tool_calls: vec![],
+        reasoning: None,
     })
     .unwrap();
 
@@ -744,6 +756,7 @@ fn fork_from_specific_entry_includes_correct_history() {
         .append(&Message::Assistant {
             content: "reply1".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
     session
@@ -755,6 +768,7 @@ fn fork_from_specific_entry_includes_correct_history() {
         .append(&Message::Assistant {
             content: "reply2".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 
@@ -805,6 +819,7 @@ fn forked_session_branch_has_correct_root_id() {
         .append(&Message::Assistant {
             content: "child".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 
@@ -958,6 +973,7 @@ fn arch_s6_fork_file_receives_subsequent_appends() {
         .append(&Message::Assistant {
             content: "after fork".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .expect("append should write to fork file");
 
@@ -983,6 +999,7 @@ fn make_session_with_two_entries() -> Session {
         .append(&Message::Assistant {
             content: "second".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
     session
@@ -1002,6 +1019,7 @@ fn fork_durable_history_clone_source_bytes_unchanged() {
         .append(&Message::Assistant {
             content: "world".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 
@@ -1205,6 +1223,7 @@ fn reconcile_index_repairs_stale_entries() {
         .append(&Message::Assistant {
             content: "hi".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 
@@ -1238,6 +1257,7 @@ fn snapshot_bytes_returns_file_contents() {
         .append(&Message::Assistant {
             content: "second".into(),
             tool_calls: vec![],
+            reasoning: None,
         })
         .unwrap();
 

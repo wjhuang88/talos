@@ -14,15 +14,24 @@ impl Session {
     pub fn append_with_metadata(
         &self,
         message: &Message,
-        metadata: SessionMetadata,
+        mut metadata: SessionMetadata,
     ) -> Result<(), SessionError> {
         let (role, content) = message_parts(message);
+        if let Message::Assistant {
+            reasoning: Some(r), ..
+        } = message
+        {
+            metadata.reasoning = Some(r.clone());
+        }
         let entry = self.build_entry(&role, &content, metadata)?;
         self.append_entry_locked(&entry)
     }
 
     pub fn append_event(&self, event: &AgentEvent) -> Result<(), SessionError> {
-        if matches!(event, AgentEvent::ThinkingDelta { .. }) {
+        if matches!(
+            event,
+            AgentEvent::ThinkingDelta { .. } | AgentEvent::ReasoningComplete { .. }
+        ) {
             return Ok(());
         }
         let content =
@@ -118,6 +127,7 @@ impl Session {
                     Message::Assistant {
                         content: cleaned,
                         tool_calls,
+                        reasoning: entry.metadata.reasoning,
                     }
                     .into()
                 }
@@ -289,6 +299,7 @@ fn message_parts(message: &Message) -> (String, String) {
         Message::Assistant {
             content,
             tool_calls,
+            ..
         } => {
             if tool_calls.is_empty() {
                 return ("assistant".to_string(), content.clone());

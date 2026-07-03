@@ -559,6 +559,7 @@ mod tests {
             .append(&Message::Assistant {
                 content: "You can use SQLite with FTS5 extension. It provides efficient full-text indexing.".into(),
                 tool_calls: vec![],
+                reasoning: None,
             })
             .unwrap();
         session
@@ -570,6 +571,7 @@ mod tests {
             .append(&Message::Assistant {
                 content: "FTS5 uses BM25 ranking by default. Lower scores indicate more relevant matches.".into(),
                 tool_calls: vec![],
+                reasoning: None,
             })
             .unwrap();
         session
@@ -833,6 +835,7 @@ mod tests {
             .append(&Message::Assistant {
                 content: "Reply to initial message".into(),
                 tool_calls: vec![],
+                reasoning: None,
             })
             .unwrap();
         index.index_session(&session).unwrap();
