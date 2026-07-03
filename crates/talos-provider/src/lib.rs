@@ -22,9 +22,11 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{Value, json};
+use talos_config::ReasoningOptions;
 use talos_core::message::ToolCall;
 use talos_core::message::{
-    AgentEvent, Message, StopReason, SystemCacheMarker, SystemCacheType, Usage,
+    AgentEvent, AssistantReasoning, Message, ReasoningBlock, StopReason, SystemCacheMarker,
+    SystemCacheType, Usage,
 };
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::ToolProvenance;
@@ -45,6 +47,8 @@ pub struct AnthropicProvider {
     model: String,
     base_url: String,
     client: Client,
+    reasoning: Option<ReasoningOptions>,
+    output_limit: Option<u32>,
 }
 
 impl AnthropicProvider {
@@ -60,6 +64,8 @@ impl AnthropicProvider {
             model: model.into(),
             base_url: ANTHROPIC_API_URL.into(),
             client: Client::new(),
+            reasoning: None,
+            output_limit: None,
         }
     }
 
@@ -69,8 +75,25 @@ impl AnthropicProvider {
         self
     }
 
+    /// Set per-model reasoning and output token configuration.
+    pub fn with_reasoning(
+        mut self,
+        reasoning: Option<ReasoningOptions>,
+        output_limit: Option<u32>,
+    ) -> Self {
+        self.reasoning = reasoning;
+        self.output_limit = output_limit;
+        self
+    }
+
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(&self.model, messages, &[]);
+        let body = build_request_body(
+            &self.model,
+            messages,
+            &[],
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
         self.send_request(&body).await
     }
 
@@ -79,7 +102,13 @@ impl AnthropicProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(&self.model, messages, tools);
+        let body = build_request_body(
+            &self.model,
+            messages,
+            tools,
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
         self.send_request(&body).await
     }
 
@@ -158,7 +187,13 @@ impl LanguageModel for AnthropicProvider {
     }
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {
-        let body = build_request_body(&self.model, messages, &[]);
+        let body = build_request_body(
+            &self.model,
+            messages,
+            &[],
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
         Some(json!({
             "method": "POST",
             "url": &self.base_url,
@@ -187,11 +222,18 @@ pub fn anthropic_request_debug_snapshot(
             "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         },
-        "body": build_request_body(model, messages, &[]),
+        "body": build_request_body(model, messages, &[], None, None),
     })
 }
 
-fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition]) -> Value {
+fn build_request_body(
+    model: &str,
+    messages: &[Message],
+    tools: &[ToolDefinition],
+    reasoning: Option<&ReasoningOptions>,
+    output_limit: Option<u32>,
+) -> Value {
+    let max_tokens = output_limit.unwrap_or(4096);
     let mut system_blocks = Vec::new();
     for msg in messages {
         if let Message::System {
@@ -218,9 +260,38 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
             Message::Assistant {
                 content,
                 tool_calls,
-                ..
+                reasoning,
             } => {
                 let mut blocks = Vec::new();
+
+                if let Some(AssistantReasoning {
+                    provider,
+                    model: reasoning_model,
+                    blocks: reasoning_blocks,
+                }) = reasoning
+                    && provider == "anthropic"
+                    && reasoning_model == model
+                {
+                    for block in reasoning_blocks {
+                        match block {
+                            ReasoningBlock::Thinking { text, signature } => {
+                                blocks.push(json!({
+                                    "type": "thinking",
+                                    "thinking": text,
+                                    "signature": signature,
+                                }));
+                            }
+                            ReasoningBlock::Redacted { data } => {
+                                blocks.push(json!({
+                                    "type": "redacted_thinking",
+                                    "data": data,
+                                }));
+                            }
+                            ReasoningBlock::Plain { .. } => {}
+                        }
+                    }
+                }
+
                 if !content.is_empty() {
                     blocks.push(json!({
                         "type": "text",
@@ -261,9 +332,48 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
     let mut body = json!({
         "model": model,
         "messages": anthropic_messages,
-        "max_tokens": 4096,
+        "max_tokens": max_tokens,
         "stream": true,
     });
+
+    if let Some(reasoning) = reasoning {
+        let mut budget_tokens = reasoning
+            .budget_tokens
+            .unwrap_or_else(|| max_tokens.saturating_mul(80) / 100);
+        if budget_tokens >= max_tokens {
+            budget_tokens = max_tokens.saturating_sub(1);
+        }
+
+        let mut include_thinking_param = true;
+        if let Some(Message::Assistant {
+            tool_calls,
+            reasoning,
+            ..
+        }) = messages.last()
+            && !tool_calls.is_empty()
+        {
+            let has_reasoning_blocks = reasoning.as_ref().is_some_and(|assistant_reasoning| {
+                assistant_reasoning.provider == "anthropic"
+                    && assistant_reasoning.model == model
+                    && !assistant_reasoning.blocks.is_empty()
+            });
+
+            if !has_reasoning_blocks {
+                include_thinking_param = false;
+                tracing::warn!(
+                    "anthropic: omitting thinking parameter for trailing tool_use assistant message without replayable reasoning blocks"
+                );
+            }
+        }
+
+        if include_thinking_param {
+            body["thinking"] = json!({
+                "type": "enabled",
+                "budget_tokens": budget_tokens,
+            });
+            body["temperature"] = json!(1);
+        }
+    }
 
     if !tools.is_empty() {
         let tools_json: Vec<Value> = tools
@@ -384,6 +494,11 @@ struct ToolUseBlock {
     input_json: String,
 }
 
+struct ThinkingBlockState {
+    text: String,
+    signature: String,
+}
+
 async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEvent>) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
@@ -391,11 +506,14 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut buffer = String::new();
     let mut input_tokens: u32 = 0;
     let mut output_tokens: u32 = 0;
+    let mut reasoning_tokens: u32 = 0;
     let mut cache_read_tokens: u32 = 0;
     let mut cache_write_tokens: u32 = 0;
     let mut text_accumulator = String::new();
     let mut tool_use_blocks: std::collections::HashMap<u32, ToolUseBlock> =
         std::collections::HashMap::new();
+    let mut current_thinking: Option<ThinkingBlockState> = None;
+    let mut reasoning_blocks: Vec<ReasoningBlock> = Vec::new();
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
@@ -428,29 +546,43 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                     }
                 }
                 Some("content_block_start") => {
-                    if let Some(block) = data.get("content_block")
-                        && block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
-                    {
-                        let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
-                        let id = block
-                            .get("id")
-                            .and_then(|i| i.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        let name = block
-                            .get("name")
-                            .and_then(|n| n.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        tool_use_blocks.insert(
-                            index,
-                            ToolUseBlock {
-                                id,
-                                name: name.clone(),
-                                input_json: String::new(),
-                            },
-                        );
-                        let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
+                    if let Some(block) = data.get("content_block") {
+                        let block_type = block.get("type").and_then(|t| t.as_str());
+                        if block_type == Some("tool_use") {
+                            let index =
+                                data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
+                            let id = block
+                                .get("id")
+                                .and_then(|i| i.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let name = block
+                                .get("name")
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            tool_use_blocks.insert(
+                                index,
+                                ToolUseBlock {
+                                    id,
+                                    name: name.clone(),
+                                    input_json: String::new(),
+                                },
+                            );
+                            let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
+                        } else if block_type == Some("thinking") {
+                            current_thinking = Some(ThinkingBlockState {
+                                text: String::new(),
+                                signature: String::new(),
+                            });
+                        } else if block_type == Some("redacted_thinking") {
+                            let data = block
+                                .get("data")
+                                .and_then(|d| d.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            reasoning_blocks.push(ReasoningBlock::Redacted { data });
+                        }
                     }
                 }
                 Some("content_block_delta") => {
@@ -472,6 +604,29 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             block.input_json.push_str(json_str);
                         }
                     }
+                    if let Some(delta) = data.get("delta") {
+                        if delta.get("type").and_then(|t| t.as_str()) == Some("thinking_delta") {
+                            if let Some(thinking_text) =
+                                delta.get("thinking").and_then(|t| t.as_str())
+                            {
+                                if let Some(current) = current_thinking.as_mut() {
+                                    current.text.push_str(thinking_text);
+                                }
+                                let _ = tx
+                                    .send(AgentEvent::ThinkingDelta {
+                                        delta: thinking_text.to_string(),
+                                    })
+                                    .await;
+                            }
+                        } else if delta.get("type").and_then(|t| t.as_str())
+                            == Some("signature_delta")
+                            && let Some(signature_text) =
+                                delta.get("signature").and_then(|s| s.as_str())
+                            && let Some(current) = current_thinking.as_mut()
+                        {
+                            current.signature.push_str(signature_text);
+                        }
+                    }
                 }
                 Some("content_block_stop") => {
                     let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
@@ -490,12 +645,31 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             })
                             .await;
                     }
+                    if let Some(thinking) = current_thinking.take() {
+                        let signature = if thinking.signature.is_empty() {
+                            None
+                        } else {
+                            Some(thinking.signature)
+                        };
+                        reasoning_blocks.push(ReasoningBlock::Thinking {
+                            text: thinking.text,
+                            signature,
+                        });
+                    }
                 }
                 Some("message_delta") => {
                     if let Some(usage) = extract_usage_from_message_delta(&data) {
                         output_tokens = usage.output_tokens;
+                        reasoning_tokens = usage.reasoning_tokens;
                     }
                     if let Some(stop_reason) = extract_stop_reason(&data) {
+                        if !reasoning_blocks.is_empty() {
+                            let _ = tx
+                                .send(AgentEvent::ReasoningComplete {
+                                    blocks: std::mem::take(&mut reasoning_blocks),
+                                })
+                                .await;
+                        }
                         let tool_calls = parse_text_tool_calls(&text_accumulator);
                         for call in tool_calls {
                             let _ = tx
@@ -514,7 +688,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                     output_tokens,
                                     cache_read_tokens,
                                     cache_write_tokens,
-                                    reasoning_tokens: 0,
+                                    reasoning_tokens,
                                 },
                             })
                             .await;
@@ -535,6 +709,14 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
         }
     }
 
+    if !reasoning_blocks.is_empty() {
+        let _ = tx
+            .send(AgentEvent::ReasoningComplete {
+                blocks: std::mem::take(&mut reasoning_blocks),
+            })
+            .await;
+    }
+
     let _ = tx
         .send(AgentEvent::TurnEnd {
             stop_reason: StopReason::EndTurn,
@@ -543,7 +725,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 output_tokens,
                 cache_read_tokens,
                 cache_write_tokens,
-                reasoning_tokens: 0,
+                reasoning_tokens,
             },
         })
         .await;
@@ -703,7 +885,11 @@ fn extract_usage_from_message_delta(data: &Value) -> Option<Usage> {
             .unwrap_or(0) as u32,
         cache_read_tokens: 0,
         cache_write_tokens: 0,
-        reasoning_tokens: 0,
+        reasoning_tokens: usage
+            .get("output_tokens_details")
+            .and_then(|details| details.get("thinking_tokens"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32,
     })
 }
 
@@ -743,12 +929,16 @@ fn exponential_backoff(attempt: u32) -> Duration {
 mod tests {
     use super::*;
 
+    fn sse_event(event_type: &str, data: &Value) -> String {
+        format!("event: {event_type}\ndata: {}\n\n", data)
+    }
+
     #[test]
     fn build_request_body_user_only() {
         let messages = vec![Message::User {
             content: "Hello".into(),
         }];
-        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
 
         assert_eq!(body["model"], "claude-sonnet-4-20250514");
         assert_eq!(body["max_tokens"], 4096);
@@ -773,7 +963,7 @@ mod tests {
                 reasoning: None,
             },
         ];
-        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
 
         assert_eq!(body["messages"][1]["role"], "assistant");
         let blocks = body["messages"][1]["content"].as_array().unwrap();
@@ -799,7 +989,7 @@ mod tests {
             },
         ];
 
-        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
 
         assert_eq!(body["messages"].as_array().unwrap().len(), 1);
         assert_eq!(body["messages"][0]["role"], "user");
@@ -848,5 +1038,252 @@ mod tests {
         assert_eq!(d0, Duration::from_millis(500));
         assert_eq!(d1, Duration::from_millis(1000));
         assert_eq!(d2, Duration::from_millis(2000));
+    }
+
+    #[tokio::test]
+    async fn test_anthropic_thinking_delta_parsing() {
+        let mut server = mockito::Server::new_async().await;
+        let signature = "sig:abc+/=\n==";
+        let body = format!(
+            "{}{}{}{}{}{}",
+            sse_event(
+                "message_start",
+                &json!({
+                    "message": {
+                        "usage": {
+                            "input_tokens": 3,
+                            "output_tokens": 0,
+                            "cache_read_input_tokens": 0,
+                            "cache_creation_input_tokens": 0
+                        }
+                    }
+                })
+            ),
+            sse_event(
+                "content_block_start",
+                &json!({
+                    "index": 0,
+                    "content_block": { "type": "thinking" }
+                })
+            ),
+            sse_event(
+                "content_block_delta",
+                &json!({
+                    "index": 0,
+                    "delta": { "type": "thinking_delta", "thinking": "step-1 " }
+                })
+            ),
+            sse_event(
+                "content_block_delta",
+                &json!({
+                    "index": 0,
+                    "delta": { "type": "signature_delta", "signature": signature }
+                })
+            ),
+            sse_event("content_block_stop", &json!({ "index": 0 })),
+            sse_event(
+                "message_delta",
+                &json!({
+                    "delta": { "stop_reason": "end_turn" },
+                    "usage": {
+                        "output_tokens": 4,
+                        "output_tokens_details": { "thinking_tokens": 2 }
+                    }
+                })
+            )
+        );
+
+        let _mock = server
+            .mock("GET", "/thinking")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(body)
+            .create_async()
+            .await;
+
+        let response = reqwest::get(format!("{}/thinking", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(32);
+        parse_sse_stream(response, tx).await;
+
+        let mut thinking_deltas = Vec::new();
+        let mut reasoning_complete = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ThinkingDelta { delta } => thinking_deltas.push(delta),
+                AgentEvent::ReasoningComplete { blocks } => reasoning_complete = Some(blocks),
+                _ => {}
+            }
+        }
+
+        assert_eq!(thinking_deltas, vec!["step-1 ".to_string()]);
+        let blocks = reasoning_complete.expect("missing reasoning complete event");
+        assert_eq!(blocks.len(), 1);
+        match &blocks[0] {
+            ReasoningBlock::Thinking { text, signature: s } => {
+                assert_eq!(text, "step-1 ");
+                assert_eq!(s.as_deref(), Some(signature));
+            }
+            other => panic!("expected thinking block, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_anthropic_redacted_thinking_capture() {
+        let mut server = mockito::Server::new_async().await;
+        let redacted_data = "eyJyZWRhY3RlZCI6dHJ1ZSwic2lnIjoiKysvPSJ9";
+        let body = format!(
+            "{}{}{}{}",
+            sse_event(
+                "message_start",
+                &json!({
+                    "message": {
+                        "usage": {
+                            "input_tokens": 1,
+                            "output_tokens": 0,
+                            "cache_read_input_tokens": 0,
+                            "cache_creation_input_tokens": 0
+                        }
+                    }
+                })
+            ),
+            sse_event(
+                "content_block_start",
+                &json!({
+                    "index": 0,
+                    "content_block": {
+                        "type": "redacted_thinking",
+                        "data": redacted_data
+                    }
+                })
+            ),
+            sse_event("content_block_stop", &json!({ "index": 0 })),
+            sse_event(
+                "message_delta",
+                &json!({
+                    "delta": { "stop_reason": "end_turn" },
+                    "usage": { "output_tokens": 1 }
+                })
+            )
+        );
+
+        let _mock = server
+            .mock("GET", "/redacted")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(body)
+            .create_async()
+            .await;
+
+        let response = reqwest::get(format!("{}/redacted", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(32);
+        parse_sse_stream(response, tx).await;
+
+        let mut reasoning_complete = None;
+        while let Some(event) = rx.recv().await {
+            if let AgentEvent::ReasoningComplete { blocks } = event {
+                reasoning_complete = Some(blocks);
+            }
+        }
+
+        let blocks = reasoning_complete.expect("missing reasoning complete event");
+        assert_eq!(blocks.len(), 1);
+        match &blocks[0] {
+            ReasoningBlock::Redacted { data } => assert_eq!(data, redacted_data),
+            other => panic!("expected redacted block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_anthropic_reasoning_replay() {
+        let signature = "sig-byte-identical+/=";
+        let messages = vec![
+            Message::User {
+                content: "use tool".into(),
+            },
+            Message::Assistant {
+                content: "done".into(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: json!({"command": "ls"}),
+                }],
+                reasoning: Some(AssistantReasoning {
+                    provider: "anthropic".into(),
+                    model: "claude-sonnet-4-20250514".into(),
+                    blocks: vec![
+                        ReasoningBlock::Thinking {
+                            text: "reason-step".into(),
+                            signature: Some(signature.into()),
+                        },
+                        ReasoningBlock::Redacted {
+                            data: "opaque-data".into(),
+                        },
+                    ],
+                }),
+            },
+        ];
+
+        let body = build_request_body(
+            "claude-sonnet-4-20250514",
+            &messages,
+            &[],
+            Some(&ReasoningOptions {
+                effort: None,
+                budget_tokens: Some(1000),
+                replay: true,
+            }),
+            Some(4096),
+        );
+
+        let blocks = body["messages"][1]["content"].as_array().unwrap();
+        assert_eq!(blocks[0]["type"], "thinking");
+        assert_eq!(blocks[0]["thinking"], "reason-step");
+        assert_eq!(blocks[0]["signature"], signature);
+        assert_eq!(blocks[1]["type"], "redacted_thinking");
+        assert_eq!(blocks[1]["data"], "opaque-data");
+        assert_eq!(blocks[2]["type"], "text");
+        assert_eq!(blocks[3]["type"], "tool_use");
+    }
+
+    #[test]
+    fn test_anthropic_degradation_guardrail() {
+        let messages = vec![Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![ToolCall {
+                id: "call_1".into(),
+                name: "bash".into(),
+                input: json!({"command": "pwd"}),
+            }],
+            reasoning: None,
+        }];
+
+        let body = build_request_body(
+            "claude-sonnet-4-20250514",
+            &messages,
+            &[],
+            Some(&ReasoningOptions {
+                effort: None,
+                budget_tokens: Some(200),
+                replay: true,
+            }),
+            Some(1024),
+        );
+
+        assert!(body.get("thinking").is_none());
+        assert!(body.get("temperature").is_none());
+    }
+
+    #[test]
+    fn test_anthropic_max_tokens_from_config() {
+        let messages = vec![Message::User {
+            content: "Hello".into(),
+        }];
+
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, Some(8192));
+        assert_eq!(body["max_tokens"], 8192);
     }
 }

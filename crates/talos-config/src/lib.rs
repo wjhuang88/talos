@@ -22,7 +22,7 @@ pub use error::ConfigError;
 pub use types::{
     Config, DashboardConfig, HookConfig, LogConfig, LogFileConfig, LogFormat, LogRotation,
     McpConfig, McpServerConfig, MemoryPromptConfig, ModelConfig, ProviderConfig, ProviderProtocol,
-    RpcConfig, SkillConfig,
+    ReasoningEffort, ReasoningOptions, RpcConfig, SkillConfig,
 };
 
 pub(crate) use builtin::builtin_provider_config;
