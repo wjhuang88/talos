@@ -3,13 +3,15 @@
 //! Contains the model picker data construction and the shared session rebuild
 //! logic used when switching models at runtime.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
-use talos_config::Config;
+use talos_config::{Config, builtin_provider_config};
 use talos_conversation::{ModelPickerData, ModelPickerItem};
 use talos_core::message::Message;
+use talos_core::model::ProviderSource;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
 use talos_session::{Session, SessionManager};
@@ -36,23 +38,54 @@ pub(crate) struct CatalogSnapshot {
 
 /// Opens the catalog database and takes a snapshot, if available.
 ///
-/// Returns `None` when the database does not exist yet, is corrupt, has an
-/// incompatible schema version, or has not been seeded with any providers
-/// (a fresh, never-populated `catalog.db`) — callers must degrade to
-/// `builtin_models()` in every one of these cases. This is a read-only startup
-/// probe: it must not create `catalog.db` as a side effect. Never blocks startup
-/// or panics: all failure modes route through `Result::ok()`.
+/// When the database does not exist yet, this creates it and seeds it from the
+/// compiled-in `models.toml` dataset so a fresh installation has a durable
+/// catalog without a manual initialization step. Existing corrupt or
+/// incompatible databases are not overwritten; callers degrade to
+/// `builtin_models()` in those cases. Never blocks startup or panics: all
+/// failure modes route through `Result::ok()`.
 pub(crate) fn open_catalog_snapshot(catalog_path: &std::path::Path) -> Option<CatalogSnapshot> {
-    if !catalog_path.is_file() {
+    let existed = catalog_path.is_file();
+    let catalog = talos_models::ModelCatalog::open(catalog_path).ok()?;
+    if !existed && seed_catalog_from_builtin(&catalog).is_err() {
         return None;
     }
-    let catalog = talos_models::ModelCatalog::open(catalog_path).ok()?;
     let providers = catalog.all_providers().ok()?;
     if providers.is_empty() {
         return None;
     }
     let models = catalog.all_models().ok()?;
     Some(CatalogSnapshot { providers, models })
+}
+
+fn seed_catalog_from_builtin(
+    catalog: &talos_models::ModelCatalog,
+) -> Result<(), talos_models::CatalogError> {
+    let models = talos_config::model::builtin_models();
+    let providers = builtin_providers_for_models(&models);
+    catalog.seed(&providers, &models, "builtin")
+}
+
+fn builtin_providers_for_models(
+    models: &[talos_config::model::ModelMetadata],
+) -> Vec<talos_models::ProviderInfo> {
+    let mut ids = BTreeSet::new();
+    for model in models {
+        ids.insert(model.provider.clone());
+    }
+    ids.into_iter()
+        .map(|id| {
+            let builtin = builtin_provider_config(&id);
+            talos_models::ProviderInfo {
+                id: id.clone(),
+                name: id,
+                api_base_url: builtin.as_ref().and_then(|p| p.base_url.clone()),
+                env_var: builtin.and_then(|p| p.api_key_env),
+                doc_url: None,
+                source: ProviderSource::Builtin,
+            }
+        })
+        .collect()
 }
 
 /// Constructs [`ModelPickerData`] from the given [`Config`].

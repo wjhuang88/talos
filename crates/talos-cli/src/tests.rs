@@ -7,7 +7,9 @@ mod tests {
     use crate::registry;
     use crate::skill_runtime::discover_runtime_skills;
     use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
-    use crate::{config_get_dotted, config_set_dotted, is_secret_key, mask_secrets};
+    use crate::{
+        config_get_dotted, config_set_dotted, is_secret_key, mask_secrets, run_import_models,
+    };
     use talos_conversation::{ConversationEngine, ModelInfo, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
 
@@ -17,6 +19,61 @@ mod tests {
         std::sync::Arc::new(tokio::sync::Mutex::new(
             discover_runtime_skills(dir.path(), false).unwrap(),
         ))
+    }
+
+    #[test]
+    fn import_models_creates_and_seeds_catalog_db() {
+        let _lock = crate::test_support::HOME_ENV_MUTEX.lock().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let original_home = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", dir.path()) };
+
+        let json_path = dir.path().join("api.json");
+        std::fs::write(
+            &json_path,
+            r#"{
+              "acme": {
+                "name": "Acme AI",
+                "env": ["ACME_API_KEY"],
+                "api": "https://api.acme.example/v1",
+                "doc": "https://docs.acme.example",
+                "models": {
+                  "acme-large": {
+                    "limit": { "context": 128000, "output": 8192 },
+                    "cost": { "input": 1.25, "output": 5.0 },
+                    "tool_call": true
+                  }
+                }
+              }
+            }"#,
+        )
+        .unwrap();
+
+        let result = run_import_models(&json_path);
+
+        match original_home {
+            Some(value) => unsafe { std::env::set_var("HOME", value) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+
+        result.unwrap();
+        let catalog_path = dir.path().join(".talos").join("catalog.db");
+        assert!(catalog_path.is_file());
+        let catalog = talos_models::ModelCatalog::open(&catalog_path).unwrap();
+        assert_eq!(catalog.provider_count().unwrap(), 1);
+        assert_eq!(catalog.model_count().unwrap(), 1);
+
+        let providers = catalog.all_providers().unwrap();
+        assert_eq!(providers[0].id, "acme");
+        assert_eq!(providers[0].name, "Acme AI");
+        assert_eq!(
+            providers[0].api_base_url.as_deref(),
+            Some("https://api.acme.example/v1")
+        );
+
+        let models = catalog.all_models().unwrap();
+        assert_eq!(models[0].provider, "acme");
+        assert_eq!(models[0].id, "acme-large");
     }
 
     #[test]

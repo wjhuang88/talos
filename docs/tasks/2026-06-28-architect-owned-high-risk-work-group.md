@@ -19,10 +19,9 @@ This group does not replace the owning backlog files, iterations, ADRs, or the e
 high-risk governance gate. It is the direct-oversight view of the work that should not be delegated
 as routine product development.
 
-Current handling: high-risk implementation is paused while delegated low-risk public-site and user
-documentation work proceeds through
-`docs/tasks/2026-06-29-delegable-product-site-docs-two-month-plan.md`. Resume this group only after
-explicit maintainer direction.
+Current handling: explicit maintainer direction on 2026-07-04 resumed direct senior-agent planning
+through `docs/tasks/2026-07-04-architect-owned-four-month-high-risk-execution.md`. This group
+remains the selection baseline; execution state and checkpoints live in that new task record.
 
 ## Selection Rules
 

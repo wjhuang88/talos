@@ -2134,14 +2134,14 @@ mod connect_tests {
     }
 
     #[test]
-    fn open_catalog_snapshot_missing_file_returns_none() {
+    fn open_catalog_snapshot_missing_file_creates_seeded_catalog() {
         let dir = tempfile::tempdir().expect("tempdir");
         let missing = dir.path().join("does-not-exist").join("catalog.db");
-        assert!(crate::model_lifecycle::open_catalog_snapshot(&missing).is_none());
-        assert!(
-            !missing.exists(),
-            "read-only snapshot probing must not create catalog.db"
-        );
+        let snapshot = crate::model_lifecycle::open_catalog_snapshot(&missing)
+            .expect("missing catalog should be implicitly created and seeded");
+        assert!(missing.exists());
+        assert!(!snapshot.providers.is_empty());
+        assert!(!snapshot.models.is_empty());
     }
 
     #[test]

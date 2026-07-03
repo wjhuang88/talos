@@ -322,6 +322,15 @@ completes the selected command into the composer. `Backspace` edits the filter a
 menu without clearing the composer. Use `/help` to list the commands available in the current
 session.
 
+Use `/model` to switch among models whose providers are already configured. The picker shows only
+usable models, grouped by provider, with the active model pinned in a `Current` group. Use
+`/connect` to add or update provider credentials. `/connect` shows provider setup choices from the
+local model catalog, asks for an API key, then offers an optional custom endpoint (`base_url`) for
+gateway-compatible providers. A fresh install does not need a manual catalog initialization step:
+Talos creates `~/.talos/catalog.db` on first catalog access and seeds it from the packaged offline
+`models.toml`. `talos --import-models <path>` refreshes that catalog from a models.dev JSON file
+when you want newer provider metadata.
+
 ## Built-In Capabilities
 
 Talos ships with built-in tools for common coding-agent work:
