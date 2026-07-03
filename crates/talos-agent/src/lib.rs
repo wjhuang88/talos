@@ -32,7 +32,9 @@ pub mod prompt;
 pub mod session;
 mod tool_execution;
 
-use talos_core::message::{AgentEvent, Message, MessageToolResult, ToolCall};
+use talos_core::message::{
+    AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, ToolCall,
+};
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolPresentationPolicy, ToolProvenance, ToolRegistry};
 use talos_permission::PermissionEngine;
@@ -173,6 +175,12 @@ pub struct Agent {
     memory_provider: Option<Arc<MemoryProviderCallback>>,
     /// Optional provider callback for injecting bounded active session todos.
     todo_section_provider: Option<Arc<TodoSectionProviderCallback>>,
+    /// Config provider key for reasoning origin stamping and replay gating.
+    provider_key: Option<String>,
+    /// Model id for reasoning origin stamping and replay gating.
+    model_id: Option<String>,
+    /// Whether to replay reasoning in request history (ADR-034 replay policy).
+    replay_reasoning: bool,
     /// When true, bash tool output exceeding the line threshold is compressed
     /// before entering model context. Default: false.
     bash_compression_enabled: bool,
@@ -379,6 +387,32 @@ impl Agent {
                 }
             };
 
+            let filtered_provider_messages;
+            let provider_messages = if self.replay_reasoning {
+                provider_messages
+            } else {
+                filtered_provider_messages = provider_messages
+                    .iter()
+                    .map(|message| {
+                        if let Message::Assistant {
+                            content,
+                            tool_calls,
+                            reasoning: Some(_),
+                        } = message
+                        {
+                            Message::Assistant {
+                                content: content.clone(),
+                                tool_calls: tool_calls.clone(),
+                                reasoning: None,
+                            }
+                        } else {
+                            message.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                filtered_provider_messages.as_slice()
+            };
+
             let mut rx = match self
                 .provider
                 .stream_with_tools(provider_messages, &active_tool_definitions)
@@ -398,6 +432,7 @@ impl Agent {
 
             let mut turn_tool_calls: Vec<PendingToolCall> = Vec::new();
             let mut turn_text = String::new();
+            let mut turn_reasoning_blocks: Option<Vec<ReasoningBlock>> = None;
             let mut saw_turn_end = false;
             let mut usage = talos_core::message::Usage::default();
 
@@ -481,6 +516,9 @@ impl Agent {
                             TurnStatus::UnexpectedEvent,
                         );
                     }
+                    AgentEvent::ReasoningComplete { blocks } => {
+                        turn_reasoning_blocks = Some(blocks);
+                    }
                     AgentEvent::TurnStart | AgentEvent::ToolResult { .. } => {}
                     _ => {}
                 }
@@ -506,10 +544,17 @@ impl Agent {
             }
 
             if turn_tool_calls.is_empty() {
+                let reasoning = turn_reasoning_blocks
+                    .take()
+                    .map(|blocks| AssistantReasoning {
+                        provider: self.provider_key.clone().unwrap_or_default(),
+                        model: self.model_id.clone().unwrap_or_default(),
+                        blocks,
+                    });
                 messages.push(Message::Assistant {
                     content: talos_core::message::strip_tool_syntax(&turn_text),
                     tool_calls: vec![],
-                    reasoning: None,
+                    reasoning,
                 });
                 let persisted = messages[persist_start..].to_vec();
                 break (Ok((turn_text, persisted)), TurnStatus::Success);
@@ -594,10 +639,17 @@ impl Agent {
             }
 
             let cleaned_turn_text = talos_core::message::strip_tool_syntax(&turn_text);
+            let reasoning = turn_reasoning_blocks
+                .take()
+                .map(|blocks| AssistantReasoning {
+                    provider: self.provider_key.clone().unwrap_or_default(),
+                    model: self.model_id.clone().unwrap_or_default(),
+                    blocks,
+                });
             let assistant_msg = Message::Assistant {
                 content: cleaned_turn_text,
                 tool_calls: effective_tool_calls.clone(),
-                reasoning: None,
+                reasoning,
             };
             messages.push(assistant_msg);
 

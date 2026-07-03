@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use talos_core::message::{AgentEvent, Message, MessageToolResult, StopReason, ToolCall, Usage};
+use talos_core::message::{
+    AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, StopReason,
+    ToolCall, Usage,
+};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::{
     AgentTool, ToolBackend, ToolContinuation, ToolFamily, ToolNature, ToolPermissionFacet,
@@ -575,6 +578,168 @@ async fn test_run_streaming_keeps_thinking_out_of_final_history() {
             .iter()
             .any(|event| matches!(event, AgentEvent::ThinkingDelta { .. }))
     );
+}
+
+#[tokio::test]
+async fn test_replay_reasoning_false_strips_reasoning_for_provider_messages_only() {
+    struct MessageCapturingModel {
+        responses: Arc<Mutex<Vec<Vec<AgentEvent>>>>,
+        captured_messages: Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+    }
+
+    #[async_trait]
+    impl LanguageModel for MessageCapturingModel {
+        async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let (tx, rx) = mpsc::channel(64);
+            let responses = self.responses.clone();
+            tokio::spawn(async move {
+                let mut responses = responses.lock().await;
+                let events = responses.pop_front().unwrap_or_default();
+                for event in events {
+                    tx.send(event).await.expect("receiver dropped");
+                }
+            });
+            Ok(rx)
+        }
+
+        async fn stream_with_tools(
+            &self,
+            messages: &[Message],
+            _tools: &[ToolDefinition],
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            self.captured_messages
+                .lock()
+                .expect("lock poisoned")
+                .push(messages.to_vec());
+            self.stream(messages).await
+        }
+    }
+
+    let responses = vec![vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta { delta: "ok".into() },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ]];
+    let captured_messages = Arc::new(std::sync::Mutex::new(Vec::<Vec<Message>>::new()));
+    let model = MessageCapturingModel {
+        responses: Arc::new(Mutex::new(responses)),
+        captured_messages: captured_messages.clone(),
+    };
+
+    let history = vec![Message::Assistant {
+        content: "prior answer".into(),
+        tool_calls: vec![],
+        reasoning: Some(AssistantReasoning {
+            provider: "anthropic".into(),
+            model: "claude-sonnet-4-5".into(),
+            blocks: vec![ReasoningBlock::Plain {
+                text: "private chain-of-thought".into(),
+            }],
+        }),
+    }];
+    let history_for_run = history.clone();
+
+    let agent = Agent::with_security(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    )
+    .with_reasoning_identity(None, None, false);
+
+    let (tx, _rx) = mpsc::unbounded_channel::<AgentEvent>();
+    let _ = agent
+        .run_streaming("continue".into(), history_for_run, tx)
+        .await
+        .unwrap();
+
+    let captured = captured_messages.lock().expect("lock poisoned");
+    let first_call_messages = &captured[0];
+    let prior_message = first_call_messages
+        .iter()
+        .find(|message| {
+            matches!(
+                message,
+                Message::Assistant {
+                    content,
+                    reasoning: _,
+                    ..
+                } if content == "prior answer"
+            )
+        })
+        .expect("prior assistant message should be forwarded");
+    assert!(matches!(
+        prior_message,
+        Message::Assistant {
+            reasoning: None,
+            ..
+        }
+    ));
+
+    assert!(matches!(
+        &history[0],
+        Message::Assistant {
+            reasoning: Some(_),
+            ..
+        }
+    ));
+}
+
+#[tokio::test]
+async fn test_reasoning_complete_blocks_stamped_with_identity_on_assistant_message() {
+    let reasoning_blocks = vec![ReasoningBlock::Plain {
+        text: "reasoning payload".into(),
+    }];
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::ReasoningComplete {
+            blocks: reasoning_blocks.clone(),
+        },
+        AgentEvent::TextDelta {
+            delta: "Final answer".into(),
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ];
+
+    let agent = Agent::with_security(
+        Arc::new(MockModel::new(vec![events])),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    )
+    .with_reasoning_identity(
+        Some("anthropic".to_string()),
+        Some("claude-sonnet-4-5".to_string()),
+        true,
+    );
+
+    let (tx, _rx) = mpsc::unbounded_channel::<AgentEvent>();
+    let (_response, new_messages) = agent.run_streaming("Hi".into(), vec![], tx).await.unwrap();
+
+    let assistant = new_messages
+        .iter()
+        .find(|message| matches!(message, Message::Assistant { .. }))
+        .expect("assistant message should be persisted");
+
+    assert!(matches!(
+        assistant,
+        Message::Assistant {
+            content,
+            reasoning: Some(AssistantReasoning { provider, model, blocks }),
+            ..
+        } if content == "Final answer"
+            && provider == "anthropic"
+            && model == "claude-sonnet-4-5"
+            && blocks == &reasoning_blocks
+    ));
 }
 
 #[tokio::test]

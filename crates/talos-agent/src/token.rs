@@ -54,6 +54,7 @@ pub struct ModelPricing {
 ///     output_tokens: 50,
 ///     cache_read_tokens: 80,
 ///     cache_write_tokens: 20,
+///     reasoning_tokens: 0,
 /// });
 ///
 /// // Get cumulative usage

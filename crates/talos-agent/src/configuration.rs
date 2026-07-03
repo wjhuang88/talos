@@ -53,6 +53,9 @@ impl Agent {
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
             todo_section_provider: None,
+            provider_key: None,
+            model_id: None,
+            replay_reasoning: true,
             bash_compression_enabled: false,
         }
     }
@@ -121,8 +124,25 @@ impl Agent {
             cached_stable_prefix: std::sync::Mutex::new(None),
             memory_provider: None,
             todo_section_provider: None,
+            provider_key: None,
+            model_id: None,
+            replay_reasoning: true,
             bash_compression_enabled: false,
         }
+    }
+
+    /// Configures reasoning origin identity and replay behavior (ADR-034).
+    #[must_use]
+    pub fn with_reasoning_identity(
+        mut self,
+        provider_key: Option<String>,
+        model_id: Option<String>,
+        replay: bool,
+    ) -> Self {
+        self.provider_key = provider_key;
+        self.model_id = model_id;
+        self.replay_reasoning = replay;
+        self
     }
 
     /// Sets a memory provider callback for injecting memory into the system prompt.
