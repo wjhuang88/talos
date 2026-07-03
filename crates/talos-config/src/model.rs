@@ -141,26 +141,108 @@ struct ModelDataset {
 
 /// Import model data from models.dev JSON format.
 ///
-/// Accepts the `models.json` array format from models.dev and maps fields:
-/// - `context_length` → `context_limit`
-/// - `max_tokens` → `output_limit`
-/// - `pricing.input` → `pricing.input_per_1m`
-/// - `pricing.output` → `pricing.output_per_1m`
-/// - `pricing.cache_read` → `pricing.cache_read_per_1m`
-/// - `capabilities.*` → `capabilities.*`
+/// Handles the canonical models.dev format: a JSON object keyed by `"provider/model-id"`,
+/// where each value contains fields like `name`, `reasoning`, `tool_call`, `limit.context`,
+/// `limit.output`, `attachment`, etc.
+///
+/// Also accepts the legacy array format (`[{id, provider, ...}]`) for backward compatibility.
 ///
 /// # Errors
 ///
 /// Returns [`ModelError::ImportError`] if the JSON is invalid or cannot be parsed.
 pub fn import_models_dev(json: &str) -> Result<Vec<ModelMetadata>, ModelError> {
-    // Try parsing as the canonical models.dev format first.
-    let raw: Vec<serde_json::Value> =
-        serde_json::from_str(json).map_err(|e| ModelError::ImportError(e.to_string()))?;
-
     let now = chrono_utc();
-    let mut models = Vec::with_capacity(raw.len());
 
-    for value in raw {
+    if let Ok(map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(json) {
+        return import_models_dev_object(&map, &now);
+    }
+
+    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(json) {
+        return import_models_dev_array(&arr, &now);
+    }
+
+    Err(ModelError::ImportError(
+        "expected JSON object (models.dev canonical) or array (legacy)".to_string(),
+    ))
+}
+
+fn import_models_dev_object(
+    map: &serde_json::Map<String, serde_json::Value>,
+    now: &str,
+) -> Result<Vec<ModelMetadata>, ModelError> {
+    let mut models = Vec::with_capacity(map.len());
+
+    for (full_id, value) in map {
+        let obj = value.as_object().ok_or_else(|| {
+            ModelError::ImportError(format!("entry '{full_id}' is not an object"))
+        })?;
+
+        let (provider, model_id) = full_id.split_once('/').unwrap_or(("unknown", full_id));
+
+        let limit = obj.get("limit");
+        let context_limit = limit
+            .and_then(|l| l.get("context"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+        let output_limit = limit
+            .and_then(|l| l.get("output"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32);
+
+        let pricing = obj.get("pricing").map(|p| ModelPricing {
+            input_per_1m: p.get("input").and_then(|v| v.as_f64()),
+            output_per_1m: p.get("output").and_then(|v| v.as_f64()),
+            cache_read_per_1m: p.get("cache_read").and_then(|v| v.as_f64()),
+        });
+
+        let capabilities = ModelCapabilities {
+            tools: obj
+                .get("tool_call")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            structured_output: obj
+                .get("structured_output")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            reasoning: obj
+                .get("reasoning")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            image_input: obj
+                .get("attachment")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+        };
+
+        let release_date = obj
+            .get("release_date")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        models.push(ModelMetadata {
+            id: model_id.to_string(),
+            provider: provider.to_string(),
+            context_limit,
+            output_limit,
+            pricing,
+            capabilities,
+            release_date,
+            source: ModelSource::ModelsDev {
+                refreshed_at: now.to_string(),
+            },
+        });
+    }
+
+    Ok(models)
+}
+
+fn import_models_dev_array(
+    arr: &[serde_json::Value],
+    now: &str,
+) -> Result<Vec<ModelMetadata>, ModelError> {
+    let mut models = Vec::with_capacity(arr.len());
+
+    for value in arr {
         let obj = value
             .as_object()
             .ok_or_else(|| ModelError::ImportError("expected array of objects".to_string()))?;
@@ -238,7 +320,7 @@ pub fn import_models_dev(json: &str) -> Result<Vec<ModelMetadata>, ModelError> {
             capabilities,
             release_date,
             source: ModelSource::ModelsDev {
-                refreshed_at: now.clone(),
+                refreshed_at: now.to_string(),
             },
         });
     }
