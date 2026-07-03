@@ -24,14 +24,14 @@
 | F105 | GOV-003 | Planned | CMD-001 | Read-only `/agile status` |
 | F106 | GOV-003/WEB-001 | Planned/In Progress | F105/ADR-031 | Read-only dashboard governance route/page |
 | F107 | Frontline plan | Planned | F100-F106 | Month-1 closeout |
-| F108 | WEB-001 | Planned | ADR-031 | Opt-in `[dashboard] loopback_only` config (default false keeps token auth) |
+| F108 | WEB-001 | Planned | ADR-031 | `[dashboard] loopback_only` config (default true; false restores token auth) |
 
 ### Scope
 
 - Add or harden user-facing config commands without changing config persistence semantics.
 - Keep secret masking and `${ENV_VAR}` substitution intact.
 - Add read-only governance status surfaces.
-- Keep dashboard changes loopback-only and token-gated.
+- Keep dashboard changes loopback-only; token auth is opt-in via `[dashboard] loopback_only = false`.
 - Add command-line style composer cursor shortcuts without changing popup or approval priority.
 
 ### Non-Goals

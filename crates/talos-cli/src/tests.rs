@@ -831,6 +831,44 @@ api_key_env = "ANTHROPIC_API_KEY"
     }
 
     #[test]
+    fn config_get_dashboard_values() {
+        let config = talos_config::Config::default();
+        assert_eq!(
+            config_get_dotted(&config, "dashboard.enabled").unwrap(),
+            "true"
+        );
+        assert_eq!(
+            config_get_dotted(&config, "dashboard.loopback_only").unwrap(),
+            "true"
+        );
+    }
+
+    #[test]
+    fn config_set_dashboard_values() {
+        let mut config = talos_config::Config::default();
+        config_set_dotted(&mut config, "dashboard.enabled", "false").unwrap();
+        config_set_dotted(&mut config, "dashboard.loopback_only", "false").unwrap();
+
+        assert!(!config.dashboard.enabled);
+        assert!(!config.dashboard.loopback_only);
+        assert_eq!(
+            config_get_dotted(&config, "dashboard.enabled").unwrap(),
+            "false"
+        );
+        assert_eq!(
+            config_get_dotted(&config, "dashboard.loopback_only").unwrap(),
+            "false"
+        );
+    }
+
+    #[test]
+    fn config_set_dashboard_bool_rejects_invalid_value() {
+        let mut config = talos_config::Config::default();
+        let err = config_set_dotted(&mut config, "dashboard.loopback_only", "maybe").unwrap_err();
+        assert!(err.to_string().contains("invalid boolean"));
+    }
+
+    #[test]
     fn config_flag_and_subcommand_equivalence() {
         let config = talos_config::Config {
             provider: "anthropic".to_string(),

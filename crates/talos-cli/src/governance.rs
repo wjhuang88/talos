@@ -190,40 +190,22 @@ fn is_open_iteration_state(state: &str) -> bool {
 }
 
 fn print_validation_status(workspace: &Path) {
-    let script = workspace
-        .join("scripts")
-        .join("validate_project_governance.sh");
-    if !script.exists() {
-        return;
-    }
-
+    let report = talos_conversation::collect_governance_validation(workspace);
     println!("Validation");
     println!("-----------");
-    let output = std::process::Command::new("bash")
-        .arg(&script)
-        .arg(".")
-        .current_dir(workspace)
-        .output();
-
-    match output {
-        Ok(out) => {
-            let combined = format!(
-                "{}{}",
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            );
-            if out.status.success() {
-                println!("  Status: PASS");
-            } else {
-                println!("  Status: FAIL");
-            }
-            for line in combined.lines() {
-                if line.contains("warning") || line.contains("passed") || line.contains("error") {
-                    println!("  {line}");
-                }
-            }
-        }
-        Err(e) => println!("  Unable to run validation: {e}"),
+    if report.errors == 0 {
+        println!("  Status: PASS ({} warning(s))", report.warnings);
+    } else {
+        println!(
+            "  Status: FAIL ({} error(s), {} warning(s))",
+            report.errors, report.warnings
+        );
+    }
+    for finding in report.findings.iter().take(12) {
+        println!("  {finding}");
+    }
+    if report.findings.len() > 12 {
+        println!("  ... {} more finding(s)", report.findings.len() - 12);
     }
     println!();
 }
@@ -299,6 +281,29 @@ mod tests {
         print_manifest(dir.path());
         print_board_disposition(dir.path());
         print_iteration_summary(dir.path());
+    }
+
+    #[test]
+    fn validation_status_does_not_execute_workspace_script() {
+        let dir = tempdir().unwrap();
+        let gov_dir = dir.path().join(".agent-governance");
+        fs::create_dir_all(&gov_dir).unwrap();
+        fs::write(
+            gov_dir.join("manifest.yaml"),
+            "profile: \"small\"\nstatus: \"conformant\"\n",
+        )
+        .unwrap();
+        let script_dir = dir.path().join("scripts");
+        fs::create_dir_all(&script_dir).unwrap();
+        fs::write(
+            script_dir.join("validate_project_governance.sh"),
+            "#!/usr/bin/env bash\ntouch executed-marker\n",
+        )
+        .unwrap();
+
+        print_validation_status(dir.path());
+
+        assert!(!dir.path().join("executed-marker").exists());
     }
 
     #[test]

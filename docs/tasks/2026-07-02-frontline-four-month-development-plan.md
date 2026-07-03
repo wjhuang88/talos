@@ -108,7 +108,7 @@ acceptance criteria, ADRs, or iteration records.
 | F104 | 3 | I080 | C | TUI composer command-line navigation shortcuts: `Ctrl+A` line start and `Ctrl+E` line end. | TUI-021/TUI-009 | TUI keyboard tests | Planned |
 | F105 | 3 | I080 | A | GOV-003 `/agile status` read-only command backed by board/backlog/iteration parsing. | GOV-003/CMD-001 | CLI/TUI command tests | Planned |
 | F106 | 4 | I080 | A | Dashboard governance read-only page or JSON route for board/backlog/validation status. | WEB-001/GOV-003/F105 | dashboard route tests; redaction tests | Planned |
-| F108 | 4 | I080 | A | Opt-in `[dashboard] loopback_only` config (default false keeps token auth; when true, bind loopback only and skip token gate). | WEB-001/ADR-031 | config tests; dashboard route tests | Planned |
+| F108 | 4 | I080 | A | `[dashboard] loopback_only` config (default true per maintainer direction; false restores token auth). | WEB-001/ADR-031 | config tests; dashboard route tests | Planned |
 | F107 | 4 | I080 | F | Month-1 closeout: config/governance/input evidence and residuals. | F100-F108 | `cargo test --workspace`; governance | Planned |
 | F110 | 5 | I081 | B | Plugin package diagnostics: list configured local packages, manifests, capabilities, and validation errors. | PLUGIN-001/CMD-002 | plugin manifest tests; `/plugins` tests | Planned |
 | F111 | 5 | I081 | C | `/hooks` builtin-hook listing and config-introduced hook diagnostics without executable carriers. | HOOK-001/CMD-002 | command registry tests; hook diagnostics tests | Planned |

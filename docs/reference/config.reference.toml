@@ -40,8 +40,9 @@ model = "claude-sonnet-4-20250514"
 # ── Loopback Dashboard ────────────────────────────────────────────────────────
 # [dashboard]
 # enabled = true                        # start read-only 127.0.0.1 dashboard in TUI mode
-# Set enabled = false to disable the local dashboard. Startup prints the URL and
-# per-process bearer token; the token is not persisted in this config file.
+# loopback_only = true                  # true: no token, rely on 127.0.0.1 bind only
+# Set enabled = false to disable the local dashboard. Set loopback_only = false
+# to require a per-process bearer token; the token is not persisted in this file.
 
 # ── Provider Definitions ──────────────────────────────────────────────────────
 # Each [providers.<name>] section defines a named provider.

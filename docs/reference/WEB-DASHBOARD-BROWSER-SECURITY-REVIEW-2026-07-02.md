@@ -9,8 +9,9 @@
 
 This review keeps the existing product boundary:
 
-- dashboard remains loopback-only, token-authenticated, read-only, and default-on only in TUI mode
-  with `[dashboard] enabled = false` opt-out per the 2026-07-02 ADR-031 amendment;
+- dashboard remains loopback-only, read-only, and default-on only in TUI mode with
+  `[dashboard] enabled = false` opt-out per the 2026-07-02 ADR-031 amendment; bearer-token
+  authentication is opt-in via `[dashboard] loopback_only = false`;
 - browser-page support remains mock/record-only, with no real connector, cookies, storage, DOM,
   screenshot, profile path, click, fill, upload, download, or automation support;
 - `fetch_url` remains the unified model-facing web/page ingestion entry.

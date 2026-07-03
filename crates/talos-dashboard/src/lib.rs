@@ -48,15 +48,14 @@ pub struct DashboardServer {
 
 impl DashboardServer {
     pub fn new(snapshot: DashboardSnapshot) -> Self {
-        Self::with_loopback_only(snapshot, false)
+        Self::with_loopback_only(snapshot, true)
     }
 
     /// Create a dashboard server with explicit loopback-only control.
     ///
     /// When `loopback_only` is `true`, the bearer token middleware is skipped
     /// and the server relies on the `127.0.0.1` bind as the only access
-    /// control. Callers should set this to `true` only when the user has
-    /// explicitly opted in via `[dashboard] loopback_only = true` in config.
+    /// control. Set this to `false` to require a per-process bearer token.
     pub fn with_loopback_only(snapshot: DashboardSnapshot, loopback_only: bool) -> Self {
         Self {
             state: AppState {
@@ -324,7 +323,7 @@ mod tests {
     }
 
     fn build_test_app() -> (Router, String) {
-        let server = DashboardServer::new(test_snapshot());
+        let server = DashboardServer::with_loopback_only(test_snapshot(), false);
         let token = server.token().to_string();
         (server.build_router(), token)
     }
@@ -469,7 +468,7 @@ mod tests {
             ]),
             governance: "refresh_token=abc status=ok".to_string(),
         };
-        let server = DashboardServer::new(snapshot);
+        let server = DashboardServer::with_loopback_only(snapshot, false);
         let token = server.token().to_string();
         let app = server.build_router();
 
@@ -500,8 +499,8 @@ mod tests {
 
     #[test]
     fn token_is_crypto_random_per_instance() {
-        let s1 = DashboardServer::new(test_snapshot());
-        let s2 = DashboardServer::new(test_snapshot());
+        let s1 = DashboardServer::with_loopback_only(test_snapshot(), false);
+        let s2 = DashboardServer::with_loopback_only(test_snapshot(), false);
         assert_ne!(s1.token(), s2.token());
         assert_eq!(s1.token().len(), 32);
     }
@@ -553,5 +552,14 @@ mod tests {
         let (app, _token) = build_test_app();
         let (status, _) = request(&app, Method::GET, "/status", None).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn default_server_is_loopback_only() {
+        let server = DashboardServer::new(test_snapshot());
+        let app = server.build_router();
+        let (status, body) = request(&app, Method::GET, "/status", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("test-model"));
     }
 }

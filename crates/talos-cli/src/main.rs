@@ -629,6 +629,8 @@ pub(crate) fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
             .and_then(|m| m.output_limit)
             .map(|v| v.to_string())
             .ok_or_else(|| anyhow::anyhow!("not found")),
+        ["dashboard", "enabled"] => Ok(config.dashboard.enabled.to_string()),
+        ["dashboard", "loopback_only"] => Ok(config.dashboard.loopback_only.to_string()),
         _ => anyhow::bail!("unsupported config key: '{key}'"),
     }
 }
@@ -721,7 +723,23 @@ pub(crate) fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> 
                 .output_limit = Some(limit);
             Ok(())
         }
+        ["dashboard", "enabled"] => {
+            config.dashboard.enabled = parse_config_bool(value, key)?;
+            Ok(())
+        }
+        ["dashboard", "loopback_only"] => {
+            config.dashboard.loopback_only = parse_config_bool(value, key)?;
+            Ok(())
+        }
         _ => anyhow::bail!("unsupported config key for set: '{key}'"),
+    }
+}
+
+fn parse_config_bool(value: &str, key: &str) -> Result<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        _ => anyhow::bail!("invalid boolean for '{key}': expected true or false"),
     }
 }
 

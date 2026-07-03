@@ -27,6 +27,7 @@ pub use command_registry::{
     always_available, command_registry,
 };
 pub use engine::ConversationEngine;
+pub use governance_summary::{GovernanceValidationReport, collect_governance_validation};
 pub use types::{
     ChatMessage, CopyScope, CredentialRequestData, CredentialResponseData, McpServerDiagnostic,
     MessageRole, MessageSource, MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem,
