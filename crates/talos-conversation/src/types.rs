@@ -264,6 +264,9 @@ pub struct CredentialRequestData {
     pub provider: String,
     pub model_id: Option<String>,
     pub connect_mode: bool,
+    /// Catalog/builtin base URL suggested as the default endpoint.
+    /// Used when the user leaves the base URL field blank in `/connect`.
+    pub default_base_url: Option<String>,
 }
 
 /// User-entered credential returned from the TUI credential input panel.
@@ -276,6 +279,10 @@ pub struct CredentialResponseData {
     pub api_key: String,
     pub model_id: Option<String>,
     pub connect_mode: bool,
+    /// Resolved base URL: user-entered value, falling back to the request's
+    /// `default_base_url` when the user left the field blank. `None` means
+    /// no base URL should be written (use the provider adapter's default).
+    pub base_url: Option<String>,
 }
 
 impl std::fmt::Debug for CredentialResponseData {
@@ -285,6 +292,7 @@ impl std::fmt::Debug for CredentialResponseData {
             .field("api_key", &"***")
             .field("model_id", &self.model_id)
             .field("connect_mode", &self.connect_mode)
+            .field("base_url", &self.base_url)
             .finish()
     }
 }
