@@ -93,7 +93,8 @@
 
 ## Verification Evidence
 
-- Planned.
+- UX100 complete: ADR-034 v3 accepted (2026-07-03) after architecture review. Cross-project research recorded in REFERENCE-PROJECTS.md §20. Owner docs (MODEL-003 ADR gate, UX-001 acceptance criterion) synced.
+- UX101-UX106: Planned.
 
 ## Variance And Residuals
 
