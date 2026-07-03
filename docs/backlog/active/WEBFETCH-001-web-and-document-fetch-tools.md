@@ -24,6 +24,12 @@ and permission-boundary implementation before adding more code. The first I090 d
 WEBFETCH Phase 2+ is already satisfied for local text/HTML/JSON/CSV/Markdown/XML resources or
 whether a bounded implementation gap remains.
 
+I090 A3/A4 closed the first local bounded extraction slice on 2026-07-04. `document_extract`
+supports bounded text, Markdown, HTML, JSON, JSONL, CSV, TSV, and XML output. PDF, Office, image,
+archive, binary, and unknown inputs are explicitly classified as unsupported and return metadata
+without dumping bytes. Rich PDF/Office/OCR/browser extraction remains out of scope and still needs
+a later ADR/dependency gate.
+
 ## Priority
 
 P2 research/planning for Phase 2+. Next phases: HTML extraction, link ranking, markdown conversion,
@@ -357,6 +363,19 @@ incrementally.
 - [ ] webclaw is recorded as reference/optional external integration, not a direct embed candidate.
 - [ ] MarkItDown-like functionality is phased by format; no Python runtime dependency is added.
 - [ ] RES-001 can use these tools without requiring unattended crawling or hosted services.
+
+### I090 Local Document Extraction Slice (delivered 2026-07-04)
+
+- [x] `document_extract` is read-only and remains separate from network fetch and write-capable
+      save/download tools.
+- [x] Supported local formats are bounded and deterministic: text, Markdown, HTML, JSON, JSONL,
+      CSV, TSV, and XML.
+- [x] Unsupported PDF, Office, image, archive, binary, and unknown inputs return metadata-only
+      unsupported output.
+- [x] Regression tests prove PDF, image, and Office-like bytes are not dumped into model-facing
+      output.
+- [x] No PDF parser, Office parser, OCR, browser automation, crawler behavior, Python runtime, or
+      heavy native conversion dependency was added.
 
 ## Non-Goals
 

@@ -65,6 +65,10 @@ enum DetectedFormat {
     JsonLines,
     Csv,
     Xml,
+    Pdf,
+    Office,
+    Image,
+    Archive,
     Binary,
     Unknown,
 }
@@ -79,6 +83,10 @@ impl DetectedFormat {
             DetectedFormat::JsonLines => "jsonl",
             DetectedFormat::Csv => "csv",
             DetectedFormat::Xml => "xml",
+            DetectedFormat::Pdf => "pdf",
+            DetectedFormat::Office => "office",
+            DetectedFormat::Image => "image",
+            DetectedFormat::Archive => "archive",
             DetectedFormat::Binary => "binary",
             DetectedFormat::Unknown => "unknown",
         }
@@ -96,6 +104,14 @@ fn extension_to_format(ext: &str) -> Option<DetectedFormat> {
         "jsonl" | "ndjson" => Some(DetectedFormat::JsonLines),
         "csv" | "tsv" | "tab" => Some(DetectedFormat::Csv),
         "xml" => Some(DetectedFormat::Xml),
+        "pdf" => Some(DetectedFormat::Pdf),
+        "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "odt" | "ods" | "odp" => {
+            Some(DetectedFormat::Office)
+        }
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "tif" | "tiff" | "heic" => {
+            Some(DetectedFormat::Image)
+        }
+        "zip" | "tar" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "rar" => Some(DetectedFormat::Archive),
         _ => None,
     }
 }
@@ -109,9 +125,35 @@ fn parse_format_hint(hint: &str) -> Option<DetectedFormat> {
         "jsonl" | "ndjson" | "json-lines" => Some(DetectedFormat::JsonLines),
         "csv" | "tsv" => Some(DetectedFormat::Csv),
         "xml" => Some(DetectedFormat::Xml),
+        "pdf" => Some(DetectedFormat::Pdf),
+        "office" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" => Some(DetectedFormat::Office),
+        "image" | "png" | "jpg" | "jpeg" | "gif" | "webp" => Some(DetectedFormat::Image),
+        "archive" | "zip" => Some(DetectedFormat::Archive),
         "auto" | "" => None,
         _ => Some(DetectedFormat::Unknown),
     }
+}
+
+fn sniff_unsupported_binary(bytes: &[u8]) -> Option<DetectedFormat> {
+    if bytes.starts_with(b"%PDF-") {
+        return Some(DetectedFormat::Pdf);
+    }
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+        || bytes.starts_with(b"\xff\xd8\xff")
+        || bytes.starts_with(b"GIF87a")
+        || bytes.starts_with(b"GIF89a")
+        || (bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP")
+    {
+        return Some(DetectedFormat::Image);
+    }
+    if bytes.starts_with(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") {
+        return Some(DetectedFormat::Office);
+    }
+    if bytes.starts_with(b"PK\x03\x04") || bytes.starts_with(b"PK\x05\x06") {
+        return Some(DetectedFormat::Archive);
+    }
+
+    None
 }
 
 fn looks_like_html(bytes: &[u8]) -> bool {
@@ -137,6 +179,10 @@ fn detect_format(path: &Path, hint: Option<&str>, first_bytes: &[u8]) -> Detecte
     if let Some(ext) = path.extension().and_then(|e| e.to_str())
         && let Some(fmt) = extension_to_format(ext)
     {
+        return fmt;
+    }
+
+    if let Some(fmt) = sniff_unsupported_binary(first_bytes) {
         return fmt;
     }
 
@@ -419,7 +465,12 @@ impl DocumentExtractTool {
             DetectedFormat::JsonLines => extract_jsonl(&content_str, max_bytes),
             DetectedFormat::Csv => extract_csv(&content_str, max_bytes),
             DetectedFormat::Xml => extract_xml(&content_str, max_bytes),
-            DetectedFormat::Binary | DetectedFormat::Unknown => {
+            DetectedFormat::Pdf
+            | DetectedFormat::Office
+            | DetectedFormat::Image
+            | DetectedFormat::Archive
+            | DetectedFormat::Binary
+            | DetectedFormat::Unknown => {
                 return Ok(format_metadata_only(
                     &extract_input.path,
                     file_size,
@@ -545,6 +596,12 @@ mod tests {
         path
     }
 
+    fn create_temp_bytes_with_ext(bytes: &[u8], ext: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("test_{}.{}", unique_id(), ext));
+        std::fs::write(&path, bytes).unwrap();
+        path
+    }
+
     fn run_extract(path: &Path, format_hint: Option<&str>, max_bytes: Option<usize>) -> String {
         let tool = DocumentExtractTool::new(PathBuf::from("/"));
         let input = if let Some(mb) = max_bytes {
@@ -637,6 +694,45 @@ mod tests {
         assert!(output.contains("binary"));
         assert!(output.contains("unsupported"));
         assert!(output.contains("read"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_extract_pdf_returns_metadata_without_dumping_bytes() {
+        let path = create_temp_bytes_with_ext(
+            b"%PDF-1.7\nSECRET PDF BODY SHOULD NOT BE EXTRACTED\n%%EOF",
+            "pdf",
+        );
+        let output = run_extract(&path, None, None);
+        assert!(output.contains("Format: pdf (unsupported)"));
+        assert!(output.contains("Unsupported format for text extraction"));
+        assert!(!output.contains("SECRET PDF BODY"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_extract_image_magic_returns_metadata_without_dumping_bytes() {
+        let path = create_temp_bytes_with_ext(
+            b"\x89PNG\r\n\x1a\nSECRET IMAGE BODY SHOULD NOT BE EXTRACTED",
+            "dat",
+        );
+        let output = run_extract(&path, None, None);
+        assert!(output.contains("Format: image (unsupported)"));
+        assert!(output.contains("Unsupported format for text extraction"));
+        assert!(!output.contains("SECRET IMAGE BODY"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_extract_office_extension_returns_metadata_without_dumping_bytes() {
+        let path = create_temp_bytes_with_ext(
+            b"PK\x03\x04SECRET OFFICE BODY SHOULD NOT BE EXTRACTED",
+            "docx",
+        );
+        let output = run_extract(&path, None, None);
+        assert!(output.contains("Format: office (unsupported)"));
+        assert!(output.contains("Unsupported format for text extraction"));
+        assert!(!output.contains("SECRET OFFICE BODY"));
         std::fs::remove_file(&path).ok();
     }
 
@@ -752,6 +848,10 @@ mod tests {
             extension_to_format("jsonl"),
             Some(DetectedFormat::JsonLines)
         );
+        assert_eq!(extension_to_format("pdf"), Some(DetectedFormat::Pdf));
+        assert_eq!(extension_to_format("docx"), Some(DetectedFormat::Office));
+        assert_eq!(extension_to_format("png"), Some(DetectedFormat::Image));
+        assert_eq!(extension_to_format("zip"), Some(DetectedFormat::Archive));
         assert_eq!(extension_to_format("bin"), None);
     }
 
@@ -759,6 +859,10 @@ mod tests {
     fn test_detect_format_by_hint() {
         assert_eq!(parse_format_hint("html"), Some(DetectedFormat::Html));
         assert_eq!(parse_format_hint("json"), Some(DetectedFormat::Json));
+        assert_eq!(parse_format_hint("pdf"), Some(DetectedFormat::Pdf));
+        assert_eq!(parse_format_hint("office"), Some(DetectedFormat::Office));
+        assert_eq!(parse_format_hint("image"), Some(DetectedFormat::Image));
+        assert_eq!(parse_format_hint("archive"), Some(DetectedFormat::Archive));
         assert_eq!(parse_format_hint("auto"), None);
         assert_eq!(parse_format_hint(""), None);
     }

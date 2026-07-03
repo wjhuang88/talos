@@ -49,9 +49,9 @@ is not suitable for routine frontline delegation.
 | A0 | Establish execution contract | This task record plus I090-I093 planned iteration shells exist; Board and iteration index point to the track. | User request | `scripts/validate_project_governance.sh .` and `git diff --check` pass. | Keep task in Planned if governance fails. | In Progress |
 | A1 | Close or pause I085 | MC107 disposition recorded: README depth and real TUI `/model`/`/connect` verification either complete or explicitly paused. Catalog.db first-run creation semantics must be correct before closeout. | A0 | I085 owner docs and Board agree; workspace checks pass if code changes. | Pause I085 with exact residual owner before activating I090. | Complete |
 | A2 | Activate I090 | Start the month-1 high-risk tool/ingestion boundary iteration. | A1 | Iteration README, Board, and relevant backlog owners mark I090 Active/In Progress. | Keep I090 Planned and record blocker. | Complete |
-| A3 | WEBFETCH bounded extraction decision | Decide the first Rust-native bounded extraction slice and explicit unsupported formats. | A2 | Proposal/ADR if needed; permission and size/time budgets named. | Keep WEBFETCH Phase 2+ design-only. | In Progress |
-| A4 | Implement first bounded extraction slice | A local `document_extract` or equivalent bounded extractor for safe text/HTML/JSON/CSV/Markdown-like inputs, no PDF/Office/OCR/browser. | A3 | Tool tests, permission tests, runtime smoke, docs. | Ship design only; no runtime tool. | Planned |
-| A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | Planned |
+| A3 | WEBFETCH bounded extraction decision | Decide the first Rust-native bounded extraction slice and explicit unsupported formats. | A2 | Proposal/ADR if needed; permission and size/time budgets named. | Keep WEBFETCH Phase 2+ design-only. | Complete |
+| A4 | Implement first bounded extraction slice | A local `document_extract` or equivalent bounded extractor for safe text/HTML/JSON/CSV/Markdown-like inputs, no PDF/Office/OCR/browser. | A3 | Tool tests, permission tests, runtime smoke, docs. | Ship design only; no runtime tool. | Complete |
+| A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | In Progress |
 | A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Planned |
 | A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Planned |
 | A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Planned |
@@ -304,3 +304,48 @@ Recovery or resume instruction:
 - Run `git status --short`.
 - Read I090, WEBFETCH-001, TOOL-011, `crates/talos-tools/src/document_extract.rs`,
   `crates/talos-tools/src/search_tools.rs`, and `crates/talos-tools/src/search_engine.rs`.
+
+### A3/A4 — Bounded Local Extraction Slice Closed (2026-07-04)
+
+Completed task items:
+
+- Audited the existing `document_extract` implementation before expanding scope.
+- Confirmed the first safe local slice already supports bounded text, Markdown, HTML, JSON, JSONL,
+  CSV, TSV, and XML extraction.
+- Fixed the high-risk gap where ASCII-like PDF, image, Office, or archive bytes could be treated as
+  text when no NUL byte was present.
+- Added explicit PDF/Office/image/archive extension and magic-byte classification that returns
+  metadata-only unsupported output and does not dump embedded bytes.
+
+Current state and artifacts:
+
+- Code: `crates/talos-tools/src/document_extract.rs`.
+- Owner docs: I090 and WEBFETCH-001 updated with A3/A4 evidence and residual scope.
+- No PDF parser, Office parser, OCR, browser automation, crawler behavior, or heavy conversion
+  dependency was added.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy -p talos-tools -- -D warnings`: passed.
+- `cargo test -p talos-tools document_extract`: 31 matching unit tests passed.
+- `cargo test -p talos-tools --test document_boundaries`: 15 tests passed.
+
+Open risks or deviations:
+
+- Full `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` remain the final
+  implementation-phase gate for I090 closeout; this checkpoint used targeted tool-crate gates to
+  keep the phase small.
+- TOOL-011 search stabilization still needs audit before broader ingestion depends on search.
+
+Next task item:
+
+- A5: audit ripgrep-backed `grep` behavior against TOOL-011, decide whether it blocks I090 closeout,
+  and either fix the minimum gaps or record a precise deferral.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I090, TOOL-011, `crates/talos-tools/src/search_tools.rs`, and
+  `crates/talos-tools/src/search_engine.rs`.
