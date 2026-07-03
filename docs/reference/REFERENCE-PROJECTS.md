@@ -37,6 +37,7 @@
 | **OpenCode** | <https://github.com/anomalyco/opencode> | TypeScript / Effect | `main` branch, `16cae9a3` |
 | **Hermes** | <https://github.com/NousResearch/hermes-agent> | Python | `main` branch |
 | **Hermes Rust** | <https://github.com/Lumio-Research/hermes-agent-rs> | Rust (community) | `main` branch |
+| **omp.sh** | <https://github.com/can1357/oh-my-pi> | TypeScript | `main` branch, `afc79e4c` |
 
 ---
 
@@ -1134,6 +1135,292 @@ mod aurora {
 3. **Semantic colors are restrained**: Errors/warnings/success use Aurora colors sparingly
 4. **Consistent with developer tools**: Nord is widely adopted in terminals, editors, and IDEs
 5. **Accessible**: All text/background combinations meet WCAG AA contrast requirements
+
+---
+
+## 20. Reasoning / Thinking Token Usage (ADR-034 Research)
+
+### What to study: How each project tracks, prices, and displays reasoning/thinking tokens.
+
+Researched 2026-07-03 for ADR-034. This section documents the cross-project landscape so future
+reasoning-related work has a stable reference.
+
+### Provider API field shapes (ground truth)
+
+| Provider | Total output field | Reasoning subset field | Semantics |
+|---|---|---|---|
+| **Anthropic** (extended thinking) | `usage.output_tokens` | `usage.output_tokens_details.thinking_tokens` | Thinking tokens are **included inside** `output_tokens` |
+| **OpenAI** (o-series) | `usage.completion_tokens` | `usage.completion_tokens_details.reasoning_tokens` | Reasoning tokens are **included inside** `completion_tokens` |
+| **OpenAI-compatible** (some gateways) | `usage.completion_tokens` | `usage.completion_tokens_details.reasoning_tokens` or top-level `usage.reasoning_tokens` | Best-effort; not standardized |
+| **Google Gemini** | `usage.candidatesTokenCount` | `usage.thoughtsTokenCount` | Added into output for billing |
+
+Key: reasoning tokens are a **subset** of output tokens for OpenAI and Anthropic — they are
+informational (how many output tokens were reasoning), not additive. The billable total is the
+inclusive `output_tokens` / `completion_tokens`.
+
+### Cross-project comparison
+
+| Project | Separate reasoning field? | Field name | Pricing | Display |
+|---|---|---|---|---|
+| **Cline** | Yes | `reasoningTokenCount` | Normalized from multiple provider paths; telemetry export | Telemetry only |
+| **omp.sh** (oh-my-pi) | Yes | `reasoningTokens` | Subset of output; priced at output rate | Live thinking-token counter beside thinking-speed badge; telemetry `gen_ai.usage.reasoning.output_tokens` |
+| **Pi** (earendil-works/pi) | Yes | `reasoning` | Subset of output | Not separately displayed |
+| **Codex** | Passthrough | `output_tokens_details.reasoning_tokens` | Same as output (Responses API shape) | Not separately displayed |
+| **OpenCode** (Go) | No | N/A | Folded into output rate | Thinking content shown inline; no token count |
+| **Claude Code** | No | N/A | Folded into output rate | Thinking summaries shown (ctrl+o transcript view) |
+| **Aider** | No | N/A | N/A | Reasoning tags for display only |
+| **Continue** | Partially | Content-based estimation | Not separate | Thinking messages in UI state |
+
+### Project-specific findings
+
+#### Cline (best precedent for separate tracking)
+
+Cline normalizes reasoning tokens from multiple provider shapes into a single field:
+
+```typescript
+const REASONING_TOKEN_PATHS = [
+  ["outputTokenDetails", "reasoningTokens"],
+  ["output_tokens_details", "reasoning_tokens"],
+  ["completion_tokens_details", "reasoning_tokens"],
+  ["reasoningTokens"],
+  ["reasoning_tokens"],
+];
+```
+
+- Source: `cline/cline` `sdk/packages/llms/src/providers/ai-sdk.ts` lines 535-541
+- Usage model: `reasoningTokenCount?: number` in `sdk/packages/shared/src/agent.ts` lines 80-86
+- Surfaces the metric in telemetry export.
+
+#### omp.sh / oh-my-pi (best precedent for display + telemetry)
+
+omp.sh inherits pi's accounting model but makes reasoning tokens explicit:
+
+- Usage type: `reasoningTokens?: number` — subset of `output`
+  - `packages/catalog/src/types.ts` lines 112-123
+- OpenAI-compatible parsing: reads `completion_tokens_details.reasoning_tokens` /
+  `output_tokens_details.reasoning_tokens`
+  - `packages/ai/src/providers/openai-completions.ts` lines 1550-1571
+  - `packages/ai/src/providers/openai-shared.ts` lines 2491-2514
+- Google parsing: maps `thoughtsTokenCount` into `reasoningTokens`, adds into `output`
+  - `packages/ai/src/providers/google-shared.ts` lines 740-748
+- TUI: live thinking-token counter beside thinking-speed badge
+  - `packages/coding-agent/src/modes/components/assistant-message.ts` lines 233-337, 668-676
+- Telemetry: exports `gen_ai.usage.reasoning.output_tokens`
+  - `packages/agent/src/telemetry.ts` lines 1209-1213
+
+#### Pi (earendil-works/pi)
+
+Same concept as omp.sh but names the field `reasoning` instead of `reasoningTokens`:
+
+- Usage type: `reasoning?: number` in `packages/ai/src/types.ts` lines 359-366
+- OpenAI parsing: `reasoning_tokens` — `packages/ai/src/api/openai-completions.ts` lines 1550-1571
+- Google parsing: `thoughtsTokenCount` — `packages/ai/src/api/google-generative-ai.ts` lines 219-227
+- Anthropic parsing: `output_tokens_details.thinking_tokens` — `packages/ai/src/api/anthropic-messages.ts` lines 697-706
+
+#### OpenCode (Go) — no separate accounting
+
+OpenCode does **not** model reasoning/thinking tokens as a separate usage bucket:
+
+```go
+type TokenUsage struct {
+    InputTokens         int64
+    OutputTokens        int64
+    CacheCreationTokens int64
+    CacheReadTokens     int64
+}
+```
+
+- Source: `internal/llm/provider/provider.go` lines 30-35
+- Anthropic usage: maps only 4 fields; thinking enabled in request but not separately counted
+  - `internal/llm/provider/anthropic.go` lines 443-449
+- OpenAI usage: maps prompt/completion + cached; no `reasoning_tokens` extraction
+  - `internal/llm/provider/openai.go` lines 384-393
+- Cost: `model.CostPer1MOut/1e6 * float64(usage.OutputTokens)` — reasoning priced at output rate
+  - `internal/llm/agent/agent.go` lines 494-507
+
+#### Claude Code — display yes, separate accounting no
+
+- `getTokenCountFromUsage()`: sums only input + cache + output
+  - `claude-code/src/utils/tokens.ts` lines 44-51 (source reconstruction)
+- Cost tracker: aggregates only input/output/cache fields
+  - `claude-code/src/cost-tracker.ts` lines 264-294
+- Thinking summaries are a settings/UI concern (`showThinkingSummaries`)
+  - `claude-code/src/utils/settings/types.ts` lines 957-964
+
+#### Codex — Responses API passthrough
+
+Codex uses the OpenAI Responses API shape directly:
+
+```typescript
+type ResponseCompletedUsage = {
+  input_tokens: number;
+  input_tokens_details: { cached_tokens: number } | null;
+  output_tokens: number;
+  output_tokens_details: { reasoning_tokens: number } | null;
+  total_tokens: number;
+};
+```
+
+- Source: `sdk/typescript/tests/responsesProxy.ts` line 5
+
+### Talos design decision (ADR-034)
+
+Based on this research, ADR-034 adopts the **Cline/omp.sh pattern**: add a `reasoning_tokens`
+field to `Usage` as an informational subset of `output_tokens`, priced at the normal output
+rate, surfaced in the status bar and exit summary. This follows the majority precedent of
+projects that track reasoning separately (Cline, omp.sh, Pi, Codex) while keeping the billing
+model simple (no separate reasoning pricing).
+
+### Thinking content in request history (multi-turn context)
+
+Researched 2026-07-03. This subsection documents whether reference projects include
+thinking/reasoning content in the messages array sent to the provider in subsequent turns.
+
+| Project | Thinking in request history? | Details |
+|---|---|---|
+| **Anthropic official** | YES (conditionally) | "Strictly necessary when using tools with extended thinking." Must pass unchanged with `signature`. Optional for non-tool conversations. |
+| **omp.sh** | YES | Replays `reasoning_content` on assistant turns; `replayReasoningContent` flag for local servers (KV cache safety); gateways require it on tool-call turns |
+| **Pi** | YES | Same as omp.sh; preserves `thinking`/`redacted_thinking` blocks; fills empty `reasoning_content` when provider requires |
+| **Cline** | YES (by default) | Keeps reasoning with signature/redactedData metadata; skips only for Cerebras |
+| **Claude Code** | YES (generally) | Preserves thinking; strips trailing thinking, orphaned thinking-only messages, and signature blocks on model fallback |
+| **OpenCode (Go)** | NO (outlier) | Stores `ReasoningContent` but strips during provider message conversion |
+
+#### Anthropic official guidance
+
+From Anthropic docs (`platform.claude.com/docs/en/build-with-claude/extended-thinking`):
+
+- "It is only strictly necessary to send back thinking blocks when using tools with extended
+  thinking. Otherwise you can omit thinking blocks from previous turns."
+- Thinking blocks must be passed **unchanged** — the `signature` field is opaque encryption
+  that verifies the block was generated by Claude.
+- For `display: "omitted"` thinking, the text is empty but the signature still carries encrypted
+  full thinking for multi-turn continuity.
+- Opus 4.5+ / Sonnet 4.6+ keep thinking in context by default; earlier models strip by default.
+
+SDK evidence: `ThinkingBlockParam` and `RedactedThinkingBlockParam` are part of `MessageParam.content`
+in the TypeScript SDK (`anthropic-sdk-typescript/src/resources/messages/messages.ts` lines 844-880).
+
+#### omp.sh sophisticated replay policy
+
+omp.sh (`can1357/oh-my-pi`) has the most nuanced handling:
+
+- `replayReasoningContent?: boolean` config flag — auto-detected for local servers
+  - Comment: "Local llama.cpp-style servers re-tokenize the full chat-template prompt every
+    request; Qwen3 / DeepSeek-R1 / GLM templates reconstruct the `<think>` block from
+    `reasoning_content`. Dropping the field re-renders the assistant turn without `<think>`,
+    diverging from the slot's KV cache state and forcing full prompt re-processing (#3528)."
+  - Source: `packages/catalog/src/types.ts` lines 214-226
+- `requiresReasoningContentForToolCalls?: boolean` — some gateways REQUIRE it
+  - Comment: "they 400 with `Extra inputs are not permitted` when thinking is off but the field
+    is supplied (#1071), and 400 with `thinking is enabled but reasoning_content is missing in
+    assistant tool call message at index N` (#1484)"
+  - Source: `packages/catalog/src/compat/openai.ts` lines 133+
+- OpenAI completions encoder writes reasoning back: `assistantMsg[reasoningField] = ...`
+  - Source: `packages/ai/src/providers/openai-completions.ts` lines 1819-1833
+- Anthropic encoder preserves `thinking`/`redacted_thinking` blocks
+  - Source: `packages/ai/src/providers/openai-chat-server.ts` lines 91-96, 235-243
+
+#### Pi replay behavior
+
+Pi (`earendil-works/pi`) inherits the same pattern:
+
+- Anthropic request builder includes assistant thinking blocks in next payload
+  - Source: `packages/ai/src/api/anthropic-messages.ts` lines 1064-1120
+- OpenAI completions writes `reasoning_content` back onto assistant messages
+  - Source: `packages/ai/src/api/openai-completions.ts` lines 938-965
+- Cross-provider transform: same-provider replay keeps thinking; cross-provider can downgrade to
+  text or omit for redacted/aborted turns
+  - Source: `packages/ai/src/api/transform-messages.ts` lines 97-113, 186-193
+
+#### Cline passthrough
+
+Cline includes reasoning in history by default with metadata:
+
+- `shouldIncludeReasoningHistory()` returns `true` for all providers except Cerebras
+- Reasoning blocks carry `signature` / `redactedData` through provider options
+- Source: `cline/cline` `sdk/packages/llms/src/providers/ai-sdk.ts` lines 242-301
+
+#### Claude Code selective stripping
+
+Claude Code preserves thinking generally but applies cleanup:
+
+- `filterTrailingThinkingFromLastAssistant()` — API doesn't allow trailing thinking blocks
+  - Source: `claude-code/src/utils/messages.ts` lines 4777-4827
+- `filterOrphanedThinkingOnlyMessages()` — removes thinking-only assistant messages
+  - Source: `claude-code/src/utils/messages.ts` lines 4980-5099
+- `stripSignatureBlocks()` — strips on model fallback. Correction (2026-07-03 review): signatures
+  are **model-bound, not key-bound** — Anthropic docs state signature values are compatible
+  across platforms (Claude APIs, Bedrock, Vertex) and thinking blocks are "tied to the model
+  that produced them". The strip exists for cross-model continuity, not key binding.
+  - Source: `claude-code/src/query.ts` lines 924-929
+- Normal request building keeps assistant content through normalization
+  - Source: `claude-code/src/services/api/claude.ts` lines 1259-1267
+
+#### OpenCode (Go) — the outlier
+
+OpenCode stores `ReasoningContent` but strips it during provider message conversion:
+
+- Anthropic `convertMessages()`: only creates text blocks and tool-use blocks, no thinking blocks
+  - Source: `internal/llm/provider/anthropic.go` lines 60-118
+- OpenAI `convertMessages()`: only sets `Content` and `ToolCalls`, no `reasoning_content`
+  - Source: `internal/llm/provider/openai.go` lines 68-123
+
+This pattern is explicitly **rejected for Talos** because it risks breaking Anthropic tool
+conversations with extended thinking and local-server KV cache stability.
+
+#### Provider ground-truth verification (2026-07-03 architecture review)
+
+The ADR-034 review verified the replay claims against official docs and SDK source. These facts
+supersede any conflicting project-derived claims above:
+
+- **Anthropic `signature` is Required**: `ThinkingBlockParam` marks both `thinking` and
+  `signature` as required fields (TS SDK `messages.ts`, Python SDK `thinking_block_param.py`).
+  Blocks must be passed back "complete and unmodified"; they "cannot be edited, reordered,
+  filtered, or reconstructed" — violations return `400 invalid_request_error`.
+  - https://platform.claude.com/docs/en/build-with-claude/extended-thinking
+  - https://platform.claude.com/docs/en/api/errors
+- **Tool-continuation failure mode**: with thinking enabled, a request whose trailing assistant
+  `tool_use` turn lacks its thinking block fails with "Expected `thinking` or
+  `redacted_thinking`, but found `tool_use`".
+  - https://platform.claude.com/docs/en/cookbook/extended-thinking-extended-thinking-with-tool-use
+- **Signatures are model-bound, not key-bound**: "Signature values are compatible across
+  platforms (Claude APIs, Amazon Bedrock, and Google Cloud)"; "Thinking blocks are tied to the
+  model that produced them."
+  - https://platform.claude.com/docs/en/build-with-claude/extended-thinking#thinking-encryption
+  - https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking
+- **DeepSeek native API is conditional** (gap in the original research): without tool calls,
+  replayed `reasoning_content` is ignored; **with tool calls it is required** — missing it
+  returns 400. The historical "never send reasoning_content back" rule is obsolete.
+  - https://api-docs.deepseek.com/guides/thinking_mode
+  - https://api-docs.deepseek.com/guides/reasoning_model
+- **Gemini requires `thoughtSignature` replay** for multi-turn function calling on Gemini 3
+  (gap in the original research; relevant only if a Gemini-native adapter is ever added).
+  - https://ai.google.dev/gemini-api/docs/thinking
+- **Official OpenAI Chat Completions never streams reasoning**: the SDK `ChatCompletionChunk`
+  delta carries only `content`/`function_call`/`refusal`/`role`/`tool_calls` — no
+  `reasoning_content`. That field is an OpenAI-compatible gateway/local-server convention
+  (DeepSeek, GLM, Qwen templates). OpenAI reasoning state lives in the Responses API.
+  - https://developers.openai.com/api/docs/guides/reasoning
+  - https://github.com/openai/openai-python/blob/main/src/openai/types/chat/chat_completion_chunk.py
+
+#### Talos design decision (ADR-034)
+
+ADR-034 (as revised 2026-07-03 after architecture review) adopts the majority pattern with a
+structured data model: **retain thinking in request-history metadata, keep display transient**.
+Specifically:
+
+- Structured `ReasoningBlock` enum (`Thinking { text, signature }`, `Redacted { data }`,
+  `Plain { text }`) wrapped in `AssistantReasoning { provider, model, blocks }` on the durable
+  `Message::Assistant`. A plain `Option<String>` was rejected by the review — it cannot carry
+  Anthropic signatures or redacted payloads.
+- JSONL persistence rides `SessionMetadata.reasoning` (the JSONL format does not serialize
+  `Message` structs), giving session-resume thinking continuity.
+- Replay is **origin-gated**: blocks are replayed only to the exact (provider, model) that
+  produced them; foreign blocks are stripped from request copies (signatures are model-bound).
+- TUI/scrollback display stays transient (existing `ThinkingPreview` pipeline); `/copy` and
+  `/export` exclude reasoning by design.
+- `replay: bool` per-model config flag (default `true`) with a config-load consequence warning.
+- The OpenCode outlier pattern (strip thinking from requests) is rejected.
 
 ---
 
