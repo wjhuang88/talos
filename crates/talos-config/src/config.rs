@@ -182,6 +182,7 @@ impl Config {
                 config.api_key_env = user_config.api_key_env.clone();
             }
             config.models.extend(user_config.models.clone());
+            config.timeout = user_config.timeout.clone();
         }
         config
     }

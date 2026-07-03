@@ -352,6 +352,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
                         reasoning: None,
                     },
                 )]),
+                timeout: Default::default(),
             },
         )]),
         log: LogConfig::default(),
@@ -1165,4 +1166,33 @@ fn test_skill_config_serializes() {
     let serialized = toml::to_string(&config).unwrap();
     assert!(serialized.contains("discover_shared"));
     assert!(serialized.contains("true"));
+}
+
+#[test]
+fn test_provider_timeout_config_defaults() {
+    let timeout = ProviderTimeoutConfig::default();
+    assert_eq!(timeout.first_packet_timeout_secs, 30);
+    assert_eq!(timeout.stream_idle_timeout_secs, 90);
+}
+
+#[test]
+fn test_provider_timeout_config_parsed_from_toml() {
+    let config: Config = toml::from_str(
+        r#"
+            provider = "openai"
+            model = "gpt-4o"
+
+            [providers.openai]
+            api_key_env = "OPENAI_API_KEY"
+
+            [providers.openai.timeout]
+            first_packet_timeout_secs = 12
+            stream_idle_timeout_secs = 34
+        "#,
+    )
+    .unwrap();
+
+    let timeout = &config.providers["openai"].timeout;
+    assert_eq!(timeout.first_packet_timeout_secs, 12);
+    assert_eq!(timeout.stream_idle_timeout_secs, 34);
 }

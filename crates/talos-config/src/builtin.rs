@@ -10,6 +10,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("ANTHROPIC_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "openai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -18,6 +19,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "google" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -26,6 +28,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("GOOGLE_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "deepseek" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -34,6 +37,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("DEEPSEEK_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "qwen" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -42,6 +46,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "zhipu" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -50,6 +55,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("ZHIPU_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "zai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -58,6 +64,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("ZAI_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "zhipu-coding-plan" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -66,6 +73,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("ZHIPU_CODING_PLAN_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "zai-coding-plan" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -74,6 +82,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("ZAI_CODING_PLAN_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "minimax" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -82,6 +91,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("MINIMAX_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "moonshot" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -90,6 +100,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("MOONSHOT_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         "openrouter" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
@@ -98,6 +109,7 @@ pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             api_key: None,
             api_key_env: Some("OPENROUTER_API_KEY".to_string()),
             models: HashMap::new(),
+            timeout: Default::default(),
         }),
         _ => None,
     }

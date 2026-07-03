@@ -65,6 +65,27 @@ impl Default for ReasoningOptions {
 }
 
 /// Named provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(default)]
+pub struct ProviderTimeoutConfig {
+    /// Maximum seconds from request dispatch to first stream event.
+    /// Default: 30 seconds.
+    pub first_packet_timeout_secs: u64,
+    /// Maximum seconds between stream events after the first packet.
+    /// Default: 90 seconds.
+    pub stream_idle_timeout_secs: u64,
+}
+
+impl Default for ProviderTimeoutConfig {
+    fn default() -> Self {
+        Self {
+            first_packet_timeout_secs: 30,
+            stream_idle_timeout_secs: 90,
+        }
+    }
+}
+
+/// Named provider configuration.
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
     #[serde(default)]
@@ -90,6 +111,9 @@ pub struct ProviderConfig {
     /// Provider-specific model configuration keyed by model name.
     #[serde(default)]
     pub models: HashMap<String, ModelConfig>,
+    /// Stream timeout configuration for provider requests.
+    #[serde(default)]
+    pub timeout: ProviderTimeoutConfig,
 }
 
 impl std::fmt::Debug for ProviderConfig {
@@ -101,6 +125,7 @@ impl std::fmt::Debug for ProviderConfig {
             .field("api_key", &self.api_key.as_deref().map(|_| "***"))
             .field("api_key_env", &self.api_key_env)
             .field("models", &self.models)
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
