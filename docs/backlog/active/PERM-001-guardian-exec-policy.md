@@ -14,6 +14,11 @@ I092 activation note (2026-07-04): PERM-001 is selected only for the autonomy pe
 Guardian auto-approval and exec DSL implementation remain disabled. A11 must prove deny/ask/allow
 behavior for scheduled, batch, and exec-style paths before any runtime expansion.
 
+I092 A11 result (2026-07-04): `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07-04.md` records
+the non-bypass matrix. Guardian remains disabled; Guardian auto-approval is denied for
+write/execute/network in the first slice; exec DSL remains unimplemented and must compile to typed
+permission rules before any runtime use.
+
 ## Priority
 
 P2.
@@ -26,10 +31,15 @@ P2.
 
 ## Acceptance Criteria
 
-- [ ] Guardian remains disabled by default and cannot bypass `PermissionEngine`.
-- [ ] Guardian cannot auto-approve write-capable tools in the first slice.
+- [ ] Runtime Guardian implementation remains disabled by default and cannot bypass
+      `PermissionEngine`.
+- [ ] Runtime Guardian implementation cannot auto-approve write-capable tools in the first slice.
+- [x] Autonomy permission matrix records that Guardian remains disabled by default and cannot
+      bypass `PermissionEngine`.
+- [x] Autonomy permission matrix records that Guardian cannot auto-approve write-capable tools in
+      the first slice.
 - [ ] Exec DSL compiles into typed permission rules and is not a shell parser.
-- [ ] Complex shell features fail back to Ask unless a future ADR changes the boundary.
+- [x] Complex shell features fail back to Ask unless a future ADR changes the boundary.
 - [ ] Decision logs avoid secrets and full sensitive arguments.
 
 ## Residual Work Destination

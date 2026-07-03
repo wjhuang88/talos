@@ -1,6 +1,6 @@
 # Iteration I092: Context Compression And Autonomy Gates
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-04
 > Planned objective: prove or reject active context compression and split autonomous execution
 > features into non-bypass permission slices.
@@ -75,6 +75,7 @@
 |---|---|---|
 | 2026-07-04 | Activation | Activated after I091 completed `/hooks` diagnostics, hook manifest declaration validation, and optional asset distribution policy. Non-terminal inventory disposition: I085 remains Paused with MC107 real terminal `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells; I093 remains the planned next direct-owner shell. I092 starts with cache-stability proof/rejection before autonomy implementation, then a permission matrix for scheduled/batch/exec-style paths. |
 | 2026-07-04 | A10 execution | Closed the first MEM-007 evidence slice for bash-only active compression. The existing compressor is deterministic and default-off; added regression tests proving enabling compression does not change stable-prefix bytes, and long bash output is compressed only in the model-facing tool result while the UI event/export surface keeps the full raw output. Corrected docs/comments that previously over-claimed durable JSONL raw-output preservation. |
+| 2026-07-04 | A11 execution | Closed the autonomy permission packet as a policy/test matrix without runtime expansion. Added `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07-04.md` covering scheduled message injection, scheduled direct tool execution, persistent scheduler state, batch read/write/edit, Guardian advice/auto-approval, direct exec, exec DSL, and plugin-originated tool autonomy. The matrix keeps direct scheduled tool execution, persistent scheduler state, Guardian auto-approval, exec DSL, and batch write/edit runtime expansion disabled until future ADR/test gates. |
 
 ## Verification Evidence
 
@@ -86,6 +87,8 @@
 - `cargo test -p talos-agent bash_compression`: 2 matching regression tests passed.
 - `cargo test -p talos-agent`: 196 unit tests and 12 doctests passed.
 - `cargo test --workspace`: passed.
+- `cargo test -p talos-permission`: 56 unit tests and 1 doctest passed.
+- `cargo test -p talos-tools exec_tool`: 10 matching exec-tool tests passed.
 
 ## Variance And Residuals
 
@@ -93,9 +96,11 @@
 - A10 is complete for the bash-only evidence slice, not for all MEM-007 strategies. `read`,
   `grep`, `git_diff`, cross-turn dedup, and durable JSONL dual-track raw-output storage remain
   deferred.
-- A11 remains the autonomy permission packet and must not ship scheduled direct tool execution,
-  Guardian auto-approval, exec DSL implementation, or batch writes before deny/ask/allow matrix
-  coverage is explicit.
+- A11 completed the autonomy permission packet. It did not ship scheduled direct tool execution,
+  Guardian auto-approval, exec DSL implementation, or batch writes; those remain gated by the
+  matrix.
+- I092 is complete. Autonomy runtime expansion remains deferred; A11 produced the matrix and
+  validation target, not new scheduled/batch/Guardian/DSL behavior.
 
 ## Retrospective
 
@@ -104,3 +109,6 @@
 - The existing bash compressor was already a reasonable minimal slice. The main A10 correction was
   adding the missing cache/export regression proof and narrowing documentation to match the actual
   storage boundary.
+- The autonomy work was safest as a written gate. Existing permission primitives support the
+  matrix, but none of the deferred autonomy features should be implemented without dedicated tests
+  named in the matrix.

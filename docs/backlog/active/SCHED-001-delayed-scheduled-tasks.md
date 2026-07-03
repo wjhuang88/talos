@@ -9,6 +9,11 @@ I092 activation note (2026-07-04): selected for autonomy permission analysis onl
 injection remains the safe shape; direct scheduled tool execution, persistence, and cron-style
 expansion remain out of scope until a non-bypass permission matrix is recorded.
 
+I092 A11 result (2026-07-04): `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07-04.md` records
+the scheduled-task boundary. Scheduled message injection does not grant permission to future tool
+calls. Scheduled direct tool execution and persistent scheduler state remain denied/deferred until a
+future ADR and fire-time permission re-evaluation tests exist.
+
 ## Problem
 
 The agent cannot schedule future actions. If the LLM wants to "check again in 60 seconds"

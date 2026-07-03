@@ -10,6 +10,10 @@ I092 activation note (2026-07-04):
   write/edit implementation.
 - No batch file operation runtime changes are authorized by activation alone.
 
+I092 A11 result (2026-07-04): `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07-04.md` records
+the batch-operation gate. Batch read may be allowed per readable path; batch write/edit must ask per
+write/edit path and deny if any explicit deny applies. Mixed outcomes must be reported per item.
+
 ## Problem
 
 The built-in `read`, `write`, and `edit` tools accept a single file path per invocation.
@@ -74,6 +78,7 @@ multiple file operations in a single tool call.
 
 - TOOL-002 (tool calling architecture) — schema validation must handle array inputs.
 - PERM-002 (operation-scoped permissions) — batch permission evaluation path.
+- I092 autonomy matrix — per-resource deny/ask/allow behavior before runtime expansion.
 
 ## Decision links and constraints
 

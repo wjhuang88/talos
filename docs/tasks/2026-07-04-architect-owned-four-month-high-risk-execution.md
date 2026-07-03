@@ -57,8 +57,8 @@ is not suitable for routine frontline delegation.
 | A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Complete |
 | A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Complete |
 | A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Complete |
-| A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | In Progress |
-| A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Planned |
+| A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Complete |
+| A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | In Progress |
 | A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | Planned |
 | A14 | REL-002 self-bootstrap rehearsal | Record one Talos-on-Talos rehearsal packet or a failed rehearsal with exact gap evidence. | A13 | REL-002 evidence table updated; no v1.0 claim unless criteria met. | Record non-qualifying evidence. | Planned |
 | A15 | Final closeout | Four-month matrix, residual owners, release posture, docs, Board, and handoff are synchronized. | A14 | workspace tests, clippy, governance, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
@@ -595,3 +595,35 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I092, SCHED-001, PERM-001, TOOL-010, and this task's A10 checkpoint.
+
+### A11 — Autonomy Permission Matrix Closed (2026-07-04)
+
+Completed task items:
+
+- Added `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07-04.md`.
+- Split scheduled message injection, scheduled direct tool execution, persistent scheduler state,
+  batch read/write/edit, Guardian advice/auto-approval, direct exec, exec DSL, and plugin-originated
+  autonomy into explicit deny/ask/allow gates.
+- Synchronized PERM-001, SCHED-001, TOOL-010, Product Backlog, I092, Board, and iteration index.
+
+Current state and artifacts:
+
+- I092 is Complete once validation passes.
+- No scheduled direct tool execution, persistent scheduler, Guardian auto-approval, exec DSL, batch
+  write/edit runtime expansion, plugin-originated autonomy, or permission-default relaxation shipped.
+
+Commands/checks and actual results:
+
+- `cargo test -p talos-permission`: 56 unit tests and 1 doctest passed.
+- `cargo test -p talos-tools exec_tool`: 10 matching exec-tool tests passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- A12: activate I093 after this A11 phase is committed and pushed.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I093, REL-002, RUNTIME-001, GOV-003, ARCH-030, and this task's A11 checkpoint.
