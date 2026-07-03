@@ -244,8 +244,111 @@ async fn handle_provider_setup(
         talos_conversation::CredentialRequestData {
             provider: provider.to_string(),
             model_id: None,
+            connect_mode: false,
         },
     ));
+}
+
+async fn handle_connect(ui_tx: &mpsc::UnboundedSender<UiOutput>, config: &Config, provider: &str) {
+    if provider.is_empty() {
+        let data = build_connect_picker_data(config);
+        let _ = ui_tx.send(UiOutput::ConnectPicker(data));
+        return;
+    }
+
+    if config.provider_authenticated(provider) {
+        send_stream(
+            ui_tx,
+            MessageSource::System,
+            format!("[System] Provider '{provider}' is already connected.\n"),
+        );
+        return;
+    }
+
+    let _ = ui_tx.send(UiOutput::CredentialRequest(
+        talos_conversation::CredentialRequestData {
+            provider: provider.to_string(),
+            model_id: None,
+            connect_mode: true,
+        },
+    ));
+}
+
+async fn handle_connect_with_credential(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    cred: talos_conversation::CredentialResponseData,
+) -> Option<Config> {
+    let mut new_config = config.clone();
+    new_config.set_provider_credential(&cred.provider, &cred.api_key);
+
+    let provider_entry = new_config
+        .providers
+        .entry(cred.provider.clone())
+        .or_default();
+    if provider_entry.api_key_env.is_none() {
+        provider_entry.api_key_env = match cred.provider.as_str() {
+            "anthropic" => Some("ANTHROPIC_API_KEY".to_string()),
+            "openai" => Some("OPENAI_API_KEY".to_string()),
+            _ => Some(format!("{}_API_KEY", cred.provider.to_uppercase())),
+        };
+    }
+
+    if let Err(e) = new_config.save() {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!("[Error] Failed to save provider config: {e}\n"),
+        );
+        return None;
+    }
+
+    send_stream(
+        ui_tx,
+        MessageSource::System,
+        format!(
+            "[System] Provider '{}' connected. Use /model to browse its models.\n",
+            cred.provider
+        ),
+    );
+    Some(new_config)
+}
+
+fn build_connect_picker_data(config: &Config) -> talos_conversation::ConnectPickerData {
+    use std::collections::BTreeMap;
+    use talos_config::model;
+    use talos_conversation::{ConnectPickerData, ConnectPickerItem};
+
+    let all = model::builtin_models();
+    let mut model_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for m in &all {
+        *model_counts.entry(m.provider.clone()).or_default() += 1;
+    }
+
+    let mut connected = Vec::new();
+    let mut available = Vec::new();
+
+    for (provider_id, count) in model_counts {
+        let has_credential = config.provider_authenticated(&provider_id);
+        let item = ConnectPickerItem {
+            provider: provider_id.clone(),
+            name: provider_id.clone(),
+            model_count: count,
+            api_base_url: None,
+            has_credential,
+            doc_url: None,
+        };
+        if has_credential {
+            connected.push(item);
+        } else {
+            available.push(item);
+        }
+    }
+
+    ConnectPickerData {
+        connected,
+        available,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -294,6 +397,7 @@ async fn handle_session_model(
             talos_conversation::CredentialRequestData {
                 provider: provider_name,
                 model_id: Some(model_id.clone()),
+                connect_mode: false,
             },
         ));
         return None;
@@ -703,6 +807,20 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 }
                 SessionLifecycleRequest::ProviderSetup(provider) => {
                     handle_provider_setup(&ui_tx_for_handler, &config_for_handler, &provider).await;
+                }
+                SessionLifecycleRequest::ConnectRequest { provider } => {
+                    handle_connect(&ui_tx_for_handler, &config_for_handler, &provider).await;
+                }
+                SessionLifecycleRequest::ConnectWithCredential(resp) => {
+                    if let Some(new_config) = handle_connect_with_credential(
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        resp,
+                    )
+                    .await
+                    {
+                        config_for_handler = new_config;
+                    }
                 }
             }
         }

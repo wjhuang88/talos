@@ -251,6 +251,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             available: always_available,
         },
         CommandDefinition {
+            name: "/connect",
+            aliases: &[],
+            usage: "/connect [provider]",
+            description: "Connect a provider with credentials",
+            arg_hint: Some("[provider]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
             name: "/todo",
             aliases: &[],
             usage: "/todo [list|show|stats|export]",

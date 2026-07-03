@@ -116,7 +116,7 @@ impl Tui {
                 }
             }
             PanelAction::ProviderSetup(provider) => {
-                self.state.open_credential_input(&provider, None);
+                self.state.open_credential_input(&provider, None, false);
                 self.state.input_clear();
             }
             PanelAction::None => {}
@@ -647,9 +647,16 @@ impl Tui {
             UiOutput::ModelPicker(data) => {
                 self.state.open_model_picker(&data);
             }
+            UiOutput::ConnectPicker(data) => {
+                self.state.open_connect_picker(&data);
+            }
+            UiOutput::ConnectProviderRequest { .. } => {}
             UiOutput::CredentialRequest(req) => {
-                self.state
-                    .open_credential_input(&req.provider, req.model_id.as_deref());
+                self.state.open_credential_input(
+                    &req.provider,
+                    req.model_id.as_deref(),
+                    req.connect_mode,
+                );
             }
             UiOutput::HydrateHistory(messages) => {
                 self.finalize_active_stream();

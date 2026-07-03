@@ -554,6 +554,11 @@ impl ConversationEngine {
                     }));
                 }
             }
+            "/connect" => {
+                outputs.push(UiOutput::ConnectProviderRequest {
+                    provider: arg.to_string(),
+                });
+            }
             "/todo" => {
                 outputs.extend(self.handle_todo_command(arg));
             }

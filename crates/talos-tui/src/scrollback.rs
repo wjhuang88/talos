@@ -377,9 +377,9 @@ impl ViewportComponent for BottomPanelComponent<'_> {
 
         if self.menu.is_credential_input() {
             let (provider, model_id) = match &self.menu.kind {
-                Some(crate::state::PanelKind::CredentialInput { provider, model_id }) => {
-                    (provider.as_str(), model_id.as_deref())
-                }
+                Some(crate::state::PanelKind::CredentialInput {
+                    provider, model_id, ..
+                }) => (provider.as_str(), model_id.as_deref()),
                 _ => ("?", None),
             };
             let buffer = self.menu.credential_buffer.as_str();

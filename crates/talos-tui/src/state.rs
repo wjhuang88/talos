@@ -6,8 +6,8 @@
 use std::time::{Duration, Instant};
 
 use talos_conversation::{
-    CommandExecutionMode, CredentialResponseData, ModelPickerData, SessionPickerItem,
-    StatusSnapshot, TipKind,
+    CommandExecutionMode, CredentialResponseData, ModelPickerData, ModelPickerItem,
+    SessionPickerItem, StatusSnapshot, TipKind,
 };
 use talos_core::ApprovalChoice;
 
@@ -51,9 +51,11 @@ pub(crate) enum PanelKind {
     SlashCommand,
     SessionPicker,
     ModelPicker,
+    ConnectPicker,
     CredentialInput {
         provider: String,
         model_id: Option<String>,
+        connect_mode: bool,
     },
     Approval {
         tool_name: String,
@@ -131,21 +133,55 @@ impl BottomPanelState {
     pub(crate) fn open_model_picker(data: &ModelPickerData) -> Self {
         let mut panel_items: Vec<PanelItem> = Vec::new();
 
-        if !data.ready_models.is_empty() {
+        let (current_models, other_ready): (Vec<&ModelPickerItem>, Vec<&ModelPickerItem>) =
+            data.ready_models.iter().partition(|m| m.is_current);
+
+        if !current_models.is_empty() {
             panel_items.push(PanelItem {
-                label: "Ready".into(),
+                label: "Current".into(),
                 description: String::new(),
                 action: PanelItemAction::Header,
                 is_current: false,
             });
-            panel_items.extend(data.ready_models.iter().map(|m| PanelItem {
+            panel_items.extend(current_models.iter().map(|m| PanelItem {
                 label: m.label.clone(),
                 description: m.provider.clone(),
                 action: PanelItemAction::Select {
                     command: m.command.clone(),
                     value: m.model_id.clone(),
                 },
-                is_current: m.is_current,
+                is_current: true,
+            }));
+        }
+
+        let mut provider_groups: std::collections::BTreeMap<&str, Vec<&ModelPickerItem>> =
+            std::collections::BTreeMap::new();
+        for m in &other_ready {
+            provider_groups
+                .entry(m.provider.as_str())
+                .or_default()
+                .push(m);
+        }
+
+        for (provider, models) in &provider_groups {
+            panel_items.push(PanelItem {
+                label: (*provider).to_string(),
+                description: format!(
+                    "{} model{}",
+                    models.len(),
+                    if models.len() == 1 { "" } else { "s" }
+                ),
+                action: PanelItemAction::Header,
+                is_current: false,
+            });
+            panel_items.extend(models.iter().map(|m| PanelItem {
+                label: m.label.clone(),
+                description: m.provider.clone(),
+                action: PanelItemAction::Select {
+                    command: m.command.clone(),
+                    value: m.model_id.clone(),
+                },
+                is_current: false,
             }));
         }
 
@@ -163,7 +199,7 @@ impl BottomPanelState {
                     p.model_count,
                     if p.model_count == 1 { "" } else { "s" }
                 ),
-                description: "Setup required".to_string(),
+                description: "Use /connect to set up".to_string(),
                 action: PanelItemAction::ProviderSetup {
                     provider: p.provider.clone(),
                 },
@@ -189,12 +225,88 @@ impl BottomPanelState {
         }
     }
 
-    pub(crate) fn open_credential_input(provider: &str, model_id: Option<&str>) -> Self {
+    pub(crate) fn open_connect_picker(data: &talos_conversation::ConnectPickerData) -> Self {
+        let mut panel_items: Vec<PanelItem> = Vec::new();
+
+        if !data.connected.is_empty() {
+            panel_items.push(PanelItem {
+                label: "Connected".into(),
+                description: String::new(),
+                action: PanelItemAction::Header,
+                is_current: false,
+            });
+            panel_items.extend(data.connected.iter().map(|p| {
+                let cred_label = if p.has_credential {
+                    "credential present"
+                } else {
+                    ""
+                };
+                let url_label = p.api_base_url.as_deref().unwrap_or("");
+                let desc = if cred_label.is_empty() && url_label.is_empty() {
+                    format!("{} models", p.model_count)
+                } else if url_label.is_empty() {
+                    format!("{} models   {}", p.model_count, cred_label)
+                } else {
+                    format!("{} models   {}   {}", p.model_count, cred_label, url_label)
+                };
+                PanelItem {
+                    label: format!("{}   {}", p.name, p.provider),
+                    description: desc,
+                    action: PanelItemAction::Select {
+                        command: "/connect".to_string(),
+                        value: p.provider.clone(),
+                    },
+                    is_current: false,
+                }
+            }));
+        }
+
+        if !data.available.is_empty() {
+            panel_items.push(PanelItem {
+                label: "Available".into(),
+                description: String::new(),
+                action: PanelItemAction::Header,
+                is_current: false,
+            });
+            panel_items.extend(data.available.iter().map(|p| {
+                let url_label = p.api_base_url.as_deref().unwrap_or("—");
+                PanelItem {
+                    label: format!("{}   {}", p.name, p.provider),
+                    description: format!("{} models   {}", p.model_count, url_label),
+                    action: PanelItemAction::Select {
+                        command: "/connect".to_string(),
+                        value: p.provider.clone(),
+                    },
+                    is_current: false,
+                }
+            }));
+        }
+
+        let initial_index = panel_items
+            .iter()
+            .position(|i| i.action != PanelItemAction::Header)
+            .unwrap_or(0);
+
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::ConnectPicker),
+            items: panel_items,
+            selected_index: initial_index,
+            credential_buffer: String::new(),
+        }
+    }
+
+    pub(crate) fn open_credential_input(
+        provider: &str,
+        model_id: Option<&str>,
+        connect_mode: bool,
+    ) -> Self {
         Self {
             is_open: true,
             kind: Some(PanelKind::CredentialInput {
                 provider: provider.to_string(),
                 model_id: model_id.map(|s| s.to_string()),
+                connect_mode,
             }),
             items: vec![],
             selected_index: 0,
@@ -483,8 +595,17 @@ impl TuiState {
         self.slash_menu = BottomPanelState::open_model_picker(data);
     }
 
-    pub(crate) fn open_credential_input(&mut self, provider: &str, model_id: Option<&str>) {
-        self.slash_menu = BottomPanelState::open_credential_input(provider, model_id);
+    pub(crate) fn open_connect_picker(&mut self, data: &talos_conversation::ConnectPickerData) {
+        self.slash_menu = BottomPanelState::open_connect_picker(data);
+    }
+
+    pub(crate) fn open_credential_input(
+        &mut self,
+        provider: &str,
+        model_id: Option<&str>,
+        connect_mode: bool,
+    ) {
+        self.slash_menu = BottomPanelState::open_credential_input(provider, model_id, connect_mode);
     }
 
     pub(crate) fn credential_append_char(&mut self, ch: char) {
@@ -509,10 +630,12 @@ impl TuiState {
         if !self.slash_menu.is_credential_input() {
             return None;
         }
-        let (provider, model_id) = match &self.slash_menu.kind {
-            Some(PanelKind::CredentialInput { provider, model_id }) => {
-                (provider.clone(), model_id.clone())
-            }
+        let (provider, model_id, connect_mode) = match &self.slash_menu.kind {
+            Some(PanelKind::CredentialInput {
+                provider,
+                model_id,
+                connect_mode,
+            }) => (provider.clone(), model_id.clone(), *connect_mode),
             _ => return None,
         };
         let key = std::mem::take(&mut self.slash_menu.credential_buffer)
@@ -526,6 +649,7 @@ impl TuiState {
                 provider,
                 api_key: key,
                 model_id,
+                connect_mode,
             })
         }
     }
@@ -685,13 +809,14 @@ mod tests {
     fn credential_input_collects_pasted_text_and_submits() {
         let mut state = TuiState::new();
 
-        state.open_credential_input("openai", None);
+        state.open_credential_input("openai", None, false);
         state.credential_append_str("sk-test-key\n");
 
         let response = state.credential_submit().expect("credential response");
         assert_eq!(response.provider, "openai");
         assert_eq!(response.api_key, "sk-test-key");
         assert_eq!(response.model_id, None);
+        assert!(!response.connect_mode);
         assert!(!state.slash_menu.is_open);
     }
 
@@ -699,7 +824,7 @@ mod tests {
     fn empty_credential_submit_closes_without_response() {
         let mut state = TuiState::new();
 
-        state.open_credential_input("openai", Some("gpt-4.1"));
+        state.open_credential_input("openai", Some("gpt-4.1"), false);
 
         assert!(state.credential_submit().is_none());
         assert!(!state.slash_menu.is_open);

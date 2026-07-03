@@ -1296,7 +1296,7 @@ fn complete_slash_command_multiple_matches() {
 
     let completions = engine.complete_slash_command("/c");
 
-    assert_eq!(completions, vec!["/copy"]);
+    assert_eq!(completions, vec!["/copy", "/connect"]);
 }
 
 #[test]

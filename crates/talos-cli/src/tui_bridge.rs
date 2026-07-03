@@ -102,6 +102,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     UiOutput::ModelSwitchRequest(req) => {
                                         let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(req));
                                     }
+                                    UiOutput::ConnectProviderRequest { provider } => {
+                                        let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
+                                    }
                                     UiOutput::SkillCommand(req) => {
                                         handle_skill_command(
                                             req,
@@ -128,7 +131,11 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         }
                     }
                     UserInput::Credential(resp) => {
-                        let _ = session_tx.send(SessionLifecycleRequest::ModelSwitchWithCredential(resp));
+                        if resp.connect_mode {
+                            let _ = session_tx.send(SessionLifecycleRequest::ConnectWithCredential(resp));
+                        } else {
+                            let _ = session_tx.send(SessionLifecycleRequest::ModelSwitchWithCredential(resp));
+                        }
                     }
                     UserInput::ProviderSetup(provider) => {
                         let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider));
@@ -221,4 +228,6 @@ pub(crate) enum SessionLifecycleRequest {
     ModelSwitch(ModelSwitchRequest),
     ModelSwitchWithCredential(CredentialResponseData),
     ProviderSetup(String),
+    ConnectRequest { provider: String },
+    ConnectWithCredential(CredentialResponseData),
 }

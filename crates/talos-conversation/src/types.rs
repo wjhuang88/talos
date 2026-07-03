@@ -230,8 +230,15 @@ pub enum UiOutput {
     SessionPicker(Vec<SessionPickerItem>),
     /// Open the bottom panel as a two-layer model picker.
     ModelPicker(ModelPickerData),
+    /// Open the bottom panel as a connect provider picker.
+    ConnectPicker(ConnectPickerData),
     /// Request to switch the active model.
     ModelSwitchRequest(ModelSwitchRequest),
+    /// Request to connect (register credential for) a provider.
+    /// Empty `provider` signals "show picker".
+    ConnectProviderRequest {
+        provider: String,
+    },
     /// Request runtime Skill activation or reference loading.
     SkillCommand(SkillCommandRequest),
     /// Request a read-only todo list/status/export view for the active session.
@@ -256,6 +263,7 @@ pub enum UiOutput {
 pub struct CredentialRequestData {
     pub provider: String,
     pub model_id: Option<String>,
+    pub connect_mode: bool,
 }
 
 /// User-entered credential returned from the TUI credential input panel.
@@ -267,6 +275,7 @@ pub struct CredentialResponseData {
     pub provider: String,
     pub api_key: String,
     pub model_id: Option<String>,
+    pub connect_mode: bool,
 }
 
 impl std::fmt::Debug for CredentialResponseData {
@@ -275,6 +284,7 @@ impl std::fmt::Debug for CredentialResponseData {
             .field("provider", &self.provider)
             .field("api_key", &"***")
             .field("model_id", &self.model_id)
+            .field("connect_mode", &self.connect_mode)
             .finish()
     }
 }
@@ -367,6 +377,27 @@ pub struct ModelPickerData {
 pub struct ProviderSetupItem {
     pub provider: String,
     pub model_count: usize,
+}
+
+/// A candidate provider displayed in the interactive connect picker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectPickerItem {
+    pub provider: String,
+    pub name: String,
+    pub model_count: usize,
+    pub api_base_url: Option<String>,
+    pub has_credential: bool,
+    pub doc_url: Option<String>,
+}
+
+/// Payload for [`UiOutput::ConnectPicker`] — drives the two-group provider picker.
+///
+/// `connected` providers have credentials configured. `available` providers
+/// are in the catalog but not yet connected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectPickerData {
+    pub connected: Vec<ConnectPickerItem>,
+    pub available: Vec<ConnectPickerItem>,
 }
 
 /// Request to switch the active model (created by `/model`).
