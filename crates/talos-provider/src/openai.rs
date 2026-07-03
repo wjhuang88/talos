@@ -18,7 +18,8 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use talos_core::message::{AgentEvent, Message, StopReason, ToolCall, Usage};
+use talos_config::ReasoningOptions;
+use talos_core::message::{AgentEvent, Message, ReasoningBlock, StopReason, ToolCall, Usage};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
@@ -40,6 +41,8 @@ pub struct OpenAIProvider {
     model: String,
     base_url: String,
     client: Client,
+    reasoning: Option<ReasoningOptions>,
+    output_limit: Option<u32>,
 }
 
 impl OpenAIProvider {
@@ -55,6 +58,8 @@ impl OpenAIProvider {
             model: model.into(),
             base_url: OPENAI_API_URL.into(),
             client: Client::new(),
+            reasoning: None,
+            output_limit: None,
         }
     }
 
@@ -73,6 +78,17 @@ impl OpenAIProvider {
         self
     }
 
+    /// Set per-model reasoning and output token configuration.
+    pub fn with_reasoning(
+        mut self,
+        reasoning: Option<ReasoningOptions>,
+        output_limit: Option<u32>,
+    ) -> Self {
+        self.reasoning = reasoning;
+        self.output_limit = output_limit;
+        self
+    }
+
     /// Compose the chat completions endpoint URL by appending the standard
     /// path to the configured base.
     fn endpoint_url(&self) -> String {
@@ -81,7 +97,13 @@ impl OpenAIProvider {
     }
 
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(&self.model, messages, &[]);
+        let body = build_request_body(
+            &self.model,
+            messages,
+            &[],
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
         self.send_request(&body).await
     }
 
@@ -90,7 +112,13 @@ impl OpenAIProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(&self.model, messages, tools);
+        let body = build_request_body(
+            &self.model,
+            messages,
+            tools,
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
         self.send_request(&body).await
     }
 
@@ -168,7 +196,13 @@ impl LanguageModel for OpenAIProvider {
     }
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {
-        let body = build_request_body(&self.model, messages, &[]);
+        let body = build_request_body(
+            &self.model,
+            messages,
+            &[],
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
         Some(json!({
             "method": "POST",
             "url": self.endpoint_url(),
@@ -200,7 +234,7 @@ pub fn openai_request_debug_snapshot(
             "Authorization": format!("Bearer {}", redact_secret(api_key)),
             "Content-Type": "application/json",
         },
-        "body": build_request_body(model, messages, &[]),
+        "body": build_request_body(model, messages, &[], None, None),
     })
 }
 
@@ -225,6 +259,8 @@ struct OpenAIChoice {
 struct OpenAIDelta {
     #[serde(default)]
     content: Option<String>,
+    #[serde(default)]
+    reasoning_content: Option<String>,
     #[serde(default)]
     tool_calls: Option<Vec<OpenAIDeltaToolCall>>,
 }
@@ -259,11 +295,13 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
     let mut buffer = String::new();
     let mut input_tokens: u32 = 0;
     let mut output_tokens: u32 = 0;
+    let mut reasoning_tokens: u32 = 0;
 
     let mut tool_call_ids: Vec<String> = Vec::new();
     let mut tool_call_names: Vec<String> = Vec::new();
     let mut tool_call_args: Vec<String> = Vec::new();
     let mut text_accumulator = String::new();
+    let mut reasoning_text = String::new();
     while let Some(chunk_result) = stream.next().await {
         let chunk = match chunk_result {
             Ok(bytes) => match String::from_utf8(bytes.to_vec()) {
@@ -297,6 +335,15 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         })
                         .await;
                 }
+                if !reasoning_text.is_empty() {
+                    let _ = tx
+                        .send(AgentEvent::ReasoningComplete {
+                            blocks: vec![ReasoningBlock::Plain {
+                                text: std::mem::take(&mut reasoning_text),
+                            }],
+                        })
+                        .await;
+                }
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
                         stop_reason: StopReason::EndTurn,
@@ -305,7 +352,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             output_tokens,
                             cache_read_tokens: 0,
                             cache_write_tokens: 0,
-                            reasoning_tokens: 0,
+                            reasoning_tokens,
                         },
                     })
                     .await;
@@ -317,9 +364,10 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 Err(_) => continue,
             };
 
-            if let Some((input, output)) = extract_openai_usage(&data) {
+            if let Some((input, output, reasoning)) = extract_openai_usage(&data) {
                 input_tokens = input;
                 output_tokens = output;
+                reasoning_tokens = reasoning;
             }
 
             if chunk.choices.is_empty() {
@@ -335,6 +383,17 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 let _ = tx
                     .send(AgentEvent::TextDelta {
                         delta: text.clone(),
+                    })
+                    .await;
+            }
+
+            if let Some(ref reasoning_content) = choice.delta.reasoning_content
+                && !reasoning_content.is_empty()
+            {
+                reasoning_text.push_str(reasoning_content);
+                let _ = tx
+                    .send(AgentEvent::ThinkingDelta {
+                        delta: reasoning_content.clone(),
                     })
                     .await;
             }
@@ -408,6 +467,16 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                         .await;
                 }
 
+                if !reasoning_text.is_empty() {
+                    let _ = tx
+                        .send(AgentEvent::ReasoningComplete {
+                            blocks: vec![ReasoningBlock::Plain {
+                                text: std::mem::take(&mut reasoning_text),
+                            }],
+                        })
+                        .await;
+                }
+
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
                         stop_reason,
@@ -416,7 +485,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             output_tokens,
                             cache_read_tokens: 0,
                             cache_write_tokens: 0,
-                            reasoning_tokens: 0,
+                            reasoning_tokens,
                         },
                     })
                     .await;
@@ -433,6 +502,16 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 call,
                 provenance: ToolProvenance::Native,
                 summary_fields: vec![],
+            })
+            .await;
+    }
+
+    if !reasoning_text.is_empty() {
+        let _ = tx
+            .send(AgentEvent::ReasoningComplete {
+                blocks: vec![ReasoningBlock::Plain {
+                    text: std::mem::take(&mut reasoning_text),
+                }],
             })
             .await;
     }
@@ -464,7 +543,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 output_tokens,
                 cache_read_tokens: 0,
                 cache_write_tokens: 0,
-                reasoning_tokens: 0,
+                reasoning_tokens,
             },
         })
         .await;
@@ -487,7 +566,7 @@ fn extract_event_data(event_text: &str) -> Value {
     Value::Null
 }
 
-fn extract_openai_usage(data: &Value) -> Option<(u32, u32)> {
+fn extract_openai_usage(data: &Value) -> Option<(u32, u32, u32)> {
     let usage_data = data.get("usage").filter(|usage| !usage.is_null())?;
     let input_tokens = usage_data
         .get("prompt_tokens")
@@ -497,7 +576,12 @@ fn extract_openai_usage(data: &Value) -> Option<(u32, u32)> {
         .get("completion_tokens")
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as u32;
-    Some((input_tokens, output_tokens))
+    let reasoning_tokens = usage_data
+        .get("completion_tokens_details")
+        .and_then(|details| details.get("reasoning_tokens"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    Some((input_tokens, output_tokens, reasoning_tokens))
 }
 
 fn exponential_backoff(attempt: u32) -> Duration {
@@ -514,13 +598,15 @@ mod tests {
         EMPTY_USER_MESSAGE, OpenAIFunction, OpenAIMessage, OpenAIToolCall,
     };
     use serde_json::json;
+    use talos_config::{ReasoningEffort, ReasoningOptions};
+    use talos_core::message::{AssistantReasoning, ReasoningBlock};
 
     #[test]
     fn build_request_body_user_only() {
         let messages = vec![Message::User {
             content: "Hello".into(),
         }];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["model"], "gpt-4o");
         assert_eq!(body["stream"], true);
@@ -531,10 +617,36 @@ mod tests {
 
     #[test]
     fn build_request_body_requests_streaming_usage() {
-        let body = build_request_body("gpt-4o", &[], &[]);
+        let body = build_request_body("gpt-4o", &[], &[], None, None);
 
         assert_eq!(body["stream"], true);
         assert_eq!(body["stream_options"]["include_usage"], true);
+    }
+
+    #[test]
+    fn test_openai_reasoning_effort_request() {
+        let body = build_request_body(
+            "o3",
+            &[],
+            &[],
+            Some(&ReasoningOptions {
+                effort: Some(ReasoningEffort::High),
+                budget_tokens: None,
+                replay: true,
+            }),
+            Some(2048),
+        );
+
+        assert_eq!(body["reasoning_effort"], "high");
+        assert_eq!(body["max_completion_tokens"], 2048);
+    }
+
+    #[test]
+    fn test_openai_non_reasoning_keeps_body() {
+        let body = build_request_body("gpt-4o", &[], &[], None, Some(2048));
+
+        assert!(body.get("reasoning_effort").is_none());
+        assert!(body.get("max_completion_tokens").is_none());
     }
 
     #[test]
@@ -548,7 +660,7 @@ mod tests {
                 content: "Hello".into(),
             },
         ];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][0]["role"], "system");
         assert_eq!(body["messages"][0]["content"], "Stable system prompt");
@@ -571,7 +683,7 @@ mod tests {
                 reasoning: None,
             },
         ];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][1]["role"], "assistant");
         let tool_calls = body["messages"][1]["tool_calls"].as_array().unwrap();
@@ -590,7 +702,7 @@ mod tests {
                 is_error: false,
             },
         }];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][0]["role"], "tool");
         assert_eq!(body["messages"][0]["tool_call_id"], "call_1");
@@ -604,7 +716,7 @@ mod tests {
             tool_calls: vec![],
             reasoning: None,
         }];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][0]["role"], "assistant");
         assert_eq!(body["messages"][0]["content"], "I'll help with that.");
@@ -630,7 +742,7 @@ mod tests {
                 },
             },
         ];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][0]["content"], EMPTY_USER_MESSAGE);
         assert_eq!(body["messages"][1]["content"], EMPTY_ASSISTANT_MESSAGE);
@@ -648,13 +760,41 @@ mod tests {
             }],
             reasoning: None,
         }];
-        let body = build_request_body("gpt-4o", &messages, &[]);
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(
             body["messages"][0]["content"],
             EMPTY_ASSISTANT_TOOL_CALL_MESSAGE
         );
         assert!(body["messages"][0]["tool_calls"].is_array());
+    }
+
+    #[test]
+    fn test_openai_reasoning_content_replay() {
+        let messages = vec![Message::Assistant {
+            content: "Result".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "my-gateway".into(),
+                model: "glm-5".into(),
+                blocks: vec![
+                    ReasoningBlock::Plain {
+                        text: "first ".into(),
+                    },
+                    ReasoningBlock::Thinking {
+                        text: "ignored".into(),
+                        signature: Some("sig".into()),
+                    },
+                    ReasoningBlock::Plain {
+                        text: "second".into(),
+                    },
+                ],
+            }),
+        }];
+
+        let body = build_request_body("glm-5", &messages, &[], None, None);
+
+        assert_eq!(body["messages"][0]["reasoning_content"], "first second");
     }
 
     #[test]
@@ -749,7 +889,23 @@ mod tests {
         let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
         assert_eq!(chunk.choices[0].delta.content, Some("Hello".into()));
         assert!(chunk.choices[0].delta.tool_calls.is_none());
+        assert!(chunk.choices[0].delta.reasoning_content.is_none());
         assert!(chunk.choices[0].finish_reason.is_none());
+    }
+
+    #[test]
+    fn openai_stream_chunk_deserialize_reasoning_content() {
+        let json_str = r#"{
+            "choices": [{
+                "delta": {"reasoning_content": "thinking chunk"},
+                "finish_reason": null
+            }]
+        }"#;
+        let chunk: OpenAIStreamChunk = serde_json::from_str(json_str).unwrap();
+        assert_eq!(
+            chunk.choices[0].delta.reasoning_content,
+            Some("thinking chunk".into())
+        );
     }
 
     #[test]
@@ -845,11 +1001,29 @@ mod tests {
             "usage": {
                 "prompt_tokens": 123,
                 "completion_tokens": 45,
+                "completion_tokens_details": {
+                    "reasoning_tokens": 12
+                },
                 "total_tokens": 168
             }
         });
 
-        assert_eq!(extract_openai_usage(&data), Some((123, 45)));
+        assert_eq!(extract_openai_usage(&data), Some((123, 45, 12)));
+    }
+
+    #[test]
+    fn test_openai_reasoning_tokens_extraction() {
+        let data = json!({
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "completion_tokens_details": {
+                    "reasoning_tokens": 7
+                }
+            }
+        });
+
+        assert_eq!(extract_openai_usage(&data), Some((10, 20, 7)));
     }
 
     #[test]
@@ -867,7 +1041,7 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let stream_body = concat!(
             "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"},\"finish_reason\":null}]}\n\n",
-            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":123,\"completion_tokens\":45,\"total_tokens\":168}}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":123,\"completion_tokens\":45,\"completion_tokens_details\":{\"reasoning_tokens\":9},\"total_tokens\":168}}\n\n",
             "data: [DONE]\n\n"
         );
         let _mock = server
@@ -894,6 +1068,52 @@ mod tests {
         let usage = final_usage.unwrap();
         assert_eq!(usage.input_tokens, 123);
         assert_eq!(usage.output_tokens, 45);
+        assert_eq!(usage.reasoning_tokens, 9);
+    }
+
+    #[tokio::test]
+    async fn test_openai_reasoning_content_stream() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"step 1 \"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"step 2\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(response, tx).await;
+
+        let mut thinking_deltas = Vec::new();
+        let mut reasoning_blocks = None;
+
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ThinkingDelta { delta } => thinking_deltas.push(delta),
+                AgentEvent::ReasoningComplete { blocks } => reasoning_blocks = Some(blocks),
+                _ => {}
+            }
+        }
+
+        assert_eq!(
+            thinking_deltas,
+            vec!["step 1 ".to_string(), "step 2".to_string()]
+        );
+        assert_eq!(
+            reasoning_blocks,
+            Some(vec![ReasoningBlock::Plain {
+                text: "step 1 step 2".to_string(),
+            }])
+        );
     }
 
     #[test]
@@ -903,12 +1123,14 @@ mod tests {
             content: Some("Hello".into()),
             tool_calls: None,
             tool_call_id: None,
+            reasoning_content: None,
         };
         let json = serde_json::to_value(&msg).unwrap();
         assert_eq!(json["role"], "user");
         assert_eq!(json["content"], "Hello");
         assert!(json["tool_calls"].is_null());
         assert!(json["tool_call_id"].is_null());
+        assert!(json["reasoning_content"].is_null());
     }
 
     #[test]

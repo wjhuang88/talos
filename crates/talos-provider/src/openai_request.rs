@@ -2,7 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use talos_config::{ReasoningEffort, ReasoningOptions};
 use talos_core::message::Message;
+use talos_core::message::ReasoningBlock;
 use talos_core::provider::ToolDefinition;
 
 pub(crate) const EMPTY_USER_MESSAGE: &str = "(silence)";
@@ -20,6 +22,8 @@ pub(crate) struct OpenAIMessage {
     pub(crate) tool_calls: Option<Vec<OpenAIToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) reasoning_content: Option<String>,
 }
 
 /// OpenAI tool call representation in the API.
@@ -42,6 +46,8 @@ pub(crate) fn build_request_body(
     model: &str,
     messages: &[Message],
     tools: &[ToolDefinition],
+    reasoning: Option<&ReasoningOptions>,
+    output_limit: Option<u32>,
 ) -> Value {
     let openai_messages: Vec<OpenAIMessage> = messages
         .iter()
@@ -51,23 +57,26 @@ pub(crate) fn build_request_body(
                 content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
                 tool_calls: None,
                 tool_call_id: None,
+                reasoning_content: None,
             },
             Message::Context { content } => OpenAIMessage {
                 role: "user".into(),
                 content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
                 tool_calls: None,
                 tool_call_id: None,
+                reasoning_content: None,
             },
             Message::User { content } => OpenAIMessage {
                 role: "user".into(),
                 content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
                 tool_calls: None,
                 tool_call_id: None,
+                reasoning_content: None,
             },
             Message::Assistant {
                 content,
                 tool_calls,
-                ..
+                reasoning,
             } => {
                 let openai_tool_calls = if tool_calls.is_empty() {
                     None
@@ -86,6 +95,26 @@ pub(crate) fn build_request_body(
                             .collect(),
                     )
                 };
+
+                let reasoning_content = reasoning.as_ref().and_then(|assistant_reasoning| {
+                    if assistant_reasoning.model != model {
+                        return None;
+                    }
+
+                    let mut combined = String::new();
+                    for block in &assistant_reasoning.blocks {
+                        if let ReasoningBlock::Plain { text } = block {
+                            combined.push_str(text);
+                        }
+                    }
+
+                    if combined.is_empty() {
+                        None
+                    } else {
+                        Some(combined)
+                    }
+                });
+
                 OpenAIMessage {
                     role: "assistant".into(),
                     content: if content.trim().is_empty() {
@@ -99,6 +128,7 @@ pub(crate) fn build_request_body(
                     },
                     tool_calls: openai_tool_calls,
                     tool_call_id: None,
+                    reasoning_content,
                 }
             }
             Message::Tool { result } => {
@@ -112,6 +142,7 @@ pub(crate) fn build_request_body(
                     content: Some(content),
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
+                    reasoning_content: None,
                 }
             }
         })
@@ -141,6 +172,16 @@ pub(crate) fn build_request_body(
             })
             .collect();
         body["tools"] = json!(tools_json);
+    }
+
+    if let Some(reasoning) = reasoning {
+        let effort = match reasoning.effort.clone().unwrap_or(ReasoningEffort::Medium) {
+            ReasoningEffort::Low => "low",
+            ReasoningEffort::Medium => "medium",
+            ReasoningEffort::High => "high",
+        };
+        body["reasoning_effort"] = json!(effort);
+        body["max_completion_tokens"] = json!(output_limit.unwrap_or(4096));
     }
 
     body
