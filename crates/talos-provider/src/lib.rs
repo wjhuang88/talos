@@ -16,6 +16,7 @@
 pub mod mock;
 pub mod openai;
 mod openai_request;
+pub mod retry;
 
 use std::time::Duration;
 
@@ -33,10 +34,10 @@ use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+use crate::retry::{RetryDecision, classify_retry_with_backoff};
+
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
-const MAX_RETRIES: u32 = 3;
-const BASE_RETRY_DELAY_MS: u64 = 500;
 
 /// Anthropic Claude provider implementing [`LanguageModel`].
 ///
@@ -121,7 +122,8 @@ impl AnthropicProvider {
     }
 
     async fn send_request(&self, body: &Value) -> ProviderResult<reqwest::Response> {
-        let mut attempt = 0;
+        let max_attempts = self.timeout_config.max_attempts;
+        let mut attempt = 0u32;
         loop {
             let response = self
                 .client
@@ -131,46 +133,73 @@ impl AnthropicProvider {
                 .header("content-type", "application/json")
                 .json(&body)
                 .send()
-                .await
-                .map_err(|e| ProviderError::NetworkError(e.to_string()))?;
+                .await;
 
-            let status = response.status();
-
-            if status.is_success() {
-                return Ok(response);
-            }
-
-            let body_text = response.text().await.unwrap_or_default();
-
-            if status.as_u16() == 401 {
-                return Err(ProviderError::AuthenticationFailed(body_text));
-            }
-
-            if status.as_u16() == 429 {
-                if attempt >= MAX_RETRIES {
-                    return Err(ProviderError::RateLimited(body_text));
+            match response {
+                Ok(resp) if resp.status().is_success() => return Ok(resp),
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body_text = resp.text().await.unwrap_or_default();
+                    let error = status_to_error(status, body_text);
+                    match classify_retry_with_backoff(
+                        &error,
+                        attempt,
+                        max_attempts,
+                        self.timeout_config.backoff_base_ms,
+                        self.timeout_config.backoff_max_ms,
+                    ) {
+                        RetryDecision::Retry {
+                            attempt: new_attempt,
+                            delay_ms,
+                        } => {
+                            tracing::warn!(
+                                attempt = new_attempt,
+                                delay_ms,
+                                "retrying anthropic provider request"
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = new_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
                 }
-                let delay = exponential_backoff(attempt);
-                tokio::time::sleep(delay).await;
-                attempt += 1;
-                continue;
-            }
-
-            if status.is_server_error() {
-                if attempt >= MAX_RETRIES {
-                    return Err(ProviderError::ServerError(body_text));
+                Err(e) => {
+                    let error = ProviderError::NetworkError(e.to_string());
+                    match classify_retry_with_backoff(
+                        &error,
+                        attempt,
+                        max_attempts,
+                        self.timeout_config.backoff_base_ms,
+                        self.timeout_config.backoff_max_ms,
+                    ) {
+                        RetryDecision::Retry {
+                            attempt: new_attempt,
+                            delay_ms,
+                        } => {
+                            tracing::warn!(
+                                attempt = new_attempt,
+                                delay_ms,
+                                "retrying anthropic network error"
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = new_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
                 }
-                let delay = exponential_backoff(attempt);
-                tokio::time::sleep(delay).await;
-                attempt += 1;
-                continue;
             }
-
-            return Err(ProviderError::InvalidResponse(format!(
-                "unexpected status {}: {}",
-                status, body_text
-            )));
         }
+    }
+}
+
+fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
+    match status.as_u16() {
+        401 | 403 => ProviderError::AuthenticationFailed(body),
+        408 | 409 | 425 | 429 => ProviderError::RateLimited(body),
+        s if s >= 500 => ProviderError::ServerError(body),
+        _ => ProviderError::InvalidResponse(format!("unexpected status {status}: {body}")),
     }
 }
 
@@ -972,11 +1001,6 @@ fn extract_error_message(data: &Value) -> Option<String> {
         .map(String::from)
 }
 
-fn exponential_backoff(attempt: u32) -> Duration {
-    let delay_ms = BASE_RETRY_DELAY_MS * 2_u64.pow(attempt);
-    Duration::from_millis(delay_ms)
-}
-
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
@@ -1121,18 +1145,6 @@ mod tests {
             }
         });
         assert_eq!(extract_stop_reason(&data), Some(StopReason::EndTurn));
-    }
-
-    #[test]
-    fn exponential_backoff_increases() {
-        let d0 = exponential_backoff(0);
-        let d1 = exponential_backoff(1);
-        let d2 = exponential_backoff(2);
-        assert!(d0 < d1);
-        assert!(d1 < d2);
-        assert_eq!(d0, Duration::from_millis(500));
-        assert_eq!(d1, Duration::from_millis(1000));
-        assert_eq!(d2, Duration::from_millis(2000));
     }
 
     #[tokio::test]

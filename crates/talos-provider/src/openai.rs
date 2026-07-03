@@ -26,12 +26,10 @@ use tokio::sync::mpsc;
 
 use crate::openai_request::{build_request_body, redact_secret};
 use crate::parse_text_tool_calls;
+use crate::retry::{RetryDecision, classify_retry_with_backoff};
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1";
 const CHAT_COMPLETIONS_PATH: &str = "/chat/completions";
-const MAX_RETRIES: u32 = 3;
-const BASE_RETRY_DELAY_MS: u64 = 500;
-
 /// OpenAI Chat Completions provider implementing [`LanguageModel`].
 ///
 /// Streams text deltas and tool calls via SSE from the OpenAI Chat Completions API.
@@ -131,7 +129,8 @@ impl OpenAIProvider {
     }
 
     async fn send_request(&self, body: &Value) -> ProviderResult<reqwest::Response> {
-        let mut attempt = 0;
+        let max_attempts = self.timeout_config.max_attempts;
+        let mut attempt = 0u32;
         loop {
             let response = self
                 .client
@@ -140,46 +139,73 @@ impl OpenAIProvider {
                 .header("Content-Type", "application/json")
                 .json(&body)
                 .send()
-                .await
-                .map_err(|e| ProviderError::NetworkError(e.to_string()))?;
+                .await;
 
-            let status = response.status();
-
-            if status.is_success() {
-                return Ok(response);
-            }
-
-            let body_text = response.text().await.unwrap_or_default();
-
-            if status.as_u16() == 401 || status.as_u16() == 403 {
-                return Err(ProviderError::AuthenticationFailed(body_text));
-            }
-
-            if status.as_u16() == 429 {
-                if attempt >= MAX_RETRIES {
-                    return Err(ProviderError::RateLimited(body_text));
+            match response {
+                Ok(resp) if resp.status().is_success() => return Ok(resp),
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body_text = resp.text().await.unwrap_or_default();
+                    let error = status_to_error(status, body_text);
+                    match classify_retry_with_backoff(
+                        &error,
+                        attempt,
+                        max_attempts,
+                        self.timeout_config.backoff_base_ms,
+                        self.timeout_config.backoff_max_ms,
+                    ) {
+                        RetryDecision::Retry {
+                            attempt: new_attempt,
+                            delay_ms,
+                        } => {
+                            tracing::warn!(
+                                attempt = new_attempt,
+                                delay_ms,
+                                "retrying openai provider request"
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = new_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
                 }
-                let delay = exponential_backoff(attempt);
-                tokio::time::sleep(delay).await;
-                attempt += 1;
-                continue;
-            }
-
-            if status.is_server_error() {
-                if attempt >= MAX_RETRIES {
-                    return Err(ProviderError::ServerError(body_text));
+                Err(e) => {
+                    let error = ProviderError::NetworkError(e.to_string());
+                    match classify_retry_with_backoff(
+                        &error,
+                        attempt,
+                        max_attempts,
+                        self.timeout_config.backoff_base_ms,
+                        self.timeout_config.backoff_max_ms,
+                    ) {
+                        RetryDecision::Retry {
+                            attempt: new_attempt,
+                            delay_ms,
+                        } => {
+                            tracing::warn!(
+                                attempt = new_attempt,
+                                delay_ms,
+                                "retrying openai network error"
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = new_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
                 }
-                let delay = exponential_backoff(attempt);
-                tokio::time::sleep(delay).await;
-                attempt += 1;
-                continue;
             }
-
-            return Err(ProviderError::InvalidResponse(format!(
-                "unexpected status {}: {}",
-                status, body_text
-            )));
         }
+    }
+}
+
+fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
+    match status.as_u16() {
+        401 | 403 => ProviderError::AuthenticationFailed(body),
+        408 | 409 | 425 | 429 => ProviderError::RateLimited(body),
+        s if s >= 500 => ProviderError::ServerError(body),
+        _ => ProviderError::InvalidResponse(format!("unexpected status {status}: {body}")),
     }
 }
 
@@ -637,11 +663,6 @@ fn extract_openai_usage(data: &Value) -> Option<(u32, u32, u32)> {
     Some((input_tokens, output_tokens, reasoning_tokens))
 }
 
-fn exponential_backoff(attempt: u32) -> Duration {
-    let delay_ms = BASE_RETRY_DELAY_MS * 2_u64.pow(attempt);
-    Duration::from_millis(delay_ms)
-}
-
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
@@ -954,18 +975,6 @@ mod tests {
         let event_text = "\n\n";
         let data = extract_event_data(event_text);
         assert!(data.is_null());
-    }
-
-    #[test]
-    fn exponential_backoff_increases() {
-        let d0 = exponential_backoff(0);
-        let d1 = exponential_backoff(1);
-        let d2 = exponential_backoff(2);
-        assert!(d0 < d1);
-        assert!(d1 < d2);
-        assert_eq!(d0, Duration::from_millis(500));
-        assert_eq!(d1, Duration::from_millis(1000));
-        assert_eq!(d2, Duration::from_millis(2000));
     }
 
     #[test]
