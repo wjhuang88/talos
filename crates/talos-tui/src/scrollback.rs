@@ -33,6 +33,7 @@ pub(crate) struct PreviewComponent<'a> {
     pub(crate) text: &'a str,
     pub(crate) spinner_color: Option<Color>,
     pub(crate) text_color: Option<Color>,
+    pub(crate) thinking_label_frame: Option<usize>,
 }
 
 impl ViewportComponent for PreviewComponent<'_> {
@@ -55,24 +56,74 @@ impl ViewportComponent for PreviewComponent<'_> {
                     .unwrap_or(display.len()),
             );
             frame.render_widget(
-                Paragraph::new(Line::from(vec![
-                    Span::styled(pad_part.to_string(), Style::default().fg(color)),
-                    Span::styled(text_part.to_string(), Style::default().fg(text_color)),
-                ])),
+                Paragraph::new(Line::from(preview_line_spans(
+                    pad_part,
+                    text_part,
+                    Some(color),
+                    text_color,
+                    self.thinking_label_frame,
+                ))),
                 area,
             );
         } else {
             let full = format!("{}{}", self.padding, line);
             let display = truncate_end_to_width(&full, area.width);
             frame.render_widget(
-                Paragraph::new(Line::from(Span::styled(
-                    display,
-                    Style::default().fg(text_color),
+                Paragraph::new(Line::from(preview_line_spans(
+                    "",
+                    &display,
+                    None,
+                    text_color,
+                    self.thinking_label_frame,
                 ))),
                 area,
             );
         }
     }
+}
+
+pub(crate) fn preview_line_spans<'a>(
+    pad_part: &'a str,
+    text_part: &'a str,
+    padding_color: Option<Color>,
+    text_color: Color,
+    thinking_label_frame: Option<usize>,
+) -> Vec<Span<'a>> {
+    let mut spans = Vec::new();
+    if !pad_part.is_empty() {
+        spans.push(Span::styled(
+            pad_part.to_string(),
+            Style::default().fg(padding_color.unwrap_or(text_color)),
+        ));
+    }
+
+    if let Some(frame) = thinking_label_frame
+        && let Some(rest) = text_part.strip_prefix("thinking")
+    {
+        let ramp = semantic::THINKING_LABEL_GRADIENT;
+        let offset = (frame / 2) % ramp.len();
+        for (idx, ch) in "thinking".chars().enumerate() {
+            spans.push(Span::styled(
+                ch.to_string(),
+                Style::default()
+                    .fg(ramp[(idx + offset) % ramp.len()])
+                    .add_modifier(Modifier::BOLD),
+            ));
+        }
+        if !rest.is_empty() {
+            spans.push(Span::styled(
+                rest.to_string(),
+                Style::default().fg(text_color),
+            ));
+        }
+        return spans;
+    }
+
+    spans.push(Span::styled(
+        text_part.to_string(),
+        Style::default().fg(text_color),
+    ));
+    spans
 }
 
 pub(crate) fn animated_hold_preview_text(status: &HoldStatus, frame: usize) -> String {

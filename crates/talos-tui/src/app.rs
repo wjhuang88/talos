@@ -720,11 +720,18 @@ impl Tui {
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));
+        let thinking_label_frame = self
+            .state
+            .thinking_preview
+            .as_ref()
+            .filter(|_| status.is_processing && hold_status.is_none())
+            .map(|_| self.processing_frame);
         let preview = crate::scrollback::PreviewComponent {
             padding: &preview_padding,
             text: &preview_text,
             spinner_color,
             text_color: preview_text_color,
+            thinking_label_frame,
         };
         let queue = crate::scrollback::QueuePreviewComponent {
             count: status.steering_count + status.followup_count,

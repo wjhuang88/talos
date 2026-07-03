@@ -279,6 +279,32 @@ fn preview_spinner_uses_single_block() {
 }
 
 #[test]
+fn thinking_preview_styles_only_label_with_blue_gradient() {
+    let spans =
+        scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(0));
+
+    assert_eq!(spans.len(), 9);
+    let label: String = spans[..8]
+        .iter()
+        .map(|span| span.content.as_ref())
+        .collect();
+    assert_eq!(label, "thinking");
+    for (idx, span) in spans[..8].iter().enumerate() {
+        assert_eq!(
+            span.style.fg,
+            Some(semantic::THINKING_LABEL_GRADIENT[idx % 4])
+        );
+    }
+    assert_eq!(spans[8].content.as_ref(), ": draft");
+    assert_eq!(spans[8].style.fg, Some(semantic::PREVIEW_FG));
+
+    let shifted =
+        scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(2));
+    assert_ne!(spans[0].style.fg, shifted[0].style.fg);
+    assert_eq!(shifted[8].style.fg, Some(semantic::PREVIEW_FG));
+}
+
+#[test]
 fn stream_render_state_renders_code_fence_on_finish() {
     let mut state = StreamRenderState::default();
     assert!(state.start(MessageSource::Assistant).is_empty());
