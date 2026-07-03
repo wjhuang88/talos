@@ -47,6 +47,8 @@ docs/proposals/
   self-bootstrap validation planning, evidence, and no-hidden-pass rules.
 - [Built-in Workspace Search Tools](builtin-workspace-search-tools.md) — detailed design for
   I012 `find_files` / `grep` tools and fff-inspired ranking/indexing follow-ups.
+- [Intent-Driven Project Management](intent-driven-project-management.md) — proposal for integrating
+  natural-language project-management intent recognition with GOV-003 typed governance execution.
 - [Provider Plugin Architecture](provider-plugin-architecture.md) — long-term provider config
   and plugin direction behind I011-S2.
 - [Reasoning / Thinking Field](reasoning-thinking-field.md) — provider-specific reasoning field

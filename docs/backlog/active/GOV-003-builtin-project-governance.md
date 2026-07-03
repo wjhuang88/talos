@@ -56,6 +56,33 @@ Behavior by project state:
 The command delegates to GOV-003's governance engine; it does not mutate
 conversation display state directly. Follows CMD-001 typed-owner pattern.
 
+### Capability 1: Intent Recognition And Governance Routing
+
+Natural-language project-management requests should route to the same typed governance actions as
+explicit `/agile` commands. Intent recognition is the trigger layer; GOV-003 remains the owner of
+project-management behavior.
+
+Examples:
+
+- "what is active right now?" -> read-only governance status
+- "validate governance" -> read-only governance validation report
+- "start the next iteration" -> preview a start-iteration plan
+- "record this as a future idea" -> preview a proposal/backlog write
+- "the requirement changed" -> preview a change-control action
+
+Routing rules:
+
+- Read-only intents may execute immediately when confidence is high.
+- Ambiguous intents ask for clarification.
+- Mutating intents produce a typed plan and diff/preview first.
+- Confirmed writes must use the permission pipeline and may not be performed directly by intent
+  recognition.
+- Slash commands and natural-language intents must share one governance action implementation path.
+
+Design note: see `docs/proposals/intent-driven-project-management.md` for the proposed integration
+with CMD-001, `talos-conversation`, the future GOV-003 engine boundary, TUI confirmation, and
+dashboard reporting.
+
 When entering a workspace, Talos inspects the project and classifies its
 governance state:
 
