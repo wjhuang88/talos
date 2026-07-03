@@ -124,6 +124,17 @@ pub enum TipKind {
     Error,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TurnPhase {
+    Connecting,
+    Retrying { attempt: u32 },
+    Thinking,
+    Generating,
+    TimedOut,
+    Failed,
+    Cancelled,
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StatusSnapshot {
     pub model_name: String,
@@ -134,6 +145,7 @@ pub struct StatusSnapshot {
     pub steering_count: usize,
     pub followup_count: usize,
     pub is_processing: bool,
+    pub phase: Option<TurnPhase>,
     pub context_limit: Option<u32>,
     pub input_price_per_million: Option<f64>,
     pub output_price_per_million: Option<f64>,

@@ -12,8 +12,13 @@ use crate::types::{
     ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
     SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
-    TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, UiOutput,
+    TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput,
 };
+
+fn is_timeout_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("timeout") || lower.contains("timed out")
+}
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
     match provenance {
@@ -140,6 +145,7 @@ pub struct ConversationEngine {
     pub(crate) skills: Vec<SkillDiagnostic>,
     pub(crate) scrollback: ScrollbackState,
     pub(crate) is_processing: bool,
+    pub(crate) current_phase: Option<TurnPhase>,
     pub(crate) context_limit: Option<u32>,
     pub(crate) input_price_per_million: Option<f64>,
     pub(crate) output_price_per_million: Option<f64>,
@@ -173,6 +179,7 @@ impl ConversationEngine {
             skills: Vec::new(),
             scrollback: ScrollbackState::default(),
             is_processing: false,
+            current_phase: None,
             context_limit: None,
             input_price_per_million: None,
             output_price_per_million: None,
@@ -211,6 +218,7 @@ impl ConversationEngine {
             steering_count: self.steering_queue.len(),
             followup_count: self.followup_queue.len(),
             is_processing: self.is_processing,
+            phase: self.current_phase.clone(),
             context_limit: self.context_limit,
             input_price_per_million: self.input_price_per_million,
             output_price_per_million: self.output_price_per_million,
@@ -248,6 +256,7 @@ impl ConversationEngine {
     pub fn cancel_turn(&mut self) -> Vec<UiOutput> {
         self.close_stream();
         self.is_processing = false;
+        self.current_phase = Some(TurnPhase::Cancelled);
         self.current_turn_text.clear();
         let had_thinking = !self.current_thinking_text.is_empty();
         self.current_thinking_text.clear();
@@ -271,6 +280,7 @@ impl ConversationEngine {
         match event {
             AgentEvent::TurnStart => {
                 self.is_processing = true;
+                self.current_phase = Some(TurnPhase::Connecting);
                 self.current_turn_text.clear();
                 self.current_thinking_text.clear();
 
@@ -283,6 +293,7 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::TextDelta { delta } => {
+                self.current_phase = Some(TurnPhase::Generating);
                 self.current_turn_text.push_str(delta);
                 if let Some(ref tx) = self.stream_tx {
                     let _ = tx.send(delta.clone());
@@ -290,16 +301,20 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ThinkingDelta { delta } => {
+                self.current_phase = Some(TurnPhase::Thinking);
                 self.current_thinking_text.push_str(delta);
                 outputs.push(UiOutput::ThinkingPreview {
                     text: Some(self.current_thinking_text.clone()),
                 });
+                outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolCallStarted { name } => {
+                self.current_phase = Some(TurnPhase::Generating);
                 self.close_stream();
                 outputs.push(UiOutput::ToolCallStarted {
                     name: name.to_string(),
                 });
+                outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolCall {
                 call,
@@ -342,6 +357,7 @@ impl ConversationEngine {
                 if matches!(stop_reason, StopReason::EndTurn) {
                     self.is_processing = false;
                 }
+                self.current_phase = None;
                 self.finalize_turn();
                 self.usage = usage.clone();
                 self.last_flushed_message = self.messages.len();
@@ -356,6 +372,11 @@ impl ConversationEngine {
             AgentEvent::Error { message } => {
                 self.close_stream();
                 self.is_processing = false;
+                self.current_phase = Some(if is_timeout_error(message) {
+                    TurnPhase::TimedOut
+                } else {
+                    TurnPhase::Failed
+                });
                 self.current_turn_text.clear();
                 let had_thinking = !self.current_thinking_text.is_empty();
                 self.current_thinking_text.clear();

@@ -7,7 +7,7 @@ use crate::engine::ConversationEngine;
 use crate::types::{
     ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, ModelPickerItem,
     PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind, TodoCommandAction,
-    TodoExportFormat, ToolCallDisplay, ToolResultDisplay, UiOutput,
+    TodoExportFormat, ToolCallDisplay, ToolResultDisplay, TurnPhase, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -802,9 +802,49 @@ fn cancel_turn_clears_processing_state() {
     assert!(outputs.iter().any(|output| {
         matches!(
             output,
-            UiOutput::Status(status) if !status.is_processing
+            UiOutput::Status(status) if !status.is_processing && status.phase == Some(TurnPhase::Cancelled)
         )
     }));
+}
+
+#[test]
+fn phase_transitions_turnstart_to_thinking_to_generating_to_end() {
+    let mut engine = new_engine();
+
+    let start = engine.handle_agent_event(&AgentEvent::TurnStart);
+    let start_status = find_status(&start).expect("turn start status");
+    assert_eq!(start_status.phase, Some(TurnPhase::Connecting));
+
+    let thinking = engine.handle_agent_event(&AgentEvent::ThinkingDelta {
+        delta: "analyzing".to_string(),
+    });
+    let thinking_status = find_status(&thinking).expect("thinking status");
+    assert_eq!(thinking_status.phase, Some(TurnPhase::Thinking));
+
+    let generating = engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: "result".to_string(),
+    });
+    let generating_status = find_status(&generating).expect("text delta status");
+    assert_eq!(generating_status.phase, Some(TurnPhase::Generating));
+
+    let end = engine.handle_agent_event(&AgentEvent::TurnEnd {
+        usage: Usage::default(),
+        stop_reason: StopReason::EndTurn,
+    });
+    let end_status = find_status(&end).expect("turn end status");
+    assert_eq!(end_status.phase, None);
+}
+
+#[test]
+fn timeout_error_sets_timed_out_phase() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "request timed out after 30s".to_string(),
+    });
+    let status = find_status(&outputs).expect("error status");
+    assert_eq!(status.phase, Some(TurnPhase::TimedOut));
 }
 
 #[test]
