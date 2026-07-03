@@ -16,6 +16,11 @@ and prepare its own changes through the project's normal governance and safety g
 The current development process still relies on Codex. Therefore Talos remains pre-1.0 even when
 individual product capabilities are useful and releaseable.
 
+I093 activation note (2026-07-04): selected for readiness audit only. This does not authorize a
+`v1.0.0` claim, tag, publish, or release action. Codex-primary work in the 2026-07-04 direct-owner
+track remains non-qualifying for REL-002 unless a later Talos-primary rehearsal explicitly proves
+otherwise.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent

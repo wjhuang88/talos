@@ -7,6 +7,9 @@
 **Depends on**: `talos-agent` turn-loop stability; `talos-core` protocol stability; permission
 pipeline stability; session protocol cleanup; ADR-024
 
+I093 activation note (2026-07-04): selected for self-bootstrap readiness audit only. The current
+status remains "Complete (pre-1.0 facade)", not a stable 1.0 SDK guarantee.
+
 ## Problem
 
 Talos's core turn loop is mostly isolated in `talos-agent`, and CLI/TUI crates do not own the

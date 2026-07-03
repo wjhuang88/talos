@@ -129,7 +129,7 @@ docs/iterations/
 | I090 | High-Risk Ingestion And Search Boundary | **Complete (2026-07-04)** | Month 1 of the direct senior-agent high-risk execution track. Bounded document extraction and ripgrep-backed search stabilization are complete; full workspace and governance closeout passed. No browser/PDF/Office/OCR scope. See `I090-high-risk-ingestion-search-boundary.md` and `../tasks/2026-07-04-architect-owned-four-month-high-risk-execution.md`. |
 | I091 | Plugin, Hook, And Distribution Boundary | **Complete (2026-07-04)** | Month 2 of the direct senior-agent high-risk execution track. `/hooks` diagnostics, hook manifest declaration validation, and optional runtime asset distribution policy are complete; no remote install, marketplace, write-capable plugin tools, or auto-discovery. See `I091-plugin-hook-distribution-boundary.md`. |
 | I092 | Context Compression And Autonomy Gates | **Complete (2026-07-04)** | Month 3 of the direct senior-agent high-risk execution track. Bash-only cache-safe compression proof and deny/ask/allow autonomy matrix closed without runtime autonomy expansion. See `I092-context-compression-autonomy-gates.md`. |
-| I093 | Self-Bootstrap, Runtime, And Release Gate | **Planned (2026-07-04)** | Month 4 of the direct senior-agent high-risk execution track. REL-002 evidence, runtime/governance residual audit, and closeout without a v1.0 claim. See `I093-self-bootstrap-runtime-release-gate.md`. |
+| I093 | Self-Bootstrap, Runtime, And Release Gate | **Active (2026-07-04)** | Month 4 of the direct senior-agent high-risk execution track. REL-002 evidence, runtime/governance residual audit, and closeout without a v1.0 claim. See `I093-self-bootstrap-runtime-release-gate.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -175,7 +175,7 @@ rewrite published iteration baselines.
 | I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |
 | I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
 | I092 | Complete | Closed 2026-07-04 with bash-only cache-stability/export evidence and autonomy permission matrix. |
-| I093 | Planned | Direct senior-agent high-risk track month 4. Activation blocked until I092 closes or is explicitly deferred. |
+| I093 | Active | Activated after I092 completion. Readiness/reporting only; no v1.0 claim, tag, publish, or release action. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |

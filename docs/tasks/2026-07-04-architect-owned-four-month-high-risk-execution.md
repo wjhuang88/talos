@@ -58,8 +58,8 @@ is not suitable for routine frontline delegation.
 | A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Complete |
 | A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Complete |
 | A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Complete |
-| A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | In Progress |
-| A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | Planned |
+| A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Complete |
+| A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | In Progress |
 | A14 | REL-002 self-bootstrap rehearsal | Record one Talos-on-Talos rehearsal packet or a failed rehearsal with exact gap evidence. | A13 | REL-002 evidence table updated; no v1.0 claim unless criteria met. | Record non-qualifying evidence. | Planned |
 | A15 | Final closeout | Four-month matrix, residual owners, release posture, docs, Board, and handoff are synchronized. | A14 | workspace tests, clippy, governance, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
 
@@ -627,3 +627,31 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I093, REL-002, RUNTIME-001, GOV-003, ARCH-030, and this task's A11 checkpoint.
+
+### A12 — I093 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I093 after I092 closeout.
+- Recorded non-terminal inventory: I085 remains Paused; I086-I089 remain planned product-hardening
+  shells.
+- Synchronized REL-002, RUNTIME-001, GOV-003, ARCH-030, Board, and iteration index with the I093
+  readiness-only boundary.
+
+Current state and artifacts:
+
+- I093 is Active.
+- REL-002 remains not ready for `v1.0.0`.
+- RUNTIME-001 remains a pre-1.0 facade, GOV-003 remains Phase 1 partial, and ARCH-030 remains a
+  residual register.
+- No tag, publish, release action, v1.0 claim, or gate lowering is active.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I093, REL-002, RUNTIME-001, GOV-003, ARCH-030, and this task's A12 checkpoint.

@@ -6,6 +6,10 @@
 **Depends on**: I035 and CMD-001 for Phase 1 read-only runtime status; WEB-001 only for Phase 3
 management UI surface
 
+I093 activation note (2026-07-04): selected for self-bootstrap readiness audit only. Phase 2 gate
+enforcement and Phase 3 PM web UI remain future work; this activation does not add governance
+mutation or enforcement behavior.
+
 ## Problem
 
 The `agent-project-governance` skill (wjhuang88, v2.0.0) provides structured project

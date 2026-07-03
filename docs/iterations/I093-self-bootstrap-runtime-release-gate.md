@@ -1,6 +1,6 @@
 # Iteration I093: Self-Bootstrap, Runtime, And Release Gate
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: update the self-bootstrap readiness boundary, runtime SDK residuals, and
 > release posture without making a v1.0 claim prematurely.
@@ -71,15 +71,19 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated after I092 completed bash-only cache-stability/export evidence and the autonomy permission matrix. Non-terminal inventory disposition: I085 remains Paused with MC107 real terminal `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells. I093 starts with readiness/reporting only: REL-002 remains not ready for `v1.0.0`, RUNTIME-001 is complete only as a pre-1.0 facade, GOV-003 remains Phase 1 partial, and ARCH-030 remains a residual register. No tag, publish, release action, or v1.0 claim is authorized. |
 
 ## Verification Evidence
 
-- Pending.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
 
 ## Variance And Residuals
 
-- Pending.
+- No release, publish, tag, or v1.0 posture changed at activation.
+- A13 starts with runtime/governance/readiness audit evidence. A14 remains closeout and handoff.
 
 ## Retrospective
 
-- Pending.
+- Activation preserves pre-1.0 honesty. The next work should name concrete gaps rather than
+  convert Codex-primary evidence into REL-002 qualification.

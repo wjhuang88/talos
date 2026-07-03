@@ -6,6 +6,9 @@
 **Parent**: Two-month architecture optimization M10/M11
 **Selected iteration**: Not selected
 
+I093 activation note (2026-07-04): selected for release-readiness audit only. The residual roots
+remain watchlist items; no decomposition slice is activated by I093 activation alone.
+
 ## Problem
 
 The 2026-06-27/28 architecture optimization cycle reduced several production roots, but a small set
