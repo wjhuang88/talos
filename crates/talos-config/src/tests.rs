@@ -319,7 +319,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
     // not context_limit() (user-config only).
     let builtin = Config {
         provider: "openai".to_string(),
-        model: "gpt-4.1-2025-04-14".to_string(),
+        model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
         log: LogConfig::default(),
         hooks: HookConfig::default(),
@@ -648,7 +648,7 @@ fn test_resolve_model_limits_falls_back_to_conservative_when_not_in_catalog() {
 fn test_resolve_model_limits_output_limit_from_catalog() {
     let config = Config {
         provider: "openai".to_string(),
-        model: "gpt-4.1-2025-04-14".to_string(),
+        model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
         ..Default::default()
     };
@@ -778,8 +778,8 @@ fn test_set_active_model_sets_provider_from_catalog() {
 #[test]
 fn test_set_active_model_openai() {
     let mut config = Config::default();
-    config.set_active_model("gpt-4.1-2025-04-14").unwrap();
-    assert_eq!(config.model, "gpt-4.1-2025-04-14");
+    config.set_active_model("gpt-4.1").unwrap();
+    assert_eq!(config.model, "gpt-4.1");
     assert_eq!(config.provider, "openai");
     assert!(config.providers.contains_key("openai"));
 }

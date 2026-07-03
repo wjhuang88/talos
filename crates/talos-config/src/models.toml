@@ -3,6 +3,18 @@
 # Only models with tool calling support are included.
 
 [[models]]
+id = "claude-sonnet-5"
+provider = "anthropic"
+context_limit = 1000000
+output_limit = 128000
+release_date = "2026-06-30"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
 id = "claude-sonnet-4-5-20250929"
 provider = "anthropic"
 context_limit = 200000
@@ -20,6 +32,18 @@ provider = "anthropic"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-09-29"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "claude-opus-4-8"
+provider = "anthropic"
+context_limit = 1000000
+output_limit = 128000
+release_date = "2026-05-28"
 
 [models.capabilities]
 tools = true
@@ -51,6 +75,18 @@ reasoning = true
 image_input = true
 
 [[models]]
+id = "claude-haiku-4-5-20251001"
+provider = "anthropic"
+context_limit = 200000
+output_limit = 64000
+release_date = "2025-10-15"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
 id = "claude-haiku-4-5"
 provider = "anthropic"
 context_limit = 200000
@@ -63,7 +99,79 @@ reasoning = true
 image_input = true
 
 [[models]]
-id = "gpt-4.1-2025-04-14"
+id = "gpt-5.5"
+provider = "openai"
+context_limit = 1050000
+output_limit = 128000
+release_date = "2026-04-23"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "gpt-5.5-pro"
+provider = "openai"
+context_limit = 1050000
+output_limit = 128000
+release_date = "2026-04-23"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "gpt-5.4-mini"
+provider = "openai"
+context_limit = 400000
+output_limit = 128000
+release_date = "2026-03-17"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "gpt-5.4-nano"
+provider = "openai"
+context_limit = 400000
+output_limit = 128000
+release_date = "2026-03-17"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "gpt-5.3-codex"
+provider = "openai"
+context_limit = 400000
+output_limit = 128000
+release_date = "2026-02-05"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "o3-pro"
+provider = "openai"
+context_limit = 200000
+output_limit = 100000
+release_date = "2025-06-10"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "gpt-4.1"
 provider = "openai"
 context_limit = 1047576
 output_limit = 32768
@@ -75,7 +183,7 @@ reasoning = false
 image_input = true
 
 [[models]]
-id = "o3-2025-04-16"
+id = "o3"
 provider = "openai"
 context_limit = 200000
 output_limit = 100000
@@ -87,7 +195,7 @@ reasoning = true
 image_input = false
 
 [[models]]
-id = "o4-mini-2025-04-16"
+id = "o4-mini"
 provider = "openai"
 context_limit = 200000
 output_limit = 100000
@@ -97,13 +205,37 @@ release_date = "2025-04-16"
 tools = true
 reasoning = true
 image_input = false
+
+[[models]]
+id = "gemini-3.5-flash"
+provider = "google"
+context_limit = 1048576
+output_limit = 65536
+release_date = "2026-05-19"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
+id = "gemini-3.1-pro-preview"
+provider = "google"
+context_limit = 1048576
+output_limit = 65536
+release_date = "2026-02-19"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
 
 [[models]]
 id = "gemini-2.5-pro"
 provider = "google"
 context_limit = 1048576
 output_limit = 65536
-release_date = "2025-03-24"
+release_date = "2025-06-17"
 
 [models.capabilities]
 tools = true
@@ -115,7 +247,7 @@ id = "gemini-2.5-flash"
 provider = "google"
 context_limit = 1048576
 output_limit = 65536
-release_date = "2025-05-20"
+release_date = "2025-06-17"
 
 [models.capabilities]
 tools = true
@@ -187,7 +319,7 @@ id = "glm-5.1"
 provider = "zhipu"
 context_limit = 200000
 output_limit = 131072
-release_date = "2026-04-07"
+release_date = "2026-03-27"
 
 [models.capabilities]
 tools = true
@@ -413,7 +545,7 @@ image_input = false
 [[models]]
 id = "MiniMax-M3"
 provider = "minimax"
-context_limit = 512000
+context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-01"
 
@@ -459,6 +591,18 @@ reasoning = true
 image_input = false
 
 [[models]]
+id = "kimi-k2.7-code"
+provider = "moonshot"
+context_limit = 262144
+output_limit = 262144
+release_date = "2026-06-12"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = true
+
+[[models]]
 id = "kimi-k2.6"
 provider = "moonshot"
 context_limit = 262144
@@ -476,6 +620,30 @@ provider = "moonshot"
 context_limit = 262144
 output_limit = 262144
 release_date = "2026-01-15"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "qwen3.7-max"
+provider = "qwen"
+context_limit = 1000000
+output_limit = 65536
+release_date = "2026-05-21"
+
+[models.capabilities]
+tools = true
+reasoning = true
+image_input = false
+
+[[models]]
+id = "qwen3.6-plus"
+provider = "qwen"
+context_limit = 1000000
+output_limit = 65536
+release_date = "2026-04-02"
 
 [models.capabilities]
 tools = true
@@ -519,9 +687,9 @@ reasoning = true
 image_input = false
 
 [[models]]
-id = "anthropic/claude-sonnet-4-5"
+id = "anthropic/claude-sonnet-4.5"
 provider = "openrouter"
-context_limit = 200000
+context_limit = 1000000
 output_limit = 64000
 release_date = "2025-09-29"
 
@@ -531,21 +699,21 @@ reasoning = true
 image_input = true
 
 [[models]]
-id = "openai/gpt-4.1"
+id = "openai/gpt-5.5"
 provider = "openrouter"
-context_limit = 1047576
-output_limit = 32768
-release_date = "2025-04-14"
+context_limit = 1050000
+output_limit = 128000
+release_date = "2026-04-23"
 
 [models.capabilities]
 tools = true
-reasoning = false
+reasoning = true
 image_input = true
 
 [[models]]
 id = "deepseek/deepseek-v4-pro"
 provider = "openrouter"
-context_limit = 1000000
+context_limit = 1048576
 output_limit = 384000
 release_date = "2026-04-24"
 
