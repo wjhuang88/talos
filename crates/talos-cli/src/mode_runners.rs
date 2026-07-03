@@ -283,7 +283,8 @@ async fn handle_connect(
             catalog
                 .and_then(|c| c.providers.iter().find(|p| p.id == provider))
                 .and_then(|p| p.api_base_url.clone())
-        });
+        })
+        .or_else(|| talos_config::builtin_provider_config(provider).and_then(|p| p.base_url));
 
     let _ = ui_tx.send(UiOutput::CredentialRequest(
         talos_conversation::CredentialRequestData {
@@ -403,7 +404,8 @@ fn build_connect_picker_data(
             provider: provider_id.clone(),
             name: provider_id.clone(),
             model_count: count,
-            api_base_url: None,
+            api_base_url: talos_config::builtin_provider_config(&provider_id)
+                .and_then(|p| p.base_url),
             has_credential,
             doc_url: None,
         };
@@ -2091,8 +2093,8 @@ mod connect_tests {
         let with_catalog = build_connect_picker_data(&config, Some(&snapshot));
         let without_catalog = build_connect_picker_data(&config, None);
 
-        // The catalog-backed result must carry provider metadata that the
-        // builtin-only fallback cannot produce (builtin has no base URLs).
+        // The catalog-backed result must carry provider metadata and takes
+        // precedence over builtin fallback data.
         let groq_with_catalog = with_catalog
             .available
             .iter()
@@ -2100,17 +2102,26 @@ mod connect_tests {
             .expect("groq present via catalog");
         assert!(groq_with_catalog.api_base_url.is_some());
 
-        // builtin_models() has no "groq" provider at all in this fixture's
-        // assumptions-free check: whichever providers it does have, none
-        // carry base_url/doc_url metadata (that field is always None).
-        for item in without_catalog
+        assert!(
+            without_catalog
+                .connected
+                .iter()
+                .chain(without_catalog.available.iter())
+                .all(|item| item.provider != "groq"),
+            "groq should only appear from the live catalog in this fixture"
+        );
+
+        let qwen = without_catalog
             .connected
             .iter()
             .chain(without_catalog.available.iter())
-        {
-            assert!(item.api_base_url.is_none());
-            assert!(item.doc_url.is_none());
-        }
+            .find(|item| item.provider == "qwen")
+            .expect("qwen should be present via packaged models.toml fallback");
+        assert_eq!(
+            qwen.api_base_url.as_deref(),
+            Some("https://dashscope.aliyuncs.com/compatible-mode/v1")
+        );
+        assert!(qwen.doc_url.is_none());
     }
 
     #[test]
@@ -2127,6 +2138,10 @@ mod connect_tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let missing = dir.path().join("does-not-exist").join("catalog.db");
         assert!(crate::model_lifecycle::open_catalog_snapshot(&missing).is_none());
+        assert!(
+            !missing.exists(),
+            "read-only snapshot probing must not create catalog.db"
+        );
     }
 
     #[test]
@@ -2328,6 +2343,27 @@ mod connect_tests {
         assert_eq!(
             default_base_url.as_deref(),
             Some("https://api.groq.com/openai/v1")
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_default_base_url_falls_back_to_builtin_provider_config() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+
+        handle_connect(&tx, &config, "qwen", None).await;
+        drop(tx);
+
+        let mut default_base_url = None;
+        while let Some(output) = rx.recv().await {
+            if let UiOutput::CredentialRequest(req) = output {
+                default_base_url = req.default_base_url;
+            }
+        }
+
+        assert_eq!(
+            default_base_url.as_deref(),
+            Some("https://dashscope.aliyuncs.com/compatible-mode/v1")
         );
     }
 

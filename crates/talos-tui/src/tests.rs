@@ -695,6 +695,49 @@ mod tests {
     }
 
     #[test]
+    fn test_slash_menu_enter_uses_first_command_prefix_match() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        state.append_slash_query_char('m');
+        state.append_slash_query_char('o');
+
+        let visible: Vec<&str> = state
+            .slash_menu
+            .filtered_items(state.panel_query())
+            .into_iter()
+            .map(|item| item.label.as_str())
+            .collect();
+        assert_eq!(visible.first(), Some(&"/model"));
+
+        let action = state.accept_selected_panel_item();
+        assert_eq!(action, crate::state::PanelAction::None);
+        assert_eq!(state.input_buffer, "/model ");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_slash_menu_pasted_prefix_selects_first_match_before_enter() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        state.input_paste("mo");
+
+        let visible: Vec<&str> = state
+            .slash_menu
+            .filtered_items(state.panel_query())
+            .into_iter()
+            .map(|item| item.label.as_str())
+            .collect();
+        assert_eq!(visible.first(), Some(&"/model"));
+
+        let action = state.accept_selected_panel_item();
+        assert_eq!(action, crate::state::PanelAction::None);
+        assert_eq!(state.input_buffer, "/model ");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
     fn test_slash_menu_uses_registry_execution_mode() {
         let registry = talos_conversation::command_registry();
         let menu = BottomPanelState::open_slash(registry);

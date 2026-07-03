@@ -499,11 +499,11 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             .fg(semantic::TEXT_ACCENT)
             .bg(semantic::NORD2);
         let header_style = Style::default()
-            .fg(semantic::DIM_TEXT)
+            .fg(semantic::TEXT_WARNING)
             .bg(semantic::NORD2)
             .bold();
         let header_selected = Style::default()
-            .fg(semantic::TEXT_ACCENT)
+            .fg(semantic::TEXT_WARNING)
             .bg(semantic::NORD2)
             .bold();
 

@@ -1,7 +1,7 @@
 use crate::{ProviderConfig, ProviderProtocol};
 use std::collections::HashMap;
 
-pub(crate) fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
+pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
     match name {
         "anthropic" => Some(ProviderConfig {
             protocol: ProviderProtocol::AnthropicMessages,

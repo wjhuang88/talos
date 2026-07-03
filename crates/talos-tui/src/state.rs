@@ -437,13 +437,23 @@ impl BottomPanelState {
         };
 
         if self.is_slash() {
-            return self
-                .items
-                .iter()
-                .enumerate()
-                .filter(|(_, item)| item_matches(item))
-                .map(|(i, _)| i)
-                .collect();
+            let command_name = |item: &PanelItem| -> String {
+                item.label
+                    .strip_prefix('/')
+                    .unwrap_or(&item.label)
+                    .to_lowercase()
+            };
+            let mut prefix_matches = Vec::new();
+            let mut other_matches = Vec::new();
+            for (i, item) in self.items.iter().enumerate() {
+                if command_name(item).starts_with(&lower) {
+                    prefix_matches.push(i);
+                } else if item_matches(item) {
+                    other_matches.push(i);
+                }
+            }
+            prefix_matches.extend(other_matches);
+            return prefix_matches;
         }
 
         let mut result = Vec::new();
@@ -607,7 +617,8 @@ impl TuiState {
             self.credential_append_str(text);
         } else if self.slash_menu.is_slash() {
             self.input_append_str(text);
-            self.slash_menu.selected_index = 0;
+            let query = self.panel_query().to_string();
+            self.slash_menu.reset_selection_for_query(&query);
         } else if !self.slash_menu.is_open {
             self.input_append_str(text);
         }
@@ -1153,6 +1164,9 @@ mod tests {
         state.input_paste("model");
 
         assert_eq!(state.input_buffer, "/model");
+        let action = state.accept_selected_panel_item();
+        assert_eq!(action, crate::state::PanelAction::None);
+        assert_eq!(state.input_buffer, "/model ");
     }
 
     #[test]

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
-use talos_conversation::{ModelPickerData, ModelPickerItem, ProviderSetupItem};
+use talos_conversation::{ModelPickerData, ModelPickerItem};
 use talos_core::message::Message;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
@@ -39,12 +39,13 @@ pub(crate) struct CatalogSnapshot {
 /// Returns `None` when the database does not exist yet, is corrupt, has an
 /// incompatible schema version, or has not been seeded with any providers
 /// (a fresh, never-populated `catalog.db`) — callers must degrade to
-/// `builtin_models()` in every one of these cases. `ModelCatalog::open`
-/// creates an empty database for a missing path, so an explicit
-/// empty-providers check is required to avoid treating an unseeded catalog
-/// as "no providers available" instead of "fall back to builtin". Never
-/// blocks startup or panics: all failure modes route through `Result::ok()`.
+/// `builtin_models()` in every one of these cases. This is a read-only startup
+/// probe: it must not create `catalog.db` as a side effect. Never blocks startup
+/// or panics: all failure modes route through `Result::ok()`.
 pub(crate) fn open_catalog_snapshot(catalog_path: &std::path::Path) -> Option<CatalogSnapshot> {
+    if !catalog_path.is_file() {
+        return None;
+    }
     let catalog = talos_models::ModelCatalog::open(catalog_path).ok()?;
     let providers = catalog.all_providers().ok()?;
     if providers.is_empty() {
@@ -59,10 +60,8 @@ pub(crate) fn open_catalog_snapshot(catalog_path: &std::path::Path) -> Option<Ca
 /// Iterates the model catalog, detects duplicate model IDs across providers,
 /// checks provider authentication, and formats display strings. Models from
 /// authenticated providers appear in `ready_models`; unauthenticated providers
-/// are grouped into `setup_providers` with their model counts.
+/// are intentionally omitted from `/model` and handled by `/connect`.
 pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
-    use std::collections::BTreeMap;
-
     let catalog = config.all_models();
 
     // Detect model IDs that appear under multiple providers (e.g., glm-5.2
@@ -74,8 +73,6 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
     }
 
     let mut ready_models: Vec<ModelPickerItem> = Vec::new();
-    let mut unauthed_by_provider: BTreeMap<String, usize> = BTreeMap::new();
-
     for m in &catalog {
         let provider_authed = config.provider_authenticated(&m.provider);
         let pricing_str = m.pricing.as_ref().map(|p| {
@@ -110,22 +107,12 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                 authenticated: true,
                 is_current: m.id == config.model && m.provider == config.provider,
             });
-        } else {
-            *unauthed_by_provider.entry(m.provider.clone()).or_default() += 1;
         }
     }
 
-    let setup_providers: Vec<ProviderSetupItem> = unauthed_by_provider
-        .into_iter()
-        .map(|(provider, count)| ProviderSetupItem {
-            provider,
-            model_count: count,
-        })
-        .collect();
-
     ModelPickerData {
         ready_models,
-        setup_providers,
+        setup_providers: Vec::new(),
     }
 }
 
@@ -539,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn unauthenticated_providers_appear_in_setup_providers() {
+    fn unauthenticated_providers_are_omitted_from_model_picker() {
         let mut config = Config::default();
         config.model = "claude-sonnet-4-5-20250929".to_string();
         config.provider = "anthropic".to_string();
@@ -560,28 +547,17 @@ mod tests {
 
         let data = build_model_picker_data(&config);
 
-        let openai_setup: Vec<_> = data
-            .setup_providers
-            .iter()
-            .filter(|p| p.provider == "openai")
-            .collect();
         assert!(
-            !openai_setup.is_empty(),
-            "Expected openai in setup_providers when unauthenticated"
+            data.setup_providers.is_empty(),
+            "unauthenticated providers belong in /connect, not /model"
         );
         assert!(
-            openai_setup[0].model_count > 0,
-            "openai setup_providers entry should have model_count > 0"
+            data.ready_models.iter().all(|m| m.authenticated),
+            "/model picker must contain only authenticated providers"
         );
-
-        let anthropic_setup: Vec<_> = data
-            .setup_providers
-            .iter()
-            .filter(|p| p.provider == "anthropic")
-            .collect();
         assert!(
-            anthropic_setup.is_empty(),
-            "anthropic should not be in setup_providers when authenticated"
+            data.ready_models.iter().all(|m| m.provider != "openai"),
+            "unauthenticated openai models must be omitted from /model"
         );
     }
 

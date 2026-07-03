@@ -25,5 +25,5 @@ pub use types::{
     ProviderTimeoutConfig, ReasoningEffort, ReasoningOptions, RpcConfig, SkillConfig,
 };
 
-pub(crate) use builtin::builtin_provider_config;
+pub use builtin::builtin_provider_config;
 pub(crate) use env::{home_dir, substitute_env_vars};

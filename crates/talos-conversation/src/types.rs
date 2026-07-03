@@ -257,8 +257,8 @@ pub enum UiOutput {
 ///
 /// When `model_id` is `Some`, the credential is collected for a specific
 /// model switch. When `None`, the credential is collected at the provider
-/// level (e.g. from the two-layer picker's "Setup required" group) and the
-/// picker should re-open after the key is saved.
+/// level (normally from `/connect`) and the picker should re-open after the
+/// key is saved.
 #[derive(Debug, Clone)]
 pub struct CredentialRequestData {
     pub provider: String,
@@ -372,15 +372,15 @@ pub struct ModelPickerItem {
 /// Payload for [`UiOutput::ModelPicker`] — drives the two-layer picker.
 ///
 /// `ready_models` are authenticated and listed individually. `setup_providers`
-/// are unauthenticated and shown as a single row per provider; selecting one
-/// triggers provider-level credential entry, after which the picker re-opens.
+/// is retained for wire compatibility with older callers, but current `/model`
+/// UX leaves unauthenticated provider setup to `/connect`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelPickerData {
     pub ready_models: Vec<ModelPickerItem>,
     pub setup_providers: Vec<ProviderSetupItem>,
 }
 
-/// An unauthenticated provider shown in the picker's "Setup required" section.
+/// Legacy unauthenticated provider row for model picker payloads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderSetupItem {
     pub provider: String,
@@ -442,9 +442,8 @@ pub struct SessionPickerItem {
 pub enum UserInput {
     Message(String),
     Credential(CredentialResponseData),
-    /// User selected an unauthenticated provider from the picker's
-    /// "Setup required" group. The bridge routes this to provider-level
-    /// credential entry.
+    /// User selected a provider-level setup row. The bridge routes this to
+    /// provider-level credential entry.
     ProviderSetup(String),
     Cancel,
     Exit,
