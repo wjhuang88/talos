@@ -39,7 +39,7 @@ use crate::mode_runtime::{
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
-    RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
+    CatalogSnapshot, RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
     rebuild_session_for_model,
 };
 use crate::provider_setup::{build_provider, parse_provider};
@@ -245,13 +245,19 @@ async fn handle_provider_setup(
             provider: provider.to_string(),
             model_id: None,
             connect_mode: false,
+            default_base_url: None,
         },
     ));
 }
 
-async fn handle_connect(ui_tx: &mpsc::UnboundedSender<UiOutput>, config: &Config, provider: &str) {
+async fn handle_connect(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    provider: &str,
+    catalog: Option<&CatalogSnapshot>,
+) {
     if provider.is_empty() {
-        let data = build_connect_picker_data(config);
+        let data = build_connect_picker_data(config, catalog);
         let _ = ui_tx.send(UiOutput::ConnectPicker(data));
         return;
     }
@@ -265,11 +271,26 @@ async fn handle_connect(ui_tx: &mpsc::UnboundedSender<UiOutput>, config: &Config
         return;
     }
 
+    // Precedence: existing user config base_url > catalog default > None.
+    // This preserves `providers.<name>.base_url` unless the user explicitly
+    // changes it, while still offering the catalog endpoint as a suggested
+    // default for brand-new providers.
+    let default_base_url = config
+        .providers
+        .get(provider)
+        .and_then(|p| p.base_url.clone())
+        .or_else(|| {
+            catalog
+                .and_then(|c| c.providers.iter().find(|p| p.id == provider))
+                .and_then(|p| p.api_base_url.clone())
+        });
+
     let _ = ui_tx.send(UiOutput::CredentialRequest(
         talos_conversation::CredentialRequestData {
             provider: provider.to_string(),
             model_id: None,
             connect_mode: true,
+            default_base_url,
         },
     ));
 }
@@ -293,6 +314,13 @@ async fn handle_connect_with_credential(
             _ => Some(format!("{}_API_KEY", cred.provider.to_uppercase())),
         };
     }
+    // `cred.base_url` is already resolved by the TUI credential panel to
+    // either the user-typed value or the request's `default_base_url`.
+    // `None` here means neither was available, so the existing (or absent)
+    // `base_url` is left untouched — never overwritten with an empty value.
+    if let Some(base_url) = cred.base_url.as_ref() {
+        provider_entry.base_url = Some(base_url.clone());
+    }
 
     if let Err(e) = new_config.save() {
         send_stream(
@@ -314,12 +342,53 @@ async fn handle_connect_with_credential(
     Some(new_config)
 }
 
-fn build_connect_picker_data(config: &Config) -> talos_conversation::ConnectPickerData {
+/// Builds [`talos_conversation::ConnectPickerData`] for the `/connect` picker.
+///
+/// Prefers live `catalog.db` data (provider display name, API base URL, docs
+/// URL) when `catalog` is `Some`. Falls back to `builtin_models()`-derived
+/// provider identifiers (no display name/URL metadata) when the catalog is
+/// unavailable, corrupt, or has an incompatible schema — this fallback never
+/// blocks `/connect` from functioning.
+fn build_connect_picker_data(
+    config: &Config,
+    catalog: Option<&CatalogSnapshot>,
+) -> talos_conversation::ConnectPickerData {
     use std::collections::BTreeMap;
-    use talos_config::model;
     use talos_conversation::{ConnectPickerData, ConnectPickerItem};
 
-    let all = model::builtin_models();
+    if let Some(snapshot) = catalog {
+        let mut model_counts: BTreeMap<&str, usize> = BTreeMap::new();
+        for m in &snapshot.models {
+            *model_counts.entry(m.provider.as_str()).or_default() += 1;
+        }
+
+        let mut connected = Vec::new();
+        let mut available = Vec::new();
+
+        for p in &snapshot.providers {
+            let has_credential = config.provider_authenticated(&p.id);
+            let item = ConnectPickerItem {
+                provider: p.id.clone(),
+                name: p.name.clone(),
+                model_count: model_counts.get(p.id.as_str()).copied().unwrap_or(0),
+                api_base_url: p.api_base_url.clone(),
+                has_credential,
+                doc_url: p.doc_url.clone(),
+            };
+            if has_credential {
+                connected.push(item);
+            } else {
+                available.push(item);
+            }
+        }
+
+        return ConnectPickerData {
+            connected,
+            available,
+        };
+    }
+
+    let all = talos_config::model::builtin_models();
     let mut model_counts: BTreeMap<String, usize> = BTreeMap::new();
     for m in &all {
         *model_counts.entry(m.provider.clone()).or_default() += 1;
@@ -398,6 +467,7 @@ async fn handle_session_model(
                 provider: provider_name,
                 model_id: Some(model_id.clone()),
                 connect_mode: false,
+                default_base_url: None,
             },
         ));
         return None;
@@ -551,6 +621,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     let workspace_root = resolve_workspace_root(&cli)?;
+    let catalog_snapshot = crate::model_lifecycle::open_catalog_snapshot(
+        &crate::storage::resolve_talos_root().join("catalog.db"),
+    )
+    .map(Arc::new);
     let session_manager =
         talos_session::SessionManager::new().context("failed to initialize session manager")?;
     let display_name = workspace_display_name(&workspace_root);
@@ -667,6 +741,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let transition_for_handler = transition.clone();
     let ui_tx_for_handler = ui_output_tx.clone();
     let config_for_handler = config.clone();
+    let catalog_for_handler = catalog_snapshot.clone();
     let api_key_for_handler = api_key.clone();
     let hooks_for_handler = hooks.clone();
     let workspace_root_for_handler = workspace_root.to_path_buf();
@@ -809,7 +884,13 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     handle_provider_setup(&ui_tx_for_handler, &config_for_handler, &provider).await;
                 }
                 SessionLifecycleRequest::ConnectRequest { provider } => {
-                    handle_connect(&ui_tx_for_handler, &config_for_handler, &provider).await;
+                    handle_connect(
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        &provider,
+                        catalog_for_handler.as_deref(),
+                    )
+                    .await;
                 }
                 SessionLifecycleRequest::ConnectWithCredential(resp) => {
                     if let Some(new_config) = handle_connect_with_credential(
@@ -1914,6 +1995,368 @@ fn parse_dashboard_open_iterations(content: &str) -> Vec<(String, String, String
     }
 
     items
+}
+
+#[cfg(test)]
+mod connect_tests {
+    use super::*;
+    use crate::test_support::HOME_ENV_MUTEX;
+    use talos_config::ProviderConfig;
+    use talos_core::model::{ModelMetadata, ProviderInfo, ProviderSource};
+
+    /// Runs `f` with `HOME` redirected to a fresh temp directory, restoring
+    /// the original `HOME` afterward. Must be called under `HOME_ENV_MUTEX`
+    /// (shared crate-wide — see `crate::test_support` for why a private
+    /// per-module mutex is not sufficient).
+    async fn with_isolated_home<F, Fut, T>(f: F) -> T
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = T>,
+    {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let original = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", dir.path()) };
+        let result = f().await;
+        match original {
+            Some(value) => unsafe { std::env::set_var("HOME", value) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+        result
+    }
+
+    fn snapshot_provider(id: &str, name: &str, api_base_url: Option<&str>) -> ProviderInfo {
+        ProviderInfo {
+            id: id.to_string(),
+            name: name.to_string(),
+            api_base_url: api_base_url.map(str::to_string),
+            env_var: Some(format!("{}_API_KEY", id.to_uppercase())),
+            doc_url: Some(format!("https://docs.{id}.example")),
+            source: ProviderSource::Builtin,
+        }
+    }
+
+    fn snapshot_model(id: &str, provider: &str) -> ModelMetadata {
+        ModelMetadata {
+            id: id.to_string(),
+            provider: provider.to_string(),
+            context_limit: Some(100_000),
+            output_limit: None,
+            pricing: None,
+            capabilities: Default::default(),
+            release_date: None,
+            source: Default::default(),
+        }
+    }
+
+    fn sample_snapshot() -> CatalogSnapshot {
+        CatalogSnapshot {
+            providers: vec![
+                snapshot_provider("anthropic", "Anthropic", None),
+                snapshot_provider("groq", "Groq", Some("https://api.groq.com/openai/v1")),
+            ],
+            models: vec![
+                snapshot_model("claude-sonnet-4-5", "anthropic"),
+                snapshot_model("llama-3", "groq"),
+                snapshot_model("mixtral", "groq"),
+            ],
+        }
+    }
+
+    #[test]
+    fn build_connect_picker_data_uses_catalog_provider_metadata() {
+        let config = Config::default();
+        let snapshot = sample_snapshot();
+
+        let data = build_connect_picker_data(&config, Some(&snapshot));
+
+        let groq = data
+            .available
+            .iter()
+            .find(|p| p.provider == "groq")
+            .expect("groq must be in available");
+        assert_eq!(groq.name, "Groq");
+        assert_eq!(
+            groq.api_base_url.as_deref(),
+            Some("https://api.groq.com/openai/v1")
+        );
+        assert_eq!(groq.doc_url.as_deref(), Some("https://docs.groq.example"));
+        assert_eq!(groq.model_count, 2);
+    }
+
+    #[test]
+    fn build_connect_picker_data_catalog_takes_precedence_over_builtin() {
+        let config = Config::default();
+        let snapshot = sample_snapshot();
+
+        let with_catalog = build_connect_picker_data(&config, Some(&snapshot));
+        let without_catalog = build_connect_picker_data(&config, None);
+
+        // The catalog-backed result must carry provider metadata that the
+        // builtin-only fallback cannot produce (builtin has no base URLs).
+        let groq_with_catalog = with_catalog
+            .available
+            .iter()
+            .find(|p| p.provider == "groq")
+            .expect("groq present via catalog");
+        assert!(groq_with_catalog.api_base_url.is_some());
+
+        // builtin_models() has no "groq" provider at all in this fixture's
+        // assumptions-free check: whichever providers it does have, none
+        // carry base_url/doc_url metadata (that field is always None).
+        for item in without_catalog
+            .connected
+            .iter()
+            .chain(without_catalog.available.iter())
+        {
+            assert!(item.api_base_url.is_none());
+            assert!(item.doc_url.is_none());
+        }
+    }
+
+    #[test]
+    fn build_connect_picker_data_none_falls_back_without_blocking() {
+        let config = Config::default();
+        // Must not panic and must return a non-crashing (possibly empty)
+        // result when catalog is unavailable.
+        let data = build_connect_picker_data(&config, None);
+        assert!(data.connected.len() + data.available.len() > 0);
+    }
+
+    #[test]
+    fn open_catalog_snapshot_missing_file_returns_none() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("does-not-exist").join("catalog.db");
+        assert!(crate::model_lifecycle::open_catalog_snapshot(&missing).is_none());
+    }
+
+    #[test]
+    fn open_catalog_snapshot_corrupt_file_returns_none_not_panic() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("corrupt.db");
+        std::fs::write(&path, b"not a sqlite database").expect("write corrupt file");
+        assert!(crate::model_lifecycle::open_catalog_snapshot(&path).is_none());
+    }
+
+    #[tokio::test]
+    async fn handle_connect_with_credential_writes_new_provider_api_key_and_base_url() {
+        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let new_config = with_isolated_home(|| async {
+            let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+            let config = Config::default();
+            let cred = talos_conversation::CredentialResponseData {
+                provider: "groq".to_string(),
+                api_key: "gsk-secret".to_string(),
+                model_id: None,
+                connect_mode: true,
+                base_url: Some("https://api.groq.com/openai/v1".to_string()),
+            };
+
+            let result = handle_connect_with_credential(&tx, &config, cred).await;
+            drop(tx);
+            while rx.recv().await.is_some() {}
+            result
+        })
+        .await
+        .expect("new provider connect must succeed");
+
+        let groq = new_config
+            .providers
+            .get("groq")
+            .expect("groq entry created");
+        assert_eq!(groq.api_key.as_deref(), Some("gsk-secret"));
+        assert_eq!(groq.api_key_env.as_deref(), Some("GROQ_API_KEY"));
+        assert_eq!(
+            groq.base_url.as_deref(),
+            Some("https://api.groq.com/openai/v1")
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
+        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let new_config = with_isolated_home(|| async {
+            let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+            let mut config = Config::default();
+            config.providers.insert(
+                "groq".to_string(),
+                ProviderConfig {
+                    base_url: Some("https://old.groq.example/v1".to_string()),
+                    models: std::collections::HashMap::from([(
+                        "llama-3".to_string(),
+                        talos_config::ModelConfig {
+                            context_limit: Some(999_000),
+                            output_limit: None,
+                            reasoning: None,
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            );
+            // An unrelated provider that must remain completely untouched.
+            config.providers.insert(
+                "anthropic".to_string(),
+                ProviderConfig {
+                    api_key: Some("sk-ant-untouched".to_string()),
+                    ..Default::default()
+                },
+            );
+
+            let cred = talos_conversation::CredentialResponseData {
+                provider: "groq".to_string(),
+                api_key: "gsk-updated".to_string(),
+                model_id: None,
+                connect_mode: true,
+                base_url: None, // user left it blank; resolved default was also None
+            };
+
+            let result = handle_connect_with_credential(&tx, &config, cred).await;
+            drop(tx);
+            while rx.recv().await.is_some() {}
+            result
+        })
+        .await
+        .expect("existing provider reconnect must succeed");
+
+        let groq = new_config.providers.get("groq").expect("groq entry exists");
+        assert_eq!(groq.api_key.as_deref(), Some("gsk-updated"));
+        assert_eq!(
+            groq.base_url.as_deref(),
+            Some("https://old.groq.example/v1"),
+            "existing base_url must be preserved when cred.base_url is None"
+        );
+        assert_eq!(
+            groq.models.get("llama-3").and_then(|m| m.context_limit),
+            Some(999_000),
+            "existing model overrides must be preserved"
+        );
+
+        let anthropic = new_config
+            .providers
+            .get("anthropic")
+            .expect("anthropic entry exists");
+        assert_eq!(
+            anthropic.api_key.as_deref(),
+            Some("sk-ant-untouched"),
+            "unrelated provider must not be touched by a groq connect"
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_with_credential_updates_base_url_when_provided() {
+        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let new_config = with_isolated_home(|| async {
+            let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+            let mut config = Config::default();
+            config.providers.insert(
+                "groq".to_string(),
+                ProviderConfig {
+                    base_url: Some("https://old.groq.example/v1".to_string()),
+                    ..Default::default()
+                },
+            );
+
+            let cred = talos_conversation::CredentialResponseData {
+                provider: "groq".to_string(),
+                api_key: "gsk-updated".to_string(),
+                model_id: None,
+                connect_mode: true,
+                base_url: Some("https://new.groq.example/v1".to_string()),
+            };
+
+            let result = handle_connect_with_credential(&tx, &config, cred).await;
+            drop(tx);
+            while rx.recv().await.is_some() {}
+            result
+        })
+        .await
+        .expect("update must succeed");
+
+        let groq = new_config.providers.get("groq").unwrap();
+        assert_eq!(
+            groq.base_url.as_deref(),
+            Some("https://new.groq.example/v1"),
+            "explicit user input must update the base_url"
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_default_base_url_prefers_existing_config_over_catalog() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let mut config = Config::default();
+        config.providers.insert(
+            "groq".to_string(),
+            ProviderConfig {
+                base_url: Some("https://user-custom.example/v1".to_string()),
+                ..Default::default()
+            },
+        );
+        let snapshot = sample_snapshot(); // catalog has https://api.groq.com/openai/v1
+
+        handle_connect(&tx, &config, "groq", Some(&snapshot)).await;
+        drop(tx);
+
+        let mut default_base_url = None;
+        while let Some(output) = rx.recv().await {
+            if let UiOutput::CredentialRequest(req) = output {
+                default_base_url = req.default_base_url;
+            }
+        }
+
+        assert_eq!(
+            default_base_url.as_deref(),
+            Some("https://user-custom.example/v1"),
+            "existing user config base_url must win over the catalog default"
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_default_base_url_falls_back_to_catalog() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        let snapshot = sample_snapshot();
+
+        handle_connect(&tx, &config, "groq", Some(&snapshot)).await;
+        drop(tx);
+
+        let mut default_base_url = None;
+        while let Some(output) = rx.recv().await {
+            if let UiOutput::CredentialRequest(req) = output {
+                default_base_url = req.default_base_url;
+            }
+        }
+
+        assert_eq!(
+            default_base_url.as_deref(),
+            Some("https://api.groq.com/openai/v1")
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_already_authenticated_does_not_request_credential() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let mut config = Config::default();
+        config.providers.insert(
+            "groq".to_string(),
+            ProviderConfig {
+                api_key: Some("gsk-existing".to_string()),
+                ..Default::default()
+            },
+        );
+
+        handle_connect(&tx, &config, "groq", None).await;
+        drop(tx);
+
+        let mut saw_credential_request = false;
+        while let Some(output) = rx.recv().await {
+            if matches!(output, UiOutput::CredentialRequest(_)) {
+                saw_credential_request = true;
+            }
+        }
+        assert!(
+            !saw_credential_request,
+            "already-connected provider must not prompt for credentials again"
+        );
+    }
 }
 
 #[cfg(test)]

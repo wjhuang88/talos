@@ -22,6 +22,38 @@ use crate::registry::{
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 
+/// A point-in-time snapshot of the catalog database, taken once at startup.
+///
+/// Opening SQLite on every `/connect`/`/model` invocation would reintroduce
+/// implicit SQLite access into hot paths; a single snapshot read at startup
+/// keeps `talos-config` free of any SQLite dependency while still surfacing
+/// live `catalog.db` data (provider name/base URL/doc URL, model entries)
+/// when present.
+pub(crate) struct CatalogSnapshot {
+    pub(crate) providers: Vec<talos_models::ProviderInfo>,
+    pub(crate) models: Vec<talos_config::model::ModelMetadata>,
+}
+
+/// Opens the catalog database and takes a snapshot, if available.
+///
+/// Returns `None` when the database does not exist yet, is corrupt, has an
+/// incompatible schema version, or has not been seeded with any providers
+/// (a fresh, never-populated `catalog.db`) — callers must degrade to
+/// `builtin_models()` in every one of these cases. `ModelCatalog::open`
+/// creates an empty database for a missing path, so an explicit
+/// empty-providers check is required to avoid treating an unseeded catalog
+/// as "no providers available" instead of "fall back to builtin". Never
+/// blocks startup or panics: all failure modes route through `Result::ok()`.
+pub(crate) fn open_catalog_snapshot(catalog_path: &std::path::Path) -> Option<CatalogSnapshot> {
+    let catalog = talos_models::ModelCatalog::open(catalog_path).ok()?;
+    let providers = catalog.all_providers().ok()?;
+    if providers.is_empty() {
+        return None;
+    }
+    let models = catalog.all_models().ok()?;
+    Some(CatalogSnapshot { providers, models })
+}
+
 /// Constructs [`ModelPickerData`] from the given [`Config`].
 ///
 /// Iterates the model catalog, detects duplicate model IDs across providers,
