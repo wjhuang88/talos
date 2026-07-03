@@ -45,6 +45,39 @@ pub struct MessageToolResult {
     pub is_error: bool,
 }
 
+/// One provider-native reasoning block attached to an assistant message.
+///
+/// See ADR-034 for the full boundary design.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ReasoningBlock {
+    /// Signed thinking (Anthropic `thinking` block). `text` may be empty when
+    /// the provider omits display text; `signature` is opaque and must be
+    /// replayed byte-for-byte, never inspected or trimmed.
+    Thinking {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        signature: Option<String>,
+    },
+    /// Encrypted redacted thinking (Anthropic `redacted_thinking`). Replayed
+    /// byte-for-byte; never rendered anywhere.
+    Redacted { data: String },
+    /// Plain reasoning text (OpenAI-compatible `reasoning_content`).
+    Plain { text: String },
+}
+
+/// Reasoning payload for one assistant message, stamped with the identity
+/// that produced it. Request-history metadata only — never display content.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AssistantReasoning {
+    /// Config provider key that produced the blocks (e.g. `anthropic`, `my-gateway`).
+    pub provider: String,
+    /// Model id that produced the blocks (e.g. `claude-sonnet-4-5`).
+    pub model: String,
+    /// Provider-native blocks in stream order.
+    pub blocks: Vec<ReasoningBlock>,
+}
+
 /// A message in the conversation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "role", rename_all = "snake_case")]
@@ -74,6 +107,11 @@ pub enum Message {
         /// Tool calls requested by the assistant.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         tool_calls: Vec<ToolCall>,
+        /// Provider-native reasoning blocks attached to this message.
+        ///
+        /// Request-history metadata only — never display content. See ADR-034.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reasoning: Option<AssistantReasoning>,
     },
     /// Result of a tool execution.
     Tool {
@@ -107,6 +145,9 @@ pub struct Usage {
     /// Tokens written to cache.
     #[serde(default)]
     pub cache_write_tokens: u32,
+    /// Reasoning/thinking tokens — informational subset of `output_tokens`.
+    #[serde(default)]
+    pub reasoning_tokens: u32,
 }
 
 /// Events emitted during a turn for streaming.
@@ -128,6 +169,12 @@ pub enum AgentEvent {
     ThinkingDelta {
         /// The thinking text chunk.
         delta: String,
+    },
+    /// Emitted once per provider response, before `TurnEnd`, when the response
+    /// carried reasoning blocks. Durable replay payload; never display content.
+    ReasoningComplete {
+        /// Provider-native reasoning blocks in stream order.
+        blocks: Vec<ReasoningBlock>,
     },
     /// Tool call detected: parameters still streaming.
     ToolCallStarted {
@@ -189,6 +236,7 @@ mod tests {
                 name: "read_file".into(),
                 input: serde_json::json!({"path": "src/main.rs"}),
             }],
+            reasoning: None,
         };
         let json = serde_json::to_string(&msg).unwrap();
         let decoded: Message = serde_json::from_str(&json).unwrap();
@@ -239,6 +287,7 @@ mod tests {
                     output_tokens: 50,
                     cache_read_tokens: 80,
                     cache_write_tokens: 20,
+                    reasoning_tokens: 0,
                 },
             },
             AgentEvent::Error {
