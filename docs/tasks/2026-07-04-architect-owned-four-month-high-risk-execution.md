@@ -1,6 +1,6 @@
 # 2026-07-04 Architect-Owned Four-Month High-Risk Execution
 
-> Status: In Progress
+> Status: Complete
 > Created: 2026-07-04
 > Owner boundary: direct senior-agent execution required
 > Trigger: user requested a four-month high-risk, high-difficulty, unattended task plan for work
@@ -61,7 +61,7 @@ is not suitable for routine frontline delegation.
 | A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Complete |
 | A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | Complete |
 | A14 | REL-002 self-bootstrap rehearsal | Record one Talos-on-Talos rehearsal packet or a failed rehearsal with exact gap evidence. | A13 | REL-002 evidence table updated; no v1.0 claim unless criteria met. | Record non-qualifying evidence. | Complete |
-| A15 | Final closeout | Four-month matrix, residual owners, release posture, docs, Board, and handoff are synchronized. | A14 | workspace tests, clippy, governance, final checkpoint. | Mark Partial with exact unfinished owners. | In Progress |
+| A15 | Final closeout | Four-month matrix, residual owners, release posture, docs, Board, and handoff are synchronized. | A14 | workspace tests, clippy, governance, final checkpoint. | Mark Partial with exact unfinished owners. | Complete |
 
 ## Dependencies And Prerequisites
 
@@ -723,3 +723,42 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read the A14 evidence record, I093, REL-002, and this task's A14 checkpoint before final closeout.
+
+### A15 — Final Closeout Drafted (2026-07-04)
+
+Completed task items:
+
+- Added `docs/reference/I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md`.
+- Synchronized I093, iteration index, Product Backlog, Board, reference index, and this task.
+- Moved the direct-owner high-risk track to Complete while preserving REL-002 as No-go.
+- Recorded residual owners for MC107, REL-002/RUNTIME/GOV gaps, ARCH-030 risks, distribution,
+  compression, and autonomy gates.
+
+Current state and artifacts:
+
+- I090-I093 are complete.
+- I085 remains paused with MC107 real-terminal `/connect` walkthrough residual.
+- REL-002 remains Planned/not ready and cannot support a `v1.0.0` claim.
+- No tag, publish, release action, permission-default change, remote install, marketplace behavior,
+  or gate lowering occurred.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- The track closed prerequisites and risk boundaries, but did not produce REL-002 qualifying
+  self-bootstrap evidence.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read this A15 checkpoint, `docs/reference/I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md`, I093, and
+  REL-002.
+- Continue by running the pending validation commands and either fix failures or record the blocker.
