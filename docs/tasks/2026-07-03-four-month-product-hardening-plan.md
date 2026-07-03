@@ -18,6 +18,9 @@ This is a planning and execution handoff. It does not authorize crate publishing
 remote dashboard access, browser automation, write-capable plugin tools, marketplace behavior, or
 permission-default changes.
 
+**Programmer handoff**:
+[I085 Model Catalog Programmer Handoff](2026-07-03-programmer-handoff-i085-model-catalog.md)
+
 ## Current State
 
 - I084 is complete and release-facing reliability work is closed.
@@ -93,3 +96,13 @@ of a raw GitHub URL. The safer design is:
    priority.
 4. Update owner docs before derived board/backlog views.
 5. Run `scripts/validate_project_governance.sh .` after governance changes.
+
+## Execution Log
+
+### I085 Delegation Prep (2026-07-03)
+
+Created `docs/tasks/2026-07-03-programmer-handoff-i085-model-catalog.md` for Stage 1 I085
+assignment. The handoff limits immediate delegation to H100-H101 / MC100-MC103: shared catalog
+types, `talos-models`, SQLite store/migrations, models.dev import parsing, gated built-in refresh,
+and catalog-aware resolver precedence. Stage 2 `/model` and `/connect` work remains gated until the
+resolver precedence tests pass.

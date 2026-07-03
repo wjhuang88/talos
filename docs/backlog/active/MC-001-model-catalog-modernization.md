@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | MC-001 (Epic) |
 | Priority | P1 |
-| Status | Planned |
+| Status | In Progress |
 | Origin | Maintainer feedback 2026-07-03 — model catalog pipeline broken: import format mismatch, write-only cache, auth-gated picker hides most providers, only 12 hardcoded providers visible |
 | Owns | MODEL-001 (catalog data layer), MODEL-005 (interactive selection), CONF-002 (onboarding) |
 | Parent Epic | None (this IS the epic) |
@@ -59,6 +59,12 @@ Implement in two stages:
 2. MC104-MC107: `/connect`, `/model`, group-aware filtering, docs, validation.
 
 The command split must not begin until the resolver precedence path is tested.
+
+## Execution Log
+
+| Date | Status | Record |
+|---|---|---|
+| 2026-07-03 | In Progress | I085 activated after `v0.2.2` closeout. Stage 1 starts with MC100-MC103 only: shared catalog types, `talos-models`, SQLite catalog store/migrations, models.dev import parsing, gated built-in refresh, and catalog-aware resolver. Stage 2 `/model` and `/connect` work remains blocked until resolver precedence tests pass. Programmer handoff: `docs/tasks/2026-07-03-programmer-handoff-i085-model-catalog.md`. |
 
 ## Acceptance Criteria
 

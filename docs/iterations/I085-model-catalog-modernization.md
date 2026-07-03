@@ -1,6 +1,6 @@
 # Iteration I085: Model Catalog Modernization — talos-models, /model, /connect
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-03
 > Planned objective: Replace the ad-hoc model catalog pipeline (hand-maintained TOML + broken
 > models.dev import + auth-gated picker) with a proper `talos-models` crate backed by SQLite,
@@ -350,6 +350,7 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 | 2026-07-03 | Planning | Created from maintainer feedback that model catalog pipeline is broken (import format mismatch, write-only cache, auth-gated picker hides most providers). |
 | 2026-07-03 | Correction | Live api.json verified (2.9MB fetch): top level is an object keyed by provider (150 providers); each `provider.models` is an **object map keyed by model id** with `cost`/`limit`/`modalities` fields. `import_models_dev()`'s flat `"provider/model-id"` key assumption and `pricing` field name both mismatch the real shape — importing live data would yield ~150 bogus provider-named entries. A `github-copilot` provider exists (25 models) whose auth cannot be expressed by the static schema; split to PROVIDER-003. |
 | 2026-07-03 | Execution | Interim manual catalog refresh landed (commit `071449b`): every `models.toml` entry verified against live api.json; fabricated dated OpenAI ids (`gpt-4.1-2025-04-14`, `o3-2025-04-16`, `o4-mini-2025-04-16`) replaced with canonical ids; MiniMax-M3/google/zhipu/openrouter field corrections; 18 current-model additions (60 models, 12 providers). MC101 pipeline scope unchanged — this is a stopgap, not the fix. |
+| 2026-07-03 | Activation | I085 activated after `v0.2.2` release closeout and programmer handoff preparation. Non-terminal inventory disposition: no conflicting active iteration; I086-I089 remain planned/deferred behind I085; I081-I083 remain superseded historical shells; paused high-risk/provider-plugin gates remain paused. Active scope starts with Stage 1 H100-H101 / MC100-MC103: shared catalog types, `talos-models`, SQLite catalog store/migrations, models.dev import parsing, gated built-in refresh, and catalog-aware resolver. Stage 2 `/model` and `/connect` work remains gated until resolver precedence tests pass. |
 
 ## Verification Evidence
 
