@@ -1,6 +1,6 @@
 # Release Preparation Closeout — 2026-07-03
 
-**Status**: Complete (release-prep closeout; tag authorized by maintainer)
+**Status**: Complete (v0.2.2 tag pushed 2026-07-03)
 
 ## Purpose
 
@@ -31,6 +31,9 @@ explicitly authorized a release with tag push only and no build wait; the releas
 
 ## Validation Evidence
 
+- 2026-07-03: `v0.2.2` tag created and pushed (tag commit dated 2026-07-03 16:25 +0800,
+  verified via `git tag`/`git log`). The hardening plan's "start after `v0.2.2` tag push"
+  precondition is satisfied.
 - 2026-07-03 pre-tag validation for `v0.2.2`:
   - `cargo fmt --all -- --check` — pass.
   - `cargo check --workspace` — pass.
