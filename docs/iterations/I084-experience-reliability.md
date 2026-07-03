@@ -1,6 +1,6 @@
 # Iteration I084: Experience Reliability — Thinking, Timeout, Retry, And Status
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-07-03
 > Planned objective: Execute the first UX reliability series: provider thinking compatibility,
 > first-packet and stream-idle timeout detection, retry/backoff, and clear TUI model-call status.
@@ -94,11 +94,23 @@
 ## Verification Evidence
 
 - UX100 complete: ADR-034 v3 accepted (2026-07-03) after architecture review. Cross-project research recorded in REFERENCE-PROJECTS.md §20. Owner docs (MODEL-003 ADR gate, UX-001 acceptance criterion) synced.
-- UX101-UX106: Planned.
+- UX101 complete: Reasoning implementation across 4 phases (data model, Anthropic path, OpenAI path, agent replay gate). 20+ tests added. Committed: 2ddae35..6e1dea4.
+- UX102 complete: Config validation (capability gating + replay-disable warnings), config.reference.toml documentation. Committed: 29a7750..2d9e8a9.
+- UX103 complete: Provider first-packet and stream-idle timeout detection with structured errors. 6 tests added. Committed: db9f0a2..eeafc1a.
+- UX104 complete: Retry classifier with exponential backoff and jitter, replacing ad-hoc retry logic. 8 tests added. Committed: 9362e6d..9fe4b83.
+- UX105 complete: TurnPhase status states (Connecting/Thinking/Generating/TimedOut/Failed/Cancelled) in conversation engine and TUI. 6 tests added. Committed: 225a1ab..0b8fbbb.
+- UX106 complete: Owner docs synced, validation run. 1497 workspace tests pass. Clippy clean. Fmt clean. Governance validation passed (0 warnings).
+- Full validation: `cargo test --workspace` = 1497 tests pass; `cargo clippy --workspace -- -D warnings` = clean; `cargo fmt --all -- --check` = clean; `scripts/validate_project_governance.sh .` = 0 warnings.
 
 ## Variance And Residuals
 
-- Planned.
+- Age-based reasoning compaction deferred to MEM-007 (active context compression).
+- Richer thinking TUI (collapsible section, scrollable panel) deferred to a separate design decision.
+- Per-gateway compatibility overrides (requires_reasoning_replay / forbids_reasoning_replay) deferred until evidence demands.
+- Gemini native adapter (thoughtSignature) deferred to a future Gemini protocol decision.
+- OpenAI Responses API (encrypted reasoning items) deferred to a separate ADR when Responses support lands.
+- Provider retry status events (Retrying phase in TUI) not yet emitted — retry happens inside send_request before streaming starts. Future enhancement could surface retry attempts.
+- StatusSnapshot.usage is last-turn only (pre-existing latent issue); cumulative usage via TokenEstimator is not plumbed to the TUI.
 
 ## Retrospective
 
