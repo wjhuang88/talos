@@ -70,7 +70,7 @@ After setup, every push to `main` that changes files under `site/` triggers
 
 ## Updating the site after a release
 
-After the maintainer tags a new release (e.g. `v0.2.1`), the public
+After the maintainer tags a new release (e.g. `v0.2.2`), the public
 materials must be updated in this order:
 
 1. Update `README.md` and `README.zh-CN.md` with the new tag, install
