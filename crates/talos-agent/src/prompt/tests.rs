@@ -555,6 +555,23 @@ fn test_identity_prompt_contains_accuracy_discipline() {
     assert!(DEFAULT_IDENTITY.contains("anti-sycophancy red flags"));
 }
 
+#[test]
+fn test_identity_prompt_covers_proactive_todo_planning() {
+    // Regression: identity.txt previously only covered todo_create on
+    // mid-task interruption, with no trigger for a fresh complex task.
+    assert!(DEFAULT_IDENTITY.contains("3 or more distinct steps"));
+    assert!(DEFAULT_IDENTITY.contains("Skip todo tracking"));
+    assert!(DEFAULT_IDENTITY.contains("in_progress"));
+    assert!(DEFAULT_IDENTITY.contains("todo_query"));
+    assert!(DEFAULT_IDENTITY.contains("do not batch completions"));
+}
+
+#[test]
+fn test_identity_prompt_still_covers_task_interruption() {
+    assert!(DEFAULT_IDENTITY.contains("Task Interruption"));
+    assert!(DEFAULT_IDENTITY.contains("context drift"));
+}
+
 // --- Memory section tests ---
 
 #[test]

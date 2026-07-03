@@ -40,6 +40,9 @@ repeating known mistakes.
 | 28 | Process | 并行审计是 closeout 前的必要闸门；自我比较 bug 能穿透单元测试 | I043/I044 |
 | 29 | Config | 机密字段必须显示层屏蔽，不得在持久化层 skip_serializing；否则用户写进文件的 key 会被静默擦除 | I045 |
 | 30 | Session | 生命周期操作必须从全新启动路径追溯——Model switch 需要 ensure_persisted() 处理首轮无 session 的边界情况 | I045 |
+| 31 | Build | `ring` + `cargo-xwin` Windows ARM64 交叉编译失败, musl 替代方案 | I046 |
+| 32 | Governance | 共享数据集变更后必须重新验证, closeout 证据必须反映最终提交状态 | I046 |
+| 33 | Agent | Agent 收到新需求时不应立即中断当前任务, 通过 todo 工具捕获并规划执行节奏 | I045 |
 
 ## Lessons
 
@@ -503,3 +506,16 @@ repeating known mistakes.
   1. **Re-run `cargo test --workspace` after ANY commit that touches shared datasets** (`models.toml`, protocol types, public API signatures) — not just after the feature commit.
   2. **Closeout verification must reflect the final committed state.** If commits land after the verification run, re-verify before marking Complete.
   3. **Prefer `cargo test --workspace` over `cargo test -p <crate>` for closeout.** The targeted test hid the cross-crate breakage.
+
+## #33: Agent 收到新需求时不应立即中断当前任务，通过 todo 工具捕获并规划执行节奏
+
+- **Area**: Agent / Prompt Engineering
+- **Added**: I045 (2026-07-01)
+- **Trigger**: 用户报告模型切换导致 todo 列表丢失，Agent 立即跳转到代码库调查 EVOLUTION.md、I045 文档等，用户指出发生了多次话题跳跃。
+- **Symptom**: 用户在同一个会话中提出多个需求时，Agent 每次立即中断当前工作去追逐新话题，导致上下文漂移，没有任务被完成闭环。
+- **Root cause**: Agent 系统提示词（`identity.txt`）中没有"收到新需求时先捕获再规划"的行为规则。Agent 默认行为是立即响应用户最新消息，不管手头是否还有其他未完成的事情。
+- **Fix**: 在 `crates/talos-agent/prompts/identity.txt` 中新增 "Task Interruption and Planning" 节：当用户提出新需求时，Agent 应使用 `todo_create` 捕获为待办项，在当前任务到达检查点后再评估优先级和规划执行顺序，与用户确认后再切换。
+- **Prevention**:
+  1. **系统提示词是 Agent 行为的第一防线。** 任何关于执行节奏、任务规划的期望行为必须在 identity 模板中明确化。
+  2. **Agent 的默认"立即响应"倾向与多任务场景冲突。** 需要显式规则覆盖。
+  3. **todo 工具不仅是记录工具，也是中断缓冲区。** 新需求先进入 todo 队列，避免直接丢掉当前上下文。
