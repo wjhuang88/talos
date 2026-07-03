@@ -165,7 +165,7 @@ impl Agent {
     ///
     /// When enabled, bash tool output exceeding 30 lines is compressed to the
     /// last 30 lines plus a truncation marker before entering model context.
-    /// The raw output is preserved in the session JSONL log.
+    /// The raw output is preserved on the UI event/export surface.
     ///
     /// Default: disabled (false).
     #[must_use]

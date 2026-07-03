@@ -2,7 +2,7 @@
 //!
 //! This module implements MEM-007 active context compression, starting with
 //! `bash` tool output. Compression applies only to the model-facing
-//! representation; raw output is preserved in the session JSONL log.
+//! representation; raw output is preserved on the UI event/export surface.
 //!
 //! # Design Constraints
 //!
@@ -43,7 +43,7 @@ pub struct CompressedOutput {
 ///
 /// When enabled and bash output exceeds the configured line threshold, the
 /// model-facing content is compressed to the last N lines plus a truncation
-/// marker. Full output is preserved in the session JSONL log.
+/// marker. Full output is preserved on the UI event/export surface.
 #[derive(Debug, Clone, Copy)]
 pub struct BashOutputCompressor {
     /// Maximum number of lines to retain from the end of the output.

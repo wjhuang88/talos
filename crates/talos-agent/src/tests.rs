@@ -2171,6 +2171,61 @@ impl LanguageModel for CapturingModel {
     }
 }
 
+struct CapturingMessagesModel {
+    responses: Arc<Mutex<Vec<Vec<AgentEvent>>>>,
+    captured_messages: Arc<std::sync::Mutex<Vec<Vec<Message>>>>,
+}
+
+impl CapturingMessagesModel {
+    fn new(responses: Vec<Vec<AgentEvent>>) -> (Self, Arc<std::sync::Mutex<Vec<Vec<Message>>>>) {
+        let captured_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
+        (
+            Self {
+                responses: Arc::new(Mutex::new(responses)),
+                captured_messages: captured_messages.clone(),
+            },
+            captured_messages,
+        )
+    }
+}
+
+#[async_trait]
+impl LanguageModel for CapturingMessagesModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let (tx, rx) = mpsc::channel(64);
+        let responses = self.responses.clone();
+        tokio::spawn(async move {
+            let mut responses = responses.lock().await;
+            let events = responses.pop_front().unwrap_or_default();
+            for event in events {
+                tx.send(event).await.expect("receiver dropped");
+            }
+        });
+        Ok(rx)
+    }
+
+    async fn stream_with_tools(
+        &self,
+        messages: &[Message],
+        _tools: &[ToolDefinition],
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        self.captured_messages
+            .lock()
+            .expect("lock poisoned")
+            .push(messages.to_vec());
+        self.stream(messages).await
+    }
+}
+
+fn stable_part(prompt: &str) -> &str {
+    for marker in ["# Runtime Context", "# Context", "# User Preferences"] {
+        if let Some(pos) = prompt.find(marker) {
+            return &prompt[..pos];
+        }
+    }
+    prompt
+}
+
 #[tokio::test]
 async fn test_tool_presentation_policy_syncs_prompt_and_provider_definitions() {
     let response_events = vec![
@@ -2653,6 +2708,115 @@ async fn test_stable_prefix_identical_across_turns() {
         stable_1, stable_2,
         "stable prefix should be identical between turn 2 and 3"
     );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_bash_compression_does_not_change_stable_prefix() {
+    let response_events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta { delta: "OK".into() },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        },
+    ];
+
+    let (plain_model, plain_prompts) = CapturingModel::new(vec![response_events.clone()]);
+    let plain_agent = Agent::new(Arc::new(plain_model), ToolRegistry::new());
+    let _ = plain_agent.run("plain".into()).await.unwrap();
+
+    let (compressed_model, compressed_prompts) = CapturingModel::new(vec![response_events]);
+    let compressed_agent =
+        Agent::new(Arc::new(compressed_model), ToolRegistry::new()).with_bash_compression(true);
+    let _ = compressed_agent.run("compressed".into()).await.unwrap();
+
+    let plain_prompts = plain_prompts.lock().expect("lock poisoned");
+    let compressed_prompts = compressed_prompts.lock().expect("lock poisoned");
+    assert_eq!(plain_prompts.len(), 1);
+    assert_eq!(compressed_prompts.len(), 1);
+    assert_eq!(
+        stable_part(&plain_prompts[0]),
+        stable_part(&compressed_prompts[0]),
+        "bash compression must not alter stable-prefix bytes"
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_bash_compression_preserves_ui_result_and_compresses_model_context() {
+    let long_output = (0..50)
+        .map(|i| format!("row-{i:03}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "call_bash".into(),
+                    name: "bash".into(),
+                    input: serde_json::json!({ "command": "generate output" }),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+    let (model, captured_messages) = CapturingMessagesModel::new(responses);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "bash".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success(long_output.clone()),
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+    let agent = Agent::new(Arc::new(model), registry).with_bash_compression(true);
+    let (tx, mut rx) = mpsc::unbounded_channel::<AgentEvent>();
+
+    let (_response, _new_messages) = agent
+        .run_streaming("run bash".into(), vec![], tx)
+        .await
+        .unwrap();
+
+    let captured = captured_messages.lock().expect("lock poisoned");
+    assert_eq!(captured.len(), 2, "tool turn should call provider twice");
+    let model_tool_result = captured[1]
+        .iter()
+        .find_map(|message| match message {
+            Message::Tool { result } => Some(result),
+            _ => None,
+        })
+        .expect("second provider call should include model-facing tool result");
+    assert!(model_tool_result.content.contains("first 20 lines omitted"));
+    assert!(model_tool_result.content.contains("row-020"));
+    assert!(model_tool_result.content.contains("row-049"));
+    assert!(!model_tool_result.content.contains("row-000"));
+    assert!(!model_tool_result.content.contains("row-019"));
+
+    let mut ui_tool_result = None;
+    while let Ok(event) = rx.try_recv() {
+        if let AgentEvent::ToolResult { result } = event {
+            ui_tool_result = Some(result);
+        }
+    }
+    let ui_tool_result = ui_tool_result.expect("UI should receive full tool result event");
+    assert_eq!(ui_tool_result.content, long_output);
 }
 
 #[tokio::test]

@@ -74,20 +74,33 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-04 | Activation | Activated after I091 completed `/hooks` diagnostics, hook manifest declaration validation, and optional asset distribution policy. Non-terminal inventory disposition: I085 remains Paused with MC107 real terminal `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells; I093 remains the planned next direct-owner shell. I092 starts with cache-stability proof/rejection before autonomy implementation, then a permission matrix for scheduled/batch/exec-style paths. |
+| 2026-07-04 | A10 execution | Closed the first MEM-007 evidence slice for bash-only active compression. The existing compressor is deterministic and default-off; added regression tests proving enabling compression does not change stable-prefix bytes, and long bash output is compressed only in the model-facing tool result while the UI event/export surface keeps the full raw output. Corrected docs/comments that previously over-claimed durable JSONL raw-output preservation. |
 
 ## Verification Evidence
 
 - `scripts/validate_project_governance.sh .`: passed, 0 warnings.
 - `git diff --check`: clean.
+- `cargo fmt --all -- --check`: passed.
+- `cargo check -p talos-agent`: passed.
+- `cargo clippy -p talos-agent -- -D warnings`: passed.
+- `cargo test -p talos-agent bash_compression`: 2 matching regression tests passed.
+- `cargo test -p talos-agent`: 196 unit tests and 12 doctests passed.
+- `cargo test --workspace`: passed.
 
 ## Variance And Residuals
 
 - No compression or autonomy runtime behavior has changed at activation.
-- A10 starts with MEM-007 evidence. A11 remains the autonomy permission packet and must not ship
-  scheduled direct tool execution, Guardian auto-approval, exec DSL implementation, or batch writes
-  before deny/ask/allow matrix coverage is explicit.
+- A10 is complete for the bash-only evidence slice, not for all MEM-007 strategies. `read`,
+  `grep`, `git_diff`, cross-turn dedup, and durable JSONL dual-track raw-output storage remain
+  deferred.
+- A11 remains the autonomy permission packet and must not ship scheduled direct tool execution,
+  Guardian auto-approval, exec DSL implementation, or batch writes before deny/ask/allow matrix
+  coverage is explicit.
 
 ## Retrospective
 
 - Activation intentionally keeps implementation disabled until cache-stability and permission
   non-bypass evidence exist.
+- The existing bash compressor was already a reasonable minimal slice. The main A10 correction was
+  adding the missing cache/export regression proof and narrowing documentation to match the actual
+  storage boundary.

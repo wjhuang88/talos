@@ -56,8 +56,8 @@ is not suitable for routine frontline delegation.
 | A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Complete |
 | A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Complete |
 | A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Complete |
-| A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | In Progress |
-| A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Planned |
+| A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Complete |
+| A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | In Progress |
 | A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Planned |
 | A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | Planned |
 | A14 | REL-002 self-bootstrap rehearsal | Record one Talos-on-Talos rehearsal packet or a failed rehearsal with exact gap evidence. | A13 | REL-002 evidence table updated; no v1.0 claim unless criteria met. | Record non-qualifying evidence. | Planned |
@@ -548,3 +548,50 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I092, MEM-007, ARCH-006, MEM-005, and this task's A9 checkpoint before editing runtime code.
+
+### A10 — MEM-007 Bash Compression Evidence Closed (2026-07-04)
+
+Completed task items:
+
+- Audited existing MEM-007 bash output compression and kept it default-off.
+- Added a stable-prefix regression proving `with_bash_compression(true)` does not alter stable-prefix
+  bytes.
+- Added an end-to-end regression proving long bash output is compressed only in the model-facing
+  tool result while the UI event/export surface keeps the full raw output.
+- Corrected comments and MEM-007 storage text to avoid over-claiming durable JSONL raw-output
+  preservation.
+
+Current state and artifacts:
+
+- Code/tests: `crates/talos-agent/src/tests.rs`, `crates/talos-agent/src/compression.rs`,
+  `crates/talos-agent/src/configuration.rs`.
+- Owner docs: I092, MEM-007, Board, and this task updated.
+- Runtime default remains unchanged: bash compression is disabled unless explicitly enabled.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check -p talos-agent`: passed.
+- `cargo clippy -p talos-agent -- -D warnings`: passed.
+- `cargo test -p talos-agent bash_compression`: 2 matching regression tests passed.
+- `cargo test -p talos-agent`: 196 unit tests and 12 doctests passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- A10 closes only the bash evidence slice. `read`, `grep`, `git_diff`, cross-turn dedup, and
+  representative multi-session savings measurement remain open MEM-007 work.
+- Durable JSONL dual-track raw-output storage is not implemented; current proof covers the UI
+  event/export surface.
+
+Next task item:
+
+- A11: define the non-bypass deny/ask/allow permission matrix for scheduled, batch, and exec-style
+  autonomy before any runtime expansion.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I092, SCHED-001, PERM-001, TOOL-010, and this task's A10 checkpoint.

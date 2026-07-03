@@ -8,9 +8,20 @@
 I092 activation note (2026-07-04):
 - First slice is evidence-first. Prove or reject deterministic pre-entry compression without
   changing stable-prefix bytes.
-- Runtime compression must remain disabled unless stable-prefix, determinism, and raw-export
+- Runtime compression must remain disabled unless stable-prefix, determinism, and raw UI/export
   preservation tests exist.
 - No ML/ONNX model or new native dependency is in scope.
+
+I092 A10 evidence note (2026-07-04):
+- Bash-only compression is default-off and deterministic.
+- Added tests prove stable-prefix bytes are unchanged when bash compression is enabled, and the
+  model-facing bash result is compressed while the UI event/export surface receives the full raw
+  output.
+- Token-saving evidence for the test fixture: a 50-line bash result is reduced to the 30 retained
+  tail lines plus a deterministic omission marker, roughly 40% fewer content lines before byte-level
+  marker overhead.
+- This does not close the full MEM-007 strategy set. `read`, `grep`, `git_diff`, cross-turn dedup,
+  representative session measurement, and durable JSONL dual-track raw-output storage remain open.
 
 ## Problem
 
@@ -100,8 +111,10 @@ must be preserved for:
 - Debug/diagnostics
 - Potential re-expansion if the agent explicitly requests full content via a follow-up tool call
 
-Storage: raw outputs are written to the session's JSONL log (already the durable source of
-truth). The in-memory `Message::Tool` carries the compressed form.
+Storage boundary for the first evidence slice: raw outputs must remain visible on the UI event and
+transcript/export surface while the in-memory `Message::Tool` carries the compressed form. A durable
+dual-track JSONL raw-output store is not part of the first slice and must not be claimed until it is
+implemented and tested.
 
 ### What compression is NOT
 
@@ -147,10 +160,11 @@ Agent turn loop (run_inner):
 - [ ] Tool output compression prototyped for `read`, `grep`, `git_diff`, `bash` with
       deterministic strategies and per-tool rules.
 - [ ] Cross-turn dedup prototyped for repeated `read` and `grep` calls.
-- [ ] Raw output preservation verified: `/export` produces full uncompressed transcript.
-- [ ] **Cache stability test**: stable prefix hash is identical with compression enabled
+- [x] Bash-only model-facing compression is proven default-off and deterministic.
+- [x] Raw output preservation verified for the UI event/export surface.
+- [x] **Cache stability test**: stable prefix hash is identical with compression enabled
       vs disabled. No regression.
-- [ ] **Determinism test**: same tool output + same compression config → byte-identical
+- [x] **Determinism test**: same tool output + same compression config → byte-identical
       compressed result across runs.
 - [ ] Token savings measured: before/after comparison on representative agent sessions
       (coding task, exploration task, debugging task).
