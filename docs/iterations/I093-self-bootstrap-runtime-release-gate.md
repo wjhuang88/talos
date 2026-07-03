@@ -73,16 +73,18 @@
 |---|---|---|
 | 2026-07-04 | Activation | Activated after I092 completed bash-only cache-stability/export evidence and the autonomy permission matrix. Non-terminal inventory disposition: I085 remains Paused with MC107 real terminal `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells. I093 starts with readiness/reporting only: REL-002 remains not ready for `v1.0.0`, RUNTIME-001 is complete only as a pre-1.0 facade, GOV-003 remains Phase 1 partial, and ARCH-030 remains a residual register. No tag, publish, release action, or v1.0 claim is authorized. |
 | 2026-07-04 | A13 execution | Updated REL-002 readiness with `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md`. The verdict remains not ready for `v1.0.0`; RUNTIME-001 still needs Talos-primary edit/validation/git evidence and stable SDK surface classification, GOV-003 still needs mutating governance/gate enforcement/risk classification, and ARCH-030 identifies session SQLite and Git tool roots as the highest self-bootstrap risks before continuity/git workflows expand. |
+| 2026-07-04 | A14 execution | Recorded `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md` as non-qualifying REL-002 evidence. Talos proved only `talos 0.2.2` CLI version availability; Codex remained primary for planning, editing, validation orchestration, docs sync, commit, and push. |
 
 ## Verification Evidence
 
 - `scripts/validate_project_governance.sh .`: passed, 0 warnings.
 - `git diff --check`: clean.
+- `cargo run -p talos-cli -- --version`: passed; output included `talos 0.2.2`.
 
 ## Variance And Residuals
 
 - No release, publish, tag, or v1.0 posture changed at activation.
-- A13 is complete. A14 remains the self-bootstrap rehearsal/non-qualification record.
+- A14 is complete as a non-qualification record. A15 remains final closeout.
 
 ## Retrospective
 
@@ -90,3 +92,5 @@
   convert Codex-primary evidence into REL-002 qualification.
 - A13 confirmed the core posture: improved prerequisites are not qualifying self-bootstrap
   evidence. The next highest-value work is a tightly scoped Talos-primary rehearsal.
+- A14 confirmed that a version-runnable CLI is not self-bootstrap evidence. REL-002 needs a
+  Talos-primary edit/validation/governance loop before the next rehearsal can be qualifying.

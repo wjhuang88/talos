@@ -60,8 +60,8 @@ is not suitable for routine frontline delegation.
 | A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Complete |
 | A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Complete |
 | A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | Complete |
-| A14 | REL-002 self-bootstrap rehearsal | Record one Talos-on-Talos rehearsal packet or a failed rehearsal with exact gap evidence. | A13 | REL-002 evidence table updated; no v1.0 claim unless criteria met. | Record non-qualifying evidence. | In Progress |
-| A15 | Final closeout | Four-month matrix, residual owners, release posture, docs, Board, and handoff are synchronized. | A14 | workspace tests, clippy, governance, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
+| A14 | REL-002 self-bootstrap rehearsal | Record one Talos-on-Talos rehearsal packet or a failed rehearsal with exact gap evidence. | A13 | REL-002 evidence table updated; no v1.0 claim unless criteria met. | Record non-qualifying evidence. | Complete |
+| A15 | Final closeout | Four-month matrix, residual owners, release posture, docs, Board, and handoff are synchronized. | A14 | workspace tests, clippy, governance, final checkpoint. | Mark Partial with exact unfinished owners. | In Progress |
 
 ## Dependencies And Prerequisites
 
@@ -684,3 +684,42 @@ Recovery or resume instruction:
 - Run `git status --short`.
 - Read REL-002, `docs/reference/SELF-BOOTSTRAP-EVIDENCE-TEMPLATE.md`, and this task's A13
   checkpoint.
+
+### A14 — Self-Bootstrap Non-Qualification Evidence Recorded (2026-07-04)
+
+Completed task items:
+
+- Recorded `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md`.
+- Classified the attempted I093 evidence packet as non-qualifying for REL-002.
+- Proved only the local CLI version surface with `cargo run -p talos-cli -- --version`.
+- Synchronized REL-002, I093, Board, and this task with the non-qualification result.
+
+Current state and artifacts:
+
+- REL-002 remains No-go for `v1.0.0`.
+- Talos did not run as the primary repository-editing agent.
+- Codex remained primary for planning, editing, validation orchestration, owner-doc sync, commit,
+  and push.
+- The next qualifying rehearsal requires a Talos-primary documentation-only edit loop with explicit
+  validation evidence capture.
+
+Commands/checks and actual results:
+
+- `cargo run -p talos-cli -- --version`: passed; output included `talos 0.2.2`.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- `cargo check --workspace` and `cargo test --workspace` were not run for this docs-only A14 packet.
+- A14 intentionally records gap evidence, not a qualifying Talos-on-Talos session.
+
+Next task item:
+
+- A15: final closeout with four-month matrix, residual owners, release posture, docs, Board, and
+  handoff synchronized.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read the A14 evidence record, I093, REL-002, and this task's A14 checkpoint before final closeout.

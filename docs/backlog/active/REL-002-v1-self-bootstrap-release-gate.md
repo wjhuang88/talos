@@ -25,6 +25,11 @@ I093 A13 result (2026-07-04): `docs/reference/REL-002-READINESS-REPORT-2026-07-0
 runtime/governance/architecture readiness audit. Verdict remains not ready for `v1.0.0`; the
 minimum next packet is a controlled Talos-primary rehearsal.
 
+I093 A14 result (2026-07-04): `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md`
+records the attempted evidence packet as non-qualifying. Talos proved only the local `talos 0.2.2`
+CLI version surface; Codex remained the primary executor for planning, editing, validation
+orchestration, owner-doc sync, commit, and push.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent
@@ -92,6 +97,7 @@ Each qualifying self-bootstrap session must record:
 |---|---|---|---|
 | 2026-07-02 | T123 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md` | Does not qualify. Talos generated a read-only validation plan, but Codex remained the primary executor for implementation, validation execution, docs, git, push, and issue sync. |
 | 2026-07-02 | T132 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md` | Does not qualify. Talos generated workspace/governance validation plans for an architecture-sensitive ADR slice, but Codex remained the primary executor and the >60% autonomous coverage target was missed. |
+| 2026-07-04 | I093-A14 | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md` | Does not qualify. Talos only proved `talos 0.2.2` CLI availability; Codex remained primary for planning, edits, validation orchestration, docs sync, commit, and push. |
 
 ## Readiness Reports
 
