@@ -71,15 +71,13 @@ pub(crate) fn build_provider(
             if let Some(base_url) = config.base_url() {
                 provider = provider.with_base_url(base_url);
             }
-            let model_config = config
-                .active_provider_config()
-                .models
-                .get(&config.model)
-                .cloned();
+            let provider_config = config.active_provider_config();
+            let model_config = provider_config.models.get(&config.model).cloned();
             provider = provider.with_reasoning(
                 model_config.as_ref().and_then(|m| m.reasoning.clone()),
                 config.output_limit(),
             );
+            provider = provider.with_timeout_config(provider_config.timeout.clone());
             Arc::new(provider)
         }
         ProviderProtocol::OpenAIChat => {
@@ -87,15 +85,13 @@ pub(crate) fn build_provider(
             if let Some(base_url) = config.base_url() {
                 provider = provider.with_base_url(base_url);
             }
-            let model_config = config
-                .active_provider_config()
-                .models
-                .get(&config.model)
-                .cloned();
+            let provider_config = config.active_provider_config();
+            let model_config = provider_config.models.get(&config.model).cloned();
             provider = provider.with_reasoning(
                 model_config.as_ref().and_then(|m| m.reasoning.clone()),
                 config.output_limit(),
             );
+            provider = provider.with_timeout_config(provider_config.timeout.clone());
             Arc::new(provider)
         }
     }
