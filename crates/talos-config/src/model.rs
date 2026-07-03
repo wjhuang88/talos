@@ -2,9 +2,18 @@
 //!
 //! Provides a built-in dataset of mainstream models and supports importing
 //! additional model data from models.dev JSON endpoints.
+//!
+//! The shared data types ([`ModelMetadata`], [`ModelSource`], [`ModelPricing`],
+//! [`ModelCapabilities`]) and lookup helpers ([`find_model`],
+//! [`find_model_by_provider`], [`models_with_id`]) are defined in
+//! `talos_core::model` and re-exported here for backward compatibility.
 
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+pub use talos_core::model::{
+    ModelCapabilities, ModelMetadata, ModelPricing, ModelSource, find_model,
+    find_model_by_provider, models_with_id,
+};
+
+use serde::Deserialize;
 use thiserror::Error;
 
 /// Error types for model metadata operations.
@@ -17,75 +26,6 @@ pub enum ModelError {
     /// Failed to parse models.dev JSON import data.
     #[error("failed to parse models.dev import: {0}")]
     ImportError(String),
-}
-
-/// Source of model metadata.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ModelSource {
-    /// From the built-in dataset embedded at compile time.
-    #[default]
-    Builtin,
-    /// Manually added by the user.
-    Manual,
-    /// Imported from models.dev, with a refresh timestamp.
-    ModelsDev { refreshed_at: String },
-}
-
-/// Pricing information for a model (per 1M tokens, USD).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
-pub struct ModelPricing {
-    /// Input token price per 1M tokens.
-    pub input_per_1m: Option<f64>,
-    /// Output token price per 1M tokens.
-    pub output_per_1m: Option<f64>,
-    /// Cache read token price per 1M tokens.
-    pub cache_read_per_1m: Option<f64>,
-}
-
-/// Capability flags for a model.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-pub struct ModelCapabilities {
-    /// Supports tool/function calling.
-    #[serde(default)]
-    pub tools: bool,
-    /// Supports structured/JSON output.
-    #[serde(default)]
-    pub structured_output: bool,
-    /// Supports reasoning/thinking mode.
-    #[serde(default)]
-    pub reasoning: bool,
-    /// Accepts image input.
-    #[serde(default)]
-    pub image_input: bool,
-}
-
-/// Static metadata for a known model.
-///
-/// Represents model knowledge (context limits, pricing, capabilities)
-/// independent of runtime configuration. Used to inform the agent about
-/// model properties without hardcoded fallbacks.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct ModelMetadata {
-    /// Unique model identifier (e.g., "claude-sonnet-4-5-20250929").
-    pub id: String,
-    /// Provider name (e.g., "anthropic", "openai", "google").
-    pub provider: String,
-    /// Maximum context window in tokens.
-    pub context_limit: Option<u32>,
-    /// Maximum output tokens.
-    pub output_limit: Option<u32>,
-    /// Pricing information (per 1M tokens, USD).
-    #[serde(default)]
-    pub pricing: Option<ModelPricing>,
-    /// Model capability flags.
-    #[serde(default)]
-    pub capabilities: ModelCapabilities,
-    /// Model release date (ISO 8601 or similar).
-    pub release_date: Option<String>,
-    /// Where this metadata originated.
-    #[serde(default)]
-    pub source: ModelSource,
 }
 
 /// Load the built-in model dataset embedded at compile time.
@@ -101,36 +41,6 @@ pub fn builtin_models() -> Vec<ModelMetadata> {
             m
         })
         .collect()
-}
-
-/// Look up a model by id in a dataset.
-///
-/// Returns the first model whose `id` matches. When multiple providers share
-/// the same model id (e.g. `glm-5.2` under `zhipu`, `zai`, etc.), this returns
-/// an arbitrary first match. Use [`find_model_by_provider`] for unambiguous
-/// resolution in those cases.
-pub fn find_model<'a>(models: &'a [ModelMetadata], id: &str) -> Option<&'a ModelMetadata> {
-    models.iter().find(|m| m.id == id)
-}
-
-/// Look up a model by `(provider, id)` in a dataset.
-///
-/// Use this instead of [`find_model`] whenever the active provider is known,
-/// so that duplicate model ids across providers resolve unambiguously.
-pub fn find_model_by_provider<'a>(
-    models: &'a [ModelMetadata],
-    provider: &str,
-    id: &str,
-) -> Option<&'a ModelMetadata> {
-    models.iter().find(|m| m.provider == provider && m.id == id)
-}
-
-/// Collects all models whose `id` matches, regardless of provider.
-///
-/// Returns an empty vector when the id is unique or absent. Use this to detect
-/// ambiguity before resolving a bare model id.
-pub fn models_with_id<'a>(models: &'a [ModelMetadata], id: &str) -> Vec<&'a ModelMetadata> {
-    models.iter().filter(|m| m.id == id).collect()
 }
 
 /// Internal TOML dataset wrapper.

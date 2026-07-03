@@ -351,14 +351,36 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 | 2026-07-03 | Correction | Live api.json verified (2.9MB fetch): top level is an object keyed by provider (150 providers); each `provider.models` is an **object map keyed by model id** with `cost`/`limit`/`modalities` fields. `import_models_dev()`'s flat `"provider/model-id"` key assumption and `pricing` field name both mismatch the real shape — importing live data would yield ~150 bogus provider-named entries. A `github-copilot` provider exists (25 models) whose auth cannot be expressed by the static schema; split to PROVIDER-003. |
 | 2026-07-03 | Execution | Interim manual catalog refresh landed (commit `071449b`): every `models.toml` entry verified against live api.json; fabricated dated OpenAI ids (`gpt-4.1-2025-04-14`, `o3-2025-04-16`, `o4-mini-2025-04-16`) replaced with canonical ids; MiniMax-M3/google/zhipu/openrouter field corrections; 18 current-model additions (60 models, 12 providers). MC101 pipeline scope unchanged — this is a stopgap, not the fix. |
 | 2026-07-03 | Activation | I085 activated after `v0.2.2` release closeout and programmer handoff preparation. Non-terminal inventory disposition: no conflicting active iteration; I086-I089 remain planned/deferred behind I085; I081-I083 remain superseded historical shells; paused high-risk/provider-plugin gates remain paused. Active scope starts with Stage 1 H100-H101 / MC100-MC103: shared catalog types, `talos-models`, SQLite catalog store/migrations, models.dev import parsing, gated built-in refresh, and catalog-aware resolver. Stage 2 `/model` and `/connect` work remains gated until resolver precedence tests pass. |
+| 2026-07-03 | Execution | Stage 1 (S1-A through S1-E) implemented in a single session. **S1-A**: `ModelMetadata`, `ModelSource`, `ModelPricing`, `ModelCapabilities`, `ProviderInfo`, `ProviderSource`, and lookup helpers (`find_model`, `find_model_by_provider`, `models_with_id`) moved to `talos-core::model`; `talos-config` re-exports for backward compatibility. New `talos-models` crate added to workspace. **S1-B**: `ModelCatalog` SQLite store with `open`/`open_memory`/`seed`/`upsert_provider`/`upsert_model`/`all_models`/`models_by_provider`/`all_providers`/`find_model`/`search_models`/`search_providers`/`set_meta`/`get_meta`; schema v1 with `schema_version` table; corrupt DB propagates errors (no panic); incompatible schema versions rejected with `IncompatibleSchema` error. **S1-C**: `import_models_dev_api` and `import_models_dev_models` parsers in `talos-models` handle the real models.dev object-keyed format (provider → models map); both return `ImportResult { providers, models }` with full provider metadata (name, env var, API base URL, docs URL). **S1-D**: `crates/talos-config/build.rs` with `BUILD_MODELS=1` gated refresh via curl; normal builds stay offline; parse failure returns error and preserves committed TOML. **S1-E**: `Config::all_models_with_catalog` and `Config::resolve_model_limits_with_catalog` accept `Option<&[ModelMetadata]>` catalog overlay; `talos-config` does NOT depend on `talos-models`; catalog failure degrades gracefully to builtin TOML. |
+| 2026-07-03 | Review | Acceptance review identified 3 gaps: (1) schema version not validated against `SCHEMA_VERSION`; (2) `BUILD_MODELS=1` could write empty `models.toml` on parse failure; (3) provider metadata not imported. All 3 fixed: schema version check added with `IncompatibleSchema` error + test; `unwrap_or_default()` replaced with error propagation + empty-result guard; provider-level fields (`name`, `env`, `api`, `doc`) parsed from real api.json format and returned via `ImportResult`; `seed()` accepts `&[ProviderInfo]` alongside `&[ModelMetadata]`. |
 
 ## Verification Evidence
 
-- Planned.
+- Stage 1 complete (2026-07-03). `cargo fmt --all -- --check`: clean.
+- `cargo check --workspace`: clean.
+- `cargo clippy -p talos-models -p talos-config -p talos-core -- -D warnings`: clean.
+- `cargo test --workspace`: 1578 passed, 0 failed.
+  - `talos-core`: 44 tests (6 new model module tests).
+  - `talos-config`: 107 tests (9 new catalog-aware resolver tests).
+  - `talos-models`: 36 tests (10 import parser tests with provider metadata, 26 store CRUD/query/search/schema-version tests).
+- Normal build verified offline: `BUILD_MODELS` not set → no network calls.
+- `BUILD_MODELS=1 cargo build`: not run (network-dependent; requires models.dev
+  reachability — recorded as validation not run per handoff instructions).
+- S1-E resolver precedence tests prove: user config > catalog > builtin > fallback;
+  catalog `None` does not block startup; empty catalog falls back to builtin.
+- Acceptance review gaps fixed: (1) `IncompatibleSchema` error on version mismatch;
+  (2) build.rs parse failure preserves committed TOML; (3) provider metadata
+  (name, env, api, doc) parsed from api.json and stored via `seed(&[ProviderInfo], &[ModelMetadata], &str)`.
 
 ## Variance And Residuals
 
-- Planned.
+- `BUILD_MODELS=1` refresh path implemented but not validated with live network
+  fetch (requires models.dev reachability). Code compiles and the non-network
+  path is verified. Stage 2 validation should run `BUILD_MODELS=1 cargo build`
+  and verify `git diff -- crates/talos-config/src/models.toml`.
+- Stage 2 (`/model` and `/connect` interactive changes) remains gated. The
+  catalog-aware resolver methods (`all_models_with_catalog`,
+  `resolve_model_limits_with_catalog`) are available for Stage 2 wiring.
 
 ## Retrospective
 

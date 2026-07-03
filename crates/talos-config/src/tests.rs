@@ -1205,3 +1205,197 @@ fn test_provider_timeout_config_parsed_from_toml() {
     assert_eq!(timeout.backoff_base_ms, 250);
     assert_eq!(timeout.backoff_max_ms, 2000);
 }
+
+#[test]
+fn test_all_models_with_catalog_overlays_builtin() {
+    let config = Config::default();
+    let builtin_count = config.all_models().len();
+
+    let catalog_models = vec![model::ModelMetadata {
+        id: "catalog-only-model".to_string(),
+        provider: "catalog-provider".to_string(),
+        context_limit: Some(500_000),
+        output_limit: Some(10_000),
+        pricing: None,
+        capabilities: model::ModelCapabilities {
+            tools: true,
+            ..Default::default()
+        },
+        release_date: None,
+        source: model::ModelSource::ModelsDev {
+            refreshed_at: "2025-07-03T00:00:00Z".to_string(),
+        },
+    }];
+
+    let merged = config.all_models_with_catalog(Some(&catalog_models));
+    assert_eq!(merged.len(), builtin_count + 1);
+
+    let found = model::find_model_by_provider(&merged, "catalog-provider", "catalog-only-model");
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().context_limit, Some(500_000));
+}
+
+#[test]
+fn test_all_models_with_catalog_replaces_builtin_entry() {
+    let config = Config::default();
+    let builtins = model::builtin_models();
+    let first = &builtins[0];
+
+    let catalog_models = vec![model::ModelMetadata {
+        id: first.id.clone(),
+        provider: first.provider.clone(),
+        context_limit: Some(999_999),
+        output_limit: Some(99_999),
+        pricing: None,
+        capabilities: model::ModelCapabilities::default(),
+        release_date: None,
+        source: model::ModelSource::ModelsDev {
+            refreshed_at: "2025-07-03T00:00:00Z".to_string(),
+        },
+    }];
+
+    let merged = config.all_models_with_catalog(Some(&catalog_models));
+    let found = model::find_model_by_provider(&merged, &first.provider, &first.id).unwrap();
+    assert_eq!(found.context_limit, Some(999_999));
+    assert_eq!(found.output_limit, Some(99_999));
+}
+
+#[test]
+fn test_all_models_with_catalog_user_config_overrides_catalog() {
+    let mut config = Config::default();
+    config.provider = "test".to_string();
+    config.model = "m1".to_string();
+    config.providers.insert(
+        "test".to_string(),
+        ProviderConfig {
+            models: HashMap::from([(
+                "m1".to_string(),
+                ModelConfig {
+                    context_limit: Some(42_000),
+                    output_limit: Some(4_200),
+                    reasoning: None,
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+
+    let catalog_models = vec![model::ModelMetadata {
+        id: "m1".to_string(),
+        provider: "test".to_string(),
+        context_limit: Some(500_000),
+        output_limit: Some(50_000),
+        pricing: None,
+        capabilities: model::ModelCapabilities::default(),
+        release_date: None,
+        source: model::ModelSource::ModelsDev {
+            refreshed_at: "t".to_string(),
+        },
+    }];
+
+    let merged = config.all_models_with_catalog(Some(&catalog_models));
+    let found = model::find_model_by_provider(&merged, "test", "m1").unwrap();
+    assert_eq!(found.context_limit, Some(42_000));
+    assert_eq!(found.output_limit, Some(4_200));
+    assert_eq!(found.source, model::ModelSource::Manual);
+}
+
+#[test]
+fn test_all_models_with_catalog_none_matches_all_models() {
+    let config = Config::default();
+    let without = config.all_models();
+    let with_none = config.all_models_with_catalog(None);
+    assert_eq!(without.len(), with_none.len());
+}
+
+#[test]
+fn test_resolve_model_limits_with_catalog_precedence() {
+    let mut config = Config::default();
+    config.provider = "test-provider".to_string();
+    config.model = "test-model".to_string();
+
+    let catalog_models = vec![model::ModelMetadata {
+        id: "test-model".to_string(),
+        provider: "test-provider".to_string(),
+        context_limit: Some(300_000),
+        output_limit: Some(30_000),
+        pricing: None,
+        capabilities: model::ModelCapabilities::default(),
+        release_date: None,
+        source: model::ModelSource::Builtin,
+    }];
+
+    let (ctx, out) = config.resolve_model_limits_with_catalog(Some(&catalog_models));
+    assert_eq!(ctx, 300_000);
+    assert_eq!(out, Some(30_000));
+}
+
+#[test]
+fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
+    let mut config = Config::default();
+    config.provider = "tp".to_string();
+    config.model = "tm".to_string();
+    config.providers.insert(
+        "tp".to_string(),
+        ProviderConfig {
+            models: HashMap::from([(
+                "tm".to_string(),
+                ModelConfig {
+                    context_limit: Some(111_000),
+                    output_limit: Some(11_100),
+                    reasoning: None,
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+
+    let catalog_models = vec![model::ModelMetadata {
+        id: "tm".to_string(),
+        provider: "tp".to_string(),
+        context_limit: Some(300_000),
+        output_limit: Some(30_000),
+        pricing: None,
+        capabilities: model::ModelCapabilities::default(),
+        release_date: None,
+        source: model::ModelSource::Builtin,
+    }];
+
+    let (ctx, out) = config.resolve_model_limits_with_catalog(Some(&catalog_models));
+    assert_eq!(ctx, 111_000);
+    assert_eq!(out, Some(11_100));
+}
+
+#[test]
+fn test_resolve_model_limits_with_catalog_none_falls_back_to_builtin() {
+    let mut config = Config::default();
+    config.provider = "anthropic".to_string();
+    config.model = "claude-sonnet-4-5-20250929".to_string();
+
+    let from_catalog = config.resolve_model_limits_with_catalog(None);
+    let from_builtin = config.resolve_model_limits();
+    assert_eq!(from_catalog, from_builtin);
+}
+
+#[test]
+fn test_resolve_model_limits_with_catalog_fallback_for_unknown() {
+    let mut config = Config::default();
+    config.provider = "unknown".to_string();
+    config.model = "unknown-model".to_string();
+
+    let catalog_models: Vec<model::ModelMetadata> = vec![];
+    let (ctx, out) = config.resolve_model_limits_with_catalog(Some(&catalog_models));
+    assert_eq!(ctx, 128_000);
+    assert!(out.is_none());
+}
+
+#[test]
+fn test_resolve_model_limits_with_empty_catalog_does_not_block() {
+    let mut config = Config::default();
+    config.provider = "anthropic".to_string();
+    config.model = "claude-sonnet-4-5-20250929".to_string();
+
+    let empty_catalog: Vec<model::ModelMetadata> = vec![];
+    let (ctx, _) = config.resolve_model_limits_with_catalog(Some(&empty_catalog));
+    assert!(ctx > 0, "should fall back to builtin, not block");
+}

@@ -131,26 +131,47 @@ impl Config {
             .and_then(|model| model.output_limit)
     }
 
-    /// Resolves model limits using the full precedence chain:
-    /// 1. User-configured limits in `~/.talos/config.toml` for the active model.
-    /// 2. Built-in catalog from `builtin_models()` matched by model ID.
+    /// Resolves model limits using the precedence chain:
+    /// 1. User-configured limits in `~/.talos/config.toml`.
+    /// 2. Built-in catalog from `builtin_models()`.
     /// 3. Conservative fallback `(128_000, None)`.
-    ///
-    /// Returns `(context_limit, output_limit)`.
     #[must_use]
     pub fn resolve_model_limits(&self) -> (u32, Option<u32>) {
+        self.resolve_model_limits_with_catalog(None)
+    }
+
+    /// Resolves model limits with an optional catalog overlay.
+    ///
+    /// Precedence (highest first):
+    /// 1. User-configured limits in `~/.talos/config.toml`.
+    /// 2. Catalog DB data (when `catalog` is `Some`).
+    /// 3. Built-in catalog from `builtin_models()`.
+    /// 4. Conservative fallback `(128_000, None)`.
+    ///
+    /// When `catalog` is `None` (catalog unavailable or corrupt), the chain
+    /// degrades gracefully to built-in data then fallback — startup is never
+    /// blocked by catalog DB failure.
+    #[must_use]
+    pub fn resolve_model_limits_with_catalog(
+        &self,
+        catalog: Option<&[model::ModelMetadata]>,
+    ) -> (u32, Option<u32>) {
         const CONSERVATIVE_FALLBACK: u32 = 128_000;
 
-        // Step 1: Check user config
         if let Some(model_config) = self.active_model_config()
             && let Some(ctx) = model_config.context_limit
         {
             return (ctx, model_config.output_limit);
         }
 
-        // Step 2: Look up in builtin catalog, qualified by active provider so
-        // that duplicate model ids (e.g. glm-5.2 under zhipu/zai) resolve to
-        // the intended provider's metadata.
+        if let Some(catalog_models) = catalog
+            && let Some(meta) =
+                model::find_model_by_provider(catalog_models, &self.provider, &self.model)
+            && let Some(ctx) = meta.context_limit
+        {
+            return (ctx, meta.output_limit);
+        }
+
         let builtins = model::builtin_models();
         if let Some(meta) = model::find_model_by_provider(&builtins, &self.provider, &self.model)
             && let Some(ctx) = meta.context_limit
@@ -158,7 +179,6 @@ impl Config {
             return (ctx, meta.output_limit);
         }
 
-        // Step 3: Conservative fallback
         (CONSERVATIVE_FALLBACK, None)
     }
 
@@ -326,10 +346,39 @@ impl Config {
     }
 
     /// Returns all available models: built-in catalog merged with user-configured
-    /// models from `providers.*.models`. Configured models override builtin entries
-    /// with the same `(provider, model_id)` pair.
+    /// models from `providers.*.models`.
     pub fn all_models(&self) -> Vec<model::ModelMetadata> {
+        self.all_models_with_catalog(None)
+    }
+
+    /// Returns all available models with an optional catalog overlay.
+    ///
+    /// Merge precedence (each layer overrides the previous for matching
+    /// `(provider, model_id)` pairs):
+    /// 1. Built-in catalog from `builtin_models()`.
+    /// 2. Catalog DB data (when `catalog` is `Some`).
+    /// 3. User-configured models from `providers.*.models`.
+    ///
+    /// When `catalog` is `None`, behavior is identical to [`all_models`].
+    pub fn all_models_with_catalog(
+        &self,
+        catalog: Option<&[model::ModelMetadata]>,
+    ) -> Vec<model::ModelMetadata> {
         let mut models = model::builtin_models();
+
+        if let Some(catalog_models) = catalog {
+            for cm in catalog_models {
+                if let Some(existing) = models
+                    .iter_mut()
+                    .find(|m| m.provider == cm.provider && m.id == cm.id)
+                {
+                    *existing = cm.clone();
+                } else {
+                    models.push(cm.clone());
+                }
+            }
+        }
+
         for (provider_name, provider) in &self.providers {
             for (model_id, cfg) in &provider.models {
                 if let Some(existing) = models
