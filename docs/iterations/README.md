@@ -120,6 +120,7 @@ docs/iterations/
 | I081 | Frontline Month 2 — Extension And Distribution Discipline | **Planned (2026-07-02)** | Weeks 5-8 of the 2026-07-02 frontline plan: plugin diagnostics, hook listing, read-only plugin polish, local opt-in UX, asset distribution design, and closeout. See `I081-frontline-extension-distribution.md`. |
 | I082 | Frontline Month 3 — Document Ingestion And Parser Footprint | **Planned (2026-07-02)** | Weeks 9-12 of the 2026-07-02 frontline plan: document extraction, HTML/link extraction, link references, parser feature gates, and closeout. See `I082-frontline-ingestion-footprint.md`. |
 | I083 | Frontline Month 4 — Ecosystem Compatibility And Release Posture | **Planned (2026-07-02)** | Weeks 13-16 of the 2026-07-02 frontline plan: shared skills policy/implementation, REL-002 rehearsal evidence, docs sweep, release posture, closeout, and handoff. See `I083-frontline-ecosystem-release-posture.md`. |
+| I084 | Experience Reliability — Thinking, Timeout, Retry, And Status | **Planned (2026-07-03)** | Maintainer reprioritization: provider thinking compatibility, first-packet/idle timeout, retry/backoff, and clear TUI model-call states move ahead of plugin/distribution work unless explicitly restored. See `I084-experience-reliability.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -157,6 +158,7 @@ rewrite published iteration baselines.
 | I081 | Planned | Second monthly shell for the 2026-07-02 frontline development plan; wait for I080 closeout or explicit replan. |
 | I082 | Planned | Third monthly shell for the 2026-07-02 frontline development plan; wait for I081 closeout or explicit replan. |
 | I083 | Planned | Fourth monthly shell for the 2026-07-02 frontline development plan; wait for I082 closeout or explicit replan. |
+| I084 | Planned | UX reliability reprioritization from 2026-07-03 maintainer feedback; activate ahead of I081 unless maintainer explicitly restores the prior frontline order. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |
 | I040 | Complete (2026-06-22) | Removed from non-terminal inventory (Complete record in I040 doc). |

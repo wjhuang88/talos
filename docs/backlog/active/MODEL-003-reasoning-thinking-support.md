@@ -1,13 +1,15 @@
 # MODEL-003: Reasoning / Thinking Field Support
 
-**Status**: ADR-needed
-**Priority**: P2
+**Status**: ADR-needed — selected into UX-001/I084 planning
+**Priority**: P1
 **Source**: MODEL-001 split (2026-06-20); original proposal `docs/proposals/reasoning-thinking-field.md` (2026-06-02)
 **Depends on**: MODEL-001 catalog (model metadata schema for reasoning capability flags); ADR gate
 
 ## Problem
 
-Modern LLM providers expose reasoning/thinking fields that Talos currently ignores:
+Modern LLM providers expose reasoning/thinking fields that Talos currently ignores. This is now a
+P1 UX reliability item because missing thinking compatibility makes thinking-capable models appear
+stalled or degraded even though Talos already has a transient TUI preview boundary:
 
 | Provider | Request field | Stream handling |
 |---|---|---|
@@ -25,6 +27,14 @@ Consequences:
 
 Design and implement end-to-end reasoning/thinking support across the full Talos
 pipeline.
+
+## Priority Update 2026-07-03
+
+Maintainer feedback elevated this story from P2 to P1 and grouped it under
+`UX-001: Experience Reliability Program`. The first implementation container is
+`I084: Experience Reliability`, with UX100-UX102 covering ADR, stream normalization, and request-side
+reasoning configuration. The previous ADR gate still stands; elevation changes sequencing, not the
+requirement to decide provider request schema and persistence boundaries before code.
 
 ### ADR gate (must be resolved before any implementation)
 
@@ -92,12 +102,19 @@ per-model `limit` fields. Adding `options.thinking` follows the same pattern.
 
 ### Implementation (post-ADR)
 
-- Request body construction per provider
-- SSE stream parsing for reasoning chunks
-- `AgentEvent` extension (if needed)
-- TUI rendering
-- Session persistence
-- Usage/cost display in status bar and exit summary
+- Request body construction per provider:
+  - Anthropic `thinking: {type: "enabled", budget_tokens: N}`
+  - OpenAI o-series `reasoning_effort` plus `max_completion_tokens` handling
+  - OpenAI-compatible nested options such as `options.thinking`
+- SSE stream parsing for reasoning chunks:
+  - Anthropic `thinking_delta`
+  - OpenAI-compatible `reasoning_content` or configured interleaved reasoning field
+  - provider-marked hidden reasoning must not be exposed by default
+- Normalize provider chunks into Talos's transient thinking preview boundary.
+- Keep final assistant text separate from thinking preview text.
+- Decide whether any reasoning is persisted before changing JSONL/session schema.
+- Usage/cost display in status bar and exit summary where provider metadata supports reasoning token
+  accounting.
 
 ## Relationship To MODEL-001
 
@@ -120,6 +137,17 @@ whether reasoning is visible/hidden/interleaved). MODEL-003 implements the
 - [ ] Session JSONL preserves reasoning per ADR decision
 - [ ] Usage/cost display accounts for reasoning tokens where provider metadata supports it
 - [ ] Existing provider tests pass; new tests cover each provider's reasoning path
+
+## UX-001 Integration
+
+MODEL-003 pairs with `PROVIDER-002`:
+
+- MODEL-003 handles **what** different providers mean by thinking/reasoning and how Talos normalizes
+  it.
+- PROVIDER-002 handles **when** the provider call is considered stalled, retryable, timed out, or
+  failed.
+- TUI/conversation work in I084 must consume both so users see meaningful states instead of silent
+  waits.
 
 ## Required Reads
 
