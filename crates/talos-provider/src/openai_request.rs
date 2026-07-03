@@ -67,6 +67,7 @@ pub(crate) fn build_request_body(
             Message::Assistant {
                 content,
                 tool_calls,
+                ..
             } => {
                 let openai_tool_calls = if tool_calls.is_empty() {
                     None

@@ -305,6 +305,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             output_tokens,
                             cache_read_tokens: 0,
                             cache_write_tokens: 0,
+                            reasoning_tokens: 0,
                         },
                     })
                     .await;
@@ -415,6 +416,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                             output_tokens,
                             cache_read_tokens: 0,
                             cache_write_tokens: 0,
+                            reasoning_tokens: 0,
                         },
                     })
                     .await;
@@ -462,6 +464,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 output_tokens,
                 cache_read_tokens: 0,
                 cache_write_tokens: 0,
+                reasoning_tokens: 0,
             },
         })
         .await;
@@ -565,6 +568,7 @@ mod tests {
                     name: "bash".into(),
                     input: json!({"command": "ls"}),
                 }],
+                reasoning: None,
             },
         ];
         let body = build_request_body("gpt-4o", &messages, &[]);
@@ -598,6 +602,7 @@ mod tests {
         let messages = vec![Message::Assistant {
             content: "I'll help with that.".into(),
             tool_calls: vec![],
+            reasoning: None,
         }];
         let body = build_request_body("gpt-4o", &messages, &[]);
 
@@ -615,6 +620,7 @@ mod tests {
             Message::Assistant {
                 content: String::new(),
                 tool_calls: vec![],
+                reasoning: None,
             },
             Message::Tool {
                 result: talos_core::message::MessageToolResult {
@@ -640,6 +646,7 @@ mod tests {
                 name: "bash".into(),
                 input: json!({"command": "true"}),
             }],
+            reasoning: None,
         }];
         let body = build_request_body("gpt-4o", &messages, &[]);
 

@@ -218,6 +218,7 @@ fn build_request_body(model: &str, messages: &[Message], tools: &[ToolDefinition
             Message::Assistant {
                 content,
                 tool_calls,
+                ..
             } => {
                 let mut blocks = Vec::new();
                 if !content.is_empty() {
@@ -513,6 +514,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                                     output_tokens,
                                     cache_read_tokens,
                                     cache_write_tokens,
+                                    reasoning_tokens: 0,
                                 },
                             })
                             .await;
@@ -541,6 +543,7 @@ async fn parse_sse_stream(response: reqwest::Response, tx: mpsc::Sender<AgentEve
                 output_tokens,
                 cache_read_tokens,
                 cache_write_tokens,
+                reasoning_tokens: 0,
             },
         })
         .await;
@@ -687,6 +690,7 @@ fn extract_usage_from_message_start(data: &Value) -> Option<Usage> {
                 .get("cache_creation_input_tokens")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0) as u32,
+            reasoning_tokens: 0,
         })
 }
 
@@ -699,6 +703,7 @@ fn extract_usage_from_message_delta(data: &Value) -> Option<Usage> {
             .unwrap_or(0) as u32,
         cache_read_tokens: 0,
         cache_write_tokens: 0,
+        reasoning_tokens: 0,
     })
 }
 
@@ -765,6 +770,7 @@ mod tests {
                     name: "bash".into(),
                     input: json!({"command": "ls"}),
                 }],
+                reasoning: None,
             },
         ];
         let body = build_request_body("claude-sonnet-4-20250514", &messages, &[]);
