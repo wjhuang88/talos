@@ -20,6 +20,11 @@ validate `[[hooks]]` declarations, `HookRegistry` exposes a read-only registrati
 the conversation engine exposes `/hooks` diagnostics. Hook declarations are descriptive only; this
 does not load hook carriers or execute plugin hooks.
 
+I091 A8 aligned optional plugin package distribution with
+`docs/proposals/optional-runtime-asset-distribution.md`. Remote plugin installation remains blocked
+until a follow-up distribution ADR is accepted; installed plugin packages still require explicit
+plugin loader, provenance, sandbox, and permission gates before any capability is activated.
+
 ## Requirement
 
 Design a protocol specification and runtime architecture for loading Talos plugins.
@@ -94,7 +99,7 @@ host calls, sandbox limits, compatibility, and failure behavior.
 - [ ] Sandbox/resource limits are specified, including timeout, memory, filesystem/network access,
       and host-call allowlist.
 - [ ] Version negotiation and forward/backward compatibility rules are specified.
-- [ ] Optional plugin package distribution is aligned with DIST-001 instead of adding a separate
+- [x] Optional plugin package distribution is aligned with DIST-001 instead of adding a separate
       download path.
 - [ ] No implementation starts until the spec and ADR are accepted.
 

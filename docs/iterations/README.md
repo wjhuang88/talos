@@ -127,7 +127,7 @@ docs/iterations/
 | I088 | Extension And Ingestion Risk Bounding | **Planned (2026-07-03)** | Weeks 9-12 of the 2026-07-03 hardening plan: local plugin/hook diagnostics, asset policy, and bounded document/HTML extraction. See `I088-extension-ingestion-risk-bounding.md`. |
 | I089 | Ecosystem, Self-Bootstrap, And Closeout | **Planned (2026-07-03)** | Weeks 13-16 of the 2026-07-03 hardening plan: opt-in shared Skills decision, REL-002 rehearsal evidence, docs sweep, and handoff. See `I089-ecosystem-self-bootstrap-closeout.md`. |
 | I090 | High-Risk Ingestion And Search Boundary | **Complete (2026-07-04)** | Month 1 of the direct senior-agent high-risk execution track. Bounded document extraction and ripgrep-backed search stabilization are complete; full workspace and governance closeout passed. No browser/PDF/Office/OCR scope. See `I090-high-risk-ingestion-search-boundary.md` and `../tasks/2026-07-04-architect-owned-four-month-high-risk-execution.md`. |
-| I091 | Plugin, Hook, And Distribution Boundary | **Active (2026-07-04)** | Month 2 of the direct senior-agent high-risk execution track. Local diagnostics and distribution policy only; no remote install, marketplace, write-capable plugin tools, or auto-discovery. See `I091-plugin-hook-distribution-boundary.md`. |
+| I091 | Plugin, Hook, And Distribution Boundary | **Complete (2026-07-04)** | Month 2 of the direct senior-agent high-risk execution track. `/hooks` diagnostics, hook manifest declaration validation, and optional runtime asset distribution policy are complete; no remote install, marketplace, write-capable plugin tools, or auto-discovery. See `I091-plugin-hook-distribution-boundary.md`. |
 | I092 | Context Compression And Autonomy Gates | **Planned (2026-07-04)** | Month 3 of the direct senior-agent high-risk execution track. Cache-safe compression proof/rejection plus deny/ask/allow autonomy matrix. See `I092-context-compression-autonomy-gates.md`. |
 | I093 | Self-Bootstrap, Runtime, And Release Gate | **Planned (2026-07-04)** | Month 4 of the direct senior-agent high-risk execution track. REL-002 evidence, runtime/governance residual audit, and closeout without a v1.0 claim. See `I093-self-bootstrap-runtime-release-gate.md`. |
 
@@ -173,7 +173,7 @@ rewrite published iteration baselines.
 | I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
 | I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
 | I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |
-| I091 | Active | Activated after I090 completion. Start with audit-first plugin/hook diagnostics and distribution policy work before adding runtime behavior. |
+| I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
 | I092 | Planned | Direct senior-agent high-risk track month 3. Activation blocked until I091 closes or is explicitly deferred. |
 | I093 | Planned | Direct senior-agent high-risk track month 4. Activation blocked until I092 closes or is explicitly deferred. |
 | I035 | Complete | Removed from non-terminal inventory. |

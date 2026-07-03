@@ -54,8 +54,8 @@ is not suitable for routine frontline delegation.
 | A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | Complete |
 | A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Complete |
 | A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Complete |
-| A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | In Progress |
-| A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Planned |
+| A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Complete |
+| A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | In Progress |
 | A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Planned |
 | A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Planned |
 | A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Planned |
@@ -480,3 +480,44 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I091, DIST-001, and this task's A7 checkpoint.
+
+### A8 — Optional Asset Distribution Policy Closed (2026-07-04)
+
+Completed task items:
+
+- Added `docs/proposals/optional-runtime-asset-distribution.md` as the ADR-ready policy packet for
+  optional runtime assets.
+- Defined asset classes for model weights, WASM plugin packages, and non-executable resource packs.
+- Specified manifest fields, source and URL policy, explicit consent, Talos-controlled cache layout,
+  checksum/signature verification, offline/mirror behavior, update/uninstall/cleanup, and failure
+  fallback.
+- Recorded activation separation: install does not activate plugin capabilities or grant model
+  authority.
+- Synchronized DIST-001, PLUGIN-001, MODEL-002, I091, Board, proposal index, and iteration index.
+
+Current state and artifacts:
+
+- Policy: `docs/proposals/optional-runtime-asset-distribution.md`.
+- Owner docs: DIST-001, PLUGIN-001, MODEL-002, I091, Board, and iteration index updated.
+- Runtime: no downloader, installer, marketplace, automatic prompt, or remote plugin installation
+  was implemented.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- Online asset installation still requires a follow-up ADR before implementation.
+- Third-party registries, marketplaces, automatic prompts, remote plugin install, and executable
+  hook carriers remain out of scope.
+
+Next task item:
+
+- A9: activate I092 after this A8 phase is committed and pushed.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I092, MEM-007, PERM/SCHED/TOOL autonomy backlog owners, and this task's A8 checkpoint.

@@ -74,3 +74,6 @@ docs/proposals/
   decision.** Four-entity model: skill/mcp/hook are config-introduced atomic components; plugin is a
   packaging format bundling any subset of them plus tools, carried by WASM/Lua/dylib. Blocks
   PLUGIN-001, CMD-002, HOOK-001, TOOL-008 Phase 3.
+- [Optional Runtime Asset Distribution](optional-runtime-asset-distribution.md) — ADR-ready policy
+  for optional model weights, WASM plugin packages, and resource packs with explicit consent,
+  checksums/signatures, cache layout, offline/mirror behavior, and graceful fallback.

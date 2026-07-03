@@ -159,7 +159,10 @@ Micro-model output must be structured and bounded, for example:
 - `MODEL-001` supplies model metadata and capability vocabulary; MODEL-002 decides whether Talos
   should embed a local helper model at all.
 - `DIST-001` owns the optional asset distribution strategy if local model weights are installed
-  after Talos itself is installed.
+  after Talos itself is installed. I091 A8 records the shared policy in
+  `docs/proposals/optional-runtime-asset-distribution.md`: model weights are data-only optional
+  assets, must be checksum/signature verified, may be disabled/offline/pre-seeded, and never become
+  permission authority.
 - `MEM-005` may consume micro-model classification only as a compaction hint.
 - `TOOL-002` and the permission pipeline remain authoritative for tool execution.
 - `SKILL-001` and `MCP-001` may use routing hints only after startup discovery and provenance are

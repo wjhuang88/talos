@@ -8,11 +8,16 @@ or other bulky capabilities after installation.
 
 ## Status
 
-Research. Selected into I091 policy audit on 2026-07-04.
+Policy proposal complete via I091 A8 on 2026-07-04. Follow-up ADR required before any online
+asset installation, runtime download path, marketplace behavior, or automatic prompt.
 
 I091 scope is policy-only unless a narrow local diagnostic gap is found. Do not implement online
 asset installation, marketplace behavior, remote plugin package fetching, automatic prompts, or
 runtime download paths in this iteration.
+
+I091 A8 produced `docs/proposals/optional-runtime-asset-distribution.md`, an ADR-ready policy for
+manifest schema, checksum/signature verification, Talos-controlled cache layout, consent UX,
+offline/mirror behavior, activation separation, uninstall/cleanup, and failure fallback.
 
 ## Priority
 
@@ -72,6 +77,11 @@ Potential examples:
 - `talos assets install wasm-plugin:<name>`
 - TUI prompt: "This feature requires a 120 MB local model. Download now?"
 
+I091 A8 policy narrows first implementation to an explicit manual command path before automatic
+prompts. Download and install must be separate from activation: installed plugin packages do not
+register capabilities until plugin loader/provenance/sandbox/permission gates accept them, and
+installed model weights never become permission authority.
+
 ## Hard Boundaries
 
 - Talos must not silently download large executable or model assets.
@@ -98,13 +108,13 @@ Potential examples:
 
 ## Acceptance Criteria
 
-- [ ] A distribution proposal defines asset manifests, install/cache layout, verification, update,
+- [x] A distribution proposal defines asset manifests, install/cache layout, verification, update,
       uninstall, and offline behavior.
-- [ ] The proposal distinguishes model weights, WASM plugins, and non-executable resource packs.
-- [ ] Runtime download consent and prompt UX are specified.
-- [ ] Security policy covers checksum/signature verification, provenance, mirrors, and disabled
+- [x] The proposal distinguishes model weights, WASM plugins, and non-executable resource packs.
+- [x] Runtime download consent and prompt UX are specified.
+- [x] Security policy covers checksum/signature verification, provenance, mirrors, and disabled
       online installs.
-- [ ] MODEL-002 and PLUGIN-001 both reference the shared distribution strategy instead of defining
+- [x] MODEL-002 and PLUGIN-001 both reference the shared distribution strategy instead of defining
       incompatible download paths.
 - [ ] A follow-up ADR is drafted before implementing online asset installation.
 
