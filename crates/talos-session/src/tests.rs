@@ -337,6 +337,7 @@ fn session_with_tool_calls() {
         } => {
             assert_eq!(content, "Let me check that file.");
             assert_eq!(tool_calls.len(), 1);
+            assert_eq!(tool_calls[0].id, "call_1");
             assert_eq!(tool_calls[0].name, "read_file");
             assert_eq!(
                 tool_calls[0].input,
@@ -344,6 +345,191 @@ fn session_with_tool_calls() {
             );
         }
         _ => panic!("expected Assistant message"),
+    }
+}
+
+#[test]
+fn session_tool_call_id_matches_tool_result_id_after_resume() {
+    let manager = test_manager();
+    let session = manager.create_session("test-project", "").unwrap();
+
+    session
+        .append(&Message::User {
+            content: "list files".into(),
+        })
+        .unwrap();
+    session
+        .append(&Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![ToolCall {
+                id: "call_abc123".into(),
+                name: "bash".into(),
+                input: serde_json::json!({"command": "ls"}),
+            }],
+            reasoning: None,
+        })
+        .unwrap();
+    session
+        .append(&Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "call_abc123".into(),
+                content: "file1.rs\nfile2.rs".into(),
+                is_error: false,
+            },
+        })
+        .unwrap();
+
+    let messages = session.read_messages().unwrap();
+    assert_eq!(messages.len(), 3);
+
+    let assistant_tool_id = match &messages[1] {
+        Message::Assistant { tool_calls, .. } => &tool_calls[0].id,
+        _ => panic!("expected Assistant message at index 1"),
+    };
+    let tool_use_id = match &messages[2] {
+        Message::Tool { result } => &result.tool_use_id,
+        _ => panic!("expected Tool message at index 2"),
+    };
+    assert_eq!(
+        assistant_tool_id, tool_use_id,
+        "assistant tool_call.id must match tool result tool_use_id for provider round-trip"
+    );
+}
+
+#[test]
+fn ensure_persisted_creates_empty_file_for_deferred_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("session.jsonl");
+    let mut session = Session::new_deferred(
+        Uuid::new_v4(),
+        "test".into(),
+        String::new(),
+        file_path.clone(),
+    );
+    assert!(!session.persisted);
+    assert!(!file_path.exists());
+
+    session.ensure_persisted().unwrap();
+
+    assert!(session.persisted);
+    assert!(file_path.exists());
+}
+
+#[test]
+fn ensure_persisted_does_not_truncate_existing_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("session.jsonl");
+
+    // Simulate: another Session clone (e.g., from a watch channel) already
+    // created and wrote to the file via `append_with_metadata`. The clone
+    // taken here still has `persisted = false` (the flag is a plain bool
+    // copied on clone, not shared). `ensure_persisted` must NOT truncate
+    // the existing content. This is the regression for the model-switch
+    // context-loss bug — see EVOLUTION.md lesson #30 lineage.
+    let mut prior = Session::new_deferred(
+        Uuid::new_v4(),
+        "test".into(),
+        String::new(),
+        file_path.clone(),
+    );
+    prior
+        .append(&Message::User {
+            content: "important prior turn".into(),
+        })
+        .unwrap();
+    prior
+        .append(&Message::Assistant {
+            content: "important prior answer".into(),
+            tool_calls: vec![],
+            reasoning: None,
+        })
+        .unwrap();
+    let prior_size = std::fs::metadata(&file_path).unwrap().len();
+    assert!(prior_size > 0);
+
+    let mut clone = prior.clone();
+    assert!(
+        !clone.persisted,
+        "Session::Clone copies the persisted bool verbatim"
+    );
+
+    clone.ensure_persisted().unwrap();
+
+    assert_eq!(
+        std::fs::metadata(&file_path).unwrap().len(),
+        prior_size,
+        "ensure_persisted must not truncate the existing JSONL file"
+    );
+    let messages = clone.read_messages().unwrap();
+    assert_eq!(messages.len(), 2, "prior history must survive the clone");
+}
+
+#[test]
+fn model_switch_simulation_preserves_full_history() {
+    // End-to-end regression for the user-reported bug: after multiple
+    // turn cycles through a Session (simulating real TUI usage), a clone
+    // through the watch channel must see the full history when used to
+    // build a new AppServerSession — as `rebuild_session_for_model` does.
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("session.jsonl");
+
+    // Stage 1: deferred session is created (TUI startup path).
+    let mut session = Session::new_deferred(
+        Uuid::new_v4(),
+        "talos".into(),
+        "/work".into(),
+        file_path.clone(),
+    );
+    assert!(!session.persisted);
+
+    // Stage 2: user sends the first message. Persistence happens via
+    // a clone through the watch channel (user_msg_persister task).
+    let clone_for_first_msg = session.clone();
+    clone_for_first_msg
+        .append(&Message::User {
+            content: "summarize the repo".into(),
+        })
+        .unwrap();
+    // The original session struct still has persisted = false (flag is
+    // copied on clone, never updated by append_with_metadata).
+    assert!(!session.persisted);
+    // But the file does exist and has content.
+    assert!(file_path.exists());
+    assert!(std::fs::metadata(&file_path).unwrap().len() > 0);
+
+    // Stage 3: agent runs, assistant message and tool result are
+    // persisted through the bridge forwarder (also via watch-channel clones).
+    let clone_for_assistant = session.clone();
+    clone_for_assistant
+        .append(&Message::Assistant {
+            content: "I'll inspect the repo.".into(),
+            tool_calls: vec![],
+            reasoning: None,
+        })
+        .unwrap();
+
+    // Stage 4: user invokes /model. `rebuild_session_for_model` clones
+    // from the watch channel, calls ensure_persisted, then read_messages.
+    // Before the fix, this truncated the file. After the fix, history
+    // is preserved.
+    let mut switch_clone = session.clone();
+    switch_clone.ensure_persisted().unwrap();
+    let history = switch_clone.read_messages().unwrap();
+
+    assert_eq!(
+        history.len(),
+        2,
+        "user + assistant messages must survive a model switch clone"
+    );
+    match &history[0] {
+        Message::User { content } => assert_eq!(content, "summarize the repo"),
+        other => panic!("expected User at index 0, got {other:?}"),
+    }
+    match &history[1] {
+        Message::Assistant { content, .. } => {
+            assert_eq!(content, "I'll inspect the repo.")
+        }
+        other => panic!("expected Assistant at index 1, got {other:?}"),
     }
 }
 

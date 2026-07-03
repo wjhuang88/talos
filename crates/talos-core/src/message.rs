@@ -300,6 +300,41 @@ mod tests {
             assert_eq!(event, decoded);
         }
     }
+
+    #[test]
+    fn extract_tool_calls_preserves_id_from_json_tool_block() {
+        let text = r#"I'll run that for you.
+```json-tool
+{"id":"call_abc123","args":{"command":"ls"},"name":"bash"}
+```
+Done."#;
+        let calls = extract_tool_calls_from_text(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].id, "call_abc123");
+        assert_eq!(calls[0].name, "bash");
+        assert_eq!(calls[0].input, serde_json::json!({"command": "ls"}));
+    }
+
+    #[test]
+    fn extract_tool_calls_falls_back_to_synthetic_id_when_missing() {
+        let text = r#"```json-tool
+{"args":{"command":"ls"},"name":"bash"}
+```"#;
+        let calls = extract_tool_calls_from_text(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].id, "tc_0");
+        assert_eq!(calls[0].name, "bash");
+    }
+
+    #[test]
+    fn extract_tool_calls_falls_back_when_id_is_empty() {
+        let text = r#"```json-tool
+{"id":"","args":{"command":"ls"},"name":"bash"}
+```"#;
+        let calls = extract_tool_calls_from_text(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].id, "tc_0");
+    }
 }
 
 pub fn extract_tool_calls_from_text(text: &str) -> Vec<ToolCall> {
@@ -315,8 +350,13 @@ pub fn extract_tool_calls_from_text(text: &str) -> Vec<ToolCall> {
         if let Ok(obj) = serde_json::from_str::<serde_json::Value>(content)
             && let (Some(name), Some(args)) = (obj["name"].as_str(), Some(obj["args"].clone()))
         {
+            let id = obj["id"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .unwrap_or_else(|| format!("tc_{}", calls.len()));
             calls.push(ToolCall {
-                id: format!("tc_{}", calls.len()),
+                id,
                 name: name.to_string(),
                 input: args,
             });

@@ -174,7 +174,19 @@ impl Session {
         if let Some(parent) = self.file_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::File::create(&self.file_path)?;
+        // create_new(true) avoids truncating an existing file. `Session` is
+        // Clone and `persisted: bool` is copied per clone, so a clone from a
+        // watch channel can report `persisted = false` even when another
+        // clone already created the file on disk. EVOLUTION lesson #30 path.
+        match std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&self.file_path)
+        {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
         self.persisted = true;
         Ok(())
     }

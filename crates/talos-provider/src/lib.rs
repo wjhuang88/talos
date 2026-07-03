@@ -874,8 +874,14 @@ pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
         let obj: serde_json::Value = serde_json::from_str(content).ok()?;
         let name = obj.get("name")?.as_str()?.to_string();
         let args = obj.get("args")?.clone();
+        let id = obj
+            .get("id")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
         return Some(ToolCall {
-            id: Uuid::new_v4().to_string(),
+            id,
             name,
             input: args,
         });
@@ -891,8 +897,13 @@ pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
         if let Some(brace_end) = json_str.rfind('}') {
             let json_str = &json_str[..=brace_end];
             if let Ok(args) = serde_json::from_str::<serde_json::Value>(json_str) {
+                let id = serde_json::from_str::<serde_json::Value>(json_str)
+                    .ok()
+                    .and_then(|obj| obj.get("id").and_then(|v| v.as_str()).map(String::from))
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| Uuid::new_v4().to_string());
                 return Some(ToolCall {
-                    id: Uuid::new_v4().to_string(),
+                    id,
                     name,
                     input: args,
                 });

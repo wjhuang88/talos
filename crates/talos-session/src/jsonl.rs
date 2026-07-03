@@ -308,6 +308,7 @@ fn message_parts(message: &Message) -> (String, String) {
             let mut full = content.clone();
             for tc in tool_calls {
                 let block = serde_json::json!({
+                    "id": tc.id,
                     "name": tc.name,
                     "args": tc.input,
                 });
