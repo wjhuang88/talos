@@ -64,6 +64,13 @@ model = "claude-sonnet-4-20250514"
 # Per-model limits go in [providers.<name>.models.<model>]:
 #   context_limit  Max input context tokens
 #   output_limit   Max output tokens
+#   reasoning      Per-model thinking/reasoning config (see below)
+#
+# Reasoning options (ADR-034):
+#   effort         "low" | "medium" | "high" (OpenAI o-series)
+#   budget_tokens  Token budget for thinking (Anthropic / OpenAI-compatible)
+#   replay         Replay reasoning in request history (default: true)
+#                  Disabling trades provider correctness for token savings.
 
 # ── Example: Built-in Anthropic (env-var mode) ────────────────────────────────
 # provider = "anthropic"
@@ -96,6 +103,7 @@ model = "claude-sonnet-4-20250514"
 # [providers.my-gateway.models.your-model]
 # context_limit = 202752
 # output_limit = 4096
+# reasoning = { budget_tokens = 8192 }
 
 # ── Example: ZhipuAI (Anthropic Messages protocol) ───────────────────────────
 # provider = "zhipuai"
