@@ -49,14 +49,15 @@ request/stream pipeline must emit structured state that the conversation engine 
 
 - [x] MODEL-003 ADR and implementation plan are ready before provider request schema changes.
       (ADR-034 v3 accepted 2026-07-03 after architecture review; 7 dimensions resolved.)
-- [ ] PROVIDER-002 defines and implements default first-packet timeout, idle timeout, max attempts,
-      and exponential backoff with jitter.
-- [ ] Provider clients classify HTTP 408/409/425/429/5xx, transport disconnect, DNS/connect
-      failures, and malformed stream chunks into retryable/non-retryable categories.
-- [ ] TUI/conversation surfaces connecting/retrying/timeout/failure states without duplicating
-      assistant text or corrupting session history.
-- [ ] Tests cover OpenAI-compatible, Anthropic, and mock-provider paths for thinking chunks,
+- [x] PROVIDER-002 defines and implements default first-packet timeout, idle timeout, max attempts,
+      and exponential backoff with jitter. (UX103/UX104: ProviderTimeoutConfig + retry module)
+- [x] Provider clients classify HTTP 408/409/425/429/5xx, transport disconnect, DNS/connect
+      failures, and malformed stream chunks into retryable/non-retryable categories. (UX104 retry classifier)
+- [x] TUI/conversation surfaces connecting/retrying/timeout/failure states without duplicating
+      assistant text or corrupting session history. (UX105 TurnPhase states)
+- [x] Tests cover OpenAI-compatible, Anthropic, and mock-provider paths for thinking chunks,
       no-first-packet timeout, idle timeout, retry success, retry exhaustion, and cancellation.
+      (1497 workspace tests pass; 30+ new tests across providers/conversation/TUI)
 
 ## Required Reads
 

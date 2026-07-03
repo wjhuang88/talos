@@ -85,14 +85,16 @@ Provider runtime should support these states without requiring TUI-specific code
 
 ## Acceptance Criteria
 
-- [ ] OpenAI-compatible provider has first-packet timeout, idle timeout, retry classification, and
-      backoff tests.
-- [ ] Anthropic provider has equivalent timeout/retry coverage.
-- [ ] Retrying is not attempted after assistant text/tool-call output has begun unless a later ADR
-      explicitly introduces resumable streams.
-- [ ] TUI/conversation can display retry and timeout states without duplicating assistant messages.
-- [ ] Configuration defaults are documented and do not require users to tune values for normal use.
-- [ ] `cargo test -p talos-provider -p talos-conversation -p talos-tui` passes.
+- [x] OpenAI-compatible provider has first-packet timeout, idle timeout, retry classification, and
+      backoff tests. (UX103/UX104)
+- [x] Anthropic provider has equivalent timeout/retry coverage. (UX103/UX104)
+- [x] Retrying is not attempted after assistant text/tool-call output has begun unless a later ADR
+      explicitly introduces resumable streams. (Retry only in send_request, before streaming starts)
+- [x] TUI/conversation can display retry and timeout states without duplicating assistant messages.
+      (UX105: TurnPhase states)
+- [x] Configuration defaults are documented and do not require users to tune values for normal use.
+      (ProviderTimeoutConfig with defaults; config.reference.toml documented)
+- [x] `cargo test -p talos-provider -p talos-conversation -p talos-tui` passes. (1497 workspace tests pass)
 
 ## Non-Goals
 

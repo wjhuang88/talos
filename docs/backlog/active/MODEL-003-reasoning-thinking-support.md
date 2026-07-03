@@ -130,13 +130,13 @@ whether reasoning is visible/hidden/interleaved). MODEL-003 implements the
 
 ## Acceptance Criteria (post-ADR)
 
-- [ ] ADR documented per ADR template with Constraint Decomposition
-- [ ] Provider-specific reasoning request fields constructed correctly
-- [ ] Reasoning stream chunks parsed and routed (not silently dropped)
-- [ ] TUI renders reasoning output per ADR decision
-- [ ] Session JSONL preserves reasoning per ADR decision
-- [ ] Usage/cost display accounts for reasoning tokens where provider metadata supports it
-- [ ] Existing provider tests pass; new tests cover each provider's reasoning path
+- [x] ADR documented per ADR template with Constraint Decomposition (ADR-034 v3)
+- [x] Provider-specific reasoning request fields constructed correctly (Anthropic thinking block, OpenAI reasoning_effort + max_completion_tokens, OpenAI-compatible reasoning_content)
+- [x] Reasoning stream chunks parsed and routed (ThinkingDelta + ReasoningComplete events)
+- [x] TUI renders reasoning output per ADR decision (existing one-line preview; reasoning token breakdown in status bar)
+- [x] Session JSONL preserves reasoning per ADR decision (SessionMetadata.reasoning round-trip with is_empty() trap)
+- [x] Usage/cost display accounts for reasoning tokens (reasoning_tokens informational subset of output_tokens)
+- [x] Existing provider tests pass; new tests cover each provider's reasoning path (10+ tests added across providers)
 
 ## UX-001 Integration
 
