@@ -1,6 +1,6 @@
 # MODEL-003: Reasoning / Thinking Field Support
 
-**Status**: ADR-needed — selected into UX-001/I084 planning
+**Status**: In Progress (UX100 ADR-034 accepted v3 2026-07-03; UX101-UX106 implementation pending)
 **Priority**: P1
 **Source**: MODEL-001 split (2026-06-20); original proposal `docs/proposals/reasoning-thinking-field.md` (2026-06-02)
 **Depends on**: MODEL-001 catalog (model metadata schema for reasoning capability flags); ADR gate
@@ -36,21 +36,21 @@ Maintainer feedback elevated this story from P2 to P1 and grouped it under
 reasoning configuration. The previous ADR gate still stands; elevation changes sequencing, not the
 requirement to decide provider request schema and persistence boundaries before code.
 
-### ADR gate (must be resolved before any implementation)
+### ADR gate (RESOLVED — ADR-034 v3 accepted 2026-07-03)
 
 Per the original proposal's explicit gate: *"This proposal is not sufficient as an
 implementation authority. Create an ADR before code when the design changes
 provider request schemas, session persistence, stream event types, TUI rendering,
 JSON-RPC payloads, or evolution hook contracts."*
 
-ADR must decide:
-- [ ] Request format: per-model `models.{name}.options` block vs global `ReasoningConfig`
-- [ ] Provider-specific mapping for each known provider (Anthropic, OpenAI, OpenAI-compatible)
-- [ ] Stream event shape: `ReasoningDelta` variant or same `TextDelta` with discriminator
-- [ ] Persistence: store reasoning output in JSONL as separate field, or strip to save disk
-- [ ] TUI rendering: collapsible section, hidden by default, or inline indicator
-- [ ] Cost model: whether reasoning tokens are billed separately and surfaced in usage
-- [ ] RPC/JSON-RPC exposure
+ADR-034 decisions (all 7 dimensions resolved):
+- [x] Request format: per-model `reasoning: Option<ReasoningOptions>` on `ModelConfig`
+- [x] Provider-specific mapping: Anthropic (`thinking` block + `temperature:1`), OpenAI (`reasoning_effort` + `max_completion_tokens`), OpenAI-compatible (`reasoning_content` stream/replay)
+- [x] Stream event shape: keep `ThinkingDelta` for display + new `ReasoningComplete { blocks }` for durable payload
+- [x] Persistence: structured `ReasoningBlock` / `AssistantReasoning` via `SessionMetadata.reasoning` (JSONL round-trip inside talos-session); display stays transient
+- [x] TUI rendering: existing one-line `"thinking: {text}"` preview; no new widget for this slice
+- [x] Cost model: `reasoning_tokens: u32` on `Usage` as informational subset of `output_tokens`, priced at output rate
+- [x] RPC/JSON-RPC: both variants flow through existing `AgentEvent` stream; `#[non_exhaustive]` covers additive variant
 
 ### OpenCode Reference Implementation (2026-06-20 research)
 

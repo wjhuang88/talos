@@ -47,7 +47,8 @@ request/stream pipeline must emit structured state that the conversation engine 
 
 ## Acceptance Criteria
 
-- [ ] MODEL-003 ADR and implementation plan are ready before provider request schema changes.
+- [x] MODEL-003 ADR and implementation plan are ready before provider request schema changes.
+      (ADR-034 v3 accepted 2026-07-03 after architecture review; 7 dimensions resolved.)
 - [ ] PROVIDER-002 defines and implements default first-packet timeout, idle timeout, max attempts,
       and exponential backoff with jitter.
 - [ ] Provider clients classify HTTP 408/409/425/429/5xx, transport disconnect, DNS/connect
