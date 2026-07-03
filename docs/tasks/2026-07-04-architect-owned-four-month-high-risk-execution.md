@@ -55,8 +55,8 @@ is not suitable for routine frontline delegation.
 | A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Complete |
 | A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Complete |
 | A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Complete |
-| A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | In Progress |
-| A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Planned |
+| A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Complete |
+| A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | In Progress |
 | A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Planned |
 | A12 | Activate I093 | Start self-bootstrap/runtime/release closeout iteration. | A10/A11 | Owner docs synchronized and I093 Active. | Keep I093 Planned with blocker. | Planned |
 | A13 | Runtime SDK and governance readiness audit | RUNTIME-001/GOV-003/ARCH-030 audit names the minimum self-bootstrap gaps. | A12 | Readiness report updated with concrete gaps and tests. | Keep pre-1.0 posture unchanged. | Planned |
@@ -521,3 +521,30 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I092, MEM-007, PERM/SCHED/TOOL autonomy backlog owners, and this task's A8 checkpoint.
+
+### A9 — I092 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I092 after I091 closeout.
+- Recorded non-terminal inventory: I085 remains Paused; I086-I089 remain planned product-hardening
+  shells; I093 remains planned.
+- Synchronized MEM-007, SCHED-001, PERM-001, TOOL-010, Product Backlog, Board, and iteration index
+  with the I092 activation boundary.
+
+Current state and artifacts:
+
+- I092 is Active.
+- A10 is the next implementation/rejection slice for MEM-007 cache-safe compression evidence.
+- A11 remains the autonomy permission matrix; no Guardian auto-approval, exec DSL, scheduled direct
+  tool execution, batch write/edit runtime expansion, or permission-default relaxation is active.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I092, MEM-007, ARCH-006, MEM-005, and this task's A9 checkpoint before editing runtime code.

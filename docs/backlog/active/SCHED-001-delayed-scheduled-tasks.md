@@ -5,6 +5,10 @@
 **Source**: User request 2026-06-18
 **Depends on**: None
 
+I092 activation note (2026-07-04): selected for autonomy permission analysis only. v1 message
+injection remains the safe shape; direct scheduled tool execution, persistence, and cron-style
+expansion remain out of scope until a non-bypass permission matrix is recorded.
+
 ## Problem
 
 The agent cannot schedule future actions. If the LLM wants to "check again in 60 seconds"

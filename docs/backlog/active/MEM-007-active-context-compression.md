@@ -3,7 +3,14 @@
 **Status**: Research
 **Priority**: P2
 **Source**: User request 2026-06-26; Headroom compression analysis (MEM-006 Pattern 6)
-**Iteration**: None yet
+**Iteration**: I092 active 2026-07-04
+
+I092 activation note (2026-07-04):
+- First slice is evidence-first. Prove or reject deterministic pre-entry compression without
+  changing stable-prefix bytes.
+- Runtime compression must remain disabled unless stable-prefix, determinism, and raw-export
+  preservation tests exist.
+- No ML/ONNX model or new native dependency is in scope.
 
 ## Problem
 

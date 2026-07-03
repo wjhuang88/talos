@@ -3,7 +3,12 @@
 **Status**: Refinement
 **Priority**: P3
 **Source**: User request 2026-06-26
-**Iteration**: None yet
+**Iteration**: I092 autonomy permission matrix only
+
+I092 activation note (2026-07-04):
+- TOOL-010 is selected to define independent per-resource deny/ask/allow behavior before any batch
+  write/edit implementation.
+- No batch file operation runtime changes are authorized by activation alone.
 
 ## Problem
 

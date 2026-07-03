@@ -10,6 +10,10 @@ permission boundary.
 In Progress — I077/T114 selected only the direct `exec` policy slice. Guardian approval and exec
 DSL implementation remain deferred.
 
+I092 activation note (2026-07-04): PERM-001 is selected only for the autonomy permission matrix.
+Guardian auto-approval and exec DSL implementation remain disabled. A11 must prove deny/ask/allow
+behavior for scheduled, batch, and exec-style paths before any runtime expansion.
+
 ## Priority
 
 P2.
