@@ -11,6 +11,15 @@ use crate::error::HookError;
 use crate::event::{HookEvent, HookEventKind};
 use crate::handler::{HookContext, HookHandler, HookResult};
 
+/// Read-only diagnostic view of a registered hook handler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HookRegistration {
+    /// Event kind the handler subscribed to.
+    pub event: HookEventKind,
+    /// Stable handler name.
+    pub handler: String,
+}
+
 /// Final outcome of dispatching a hook event through the registry.
 #[derive(Debug)]
 pub enum HookOutcome<'a> {
@@ -65,6 +74,23 @@ impl HookRegistry {
     #[must_use]
     pub fn handlers_for(&self, kind: HookEventKind) -> usize {
         self.handlers.get(&kind).map_or(0, Vec::len)
+    }
+
+    /// Returns a read-only diagnostic snapshot of registered handlers.
+    #[must_use]
+    pub fn registrations(&self) -> Vec<HookRegistration> {
+        let mut registrations = Vec::new();
+        for kind in crate::event::ALL_HOOK_EVENT_KINDS {
+            if let Some(handlers) = self.handlers.get(&kind) {
+                for handler in handlers {
+                    registrations.push(HookRegistration {
+                        event: kind,
+                        handler: handler.name().to_string(),
+                    });
+                }
+            }
+        }
+        registrations
     }
 
     /// Dispatches a hook event sequentially to all subscribed handlers.
@@ -130,6 +156,29 @@ mod tests {
     use super::*;
     use crate::event::TurnId;
     use crate::handler::HookContext;
+    use async_trait::async_trait;
+    use std::time::Duration;
+
+    struct DiagnosticHook;
+
+    #[async_trait]
+    impl HookHandler for DiagnosticHook {
+        fn name(&self) -> &str {
+            "diagnostic"
+        }
+
+        fn subscribed(&self) -> &'static [HookEventKind] {
+            &[HookEventKind::TurnStart, HookEventKind::TurnComplete]
+        }
+
+        fn timeout(&self) -> Duration {
+            Duration::from_millis(10)
+        }
+
+        async fn on_event(&self, _ctx: &HookContext, _event: &mut HookEvent<'_>) -> HookResult {
+            HookResult::Continue
+        }
+    }
 
     #[test]
     fn pre_filter_by_kind() {
@@ -153,5 +202,29 @@ mod tests {
                 HookOutcome::Continue(HookEvent::TurnStart { .. })
             ));
         });
+    }
+
+    #[test]
+    fn registrations_reports_handlers_without_dispatch() {
+        let mut registry = HookRegistry::new();
+        registry.register(Arc::new(DiagnosticHook));
+
+        let registrations = registry.registrations();
+
+        assert_eq!(registrations.len(), 2);
+        assert_eq!(
+            registrations[0],
+            HookRegistration {
+                event: HookEventKind::TurnStart,
+                handler: "diagnostic".to_string(),
+            }
+        );
+        assert_eq!(
+            registrations[1],
+            HookRegistration {
+                event: HookEventKind::TurnComplete,
+                handler: "diagnostic".to_string(),
+            }
+        );
     }
 }

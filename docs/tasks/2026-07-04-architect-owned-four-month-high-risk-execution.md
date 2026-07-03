@@ -53,8 +53,8 @@ is not suitable for routine frontline delegation.
 | A4 | Implement first bounded extraction slice | A local `document_extract` or equivalent bounded extractor for safe text/HTML/JSON/CSV/Markdown-like inputs, no PDF/Office/OCR/browser. | A3 | Tool tests, permission tests, runtime smoke, docs. | Ship design only; no runtime tool. | Complete |
 | A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | Complete |
 | A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Complete |
-| A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | In Progress |
-| A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Planned |
+| A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Complete |
+| A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | In Progress |
 | A9 | Activate I092 | Start context compression and autonomy permission iteration. | A7/A8 | Owner docs synchronized and I092 Active. | Keep I092 Planned with blocker. | Planned |
 | A10 | MEM-007 cache-safe compression prototype | Deterministic pre-entry compression prototype for selected tool outputs, preserving stable prefix and raw export. | A9 | Stable-prefix hash test, determinism test, raw-output export proof, token-savings report. | Reject strategy and keep MEM-005 only. | Planned |
 | A11 | Autonomy permission packet | SCHED-001/PERM-001/TOOL-010 are split into non-bypass slices with deny/ask/allow tests before any write/execute scheduling ships. | A9 | Permission regression matrix passes. | Keep features disabled/research-only. | Planned |
@@ -429,3 +429,54 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I091, PLUGIN-001, HOOK-001, DIST-001, and this task's A6 checkpoint.
+
+### A7 — Plugin/Hook Diagnostics Hardened (2026-07-04)
+
+Completed task items:
+
+- Added `/hooks` to the slash command registry and conversation engine as a read-only diagnostics
+  command.
+- `/hooks` reports config-introduced hooks as not enabled, executable hook carriers as disabled,
+  and lists the builtin hook event catalog without executing or loading hook code.
+- Added `HookRegistry::registrations()` to expose a read-only diagnostic snapshot of registered
+  handlers.
+- Extended plugin package manifest parsing with validated `[[hooks]]` declarations, including
+  event-name validation and duplicate hook rejection, without instantiating hook carriers.
+
+Current state and artifacts:
+
+- Code: `crates/talos-conversation/src/command_registry.rs`,
+  `crates/talos-conversation/src/engine.rs`, `crates/talos-conversation/src/engine_tests.rs`,
+  `crates/talos-plugin/src/registry.rs`, `crates/talos-plugin/src/manifest.rs`,
+  `crates/talos-plugin/src/lib.rs`, `crates/talos-conversation/Cargo.toml`.
+- Owner docs: I091, PLUGIN-001, HOOK-001, CMD-002, and Board updated.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy -p talos-conversation -p talos-plugin -- -D warnings`: passed.
+- `cargo test -p talos-conversation slash_hooks`: passed.
+- `cargo test -p talos-conversation every_visible_slash_command_has_an_execution_path`: passed.
+- `cargo test -p talos-plugin manifest`: 16 matching tests passed.
+- `cargo test -p talos-plugin registrations_reports_handlers_without_dispatch`: passed.
+- `cargo test -p talos-conversation -p talos-plugin`: passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- Config-introduced hook execution remains disabled. This phase validates declarations and exposes
+  diagnostics only.
+- DIST-001 policy remains open for A8.
+
+Next task item:
+
+- A8: write the optional asset/plugin package distribution policy with manifest, checksum, cache,
+  offline/mirror, consent, and failure behavior.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I091, DIST-001, and this task's A7 checkpoint.

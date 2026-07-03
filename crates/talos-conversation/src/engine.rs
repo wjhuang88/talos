@@ -476,6 +476,9 @@ impl ConversationEngine {
             "/mcp" => {
                 outputs.extend(self.handle_mcp_command());
             }
+            "/hooks" => {
+                outputs.extend(self.handle_hooks_command());
+            }
             "/skills" => {
                 outputs.extend(self.handle_skills_command(arg));
             }
@@ -712,6 +715,21 @@ impl ConversationEngine {
                     if entry.count == 1 { "" } else { "s" },
                 ));
             }
+        }
+        vec![UiOutput::Stream(StreamMessage {
+            source: MessageSource::System,
+            stream: Box::pin(stream::once(async move { text })),
+        })]
+    }
+
+    fn handle_hooks_command(&self) -> Vec<UiOutput> {
+        let mut text = String::new();
+        text.push_str("[System] Hooks diagnostics:\n");
+        text.push_str("[System]   config-introduced hooks: not enabled\n");
+        text.push_str("[System]   executable hook carriers: disabled\n");
+        text.push_str("[System]   builtin hook event catalog:\n");
+        for kind in talos_plugin::ALL_HOOK_EVENT_KINDS {
+            text.push_str(&format!("[System]     {kind}\n"));
         }
         vec![UiOutput::Stream(StreamMessage {
             source: MessageSource::System,

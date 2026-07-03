@@ -16,5 +16,7 @@ pub use event::{
     TurnId, TurnStatus,
 };
 pub use handler::{HookContext, HookHandler, HookResult};
-pub use manifest::{ManifestError, PluginManifest, PluginMetadata, PluginSkill, PluginTool};
-pub use registry::{HookOutcome, HookRegistry};
+pub use manifest::{
+    ManifestError, PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool,
+};
+pub use registry::{HookOutcome, HookRegistration, HookRegistry};

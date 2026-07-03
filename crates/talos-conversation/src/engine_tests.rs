@@ -573,6 +573,21 @@ async fn slash_mcp_shows_startup_mcp_status_before_any_call() {
     assert!(text.contains("github (connected, 3 tools)"));
 }
 
+#[tokio::test]
+async fn slash_hooks_shows_read_only_diagnostics() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/hooks");
+
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("Hooks diagnostics"));
+    assert!(text.contains("config-introduced hooks: not enabled"));
+    assert!(text.contains("executable hook carriers: disabled"));
+    assert!(text.contains("BeforeProviderCall"));
+    assert!(text.contains("TurnComplete"));
+}
+
 // ---------------------------------------------------------------------------
 // handle_slash_command: /skills
 // ---------------------------------------------------------------------------
@@ -1278,7 +1293,7 @@ fn complete_slash_command_matches_prefix() {
 
     let completions = engine.complete_slash_command("/h");
 
-    assert_eq!(completions, vec!["/help"]);
+    assert_eq!(completions, vec!["/help", "/hooks"]);
 }
 
 #[test]

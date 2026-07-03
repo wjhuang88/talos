@@ -179,6 +179,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             available: always_available,
         },
         CommandDefinition {
+            name: "/hooks",
+            aliases: &[],
+            usage: "/hooks",
+            description: "Show hook diagnostics without executing hooks",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
             name: "/skills",
             aliases: &[],
             usage: "/skills [activate <name> | reference <path>]",

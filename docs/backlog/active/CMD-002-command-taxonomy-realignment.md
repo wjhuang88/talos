@@ -35,6 +35,12 @@ Slice 2, after PLUGIN-001 ships:
 
 - `/plugins` lists loaded plugin packages and their declared capabilities (skills/mcp/hooks/tools).
 - Add `/hooks` to list registered hooks (builtin + config-introduced) once HOOK-001 ships.
+
+I091 A7 status note (2026-07-04):
+- `/hooks` now exists as a read-only diagnostics command and lists the builtin hook event catalog
+  plus the disabled config/executable hook state.
+- Full registered config-introduced hook listing remains open until config hook execution/provenance
+  ships under HOOK-001.
 - Keep `/skills` as-is.
 - Update README, TUI command menu metadata (CMD-001 registry), help text, and provenance markers.
 

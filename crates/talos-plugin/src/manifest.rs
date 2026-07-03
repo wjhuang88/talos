@@ -9,6 +9,8 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::event::ALL_HOOK_EVENT_KINDS;
+
 #[derive(Debug, Error)]
 pub enum ManifestError {
     #[error("manifest parse error: {0}")]
@@ -24,6 +26,8 @@ pub struct PluginManifest {
     pub skills: Vec<PluginSkill>,
     #[serde(default)]
     pub tools: Vec<PluginTool>,
+    #[serde(default)]
+    pub hooks: Vec<PluginHook>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +52,15 @@ pub struct PluginSkill {
 pub struct PluginTool {
     pub name: String,
     pub handler: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginHook {
+    pub name: String,
+    pub event: String,
+    pub handler: String,
+    #[serde(default)]
+    pub priority: Option<i32>,
 }
 
 pub fn parse_manifest(toml_str: &str) -> Result<PluginManifest, ManifestError> {
@@ -107,8 +120,40 @@ impl PluginManifest {
                 )));
             }
         }
+        let mut seen_hooks: HashSet<&str> = HashSet::new();
+        for hook in &self.hooks {
+            if hook.name.trim().is_empty() {
+                return Err(ManifestError::Validation(
+                    "hook name is empty in [[hooks]]".into(),
+                ));
+            }
+            if hook.handler.trim().is_empty() {
+                return Err(ManifestError::Validation(format!(
+                    "hook '{}' has empty handler",
+                    hook.name
+                )));
+            }
+            if !is_known_hook_event(&hook.event) {
+                return Err(ManifestError::Validation(format!(
+                    "hook '{}' references unknown event '{}'",
+                    hook.name, hook.event
+                )));
+            }
+            if !seen_hooks.insert(&hook.name) {
+                return Err(ManifestError::Validation(format!(
+                    "duplicate hook name '{}'",
+                    hook.name
+                )));
+            }
+        }
         Ok(())
     }
+}
+
+fn is_known_hook_event(event: &str) -> bool {
+    ALL_HOOK_EVENT_KINDS
+        .iter()
+        .any(|kind| kind.to_string() == event)
 }
 
 #[cfg(test)]
@@ -130,6 +175,12 @@ handler = "tools/greet.wasm"
 [[skills]]
 name = "my-skill"
 path = "skills/my-skill/SKILL.md"
+
+[[hooks]]
+name = "pre-call"
+event = "BeforeProviderCall"
+handler = "hooks/pre-call.wasm"
+priority = 10
 "#;
 
     #[test]
@@ -143,6 +194,11 @@ path = "skills/my-skill/SKILL.md"
         assert_eq!(manifest.tools[0].name, "greet");
         assert_eq!(manifest.skills.len(), 1);
         assert_eq!(manifest.skills[0].name, "my-skill");
+        assert_eq!(manifest.hooks.len(), 1);
+        assert_eq!(manifest.hooks[0].name, "pre-call");
+        assert_eq!(manifest.hooks[0].event, "BeforeProviderCall");
+        assert_eq!(manifest.hooks[0].handler, "hooks/pre-call.wasm");
+        assert_eq!(manifest.hooks[0].priority, Some(10));
     }
 
     #[test]
@@ -157,6 +213,7 @@ artifact = "bare.wasm"
         let manifest = parse_manifest(toml).expect("minimal manifest");
         assert!(manifest.tools.is_empty());
         assert!(manifest.skills.is_empty());
+        assert!(manifest.hooks.is_empty());
     }
 
     #[test]
@@ -319,5 +376,68 @@ network = false
 "#;
         let manifest = parse_manifest(toml).expect("manifest with permissions section");
         assert_eq!(manifest.plugin.name, "p");
+    }
+
+    #[test]
+    fn parse_hook_declaration() {
+        let toml = r#"
+[plugin]
+name = "p"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "x.wasm"
+
+[[hooks]]
+name = "turn-start"
+event = "TurnStart"
+handler = "hooks/turn-start.wasm"
+"#;
+        let manifest = parse_manifest(toml).expect("valid manifest");
+        assert_eq!(manifest.hooks.len(), 1);
+        assert_eq!(manifest.hooks[0].name, "turn-start");
+        assert_eq!(manifest.hooks[0].event, "TurnStart");
+    }
+
+    #[test]
+    fn reject_unknown_hook_event() {
+        let toml = r#"
+[plugin]
+name = "p"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "x.wasm"
+
+[[hooks]]
+name = "bad"
+event = "MadeUpEvent"
+handler = "hooks/bad.wasm"
+"#;
+        let err = parse_manifest(toml).unwrap_err();
+        assert!(matches!(err, ManifestError::Validation(ref m) if m.contains("unknown event")));
+    }
+
+    #[test]
+    fn reject_duplicate_hook_names() {
+        let toml = r#"
+[plugin]
+name = "p"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "x.wasm"
+
+[[hooks]]
+name = "dup"
+event = "TurnStart"
+handler = "hooks/a.wasm"
+
+[[hooks]]
+name = "dup"
+event = "TurnComplete"
+handler = "hooks/b.wasm"
+"#;
+        let err = parse_manifest(toml).unwrap_err();
+        assert!(
+            matches!(err, ManifestError::Validation(ref m) if m.contains("duplicate hook name"))
+        );
     }
 }

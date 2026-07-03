@@ -14,6 +14,11 @@ I091 activated 2026-07-04 to audit and close the first diagnostics slice for hoo
 work is schema/diagnostics/state visibility only. Do not add Lua, dynamic libraries, standalone
 executable hook carriers, remote plugin installation, or hidden hook execution.
 
+I091 A7 delivered the first diagnostics/schema slice: `/hooks` lists hook diagnostics and the
+builtin event catalog, `HookRegistry::registrations()` exposes registered handlers without
+dispatching them, and plugin manifests can declare `[[hooks]]` with event validation. Config hook
+execution and standalone executable carriers remain disabled.
+
 ## Requirement
 
 Promote **hook** from a code-only-registered capability to a first-class config-introduced atomic
@@ -47,8 +52,8 @@ executable hook carrier without a separate ADR or the plugin runtime adapter fro
 
 ## Acceptance Criteria
 
-- [ ] A config schema for hook declaration exists and is validated on load.
-- [ ] Builtin vs config-introduced hooks are distinguishable in diagnostics.
+- [x] A plugin-package hook declaration schema exists and is validated on manifest load.
+- [x] Builtin vs config-introduced hooks are distinguishable in diagnostics.
 - [ ] `/hooks` lists both builtin and config-introduced hooks.
 - [ ] Config-introduced hooks carry provenance and honor ordering/priority rules.
 - [ ] Hook execution failure degrades gracefully per the existing hook policy.

@@ -15,6 +15,11 @@ T111 read-only WASM slice. The I091 scope is diagnostics/provenance/confinement 
 no remote install, marketplace, automatic discovery, write-capable plugin tools, Lua, dynamic
 library support, or broader host-call surface.
 
+I091 A7 delivered the diagnostics/schema part of that scope: plugin manifests now accept and
+validate `[[hooks]]` declarations, `HookRegistry` exposes a read-only registration snapshot, and
+the conversation engine exposes `/hooks` diagnostics. Hook declarations are descriptive only; this
+does not load hook carriers or execute plugin hooks.
+
 ## Requirement
 
 Design a protocol specification and runtime architecture for loading Talos plugins.
@@ -104,6 +109,11 @@ host calls, sandbox limits, compatibility, and failure behavior.
 4. Add one fixture WASM read-only tool through the existing `AgentTool`/permission pipeline.
 5. Cover success, malformed manifest, invalid module, trap, timeout, oversized output, and denied
    permission.
+
+I091 A7 note:
+- `[[hooks]]` manifest declarations are parsed and validated for known event names, non-empty
+  handlers, and duplicate names.
+- `/hooks` is a read-only diagnostics surface; it does not load packages or execute hooks.
 
 T110 security review (2026-07-01):
 - Review artifact: `docs/reference/PLUGIN-MVP-SECURITY-REVIEW-2026-07-01.md`.

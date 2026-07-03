@@ -67,18 +67,29 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-04 | Activation | Activated after I090 completed bounded extraction and ripgrep-backed search stabilization with full workspace/governance closeout. Non-terminal inventory disposition: I085 remains Paused with MC107 manual `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells; I092-I093 remain planned direct-owner shells. I091 starts with diagnostics/policy only: audit existing plugin/hook/distribution docs and code before adding runtime behavior. |
+| 2026-07-04 | A7 execution | Closed the first local diagnostics slice without runtime expansion. Added `/hooks` as a read-only slash command that reports hook diagnostics, disabled config-introduced hooks, disabled executable hook carriers, and the builtin hook event catalog. Added `HookRegistry::registrations()` as a read-only registration snapshot. Extended plugin manifest parsing with validated `[[hooks]]` declarations so plugin packages can describe hook capabilities without executing or loading hook carriers. |
 
 ## Verification Evidence
 
 - `scripts/validate_project_governance.sh .`: passed, 0 warnings.
 - `git diff --check`: clean.
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy -p talos-conversation -p talos-plugin -- -D warnings`: passed.
+- `cargo test -p talos-conversation -p talos-plugin`: 95 conversation tests and 19 plugin unit
+  tests plus plugin integration/doc tests passed.
+- `cargo test --workspace`: passed.
 
 ## Variance And Residuals
 
 - No runtime expansion has started. Remote install, marketplace behavior, write-capable plugin
   tools, automatic discovery, Lua, dynamic library loading, and executable standalone hook carriers
   remain out of scope.
+- A8 remains open for DIST-001 distribution policy. Config-introduced hook execution remains out
+  of scope; this slice only validates declarations and exposes diagnostics.
 
 ## Retrospective
 
-- Pending.
+- The immediate product gap was diagnostic clarity, not execution. A read-only `/hooks` command and
+  manifest declaration validation make the boundary inspectable while preserving ADR-027/029
+  runtime gates.

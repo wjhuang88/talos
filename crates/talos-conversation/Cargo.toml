@@ -10,6 +10,7 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { version = "0.2.2", path = "../talos-core" }
+talos-plugin = { version = "0.2.2", path = "../talos-plugin" }
 tokio = { version = "1", features = ["sync", "macros", "time", "rt", "io-util"] }
 tokio-stream = "0.1"
 futures = "0.3"
