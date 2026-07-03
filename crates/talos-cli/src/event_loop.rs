@@ -287,6 +287,7 @@ impl EventLoop {
                         let assistant_msg = Message::Assistant {
                             content: std::mem::take(&mut self.assistant_text),
                             tool_calls: vec![],
+                            reasoning: None,
                         };
                         if let Err(e) = self.session.append(&assistant_msg) {
                             eprintln!("Warning: failed to log assistant message: {e}");

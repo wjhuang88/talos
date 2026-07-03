@@ -149,6 +149,7 @@ impl Tui {
                 Message::Assistant {
                     content,
                     tool_calls,
+                    ..
                 } => {
                     let tool_calls_in_text =
                         talos_core::message::extract_tool_calls_from_text(content);

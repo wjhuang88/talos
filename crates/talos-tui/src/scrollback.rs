@@ -665,6 +665,7 @@ pub(crate) fn render_history_messages(
             Message::Assistant {
                 content,
                 tool_calls,
+                ..
             } => {
                 let tool_calls_in_text = talos_core::message::extract_tool_calls_from_text(content);
                 let cleaned = talos_core::message::strip_tool_syntax(content);

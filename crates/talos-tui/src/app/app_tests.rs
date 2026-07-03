@@ -475,6 +475,7 @@ fn hydrate_history_preserves_prefixes_and_stream_count() {
             Message::Assistant {
                 content: "reply".to_string(),
                 tool_calls: vec![],
+                reasoning: None,
             },
         ],
     );
