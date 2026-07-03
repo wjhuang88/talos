@@ -224,22 +224,36 @@ pub(crate) fn build_tool_result_scrollback_lines(
     const MAX_RESULT_LINE_CHARS: usize = 120;
 
     if should_suppress_tool_result_content(display) {
+        let (line_color, attrs) = if display.is_error {
+            (color, primary_result_attrs())
+        } else {
+            (secondary_result_color(), secondary_result_attrs())
+        };
         return vec![ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("   {icon} {}", suppressed_tool_result_summary(display)),
-                color,
-                primary_result_attrs(),
+                format!(
+                    "{}{}",
+                    result_line_prefix(icon, true),
+                    suppressed_tool_result_summary(display)
+                ),
+                line_color,
+                attrs,
             )],
             None,
         )];
     }
 
     if display.content.is_empty() {
+        let (line_color, attrs) = if display.is_error {
+            (color, primary_result_attrs())
+        } else {
+            (secondary_result_color(), secondary_result_attrs())
+        };
         return vec![ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("   {icon} (no output)"),
-                color,
-                primary_result_attrs(),
+                format!("{}(no output)", result_line_prefix(icon, true)),
+                line_color,
+                attrs,
             )],
             None,
         )];
@@ -257,12 +271,11 @@ pub(crate) fn build_tool_result_scrollback_lines(
 
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
-        let prefix = if idx == 0 { icon } else { " " };
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
         let (line_color, attrs) = result_line_style(display, idx, color);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("   {prefix} {truncated}"),
+                format!("{}{truncated}", result_line_prefix(icon, idx == 0)),
                 line_color,
                 attrs,
             )],
@@ -284,12 +297,11 @@ fn build_head_tail_scrollback_lines(
     let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
 
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
-        let prefix = if idx == 0 { icon } else { " " };
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
         let (line_color, attrs) = result_line_style(display, idx, color);
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("   {prefix} {truncated}"),
+                format!("{}{truncated}", result_line_prefix(icon, idx == 0)),
                 line_color,
                 attrs,
             )],
@@ -320,7 +332,7 @@ fn build_head_tail_scrollback_lines(
         };
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
-                format!("     {truncated}"),
+                format!("{}{truncated}", result_line_prefix(icon, false)),
                 line_color,
                 attrs,
             )],
@@ -333,14 +345,24 @@ fn build_head_tail_scrollback_lines(
 
 fn result_line_style(
     display: &ToolResultDisplay,
-    line_index: usize,
+    _line_index: usize,
     primary_color: Option<CColor>,
 ) -> (Option<CColor>, HistoryAttrs) {
-    if line_index == 0 || display.is_error {
+    if display.is_error {
         return (primary_color, primary_result_attrs());
     }
 
     (secondary_result_color(), secondary_result_attrs())
+}
+
+fn result_line_prefix(icon: &str, is_first_line: bool) -> String {
+    if icon.trim().is_empty() {
+        "   ".to_string()
+    } else if is_first_line {
+        format!("   {icon} ")
+    } else {
+        "     ".to_string()
+    }
 }
 
 fn primary_result_attrs() -> HistoryAttrs {
@@ -449,5 +471,67 @@ mod tests {
         });
         let line = build_tool_call_scrollback_line(&display);
         assert!(line.text.contains("[mcp:github]"));
+    }
+
+    #[test]
+    fn tool_result_success_single_line_rendering() {
+        let display = ToolResultDisplay {
+            tool_name: Some("test_tool".to_string()),
+            content: "output line".to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
+        assert_eq!(lines.len(), 1);
+
+        assert!(!lines[0].text.contains('✓'));
+        assert_eq!(lines[0].segments[0].fg, secondary_result_color());
+        assert!(!lines[0].segments[0].attrs.bold);
+
+        assert_eq!(lines[0].text, "   output line");
+    }
+
+    #[test]
+    fn tool_result_error_rendering_unchanged() {
+        let display = ToolResultDisplay {
+            tool_name: Some("test_tool".to_string()),
+            content: "error line".to_string(),
+            is_error: true,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "✗", Some(CColor::Red));
+        assert_eq!(lines.len(), 1);
+
+        assert!(lines[0].text.contains('✗'));
+        assert_eq!(lines[0].segments[0].fg, Some(CColor::Red));
+        assert!(lines[0].segments[0].attrs.bold);
+        assert!(lines[0].text.starts_with("   ✗ "));
+    }
+
+    #[test]
+    fn tool_result_success_special_cases_rendering() {
+        let display_empty = ToolResultDisplay {
+            tool_name: Some("test_tool".to_string()),
+            content: "".to_string(),
+            is_error: false,
+        };
+        let lines_empty =
+            build_tool_result_scrollback_lines(&display_empty, "", Some(CColor::Green));
+        assert_eq!(lines_empty.len(), 1);
+        assert!(!lines_empty[0].text.contains('✓'));
+        assert_eq!(lines_empty[0].text, "   (no output)");
+        assert_eq!(lines_empty[0].segments[0].fg, secondary_result_color());
+        assert!(!lines_empty[0].segments[0].attrs.bold);
+
+        let display_suppressed = ToolResultDisplay {
+            tool_name: Some("read".to_string()),
+            content: "line 1\nline 2".to_string(),
+            is_error: false,
+        };
+        let lines_suppressed =
+            build_tool_result_scrollback_lines(&display_suppressed, "", Some(CColor::Green));
+        assert_eq!(lines_suppressed.len(), 1);
+        assert!(!lines_suppressed[0].text.contains('✓'));
+        assert!(lines_suppressed[0].text.starts_with("   read 2 lines"));
+        assert_eq!(lines_suppressed[0].segments[0].fg, secondary_result_color());
+        assert!(!lines_suppressed[0].segments[0].attrs.bold);
     }
 }

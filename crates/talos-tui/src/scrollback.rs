@@ -697,7 +697,7 @@ pub(crate) fn render_history_messages(
                 } else {
                     result.tool_use_id.clone()
                 };
-                let icon = if result.is_error { "✗" } else { "✓" };
+                let icon = if result.is_error { "✗" } else { "" };
                 let color = if result.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
                 } else {

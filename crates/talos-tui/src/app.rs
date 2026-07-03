@@ -522,7 +522,7 @@ impl Tui {
                 self.pending_scrollback.push(line);
             }
             UiOutput::ToolResult(display) => {
-                let icon = if display.is_error { "✗" } else { "✓" };
+                let icon = if display.is_error { "✗" } else { "" };
                 let color = if display.is_error {
                     to_crossterm_color(semantic::TEXT_ERROR)
                 } else {
