@@ -91,6 +91,7 @@ pub fn import_opencode_providers(
             let model_config = ModelConfig {
                 context_limit: model.limit.context,
                 output_limit: model.limit.output,
+                reasoning: None,
             };
             config.models.insert(model_name, model_config);
         }

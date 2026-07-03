@@ -25,6 +25,43 @@ pub struct ModelConfig {
     /// Maximum output tokens to request from this model.
     #[serde(default)]
     pub output_limit: Option<u32>,
+    /// Per-model reasoning/thinking configuration (ADR-034).
+    #[serde(default)]
+    pub reasoning: Option<ReasoningOptions>,
+}
+
+/// Reasoning effort levels for OpenAI o-series models.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+}
+
+/// Per-model reasoning/thinking options.
+///
+/// Maps to provider-specific request fields (Anthropic `thinking` block,
+/// OpenAI `reasoning_effort`, OpenAI-compatible `reasoning_content`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(default)]
+pub struct ReasoningOptions {
+    /// Reasoning effort for OpenAI-style providers.
+    pub effort: Option<ReasoningEffort>,
+    /// Token budget for Anthropic thinking blocks.
+    pub budget_tokens: Option<u32>,
+    /// Replay captured reasoning in request history (ADR-034 replay policy).
+    pub replay: bool,
+}
+
+impl Default for ReasoningOptions {
+    fn default() -> Self {
+        Self {
+            effort: None,
+            budget_tokens: None,
+            replay: true,
+        }
+    }
 }
 
 /// Named provider configuration.

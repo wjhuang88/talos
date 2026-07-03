@@ -349,6 +349,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
                     ModelConfig {
                         context_limit: Some(202_752),
                         output_limit: Some(4096),
+                        reasoning: None,
                     },
                 )]),
             },
@@ -591,6 +592,7 @@ fn test_resolve_model_limits_returns_user_config_when_set() {
                     ModelConfig {
                         context_limit: Some(150_000),
                         output_limit: Some(8000),
+                        reasoning: None,
                     },
                 )]),
                 ..Default::default()
@@ -667,6 +669,7 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
                     ModelConfig {
                         context_limit: Some(100_000),
                         output_limit: None,
+                        reasoning: None,
                     },
                 )]),
                 ..Default::default()
@@ -1063,6 +1066,7 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
                     ModelConfig {
                         context_limit: Some(50_000),
                         output_limit: Some(1000),
+                        reasoning: None,
                     },
                 )]),
                 ..Default::default()
