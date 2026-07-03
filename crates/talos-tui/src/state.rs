@@ -56,11 +56,23 @@ pub(crate) enum PanelKind {
         provider: String,
         model_id: Option<String>,
         connect_mode: bool,
+        default_base_url: Option<String>,
     },
     Approval {
         tool_name: String,
         arguments: String,
     },
+}
+
+/// Which input field the credential panel is currently editing.
+///
+/// Only relevant when `connect_mode` is `true`: normal model-credential setup
+/// stays on `ApiKey` for its single-field flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum CredentialField {
+    #[default]
+    ApiKey,
+    BaseUrl,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -70,6 +82,8 @@ pub(crate) struct BottomPanelState {
     pub(crate) items: Vec<PanelItem>,
     pub(crate) selected_index: usize,
     pub(crate) credential_buffer: String,
+    pub(crate) base_url_buffer: String,
+    pub(crate) credential_field: CredentialField,
 }
 
 impl BottomPanelState {
@@ -94,6 +108,8 @@ impl BottomPanelState {
             items,
             selected_index: 0,
             credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
         }
     }
 
@@ -127,6 +143,8 @@ impl BottomPanelState {
             items,
             selected_index: 0,
             credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
         }
     }
 
@@ -222,6 +240,8 @@ impl BottomPanelState {
             items: panel_items,
             selected_index: initial_index,
             credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
         }
     }
 
@@ -293,6 +313,8 @@ impl BottomPanelState {
             items: panel_items,
             selected_index: initial_index,
             credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
         }
     }
 
@@ -300,6 +322,7 @@ impl BottomPanelState {
         provider: &str,
         model_id: Option<&str>,
         connect_mode: bool,
+        default_base_url: Option<String>,
     ) -> Self {
         Self {
             is_open: true,
@@ -307,10 +330,13 @@ impl BottomPanelState {
                 provider: provider.to_string(),
                 model_id: model_id.map(|s| s.to_string()),
                 connect_mode,
+                default_base_url,
             }),
             items: vec![],
             selected_index: 0,
             credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
         }
     }
 
@@ -321,7 +347,9 @@ impl BottomPanelState {
     pub(crate) fn is_picker(&self) -> bool {
         matches!(
             self.kind,
-            Some(PanelKind::SessionPicker) | Some(PanelKind::ModelPicker)
+            Some(PanelKind::SessionPicker)
+                | Some(PanelKind::ModelPicker)
+                | Some(PanelKind::ConnectPicker)
         )
     }
 
@@ -380,27 +408,83 @@ impl BottomPanelState {
             ],
             selected_index: 0,
             credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
         }
     }
 
-    pub(crate) fn filtered_items(&self, query: &str) -> Vec<&PanelItem> {
-        if !self.is_slash() {
-            return self.items.iter().collect();
-        }
+    /// Returns indices into `self.items` visible under `query`.
+    ///
+    /// `SlashCommand` performs flat substring matching. Picker kinds are
+    /// grouped by `PanelItemAction::Header` delimiters: a group's header is
+    /// included only when at least one sibling item matches; groups with no
+    /// matches (including a "Current" pseudo-group) are hidden entirely.
+    /// Headers never match independently — only as a byproduct of a
+    /// matching sibling.
+    pub(crate) fn filtered_indices(&self, query: &str) -> Vec<usize> {
         if query.is_empty() {
-            return self.items.iter().collect();
+            return (0..self.items.len()).collect();
         }
+
         let lower = query.to_lowercase();
-        self.items
-            .iter()
-            .filter(|item| {
-                item.label
-                    .strip_prefix('/')
-                    .unwrap_or(&item.label)
-                    .to_lowercase()
-                    .contains(&lower)
-                    || item.description.to_lowercase().contains(&lower)
-            })
+        let item_matches = |item: &PanelItem| -> bool {
+            item.label
+                .strip_prefix('/')
+                .unwrap_or(&item.label)
+                .to_lowercase()
+                .contains(&lower)
+                || item.description.to_lowercase().contains(&lower)
+        };
+
+        if self.is_slash() {
+            return self
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| item_matches(item))
+                .map(|(i, _)| i)
+                .collect();
+        }
+
+        let mut result = Vec::new();
+        let mut i = 0;
+        while i < self.items.len() {
+            if self.items[i].action == PanelItemAction::Header {
+                let header_idx = i;
+                i += 1;
+                let group_start = i;
+                while i < self.items.len() && self.items[i].action != PanelItemAction::Header {
+                    i += 1;
+                }
+                let group_matches: Vec<usize> = (group_start..i)
+                    .filter(|&j| item_matches(&self.items[j]))
+                    .collect();
+                if !group_matches.is_empty() {
+                    result.push(header_idx);
+                    result.extend(group_matches);
+                }
+            } else {
+                if item_matches(&self.items[i]) {
+                    result.push(i);
+                }
+                i += 1;
+            }
+        }
+        result
+    }
+
+    pub(crate) fn filtered_items(&self, query: &str) -> Vec<&PanelItem> {
+        self.filtered_indices(query)
+            .into_iter()
+            .map(|i| &self.items[i])
+            .collect()
+    }
+
+    /// Returns the navigable (non-`Header`) indices visible under `query`.
+    fn navigable_indices(&self, query: &str) -> Vec<usize> {
+        self.filtered_indices(query)
+            .into_iter()
+            .filter(|&i| self.items[i].action != PanelItemAction::Header)
             .collect()
     }
 
@@ -412,41 +496,43 @@ impl BottomPanelState {
     }
 
     pub(crate) fn select_next(&mut self, query: &str) {
-        let len = self.filtered_items(query).len();
-        if len == 0 {
+        let navigable = self.navigable_indices(query);
+        if navigable.is_empty() {
             return;
         }
-        for _ in 0..len {
-            self.selected_index = (self.selected_index + 1) % len;
-            if self
-                .items
-                .get(self.selected_index)
-                .is_none_or(|i| i.action != PanelItemAction::Header)
-            {
-                return;
-            }
-        }
+        let next_pos = match navigable.iter().position(|&i| i == self.selected_index) {
+            Some(pos) => (pos + 1) % navigable.len(),
+            None => 0,
+        };
+        self.selected_index = navigable[next_pos];
     }
 
     pub(crate) fn select_prev(&mut self, query: &str) {
-        let len = self.filtered_items(query).len();
-        if len == 0 {
+        let navigable = self.navigable_indices(query);
+        if navigable.is_empty() {
             return;
         }
-        for _ in 0..len {
-            if self.selected_index == 0 {
-                self.selected_index = len - 1;
-            } else {
-                self.selected_index -= 1;
+        let prev_pos = match navigable.iter().position(|&i| i == self.selected_index) {
+            Some(pos) => {
+                if pos == 0 {
+                    navigable.len() - 1
+                } else {
+                    pos - 1
+                }
             }
-            if self
-                .items
-                .get(self.selected_index)
-                .is_none_or(|i| i.action != PanelItemAction::Header)
-            {
-                return;
-            }
-        }
+            None => 0,
+        };
+        self.selected_index = navigable[prev_pos];
+    }
+
+    /// Resets `selected_index` to the first navigable item under `query`.
+    ///
+    /// Called whenever the query changes so a stale selection (now filtered
+    /// out, or landed on a `Header`) does not leave the panel with an
+    /// invalid or non-navigable selection.
+    pub(crate) fn reset_selection_for_query(&mut self, query: &str) {
+        let navigable = self.navigable_indices(query);
+        self.selected_index = navigable.first().copied().unwrap_or(0);
     }
 }
 
@@ -604,58 +690,111 @@ impl TuiState {
         provider: &str,
         model_id: Option<&str>,
         connect_mode: bool,
+        default_base_url: Option<String>,
     ) {
-        self.slash_menu = BottomPanelState::open_credential_input(provider, model_id, connect_mode);
+        self.slash_menu = BottomPanelState::open_credential_input(
+            provider,
+            model_id,
+            connect_mode,
+            default_base_url,
+        );
     }
 
     pub(crate) fn credential_append_char(&mut self, ch: char) {
         if self.slash_menu.is_credential_input() {
-            self.slash_menu.credential_buffer.push(ch);
+            match self.slash_menu.credential_field {
+                CredentialField::ApiKey => self.slash_menu.credential_buffer.push(ch),
+                CredentialField::BaseUrl => self.slash_menu.base_url_buffer.push(ch),
+            }
         }
     }
 
     pub(crate) fn credential_append_str(&mut self, text: &str) {
         if self.slash_menu.is_credential_input() {
-            self.slash_menu.credential_buffer.push_str(text);
+            match self.slash_menu.credential_field {
+                CredentialField::ApiKey => self.slash_menu.credential_buffer.push_str(text),
+                CredentialField::BaseUrl => self.slash_menu.base_url_buffer.push_str(text),
+            }
         }
     }
 
     pub(crate) fn credential_backspace(&mut self) {
         if self.slash_menu.is_credential_input() {
-            self.slash_menu.credential_buffer.pop();
+            match self.slash_menu.credential_field {
+                CredentialField::ApiKey => {
+                    self.slash_menu.credential_buffer.pop();
+                }
+                CredentialField::BaseUrl => {
+                    self.slash_menu.base_url_buffer.pop();
+                }
+            }
         }
     }
 
+    /// Submits the currently focused credential field.
+    ///
+    /// In `connect_mode`, the first submit (API key) advances to the base
+    /// URL field instead of closing the panel; the second submit resolves
+    /// the final `base_url` (typed value, else the request's
+    /// `default_base_url`, else `None`) and returns the full response.
+    /// Non-connect mode preserves the original single-field behavior.
     pub(crate) fn credential_submit(&mut self) -> Option<CredentialResponseData> {
         if !self.slash_menu.is_credential_input() {
             return None;
         }
-        let (provider, model_id, connect_mode) = match &self.slash_menu.kind {
+        let (provider, model_id, connect_mode, default_base_url) = match &self.slash_menu.kind {
             Some(PanelKind::CredentialInput {
                 provider,
                 model_id,
                 connect_mode,
-            }) => (provider.clone(), model_id.clone(), *connect_mode),
+                default_base_url,
+            }) => (
+                provider.clone(),
+                model_id.clone(),
+                *connect_mode,
+                default_base_url.clone(),
+            ),
             _ => return None,
         };
+
+        if connect_mode && self.slash_menu.credential_field == CredentialField::ApiKey {
+            let key = self.slash_menu.credential_buffer.trim().to_string();
+            if key.is_empty() {
+                self.slash_menu.close();
+                return None;
+            }
+            self.slash_menu.credential_field = CredentialField::BaseUrl;
+            return None;
+        }
+
         let key = std::mem::take(&mut self.slash_menu.credential_buffer)
             .trim()
             .to_string();
-        self.slash_menu.close();
         if key.is_empty() {
-            None
-        } else {
-            Some(CredentialResponseData {
-                provider,
-                api_key: key,
-                model_id,
-                connect_mode,
-            })
+            self.slash_menu.close();
+            return None;
         }
+        let typed_base_url = std::mem::take(&mut self.slash_menu.base_url_buffer)
+            .trim()
+            .to_string();
+        let base_url = if typed_base_url.is_empty() {
+            default_base_url
+        } else {
+            Some(typed_base_url)
+        };
+        self.slash_menu.close();
+        Some(CredentialResponseData {
+            provider,
+            api_key: key,
+            model_id,
+            connect_mode,
+            base_url,
+        })
     }
 
     pub(crate) fn credential_cancel(&mut self) {
         self.slash_menu.credential_buffer.clear();
+        self.slash_menu.base_url_buffer.clear();
         self.slash_menu.close();
     }
 
@@ -663,17 +802,35 @@ impl TuiState {
         self.input_buffer.strip_prefix('/').unwrap_or_default()
     }
 
+    /// Returns the active search query for the currently open panel.
+    ///
+    /// `SlashCommand` strips the leading `/` (matching `slash_query`).
+    /// Picker kinds use the raw composer text as the "type to filter" query
+    /// since pickers have no `/` prefix convention.
+    pub(crate) fn panel_query(&self) -> &str {
+        if self.slash_menu.is_slash() {
+            self.slash_query()
+        } else if self.slash_menu.is_picker() {
+            self.input_buffer.as_str()
+        } else {
+            ""
+        }
+    }
+
     pub(crate) fn append_slash_query_char(&mut self, ch: char) {
         self.input_append_char(ch);
-        self.slash_menu.selected_index = 0;
+        let query = self.panel_query().to_string();
+        self.slash_menu.reset_selection_for_query(&query);
     }
 
     pub(crate) fn backspace_slash_query(&mut self) {
         self.input_backspace();
-        self.slash_menu.selected_index = 0;
-        if !self.input_buffer.starts_with('/') {
+        if self.slash_menu.is_slash() && !self.input_buffer.starts_with('/') {
             self.slash_menu.close();
+            return;
         }
+        let query = self.panel_query().to_string();
+        self.slash_menu.reset_selection_for_query(&query);
     }
 
     pub(crate) fn accept_selected_panel_item(&mut self) -> PanelAction {
@@ -685,13 +842,10 @@ impl TuiState {
     }
 
     fn accept_selected_panel_item_with_mode(&mut self, mode: PanelAcceptMode) -> PanelAction {
-        let query = self.slash_query().to_string();
-        let filtered = self.slash_menu.filtered_items(&query);
-        if filtered.is_empty() {
-            return PanelAction::None;
-        }
-        let idx = self.slash_menu.selected_index.min(filtered.len() - 1);
-        let action = filtered[idx].action.clone();
+        let action = match self.slash_menu.items.get(self.slash_menu.selected_index) {
+            Some(item) => item.action.clone(),
+            None => return PanelAction::None,
+        };
 
         match action {
             PanelItemAction::Header => PanelAction::None,
@@ -809,7 +963,7 @@ mod tests {
     fn credential_input_collects_pasted_text_and_submits() {
         let mut state = TuiState::new();
 
-        state.open_credential_input("openai", None, false);
+        state.open_credential_input("openai", None, false, None);
         state.credential_append_str("sk-test-key\n");
 
         let response = state.credential_submit().expect("credential response");
@@ -817,6 +971,7 @@ mod tests {
         assert_eq!(response.api_key, "sk-test-key");
         assert_eq!(response.model_id, None);
         assert!(!response.connect_mode);
+        assert!(response.base_url.is_none());
         assert!(!state.slash_menu.is_open);
     }
 
@@ -824,10 +979,142 @@ mod tests {
     fn empty_credential_submit_closes_without_response() {
         let mut state = TuiState::new();
 
-        state.open_credential_input("openai", Some("gpt-4.1"), false);
+        state.open_credential_input("openai", Some("gpt-4.1"), false, None);
 
         assert!(state.credential_submit().is_none());
         assert!(!state.slash_menu.is_open);
+    }
+
+    // ── /connect two-phase credential (api_key + base_url) ──────────────
+
+    #[test]
+    fn connect_mode_first_submit_advances_to_base_url_field() {
+        let mut state = TuiState::new();
+        state.open_credential_input("groq", None, true, None);
+
+        state.credential_append_str("gsk-test-key");
+        let response = state.credential_submit();
+
+        assert!(
+            response.is_none(),
+            "first Enter in connect_mode must not submit yet"
+        );
+        assert!(
+            state.slash_menu.is_open,
+            "panel must stay open for base_url"
+        );
+        assert_eq!(
+            state.slash_menu.credential_field,
+            crate::state::CredentialField::BaseUrl
+        );
+        assert_eq!(state.slash_menu.credential_buffer, "gsk-test-key");
+    }
+
+    #[test]
+    fn connect_mode_second_submit_returns_typed_base_url() {
+        let mut state = TuiState::new();
+        state.open_credential_input("groq", None, true, None);
+
+        state.credential_append_str("gsk-test-key");
+        state.credential_submit();
+        state.credential_append_str("https://custom.groq.example/v1");
+        let response = state
+            .credential_submit()
+            .expect("second submit must return response");
+
+        assert_eq!(response.provider, "groq");
+        assert_eq!(response.api_key, "gsk-test-key");
+        assert!(response.connect_mode);
+        assert_eq!(
+            response.base_url.as_deref(),
+            Some("https://custom.groq.example/v1")
+        );
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn connect_mode_empty_base_url_falls_back_to_default() {
+        let mut state = TuiState::new();
+        state.open_credential_input(
+            "groq",
+            None,
+            true,
+            Some("https://api.groq.com/openai/v1".to_string()),
+        );
+
+        state.credential_append_str("gsk-test-key");
+        state.credential_submit();
+        // Base URL left blank.
+        let response = state
+            .credential_submit()
+            .expect("blank base_url must still submit using the default");
+
+        assert_eq!(
+            response.base_url.as_deref(),
+            Some("https://api.groq.com/openai/v1")
+        );
+    }
+
+    #[test]
+    fn connect_mode_empty_base_url_with_no_default_is_none() {
+        let mut state = TuiState::new();
+        state.open_credential_input("groq", None, true, None);
+
+        state.credential_append_str("gsk-test-key");
+        state.credential_submit();
+        let response = state
+            .credential_submit()
+            .expect("blank base_url with no default must still submit");
+
+        assert!(response.base_url.is_none());
+    }
+
+    #[test]
+    fn connect_mode_empty_api_key_cancels_without_advancing() {
+        let mut state = TuiState::new();
+        state.open_credential_input("groq", None, true, None);
+
+        let response = state.credential_submit();
+
+        assert!(response.is_none());
+        assert!(
+            !state.slash_menu.is_open,
+            "empty API key in connect_mode must cancel, not advance"
+        );
+    }
+
+    #[test]
+    fn non_connect_mode_ignores_base_url_and_submits_single_phase() {
+        let mut state = TuiState::new();
+        state.open_credential_input("anthropic", None, false, None);
+
+        state.credential_append_str("sk-ant-test");
+        let response = state
+            .credential_submit()
+            .expect("non-connect mode must submit on first Enter");
+
+        assert_eq!(response.api_key, "sk-ant-test");
+        assert!(response.base_url.is_none());
+        assert!(!response.connect_mode);
+    }
+
+    #[test]
+    fn credential_append_and_backspace_route_to_active_field() {
+        let mut state = TuiState::new();
+        state.open_credential_input("groq", None, true, None);
+
+        state.credential_append_str("abc");
+        state.credential_backspace();
+        assert_eq!(state.slash_menu.credential_buffer, "ab");
+        assert!(state.slash_menu.base_url_buffer.is_empty());
+
+        state.credential_append_str("x");
+        state.credential_submit(); // advance to BaseUrl
+        state.credential_append_str("https://x.example");
+        state.credential_backspace();
+
+        assert_eq!(state.slash_menu.credential_buffer, "abx");
+        assert_eq!(state.slash_menu.base_url_buffer, "https://x.exampl");
     }
 
     #[test]
@@ -883,5 +1170,281 @@ mod tests {
         if let PanelKind::Approval { arguments, .. } = state.kind.as_ref().unwrap() {
             assert_eq!(arguments, "ls -la");
         }
+    }
+
+    // ── MC106: Group-aware search filtering ─────────────────────────────
+
+    fn model_item(id: &str, provider: &str, is_current: bool) -> ModelPickerItem {
+        ModelPickerItem {
+            command: "/model".to_string(),
+            model_id: id.to_string(),
+            provider: provider.to_string(),
+            label: format!("{id} {provider}"),
+            context_limit: Some(100_000),
+            pricing: None,
+            authenticated: true,
+            is_current,
+        }
+    }
+
+    fn sample_model_picker_data() -> ModelPickerData {
+        ModelPickerData {
+            ready_models: vec![
+                model_item("claude-sonnet-4-5", "anthropic", true),
+                model_item("claude-opus-4-1", "anthropic", false),
+                model_item("gpt-4o", "openai", false),
+                model_item("o3", "openai", false),
+            ],
+            setup_providers: vec![],
+        }
+    }
+
+    fn connect_item(
+        provider: &str,
+        name: &str,
+        has_credential: bool,
+    ) -> talos_conversation::ConnectPickerItem {
+        talos_conversation::ConnectPickerItem {
+            provider: provider.to_string(),
+            name: name.to_string(),
+            model_count: 3,
+            api_base_url: None,
+            has_credential,
+            doc_url: None,
+        }
+    }
+
+    fn sample_connect_picker_data() -> talos_conversation::ConnectPickerData {
+        talos_conversation::ConnectPickerData {
+            connected: vec![connect_item("anthropic", "Anthropic", true)],
+            available: vec![
+                connect_item("openai", "OpenAI", false),
+                connect_item("groq", "Groq", false),
+            ],
+        }
+    }
+
+    #[test]
+    fn model_picker_search_matching_provider_hides_other_groups() {
+        let data = sample_model_picker_data();
+        let menu = BottomPanelState::open_model_picker(&data);
+
+        // Groups: "Current" (claude-sonnet-4-5/anthropic), "anthropic"
+        // (claude-opus-4-1), "openai" (gpt-4o, o3).
+        let indices = menu.filtered_indices("gpt");
+        let visible_labels: Vec<&str> = indices
+            .iter()
+            .map(|&i| menu.items[i].label.as_str())
+            .collect();
+
+        assert!(
+            visible_labels.contains(&"openai"),
+            "openai header must be visible: {visible_labels:?}"
+        );
+        assert!(
+            visible_labels.iter().any(|l| l.contains("gpt-4o")),
+            "matching item must be visible: {visible_labels:?}"
+        );
+        assert!(
+            !visible_labels.iter().any(|l| l.contains("o3")),
+            "non-matching sibling must be hidden: {visible_labels:?}"
+        );
+        assert!(
+            !visible_labels.contains(&"Current"),
+            "non-matching Current group must be hidden: {visible_labels:?}"
+        );
+        assert!(
+            !visible_labels.iter().any(|l| l.contains("claude")),
+            "non-matching anthropic group must be hidden entirely: {visible_labels:?}"
+        );
+    }
+
+    #[test]
+    fn model_picker_search_no_match_hides_all_groups() {
+        let data = sample_model_picker_data();
+        let menu = BottomPanelState::open_model_picker(&data);
+
+        let indices = menu.filtered_indices("zzz-nonexistent");
+        assert!(indices.is_empty(), "no groups should match: {indices:?}");
+    }
+
+    #[test]
+    fn model_picker_empty_query_shows_everything() {
+        let data = sample_model_picker_data();
+        let menu = BottomPanelState::open_model_picker(&data);
+
+        let indices = menu.filtered_indices("");
+        assert_eq!(indices.len(), menu.items.len());
+    }
+
+    #[test]
+    fn model_picker_navigation_skips_headers_and_filtered_out_items() {
+        let data = sample_model_picker_data();
+        let mut menu = BottomPanelState::open_model_picker(&data);
+
+        // Filter to only the "openai" group (gpt-4o, o3).
+        menu.selected_index = menu
+            .filtered_indices("openai")
+            .into_iter()
+            .find(|&i| menu.items[i].action != PanelItemAction::Header)
+            .unwrap();
+
+        let first_selection = menu.selected_index;
+        assert_eq!(
+            menu.items[first_selection].action != PanelItemAction::Header,
+            true
+        );
+
+        menu.select_next("openai");
+        assert_ne!(
+            menu.items[menu.selected_index].action,
+            PanelItemAction::Header,
+            "select_next must never land on a Header"
+        );
+        assert_ne!(
+            menu.selected_index, first_selection,
+            "select_next must move within the filtered openai group"
+        );
+
+        // Navigating past the last item in the filtered set wraps back
+        // without ever landing on a hidden (anthropic) item or a header.
+        menu.select_next("openai");
+        let after_wrap = menu.selected_index;
+        assert!(
+            menu.items[after_wrap].label.contains("gpt-4o")
+                || menu.items[after_wrap].label.contains("o3"),
+            "wrapped selection must stay within the openai group, got {:?}",
+            menu.items[after_wrap].label
+        );
+    }
+
+    #[test]
+    fn model_picker_select_next_prev_never_select_header() {
+        let data = sample_model_picker_data();
+        let mut menu = BottomPanelState::open_model_picker(&data);
+
+        for _ in 0..(menu.items.len() * 2) {
+            menu.select_next("");
+            assert_ne!(
+                menu.items[menu.selected_index].action,
+                PanelItemAction::Header
+            );
+        }
+        for _ in 0..(menu.items.len() * 2) {
+            menu.select_prev("");
+            assert_ne!(
+                menu.items[menu.selected_index].action,
+                PanelItemAction::Header
+            );
+        }
+    }
+
+    #[test]
+    fn model_picker_enter_selects_correct_original_item_after_filtering() {
+        let data = sample_model_picker_data();
+        let mut menu = BottomPanelState::open_model_picker(&data);
+
+        let target_idx = menu
+            .items
+            .iter()
+            .position(
+                |i| matches!(&i.action, PanelItemAction::Select { value, .. } if value == "gpt-4o"),
+            )
+            .expect("gpt-4o item must exist");
+        menu.selected_index = target_idx;
+
+        // selected_index must remain the correct raw index even though the
+        // filtered/visible set has shrunk to a single group.
+        let indices = menu.filtered_indices("gpt");
+        assert!(indices.contains(&target_idx));
+
+        let action = menu.items[menu.selected_index].action.clone();
+        match action {
+            PanelItemAction::Select { command, value } => {
+                assert_eq!(command, "/model");
+                assert_eq!(value, "gpt-4o");
+            }
+            other => panic!("expected Select action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn connect_picker_search_matches_provider_group() {
+        let data = sample_connect_picker_data();
+        let menu = BottomPanelState::open_connect_picker(&data);
+
+        let indices = menu.filtered_indices("groq");
+        let labels: Vec<&str> = indices
+            .iter()
+            .map(|&i| menu.items[i].label.as_str())
+            .collect();
+
+        assert!(
+            labels.contains(&"Available"),
+            "matching group header must show: {labels:?}"
+        );
+        assert!(labels.iter().any(|l| l.contains("Groq")), "{labels:?}");
+        assert!(
+            !labels.iter().any(|l| l.contains("OpenAI")),
+            "non-matching sibling in same group must be hidden: {labels:?}"
+        );
+        assert!(
+            !labels.contains(&"Connected"),
+            "non-matching Connected group must be hidden entirely: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn connect_picker_is_picker_and_supports_filtering() {
+        let data = sample_connect_picker_data();
+        let menu = BottomPanelState::open_connect_picker(&data);
+        assert!(menu.is_picker());
+    }
+
+    #[test]
+    fn reset_selection_for_query_lands_on_first_navigable_match() {
+        let data = sample_model_picker_data();
+        let mut menu = BottomPanelState::open_model_picker(&data);
+
+        menu.reset_selection_for_query("openai");
+        assert_ne!(
+            menu.items[menu.selected_index].action,
+            PanelItemAction::Header
+        );
+        assert!(
+            menu.items[menu.selected_index].label.contains("gpt-4o")
+                || menu.items[menu.selected_index].label.contains("o3")
+        );
+    }
+
+    #[test]
+    fn reset_selection_for_query_falls_back_to_zero_when_nothing_matches() {
+        let data = sample_model_picker_data();
+        let mut menu = BottomPanelState::open_model_picker(&data);
+
+        menu.reset_selection_for_query("zzz-nonexistent");
+        assert_eq!(menu.selected_index, 0);
+    }
+
+    #[test]
+    fn tuistate_panel_query_uses_raw_buffer_for_pickers() {
+        let mut state = TuiState::new();
+        let data = sample_model_picker_data();
+        state.open_model_picker(&data);
+        state.input_append_char('g');
+        state.input_append_char('p');
+        state.input_append_char('t');
+
+        assert_eq!(state.panel_query(), "gpt");
+    }
+
+    #[test]
+    fn tuistate_panel_query_strips_slash_for_slash_menu() {
+        let mut state = TuiState::new();
+        state.open_slash_menu(talos_conversation::command_registry());
+        state.append_slash_query_char('m');
+        state.append_slash_query_char('o');
+
+        assert_eq!(state.panel_query(), "mo");
     }
 }

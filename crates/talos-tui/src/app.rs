@@ -116,7 +116,8 @@ impl Tui {
                 }
             }
             PanelAction::ProviderSetup(provider) => {
-                self.state.open_credential_input(&provider, None, false);
+                self.state
+                    .open_credential_input(&provider, None, false, None);
                 self.state.input_clear();
             }
             PanelAction::None => {}
@@ -656,6 +657,7 @@ impl Tui {
                     &req.provider,
                     req.model_id.as_deref(),
                     req.connect_mode,
+                    req.default_base_url.clone(),
                 );
             }
             UiOutput::HydrateHistory(messages) => {
@@ -750,12 +752,7 @@ impl Tui {
         };
         let input_pad_top = crate::scrollback::InputPadComponent;
         let input = crate::scrollback::InputComponent { state };
-        let query = state.slash_query();
-        let query_for_panel = if state.slash_menu.is_picker() {
-            ""
-        } else {
-            query
-        };
+        let query_for_panel = state.panel_query();
         let mut bottom_panel = crate::scrollback::BottomPanelComponent {
             menu: &state.slash_menu,
             query: query_for_panel,
@@ -847,10 +844,22 @@ impl Tui {
                             + input.height_hint(screen_w)
                     }
                 };
-                let input_row = stack_top.saturating_add(panel_y_offset).saturating_add(2);
-                let cursor_col = crate::scrollback::credential_cursor_col(
-                    &self.state.slash_menu.credential_buffer,
-                );
+                let field_row_offset = match self.state.slash_menu.credential_field {
+                    crate::state::CredentialField::ApiKey => 2,
+                    crate::state::CredentialField::BaseUrl => 3,
+                };
+                let input_row = stack_top
+                    .saturating_add(panel_y_offset)
+                    .saturating_add(field_row_offset);
+                let active_buffer = match self.state.slash_menu.credential_field {
+                    crate::state::CredentialField::ApiKey => {
+                        &self.state.slash_menu.credential_buffer
+                    }
+                    crate::state::CredentialField::BaseUrl => {
+                        &self.state.slash_menu.base_url_buffer
+                    }
+                };
+                let cursor_col = crate::scrollback::credential_cursor_col(active_buffer);
                 self.terminal.set_cursor(cursor_col, input_row)?;
             } else {
                 let mut input_y_offset: u16 = preview.height_hint(screen_w)
@@ -947,19 +956,11 @@ impl Tui {
                         self.toggle_evolution_panel();
                     }
                     KeyCode::Up if self.state.slash_menu.is_open => {
-                        let query = if self.state.slash_menu.is_picker() {
-                            String::new()
-                        } else {
-                            self.state.slash_query().to_string()
-                        };
+                        let query = self.state.panel_query().to_string();
                         self.state.slash_menu.select_prev(&query);
                     }
                     KeyCode::Down if self.state.slash_menu.is_open => {
-                        let query = if self.state.slash_menu.is_picker() {
-                            String::new()
-                        } else {
-                            self.state.slash_query().to_string()
-                        };
+                        let query = self.state.panel_query().to_string();
                         self.state.slash_menu.select_next(&query);
                     }
                     KeyCode::Tab if self.state.slash_menu.is_open => {

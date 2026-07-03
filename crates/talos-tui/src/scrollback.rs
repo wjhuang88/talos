@@ -352,7 +352,14 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             return 5u16.min(self.max_height);
         }
         if self.menu.is_credential_input() {
-            return 3u16.min(self.max_height);
+            let is_connect = matches!(
+                self.menu.kind,
+                Some(crate::state::PanelKind::CredentialInput {
+                    connect_mode: true,
+                    ..
+                })
+            );
+            return (if is_connect { 4u16 } else { 3u16 }).min(self.max_height);
         }
         let filtered = self.menu.filtered_items(self.query).len();
         let natural_height = if filtered == 0 {
@@ -376,47 +383,94 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         }
 
         if self.menu.is_credential_input() {
-            let (provider, model_id) = match &self.menu.kind {
+            let (provider, model_id, connect_mode) = match &self.menu.kind {
                 Some(crate::state::PanelKind::CredentialInput {
-                    provider, model_id, ..
-                }) => (provider.as_str(), model_id.as_deref()),
-                _ => ("?", None),
+                    provider,
+                    model_id,
+                    connect_mode,
+                    ..
+                }) => (provider.as_str(), model_id.as_deref(), *connect_mode),
+                _ => ("?", None, false),
             };
-            let buffer = self.menu.credential_buffer.as_str();
-            let display = credential_display_text(buffer);
             let style = Style::default().bg(semantic::INPUT_BG);
             let dim = Style::default().fg(semantic::DIM_TEXT);
-            let text_color = if buffer.is_empty() {
-                dim
-            } else {
-                Style::default().fg(semantic::TEXT_PRIMARY)
-            };
             let header = match model_id {
                 Some(id) => format!(" Provider: {provider}  Model: {id}"),
                 None => format!(" Provider: {provider}"),
             };
-            let lines = vec![
-                Line::from(Span::styled(
-                    header,
-                    Style::default().fg(crate::nord::NORD8).bold(),
-                )),
-                Line::from(Span::styled(
+
+            let api_key_display = credential_display_text(self.menu.credential_buffer.as_str());
+            let api_key_color = if self.menu.credential_buffer.is_empty() {
+                dim
+            } else {
+                Style::default().fg(semantic::TEXT_PRIMARY)
+            };
+
+            let mut lines = vec![Line::from(Span::styled(
+                header,
+                Style::default().fg(crate::nord::NORD8).bold(),
+            ))];
+
+            if !connect_mode {
+                lines.push(Line::from(Span::styled(
                     " Enter the API key for this provider and press Enter (Esc to cancel).",
                     dim,
-                )),
-                Line::from(Span::styled(format!(" ▸ {display}"), text_color)),
-            ];
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!(" ▸ {api_key_display}"),
+                    api_key_color,
+                )));
+                frame.render_widget(Paragraph::new(lines).style(style), area);
+                return;
+            }
+
+            let is_base_url_field =
+                self.menu.credential_field == crate::state::CredentialField::BaseUrl;
+            let base_url_display = if self.menu.base_url_buffer.is_empty() {
+                "(default endpoint)".to_string()
+            } else {
+                self.menu.base_url_buffer.clone()
+            };
+
+            if is_base_url_field {
+                lines.push(Line::from(Span::styled(
+                    " Optional base URL — leave blank for the default endpoint. Enter to save (Esc to cancel).",
+                    dim,
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!("   API key: {api_key_display}"),
+                    dim,
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!(" ▸ {base_url_display}"),
+                    Style::default().fg(semantic::TEXT_PRIMARY),
+                )));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    " Enter the API key, then Enter to continue to the base URL (Esc to cancel).",
+                    dim,
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!(" ▸ {api_key_display}"),
+                    api_key_color,
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!("   Base URL: {base_url_display}"),
+                    dim,
+                )));
+            }
+
             frame.render_widget(Paragraph::new(lines).style(style), area);
             return;
         }
 
-        let filtered = self.menu.filtered_items(self.query);
-        if filtered.is_empty() {
+        let indices = self.menu.filtered_indices(self.query);
+        if indices.is_empty() {
             let dim = Style::default().fg(semantic::DIM_TEXT);
             let text = if self.menu.is_slash() {
                 Line::from(Span::styled(" No matching commands", dim))
             } else {
-                Line::from(Span::styled(" No sessions found", dim))
+                Line::from(Span::styled(" No matches", dim))
             };
             frame.render_widget(
                 Paragraph::new(text).style(Style::default().bg(semantic::INPUT_BG)),
@@ -425,11 +479,16 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             return;
         }
 
-        let total = filtered.len();
+        let total = indices.len();
         let (visible, show_separator, show_indicator) = bottom_panel_rows(total, area.height);
 
-        let scroll_offset = if self.menu.selected_index >= visible {
-            self.menu.selected_index - visible + 1
+        let selected_pos = indices
+            .iter()
+            .position(|&i| i == self.menu.selected_index)
+            .unwrap_or(0);
+
+        let scroll_offset = if selected_pos >= visible {
+            selected_pos - visible + 1
         } else {
             0
         };
@@ -456,12 +515,13 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         }
 
         for i in 0..visible {
-            let idx = scroll_offset + i;
-            if idx >= total {
+            let pos = scroll_offset + i;
+            if pos >= total {
                 break;
             }
-            let item = filtered[idx];
-            let is_selected = idx == self.menu.selected_index;
+            let raw_idx = indices[pos];
+            let item = &self.menu.items[raw_idx];
+            let is_selected = raw_idx == self.menu.selected_index;
 
             if item.action == crate::state::PanelItemAction::Header {
                 let style = if is_selected {
