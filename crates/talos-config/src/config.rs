@@ -225,6 +225,28 @@ impl Config {
             )));
         }
 
+        if let Some(ref mc) = self.active_model_config()
+            && let Some(ref reasoning) = mc.reasoning
+        {
+            let builtin = model::builtin_models();
+            if let Some(meta) = model::find_model_by_provider(&builtin, &self.provider, &self.model)
+                && !meta.capabilities.reasoning
+            {
+                tracing::warn!(
+                    provider = %self.provider,
+                    model = %self.model,
+                    "reasoning configured but model lacks reasoning capability in catalog; skipping reasoning fields"
+                );
+            }
+            if !reasoning.replay {
+                tracing::warn!(
+                    provider = %self.provider,
+                    model = %self.model,
+                    "reasoning replay disabled: Anthropic tool continuations will run without thinking; local-server KV caches may be invalidated"
+                );
+            }
+        }
+
         Ok(())
     }
 
