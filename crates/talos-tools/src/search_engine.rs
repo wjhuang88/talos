@@ -6,13 +6,23 @@
 //!   `grep-searcher`, `grep-regex`, and `ignore` crates.
 
 use std::fmt;
+use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use grep_regex::RegexMatcher;
 use grep_searcher::{BinaryDetection, SearcherBuilder, Sink, SinkMatch};
 use ignore::WalkBuilder;
 use ignore::overrides::OverrideBuilder;
+
+const MAX_SEARCH_FILES: usize = 10_000;
+const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES: u64 = 50 * 1024 * 1024;
+const MAX_MATCH_LINE_BYTES: usize = 4 * 1024;
+const MAX_OUTPUT_BYTES: usize = 128 * 1024;
+const MAX_SEARCH_DURATION: Duration = Duration::from_secs(2);
+const BINARY_SNIFF_BYTES: usize = 8 * 1024;
 
 /// Errors that can occur during search operations.
 #[derive(Debug)]
@@ -21,6 +31,8 @@ pub enum SearchError {
     InvalidRegex(String),
     /// IO error during file reading or walking.
     Io(std::io::Error),
+    /// Search exceeded the elapsed-time budget.
+    Timeout(Duration),
     /// A panic occurred in the search engine (should not happen in pure Rust).
     SearchPanic(String),
 }
@@ -30,6 +42,7 @@ impl fmt::Display for SearchError {
         match self {
             SearchError::InvalidRegex(e) => write!(f, "invalid regex: {e}"),
             SearchError::Io(e) => write!(f, "io error: {e}"),
+            SearchError::Timeout(d) => write!(f, "search timed out after {}ms", d.as_millis()),
             SearchError::SearchPanic(e) => write!(f, "search engine panic: {e}"),
         }
     }
@@ -52,6 +65,29 @@ pub struct FileMatches {
     pub lines: Vec<(usize, String)>,
 }
 
+/// Compact accounting for a bounded search run.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SearchStats {
+    /// Number of candidate filesystem entries considered.
+    pub files_seen: usize,
+    /// Number of regular files passed to the searcher.
+    pub files_searched: usize,
+    /// Number of input bytes admitted under the search budget.
+    pub input_bytes: u64,
+    /// Number of output bytes admitted under the search budget.
+    pub output_bytes: usize,
+    /// Number of files skipped because they exceeded the per-file byte budget.
+    pub skipped_oversized: usize,
+    /// Number of files skipped because they appeared binary.
+    pub skipped_binary: usize,
+    /// Number of files skipped because the global file or byte budget was reached.
+    pub skipped_budget: usize,
+    /// Number of file-level dependency/IO errors suppressed to keep the search progressing.
+    pub skipped_errors: usize,
+    /// Elapsed wall-clock time in milliseconds.
+    pub elapsed_ms: u128,
+}
+
 /// Output from a search operation.
 #[derive(Debug)]
 pub struct SearchOutput {
@@ -59,6 +95,8 @@ pub struct SearchOutput {
     pub matches: Vec<FileMatches>,
     /// Whether results were truncated due to max_results limit.
     pub truncated: bool,
+    /// Compact bounded-search accounting.
+    pub stats: SearchStats,
 }
 
 /// Trait for search engine implementations.
@@ -74,6 +112,13 @@ pub trait SearchEngine: Send + Sync {
         include: Option<&glob::Pattern>,
         max_results: usize,
     ) -> Result<SearchOutput, SearchError>;
+}
+
+fn has_nul_prefix(path: &Path) -> std::io::Result<bool> {
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = [0u8; BINARY_SNIFF_BYTES];
+    let n = file.read(&mut buf)?;
+    Ok(buf[..n].contains(&0u8))
 }
 
 /// Legacy search engine using regex + walkdir (preserves exact current behavior).
@@ -170,9 +215,11 @@ impl SearchEngine for LegacySearchEngine {
             }
         }
 
+        let total_matches: usize = grouped.iter().map(|m| m.lines.len()).sum();
         Ok(SearchOutput {
             matches: grouped,
-            truncated: false,
+            truncated: total_matches >= max_results,
+            stats: SearchStats::default(),
         })
     }
 }
@@ -193,6 +240,8 @@ impl SearchEngine for RipgrepSearchEngine {
     ) -> Result<SearchOutput, SearchError> {
         let matcher =
             RegexMatcher::new(pattern).map_err(|e| SearchError::InvalidRegex(e.to_string()))?;
+        let started = Instant::now();
+        let mut stats = SearchStats::default();
 
         let files: Vec<std::path::PathBuf> = if search_path.is_file() {
             vec![search_path.to_path_buf()]
@@ -216,12 +265,29 @@ impl SearchEngine for RipgrepSearchEngine {
                     .map_err(|e| SearchError::InvalidRegex(e.to_string()))?,
             );
 
-            walker_builder
-                .build()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().map(|ft| ft.is_file()).unwrap_or(false))
-                .map(|e| e.path().to_path_buf())
-                .collect()
+            let mut files = Vec::new();
+            for entry in walker_builder.build() {
+                if started.elapsed() > MAX_SEARCH_DURATION {
+                    return Err(SearchError::Timeout(MAX_SEARCH_DURATION));
+                }
+                stats.files_seen += 1;
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(_) => {
+                        stats.skipped_errors += 1;
+                        continue;
+                    }
+                };
+                if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                    continue;
+                }
+                if files.len() >= MAX_SEARCH_FILES {
+                    stats.skipped_budget += 1;
+                    continue;
+                }
+                files.push(entry.path().to_path_buf());
+            }
+            files
         };
 
         let root = if search_path.is_file() {
@@ -236,10 +302,15 @@ impl SearchEngine for RipgrepSearchEngine {
         };
 
         let max_results = Arc::new(std::sync::atomic::AtomicUsize::new(max_results));
+        let output_bytes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let output_truncated = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let matches: Arc<std::sync::Mutex<Vec<(String, usize, String)>>> =
             Arc::new(std::sync::Mutex::new(Vec::new()));
 
         for file_path in &files {
+            if started.elapsed() > MAX_SEARCH_DURATION {
+                return Err(SearchError::Timeout(MAX_SEARCH_DURATION));
+            }
             if max_results.load(std::sync::atomic::Ordering::SeqCst) == 0 {
                 break;
             }
@@ -254,6 +325,35 @@ impl SearchEngine for RipgrepSearchEngine {
                 }
             }
 
+            let metadata = match std::fs::metadata(file_path) {
+                Ok(metadata) => metadata,
+                Err(_) => {
+                    stats.skipped_errors += 1;
+                    continue;
+                }
+            };
+            if metadata.len() > MAX_FILE_BYTES {
+                stats.skipped_oversized += 1;
+                continue;
+            }
+            match has_nul_prefix(file_path) {
+                Ok(true) => {
+                    stats.skipped_binary += 1;
+                    continue;
+                }
+                Ok(false) => {}
+                Err(_) => {
+                    stats.skipped_errors += 1;
+                    continue;
+                }
+            }
+            if stats.input_bytes.saturating_add(metadata.len()) > MAX_TOTAL_BYTES {
+                stats.skipped_budget += 1;
+                continue;
+            }
+            stats.input_bytes += metadata.len();
+            stats.files_searched += 1;
+
             let display_path = file_path
                 .strip_prefix(&root)
                 .unwrap_or(file_path)
@@ -262,6 +362,8 @@ impl SearchEngine for RipgrepSearchEngine {
 
             let matches_ref = Arc::clone(&matches);
             let max_results_ref = Arc::clone(&max_results);
+            let output_bytes_ref = Arc::clone(&output_bytes);
+            let output_truncated_ref = Arc::clone(&output_truncated);
             let display_path_ref = display_path.clone();
             let file_path = file_path.clone();
 
@@ -273,6 +375,8 @@ impl SearchEngine for RipgrepSearchEngine {
                 struct LineSink<'a> {
                     matches: &'a std::sync::Mutex<Vec<(String, usize, String)>>,
                     max_results: &'a std::sync::atomic::AtomicUsize,
+                    output_bytes: &'a std::sync::atomic::AtomicUsize,
+                    output_truncated: &'a std::sync::atomic::AtomicBool,
                     path: String,
                 }
 
@@ -288,10 +392,31 @@ impl SearchEngine for RipgrepSearchEngine {
                         if current == 0 {
                             return Ok(false);
                         }
+                        let current_output =
+                            self.output_bytes.load(std::sync::atomic::Ordering::SeqCst);
+                        if current_output >= MAX_OUTPUT_BYTES {
+                            self.output_truncated
+                                .store(true, std::sync::atomic::Ordering::SeqCst);
+                            return Ok(false);
+                        }
                         self.max_results
                             .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
 
-                        let line = String::from_utf8_lossy(mat.bytes()).trim_end().to_string();
+                        let remaining_output = MAX_OUTPUT_BYTES.saturating_sub(current_output);
+                        let shown = mat
+                            .bytes()
+                            .len()
+                            .min(MAX_MATCH_LINE_BYTES)
+                            .min(remaining_output);
+                        if shown < mat.bytes().len() {
+                            self.output_truncated
+                                .store(true, std::sync::atomic::Ordering::SeqCst);
+                        }
+                        let line = String::from_utf8_lossy(&mat.bytes()[..shown])
+                            .trim_end()
+                            .to_string();
+                        self.output_bytes
+                            .fetch_add(line.len(), std::sync::atomic::Ordering::SeqCst);
                         self.matches
                             .lock()
                             .map_err(|e| std::io::Error::other(format!("mutex poisoned: {e}")))?
@@ -307,6 +432,8 @@ impl SearchEngine for RipgrepSearchEngine {
                 let sink = LineSink {
                     matches: &matches_ref,
                     max_results: &max_results_ref,
+                    output_bytes: &output_bytes_ref,
+                    output_truncated: &output_truncated_ref,
                     path: display_path_ref,
                 };
 
@@ -315,7 +442,9 @@ impl SearchEngine for RipgrepSearchEngine {
 
             match search_result {
                 Ok(Ok(_)) => {}
-                Ok(Err(_)) => {}
+                Ok(Err(_)) => {
+                    stats.skipped_errors += 1;
+                }
                 Err(panic) => {
                     let msg = if let Some(s) = panic.downcast_ref::<String>() {
                         s.clone()
@@ -351,9 +480,19 @@ impl SearchEngine for RipgrepSearchEngine {
             }
         }
 
+        stats.output_bytes = output_bytes.load(std::sync::atomic::Ordering::SeqCst);
+        let truncated = max_results.load(std::sync::atomic::Ordering::SeqCst) == 0
+            || output_truncated.load(std::sync::atomic::Ordering::SeqCst)
+            || stats.skipped_budget > 0
+            || stats.skipped_oversized > 0
+            || stats.skipped_binary > 0
+            || stats.skipped_errors > 0;
+        stats.elapsed_ms = started.elapsed().as_millis();
+
         Ok(SearchOutput {
             matches: grouped,
-            truncated: false,
+            truncated,
+            stats,
         })
     }
 }
@@ -382,6 +521,20 @@ mod regression_tests {
     }
 
     #[test]
+    fn test_ignore_file_respected() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("visible.rs"), "fn target() {}\n").unwrap();
+        fs::write(dir.path().join("ignored.rs"), "fn target() {}\n").unwrap();
+        fs::write(dir.path().join(".ignore"), "ignored.rs\n").unwrap();
+
+        let output = engine().search("target", dir.path(), None, 50).unwrap();
+
+        let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
+        assert!(files.iter().any(|f| f.contains("visible.rs")));
+        assert!(!files.iter().any(|f| f.contains("ignored.rs")));
+    }
+
+    #[test]
     fn test_binary_file_skipped() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("text.rs"), "fn target() {}\n").unwrap();
@@ -395,6 +548,27 @@ mod regression_tests {
         let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
         assert!(files.iter().any(|f| f.contains("text.rs")));
         assert!(!files.iter().any(|f| f.contains("binary.rs")));
+        assert_eq!(output.stats.skipped_binary, 1);
+        assert!(output.truncated);
+    }
+
+    #[test]
+    fn test_oversized_file_skipped_and_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("small.rs"), "fn target() {}\n").unwrap();
+        fs::write(
+            dir.path().join("large.rs"),
+            vec![b'x'; (MAX_FILE_BYTES + 1) as usize],
+        )
+        .unwrap();
+
+        let output = engine().search("target", dir.path(), None, 50).unwrap();
+
+        let files: Vec<&str> = output.matches.iter().map(|m| m.path.as_str()).collect();
+        assert!(files.iter().any(|f| f.contains("small.rs")));
+        assert!(!files.iter().any(|f| f.contains("large.rs")));
+        assert_eq!(output.stats.skipped_oversized, 1);
+        assert!(output.truncated);
     }
 
     #[test]
@@ -410,6 +584,50 @@ mod regression_tests {
 
         let total: usize = output.matches.iter().map(|m| m.lines.len()).sum();
         assert_eq!(total, 5);
+        assert!(output.truncated);
+    }
+
+    #[test]
+    fn test_long_match_line_is_output_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let content = format!("target {}\n", "x".repeat(MAX_MATCH_LINE_BYTES * 2));
+        fs::write(dir.path().join("long.rs"), content).unwrap();
+
+        let output = engine().search("target", dir.path(), None, 50).unwrap();
+
+        assert_eq!(output.matches.len(), 1);
+        assert!(output.matches[0].lines[0].1.len() <= MAX_MATCH_LINE_BYTES);
+        assert!(output.stats.output_bytes <= MAX_OUTPUT_BYTES);
+        assert!(output.truncated);
+    }
+
+    #[test]
+    fn test_invalid_utf8_does_not_fail_whole_search() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("mixed.bin"), b"prefix \xff target suffix\n").unwrap();
+
+        let output = engine().search("target", dir.path(), None, 50).unwrap();
+
+        assert_eq!(output.matches.len(), 1);
+        assert!(output.matches[0].lines[0].1.contains("target"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_symlink_not_followed_by_default() {
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("outside.rs"), "fn target() {}\n").unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(
+            outside.path().join("outside.rs"),
+            dir.path().join("linked.rs"),
+        )
+        .unwrap();
+
+        let output = engine().search("target", dir.path(), None, 50).unwrap();
+
+        assert!(output.matches.is_empty());
     }
 
     #[test]
@@ -554,6 +772,24 @@ mod regression_tests {
 
         let ripgrep_total: usize = ripgrep_out.matches.iter().map(|m| m.lines.len()).sum();
         let legacy_total: usize = legacy_out.matches.iter().map(|m| m.lines.len()).sum();
+        assert_eq!(ripgrep_total, legacy_total);
+    }
+
+    #[test]
+    fn test_talos_repo_query_smoke_matches_legacy() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let include = glob::Pattern::new("*.rs").unwrap();
+
+        let ripgrep_out = RipgrepSearchEngine
+            .search("GrepTool", root, Some(&include), 20)
+            .unwrap();
+        let legacy_out = LegacySearchEngine
+            .search("GrepTool", root, Some(&include), 20)
+            .unwrap();
+
+        let ripgrep_total: usize = ripgrep_out.matches.iter().map(|m| m.lines.len()).sum();
+        let legacy_total: usize = legacy_out.matches.iter().map(|m| m.lines.len()).sum();
+        assert!(ripgrep_total > 0);
         assert_eq!(ripgrep_total, legacy_total);
     }
 }

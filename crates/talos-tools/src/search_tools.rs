@@ -81,10 +81,14 @@ impl GrepTool {
                     FileToolError::InvalidInput(format!("invalid regex: {msg}"))
                 }
                 EngineError::Io(e) => FileToolError::Io(e),
+                EngineError::Timeout(duration) => FileToolError::InvalidInput(format!(
+                    "search timed out after {}ms",
+                    duration.as_millis()
+                )),
                 EngineError::SearchPanic(msg) => FileToolError::InvalidInput(msg),
             })?;
 
-        format_output(&grep_input.pattern, &output.matches, max_results)
+        format_output(&grep_input.pattern, &output, max_results)
     }
 }
 
@@ -125,33 +129,75 @@ impl AgentTool for GrepTool {
 
 fn format_output(
     pattern: &str,
-    matches: &[crate::search_engine::FileMatches],
+    output: &crate::search_engine::SearchOutput,
     max_results: usize,
 ) -> Result<String, FileToolError> {
+    let matches = &output.matches;
     let total: usize = matches.iter().map(|m| m.lines.len()).sum();
 
     if total == 0 {
-        return Ok(format!("no matches found for pattern '{pattern}'"));
+        let mut text = format!("no matches found for pattern '{pattern}'");
+        append_search_summary(&mut text, output);
+        return Ok(text);
     }
 
-    let mut output = String::new();
+    let mut text = String::new();
     for fm in matches {
         if fm.lines.is_empty() {
             continue;
         }
-        output.push_str(&format!("{}:\n", fm.path));
+        text.push_str(&format!("{}:\n", fm.path));
         for (line_num, line) in &fm.lines {
-            output.push_str(&format!("  {line_num}: {line}\n"));
+            text.push_str(&format!("  {line_num}: {line}\n"));
         }
     }
 
-    if total >= max_results {
-        output.push_str(&format!(
+    if output.truncated || total >= max_results {
+        text.push_str(&format!(
             "\n... (showing first {max_results} matches, refine pattern for more)"
         ));
     }
 
-    Ok(output)
+    append_search_summary(&mut text, output);
+
+    Ok(text)
+}
+
+fn append_search_summary(text: &mut String, output: &crate::search_engine::SearchOutput) {
+    let stats = &output.stats;
+    if stats.files_seen == 0
+        && stats.files_searched == 0
+        && stats.input_bytes == 0
+        && stats.output_bytes == 0
+        && stats.skipped_oversized == 0
+        && stats.skipped_binary == 0
+        && stats.skipped_budget == 0
+        && stats.skipped_errors == 0
+    {
+        return;
+    }
+
+    text.push_str(&format!(
+        "\n\nsearch summary: files_seen={}, files_searched={}, input_bytes={}, output_bytes={}, elapsed_ms={}",
+        stats.files_seen,
+        stats.files_searched,
+        stats.input_bytes,
+        stats.output_bytes,
+        stats.elapsed_ms
+    ));
+    if stats.skipped_oversized > 0
+        || stats.skipped_binary > 0
+        || stats.skipped_budget > 0
+        || stats.skipped_errors > 0
+    {
+        text.push_str(&format!(
+            ", skipped_oversized={}, skipped_binary={}, skipped_budget={}, skipped_errors={}",
+            stats.skipped_oversized,
+            stats.skipped_binary,
+            stats.skipped_budget,
+            stats.skipped_errors
+        ));
+    }
 }
 
 /// Input parameters for the [`GlobTool`].
@@ -360,7 +406,7 @@ mod grep_tool_tests {
         let match_count = result
             .content
             .lines()
-            .filter(|l| l.contains(": ") && !l.starts_with("..."))
+            .filter(|l| l.trim_start().starts_with("1: "))
             .count();
         assert_eq!(match_count, 1);
         assert!(result.content.contains("showing first 1"));
@@ -400,6 +446,58 @@ mod grep_tool_tests {
             .await;
 
         assert!(result.is_error);
+    }
+
+    #[tokio::test]
+    async fn test_grep_path_escape_rejected() {
+        let dir = make_workspace();
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        fs::write(outside.path(), "hello outside\n").unwrap();
+        let outside_name = outside
+            .path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        let tool = GrepTool::new(dir.path().to_path_buf());
+        let result = tool
+            .execute(json!({ "pattern": "hello", "path": format!("../{outside_name}") }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("path escapes workspace root"));
+    }
+
+    #[tokio::test]
+    async fn test_grep_reports_oversized_skip_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("large.txt"),
+            vec![b'x'; 10 * 1024 * 1024 + 1],
+        )
+        .unwrap();
+
+        let tool = GrepTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "needle" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("no matches"));
+        assert!(result.content.contains("search summary:"));
+        assert!(result.content.contains("skipped_oversized=1"));
+    }
+
+    #[tokio::test]
+    async fn test_grep_reports_binary_skip_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("binary.txt"), b"before\0needle after\n").unwrap();
+
+        let tool = GrepTool::new(dir.path().to_path_buf());
+        let result = tool.execute(json!({ "pattern": "needle" })).await;
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("no matches"));
+        assert!(result.content.contains("search summary:"));
+        assert!(result.content.contains("skipped_binary=1"));
     }
 
     #[test]

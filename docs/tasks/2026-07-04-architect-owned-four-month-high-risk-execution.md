@@ -51,7 +51,7 @@ is not suitable for routine frontline delegation.
 | A2 | Activate I090 | Start the month-1 high-risk tool/ingestion boundary iteration. | A1 | Iteration README, Board, and relevant backlog owners mark I090 Active/In Progress. | Keep I090 Planned and record blocker. | Complete |
 | A3 | WEBFETCH bounded extraction decision | Decide the first Rust-native bounded extraction slice and explicit unsupported formats. | A2 | Proposal/ADR if needed; permission and size/time budgets named. | Keep WEBFETCH Phase 2+ design-only. | Complete |
 | A4 | Implement first bounded extraction slice | A local `document_extract` or equivalent bounded extractor for safe text/HTML/JSON/CSV/Markdown-like inputs, no PDF/Office/OCR/browser. | A3 | Tool tests, permission tests, runtime smoke, docs. | Ship design only; no runtime tool. | Complete |
-| A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | In Progress |
+| A5 | TOOL-011 search stabilization gate | Decide whether ripgrep-backed grep must land before more ingestion work; implement only if required. | A3 | Behavior compatibility tests and no host-`rg` runtime dependency. | Keep current grep and record deferral. | Complete |
 | A6 | Activate I091 | Start local plugin/hook/distribution boundary iteration. | A4/A5 | Owner docs synchronized and I091 Active. | Keep I091 Planned with blocker. | Planned |
 | A7 | Plugin/hook diagnostics hardening | Local plugin and hook diagnostics expose state without auto-discovery, remote install, or write-capable tools. | A6 | CLI/TUI/command tests and provenance checks. | Diagnostics-only docs, no runtime change. | Planned |
 | A8 | Distribution safety policy | Optional asset/plugin package policy names manifest, checksum, cache, offline/mirror behavior, and consent. | A6 | DIST-001 proposal/ADR update and governance pass. | Defer runtime distribution. | Planned |
@@ -349,3 +349,48 @@ Recovery or resume instruction:
 - Run `git status --short`.
 - Read I090, TOOL-011, `crates/talos-tools/src/search_tools.rs`, and
   `crates/talos-tools/src/search_engine.rs`.
+
+### A5 — Ripgrep Search Stabilization Closed (2026-07-04)
+
+Completed task items:
+
+- Audited the existing ripgrep-backed search path against TOOL-011 instead of assuming it was
+  complete.
+- Closed the bounded-search gaps: file-count budget, per-file byte budget, total input-byte
+  budget, total output-byte budget, per-line output budget, elapsed-time gate, compact search
+  summary, binary skip summary, oversized skip summary, and controlled timeout error.
+- Added regression coverage for `.ignore`, binary skip, oversized skip, invalid UTF-8, max-result
+  truncation, output-byte truncation, symlink-not-followed default behavior, path escape, fixed
+  fixture parity, and Talos-repo query parity.
+- Preserved `GrepInput` compatibility and kept the runtime path self-contained with no host `rg`.
+
+Current state and artifacts:
+
+- Code: `crates/talos-tools/src/search_engine.rs`, `crates/talos-tools/src/search_tools.rs`.
+- Owner docs: I090 and TOOL-011 updated; I090 is Complete.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy -p talos-tools -- -D warnings`: passed.
+- `cargo test -p talos-tools grep_tool_tests`: 13 tests passed.
+- `cargo test -p talos-tools search_engine::regression_tests`: 18 tests passed.
+- `cargo test -p talos-tools`: 225 tests passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Open risks or deviations:
+
+- The `SearchOutput` struct gained bounded-search statistics as part of TOOL-011 stabilization;
+  downstream callers should treat those fields as the committed search contract for this story.
+
+Next task item:
+
+- A6: after this phase commit/push, activate I091 in a separate phase commit.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I090, I091, TOOL-011, and this task's A5 checkpoint.

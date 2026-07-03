@@ -1,6 +1,6 @@
 # Iteration I090: High-Risk Ingestion And Search Boundary
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-04
 > Planned objective: define and implement the first safe, bounded ingestion/search slice without
 > weakening permission, dependency, or prompt-cache boundaries.
@@ -69,6 +69,7 @@
 |---|---|---|
 | 2026-07-04 | Activation | Activated after I085 was explicitly paused with only MC107 real terminal `/connect` walkthrough remaining. Non-terminal inventory disposition: I085 Paused; I086-I089 remain planned product-hardening shells; I091-I093 remain planned direct-owner shells. Initial evidence scan shows `document_extract`, `fetch_url`/`save_url`, and ripgrep-backed `grep` implementation already exist, so A3 starts with acceptance audit before adding code. |
 | 2026-07-04 | A3/A4 execution | Audited `document_extract` and found the first-slice extractor already covers text, Markdown, HTML, JSON, JSONL, CSV, TSV, and XML with bounded output. The acceptance gap was unsupported-format classification: extensionless or wrongly named PDF/image/Office/archive bytes without NUL could fall through to text extraction. Fixed by adding explicit PDF/Office/image/archive extension and magic-byte detection that returns metadata-only unsupported output. No PDF, Office, OCR, browser, crawler, or heavy conversion dependency was added. |
+| 2026-07-04 | A5 execution | Audited ripgrep-backed `grep` against TOOL-011 and found budget/summary gaps. Stabilized the engine with file-count, per-file byte, total input byte, output byte, match-count, and elapsed-time budgets; compact search summaries; binary and oversized skip counts; workspace escape rejection coverage; `.ignore` coverage; invalid UTF-8 coverage; symlink-not-followed coverage; and fixed-fixture plus Talos-repo parity smoke against the legacy engine. The runtime path remains library-backed and does not invoke host `rg`. |
 
 ## Verification Evidence
 
@@ -78,6 +79,11 @@
 - `cargo test -p talos-tools document_extract`: 31 matching unit tests passed, including PDF,
   image, and Office unsupported-format non-dump regressions.
 - `cargo test -p talos-tools --test document_boundaries`: 15 boundary tests passed.
+- `cargo test -p talos-tools grep_tool_tests`: 13 grep tool tests passed.
+- `cargo test -p talos-tools search_engine::regression_tests`: 18 search engine regression tests
+  passed.
+- `cargo test -p talos-tools`: 225 unit/integration/doc tests passed.
+- `cargo test --workspace`: passed.
 - `scripts/validate_project_governance.sh .`: passed, 0 warnings.
 - `git diff --check`: clean.
 
@@ -86,11 +92,13 @@
 - A3/A4 closed for the local bounded extraction slice. Unsupported PDF/Office/image/archive
   inputs intentionally remain unsupported and metadata-only; richer handlers require a later ADR
   and dependency gate.
-- A5 remains open: audit the ripgrep-backed search engine against TOOL-011 stabilization criteria
-  before broader ingestion depends on search.
+- I090 is Complete. I091 activation is the next phase and should land as a separate phase commit.
 
 ## Retrospective
 
 - The extractor existed before I090 activation, but the unsupported-format behavior was too
   permissive for ASCII-like binary formats. The direct-owner value in this phase was enforcing the
   boundary rather than expanding capability.
+- The search engine also already used ripgrep libraries, but its safety envelope was incomplete:
+  max matches alone did not bound output bytes or report skipped binary/oversized inputs. The A5
+  fix keeps the user-facing command shape stable while making the bounded-search contract explicit.
