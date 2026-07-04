@@ -48,7 +48,7 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 | B2 | Upgrade `gix` safely | Attempt `gix 0.84.0 -> 0.85.0` with no feature expansion beyond accepted scope. | B1 | `cargo update -p gix`, tool tests, workspace check/clippy/test, unavailable-host fallback tests. | Revert upgrade and record exact API/feature blocker. | Complete |
 | B3 | Git fallback audit | Classify `git_push`, `git_pull`, `git_checkout`, add/commit, and future stash/reset/merge/rebase against `gix 0.85.0`. | B2 | GIT-001 matrix updated with keep/replace/defer decisions and tests. | Keep host fallback with replacement trigger. | Complete |
 | B4 | Activate I095 | Start runtime validation evidence iteration. | B3 | I094 closed or paused with exact residuals. | Keep I095 Planned. | Complete |
-| B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | In Progress |
+| B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Complete |
 | B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Planned |
 | B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | Planned |
 | B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Planned |
@@ -295,3 +295,43 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I095, RUNTIME-001, REL-002, and this B4 checkpoint.
+
+### B5 — Validation Evidence Packet Closed (2026-07-04)
+
+Completed task items:
+
+- Added `talos validate run` for built-in allowlisted validation profiles.
+- Preserved `talos validate plan` as read-only planning.
+- Evidence records include command, required flag, source, exit status, stdout/stderr summaries,
+  status, and allowlisted-profile permission decision.
+- Updated README, README.zh-CN, RUNTIME-001, REL-002 readiness, release-notes draft, I095, Board,
+  Product Backlog, iteration index, and this task.
+
+Actual evidence sample:
+
+- `cargo run -p talos-cli -- validate run --profile governance --json`: passed.
+- The emitted `governance` record included command `scripts/validate_project_governance.sh .`,
+  `exit_status: 0`, `status: passed`,
+  `permission_decision: allowlisted validation profile: governance`, `stderr_summary: <empty>`,
+  and stdout summary `Governance validation passed: 0 warning(s).`
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-cli validation`: passed, 8 validation/governance tests.
+- `cargo check -p talos-cli`: passed.
+- `cargo clippy -p talos-cli -- -D warnings`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- B6: activate I096 Governance Mutation Gates.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I096, GOV-003, this task, and the I095 closeout before starting B6.

@@ -20,6 +20,11 @@ change the "Complete (pre-1.0 facade)" status and does not authorize arbitrary s
 expansion, scheduled execution, Guardian auto-approval, exec DSL, hidden pass/fail, release claim,
 tag, publish, or permission-default changes.
 
+I095 result (2026-07-04): `talos validate run` now executes only built-in allowlisted validation
+profiles and emits durable evidence records with command, exit status, stdout/stderr summaries, and
+the allowlisted-profile permission decision. This narrows the REL-002 validation evidence gap but
+does not make the runtime a stable 1.0 SDK or qualify any Codex-primary session as Talos-primary.
+
 ## Problem
 
 Talos's core turn loop is mostly isolated in `talos-agent`, and CLI/TUI crates do not own the

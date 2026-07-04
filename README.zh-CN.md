@@ -237,6 +237,16 @@ talos validate plan --profile governance --json
 验证计划是只读表面。它只列出必需检查和缺失前置条件，不会执行命令、安装依赖、编辑文件、
 push、publish 或打 tag。
 
+执行内置 allowlisted 验证 profile 并输出证据：
+
+```bash
+talos validate run --profile governance --json
+talos validate run --profile workspace
+```
+
+验证执行只接受内置 profile。每条证据记录包含命令、退出状态、stdout/stderr 摘要，以及
+allowlisted profile 权限决策；它不接受任意命令，不会编辑仓库文件、push、publish 或打 tag。
+
 ### 管理本地存储
 
 查看本地存储用量（只读）：

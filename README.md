@@ -250,6 +250,17 @@ talos validate plan --profile governance --json
 The validation plan surface is read-only. It lists required checks and missing prerequisites, but it
 does not execute commands, install dependencies, edit files, push, publish, or tag releases.
 
+Execute an allowlisted validation profile and emit evidence:
+
+```bash
+talos validate run --profile governance --json
+talos validate run --profile workspace
+```
+
+Validation execution accepts only built-in profiles. Each evidence record includes the command,
+exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. It does not
+accept arbitrary commands, edit repository files, push, publish, or tag releases.
+
 ### Manage Local Storage
 
 Check local storage usage (read-only):

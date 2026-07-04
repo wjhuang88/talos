@@ -25,6 +25,7 @@ not authorize a tag, publish, GitHub Release, or `v1.0.0` claim.
 | `ARCH-030` residual register | Residual roots are explicitly owned, but no readiness audit has converted them into release-blocking/non-blocking decisions for self-bootstrap. |
 | I090-I092 direct-owner work | Improves safety prerequisites, but Codex remains the primary executor; therefore it is non-qualifying for REL-002. |
 | Previous readiness report | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` remains accurate: no qualifying Talos-primary sessions exist. |
+| I095 runtime validation evidence update | `talos validate run` now executes built-in allowlisted profiles and records command, exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. This narrows the validation evidence gap but is not Talos-primary self-bootstrap evidence by itself. |
 
 ## Acceptance Assessment
 
@@ -44,7 +45,7 @@ not authorize a tag, publish, GitHub Release, or `v1.0.0` claim.
 | Gap | Current State | Minimum Next Evidence |
 |---|---|---|
 | Talos-primary edit loop | `talos-runtime` can submit turns and stream events, but no Talos-primary repo edit session qualifies. | A documentation-only Talos-primary session where Talos plans, edits, validates, and records evidence with Codex limited to review. |
-| Validation execution | Runtime has typed events and preview, but no autonomous validation runner with durable evidence records. | Allowlisted command execution plan that records command, output summary, exit status, and permission decision without hidden pass/fail. |
+| Validation execution | I095 adds `talos validate run` for built-in allowlisted profiles with durable command, output-summary, exit-status, and permission-decision records. | Use the evidence packet in a Talos-primary session; it is not enough while Codex remains the primary executor. |
 | Git/issue sync | Git push/issue comment remains external. | Explicit policy: either Talos gains permission-gated git/issue workflow or REL-002 accepts external release-operator boundary. |
 | SDK stability | `RUNTIME-001` is complete as pre-1.0 facade. | Decide which `talos-runtime` APIs graduate to stable support and which remain internal before v1.0. |
 

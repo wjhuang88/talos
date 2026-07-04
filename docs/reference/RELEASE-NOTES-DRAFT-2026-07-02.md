@@ -17,7 +17,9 @@ release owner can prepare a real changelog without mining every iteration record
   denial, bounded output, and timeout behavior.
 - WASM plugin work moved from adapter-only to read-only `AgentTool` integration behind the `wasm`
   feature, with provenance and permission coverage.
-- `talos validate plan` provides a read-only validation matrix for governance/workspace profiles.
+- `talos validate plan` provides a read-only validation matrix for governance/workspace profiles;
+  `talos validate run` now executes built-in allowlisted profiles and emits command/status/output
+  evidence.
 - Release/readiness work now includes publish guard checks, a publish gate packet, and explicit
   REL-002 self-bootstrap gap evidence.
 
@@ -31,8 +33,8 @@ release owner can prepare a real changelog without mining every iteration record
 
 ## Known Gaps
 
-- REL-002 remains unsatisfied: Talos can plan validation, but cannot yet execute validation, edit
-  repo files, commit, push, or sync issues as the primary runtime.
+- REL-002 remains unsatisfied: Talos can execute allowlisted validation profiles with evidence, but
+  cannot yet edit repo files, commit, push, or sync issues as the primary runtime.
 - `talos-runtime` cannot be published until dependency closure is safe or decoupled; its current
   dry-run is blocked by unpublished `talos-agent`.
 - `talos-cli` crates.io install remains blocked by `publish = false`; release archives and source

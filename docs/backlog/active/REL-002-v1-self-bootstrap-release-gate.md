@@ -34,6 +34,11 @@ I095 activation note (2026-07-04): selected as a prerequisite narrowing pass for
 validation evidence. This is still non-qualifying for REL-002 by itself; Codex remains the primary
 executor for this unattended task unless a later I097 Talos-primary rehearsal proves otherwise.
 
+I095 result (2026-07-04): `talos validate run` now executes built-in allowlisted profiles and
+records command, exit status, stdout/stderr summaries, and the allowlisted-profile permission
+decision. This closes the validation-evidence mechanism gap, but REL-002 remains No-go until
+Talos-primary sessions use it while Codex is not the primary executor.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent
@@ -102,6 +107,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-02 | T123 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t123-todo-views.md` | Does not qualify. Talos generated a read-only validation plan, but Codex remained the primary executor for implementation, validation execution, docs, git, push, and issue sync. |
 | 2026-07-02 | T132 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md` | Does not qualify. Talos generated workspace/governance validation plans for an architecture-sensitive ADR slice, but Codex remained the primary executor and the >60% autonomous coverage target was missed. |
 | 2026-07-04 | I093-A14 | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md` | Does not qualify. Talos only proved `talos 0.2.2` CLI availability; Codex remained primary for planning, edits, validation orchestration, docs sync, commit, and push. |
+| 2026-07-04 | I095-B5 | `docs/iterations/I095-runtime-validation-evidence.md` | Does not qualify by itself. The allowlisted validation evidence mechanism exists, but this implementation and validation were Codex-primary. |
 
 ## Readiness Reports
 
