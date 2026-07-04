@@ -1,0 +1,105 @@
+# VALIDATION-001: Internal Validation Service
+
+**Status**: Planned
+**Priority**: P0
+**Created**: 2026-07-04
+**Source**: Maintainer correction after I095 review
+**Depends on**: RUNTIME-001, GOV-003, REL-002
+
+## Problem
+
+I095 added `talos validate run`, but its execution model is still host-command oriented. The
+evidence format is useful, yet the current `governance` and `workspace` profiles execute local
+commands such as `scripts/validate_project_governance.sh .` and `cargo ...`.
+
+That is not the right long-term boundary for Talos as a general-purpose agent runtime:
+
+- Talos should expose validation as an internal callable capability, not primarily as a shell
+  command wrapper.
+- Governance validation should be implemented in Rust and callable by CLI, TUI, runtime, and future
+  agent loops without shelling out to project scripts.
+- Cargo is only the validation tool for this repository. Talos must not bake in a Rust-only agent
+  model.
+- Host-tool validation may still exist, but it must be an adapter with explicit dependency,
+  language, permission, and evidence metadata.
+
+## Goal
+
+Create a language-neutral internal validation service that can be called in-process by CLI, TUI,
+runtime, and future governance workflows. Host tools such as Cargo, npm, pytest, make, or project
+scripts are adapters, not the core abstraction.
+
+## Scope
+
+- Define shared validation types for:
+  - profile identity;
+  - check identity;
+  - execution mode: internal check vs host-tool adapter;
+  - language/ecosystem metadata;
+  - permission decision;
+  - status, exit/result code, stdout/stderr or structured diagnostic summaries;
+  - evidence source and required/optional status.
+- Move governance validation onto an internal callable path.
+- Keep `talos validate plan/run` as CLI frontends over the internal service.
+- Add a TUI-safe read-only or confirm-gated path for internal validation evidence.
+- Preserve host-tool checks as explicit adapters, not hidden runtime assumptions.
+- Make profiles project-configurable over time without allowing arbitrary command execution.
+
+## Non-Goals
+
+- No generic shell runner.
+- No arbitrary user-provided command execution in validation profiles.
+- No Rust-only validation model.
+- No hidden TUI execution of host tools.
+- No scheduled execution, Guardian auto-approval, release action, tag, publish, or permission
+  default relaxation.
+
+## Acceptance Criteria
+
+- [ ] A shared internal validation API exists outside `talos-cli`.
+- [ ] `governance` profile can run without invoking `scripts/validate_project_governance.sh`.
+- [ ] CLI `talos validate plan/run` uses the shared service rather than owning validation logic.
+- [ ] TUI can call at least one internal validation profile without spawning host commands.
+- [ ] Evidence records distinguish `internal` checks from `host_tool` checks.
+- [ ] Host-tool adapters record language/ecosystem metadata and unavailable-tool behavior.
+- [ ] Cargo is represented only as a Rust-project adapter for this repository, not as a Talos-wide
+      assumption.
+- [ ] Documentation clearly explains the boundary between internal validation and host-tool
+      validation.
+
+## Candidate Design
+
+Validation profiles should be composed from typed checks:
+
+| Check Kind | Meaning | Examples |
+|---|---|---|
+| `internal` | In-process Talos logic with no host command execution. | governance manifest validation, board/iteration consistency, config schema validation |
+| `host_tool` | Explicit adapter to a project toolchain. | Cargo, npm, pytest, make, project script |
+| `external_service` | Future adapter requiring network or credentials. | CI status, remote policy service |
+
+The first implementation should prioritize internal governance validation because it already exists
+as Rust logic through `talos-conversation` governance summary/validation code. `scripts/*.sh` can
+remain as compatibility wrappers, but they should not be the primary runtime path.
+
+## Relationship To I095
+
+I095 remains valid as a transitional evidence format and bounded CLI command. This story records the
+missing architecture requirement: validation must become a reusable internal service. The I095
+implementation should not be treated as the final TUI/runtime boundary.
+
+## Validation
+
+- Unit tests for internal validation profile execution without host commands.
+- CLI tests proving `talos validate run --profile governance` uses the internal service.
+- TUI/conversation tests proving the TUI path does not spawn host commands for internal profiles.
+- Adapter tests for host-tool unavailable behavior.
+- Governance validation and `git diff --check`.
+
+## Required Reads
+
+- `docs/iterations/I095-runtime-validation-evidence.md`
+- `docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`
+- `docs/backlog/active/GOV-003-builtin-project-governance.md`
+- `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`
+- `crates/talos-cli/src/validation.rs`
+- `crates/talos-conversation/src/governance_summary.rs`

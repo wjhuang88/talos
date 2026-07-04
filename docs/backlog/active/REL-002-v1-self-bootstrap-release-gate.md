@@ -58,6 +58,11 @@ I094-I097 closeout (2026-07-04): the direct high-risk execution set is complete 
 No-go release posture. No `v1.0.0` claim, tag, publish, release, or permission-default change
 occurred.
 
+Maintainer correction (2026-07-04): self-bootstrap validation evidence must not assume Talos is a
+Rust-only agent. `VALIDATION-001` records the requirement for a language-neutral internal
+validation service. Cargo-based checks may remain a host-tool adapter for this repository, but they
+cannot define the generic runtime validation model.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent

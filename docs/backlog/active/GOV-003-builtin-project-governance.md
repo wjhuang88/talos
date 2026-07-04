@@ -25,6 +25,11 @@ validation command, and exact row. Write requires `--confirm-preview`, appends o
 rolls back the file if validation fails. Broad governance automation, web writes, remote dashboard
 mutation, and release authority remain out of scope.
 
+Maintainer correction (2026-07-04): governance validation should not remain dependent on
+`scripts/validate_project_governance.sh` as the primary runtime path. `VALIDATION-001` owns moving
+governance validation to an internal callable service that CLI, TUI, runtime, and future governance
+actions can share.
+
 ## Problem
 
 The `agent-project-governance` skill (wjhuang88, v2.0.0) provides structured project

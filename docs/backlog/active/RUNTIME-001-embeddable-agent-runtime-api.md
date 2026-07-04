@@ -25,6 +25,12 @@ profiles and emits durable evidence records with command, exit status, stdout/st
 the allowlisted-profile permission decision. This narrows the REL-002 validation evidence gap but
 does not make the runtime a stable 1.0 SDK or qualify any Codex-primary session as Talos-primary.
 
+Maintainer correction (2026-07-04): I095 is transitional. Validation must become an internal
+callable, language-neutral runtime capability rather than primarily a CLI wrapper around host
+commands. `VALIDATION-001` owns the follow-up: governance validation should run in-process, and
+Cargo should be represented only as a Rust-project host-tool adapter, not as a Talos-wide runtime
+assumption.
+
 ## Problem
 
 Talos's core turn loop is mostly isolated in `talos-agent`, and CLI/TUI crates do not own the

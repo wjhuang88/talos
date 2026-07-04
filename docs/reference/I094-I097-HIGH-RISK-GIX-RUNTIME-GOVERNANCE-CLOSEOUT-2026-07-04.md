@@ -32,6 +32,7 @@ The high-risk gix/runtime/governance execution set is complete.
 | `RUNTIME-001` | Use `talos validate run` evidence inside a future Talos-primary session; the command exists but is not self-bootstrap proof by itself. |
 | `GOV-003` | Extend governance mutation only through scoped typed actions. Broad owner-doc automation, web writes, remote dashboard mutation, and release authority remain out of scope. |
 | `REL-002` | Requires real Talos-primary sessions. I097 is non-qualifying because Codex remained primary for planning, evidence interpretation, docs editing, broader validation orchestration, commit, and push. |
+| `VALIDATION-001` | Convert I095 validation evidence into a language-neutral internal service. Governance validation should be in-process; Cargo is only a Rust-project host-tool adapter, not a generic agent assumption. |
 
 ## Validation Evidence
 
