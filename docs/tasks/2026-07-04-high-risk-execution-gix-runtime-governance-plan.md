@@ -1,0 +1,187 @@
+# 2026-07-04 High-Risk Execution Set: gix, Runtime, Governance, Self-Bootstrap
+
+> Status: Planned
+> Created: 2026-07-04
+> Owner boundary: direct senior-agent execution required
+> Trigger: maintainer requested another high-risk execution task set and explicitly asked to include
+> the `gix` upgrade.
+> Baseline rule: this file is the execution contract. Append checkpoints instead of replacing the
+> plan. Changed objectives use a new task or iteration ID.
+
+## Outcome
+
+Plan and execute the next direct-owned high-risk Talos hardening set, focused on dependency
+upgrade risk, Git publication boundaries, runtime validation evidence, mutating governance, and
+REL-002 self-bootstrap prerequisites.
+
+This task does not reopen I090-I093. It follows from their closeout and uses new iteration IDs.
+
+## In Scope
+
+- Create four planned iteration shells:
+  - I094: `gix` upgrade and Git fallback boundary.
+  - I095: runtime validation execution evidence.
+  - I096: mutating governance preview/write gates.
+  - I097: controlled Talos-primary self-bootstrap rehearsal.
+- Include a scoped `gix 0.84.0 -> 0.85.0` upgrade attempt in I094.
+- Preserve ADR-010: `gix` remains the preferred pure-Rust Git direction; host `git` remains a
+  documented fallback only where `gix` lacks a complete safe workflow.
+- Keep REL-002 honest: no `v1.0.0` claim unless evidence is complete.
+
+## Out Of Scope
+
+- No crate publish, release tag, GitHub Release, or version-history mutation.
+- No automatic push unless the maintainer explicitly asks at that time.
+- No forced migration from host-`git` fallback to `gix` when the workflow is not proven.
+- No native Git dependency such as `git2`/libgit2.
+- No broad Git porcelain surface, destructive reset/clean/rebase, remote credential workflow, or
+  issue-sync automation unless selected into a later scoped iteration.
+- No permission-default relaxation, Guardian auto-approval, exec DSL expansion, or scheduled direct
+  tool execution.
+
+## Ordered Task Items
+
+| ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
+|---|---|---|---|---|---|---|
+| B0 | Establish execution set | This task record, I094-I097 planned shells, Board, backlog, and iteration index name the new track. | Maintainer request | Governance validation and `git diff --check` pass. | Keep task in Planned with exact blocker. | Planned |
+| B1 | Activate I094 | Start the `gix` upgrade / Git fallback boundary iteration. | B0 | Non-terminal inventory disposition recorded; I094 Active. | Keep I094 Planned if another iteration blocks activation. | Planned |
+| B2 | Upgrade `gix` safely | Attempt `gix 0.84.0 -> 0.85.0` with no feature expansion beyond accepted scope. | B1 | `cargo update -p gix`, tool tests, workspace check/clippy/test, unavailable-host fallback tests. | Revert upgrade and record exact API/feature blocker. | Planned |
+| B3 | Git fallback audit | Classify `git_push`, `git_pull`, `git_checkout`, add/commit, and future stash/reset/merge/rebase against `gix 0.85.0`. | B2 | GIT-001 matrix updated with keep/replace/defer decisions and tests. | Keep host fallback with replacement trigger. | Planned |
+| B4 | Activate I095 | Start runtime validation evidence iteration. | B3 | I094 closed or paused with exact residuals. | Keep I095 Planned. | Planned |
+| B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Planned |
+| B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Planned |
+| B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | Planned |
+| B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Planned |
+| B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | Planned |
+| B10 | Final closeout | Residual owners, release posture, Board, backlog, iterations, and handoff synchronized. | B9 | Full workspace gates, governance validation, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
+
+## Dependencies And Prerequisites
+
+- I090-I093 are complete and must not be reopened for changed objectives.
+- I085 remains Paused with MC107 real-terminal `/connect` walkthrough residual.
+- I086-I089 remain planned product-hardening shells and are not superseded by this direct-owner set.
+- ADR-010 remains binding for Git dependency choices.
+- REL-002 remains No-go for `v1.0.0`.
+
+## Artifacts And State Owners To Update
+
+- This task record.
+- Iteration shells: I094-I097.
+- `docs/iterations/README.md`.
+- `docs/backlog/active/GIT-001-embedded-git-tools.md`.
+- `docs/backlog/active/RUNTIME-001-embeddable-agent-runtime-api.md`.
+- `docs/backlog/active/GOV-003-builtin-project-governance.md`.
+- `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`.
+- `docs/BOARD.md`.
+- `docs/backlog/PRODUCT-BACKLOG.md`.
+- ADRs only if dependency, permission, Git publication, or governance semantics change.
+
+## Validation And Acceptance Evidence
+
+Every implementation phase must run:
+
+```sh
+cargo fmt --all -- --check
+cargo check --workspace
+cargo clippy --workspace -- -D warnings
+cargo test --workspace
+scripts/validate_project_governance.sh .
+git diff --check
+```
+
+I094 must additionally record:
+
+- current `gix` lockfile version and target version;
+- feature flags before/after;
+- cargo tree impact;
+- Git tool targeted tests;
+- host-`git` unavailable or retained-fallback behavior;
+- operation-by-operation keep/replace/defer decisions.
+
+Planning-only phase gates may use:
+
+```sh
+scripts/validate_project_governance.sh .
+git diff --check
+```
+
+## Branch, Worktree And Checkpoint Plan
+
+- Work in the current worktree unless the maintainer explicitly requests a branch.
+- Use one logical commit per completed phase if commits are requested.
+- Do not push unless the maintainer explicitly asks at that time.
+- Append a checkpoint before moving between B3/B4, B5/B6, B7/B8, and B10.
+
+## Allowed Permissions And External Actions
+
+Allowed by this contract:
+
+- Edit repository files in the workspace.
+- Run local build, lint, tests, governance checks, and targeted runtime smoke tests.
+- Use network only to inspect public crate metadata for `gix` when needed for the upgrade audit.
+
+Not allowed without separate explicit approval:
+
+- Push commits, tags, or release artifacts.
+- Publish crates or GitHub Releases.
+- Add major runtime/native dependencies.
+- Use credentials, paid services, destructive Git operations, remote plugin install, or marketplace
+  behavior.
+
+## Destructive Or Irreversible Operations
+
+No destructive or irreversible production operation is authorized. Destructive behavior is limited
+to temporary test fixtures and must be covered by tests.
+
+## Time, Cost And Resource Limits
+
+- Timebox: four planned high-risk iterations.
+- Monetary spend: zero.
+- Network: public crate/source metadata only, no credentials.
+- Retry deterministic failures at most twice after concrete fixes before recording a blocker.
+
+## Failure, Retry And Fallback Policy
+
+- If `gix 0.85.0` breaks current Git tools, either fix within I094 scope or revert the upgrade and
+  record the blocker.
+- If a host-`git` fallback replacement cannot prove equivalent behavior, keep fallback and record
+  the replacement trigger.
+- If validation execution cannot be permission-bounded, keep the runtime validation packet design
+  only.
+- If governance mutation cannot avoid silent drift, keep GOV-003 read-only.
+- If Codex remains primary executor for B9, record non-qualifying REL-002 evidence.
+
+## Default Decisions For Foreseeable Ambiguity
+
+- Prefer dependency upgrade without feature expansion.
+- Prefer host fallback retention over unsafe or under-tested `gix` workflow replacement.
+- Prefer read-only/preview flows before write-capable behavior.
+- Prefer explicit No-go release posture over optimistic self-bootstrap claims.
+
+## Residual-Work Destination
+
+- Git dependency/fallbacks: GIT-001 and ADR-010.
+- Runtime validation evidence: RUNTIME-001.
+- Governance mutation/gates: GOV-003.
+- Self-bootstrap/release gate: REL-002.
+- Residual architecture roots: ARCH-030.
+
+## Checkpoints
+
+### B0 — Planned Execution Set Drafted (2026-07-04)
+
+Completed task items:
+
+- Drafted the high-risk execution set.
+- Included the `gix` upgrade in I094.
+- Preserved I090-I093 as complete and REL-002 as No-go.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read this file, GIT-001, ADR-010, Board, and I094 before activating any work.

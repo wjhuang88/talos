@@ -9,7 +9,9 @@ through structured tool calls.
 
 ## Status
 
-P0-P2 complete in I026. P3 advanced operations remain planned.
+P0-P2 complete in I026. P3 advanced operations remain planned. `gix` capability tracking is a
+standing requirement for this story because host-`git` fallbacks are accepted only as documented
+bridges, not as the desired end state.
 
 ## Priority
 
@@ -248,6 +250,55 @@ to `gix` implementations. Track gix releases for:
 - Checkout/switch orchestration
 - Stash support
 
+### Standing gix Tracking Requirement
+
+Track `gix` continuously until every host-`git` fallback has an explicit keep/replace decision.
+This is not an implementation authorization by itself; each replacement still needs a scoped
+iteration with permission and behavior regressions.
+
+Update this owner doc when any of these triggers occur:
+
+- A `gix` or gitoxide release changes push, checkout/switch, stash, reset, merge/rebase, index,
+  commit, config-write, hook, or network support.
+- A Talos Git tool feature touches `git_push`, `git_pull`, `git_checkout`, `git_add`,
+  `git_commit`, stash, reset, merge, rebase, tags, or remotes.
+- A release-readiness or self-bootstrap packet depends on Git publication behavior.
+- A host-`git` fallback fails on a supported environment or becomes a portability blocker.
+
+Each tracking update must record:
+
+- `gix` version inspected and source of the capability claim.
+- Feature flags needed and whether they add network, native, unsafe, or large dependency surface.
+- Operation-by-operation decision: keep host fallback, replace with `gix`, defer, or reject.
+- Permission classification impact for read/write/execute paths.
+- Tests required before replacement, including unavailable-host behavior for any retained fallback.
+
+Current tracking baseline:
+
+| Operation family | Current Talos posture | Tracking decision |
+|---|---|---|
+| Read-only local status/diff/log/show/branches | Native `gix` direction is accepted and implemented for common reads. | Keep watching for API/output improvements, but no urgent migration gap. |
+| Add/commit | Structured tool surface exists; native `gix` write orchestration remains under evaluation. | Re-evaluate on next Git write-tool work. |
+| Push/pull | Host `git` fallback. | High-priority tracking item because REL-002 publication workflows depend on this boundary. |
+| Checkout/switch | Host `git` fallback. | Track porcelain/worktree orchestration maturity before replacing. |
+| Stash/reset/merge/rebase/tags/remotes | Future scope. | Do not implement without fresh `gix` coverage review and destructive-operation tests. |
+
+Tracking update (2026-07-04):
+
+| Item | Observation | Decision |
+|---|---|---|
+| Current Talos dependency | `Cargo.lock` pins `gix 0.84.0`; `crates/talos-tools` requests `gix = "0.84"` with `default-features = false` and features `basic`, `status`, `revision`, `blob-diff`, `index`, and `sha1`. | Keep current dependency unchanged in this tracking-only update. |
+| Latest available release | `cargo info gix` and docs.rs report latest `gix 0.85.0`, license `MIT OR Apache-2.0`, Rust version `1.85`. | No immediate upgrade without a scoped dependency/update PR and regression run. |
+| Feature surface | `gix 0.85.0` keeps network features separate (`async-network-client`, `blocking-network-client`, HTTP transport features) and keeps `worktree-mutation` as an explicit feature. | Do not enable network or worktree mutation features by default. Any future enablement needs permission and dependency-surface review. |
+| Push | `gix 0.85.0` has a `push` module, but local source inspection shows it exposes `push.default` configuration values rather than a complete push workflow for Talos's `git_push` contract. | Keep `git_push` on structured host-`git` fallback. Revisit only when `gix` exposes a tested push workflow. |
+| Checkout/switch | `gix 0.85.0` exposes low-level checkout options and worktree-state plumbing behind `worktree-mutation`, but not a Talos-ready branch switch/restore workflow. | Keep `git_checkout` on structured host-`git` fallback. Replacement requires branch switch, dirty-worktree, conflict, and permission regressions. |
+| Pull/fetch/update | `gix` continues to expose fetch/remote plumbing, but Talos's `git_pull` contract includes worktree update/merge-conflict behavior. | Keep `git_pull` on structured host-`git` fallback until fetch + update/merge workflow is mapped and tested. |
+| Stash/reset/merge/rebase | No new evidence in this pass that these are ready for Talos P3 user-facing tools. | Keep future scope; require a fresh coverage review before implementation. |
+
+Sources inspected: `cargo info gix`, docs.rs `gix 0.85.0`, local registry source
+`gix-0.85.0/Cargo.toml`, `src/push.rs`, `src/repository/checkout.rs`,
+`src/repository/remote.rs`, and `src/worktree/mod.rs`.
+
 ## Permission Model
 
 | Tool | Nature | Default Permission | Rationale |
@@ -318,6 +369,7 @@ All tools will use the `ToolNature` attribute (from I025 S5) for permission clas
 - `docs/backlog/active/TOOL-003-posix-tool-set.md` (tool registration pattern)
 - `crates/talos-tools/src/lib.rs` (AgentTool trait, ToolNature)
 - `crates/talos-permission/src/lib.rs` (permission engine)
+- `crates/talos-tools/src/git.rs` (current gix/host fallback boundary)
 
 ## Open Questions
 
