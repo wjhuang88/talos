@@ -1,6 +1,6 @@
 # Iteration I094: gix Upgrade And Git Boundary
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: upgrade `gix` safely and audit Git host-fallback boundaries without expanding
 > permission or publication authority.
@@ -70,3 +70,4 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated by the direct-owner high-risk execution set. Non-terminal inventory disposition: I085 remains Paused with MC107 real-terminal `/connect` walkthrough residual; I086-I089 remain planned product-hardening shells; I095-I097 remain planned and depend on I094/I095/I096 completion or explicit pause; I090-I093 remain Complete and are not reopened. I094 starts with dependency upgrade/fallback audit only: no permission-default change, destructive Git operation, publish, tag, or release action is authorized. |

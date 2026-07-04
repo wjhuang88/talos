@@ -130,7 +130,7 @@ docs/iterations/
 | I091 | Plugin, Hook, And Distribution Boundary | **Complete (2026-07-04)** | Month 2 of the direct senior-agent high-risk execution track. `/hooks` diagnostics, hook manifest declaration validation, and optional runtime asset distribution policy are complete; no remote install, marketplace, write-capable plugin tools, or auto-discovery. See `I091-plugin-hook-distribution-boundary.md`. |
 | I092 | Context Compression And Autonomy Gates | **Complete (2026-07-04)** | Month 3 of the direct senior-agent high-risk execution track. Bash-only cache-safe compression proof and deny/ask/allow autonomy matrix closed without runtime autonomy expansion. See `I092-context-compression-autonomy-gates.md`. |
 | I093 | Self-Bootstrap, Runtime, And Release Gate | **Complete (2026-07-04)** | Month 4 of the direct senior-agent high-risk execution track. REL-002 readiness was audited and non-qualification evidence recorded; `v1.0.0` remains No-go. See `I093-self-bootstrap-runtime-release-gate.md` and `../reference/I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md`. |
-| I094 | gix Upgrade And Git Boundary | **Planned (2026-07-04)** | Next direct-owner high-risk set. Attempt `gix 0.84.0 -> 0.85.0`, audit host-`git` fallbacks, and preserve ADR-010 permission/dependency boundaries. See `I094-gix-upgrade-git-boundary.md` and `../tasks/2026-07-04-high-risk-execution-gix-runtime-governance-plan.md`. |
+| I094 | gix Upgrade And Git Boundary | **Active (2026-07-04)** | Next direct-owner high-risk set. Attempt `gix 0.84.0 -> 0.85.0`, audit host-`git` fallbacks, and preserve ADR-010 permission/dependency boundaries. See `I094-gix-upgrade-git-boundary.md` and `../tasks/2026-07-04-high-risk-execution-gix-runtime-governance-plan.md`. |
 | I095 | Runtime Validation Evidence | **Planned (2026-07-04)** | Add or specify durable validation execution evidence needed for Talos-primary development. See `I095-runtime-validation-evidence.md`. |
 | I096 | Governance Mutation Gates | **Planned (2026-07-04)** | Define the smallest safe governance preview/write gate before Talos can self-bootstrap owner-doc updates. See `I096-governance-mutation-gates.md`. |
 | I097 | Controlled Self-Bootstrap Rehearsal | **Planned (2026-07-04)** | Attempt one controlled Talos-primary documentation-only rehearsal or record non-qualification honestly. See `I097-controlled-self-bootstrap-rehearsal.md`. |
@@ -180,7 +180,7 @@ rewrite published iteration baselines.
 | I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
 | I092 | Complete | Closed 2026-07-04 with bash-only cache-stability/export evidence and autonomy permission matrix. |
 | I093 | Complete | Closed 2026-07-04 with readiness/reporting only, non-qualifying REL-002 evidence, and no v1.0 claim, tag, publish, or release action. |
-| I094 | Planned | New direct-owner high-risk set; activate only after explicit start and non-terminal inventory disposition. |
+| I094 | Active | Activated 2026-07-04 with dependency upgrade/fallback audit only; no permission-default change, destructive Git operation, publish, tag, release, or v1.0 claim. |
 | I095 | Planned | Depends on I094 completion or explicit pause. |
 | I096 | Planned | Depends on I095 completion or explicit pause. |
 | I097 | Planned | Depends on I096 completion or explicit pause. |

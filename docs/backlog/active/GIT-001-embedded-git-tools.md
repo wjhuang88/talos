@@ -9,9 +9,13 @@ through structured tool calls.
 
 ## Status
 
-P0-P2 complete in I026. P3 advanced operations remain planned. `gix` capability tracking is a
-standing requirement for this story because host-`git` fallbacks are accepted only as documented
-bridges, not as the desired end state.
+P0-P2 complete in I026. P3 advanced operations remain planned. Selected for I094 dependency
+upgrade/fallback audit. `gix` capability tracking is a standing requirement for this story because
+host-`git` fallbacks are accepted only as documented bridges, not as the desired end state.
+
+I094 activation note (2026-07-04): selected for `gix 0.84.0 -> 0.85.0` upgrade attempt and
+operation-by-operation host fallback audit. No Git permission-default change, destructive Git
+operation, tag, publish, release, or issue-sync behavior is authorized by activation.
 
 ## Priority
 

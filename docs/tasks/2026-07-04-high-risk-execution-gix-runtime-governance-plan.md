@@ -1,6 +1,6 @@
 # 2026-07-04 High-Risk Execution Set: gix, Runtime, Governance, Self-Bootstrap
 
-> Status: Planned
+> Status: In Progress
 > Created: 2026-07-04
 > Owner boundary: direct senior-agent execution required
 > Trigger: maintainer requested another high-risk execution task set and explicitly asked to include
@@ -44,8 +44,8 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | B0 | Establish execution set | This task record, I094-I097 planned shells, Board, backlog, and iteration index name the new track. | Maintainer request | Governance validation and `git diff --check` pass. | Keep task in Planned with exact blocker. | Planned |
-| B1 | Activate I094 | Start the `gix` upgrade / Git fallback boundary iteration. | B0 | Non-terminal inventory disposition recorded; I094 Active. | Keep I094 Planned if another iteration blocks activation. | Planned |
-| B2 | Upgrade `gix` safely | Attempt `gix 0.84.0 -> 0.85.0` with no feature expansion beyond accepted scope. | B1 | `cargo update -p gix`, tool tests, workspace check/clippy/test, unavailable-host fallback tests. | Revert upgrade and record exact API/feature blocker. | Planned |
+| B1 | Activate I094 | Start the `gix` upgrade / Git fallback boundary iteration. | B0 | Non-terminal inventory disposition recorded; I094 Active. | Keep I094 Planned if another iteration blocks activation. | Complete |
+| B2 | Upgrade `gix` safely | Attempt `gix 0.84.0 -> 0.85.0` with no feature expansion beyond accepted scope. | B1 | `cargo update -p gix`, tool tests, workspace check/clippy/test, unavailable-host fallback tests. | Revert upgrade and record exact API/feature blocker. | In Progress |
 | B3 | Git fallback audit | Classify `git_push`, `git_pull`, `git_checkout`, add/commit, and future stash/reset/merge/rebase against `gix 0.85.0`. | B2 | GIT-001 matrix updated with keep/replace/defer decisions and tests. | Keep host fallback with replacement trigger. | Planned |
 | B4 | Activate I095 | Start runtime validation evidence iteration. | B3 | I094 closed or paused with exact residuals. | Keep I095 Planned. | Planned |
 | B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Planned |
@@ -185,3 +185,36 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read this file, GIT-001, ADR-010, Board, and I094 before activating any work.
+
+### B1 — I094 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I094 after B0 was committed and pushed.
+- Recorded non-terminal inventory disposition:
+  - I085 remains Paused with MC107 real-terminal `/connect` walkthrough residual.
+  - I086-I089 remain planned product-hardening shells.
+  - I095-I097 remain planned and depend on I094/I095/I096 completion or explicit pause.
+  - I090-I093 remain Complete and are not reopened.
+- Synchronized I094, Board, iteration index, Product Backlog, and this task.
+
+Current state and artifacts:
+
+- I094 is Active.
+- GIT-001 remains P0-P2 complete, P3 planned, and selected for the I094 `gix` upgrade/fallback
+  audit.
+- No dependency update has been applied yet in B1.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- B2: attempt `gix 0.84.0 -> 0.85.0` safely and run targeted Git validation.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I094, GIT-001, ADR-010, and this B1 checkpoint.
