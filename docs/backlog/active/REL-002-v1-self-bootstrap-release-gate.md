@@ -53,6 +53,11 @@ records the controlled rehearsal as non-qualifying. Talos executed allowlisted g
 validation and wrote one bounded owner-doc execution row, but Codex remained primary for planning,
 evidence interpretation, docs editing, broader validation orchestration, commit, and push.
 
+I094-I097 closeout (2026-07-04): the direct high-risk execution set is complete and
+`docs/reference/I094-I097-HIGH-RISK-GIX-RUNTIME-GOVERNANCE-CLOSEOUT-2026-07-04.md` preserves the
+No-go release posture. No `v1.0.0` claim, tag, publish, release, or permission-default change
+occurred.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent
