@@ -25,7 +25,7 @@ grep-regex = "0.1"
 grep-matcher = "0.1"
 ignore = "0.4"
 similar = "3"
-gix = { version = "0.84", default-features = false, features = [
+gix = { version = "0.85", default-features = false, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"
 ] }
 arborium = { version = "2.18", default-features = false, features = [

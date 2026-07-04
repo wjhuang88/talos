@@ -45,8 +45,8 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 |---|---|---|---|---|---|---|
 | B0 | Establish execution set | This task record, I094-I097 planned shells, Board, backlog, and iteration index name the new track. | Maintainer request | Governance validation and `git diff --check` pass. | Keep task in Planned with exact blocker. | Planned |
 | B1 | Activate I094 | Start the `gix` upgrade / Git fallback boundary iteration. | B0 | Non-terminal inventory disposition recorded; I094 Active. | Keep I094 Planned if another iteration blocks activation. | Complete |
-| B2 | Upgrade `gix` safely | Attempt `gix 0.84.0 -> 0.85.0` with no feature expansion beyond accepted scope. | B1 | `cargo update -p gix`, tool tests, workspace check/clippy/test, unavailable-host fallback tests. | Revert upgrade and record exact API/feature blocker. | In Progress |
-| B3 | Git fallback audit | Classify `git_push`, `git_pull`, `git_checkout`, add/commit, and future stash/reset/merge/rebase against `gix 0.85.0`. | B2 | GIT-001 matrix updated with keep/replace/defer decisions and tests. | Keep host fallback with replacement trigger. | Planned |
+| B2 | Upgrade `gix` safely | Attempt `gix 0.84.0 -> 0.85.0` with no feature expansion beyond accepted scope. | B1 | `cargo update -p gix`, tool tests, workspace check/clippy/test, unavailable-host fallback tests. | Revert upgrade and record exact API/feature blocker. | Complete |
+| B3 | Git fallback audit | Classify `git_push`, `git_pull`, `git_checkout`, add/commit, and future stash/reset/merge/rebase against `gix 0.85.0`. | B2 | GIT-001 matrix updated with keep/replace/defer decisions and tests. | Keep host fallback with replacement trigger. | Complete |
 | B4 | Activate I095 | Start runtime validation evidence iteration. | B3 | I094 closed or paused with exact residuals. | Keep I095 Planned. | Planned |
 | B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Planned |
 | B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Planned |
@@ -218,3 +218,49 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I094, GIT-001, ADR-010, and this B1 checkpoint.
+
+### B2/B3 — gix 0.85 Upgrade And Fallback Audit Closed (2026-07-04)
+
+Completed task items:
+
+- Upgraded `crates/talos-tools` from `gix = "0.84"` to `gix = "0.85"` with the same explicit
+  feature list: `basic`, `status`, `revision`, `blob-diff`, `index`, and `sha1`.
+- Confirmed `Cargo.lock` resolves `gix 0.85.0`.
+- Added a host-`git` unavailable regression for retained fallbacks so missing host `git` returns
+  the existing actionable error instead of an ambiguous spawn failure.
+- Updated GIT-001 with the operation-by-operation fallback decision matrix for `gix 0.85.0`.
+- Closed I094 without permission-default changes, destructive Git operations, push/tag/release
+  actions, native Git dependencies, or `gix` network/worktree-mutation feature expansion.
+
+Fallback decisions recorded in GIT-001:
+
+- Read-only local status/diff/log/show/branches: keep native `gix` direction.
+- Add/commit: keep structured host-`git` fallback while native write orchestration remains under
+  evaluation.
+- Push/pull/checkout: keep structured host-`git` fallback; `gix 0.85.0` does not yet provide a
+  Talos-ready complete workflow for these contracts.
+- Stash/reset/merge/rebase/tags/remotes: defer; require fresh coverage review and destructive
+  operation tests before implementation.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check -p talos-tools`: passed.
+- `cargo test -p talos-tools git`: passed.
+- `cargo test -p talos-tools`: passed, 226 unit tests plus 18 integration tests and doctests.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `cargo tree --invert gix@0.85.0 -e features`: passed; no Talos feature expansion beyond the
+  existing accepted feature set.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- B4: activate I095 Runtime Validation Evidence.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I095, RUNTIME-001, this task, and the I094 closeout before starting B4.

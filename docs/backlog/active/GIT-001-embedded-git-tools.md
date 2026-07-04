@@ -9,13 +9,19 @@ through structured tool calls.
 
 ## Status
 
-P0-P2 complete in I026. P3 advanced operations remain planned. Selected for I094 dependency
-upgrade/fallback audit. `gix` capability tracking is a standing requirement for this story because
-host-`git` fallbacks are accepted only as documented bridges, not as the desired end state.
+P0-P2 complete in I026. P3 advanced operations remain planned. I094 completed the `gix 0.85.0`
+dependency upgrade and fallback audit. `gix` capability tracking is a standing requirement for this
+story because host-`git` fallbacks are accepted only as documented bridges, not as the desired end
+state.
 
 I094 activation note (2026-07-04): selected for `gix 0.84.0 -> 0.85.0` upgrade attempt and
 operation-by-operation host fallback audit. No Git permission-default change, destructive Git
 operation, tag, publish, release, or issue-sync behavior is authorized by activation.
+
+I094 closeout note (2026-07-04): `talos-tools` now requests `gix = "0.85"` and `Cargo.lock`
+resolves `gix 0.85.0`. The explicit feature list remains `basic`, `status`, `revision`,
+`blob-diff`, `index`, and `sha1`; no network, worktree-mutation, native Git, destructive Git,
+permission-default, tag, publish, release, or issue-sync behavior was added.
 
 ## Priority
 
@@ -184,7 +190,7 @@ Pull from remote.
 
 ## Implementation Strategy
 
-### gix API Coverage (v0.84.0, verified 2026-06-17)
+### gix API Coverage (v0.85.0, verified 2026-07-04)
 
 Based on the gitoxide crate-status survey:
 
@@ -217,8 +223,8 @@ Based on the gitoxide crate-status survey:
 Use `gix` with minimal features for all read-only operations. No host `git` dependency.
 
 ```toml
-gix = { version = "0.84", default-features = false, features = [
-    "status", "revision", "blob-diff", "sha1", "index", "blame"
+gix = { version = "0.85", default-features = false, features = [
+    "basic", "status", "revision", "blob-diff", "index", "sha1"
 ] }
 ```
 
@@ -287,17 +293,34 @@ Current tracking baseline:
 | Checkout/switch | Host `git` fallback. | Track porcelain/worktree orchestration maturity before replacing. |
 | Stash/reset/merge/rebase/tags/remotes | Future scope. | Do not implement without fresh `gix` coverage review and destructive-operation tests. |
 
-Tracking update (2026-07-04):
+Tracking update (2026-07-04, I094 closeout):
 
 | Item | Observation | Decision |
 |---|---|---|
-| Current Talos dependency | `Cargo.lock` pins `gix 0.84.0`; `crates/talos-tools` requests `gix = "0.84"` with `default-features = false` and features `basic`, `status`, `revision`, `blob-diff`, `index`, and `sha1`. | Keep current dependency unchanged in this tracking-only update. |
-| Latest available release | `cargo info gix` and docs.rs report latest `gix 0.85.0`, license `MIT OR Apache-2.0`, Rust version `1.85`. | No immediate upgrade without a scoped dependency/update PR and regression run. |
-| Feature surface | `gix 0.85.0` keeps network features separate (`async-network-client`, `blocking-network-client`, HTTP transport features) and keeps `worktree-mutation` as an explicit feature. | Do not enable network or worktree mutation features by default. Any future enablement needs permission and dependency-surface review. |
+| Current Talos dependency | `Cargo.lock` resolves `gix 0.85.0`; `crates/talos-tools` requests `gix = "0.85"` with `default-features = false` and features `basic`, `status`, `revision`, `blob-diff`, `index`, and `sha1`. | Upgrade landed in I094 with no feature expansion. |
+| Latest available release | `cargo info gix` and docs.rs reported `gix 0.85.0`, license `MIT OR Apache-2.0`, Rust version `1.85`, during the I094 audit. | Keep 0.85 line; continue standing tracking for future releases. |
+| Feature surface | `gix 0.85.0` keeps network features separate (`async-network-client`, `blocking-network-client`, HTTP transport features) and keeps `worktree-mutation` as an explicit feature. `cargo tree --invert gix@0.85.0 -e features` showed Talos still uses only the accepted local feature surface plus transitive features required by those selected features. | Do not enable network or worktree mutation features by default. Any future enablement needs permission and dependency-surface review. |
 | Push | `gix 0.85.0` has a `push` module, but local source inspection shows it exposes `push.default` configuration values rather than a complete push workflow for Talos's `git_push` contract. | Keep `git_push` on structured host-`git` fallback. Revisit only when `gix` exposes a tested push workflow. |
 | Checkout/switch | `gix 0.85.0` exposes low-level checkout options and worktree-state plumbing behind `worktree-mutation`, but not a Talos-ready branch switch/restore workflow. | Keep `git_checkout` on structured host-`git` fallback. Replacement requires branch switch, dirty-worktree, conflict, and permission regressions. |
 | Pull/fetch/update | `gix` continues to expose fetch/remote plumbing, but Talos's `git_pull` contract includes worktree update/merge-conflict behavior. | Keep `git_pull` on structured host-`git` fallback until fetch + update/merge workflow is mapped and tested. |
+| Add/commit | The Talos surface remains permission-gated and shell-free, but the current implementation uses the structured host-`git` adapter. | Keep host fallback in I094. Native `gix` write orchestration replacement needs a separate behavior-equivalence slice. |
 | Stash/reset/merge/rebase | No new evidence in this pass that these are ready for Talos P3 user-facing tools. | Keep future scope; require a fresh coverage review before implementation. |
+
+I094 validation evidence:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check -p talos-tools`: passed.
+- `cargo test -p talos-tools git`: passed.
+- `cargo test -p talos-tools`: passed, 226 unit tests plus 18 integration tests and doctests.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `cargo tree --invert gix@0.85.0 -e features`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+New regression: retained host-`git` fallbacks now have a unit test proving that an unavailable
+host `git` executable returns `git not installed. Install git or use read-only tools.`
 
 Sources inspected: `cargo info gix`, docs.rs `gix 0.85.0`, local registry source
 `gix-0.85.0/Cargo.toml`, `src/push.rs`, `src/repository/checkout.rs`,

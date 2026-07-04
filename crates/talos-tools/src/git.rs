@@ -1,8 +1,8 @@
 //! Built-in Git tools using the gix crate (pure Rust Git implementation).
 //!
 //! Read-only tools are implemented natively via gix.
-//! Write tools use gix where possible (add, commit) and host git fallback
-//! for operations gix doesn't support (push, pull, checkout).
+//! Write tools use a structured host git fallback while native gix write
+//! orchestration remains under evaluation.
 
 use std::path::PathBuf;
 
@@ -539,8 +539,12 @@ async fn get_workdir(workspace_root: &std::path::Path) -> Result<PathBuf, GitToo
         .unwrap_or_else(|| workspace_root.to_path_buf()))
 }
 
-async fn run_host_git(workdir: &std::path::Path, args: &[&str]) -> Result<String, GitToolError> {
-    let output = tokio::process::Command::new("git")
+async fn run_host_git_with_program(
+    program: &str,
+    workdir: &std::path::Path,
+    args: &[&str],
+) -> Result<String, GitToolError> {
+    let output = tokio::process::Command::new(program)
         .args(args)
         .current_dir(workdir)
         .output()
@@ -566,6 +570,10 @@ async fn run_host_git(workdir: &std::path::Path, args: &[&str]) -> Result<String
     }
 
     Ok(stdout)
+}
+
+async fn run_host_git(workdir: &std::path::Path, args: &[&str]) -> Result<String, GitToolError> {
+    run_host_git_with_program("git", workdir, args).await
 }
 
 // ─── git_add ───
@@ -1001,5 +1009,22 @@ mod tests {
         assert_eq!(profile[2].nature, ToolNature::Write);
         assert_eq!(profile[2].resource.as_deref(), Some("/workspace"));
         assert_eq!(profile[2].resource_kind, Some(ToolResourceKind::Path));
+    }
+
+    #[tokio::test]
+    async fn host_git_unavailable_returns_actionable_error() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let err = run_host_git_with_program(
+            "talos-host-git-that-should-not-exist",
+            tempdir.path(),
+            &["status"],
+        )
+        .await
+        .expect_err("missing git executable should fail");
+
+        assert_eq!(
+            err.to_string(),
+            "git error: git not installed. Install git or use read-only tools."
+        );
     }
 }
