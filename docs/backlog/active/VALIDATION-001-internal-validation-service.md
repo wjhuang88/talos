@@ -20,6 +20,8 @@ That is not the right long-term boundary for Talos as a general-purpose agent ru
   agent loops without shelling out to project scripts.
 - Cargo is only the validation tool for this repository. Talos must not bake in a Rust-only agent
   model.
+- Talos should be able to infer common project types, then inject host-tool adapter instructions
+  only when that project type has been identified.
 - Host-tool validation may still exist, but it must be an adapter with explicit dependency,
   language, permission, and evidence metadata.
 
@@ -43,6 +45,10 @@ scripts are adapters, not the core abstraction.
 - Keep `talos validate plan/run` as CLI frontends over the internal service.
 - Add a TUI-safe read-only or confirm-gated path for internal validation evidence.
 - Preserve host-tool checks as explicit adapters, not hidden runtime assumptions.
+- Add common project-type detection so validation can identify Rust, Node.js, Python, Go, Java, or
+  mixed workspaces from project manifests before selecting host-tool adapters.
+- Add demand-driven host-tool adapter instruction injection: adapter usage guidance is loaded only
+  after a matching project type is confirmed, and remains absent for unrelated ecosystems.
 - Make profiles project-configurable over time without allowing arbitrary command execution.
 
 ## Non-Goals
@@ -62,6 +68,8 @@ scripts are adapters, not the core abstraction.
 - [ ] TUI can call at least one internal validation profile without spawning host commands.
 - [ ] Evidence records distinguish `internal` checks from `host_tool` checks.
 - [ ] Host-tool adapters record language/ecosystem metadata and unavailable-tool behavior.
+- [ ] Common project types can be inferred from manifests before host-tool adapters are selected.
+- [ ] Host-tool adapter usage instructions are injected on demand only for confirmed project types.
 - [ ] Cargo is represented only as a Rust-project adapter for this repository, not as a Talos-wide
       assumption.
 - [ ] Documentation clearly explains the boundary between internal validation and host-tool
@@ -76,6 +84,12 @@ Validation profiles should be composed from typed checks:
 | `internal` | In-process Talos logic with no host command execution. | governance manifest validation, board/iteration consistency, config schema validation |
 | `host_tool` | Explicit adapter to a project toolchain. | Cargo, npm, pytest, make, project script |
 | `external_service` | Future adapter requiring network or credentials. | CI status, remote policy service |
+
+Project-type detection should be a separate discovery step before adapter selection. For example,
+`Cargo.toml` may enable Rust/Cargo guidance, `package.json` may enable Node.js guidance, and
+`pyproject.toml` may enable Python guidance. Mixed workspaces can expose multiple adapters, but the
+validation service should not inject Cargo, npm, pytest, or similar instructions until the matching
+project type is discovered.
 
 The first implementation should prioritize internal governance validation because it already exists
 as Rust logic through `talos-conversation` governance summary/validation code. `scripts/*.sh` can
@@ -93,6 +107,8 @@ implementation should not be treated as the final TUI/runtime boundary.
 - CLI tests proving `talos validate run --profile governance` uses the internal service.
 - TUI/conversation tests proving the TUI path does not spawn host commands for internal profiles.
 - Adapter tests for host-tool unavailable behavior.
+- Project-type detection tests covering Rust, Node.js, Python, and mixed workspaces.
+- Instruction-injection tests proving unrelated host-tool adapter guidance is not loaded.
 - Governance validation and `git diff --check`.
 
 ## Required Reads
