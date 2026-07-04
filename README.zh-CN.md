@@ -247,6 +247,32 @@ talos validate run --profile workspace
 验证执行只接受内置 profile。每条证据记录包含命令、退出状态、stdout/stderr 摘要，以及
 allowlisted profile 权限决策；它不接受任意命令，不会编辑仓库文件、push、publish 或打 tag。
 
+### 治理变更预览
+
+在写入前预览一个受限的治理 owner doc 更新：
+
+```bash
+talos governance iteration-record preview \
+  --iteration I096 \
+  --date 2026-07-04 \
+  --record-type validation \
+  --record "Recorded validation evidence."
+```
+
+确认预览后才应用同一变更：
+
+```bash
+talos governance iteration-record write \
+  --iteration I096 \
+  --date 2026-07-04 \
+  --record-type validation \
+  --record "Recorded validation evidence." \
+  --confirm-preview
+```
+
+写入路径刻意保持很窄：它只会向选定 iteration owner doc 追加一行，并在写入后运行治理校验；
+如果校验失败，会回滚文件。
+
 ### 管理本地存储
 
 查看本地存储用量（只读）：

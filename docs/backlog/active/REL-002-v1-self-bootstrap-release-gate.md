@@ -39,6 +39,11 @@ records command, exit status, stdout/stderr summaries, and the allowlisted-profi
 decision. This closes the validation-evidence mechanism gap, but REL-002 remains No-go until
 Talos-primary sessions use it while Codex is not the primary executor.
 
+I096 result (2026-07-04): `talos governance iteration-record preview/write` now provides a narrow
+owner-doc mutation gate with explicit preview, `--confirm-preview`, post-write governance
+validation, and rollback on validation failure. This narrows owner-doc sync risk, but the I096
+implementation remains Codex-primary and is not a qualifying self-bootstrap session.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent
@@ -108,6 +113,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-02 | T132 | `docs/tasks/2026-07-02-self-bootstrap-rehearsal-t132-architecture-decision.md` | Does not qualify. Talos generated workspace/governance validation plans for an architecture-sensitive ADR slice, but Codex remained the primary executor and the >60% autonomous coverage target was missed. |
 | 2026-07-04 | I093-A14 | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md` | Does not qualify. Talos only proved `talos 0.2.2` CLI availability; Codex remained primary for planning, edits, validation orchestration, docs sync, commit, and push. |
 | 2026-07-04 | I095-B5 | `docs/iterations/I095-runtime-validation-evidence.md` | Does not qualify by itself. The allowlisted validation evidence mechanism exists, but this implementation and validation were Codex-primary. |
+| 2026-07-04 | I096-B7 | `docs/iterations/I096-governance-mutation-gates.md` | Does not qualify by itself. The owner-doc mutation gate exists, but this implementation and validation were Codex-primary. |
 
 ## Readiness Reports
 

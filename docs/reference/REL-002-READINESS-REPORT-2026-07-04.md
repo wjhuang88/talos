@@ -26,6 +26,7 @@ not authorize a tag, publish, GitHub Release, or `v1.0.0` claim.
 | I090-I092 direct-owner work | Improves safety prerequisites, but Codex remains the primary executor; therefore it is non-qualifying for REL-002. |
 | Previous readiness report | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` remains accurate: no qualifying Talos-primary sessions exist. |
 | I095 runtime validation evidence update | `talos validate run` now executes built-in allowlisted profiles and records command, exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. This narrows the validation evidence gap but is not Talos-primary self-bootstrap evidence by itself. |
+| I096 governance mutation gate update | `talos governance iteration-record preview/write` now provides a narrow owner-doc preview/write gate with post-write governance validation and rollback on validation failure. This narrows owner-doc sync risk, but broad governance automation remains unimplemented. |
 
 ## Acceptance Assessment
 
@@ -54,7 +55,7 @@ not authorize a tag, publish, GitHub Release, or `v1.0.0` claim.
 | Gap | Current State | Minimum Next Evidence |
 |---|---|---|
 | Read-only governance state | Shipped via CLI/TUI/dashboard status paths. | Keep; verify it reads current I090-I093 state without drift. |
-| Mutating governance actions | Not implemented. | Typed plan/preview/write flow that uses permission-gated file edits and validates owner docs after mutation. |
+| Mutating governance actions | I096 adds a narrow iteration execution-record preview/write gate with post-write governance validation and rollback. | Extend only through scoped typed actions; broad owner-doc automation remains future work. |
 | Gate enforcement | Not implemented. | Read-only violation detection first, then explicit enforcement policy; no silent blocking without user-visible reason. |
 | Risk classification | Mostly prompt/docs-driven. | Deterministic report that routes changes to ADR/security/permission/release gates before coding. |
 

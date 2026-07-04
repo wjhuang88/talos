@@ -17,6 +17,7 @@ mod colors;
 mod event_loop;
 mod exploration_cli;
 mod governance;
+mod governance_mutation;
 mod init_wizard;
 mod logging;
 mod mcp_runtime;
@@ -100,6 +101,11 @@ pub(crate) enum TalosCommand {
     Validate {
         #[command(subcommand)]
         command: validation::ValidateCommand,
+    },
+    /// Governance preview/write gates.
+    Governance {
+        #[command(subcommand)]
+        command: governance_mutation::GovernanceCommand,
     },
     /// Configuration operations.
     Config {
@@ -320,6 +326,10 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Validate { command }) = &cli.command {
         return crate::validation::run_validate_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Governance { command }) = &cli.command {
+        return crate::governance_mutation::run_governance_command(command.clone());
     }
 
     if let Some(TalosCommand::Config { command }) = &cli.command {

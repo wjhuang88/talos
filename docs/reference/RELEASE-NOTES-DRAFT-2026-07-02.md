@@ -20,6 +20,9 @@ release owner can prepare a real changelog without mining every iteration record
 - `talos validate plan` provides a read-only validation matrix for governance/workspace profiles;
   `talos validate run` now executes built-in allowlisted profiles and emits command/status/output
   evidence.
+- `talos governance iteration-record preview/write` provides a narrow owner-doc mutation gate with
+  explicit preview, `--confirm-preview`, post-write governance validation, and rollback on
+  validation failure.
 - Release/readiness work now includes publish guard checks, a publish gate packet, and explicit
   REL-002 self-bootstrap gap evidence.
 

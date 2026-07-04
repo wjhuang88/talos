@@ -261,6 +261,32 @@ Validation execution accepts only built-in profiles. Each evidence record includ
 exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. It does not
 accept arbitrary commands, edit repository files, push, publish, or tag releases.
 
+### Governance Mutation Preview
+
+Preview a bounded governance owner-doc update before writing it:
+
+```bash
+talos governance iteration-record preview \
+  --iteration I096 \
+  --date 2026-07-04 \
+  --record-type validation \
+  --record "Recorded validation evidence."
+```
+
+Apply the same mutation only after reviewing the preview:
+
+```bash
+talos governance iteration-record write \
+  --iteration I096 \
+  --date 2026-07-04 \
+  --record-type validation \
+  --record "Recorded validation evidence." \
+  --confirm-preview
+```
+
+The write path is intentionally narrow: it appends a row to the selected iteration owner doc and
+runs governance validation after the write. If validation fails, the file is rolled back.
+
 ### Manage Local Storage
 
 Check local storage usage (read-only):

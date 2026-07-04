@@ -50,7 +50,7 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 | B4 | Activate I095 | Start runtime validation evidence iteration. | B3 | I094 closed or paused with exact residuals. | Keep I095 Planned. | Complete |
 | B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Complete |
 | B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Complete |
-| B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | In Progress |
+| B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | Complete |
 | B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Planned |
 | B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | Planned |
 | B10 | Final closeout | Residual owners, release posture, Board, backlog, iterations, and handoff synchronized. | B9 | Full workspace gates, governance validation, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
@@ -367,3 +367,38 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I096, GOV-003, and this B6 checkpoint.
+
+### B7 — Governance Mutation Packet Closed (2026-07-04)
+
+Completed task items:
+
+- Added `talos governance iteration-record preview/write`.
+- Limited writes to appending one row to a single resolved `docs/iterations/I###-*.md` owner doc.
+- Required `--confirm-preview` for writes.
+- Ran governance validation after write and rolled back the file on validation failure.
+- Used the new command to write the I096 validation smoke row.
+- Updated README, README.zh-CN, GOV-003, REL-002 readiness, release-notes draft, I096, Board,
+  Product Backlog, iteration index, and this task.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-cli governance_mutation`: passed, 5 governance mutation tests.
+- `cargo check -p talos-cli`: passed.
+- `cargo clippy -p talos-cli -- -D warnings`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `cargo run -p talos-cli -- governance iteration-record preview --iteration I096 --date 2026-07-04 --record-type validation --record ...`: passed.
+- `cargo run -p talos-cli -- governance iteration-record write --iteration I096 --date 2026-07-04 --record-type validation --record ... --confirm-preview`: passed and reported `Validation: passed`.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- B8: activate I097 Controlled Self-Bootstrap Rehearsal.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I097, REL-002, this task, and the I096 closeout before starting B8.

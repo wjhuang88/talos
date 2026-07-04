@@ -18,6 +18,13 @@ I096 activation note (2026-07-04): selected for the smallest safe governance pre
 This does not authorize silent owner-doc edits, broad project-manager automation, web write routes,
 remote dashboard mutation, release claims, publish/tag actions, or permission-default changes.
 
+I096 result (2026-07-04): `talos governance iteration-record preview/write` now provides a narrow
+governance mutation gate for iteration owner docs. Preview shows the target owner doc, post-write
+validation command, and exact row. Write requires `--confirm-preview`, appends only to one resolved
+`docs/iterations/I###-*.md` execution table, runs `scripts/validate_project_governance.sh .`, and
+rolls back the file if validation fails. Broad governance automation, web writes, remote dashboard
+mutation, and release authority remain out of scope.
+
 ## Problem
 
 The `agent-project-governance` skill (wjhuang88, v2.0.0) provides structured project
