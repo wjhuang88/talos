@@ -7,10 +7,10 @@
  */
 
 :root {
-  --talos-fg: #1a1d23;
+  --talos-fg: #2e3440;
   --talos-fg-muted: #525866;
-  --talos-bg: #ffffff;
-  --talos-bg-subtle: #f5f6f8;
+  --talos-bg: #eceff4;
+  --talos-bg-subtle: #e5e9f0;
   --talos-bg-code: #f1f2f5;
   --talos-border: #d8dbe0;
   --talos-accent: #5e81ac;
@@ -18,7 +18,7 @@
   --talos-link: #5e81ac;
   --talos-shipped: #a3be8c;
   --talos-planned: #ebcb8b;
-  --talos-research: #bf616a;
+  --talos-research: #b48ead;
   --talos-danger: #a83232;
   --talos-radius: 6px;
   --talos-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
@@ -44,7 +44,7 @@
     --talos-link: #88c0d0;
     --talos-shipped: #a3be8c;
     --talos-planned: #ebcb8b;
-    --talos-research: #bf616a;
+    --talos-research: #b48ead;
     --talos-danger: #f08c8c;
     --talos-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }

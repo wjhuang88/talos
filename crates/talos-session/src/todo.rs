@@ -723,7 +723,10 @@ impl AgentTool for TodoCreateTool {
             assigned_to_turn: input.assigned_to_turn,
             tags: input.tags,
         }) {
-            Ok(item) => ToolResult::success(format_created(&item)),
+            Ok(item) => {
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&format_created(&item), &all))
+            }
             Err(err) => ToolResult::error(err.to_string()),
         }
     }
@@ -796,7 +799,10 @@ impl AgentTool for TodoUpdateStatusTool {
             Err(err) => return ToolResult::error(err),
         };
         match repo.update_status(self.session_id, id, input.status) {
-            Ok(item) => ToolResult::success(format_updated(&item)),
+            Ok(item) => {
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&format_updated(&item), &all))
+            }
             Err(err) => ToolResult::error(err.to_string()),
         }
     }
@@ -882,7 +888,10 @@ impl AgentTool for TodoUpdateTool {
             tags: input.tags,
         };
         match repo.update(self.session_id, id, update) {
-            Ok(item) => ToolResult::success(format_updated(&item)),
+            Ok(item) => {
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&format_updated(&item), &all))
+            }
             Err(err) => ToolResult::error(err.to_string()),
         }
     }
@@ -954,11 +963,13 @@ impl AgentTool for TodoDeleteTool {
         };
         match repo.delete(self.session_id, id) {
             Ok(deleted) => {
-                if deleted {
-                    ToolResult::success(format!("Deleted todo item {id}"))
+                let action = if deleted {
+                    format!("Deleted todo item {id}")
                 } else {
-                    ToolResult::success("Todo item not found (already deleted?)".to_string())
-                }
+                    "Todo item not found (already deleted?)".to_string()
+                };
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&action, &all))
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -1032,10 +1043,11 @@ impl AgentTool for TodoAddDependencyTool {
             Err(err) => return ToolResult::error(err),
         };
         match repo.add_dependency(self.session_id, ids.parent_id, ids.child_id) {
-            Ok(_dep) => ToolResult::success(format!(
-                "Added dependency: {} → {}",
-                ids.parent_id, ids.child_id
-            )),
+            Ok(_dep) => {
+                let action = format!("Added dependency: {} → {}", ids.parent_id, ids.child_id);
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&action, &all))
+            }
             Err(err) => ToolResult::error(err.to_string()),
         }
     }
@@ -1108,11 +1120,15 @@ impl AgentTool for TodoRemoveDependencyTool {
             Err(err) => return ToolResult::error(err),
         };
         match repo.remove_dependency(self.session_id, ids.parent_id, ids.child_id) {
-            Ok(removed) => ToolResult::success(if removed {
-                format!("Removed dependency: {} → {}", ids.parent_id, ids.child_id)
-            } else {
-                "Dependency edge not found (already removed?)".to_string()
-            }),
+            Ok(removed) => {
+                let action = if removed {
+                    format!("Removed dependency: {} → {}", ids.parent_id, ids.child_id)
+                } else {
+                    "Dependency edge not found (already removed?)".to_string()
+                };
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&action, &all))
+            }
             Err(err) => ToolResult::error(err.to_string()),
         }
     }
@@ -1289,6 +1305,23 @@ fn format_query_result(items: &[TodoItem]) -> String {
     for item in items {
         text.push_str(&format!("\n  {}", format_item_inline(item)));
     }
+    text
+}
+
+/// Builds a mutation result: action confirmation line + current active list.
+///
+/// Completed items are excluded so that finishing one list and starting a new
+/// one does not keep old items in the output. Use `todo_query` with
+/// `status: "completed"` to inspect finished items.
+fn format_mutation_result(action_text: &str, all_items: &[TodoItem]) -> String {
+    let mut text = String::from(action_text);
+    text.push_str("\n\n");
+    let active: Vec<TodoItem> = all_items
+        .iter()
+        .filter(|i| i.status != TodoStatus::Completed)
+        .cloned()
+        .collect();
+    text.push_str(&format_query_result(&active));
     text
 }
 

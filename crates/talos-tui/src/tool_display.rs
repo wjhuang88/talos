@@ -11,18 +11,24 @@ use crate::theme::{semantic, to_crossterm_color};
 const SUMMARIZE_OUTPUT_THRESHOLD_LINES: usize = 30;
 /// Leading lines retained when a non-summarized tool result exceeds the shared
 /// threshold and is rendered with head+tail truncation (TUI-015).
-const HEAD_LINES: usize = 10;
+const HEAD_LINES: usize = 3;
 /// Trailing lines retained when a non-summarized tool result exceeds the shared
 /// threshold and is rendered with head+tail truncation (TUI-015).
-const TAIL_LINES: usize = 10;
+const TAIL_LINES: usize = 3;
+const TOOL_CALL_ARGS_BUDGET_CHARS: usize = 180;
 
 pub(crate) fn truncate_single_line(s: &str, max: usize) -> String {
     let single = s.replace('\n', " ");
     let chars: Vec<char> = single.chars().collect();
     if chars.len() <= max {
         single
+    } else if max == 0 {
+        String::new()
     } else {
-        format!("{}…", chars[..max].iter().collect::<String>())
+        format!(
+            "{}…",
+            chars[..max.saturating_sub(1)].iter().collect::<String>()
+        )
     }
 }
 
@@ -30,6 +36,14 @@ pub(crate) fn summarize_tool_args(
     _tool_name: &str,
     args_str: &str,
     summary_fields: &[String],
+) -> String {
+    summarize_tool_args_with_budget(args_str, summary_fields, TOOL_CALL_ARGS_BUDGET_CHARS)
+}
+
+pub(crate) fn summarize_tool_args_with_budget(
+    args_str: &str,
+    summary_fields: &[String],
+    budget_chars: usize,
 ) -> String {
     let obj: serde_json::Value =
         serde_json::from_str(args_str).unwrap_or(serde_json::Value::Object(Default::default()));
@@ -51,17 +65,17 @@ pub(crate) fn summarize_tool_args(
                     serde_json::Value::Bool(b) => b.to_string(),
                     _ => val.to_string(),
                 };
-                let truncated = truncate_single_line(&display, 60);
-                format!("{field}: {truncated}")
+                format!("{field}: {display}")
             })
         })
         .collect();
 
-    if parts.is_empty() {
-        truncate_single_line(&args_str.replace('\n', " "), 120)
+    let summary = if parts.is_empty() {
+        args_str.replace('\n', " ")
     } else {
         parts.join(", ")
-    }
+    };
+    truncate_single_line(&summary, budget_chars)
 }
 
 pub(crate) fn summarize_symbol_results(content: &str, noun: &str) -> String {

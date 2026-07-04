@@ -362,20 +362,11 @@ impl BottomPanelState {
     }
 
     pub(crate) fn open_approval(tool_name: &str, arguments: &str) -> Self {
-        let args_short = if arguments.len() > 72 {
-            let mut end = 72;
-            while end > 0 && !arguments.is_char_boundary(end) {
-                end -= 1;
-            }
-            format!("{}...", &arguments[..end])
-        } else {
-            arguments.to_string()
-        };
         Self {
             is_open: true,
             kind: Some(PanelKind::Approval {
                 tool_name: tool_name.to_string(),
-                arguments: args_short,
+                arguments: arguments.to_string(),
             }),
             items: vec![
                 PanelItem {
@@ -1170,11 +1161,11 @@ mod tests {
     }
 
     #[test]
-    fn approval_truncation_handles_multibyte_utf8() {
+    fn approval_state_preserves_full_multibyte_arguments() {
         let cmd = "gh issue create --title \"feat: write 和 edit 工具应显示内容输出\" --label bug";
         let state = BottomPanelState::open_approval("bash", cmd);
         if let PanelKind::Approval { arguments, .. } = state.kind.as_ref().unwrap() {
-            assert!(arguments.ends_with("..."));
+            assert_eq!(arguments, cmd);
         }
     }
 

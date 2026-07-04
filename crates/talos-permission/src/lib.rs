@@ -418,6 +418,26 @@ impl PermissionEngine {
         self.rules.push(rule);
     }
 
+    /// Adds a runtime "always allow" rule ahead of the default catch-all ask.
+    ///
+    /// This is used for user-approved session rules. It preserves existing
+    /// deny rules and other custom policy rules that appear before the default
+    /// catch-all ask rule for the same nature, while ensuring the newly approved
+    /// resource is not shadowed by the default ask rule.
+    pub fn add_runtime_allow_rule(&mut self, rule: PermissionRule) {
+        let insert_at = rule
+            .nature
+            .and_then(|nature| {
+                self.rules.iter().position(|existing| {
+                    existing.nature == Some(nature)
+                        && existing.resource.is_none()
+                        && existing.decision == PermissionDecision::Ask
+                })
+            })
+            .unwrap_or(self.rules.len());
+        self.rules.insert(insert_at, rule);
+    }
+
     /// Evaluates a tool call against the ruleset and returns a decision.
     ///
     /// Rules are checked in order. The first rule whose `tool_name` matches and
@@ -973,6 +993,61 @@ mod tests {
         assert_eq!(
             decision,
             PermissionDecision::Deny("write not allowed".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_runtime_allow_rule_bypasses_default_ask() {
+        let mut engine = PermissionEngine::new();
+        engine.add_runtime_allow_rule(PermissionRule::new_nature(
+            ToolNature::Execute,
+            Some("bash:read_only_inspection:abc".to_string()),
+            Some(ResourceKind::Command),
+            PermissionDecision::Allow,
+        ));
+
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "bash:read_only_inspection:abc",
+            talos_core::tool::ToolResourceKind::Command,
+        )];
+        let decision = engine.evaluate_profile("bash", &profile, &serde_json::json!({}));
+
+        assert_eq!(decision, PermissionDecision::Allow);
+    }
+
+    #[test]
+    fn test_runtime_allow_rule_does_not_override_deny() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [
+                    {
+                        "decision": { "Deny": "shell blocked" },
+                        "nature": "Execute",
+                        "resource": "bash:*",
+                        "resource_kind": "command"
+                    }
+                ]
+            }))
+            .expect("deny rule config should load");
+        engine.add_runtime_allow_rule(PermissionRule::new_nature(
+            ToolNature::Execute,
+            Some("bash:read_only_inspection:abc".to_string()),
+            Some(ResourceKind::Command),
+            PermissionDecision::Allow,
+        ));
+
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "bash:read_only_inspection:abc",
+            talos_core::tool::ToolResourceKind::Command,
+        )];
+        let decision = engine.evaluate_profile("bash", &profile, &serde_json::json!({}));
+
+        assert_eq!(
+            decision,
+            PermissionDecision::Deny("shell blocked".to_string())
         );
     }
 

@@ -798,6 +798,13 @@ mod tests {
                 }],
                 reasoning: None,
             },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "file1.rs\nfile2.rs".into(),
+                    is_error: false,
+                },
+            },
         ];
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
@@ -810,7 +817,31 @@ mod tests {
     }
 
     #[test]
-    fn build_request_body_tool_result() {
+    fn build_request_body_strips_unmatched_assistant_tool_calls() {
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: json!({"command": "ls"}),
+                }],
+                reasoning: None,
+            },
+            Message::User {
+                content: "continue".into(),
+            },
+        ];
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+
+        assert_eq!(body["messages"][0]["role"], "assistant");
+        assert!(body["messages"][0].get("tool_calls").is_none());
+        assert_eq!(body["messages"][0]["content"], EMPTY_ASSISTANT_MESSAGE);
+        assert_eq!(body["messages"][1]["role"], "user");
+    }
+
+    #[test]
+    fn build_request_body_drops_orphan_tool_result() {
         let messages = vec![Message::Tool {
             result: talos_core::message::MessageToolResult {
                 tool_use_id: "call_1".into(),
@@ -820,9 +851,34 @@ mod tests {
         }];
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
-        assert_eq!(body["messages"][0]["role"], "tool");
-        assert_eq!(body["messages"][0]["tool_call_id"], "call_1");
-        assert_eq!(body["messages"][0]["content"], "file1.rs\nfile2.rs");
+        assert!(body["messages"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn build_request_body_keeps_matched_tool_result() {
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: json!({"command": "ls"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "file1.rs\nfile2.rs".into(),
+                    is_error: false,
+                },
+            },
+        ];
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+
+        assert_eq!(body["messages"][1]["role"], "tool");
+        assert_eq!(body["messages"][1]["tool_call_id"], "call_1");
+        assert_eq!(body["messages"][1]["content"], "file1.rs\nfile2.rs");
     }
 
     #[test]
@@ -847,7 +903,11 @@ mod tests {
             },
             Message::Assistant {
                 content: String::new(),
-                tool_calls: vec![],
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: json!({"command": "true"}),
+                }],
                 reasoning: None,
             },
             Message::Tool {
@@ -861,21 +921,33 @@ mod tests {
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(body["messages"][0]["content"], EMPTY_USER_MESSAGE);
-        assert_eq!(body["messages"][1]["content"], EMPTY_ASSISTANT_MESSAGE);
+        assert_eq!(
+            body["messages"][1]["content"],
+            EMPTY_ASSISTANT_TOOL_CALL_MESSAGE
+        );
         assert_eq!(body["messages"][2]["content"], EMPTY_TOOL_RESULT_MESSAGE);
     }
 
     #[test]
     fn build_request_body_assistant_tool_call_has_non_empty_content() {
-        let messages = vec![Message::Assistant {
-            content: String::new(),
-            tool_calls: vec![ToolCall {
-                id: "call_1".into(),
-                name: "bash".into(),
-                input: json!({"command": "true"}),
-            }],
-            reasoning: None,
-        }];
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: json!({"command": "true"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "ok".into(),
+                    is_error: false,
+                },
+            },
+        ];
         let body = build_request_body("gpt-4o", &messages, &[], None, None);
 
         assert_eq!(

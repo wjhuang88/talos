@@ -20,6 +20,7 @@ separate from the internal engineering docs in `docs/`.
 | `assets/talos-mark.svg` | Branded wordmark (matches TUI-005 scrollback mark). |
 | `assets/favicon.svg` | Inline-friendly favicon. |
 | `CNAME.example` | Custom-domain template. Copy to `CNAME` when a domain is ready. |
+| `zh/` | Chinese (zh-CN) mirror of all 7 pages. Shared assets in `../assets/`. Language switcher on every page (`EN` / `中文`). English is the fallback for browsers without `zh` preference. |
 
 ## Local preview
 

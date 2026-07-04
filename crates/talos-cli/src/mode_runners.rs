@@ -39,7 +39,7 @@ use crate::mode_runtime::{
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
-    CatalogSnapshot, RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
+    RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
     rebuild_session_for_model,
 };
 use crate::provider_setup::{build_provider, parse_provider};
@@ -250,14 +250,9 @@ async fn handle_provider_setup(
     ));
 }
 
-async fn handle_connect(
-    ui_tx: &mpsc::UnboundedSender<UiOutput>,
-    config: &Config,
-    provider: &str,
-    catalog: Option<&CatalogSnapshot>,
-) {
+async fn handle_connect(ui_tx: &mpsc::UnboundedSender<UiOutput>, config: &Config, provider: &str) {
     if provider.is_empty() {
-        let data = build_connect_picker_data(config, catalog);
+        let data = build_connect_picker_data(config);
         let _ = ui_tx.send(UiOutput::ConnectPicker(data));
         return;
     }
@@ -271,17 +266,16 @@ async fn handle_connect(
         return;
     }
 
-    // Precedence: existing user config base_url > catalog default > None.
-    // This preserves `providers.<name>.base_url` unless the user explicitly
-    // changes it, while still offering the catalog endpoint as a suggested
-    // default for brand-new providers.
+    // Precedence: existing user config base_url > models.toml provider default >
+    // builtin hardcoded config > None.
     let default_base_url = config
         .providers
         .get(provider)
         .and_then(|p| p.base_url.clone())
         .or_else(|| {
-            catalog
-                .and_then(|c| c.providers.iter().find(|p| p.id == provider))
+            talos_config::model::builtin_providers()
+                .iter()
+                .find(|p| p.id == provider)
                 .and_then(|p| p.api_base_url.clone())
         })
         .or_else(|| talos_config::builtin_provider_config(provider).and_then(|p| p.base_url));
@@ -345,49 +339,11 @@ async fn handle_connect_with_credential(
 
 /// Builds [`talos_conversation::ConnectPickerData`] for the `/connect` picker.
 ///
-/// Prefers live `catalog.db` data (provider display name, API base URL, docs
-/// URL) when `catalog` is `Some`. Falls back to `builtin_models()`-derived
-/// provider identifiers (no display name/URL metadata) when the catalog is
-/// unavailable, corrupt, or has an incompatible schema — this fallback never
-/// blocks `/connect` from functioning.
-fn build_connect_picker_data(
-    config: &Config,
-    catalog: Option<&CatalogSnapshot>,
-) -> talos_conversation::ConnectPickerData {
+/// Uses the compiled-in `models.toml` data (`[[providers]]` for display name,
+/// API base URL, docs URL; `[[models]]` for model counts per provider).
+fn build_connect_picker_data(config: &Config) -> talos_conversation::ConnectPickerData {
     use std::collections::BTreeMap;
     use talos_conversation::{ConnectPickerData, ConnectPickerItem};
-
-    if let Some(snapshot) = catalog {
-        let mut model_counts: BTreeMap<&str, usize> = BTreeMap::new();
-        for m in &snapshot.models {
-            *model_counts.entry(m.provider.as_str()).or_default() += 1;
-        }
-
-        let mut connected = Vec::new();
-        let mut available = Vec::new();
-
-        for p in &snapshot.providers {
-            let has_credential = config.provider_authenticated(&p.id);
-            let item = ConnectPickerItem {
-                provider: p.id.clone(),
-                name: p.name.clone(),
-                model_count: model_counts.get(p.id.as_str()).copied().unwrap_or(0),
-                api_base_url: p.api_base_url.clone(),
-                has_credential,
-                doc_url: p.doc_url.clone(),
-            };
-            if has_credential {
-                connected.push(item);
-            } else {
-                available.push(item);
-            }
-        }
-
-        return ConnectPickerData {
-            connected,
-            available,
-        };
-    }
 
     let all = talos_config::model::builtin_models();
     let mut model_counts: BTreeMap<String, usize> = BTreeMap::new();
@@ -395,19 +351,28 @@ fn build_connect_picker_data(
         *model_counts.entry(m.provider.clone()).or_default() += 1;
     }
 
+    let providers: BTreeMap<String, talos_config::model::BuiltinProvider> =
+        talos_config::model::builtin_providers()
+            .into_iter()
+            .map(|p| (p.id.clone(), p))
+            .collect();
+
     let mut connected = Vec::new();
     let mut available = Vec::new();
 
     for (provider_id, count) in model_counts {
         let has_credential = config.provider_authenticated(&provider_id);
+        let (name, api_base_url, doc_url) = providers
+            .get(&provider_id)
+            .map(|p| (p.name.clone(), p.api_base_url.clone(), p.doc_url.clone()))
+            .unwrap_or_else(|| (provider_id.clone(), None, None));
         let item = ConnectPickerItem {
             provider: provider_id.clone(),
-            name: provider_id.clone(),
+            name,
             model_count: count,
-            api_base_url: talos_config::builtin_provider_config(&provider_id)
-                .and_then(|p| p.base_url),
+            api_base_url,
             has_credential,
-            doc_url: None,
+            doc_url,
         };
         if has_credential {
             connected.push(item);
@@ -623,10 +588,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     let workspace_root = resolve_workspace_root(&cli)?;
-    let catalog_snapshot = crate::model_lifecycle::open_catalog_snapshot(
-        &crate::storage::resolve_talos_root().join("catalog.db"),
-    )
-    .map(Arc::new);
     let session_manager =
         talos_session::SessionManager::new().context("failed to initialize session manager")?;
     let display_name = workspace_display_name(&workspace_root);
@@ -743,7 +704,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     let transition_for_handler = transition.clone();
     let ui_tx_for_handler = ui_output_tx.clone();
     let config_for_handler = config.clone();
-    let catalog_for_handler = catalog_snapshot.clone();
     let api_key_for_handler = api_key.clone();
     let hooks_for_handler = hooks.clone();
     let workspace_root_for_handler = workspace_root.to_path_buf();
@@ -886,13 +846,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                     handle_provider_setup(&ui_tx_for_handler, &config_for_handler, &provider).await;
                 }
                 SessionLifecycleRequest::ConnectRequest { provider } => {
-                    handle_connect(
-                        &ui_tx_for_handler,
-                        &config_for_handler,
-                        &provider,
-                        catalog_for_handler.as_deref(),
-                    )
-                    .await;
+                    handle_connect(&ui_tx_for_handler, &config_for_handler, &provider).await;
                 }
                 SessionLifecycleRequest::ConnectWithCredential(resp) => {
                     if let Some(new_config) = handle_connect_with_credential(
@@ -2026,130 +1980,11 @@ mod connect_tests {
         result
     }
 
-    fn snapshot_provider(id: &str, name: &str, api_base_url: Option<&str>) -> ProviderInfo {
-        ProviderInfo {
-            id: id.to_string(),
-            name: name.to_string(),
-            api_base_url: api_base_url.map(str::to_string),
-            env_var: Some(format!("{}_API_KEY", id.to_uppercase())),
-            doc_url: Some(format!("https://docs.{id}.example")),
-            source: ProviderSource::Builtin,
-        }
-    }
-
-    fn snapshot_model(id: &str, provider: &str) -> ModelMetadata {
-        ModelMetadata {
-            id: id.to_string(),
-            provider: provider.to_string(),
-            context_limit: Some(100_000),
-            output_limit: None,
-            pricing: None,
-            capabilities: Default::default(),
-            release_date: None,
-            source: Default::default(),
-        }
-    }
-
-    fn sample_snapshot() -> CatalogSnapshot {
-        CatalogSnapshot {
-            providers: vec![
-                snapshot_provider("anthropic", "Anthropic", None),
-                snapshot_provider("groq", "Groq", Some("https://api.groq.com/openai/v1")),
-            ],
-            models: vec![
-                snapshot_model("claude-sonnet-4-5", "anthropic"),
-                snapshot_model("llama-3", "groq"),
-                snapshot_model("mixtral", "groq"),
-            ],
-        }
-    }
-
-    #[test]
-    fn build_connect_picker_data_uses_catalog_provider_metadata() {
-        let config = Config::default();
-        let snapshot = sample_snapshot();
-
-        let data = build_connect_picker_data(&config, Some(&snapshot));
-
-        let groq = data
-            .available
-            .iter()
-            .find(|p| p.provider == "groq")
-            .expect("groq must be in available");
-        assert_eq!(groq.name, "Groq");
-        assert_eq!(
-            groq.api_base_url.as_deref(),
-            Some("https://api.groq.com/openai/v1")
-        );
-        assert_eq!(groq.doc_url.as_deref(), Some("https://docs.groq.example"));
-        assert_eq!(groq.model_count, 2);
-    }
-
-    #[test]
-    fn build_connect_picker_data_catalog_takes_precedence_over_builtin() {
-        let config = Config::default();
-        let snapshot = sample_snapshot();
-
-        let with_catalog = build_connect_picker_data(&config, Some(&snapshot));
-        let without_catalog = build_connect_picker_data(&config, None);
-
-        // The catalog-backed result must carry provider metadata and takes
-        // precedence over builtin fallback data.
-        let groq_with_catalog = with_catalog
-            .available
-            .iter()
-            .find(|p| p.provider == "groq")
-            .expect("groq present via catalog");
-        assert!(groq_with_catalog.api_base_url.is_some());
-
-        assert!(
-            without_catalog
-                .connected
-                .iter()
-                .chain(without_catalog.available.iter())
-                .all(|item| item.provider != "groq"),
-            "groq should only appear from the live catalog in this fixture"
-        );
-
-        let qwen = without_catalog
-            .connected
-            .iter()
-            .chain(without_catalog.available.iter())
-            .find(|item| item.provider == "qwen")
-            .expect("qwen should be present via packaged models.toml fallback");
-        assert_eq!(
-            qwen.api_base_url.as_deref(),
-            Some("https://dashscope.aliyuncs.com/compatible-mode/v1")
-        );
-        assert!(qwen.doc_url.is_none());
-    }
-
     #[test]
     fn build_connect_picker_data_none_falls_back_without_blocking() {
         let config = Config::default();
-        // Must not panic and must return a non-crashing (possibly empty)
-        // result when catalog is unavailable.
-        let data = build_connect_picker_data(&config, None);
+        let data = build_connect_picker_data(&config);
         assert!(data.connected.len() + data.available.len() > 0);
-    }
-
-    #[test]
-    fn open_catalog_snapshot_missing_file_creates_seeded_catalog() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let missing = dir.path().join("does-not-exist").join("catalog.db");
-        let snapshot = crate::model_lifecycle::open_catalog_snapshot(&missing)
-            .expect("missing catalog should be implicitly created and seeded");
-        assert!(missing.exists());
-        assert!(!snapshot.providers.is_empty());
-        assert!(!snapshot.models.is_empty());
-    }
-
-    #[test]
-    fn open_catalog_snapshot_corrupt_file_returns_none_not_panic() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("corrupt.db");
-        std::fs::write(&path, b"not a sqlite database").expect("write corrupt file");
-        assert!(crate::model_lifecycle::open_catalog_snapshot(&path).is_none());
     }
 
     #[tokio::test]
@@ -2295,42 +2130,14 @@ mod connect_tests {
     }
 
     #[tokio::test]
-    async fn handle_connect_default_base_url_prefers_existing_config_over_catalog() {
-        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
-        let mut config = Config::default();
-        config.providers.insert(
-            "groq".to_string(),
-            ProviderConfig {
-                base_url: Some("https://user-custom.example/v1".to_string()),
-                ..Default::default()
-            },
-        );
-        let snapshot = sample_snapshot(); // catalog has https://api.groq.com/openai/v1
-
-        handle_connect(&tx, &config, "groq", Some(&snapshot)).await;
-        drop(tx);
-
-        let mut default_base_url = None;
-        while let Some(output) = rx.recv().await {
-            if let UiOutput::CredentialRequest(req) = output {
-                default_base_url = req.default_base_url;
-            }
-        }
-
-        assert_eq!(
-            default_base_url.as_deref(),
-            Some("https://user-custom.example/v1"),
-            "existing user config base_url must win over the catalog default"
-        );
-    }
-
-    #[tokio::test]
-    async fn handle_connect_default_base_url_falls_back_to_catalog() {
+    async fn handle_connect_default_base_url_falls_back_to_builtin_provider_config() {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
-        let snapshot = sample_snapshot();
 
-        handle_connect(&tx, &config, "groq", Some(&snapshot)).await;
+        // groq has an api_base_url in the models.toml [[providers]] section
+        // (from BUILD_MODELS=1) AND a hardcoded base_url in builtin_provider_config.
+        // Both return "https://api.groq.com/openai/v1".
+        handle_connect(&tx, &config, "groq").await;
         drop(tx);
 
         let mut default_base_url = None;
@@ -2347,27 +2154,6 @@ mod connect_tests {
     }
 
     #[tokio::test]
-    async fn handle_connect_default_base_url_falls_back_to_builtin_provider_config() {
-        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
-        let config = Config::default();
-
-        handle_connect(&tx, &config, "qwen", None).await;
-        drop(tx);
-
-        let mut default_base_url = None;
-        while let Some(output) = rx.recv().await {
-            if let UiOutput::CredentialRequest(req) = output {
-                default_base_url = req.default_base_url;
-            }
-        }
-
-        assert_eq!(
-            default_base_url.as_deref(),
-            Some("https://dashscope.aliyuncs.com/compatible-mode/v1")
-        );
-    }
-
-    #[tokio::test]
     async fn handle_connect_already_authenticated_does_not_request_credential() {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let mut config = Config::default();
@@ -2379,7 +2165,7 @@ mod connect_tests {
             },
         );
 
-        handle_connect(&tx, &config, "groq", None).await;
+        handle_connect(&tx, &config, "groq").await;
         drop(tx);
 
         let mut saw_credential_request = false;

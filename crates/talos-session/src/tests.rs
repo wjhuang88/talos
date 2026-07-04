@@ -397,6 +397,69 @@ fn session_tool_call_id_matches_tool_result_id_after_resume() {
 }
 
 #[test]
+fn resume_history_drops_orphan_tool_results() {
+    let manager = test_manager();
+    let session = manager.create_session("test-project", "").unwrap();
+
+    session
+        .append(&Message::User {
+            content: "hello".into(),
+        })
+        .unwrap();
+    session
+        .append(&Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "call_missing".into(),
+                content: "orphan".into(),
+                is_error: false,
+            },
+        })
+        .unwrap();
+    session
+        .append(&Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![ToolCall {
+                id: "call_expected".into(),
+                name: "bash".into(),
+                input: serde_json::json!({"command": "pwd"}),
+            }],
+            reasoning: None,
+        })
+        .unwrap();
+    session
+        .append(&Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "call_other".into(),
+                content: "wrong result".into(),
+                is_error: false,
+            },
+        })
+        .unwrap();
+    session
+        .append(&Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "call_expected".into(),
+                content: "/repo".into(),
+                is_error: false,
+            },
+        })
+        .unwrap();
+
+    let messages = session.read_messages().unwrap();
+
+    assert_eq!(messages.len(), 3);
+    assert!(matches!(messages[0], Message::User { .. }));
+    assert!(matches!(messages[1], Message::Assistant { .. }));
+    match &messages[2] {
+        Message::Tool { result } => {
+            assert_eq!(result.tool_use_id, "call_expected");
+            assert_eq!(result.content, "/repo");
+        }
+        other => panic!("expected matched tool result, got {other:?}"),
+    }
+}
+
+#[test]
 fn ensure_persisted_creates_empty_file_for_deferred_session() {
     let dir = tempfile::tempdir().unwrap();
     let file_path = dir.path().join("session.jsonl");
@@ -538,7 +601,16 @@ fn session_with_tool_result() {
     let manager = test_manager();
     let session = manager.create_session("test-project", "").unwrap();
 
-    let msg = Message::Tool {
+    let assistant = Message::Assistant {
+        content: String::new(),
+        tool_calls: vec![ToolCall {
+            id: "call_1".into(),
+            name: "read_file".into(),
+            input: serde_json::json!({"path": "src/main.rs"}),
+        }],
+        reasoning: None,
+    };
+    let tool_result = Message::Tool {
         result: MessageToolResult {
             tool_use_id: "call_1".into(),
             content: "fn main() {}".into(),
@@ -546,12 +618,14 @@ fn session_with_tool_result() {
         },
     };
 
-    session.append(&msg).unwrap();
+    session.append(&assistant).unwrap();
+    session.append(&tool_result).unwrap();
 
     let messages = session.read_messages().unwrap();
-    assert_eq!(messages.len(), 1);
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0], assistant);
     assert_eq!(
-        messages[0],
+        messages[1],
         Message::Tool {
             result: MessageToolResult {
                 tool_use_id: "call_1".into(),

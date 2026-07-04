@@ -11,8 +11,6 @@ use talos_core::tool::ToolProvenance;
 
 use crate::theme::semantic;
 
-/// Maximum length for tool call arguments before truncation.
-const MAX_ARGS_LENGTH: usize = 80;
 /// Maximum length for tool result content before truncation.
 const MAX_RESULT_LENGTH: usize = 200;
 
@@ -70,8 +68,6 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
             .fg(semantic::TEXT_ACCENT)
             .add_modifier(Modifier::BOLD);
         let dim_style = Style::default().fg(semantic::DIM_TEXT);
-        let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
-
         let mut spans = vec![
             Span::styled(" → ", prefix_style),
             Span::styled(self.tool_name.to_string(), tool_name_style),
@@ -85,10 +81,20 @@ impl ratatui::widgets::Widget for ToolCallBubble<'_> {
                 carrier,
             } => Some(format!("[plugin:{}@{}/{}]", name, version, carrier)),
         };
-        if let Some(badge) = provenance_badge {
-            spans.push(Span::styled(badge, dim_style));
+        if let Some(badge) = provenance_badge.as_ref() {
+            spans.push(Span::styled(badge.clone(), dim_style));
         }
         spans.push(Span::raw(", "));
+        let prefix_width = 3
+            + self.tool_name.chars().count()
+            + provenance_badge
+                .as_ref()
+                .map(|badge| badge.chars().count())
+                .unwrap_or(0)
+            + 2;
+        let args_budget = area.width as usize;
+        let args_budget = args_budget.saturating_sub(prefix_width).max(1);
+        let args_display = truncate(self.arguments, args_budget);
         spans.push(Span::styled(args_display, dim_style));
         lines.push(Line::from(spans));
 
@@ -190,7 +196,8 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         let args_style = Style::default()
             .fg(semantic::DIM_TEXT)
             .add_modifier(Modifier::DIM);
-        let args_display = truncate(self.arguments, MAX_ARGS_LENGTH);
+        let args_budget = area.width.saturating_sub(8) as usize;
+        let args_display = truncate(self.arguments, args_budget.max(1));
         lines.push(Line::from(Span::styled(
             format!("Args: {args_display}"),
             args_style,

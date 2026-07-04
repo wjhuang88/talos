@@ -3,15 +3,13 @@
 //! Contains the model picker data construction and the shared session rebuild
 //! logic used when switching models at runtime.
 
-use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
-use talos_config::{Config, builtin_provider_config};
+use talos_config::Config;
 use talos_conversation::{ModelPickerData, ModelPickerItem};
 use talos_core::message::Message;
-use talos_core::model::ProviderSource;
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_plugin::HookRegistry;
 use talos_session::{Session, SessionManager};
@@ -23,70 +21,6 @@ use crate::registry::{
 };
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
-
-/// A point-in-time snapshot of the catalog database, taken once at startup.
-///
-/// Opening SQLite on every `/connect`/`/model` invocation would reintroduce
-/// implicit SQLite access into hot paths; a single snapshot read at startup
-/// keeps `talos-config` free of any SQLite dependency while still surfacing
-/// live `catalog.db` data (provider name/base URL/doc URL, model entries)
-/// when present.
-pub(crate) struct CatalogSnapshot {
-    pub(crate) providers: Vec<talos_models::ProviderInfo>,
-    pub(crate) models: Vec<talos_config::model::ModelMetadata>,
-}
-
-/// Opens the catalog database and takes a snapshot, if available.
-///
-/// When the database does not exist yet, this creates it and seeds it from the
-/// compiled-in `models.toml` dataset so a fresh installation has a durable
-/// catalog without a manual initialization step. Existing corrupt or
-/// incompatible databases are not overwritten; callers degrade to
-/// `builtin_models()` in those cases. Never blocks startup or panics: all
-/// failure modes route through `Result::ok()`.
-pub(crate) fn open_catalog_snapshot(catalog_path: &std::path::Path) -> Option<CatalogSnapshot> {
-    let existed = catalog_path.is_file();
-    let catalog = talos_models::ModelCatalog::open(catalog_path).ok()?;
-    if !existed && seed_catalog_from_builtin(&catalog).is_err() {
-        return None;
-    }
-    let providers = catalog.all_providers().ok()?;
-    if providers.is_empty() {
-        return None;
-    }
-    let models = catalog.all_models().ok()?;
-    Some(CatalogSnapshot { providers, models })
-}
-
-fn seed_catalog_from_builtin(
-    catalog: &talos_models::ModelCatalog,
-) -> Result<(), talos_models::CatalogError> {
-    let models = talos_config::model::builtin_models();
-    let providers = builtin_providers_for_models(&models);
-    catalog.seed(&providers, &models, "builtin")
-}
-
-fn builtin_providers_for_models(
-    models: &[talos_config::model::ModelMetadata],
-) -> Vec<talos_models::ProviderInfo> {
-    let mut ids = BTreeSet::new();
-    for model in models {
-        ids.insert(model.provider.clone());
-    }
-    ids.into_iter()
-        .map(|id| {
-            let builtin = builtin_provider_config(&id);
-            talos_models::ProviderInfo {
-                id: id.clone(),
-                name: id,
-                api_base_url: builtin.as_ref().and_then(|p| p.base_url.clone()),
-                env_var: builtin.and_then(|p| p.api_key_env),
-                doc_url: None,
-                source: ProviderSource::Builtin,
-            }
-        })
-        .collect()
-}
 
 /// Constructs [`ModelPickerData`] from the given [`Config`].
 ///
@@ -410,7 +344,7 @@ mod tests {
     #[test]
     fn ready_models_have_correct_provider_and_context_limit() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.model = "claude-sonnet-4-0".to_string();
         config.provider = "anthropic".to_string();
         config.providers.insert(
             "anthropic".to_string(),
@@ -532,7 +466,7 @@ mod tests {
             },
         );
         config.providers.insert(
-            "zhipu".to_string(),
+            "zhipuai".to_string(),
             ProviderConfig {
                 api_key: Some("sk-zhipu-key".to_string()),
                 ..Default::default()
@@ -561,7 +495,7 @@ mod tests {
     #[test]
     fn unauthenticated_providers_are_omitted_from_model_picker() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.model = "claude-sonnet-4-0".to_string();
         config.provider = "anthropic".to_string();
         config.providers.insert(
             "anthropic".to_string(),
@@ -597,7 +531,7 @@ mod tests {
     #[test]
     fn is_current_flags_active_model_and_provider() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.model = "claude-sonnet-4-0".to_string();
         config.provider = "anthropic".to_string();
         config.providers.insert(
             "anthropic".to_string(),
@@ -617,8 +551,8 @@ mod tests {
             current_models.len()
         );
         assert_eq!(
-            current_models[0].model_id, "claude-sonnet-4-5-20250929",
-            "Current model should be claude-sonnet-4-5-20250929"
+            current_models[0].model_id, "claude-sonnet-4-0",
+            "Current model should be claude-sonnet-4-0"
         );
         assert_eq!(
             current_models[0].provider, "anthropic",
@@ -626,7 +560,7 @@ mod tests {
         );
 
         for m in &data.ready_models {
-            if m.model_id != "claude-sonnet-4-5-20250929" || m.provider != "anthropic" {
+            if m.model_id != "claude-sonnet-4-0" || m.provider != "anthropic" {
                 assert!(
                     !m.is_current,
                     "Model {} ({}) should not be current",
@@ -650,18 +584,19 @@ mod tests {
     #[test]
     fn provider_setup_target_falls_back_to_first_provider_model() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.model = "claude-sonnet-4-0".to_string();
         config.provider = "anthropic".to_string();
 
-        let target = provider_setup_target_model(&config, "openai").expect("target model");
+        let target = provider_setup_target_model(&config, "anthropic").expect("target model");
 
         assert!(!target.is_empty());
-        let provider = config
+        let found = config
             .all_models()
             .into_iter()
             .find(|m| m.id == target || format!("{}/{}", m.provider, m.id) == target)
-            .map(|m| m.provider)
             .expect("target exists in catalog");
-        assert_eq!(provider, "openai");
+        assert_eq!(found.provider, "anthropic");
+        // provider_setup_target_model for current provider returns the exact current model
+        assert_eq!(found.id, "claude-sonnet-4-0");
     }
 }

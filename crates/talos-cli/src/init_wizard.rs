@@ -41,7 +41,7 @@ fn print_non_interactive_instructions() {
     println!();
     println!("3. Select a model:");
     println!("   talos --available-models          # list all models");
-    println!("   talos --use-model claude-sonnet-4-20250514");
+    println!("   talos --use-model claude-sonnet-4-0");
     println!();
     println!("4. Or use the interactive wizard:");
     println!("   talos init");
@@ -294,7 +294,7 @@ fn default_env_var_for_provider(name: &str) -> Option<String> {
         "google" => Some("GOOGLE_API_KEY".to_string()),
         "deepseek" => Some("DEEPSEEK_API_KEY".to_string()),
         "qwen" => Some("DASHSCOPE_API_KEY".to_string()),
-        "zhipu" => Some("ZHIPU_API_KEY".to_string()),
+        "zhipuai" => Some("ZHIPU_API_KEY".to_string()),
         "zai" => Some("ZAI_API_KEY".to_string()),
         "zhipu-coding-plan" => Some("ZHIPU_CODING_PLAN_API_KEY".to_string()),
         "zai-coding-plan" => Some("ZAI_CODING_PLAN_API_KEY".to_string()),
@@ -337,7 +337,7 @@ fn builtin_provider_config(name: &str) -> Option<talos_config::ProviderConfig> {
             api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
             ..Default::default()
         }),
-        "zhipu" => Some(ProviderConfig {
+        "zhipuai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             base_url: Some("https://open.bigmodel.cn/api/paas/v4".to_string()),
             api_key_env: Some("ZHIPU_API_KEY".to_string()),
@@ -429,7 +429,7 @@ mod tests {
         std::fs::write(
             &config_path,
             r#"provider = "anthropic"
-model = "claude-sonnet-4-20250514"
+model = "claude-sonnet-4-0"
 "#,
         )
         .unwrap();
@@ -445,7 +445,7 @@ model = "claude-sonnet-4-20250514"
 
         // Config should be unchanged
         let config_content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(config_content.contains("claude-sonnet-4-20250514"));
+        assert!(config_content.contains("claude-sonnet-4-0"));
 
         unsafe { std::env::remove_var("HOME") };
     }
@@ -453,10 +453,19 @@ model = "claude-sonnet-4-20250514"
     #[tokio::test]
     async fn test_wizard_saves_on_confirm() {
         let _lock = HOME_ENV_MUTEX.lock().unwrap();
-        // Simulate: y (reconfigure), 1 (first provider = anthropic),
-        // ANTHROPIC_API_KEY (env var), 1 (first model), n (skip test), y (save)
-        let input = b"y\n1\nANTHROPIC_API_KEY\n1\nn\ny\n";
-        let mut reader = Cursor::new(input.as_slice());
+        // Simulate: y (reconfigure), provider index for anthropic, ANTHROPIC_API_KEY,
+        // first model, n (skip test), y (save).
+        // The provider index is discovered dynamically because the dataset size
+        // varies across BUILD_MODELS=1 regenerations.
+        let models = builtin_models();
+        let grouped = group_providers_by_name(&models);
+        let providers: Vec<&str> = grouped.keys().map(|s| s.as_str()).collect();
+        let anthro_idx = providers
+            .iter()
+            .position(|&p| p == "anthropic")
+            .expect("anthropic must be in the dataset");
+        let input = format!("y\n{}\nANTHROPIC_API_KEY\n1\nn\ny\n", anthro_idx + 1);
+        let mut reader = Cursor::new(input.as_bytes());
         let mut writer = Vec::new();
 
         let temp_dir = tempfile::tempdir().unwrap();
@@ -482,9 +491,17 @@ model = "claude-sonnet-4-20250514"
     #[tokio::test]
     async fn test_wizard_cancel_on_save() {
         let _lock = HOME_ENV_MUTEX.lock().unwrap();
-        // Simulate: y (reconfigure), 1 (anthropic), ANTHROPIC_API_KEY, 1 (model), n (skip test), n (cancel save)
-        let input = b"y\n1\nANTHROPIC_API_KEY\n1\nn\nn\n";
-        let mut reader = Cursor::new(input.as_slice());
+        // Simulate: y (reconfigure), select anthropic dynamically, ANTHROPIC_API_KEY,
+        // 1 (model), n (skip test), n (cancel save)
+        let models = builtin_models();
+        let grouped = group_providers_by_name(&models);
+        let providers: Vec<&str> = grouped.keys().map(|s| s.as_str()).collect();
+        let anthro_idx = providers
+            .iter()
+            .position(|&p| p == "anthropic")
+            .expect("anthropic must be in the dataset");
+        let input = format!("y\n{}\nANTHROPIC_API_KEY\n1\nn\nn\n", anthro_idx + 1);
+        let mut reader = Cursor::new(input.as_bytes());
         let mut writer = Vec::new();
 
         let temp_dir = tempfile::tempdir().unwrap();

@@ -23,6 +23,14 @@ resolves `gix 0.85.0`. The explicit feature list remains `basic`, `status`, `rev
 `blob-diff`, `index`, and `sha1`; no network, worktree-mutation, native Git, destructive Git,
 permission-default, tag, publish, release, or issue-sync behavior was added.
 
+Runtime leak note (2026-07-04): maintainer review found Talos runtime paths can still trigger host
+Git outside the structured Git tool boundary. `crates/talos-cli/src/governance.rs` calls
+`std::process::Command::new("git").args(["status", "--porcelain"])` for governance status output,
+and `crates/talos-agent/prompts/identity.txt` still names `git` as a `bash` exception even though
+read-only `git_status` is a built-in `gix` tool. This is a product bug, not an acceptable fallback:
+read-only runtime status must use internal/gix-backed capability or omit Git state, and prompt
+guidance must prefer built-in Git tools over host shell Git.
+
 ## Priority
 
 P2.
@@ -43,6 +51,13 @@ The agent currently relies on `bash git ...` for all Git operations. This has th
 3. **No permission granularity**: Every `git` command goes through bash approval. Read-only
    Git inspection (status, log, diff) should be auto-allowed; write operations (commit, push,
    reset) should require explicit approval.
+
+Additional runtime leak:
+
+- `talos governance status` currently shells out to host `git status --porcelain` for a dirty-tree
+  count instead of using the internal Git tool/provider boundary.
+- The agent identity prompt can still induce `bash git ...` by listing `git` as an example where
+  bash is appropriate, despite the presence of built-in Git tools.
 
 ## Proposed Tool Set
 
@@ -274,6 +289,9 @@ Update this owner doc when any of these triggers occur:
   `git_commit`, stash, reset, merge, rebase, tags, or remotes.
 - A release-readiness or self-bootstrap packet depends on Git publication behavior.
 - A host-`git` fallback fails on a supported environment or becomes a portability blocker.
+- A Talos CLI/runtime path invokes host `git` directly outside `crates/talos-tools/src/git.rs`.
+- Agent prompt guidance presents host shell Git as preferred or normal when a built-in Git tool
+  exists.
 
 Each tracking update must record:
 
@@ -288,6 +306,8 @@ Current tracking baseline:
 | Operation family | Current Talos posture | Tracking decision |
 |---|---|---|
 | Read-only local status/diff/log/show/branches | Native `gix` direction is accepted and implemented for common reads. | Keep watching for API/output improvements, but no urgent migration gap. |
+| Governance/runtime dirty-tree status | `talos governance status` directly invokes host `git status --porcelain`. | Fix required: replace with an internal/gix-backed read path or omit Git status when unavailable. Do not keep as a silent host fallback. |
+| Agent prompt Git guidance | Identity prompt still lists `git` as a bash exception. | Fix required: prompt must prefer built-in Git tools and treat host shell Git as unavailable unless no structured tool exists and the user explicitly approves. |
 | Add/commit | Structured tool surface exists; native `gix` write orchestration remains under evaluation. | Re-evaluate on next Git write-tool work. |
 | Push/pull | Host `git` fallback. | High-priority tracking item because REL-002 publication workflows depend on this boundary. |
 | Checkout/switch | Host `git` fallback. | Track porcelain/worktree orchestration maturity before replacing. |
@@ -381,6 +401,17 @@ All tools will use the `ToolNature` attribute (from I025 S5) for permission clas
 - [ ] `gix` dependency added with minimal feature set
 - [ ] No host `git` required for P0 operations
 
+### Runtime Host-Git Leak Fix
+
+- [ ] `talos governance status` does not invoke host `git`.
+- [ ] Governance dirty-tree status uses a shared internal/gix-backed read path or is omitted with
+      an explicit unavailable message.
+- [ ] Agent prompt guidance says to use built-in Git tools for Git inspection before `bash`.
+- [ ] Tests prove governance status works when host `git` is unavailable.
+- [ ] Tests or prompt snapshots prove `git` is no longer listed as a normal bash exception while
+      `git_status` is available.
+- [ ] No permission default changes are introduced.
+
 ### P1-P2 (Navigation + Write)
 - [ ] `git_checkout` switches branches
 - [ ] `git_add` stages files
@@ -397,6 +428,8 @@ All tools will use the `ToolNature` attribute (from I025 S5) for permission clas
 - `crates/talos-tools/src/lib.rs` (AgentTool trait, ToolNature)
 - `crates/talos-permission/src/lib.rs` (permission engine)
 - `crates/talos-tools/src/git.rs` (current gix/host fallback boundary)
+- `crates/talos-cli/src/governance.rs` (current direct host `git status` leak)
+- `crates/talos-agent/prompts/identity.txt` (current prompt guidance leak)
 
 ## Open Questions
 

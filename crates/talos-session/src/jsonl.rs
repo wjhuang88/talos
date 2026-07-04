@@ -1,5 +1,6 @@
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 use chrono::Utc;
+use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -114,16 +115,22 @@ impl Session {
     pub fn read_messages(&self) -> Result<Vec<Message>, SessionError> {
         let entries = self.read_entries()?;
         let mut messages = Vec::new();
+        let mut pending_tool_call_ids = HashSet::new();
 
         for entry in entries {
             let msg = match entry.role.as_str() {
-                "user" => Some(Message::User {
-                    content: entry.content,
-                }),
+                "user" => {
+                    pending_tool_call_ids.clear();
+                    Some(Message::User {
+                        content: entry.content,
+                    })
+                }
                 "assistant" => {
                     let tool_calls =
                         talos_core::message::extract_tool_calls_from_text(&entry.content);
                     let cleaned = talos_core::message::strip_tool_syntax(&entry.content);
+                    pending_tool_call_ids.clear();
+                    pending_tool_call_ids.extend(tool_calls.iter().map(|call| call.id.clone()));
                     Message::Assistant {
                         content: cleaned,
                         tool_calls,
@@ -141,13 +148,17 @@ impl Session {
                         None
                     } else {
                         let (is_error, tool_use_id, content) = parse_tool_result(&entry.content);
-                        Some(Message::Tool {
-                            result: talos_core::message::MessageToolResult {
-                                tool_use_id,
-                                content,
-                                is_error,
-                            },
-                        })
+                        if pending_tool_call_ids.remove(&tool_use_id) {
+                            Some(Message::Tool {
+                                result: talos_core::message::MessageToolResult {
+                                    tool_use_id,
+                                    content,
+                                    is_error,
+                                },
+                            })
+                        } else {
+                            None
+                        }
                     }
                 }
                 _ => None,

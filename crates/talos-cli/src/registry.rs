@@ -13,9 +13,7 @@ use talos_core::ApprovalChoice;
 use talos_core::tool::{
     AgentTool, ToolBackend, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
 };
-use talos_permission::{
-    PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
-};
+use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_session::{
     SessionManager, TodoAddDependencyTool, TodoCreateTool, TodoDeleteTool, TodoQueryTool,
     TodoRemoveDependencyTool, TodoUpdateStatusTool, TodoUpdateTool,
@@ -33,7 +31,7 @@ use talos_tools::{
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::approval::ApprovalPrompt;
+use crate::approval::{ApprovalPrompt, add_always_allow_rules, always_allow_rule_descriptions};
 use crate::colors;
 use talos_conversation::UiOutput;
 
@@ -74,13 +72,30 @@ impl TuiApprovalHandler {
             PermissionDecision::Deny(_) => ApprovalChoice::Deny,
             PermissionDecision::Ask => {
                 let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+                let always_scopes = always_allow_rule_descriptions(tool_name, profile, input);
+                let mut approval_arguments = input.clone();
+                let mut approval_summary_fields = summary_fields;
+                if !always_scopes.is_empty()
+                    && let Some(obj) = approval_arguments.as_object_mut()
+                {
+                    obj.insert(
+                        "_always_approve_scope".to_string(),
+                        serde_json::Value::Array(
+                            always_scopes
+                                .into_iter()
+                                .map(serde_json::Value::String)
+                                .collect(),
+                        ),
+                    );
+                    approval_summary_fields.push("_always_approve_scope".to_string());
+                }
 
                 if self
                     .ui_output_tx
                     .send(UiOutput::ToolApprovalRequest {
                         tool_name: tool_name.to_string(),
-                        arguments: input.clone(),
-                        summary_fields,
+                        arguments: approval_arguments,
+                        summary_fields: approval_summary_fields,
                         response: response_tx,
                     })
                     .is_err()
@@ -96,35 +111,14 @@ impl TuiApprovalHandler {
         }
     }
 
-    fn add_always_allow_rules(&self, profile: &[ToolPermissionFacet], input: &serde_json::Value) {
+    fn add_always_allow_rules(
+        &self,
+        tool_name: &str,
+        profile: &[ToolPermissionFacet],
+        input: &serde_json::Value,
+    ) {
         let mut engine = self.engine.lock().expect("engine lock poisoned");
-        for facet in profile {
-            let resource = facet
-                .resource
-                .clone()
-                .or_else(|| ResourceExtractor::extract(facet.nature, input));
-            let resource_kind = facet
-                .resource_kind
-                .map(ResourceKind::from)
-                .or_else(|| Some(default_resource_kind(facet.nature)));
-            engine.add_rule(PermissionRule::new_nature(
-                facet.nature,
-                resource,
-                resource_kind,
-                PermissionDecision::Allow,
-            ));
-        }
-    }
-}
-
-fn default_resource_kind(nature: talos_core::tool::ToolNature) -> ResourceKind {
-    match nature {
-        talos_core::tool::ToolNature::Network => ResourceKind::Domain,
-        talos_core::tool::ToolNature::Execute => ResourceKind::Command,
-        talos_core::tool::ToolNature::Read | talos_core::tool::ToolNature::Write => {
-            ResourceKind::Path
-        }
-        talos_core::tool::ToolNature::Internal => ResourceKind::Remote,
+        add_always_allow_rules(&mut engine, tool_name, profile, input);
     }
 }
 
@@ -196,7 +190,8 @@ impl AgentTool for TuiPermissionAwareTool {
         match choice {
             ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
             ApprovalChoice::AlwaysApprove => {
-                self.approval.add_always_allow_rules(&profile, &input);
+                self.approval
+                    .add_always_allow_rules(&tool_name, &profile, &input);
                 self.inner.execute(input).await
             }
             ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),

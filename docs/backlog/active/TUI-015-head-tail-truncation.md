@@ -1,8 +1,8 @@
 # TUI-015: Head+Tail Truncation For Long Tool Outputs
 
-**Status**: Refinement
+**Status**: Complete; retained lines changed to 3/3 on 2026-07-04
 **Priority**: P3
-**Source**: User request 2026-06-26 (Codex pattern)
+**Source**: User request 2026-06-26 (Codex pattern); maintainer refinement 2026-07-04
 **Iteration**: None yet
 
 ## Problem
@@ -46,9 +46,9 @@ Head+tail display format:
    ⚠ line 1 of output
    █  line 2 of output
    ...
-   █  line 10 of output
-   ⋯ 180 lines omitted
-   █  line 191 of output
+   █  line 3 of output
+   ⋯ 194 lines omitted
+   █  line 198 of output
    ...
    █  line 200 of output
 ```
@@ -56,8 +56,8 @@ Head+tail display format:
 Design parameters:
 - **Threshold**: shared with TUI-014, currently `SUMMARIZE_OUTPUT_THRESHOLD_LINES = 30`.
   Outputs ≤ threshold render fully as today.
-- **Head lines**: first 10 lines (configurable).
-- **Tail lines**: last 10 lines (configurable).
+- **Head lines**: first 3 lines.
+- **Tail lines**: last 3 lines.
 - **Separator**: `⋯ {N} lines omitted` in dim color, single line.
 - Applies to all tools NOT caught by the summarize path.
 
@@ -66,6 +66,9 @@ Design parameters:
 - No change to data sent to the model (full output in message history).
 - No change to `/export` (full transcript preserved).
 - No change to the summary path (suppressed tools stay suppressed).
+- No change to the shared threshold or to the decision of which tools summarize versus head+tail
+  truncate. This story only changes how many lines are retained once head+tail has already been
+  selected.
 - No scrollable inline viewer (future enhancement, not this story).
 
 ## Acceptance
@@ -76,11 +79,16 @@ Design parameters:
 
 - Given a non-summarize tool output of 200 lines (e.g., `bash`),
   When rendered in scrollback,
-  Then scrollback shows first 10 lines, `⋯ 180 lines omitted`, last 10 lines.
+  Then scrollback shows first 3 lines, `⋯ 194 lines omitted`, last 3 lines.
 
 - Given a summarize-eligible tool output of 200 lines (e.g., `grep`),
   When rendered in scrollback,
   Then one-line summary appears (TUI-014 handles this, NOT head+tail).
+
+- Given the head+tail retained-line setting changes,
+  When the display decision is evaluated,
+  Then the shared threshold, summarize-eligible tool list, non-summarize fallback path, and
+  model-visible tool payload remain unchanged.
 
 - Given `/export`,
   When transcript is exported,

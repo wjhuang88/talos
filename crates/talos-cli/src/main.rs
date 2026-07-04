@@ -152,7 +152,7 @@ pub(crate) struct Cli {
     #[arg(
         short,
         long,
-        help = "Override the model name (e.g., `claude-sonnet-4-20250514`)."
+        help = "Override the model name (e.g., `claude-sonnet-4-0`)."
     )]
     model: Option<String>,
 
@@ -249,7 +249,7 @@ pub(crate) struct Cli {
         long,
         value_name = "KEY=VALUE",
         conflicts_with_all = ["config_list", "config_get"],
-        help = "Set a configuration value (e.g. 'model=claude-sonnet-4-20250514')."
+        help = "Set a configuration value (e.g. 'model=claude-sonnet-4-0')."
     )]
     config_set: Option<String>,
 
@@ -262,7 +262,7 @@ pub(crate) struct Cli {
     #[arg(
         long = "use-model",
         value_name = "MODEL_ID",
-        help = "Set the active model (e.g. 'claude-sonnet-4-20250514'). Persists to config.toml."
+        help = "Set the active model (e.g. 'claude-sonnet-4-0'). Persists to config.toml."
     )]
     use_model: Option<String>,
 
@@ -288,8 +288,9 @@ pub(crate) struct Cli {
     #[arg(
         long,
         value_name = "PATH",
-        help = "Import model metadata from a models.dev JSON file into ~/.talos/catalog.db."
+        help = "Import model metadata from a models.dev JSON file (deprecated: use BUILD_MODELS=1 at build time instead; this flag is a no-op)."
     )]
+    #[allow(dead_code)]
     import_models: Option<PathBuf>,
 
     // I009-S3 begin
@@ -340,8 +341,11 @@ async fn main() -> Result<()> {
         };
     }
 
-    if let Some(path) = &cli.import_models {
-        return run_import_models(path);
+    if let Some(_path) = &cli.import_models {
+        eprintln!(
+            "Note: --import-models is deprecated. Use BUILD_MODELS=1 cargo build to regenerate \
+             the built-in model catalog at build time. This flag no longer writes to catalog.db."
+        );
     }
 
     if cli.config_list {
@@ -442,100 +446,6 @@ pub(crate) fn build_hook_registry(include_evolution: bool) -> Arc<HookRegistry> 
         }
     }
     Arc::new(registry)
-}
-
-fn run_import_models(path: &PathBuf) -> Result<()> {
-    let json = std::fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
-
-    let refreshed_at = refreshed_at_now();
-    let import = parse_models_dev_for_catalog(&json, &refreshed_at)
-        .map_err(|e| anyhow::anyhow!("failed to parse models.dev data: {e}"))?;
-    if import.models.is_empty() {
-        anyhow::bail!("models.dev import produced no models; catalog.db was not updated");
-    }
-
-    let cache_dir = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".talos")
-        .join("cache")
-        .join("models");
-    std::fs::create_dir_all(&cache_dir)
-        .map_err(|e| anyhow::anyhow!("failed to create cache dir: {e}"))?;
-
-    let cache_path = cache_dir.join("models.json");
-    std::fs::write(&cache_path, &json)
-        .map_err(|e| anyhow::anyhow!("failed to write cache: {e}"))?;
-
-    let catalog_path = crate::storage::resolve_talos_root().join("catalog.db");
-    let catalog = talos_models::ModelCatalog::open(&catalog_path)
-        .map_err(|e| anyhow::anyhow!("failed to open catalog {}: {e}", catalog_path.display()))?;
-    catalog
-        .seed(&import.providers, &import.models, &refreshed_at)
-        .map_err(|e| anyhow::anyhow!("failed to seed catalog {}: {e}", catalog_path.display()))?;
-
-    println!(
-        "Imported {} models and {} providers from models.dev",
-        import.models.len(),
-        import.providers.len()
-    );
-    println!("Catalog refreshed at {}", catalog_path.display());
-    println!("Cached to {}", cache_path.display());
-
-    let mut by_provider: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
-    for m in &import.models {
-        *by_provider.entry(m.provider.clone()).or_insert(0) += 1;
-    }
-    for (provider, count) in by_provider.iter() {
-        println!("  {provider}: {count}");
-    }
-
-    Ok(())
-}
-
-fn refreshed_at_now() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or_default();
-    format!("unix:{secs}")
-}
-
-fn parse_models_dev_for_catalog(
-    json: &str,
-    refreshed_at: &str,
-) -> std::result::Result<talos_models::ImportResult, talos_models::CatalogError> {
-    talos_models::import_models_dev_api(json, refreshed_at)
-        .or_else(|_| talos_models::import_models_dev_models(json, refreshed_at))
-        .or_else(|_| {
-            let models = talos_config::model::import_models_dev(json)
-                .map_err(|e| talos_models::CatalogError::ParseError(e.to_string()))?;
-            let providers = providers_from_models(&models, refreshed_at);
-            Ok(talos_models::ImportResult { providers, models })
-        })
-}
-
-fn providers_from_models(
-    models: &[talos_config::model::ModelMetadata],
-    refreshed_at: &str,
-) -> Vec<talos_models::ProviderInfo> {
-    let mut ids = std::collections::BTreeSet::new();
-    for model in models {
-        ids.insert(model.provider.clone());
-    }
-    ids.into_iter()
-        .map(|id| talos_models::ProviderInfo {
-            id: id.clone(),
-            name: id,
-            api_base_url: None,
-            env_var: None,
-            doc_url: None,
-            source: talos_models::ProviderSource::ModelsDev {
-                refreshed_at: refreshed_at.to_string(),
-            },
-        })
-        .collect()
 }
 
 fn run_config_list() -> Result<()> {

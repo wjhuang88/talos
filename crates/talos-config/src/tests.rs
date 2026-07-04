@@ -466,7 +466,7 @@ fn test_load_then_set_model_recovers_from_empty_model_on_disk() {
     .unwrap();
 
     let mut config = Config::load().expect("load must succeed even with empty model on disk");
-    config.model = "claude-sonnet-4-5-20250929".to_string();
+    config.model = "claude-sonnet-4-5".to_string();
     assert!(
         config.validate().is_ok(),
         "config must be valid after the user sets a model"
@@ -657,12 +657,12 @@ fn test_inline_api_key_is_serialized_in_config_toml() {
 fn test_resolve_model_limits_returns_user_config_when_set() {
     let config = Config {
         provider: "anthropic".to_string(),
-        model: "claude-sonnet-4-5-20250929".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
         providers: HashMap::from([(
             "anthropic".to_string(),
             ProviderConfig {
                 models: HashMap::from([(
-                    "claude-sonnet-4-5-20250929".to_string(),
+                    "claude-sonnet-4-5".to_string(),
                     ModelConfig {
                         context_limit: Some(150_000),
                         output_limit: Some(8000),
@@ -734,12 +734,12 @@ fn test_resolve_model_limits_output_limit_from_catalog() {
 fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
     let config = Config {
         provider: "anthropic".to_string(),
-        model: "claude-sonnet-4-5-20250929".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
         providers: HashMap::from([(
             "anthropic".to_string(),
             ProviderConfig {
                 models: HashMap::from([(
-                    "claude-sonnet-4-5-20250929".to_string(),
+                    "claude-sonnet-4-5".to_string(),
                     ModelConfig {
                         context_limit: Some(100_000),
                         output_limit: None,
@@ -840,10 +840,8 @@ fn test_provider_authenticated_returns_false_when_no_key() {
 #[test]
 fn test_set_active_model_sets_provider_from_catalog() {
     let mut config = Config::default();
-    config
-        .set_active_model("claude-sonnet-4-5-20250929")
-        .unwrap();
-    assert_eq!(config.model, "claude-sonnet-4-5-20250929");
+    config.set_active_model("claude-sonnet-4-0").unwrap();
+    assert_eq!(config.model, "claude-sonnet-4-0");
     assert_eq!(config.provider, "anthropic");
     assert!(config.providers.contains_key("anthropic"));
 }
@@ -851,8 +849,8 @@ fn test_set_active_model_sets_provider_from_catalog() {
 #[test]
 fn test_set_active_model_openai() {
     let mut config = Config::default();
-    config.set_active_model("gpt-4.1").unwrap();
-    assert_eq!(config.model, "gpt-4.1");
+    config.set_active_model("gpt-4o-2024-05-13").unwrap();
+    assert_eq!(config.model, "gpt-4o-2024-05-13");
     assert_eq!(config.provider, "openai");
     assert!(config.providers.contains_key("openai"));
 }
@@ -899,7 +897,7 @@ fn test_save_writes_api_key_in_config_toml() {
     unsafe { env::set_var("HOME", tmp_dir.to_string_lossy().as_ref()) };
 
     let mut config = Config::default();
-    config.model = "claude-sonnet-4-5-20250929".to_string();
+    config.model = "claude-sonnet-4-5".to_string();
     config.set_provider_credential("anthropic", "sk-secret-key");
     config.save().unwrap();
 
@@ -931,7 +929,7 @@ fn test_load_merges_credentials() {
 
     let config_toml = r#"
 provider = "anthropic"
-model = "claude-sonnet-4-5-20250929"
+model = "claude-sonnet-4-5"
 "#;
     fs::write(Config::default_path(), config_toml).unwrap();
 
@@ -968,7 +966,7 @@ fn test_save_preserves_inline_api_key_from_config_toml() {
 
     let config_toml = r#"
 provider = "anthropic"
-model = "claude-sonnet-4-5-20250929"
+model = "claude-sonnet-4-5"
 
 [providers.anthropic]
 protocol = "anthropic-messages"
@@ -1032,25 +1030,25 @@ fn test_skip_serializing_does_not_skip_deserialization() {
 
 #[test]
 fn test_resolve_model_limits_provider_aware_for_duplicate_ids() {
-    // glm-5.2 exists under zhipu and zai (among others). The lookup must
+    // glm-5.2 exists under many providers (models.dev). The lookup must
     // succeed for the specified provider, not fall back to the conservative
     // default or silently resolve to a different provider's entry.
-    let zhipu = Config {
-        provider: "zhipu".to_string(),
+    let aihubmix = Config {
+        provider: "aihubmix".to_string(),
         model: "glm-5.2".to_string(),
         providers: HashMap::new(),
         ..Default::default()
     };
-    let (ctx, _) = zhipu.resolve_model_limits();
+    let (ctx, _) = aihubmix.resolve_model_limits();
     assert_eq!(ctx, 1_000_000);
 
-    let zai = Config {
-        provider: "zai".to_string(),
+    let cortecs = Config {
+        provider: "cortecs".to_string(),
         model: "glm-5.2".to_string(),
         providers: HashMap::new(),
         ..Default::default()
     };
-    let (ctx2, _) = zai.resolve_model_limits();
+    let (ctx2, _) = cortecs.resolve_model_limits();
     assert_eq!(ctx2, 1_000_000);
 
     // A wrong provider+model combo must NOT resolve via a different
@@ -1070,7 +1068,7 @@ fn test_resolve_model_limits_provider_aware_for_duplicate_ids() {
 fn test_set_active_model_errors_on_ambiguous_bare_id() {
     let mut config = Config {
         provider: "anthropic".to_string(),
-        model: "claude-sonnet-4-5-20250929".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
         providers: HashMap::new(),
         ..Default::default()
     };
@@ -1080,35 +1078,35 @@ fn test_set_active_model_errors_on_ambiguous_bare_id() {
         msg.contains("multiple providers"),
         "expected ambiguity error, got: {msg}"
     );
-    assert!(msg.contains("zhipu"));
-    assert!(msg.contains("zai"));
+    assert!(msg.contains("aihubmix"));
+    assert!(msg.contains("cortecs"));
 }
 
 #[test]
 fn test_set_active_model_provider_qualified_resolves_correctly() {
     let mut config = Config {
         provider: "anthropic".to_string(),
-        model: "claude-sonnet-4-5-20250929".to_string(),
+        model: "claude-sonnet-4-5".to_string(),
         providers: HashMap::new(),
         ..Default::default()
     };
-    config.set_active_model("zai/glm-5.2").unwrap();
+    config.set_active_model("aihubmix/glm-5.2").unwrap();
     assert_eq!(config.model, "glm-5.2");
-    assert_eq!(config.provider, "zai");
-    assert!(config.providers.contains_key("zai"));
+    assert_eq!(config.provider, "aihubmix");
+    assert!(config.providers.contains_key("aihubmix"));
 }
 
 #[test]
 fn test_set_active_model_unique_bare_id_still_works() {
     let mut config = Config {
-        provider: "zai".to_string(),
+        provider: "aihubmix".to_string(),
         model: "glm-5.2".to_string(),
         providers: HashMap::new(),
         ..Default::default()
     };
-    // claude-sonnet-4-5 is unique to anthropic — bare ID should resolve.
-    config.set_active_model("claude-sonnet-4-5").unwrap();
-    assert_eq!(config.model, "claude-sonnet-4-5");
+    // claude-sonnet-4-0 is unique to anthropic — bare ID should resolve.
+    config.set_active_model("claude-sonnet-4-0").unwrap();
+    assert_eq!(config.model, "claude-sonnet-4-0");
     assert_eq!(config.provider, "anthropic");
 }
 
@@ -1123,17 +1121,17 @@ fn test_all_models_preserves_duplicates_across_providers() {
         glm52.len()
     );
     let providers: Vec<_> = glm52.iter().map(|m| m.provider.as_str()).collect();
-    assert!(providers.contains(&"zhipu"));
-    assert!(providers.contains(&"zai"));
+    assert!(providers.contains(&"aihubmix"));
+    assert!(providers.contains(&"cortecs"));
 }
 
 #[test]
 fn test_all_models_user_override_matches_by_provider_and_id() {
     let config = Config {
-        provider: "zai".to_string(),
+        provider: "cortecs".to_string(),
         model: "glm-5.2".to_string(),
         providers: HashMap::from([(
-            "zai".to_string(),
+            "cortecs".to_string(),
             ProviderConfig {
                 models: HashMap::from([(
                     "glm-5.2".to_string(),
@@ -1149,19 +1147,19 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
         ..Default::default()
     };
     let all = config.all_models();
-    // The zai entry should be overridden, NOT the zhipu entry.
-    let zai = all
+    // The cortecs entry should be overridden, NOT the aihubmix entry.
+    let cortecs_entry = all
         .iter()
-        .find(|m| m.id == "glm-5.2" && m.provider == "zai")
+        .find(|m| m.id == "glm-5.2" && m.provider == "cortecs")
         .unwrap();
-    assert_eq!(zai.context_limit, Some(50_000));
-    assert_eq!(zai.output_limit, Some(1000));
-    // The zhipu entry should be untouched.
-    let zhipu = all
+    assert_eq!(cortecs_entry.context_limit, Some(50_000));
+    assert_eq!(cortecs_entry.output_limit, Some(1000));
+    // The aihubmix entry should be untouched.
+    let aihubmix_entry = all
         .iter()
-        .find(|m| m.id == "glm-5.2" && m.provider == "zhipu")
+        .find(|m| m.id == "glm-5.2" && m.provider == "aihubmix")
         .unwrap();
-    assert_eq!(zhipu.context_limit, Some(1_000_000));
+    assert_eq!(aihubmix_entry.context_limit, Some(1_000_000));
 }
 
 #[test]
@@ -1443,7 +1441,7 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
 fn test_resolve_model_limits_with_catalog_none_falls_back_to_builtin() {
     let mut config = Config::default();
     config.provider = "anthropic".to_string();
-    config.model = "claude-sonnet-4-5-20250929".to_string();
+    config.model = "claude-sonnet-4-5".to_string();
 
     let from_catalog = config.resolve_model_limits_with_catalog(None);
     let from_builtin = config.resolve_model_limits();
@@ -1466,7 +1464,7 @@ fn test_resolve_model_limits_with_catalog_fallback_for_unknown() {
 fn test_resolve_model_limits_with_empty_catalog_does_not_block() {
     let mut config = Config::default();
     config.provider = "anthropic".to_string();
-    config.model = "claude-sonnet-4-5-20250929".to_string();
+    config.model = "claude-sonnet-4-5".to_string();
 
     let empty_catalog: Vec<model::ModelMetadata> = vec![];
     let (ctx, _) = config.resolve_model_limits_with_catalog(Some(&empty_catalog));

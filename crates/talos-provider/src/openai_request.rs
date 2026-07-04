@@ -1,5 +1,7 @@
 //! OpenAI Chat Completions request assembly.
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use talos_config::{ReasoningEffort, ReasoningOptions};
@@ -49,52 +51,73 @@ pub(crate) fn build_request_body(
     reasoning: Option<&ReasoningOptions>,
     output_limit: Option<u32>,
 ) -> Value {
+    let mut pending_tool_call_ids = HashSet::new();
     let openai_messages: Vec<OpenAIMessage> = messages
         .iter()
-        .map(|msg| match msg {
-            Message::System { content, .. } => OpenAIMessage {
-                role: "system".into(),
-                content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
-                tool_calls: None,
-                tool_call_id: None,
-                reasoning_content: None,
-            },
-            Message::Context { content } => OpenAIMessage {
-                role: "user".into(),
-                content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
-                tool_calls: None,
-                tool_call_id: None,
-                reasoning_content: None,
-            },
-            Message::User { content } => OpenAIMessage {
-                role: "user".into(),
-                content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
-                tool_calls: None,
-                tool_call_id: None,
-                reasoning_content: None,
-            },
+        .enumerate()
+        .filter_map(|(idx, msg)| match msg {
+            Message::System { content, .. } => {
+                pending_tool_call_ids.clear();
+                OpenAIMessage {
+                    role: "system".into(),
+                    content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    reasoning_content: None,
+                }
+                .into()
+            }
+            Message::Context { content } => {
+                pending_tool_call_ids.clear();
+                OpenAIMessage {
+                    role: "user".into(),
+                    content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    reasoning_content: None,
+                }
+                .into()
+            }
+            Message::User { content } => {
+                pending_tool_call_ids.clear();
+                OpenAIMessage {
+                    role: "user".into(),
+                    content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    reasoning_content: None,
+                }
+                .into()
+            }
             Message::Assistant {
                 content,
                 tool_calls,
                 reasoning,
             } => {
+                let matched_tool_call_ids = matched_following_tool_result_ids(messages, idx);
+                let mut serialized_tool_call_ids = HashSet::new();
                 let openai_tool_calls = if tool_calls.is_empty() {
                     None
                 } else {
-                    Some(
-                        tool_calls
-                            .iter()
-                            .map(|tc| OpenAIToolCall {
+                    let calls: Vec<OpenAIToolCall> = tool_calls
+                        .iter()
+                        .filter(|tc| matched_tool_call_ids.contains(&tc.id))
+                        .map(|tc| {
+                            serialized_tool_call_ids.insert(tc.id.clone());
+                            OpenAIToolCall {
                                 id: tc.id.clone(),
                                 call_type: "function".into(),
                                 function: OpenAIFunction {
                                     name: tc.name.clone(),
                                     arguments: tc.input.to_string(),
                                 },
-                            })
-                            .collect(),
-                    )
+                            }
+                        })
+                        .collect();
+                    if calls.is_empty() { None } else { Some(calls) }
                 };
+                pending_tool_call_ids.clear();
+                pending_tool_call_ids.extend(serialized_tool_call_ids);
 
                 let reasoning_content = reasoning.as_ref().and_then(|assistant_reasoning| {
                     if assistant_reasoning.model != model {
@@ -130,8 +153,16 @@ pub(crate) fn build_request_body(
                     tool_call_id: None,
                     reasoning_content,
                 }
+                .into()
             }
             Message::Tool { result } => {
+                if !pending_tool_call_ids.remove(&result.tool_use_id) {
+                    tracing::warn!(
+                        tool_use_id = %result.tool_use_id,
+                        "openai: dropping orphan tool result without preceding assistant tool_call"
+                    );
+                    return None;
+                }
                 let content = if result.is_error {
                     format!("Error: {}", result.content)
                 } else {
@@ -144,6 +175,7 @@ pub(crate) fn build_request_body(
                     tool_call_id: Some(result.tool_use_id.clone()),
                     reasoning_content: None,
                 }
+                .into()
             }
         })
         .collect();
@@ -203,6 +235,22 @@ pub(crate) fn redact_secret(secret: &str) -> String {
         .rev()
         .collect();
     format!("{prefix}...{suffix}")
+}
+
+fn matched_following_tool_result_ids(
+    messages: &[Message],
+    assistant_idx: usize,
+) -> HashSet<String> {
+    let mut matched = HashSet::new();
+    for msg in messages.iter().skip(assistant_idx + 1) {
+        match msg {
+            Message::Tool { result } => {
+                matched.insert(result.tool_use_id.clone());
+            }
+            _ => break,
+        }
+    }
+    matched
 }
 
 fn non_empty_content(content: &str, fallback: &str) -> String {

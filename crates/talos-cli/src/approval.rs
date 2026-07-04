@@ -11,6 +11,7 @@
 //! without invoking [`ApprovalPrompt::prompt`].
 
 use std::io::{self, BufRead, Write};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use talos_core::tool::{ToolNature, ToolPermissionFacet};
@@ -71,11 +72,18 @@ impl ApprovalPrompt {
         input: &serde_json::Value,
     ) -> Result<PermissionDecision> {
         let formatted = Self::format_input(input);
+        let always_scopes = always_allow_rule_descriptions(tool_name, profile, input);
 
         loop {
             eprintln!();
             eprintln!("⚠ Tool requires approval: {tool_name}");
             eprintln!("Arguments: {formatted}");
+            if !always_scopes.is_empty() {
+                eprintln!("Always approve scope:");
+                for scope in &always_scopes {
+                    eprintln!("  - {scope}");
+                }
+            }
             eprintln!();
             eprintln!("[y] Approve once  [a] Always approve  [n] Deny");
             eprint!("> ");
@@ -90,22 +98,7 @@ impl ApprovalPrompt {
             match line.trim() {
                 "y" => return Ok(PermissionDecision::Allow),
                 "a" => {
-                    for facet in permission_facets_or_default(profile, tool_name) {
-                        let resource = facet
-                            .resource
-                            .clone()
-                            .or_else(|| ResourceExtractor::extract(facet.nature, input));
-                        let resource_kind = facet
-                            .resource_kind
-                            .map(ResourceKind::from)
-                            .or_else(|| Some(default_resource_kind(facet.nature)));
-                        self.engine.add_rule(PermissionRule::new_nature(
-                            facet.nature,
-                            resource,
-                            resource_kind,
-                            PermissionDecision::Allow,
-                        ));
-                    }
+                    add_always_allow_rules(&mut self.engine, tool_name, profile, input);
                     return Ok(PermissionDecision::Allow);
                 }
                 "n" => {
@@ -158,6 +151,90 @@ impl ApprovalPrompt {
         let formatted = Self::format_input(input);
         (tool_name.to_string(), formatted, nature)
     }
+}
+
+pub(crate) fn add_always_allow_rules(
+    engine: &mut PermissionEngine,
+    tool_name: &str,
+    profile: &[ToolPermissionFacet],
+    input: &serde_json::Value,
+) {
+    for rule in always_allow_rules(tool_name, profile, input) {
+        engine.add_runtime_allow_rule(rule);
+    }
+}
+
+pub(crate) fn always_allow_rules(
+    tool_name: &str,
+    profile: &[ToolPermissionFacet],
+    input: &serde_json::Value,
+) -> Vec<PermissionRule> {
+    permission_facets_or_default(profile, tool_name)
+        .into_iter()
+        .map(|facet| {
+            let mut resource = facet
+                .resource
+                .clone()
+                .or_else(|| ResourceExtractor::extract(facet.nature, input));
+            let resource_kind = facet
+                .resource_kind
+                .map(ResourceKind::from)
+                .or_else(|| Some(default_resource_kind(facet.nature)));
+
+            if facet.nature == ToolNature::Write && resource_kind == Some(ResourceKind::Path) {
+                resource = resource.map(|path| write_always_scope(&path));
+            }
+
+            PermissionRule::new_nature(
+                facet.nature,
+                resource,
+                resource_kind,
+                PermissionDecision::Allow,
+            )
+        })
+        .collect()
+}
+
+pub(crate) fn always_allow_rule_descriptions(
+    tool_name: &str,
+    profile: &[ToolPermissionFacet],
+    input: &serde_json::Value,
+) -> Vec<String> {
+    always_allow_rules(tool_name, profile, input)
+        .into_iter()
+        .map(|rule| {
+            let nature = rule
+                .nature
+                .map(|nature| format!("{nature:?}"))
+                .unwrap_or_else(|| tool_name.to_string());
+            let resource = rule.resource.unwrap_or_else(|| "*".to_string());
+            let kind = rule
+                .resource_kind
+                .map(|kind| format!("{kind:?}"))
+                .unwrap_or_else(|| "Any".to_string());
+            format!("{nature} {kind} {resource}")
+        })
+        .collect()
+}
+
+fn write_always_scope(resource: &str) -> String {
+    if resource.ends_with('/') {
+        return directory_glob(resource);
+    }
+
+    let path = Path::new(resource);
+    match path.parent().and_then(Path::to_str) {
+        Some(parent) if !parent.is_empty() && parent != "." => directory_glob(parent),
+        _ => resource.to_string(),
+    }
+}
+
+fn directory_glob(path: &str) -> String {
+    let trimmed = path.trim_end_matches('/');
+    if trimmed.is_empty() || trimmed == "." {
+        return path.to_string();
+    }
+    format!("{trimmed}/**")
 }
 
 fn permission_facets_or_default(
@@ -248,5 +325,67 @@ mod tests {
         let formatted = ApprovalPrompt::format_input(&input);
         assert!(!formatted.ends_with(TRUNCATION_SUFFIX));
         assert!(formatted.contains("short value"));
+    }
+
+    #[test]
+    fn test_always_allow_write_scopes_to_parent_directory() {
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            "crates/talos-cli/src/main.rs",
+            talos_core::tool::ToolResourceKind::Path,
+        )];
+
+        let rules = always_allow_rules("write", &profile, &serde_json::json!({}));
+
+        assert_eq!(rules.len(), 1);
+        assert_eq!(
+            rules[0].resource.as_deref(),
+            Some("crates/talos-cli/src/**")
+        );
+        assert_eq!(rules[0].resource_kind, Some(ResourceKind::Path));
+    }
+
+    #[test]
+    fn test_always_allow_root_write_stays_file_scoped() {
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            "Cargo.toml",
+            talos_core::tool::ToolResourceKind::Path,
+        )];
+
+        let rules = always_allow_rules("write", &profile, &serde_json::json!({}));
+
+        assert_eq!(rules[0].resource.as_deref(), Some("Cargo.toml"));
+    }
+
+    #[test]
+    fn test_always_allow_rule_is_effective_against_default_ask() {
+        let mut engine = PermissionEngine::new();
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "bash:read_only_inspection:abc",
+            talos_core::tool::ToolResourceKind::Command,
+        )];
+
+        add_always_allow_rules(&mut engine, "bash", &profile, &serde_json::json!({}));
+
+        assert_eq!(
+            engine.evaluate_profile("bash", &profile, &serde_json::json!({})),
+            PermissionDecision::Allow
+        );
+    }
+
+    #[test]
+    fn test_always_allow_descriptions_show_reusable_scope() {
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            "src/main.rs",
+            talos_core::tool::ToolResourceKind::Path,
+        )];
+
+        let descriptions =
+            always_allow_rule_descriptions("write", &profile, &serde_json::json!({}));
+
+        assert_eq!(descriptions, vec!["Write Path src/**"]);
     }
 }

@@ -617,8 +617,14 @@ impl BottomPanelComponent<'_> {
             Style::default().fg(dim),
         )));
 
+        let prefix = format!("  \u{26a0} {tool_name}: ");
+        let arg_width = area
+            .width
+            .saturating_sub(prefix.chars().count() as u16)
+            .max(1) as usize;
+        let arguments = truncate_one_line(arguments, arg_width);
         lines.push(Line::from(Span::styled(
-            format!("  \u{26a0} {tool_name}: {arguments}"),
+            format!("{prefix}{arguments}"),
             Style::default().fg(warn).bg(bg).bold(),
         )));
 
@@ -641,6 +647,23 @@ impl BottomPanelComponent<'_> {
             Paragraph::new(Text::from(lines)).style(Style::default().bg(input_bg)),
             area,
         );
+    }
+}
+
+fn truncate_one_line(value: &str, max_chars: usize) -> String {
+    let single = value.replace('\n', " ");
+    let chars: Vec<char> = single.chars().collect();
+    if chars.len() <= max_chars {
+        single
+    } else if max_chars == 0 {
+        String::new()
+    } else {
+        format!(
+            "{}…",
+            chars[..max_chars.saturating_sub(1)]
+                .iter()
+                .collect::<String>()
+        )
     }
 }
 

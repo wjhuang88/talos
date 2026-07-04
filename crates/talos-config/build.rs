@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::process::Command;
 
-const API_JSON_URL: &str = "https://raw.githubusercontent.com/ai-sdk-dev/models/main/api.json";
+const API_JSON_URL: &str = "https://models.dev/api.json";
 
 fn main() {
     println!("cargo:rerun-if-changed=src/models.toml");
@@ -34,12 +34,12 @@ fn main() {
 
 fn refresh_models_toml() -> Result<usize, String> {
     let json = fetch_api_json()?;
-    let models = parse_api_json(&json)?;
+    let (providers, models) = parse_api_json(&json)?;
     if models.is_empty() {
         return Err("no models with tool_call=true found in api.json".to_string());
     }
     let count = models.len();
-    let toml_output = generate_toml(models);
+    let toml_output = generate_toml(providers, models);
     let toml_path = std::path::Path::new("src/models.toml");
     std::fs::write(toml_path, toml_output).map_err(|e| format!("write models.toml: {e}"))?;
     Ok(count)
@@ -62,7 +62,30 @@ fn fetch_api_json() -> Result<String, String> {
 #[derive(Deserialize)]
 struct ApiProvider {
     #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    api: Option<String>,
+    #[serde(default, deserialize_with = "deser_env")]
+    env: Option<String>,
+    #[serde(default)]
+    doc: Option<String>,
+    #[serde(default)]
     models: BTreeMap<String, ApiModel>,
+}
+
+fn deser_env<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum EnvField {
+        Single(String),
+        Array(Vec<String>),
+    }
+
+    match Option::<EnvField>::deserialize(d)? {
+        Some(EnvField::Single(s)) => Ok(Some(s)),
+        Some(EnvField::Array(arr)) => Ok(arr.into_iter().next()),
+        None => Ok(None),
+    }
 }
 
 #[derive(Deserialize)]
@@ -100,13 +123,28 @@ struct ApiCost {
     #[serde(default)]
     cache_read: Option<f64>,
 }
-fn parse_api_json(json: &str) -> Result<Vec<TomlModel>, String> {
+fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), String> {
     let root: BTreeMap<String, ApiProvider> =
         serde_json::from_str(json).map_err(|e| format!("parse api.json: {e}"))?;
 
+    let mut providers = Vec::new();
     let mut models = Vec::new();
 
     for (provider_id, provider) in &root {
+        // Provider-level metadata from api.json
+        let name = provider.name.clone().unwrap_or_else(|| provider_id.clone());
+        let api_base_url = provider.api.clone();
+        let env_var = provider.env.clone();
+        let doc_url = provider.doc.clone();
+
+        providers.push(TomlProvider {
+            id: provider_id.clone(),
+            name,
+            api_base_url,
+            env_var,
+            doc_url,
+        });
+
         for (model_id, model) in &provider.models {
             let tool_call = model.tool_call.unwrap_or(false);
             if !tool_call {
@@ -155,14 +193,28 @@ fn parse_api_json(json: &str) -> Result<Vec<TomlModel>, String> {
         }
     }
 
+    providers.sort_by(|a, b| a.id.cmp(&b.id));
     models.sort_by(|a, b| a.provider.cmp(&b.provider).then_with(|| a.id.cmp(&b.id)));
 
-    Ok(models)
+    Ok((providers, models))
 }
 
 #[derive(Serialize)]
 struct TomlDataset {
+    providers: Vec<TomlProvider>,
     models: Vec<TomlModel>,
+}
+
+#[derive(Serialize)]
+struct TomlProvider {
+    id: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    api_base_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    env_var: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    doc_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -206,8 +258,8 @@ fn is_false(b: &bool) -> bool {
     !b
 }
 
-fn generate_toml(models: Vec<TomlModel>) -> String {
-    let dataset = TomlDataset { models };
+fn generate_toml(providers: Vec<TomlProvider>, models: Vec<TomlModel>) -> String {
+    let dataset = TomlDataset { providers, models };
     let body = toml::to_string_pretty(&dataset).unwrap_or_default();
 
     let mut output = String::new();

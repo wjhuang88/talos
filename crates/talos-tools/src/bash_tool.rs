@@ -8,7 +8,9 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -41,6 +43,27 @@ pub struct BashTool {
     timeout: Duration,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BashCommandClass {
+    ReadOnlyInspection,
+    ValidationBuild,
+    PackageManagerOrNetwork,
+    WriteOrMutating,
+    ComplexShell,
+}
+
+impl BashCommandClass {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ReadOnlyInspection => "read_only_inspection",
+            Self::ValidationBuild => "validation_build",
+            Self::PackageManagerOrNetwork => "package_manager_or_network",
+            Self::WriteOrMutating => "write_or_mutating",
+            Self::ComplexShell => "complex_shell",
+        }
+    }
+}
+
 impl BashTool {
     /// Creates a new `BashTool` with the given working directory.
     ///
@@ -67,6 +90,10 @@ impl BashTool {
     /// Returns the timeout duration for this tool.
     pub fn timeout(&self) -> Duration {
         self.timeout
+    }
+
+    fn permission_resource_for_command(&self, command: &str) -> String {
+        bash_permission_resource(command)
     }
 
     async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
@@ -238,6 +265,22 @@ impl AgentTool for BashTool {
         ToolFamily::Shell
     }
 
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        let command = input
+            .get("command")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let class = classify_bash_command(command);
+        vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                self.permission_resource_for_command(command),
+                ToolResourceKind::Command,
+            )
+            .with_description(format!("bash {}", class.as_str())),
+        ]
+    }
+
     fn summary_fields(&self) -> &'static [&'static str] {
         &["command"]
     }
@@ -276,6 +319,123 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
         command: command.to_owned(),
         timeout_secs,
     })
+}
+
+fn bash_permission_resource(command: &str) -> String {
+    let normalized = normalize_bash_command(command);
+    let class = classify_bash_command(&normalized);
+    // Extract the program name (first word) for the resource identifier.
+    // When inside the workspace, only the command identity matters —
+    // working directory and arguments are intentionally excluded so
+    // that "always allow" for a given program+class survives cwd
+    // changes and argument variation across repeated invocations.
+    let program = normalized.split_whitespace().next().unwrap_or(&normalized);
+    format!("bash:{}:{program}", class.as_str())
+}
+
+fn normalize_bash_command(command: &str) -> String {
+    command.trim().to_string()
+}
+
+fn classify_bash_command(command: &str) -> BashCommandClass {
+    let normalized = normalize_bash_command(command);
+    if normalized.is_empty() || has_shell_control_syntax(&normalized) {
+        return BashCommandClass::ComplexShell;
+    }
+
+    let mut parts = normalized.split_whitespace();
+    let Some(program) = parts.next() else {
+        return BashCommandClass::ComplexShell;
+    };
+    let args: Vec<&str> = parts.collect();
+
+    if is_env_assignment(program) {
+        return BashCommandClass::ComplexShell;
+    }
+
+    match program {
+        "ls" | "pwd" | "cat" | "head" | "tail" | "wc" | "grep" | "rg" | "find" | "stat"
+        | "diff" | "sed" | "awk" => BashCommandClass::ReadOnlyInspection,
+        "cargo" => classify_cargo(&args),
+        "npm" | "pnpm" | "yarn" | "bun" => classify_javascript_tool(program, &args),
+        "go" => classify_go(&args),
+        "pytest" | "mvn" | "gradle" => BashCommandClass::ValidationBuild,
+        "curl" | "wget" | "ssh" | "scp" | "rsync" => BashCommandClass::PackageManagerOrNetwork,
+        "rm" | "mv" | "cp" | "mkdir" | "rmdir" | "touch" | "tee" | "chmod" | "chown" | "ln" => {
+            BashCommandClass::WriteOrMutating
+        }
+        "git" => classify_git(&args),
+        _ => BashCommandClass::ComplexShell,
+    }
+}
+
+fn has_shell_control_syntax(command: &str) -> bool {
+    command.contains('|')
+        || command.contains(';')
+        || command.contains('\n')
+        || command.contains("&&")
+        || command.contains("||")
+        || command.contains("$(")
+        || command.contains('`')
+        || command.contains('>')
+        || command.contains('<')
+        || command.ends_with('&')
+}
+
+fn is_env_assignment(token: &str) -> bool {
+    let Some((name, _)) = token.split_once('=') else {
+        return false;
+    };
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        && !name.as_bytes()[0].is_ascii_digit()
+}
+
+fn classify_cargo(args: &[&str]) -> BashCommandClass {
+    match args.first().copied() {
+        Some("test" | "check" | "build" | "clippy") => BashCommandClass::ValidationBuild,
+        Some("fmt" | "fix") => BashCommandClass::WriteOrMutating,
+        Some("install" | "publish" | "search" | "update") => {
+            BashCommandClass::PackageManagerOrNetwork
+        }
+        _ => BashCommandClass::ComplexShell,
+    }
+}
+
+fn classify_javascript_tool(program: &str, args: &[&str]) -> BashCommandClass {
+    match (program, args.first().copied()) {
+        ("bun", Some("test")) => BashCommandClass::ValidationBuild,
+        ("bun", Some("install" | "add" | "remove" | "update" | "publish")) => {
+            BashCommandClass::PackageManagerOrNetwork
+        }
+        ("npm" | "pnpm" | "yarn", Some("test" | "run")) => BashCommandClass::ValidationBuild,
+        ("npm" | "pnpm" | "yarn", Some("install" | "add" | "remove" | "update" | "publish")) => {
+            BashCommandClass::PackageManagerOrNetwork
+        }
+        _ => BashCommandClass::ComplexShell,
+    }
+}
+
+fn classify_go(args: &[&str]) -> BashCommandClass {
+    match args.first().copied() {
+        Some("test" | "build" | "vet") => BashCommandClass::ValidationBuild,
+        Some("get" | "install") => BashCommandClass::PackageManagerOrNetwork,
+        _ => BashCommandClass::ComplexShell,
+    }
+}
+
+fn classify_git(args: &[&str]) -> BashCommandClass {
+    match args.first().copied() {
+        Some("status" | "log" | "show" | "diff" | "branch") => BashCommandClass::ReadOnlyInspection,
+        Some("fetch" | "pull" | "push" | "clone") => BashCommandClass::PackageManagerOrNetwork,
+        Some(
+            "add" | "commit" | "checkout" | "switch" | "merge" | "rebase" | "reset" | "restore"
+            | "rm" | "mv" | "tag",
+        ) => BashCommandClass::WriteOrMutating,
+        _ => BashCommandClass::ComplexShell,
+    }
 }
 
 #[cfg(test)]
@@ -400,6 +560,68 @@ mod tests {
     fn test_bash_tool_not_read_only() {
         let tool = BashTool::new(test_dir());
         assert!(!tool.is_read_only());
+    }
+
+    #[test]
+    fn test_bash_permission_profile_uses_stable_exact_resource() {
+        let tool = BashTool::new(test_dir());
+        let input = serde_json::json!({ "command": "git status" });
+
+        let first = tool.permission_profile(&input);
+        let second = tool.permission_profile(&input);
+
+        assert_eq!(first, second);
+        assert_eq!(first[0].nature, ToolNature::Execute);
+        assert_eq!(first[0].resource_kind, Some(ToolResourceKind::Command));
+        assert!(
+            first[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:read_only_inspection:")
+        );
+    }
+
+    #[test]
+    fn test_bash_permission_profile_commands_with_same_program_share_resource() {
+        let tool = BashTool::new(test_dir());
+
+        let status = tool.permission_profile(&serde_json::json!({ "command": "git status" }));
+        let log = tool.permission_profile(&serde_json::json!({ "command": "git log" }));
+
+        // Same program + same class = same resource identifier,
+        // so "always allow" survives argument variation.
+        assert_eq!(status[0].resource, log[0].resource);
+    }
+
+    #[test]
+    fn test_bash_permission_profile_same_command_across_directories() {
+        let first_tool = BashTool::new(PathBuf::from("/tmp/project-a"));
+        let second_tool = BashTool::new(PathBuf::from("/tmp/project-b"));
+        let input = serde_json::json!({ "command": "git status" });
+
+        let first = first_tool.permission_profile(&input);
+        let second = second_tool.permission_profile(&input);
+
+        // Working directory is intentionally excluded from the resource
+        // identifier: "always allow" for git in any workspace directory
+        // matches the same rule.
+        assert_eq!(first[0].resource, second[0].resource);
+    }
+
+    #[test]
+    fn test_bash_command_with_shell_operator_is_complex() {
+        let tool = BashTool::new(test_dir());
+        let profile =
+            tool.permission_profile(&serde_json::json!({ "command": "git status && git log" }));
+
+        assert!(
+            profile[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:complex_shell:")
+        );
     }
 
     #[test]

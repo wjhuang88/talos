@@ -7,9 +7,7 @@ mod tests {
     use crate::registry;
     use crate::skill_runtime::discover_runtime_skills;
     use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
-    use crate::{
-        config_get_dotted, config_set_dotted, is_secret_key, mask_secrets, run_import_models,
-    };
+    use crate::{config_get_dotted, config_set_dotted, is_secret_key, mask_secrets};
     use talos_conversation::{ConversationEngine, ModelInfo, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
 
@@ -19,61 +17,6 @@ mod tests {
         std::sync::Arc::new(tokio::sync::Mutex::new(
             discover_runtime_skills(dir.path(), false).unwrap(),
         ))
-    }
-
-    #[test]
-    fn import_models_creates_and_seeds_catalog_db() {
-        let _lock = crate::test_support::HOME_ENV_MUTEX.lock().unwrap();
-        let dir = tempfile::tempdir().unwrap();
-        let original_home = std::env::var("HOME").ok();
-        unsafe { std::env::set_var("HOME", dir.path()) };
-
-        let json_path = dir.path().join("api.json");
-        std::fs::write(
-            &json_path,
-            r#"{
-              "acme": {
-                "name": "Acme AI",
-                "env": ["ACME_API_KEY"],
-                "api": "https://api.acme.example/v1",
-                "doc": "https://docs.acme.example",
-                "models": {
-                  "acme-large": {
-                    "limit": { "context": 128000, "output": 8192 },
-                    "cost": { "input": 1.25, "output": 5.0 },
-                    "tool_call": true
-                  }
-                }
-              }
-            }"#,
-        )
-        .unwrap();
-
-        let result = run_import_models(&json_path);
-
-        match original_home {
-            Some(value) => unsafe { std::env::set_var("HOME", value) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
-
-        result.unwrap();
-        let catalog_path = dir.path().join(".talos").join("catalog.db");
-        assert!(catalog_path.is_file());
-        let catalog = talos_models::ModelCatalog::open(&catalog_path).unwrap();
-        assert_eq!(catalog.provider_count().unwrap(), 1);
-        assert_eq!(catalog.model_count().unwrap(), 1);
-
-        let providers = catalog.all_providers().unwrap();
-        assert_eq!(providers[0].id, "acme");
-        assert_eq!(providers[0].name, "Acme AI");
-        assert_eq!(
-            providers[0].api_base_url.as_deref(),
-            Some("https://api.acme.example/v1")
-        );
-
-        let models = catalog.all_models().unwrap();
-        assert_eq!(models[0].provider, "acme");
-        assert_eq!(models[0].id, "acme-large");
     }
 
     #[test]
@@ -382,14 +325,14 @@ mod tests {
     fn model_metadata_context_includes_model_info_without_secret() {
         let mut config = talos_config::Config::default();
         config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.model = "claude-sonnet-4-0".to_string();
         config.set_provider_credential("anthropic", "sk-secret-value");
 
         let file = crate::mode_runtime::model_metadata_context_file(&config);
 
         assert_eq!(file.path, "TALOS_MODEL.md");
         assert!(file.content.contains("Provider: anthropic"));
-        assert!(file.content.contains("Model: claude-sonnet-4-5-20250929"));
+        assert!(file.content.contains("Model: claude-sonnet-4-0"));
         assert!(file.content.contains("Context limit:"));
         assert!(!file.content.contains("sk-secret-value"));
     }
@@ -407,7 +350,7 @@ mod tests {
                     content: "hello".into(),
                 },
                 talos_session::SessionMetadata {
-                    provider: Some("zhipu-coding-plan".into()),
+                    provider: Some("zhipuai-coding-plan".into()),
                     model: Some("glm-5.2".into()),
                     ..Default::default()
                 },
@@ -416,11 +359,11 @@ mod tests {
 
         let mut config = talos_config::Config::default();
         config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4-5-20250929".to_string();
+        config.model = "claude-sonnet-4-0".to_string();
 
         crate::mode_runtime::apply_session_model_to_config(&mut config, &session);
 
-        assert_eq!(config.provider, "zhipu-coding-plan");
+        assert_eq!(config.provider, "zhipuai-coding-plan");
         assert_eq!(config.model, "glm-5.2");
     }
 

@@ -58,6 +58,22 @@ fn approval_summary_uses_tool_summary_fields() {
 }
 
 #[test]
+fn tool_args_summary_uses_available_budget_before_truncating() {
+    let command = "cargo test -p talos-cli approval::tests::test_always_allow_rule_is_effective_against_default_ask";
+    let args = serde_json::json!({ "command": command });
+    let args_str = serde_json::to_string_pretty(&args).unwrap();
+
+    let full =
+        tool_display::summarize_tool_args_with_budget(&args_str, &["command".to_string()], 140);
+    let short =
+        tool_display::summarize_tool_args_with_budget(&args_str, &["command".to_string()], 48);
+
+    assert_eq!(full, format!("command: {command}"));
+    assert!(short.ends_with('…'));
+    assert!(short.chars().count() <= 48);
+}
+
+#[test]
 fn tool_result_scrollback_keeps_multiple_lines() {
     let display = ToolResultDisplay {
         tool_name: Some("tree".to_string()),
@@ -770,14 +786,14 @@ fn bash_over_threshold_renders_head_and_tail() {
         content,
     };
     let lines = tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
-    assert_eq!(lines.len(), 21);
+    assert_eq!(lines.len(), 7);
     assert!(lines[0].text.contains("line 0"));
-    assert!(lines[9].text.contains("line 9"));
-    assert!(lines[10].text.contains("30 lines omitted"));
-    assert!(lines[11].text.contains("line 40"));
-    assert!(lines[20].text.contains("line 49"));
+    assert!(lines[2].text.contains("line 2"));
+    assert!(lines[3].text.contains("44 lines omitted"));
+    assert!(lines[4].text.contains("line 47"));
+    assert!(lines[6].text.contains("line 49"));
     assert!(lines.iter().all(|l| !l.text.contains("line 20")));
-    assert!(lines.iter().all(|l| !l.text.contains("line 39")));
+    assert!(lines.iter().all(|l| !l.text.contains("line 46")));
 }
 
 #[test]
@@ -851,15 +867,15 @@ fn head_tail_omitted_count_is_correct() {
         };
         let lines =
             tool_display::build_tool_result_scrollback_lines(&display, "", Some(CColor::Green));
-        let expected_omitted = total - 10 - 10;
+        let expected_omitted = total - 3 - 3;
         assert!(
-            lines[10]
+            lines[3]
                 .text
                 .contains(&format!("{expected_omitted} lines omitted")),
             "total={total}: {:?}",
-            lines[10].text
+            lines[3].text
         );
-        assert_eq!(lines.len(), 21);
+        assert_eq!(lines.len(), 7);
     }
 }
 

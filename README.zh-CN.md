@@ -361,8 +361,13 @@ TUI 中可用的斜杠命令：
 | `/resume` | 列出可恢复的工作区会话；`/resume <N>` 按序号选择 |
 | `/fork` | 分叉当前会话（将历史记录克隆到子会话） |
 | `/delete` | 打开会话选择器（排除当前会话）；选择一行进行删除 |
+| `/todo`、`/todo list`、`/todo show <id>`、`/todo stats`、`/todo export [json|markdown]` | 查看或导出当前会话的待办事项；用户斜杠命令仅支持只读操作 |
+| `/hooks` | 显示已配置 Hook 的诊断信息（声明路径、是否存在、校验状态），不执行 Hook |
+| `/agile [status]` | 显示只读治理状态：看板概览、打开中的迭代、Manifest、以及 Rust 校验发现 |
 | `/model` | 打开模型选择器，在运行时浏览和切换模型；模型按提供商分组，当前模型显示在顶部分组，输入内容可按分组过滤 |
 | `/connect` | 打开提供商选择器以连接新的提供商（凭据及可选的自定义端点/`base_url`）；也可用 `/connect <provider>` 直接连接指定提供商 |
+
+使用 `/model` 在已配置凭据的提供商之间切换模型。选择器仅显示当前可用的模型，按提供商分组，并将当前使用的模型固定在"当前"分组中。使用 `/connect` 添加或更新提供商凭据。`/connect` 会从本地模型目录中显示提供商配置选项，提示输入 API key，并可选地提供自定义端点（`base_url`）以适配兼容网关的提供商。全新安装无需手动初始化目录：Talos 会在首次访问目录时创建 `~/.talos/catalog.db` 并从打包的离线 `models.toml` 种子数据填充。`talos --import-models <path>` 可以在需要更新提供商元数据时从 models.dev JSON 文件刷新该目录。
 
 ## Skills
 
