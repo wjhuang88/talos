@@ -49,8 +49,8 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 | B3 | Git fallback audit | Classify `git_push`, `git_pull`, `git_checkout`, add/commit, and future stash/reset/merge/rebase against `gix 0.85.0`. | B2 | GIT-001 matrix updated with keep/replace/defer decisions and tests. | Keep host fallback with replacement trigger. | Complete |
 | B4 | Activate I095 | Start runtime validation evidence iteration. | B3 | I094 closed or paused with exact residuals. | Keep I095 Planned. | Complete |
 | B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Complete |
-| B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Planned |
-| B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | Planned |
+| B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Complete |
+| B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | In Progress |
 | B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Planned |
 | B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | Planned |
 | B10 | Final closeout | Residual owners, release posture, Board, backlog, iterations, and handoff synchronized. | B9 | Full workspace gates, governance validation, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
@@ -335,3 +335,35 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I096, GOV-003, this task, and the I095 closeout before starting B6.
+
+### B6 — I096 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I096 after I095 was committed and pushed.
+- Recorded that I095 closed with allowlisted validation evidence, README sync, REL-002
+  non-qualification posture, workspace validation, clippy, governance validation, and
+  `git diff --check` passing.
+- Synchronized I096, GOV-003, Board, iteration index, Product Backlog, and this task.
+
+Current state and artifacts:
+
+- I096 is Active.
+- B7 is In Progress.
+- Scope is the smallest safe governance preview/write gate only. This activation does not
+  authorize silent owner-doc edits, broad project-manager automation, web write routes, remote
+  dashboard mutation, release claim, publish, tag, or permission-default change.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- B7: implement or precisely block the governance mutation packet.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I096, GOV-003, and this B6 checkpoint.

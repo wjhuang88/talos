@@ -1,12 +1,13 @@
 # Iteration I096: Governance Mutation Gates
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: design and implement the smallest safe governance preview/write gate needed
 > before Talos can self-bootstrap owner-doc updates.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: typed governance plan/preview/write flow or a recorded blocker that preserves
 > read-only governance.
+> Activated: 2026-07-04
 
 ## Published Baseline
 
@@ -51,3 +52,4 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated after I095 closed with allowlisted validation evidence, README sync, REL-002 non-qualification posture, workspace validation, clippy, governance validation, and `git diff --check` passing. Scope is the smallest safe governance preview/write gate only: no silent owner-doc edits, broad project-manager automation, web write routes, remote dashboard mutation, release claim, publish, tag, or permission-default change. |

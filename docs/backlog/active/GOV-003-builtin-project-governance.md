@@ -14,6 +14,10 @@ I093 A13 readiness result (2026-07-04): `docs/reference/REL-002-READINESS-REPORT
 keeps GOV-003 at Phase 1 partial. Read-only status is useful, but mutating governance actions,
 gate enforcement, and deterministic risk classification remain self-bootstrap gaps.
 
+I096 activation note (2026-07-04): selected for the smallest safe governance preview/write gate.
+This does not authorize silent owner-doc edits, broad project-manager automation, web write routes,
+remote dashboard mutation, release claims, publish/tag actions, or permission-default changes.
+
 ## Problem
 
 The `agent-project-governance` skill (wjhuang88, v2.0.0) provides structured project
