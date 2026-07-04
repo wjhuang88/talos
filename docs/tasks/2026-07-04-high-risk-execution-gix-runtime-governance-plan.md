@@ -51,8 +51,8 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 | B5 | Validation execution packet | Add or specify allowlisted validation execution evidence records. | B4 | Command, exit status, output summary, and permission decision are durable and tested. | Ship read-only design if execution cannot be safely bounded. | Complete |
 | B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Complete |
 | B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | Complete |
-| B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Planned |
-| B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | Planned |
+| B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Complete |
+| B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | In Progress |
 | B10 | Final closeout | Residual owners, release posture, Board, backlog, iterations, and handoff synchronized. | B9 | Full workspace gates, governance validation, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
 
 ## Dependencies And Prerequisites
@@ -402,3 +402,35 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I097, REL-002, this task, and the I096 closeout before starting B8.
+
+### B8 — I097 Activated (2026-07-04)
+
+Completed task items:
+
+- Activated I097 after I096 was committed and pushed.
+- Recorded that I096 closed with a narrow governance mutation gate, README sync, REL-002
+  non-qualification posture, workspace validation, clippy, governance validation, and
+  `git diff --check` passing.
+- Synchronized I097, REL-002, Board, iteration index, Product Backlog, and this task.
+
+Current state and artifacts:
+
+- I097 is Active.
+- B9 is In Progress.
+- Scope is documentation-only controlled self-bootstrap rehearsal. This activation does not
+  authorize a `v1.0.0` claim, release tag, publish, GitHub Release, issue automation, broad
+  governance automation, or code-feature implementation.
+
+Commands/checks and actual results:
+
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+
+Next task item:
+
+- B9: run the controlled self-bootstrap rehearsal or record the exact non-qualification boundary.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read I097, REL-002, and this B8 checkpoint.

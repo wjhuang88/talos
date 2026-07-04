@@ -44,6 +44,10 @@ owner-doc mutation gate with explicit preview, `--confirm-preview`, post-write g
 validation, and rollback on validation failure. This narrows owner-doc sync risk, but the I096
 implementation remains Codex-primary and is not a qualifying self-bootstrap session.
 
+I097 activation note (2026-07-04): selected for a documentation-only controlled self-bootstrap
+rehearsal after I095/I096 narrowed validation and owner-doc mutation evidence gaps. If Codex
+remains the primary executor, I097 must close as non-qualifying evidence.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent

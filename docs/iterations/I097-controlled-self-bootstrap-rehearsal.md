@@ -1,11 +1,12 @@
 # Iteration I097: Controlled Self-Bootstrap Rehearsal
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: attempt one controlled Talos-primary documentation-only self-bootstrap
 > rehearsal, or record non-qualification honestly.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: REL-002 evidence with explicit primary-executor boundary.
+> Activated: 2026-07-04
 
 ## Published Baseline
 
@@ -52,3 +53,4 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated after I096 closed with `talos governance iteration-record preview/write`, post-write governance validation, rollback behavior, README sync, REL-002 non-qualification posture, workspace validation, clippy, governance validation, and `git diff --check` passing. Scope is a documentation-only controlled self-bootstrap rehearsal. If Codex remains primary, the result must be recorded as non-qualifying. |
