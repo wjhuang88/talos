@@ -52,8 +52,8 @@ This task does not reopen I090-I093. It follows from their closeout and uses new
 | B6 | Activate I096 | Start mutating governance preview/write gates. | B5 | I095 closed or paused with exact residuals. | Keep I096 Planned. | Complete |
 | B7 | Governance mutation packet | Typed plan/preview/write flow for owner-doc updates with validation gates. | B6 | No silent owner-doc mutation; governance validation catches drift. | Keep governance read-only and record blocker. | Complete |
 | B8 | Activate I097 | Start controlled self-bootstrap rehearsal. | B7 | I096 closed or paused with exact residuals. | Keep I097 Planned. | Complete |
-| B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | In Progress |
-| B10 | Final closeout | Residual owners, release posture, Board, backlog, iterations, and handoff synchronized. | B9 | Full workspace gates, governance validation, final checkpoint. | Mark Partial with exact unfinished owners. | Planned |
+| B9 | Talos-primary rehearsal | Run one documentation-only Talos-primary rehearsal if runtime/governance gates are ready. | B8 | REL-002 evidence explicitly states primary executor boundary and validation evidence. | Record non-qualifying evidence. | Complete |
+| B10 | Final closeout | Residual owners, release posture, Board, backlog, iterations, and handoff synchronized. | B9 | Full workspace gates, governance validation, final checkpoint. | Mark Partial with exact unfinished owners. | In Progress |
 
 ## Dependencies And Prerequisites
 
@@ -434,3 +434,33 @@ Recovery or resume instruction:
 
 - Run `git status --short`.
 - Read I097, REL-002, and this B8 checkpoint.
+
+### B9 — Controlled Rehearsal Closed Non-Qualifying (2026-07-04)
+
+Completed task items:
+
+- Ran `talos validate run --profile governance --json`.
+- Ran `talos governance iteration-record write` to append one I097 execution row with post-write
+  governance validation.
+- Recorded evidence in `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i097-b9-nonqualification.md`.
+- Closed I097 as non-qualifying REL-002 evidence because Codex remained the primary executor.
+- Synchronized REL-002 and the 2026-07-04 readiness report.
+
+Commands/checks and actual results:
+
+- `cargo run -p talos-cli -- validate run --profile governance --json`: passed. Record showed
+  command `scripts/validate_project_governance.sh .`, permission decision
+  `allowlisted validation profile: governance`, exit status `0`, status `passed`, stdout summary
+  `Governance validation passed: 0 warning(s).`, and stderr summary `<empty>`.
+- `cargo run -p talos-cli -- governance iteration-record write --iteration I097 --date 2026-07-04 --record-type execution --record ... --confirm-preview`: passed and reported `Validation: passed`.
+
+Current state:
+
+- I097 is Complete.
+- REL-002 remains No-go for `v1.0.0`.
+- B10 final closeout is In Progress.
+
+Recovery or resume instruction:
+
+- Run `git status --short`.
+- Read this B9 checkpoint, I097 closeout, REL-002, and the readiness report before B10.

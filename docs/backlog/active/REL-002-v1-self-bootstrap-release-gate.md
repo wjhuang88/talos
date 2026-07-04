@@ -48,6 +48,11 @@ I097 activation note (2026-07-04): selected for a documentation-only controlled 
 rehearsal after I095/I096 narrowed validation and owner-doc mutation evidence gaps. If Codex
 remains the primary executor, I097 must close as non-qualifying evidence.
 
+I097 result (2026-07-04): `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i097-b9-nonqualification.md`
+records the controlled rehearsal as non-qualifying. Talos executed allowlisted governance
+validation and wrote one bounded owner-doc execution row, but Codex remained primary for planning,
+evidence interpretation, docs editing, broader validation orchestration, commit, and push.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent
@@ -118,6 +123,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-04 | I093-A14 | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i093-a14-nonqualification.md` | Does not qualify. Talos only proved `talos 0.2.2` CLI availability; Codex remained primary for planning, edits, validation orchestration, docs sync, commit, and push. |
 | 2026-07-04 | I095-B5 | `docs/iterations/I095-runtime-validation-evidence.md` | Does not qualify by itself. The allowlisted validation evidence mechanism exists, but this implementation and validation were Codex-primary. |
 | 2026-07-04 | I096-B7 | `docs/iterations/I096-governance-mutation-gates.md` | Does not qualify by itself. The owner-doc mutation gate exists, but this implementation and validation were Codex-primary. |
+| 2026-07-04 | I097-B9 | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i097-b9-nonqualification.md` | Does not qualify. Talos executed bounded validation and owner-doc mutation commands, but Codex remained primary for planning, evidence interpretation, docs editing, broader validation orchestration, commit, and push. |
 
 ## Readiness Reports
 

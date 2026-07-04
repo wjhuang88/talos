@@ -27,16 +27,17 @@ not authorize a tag, publish, GitHub Release, or `v1.0.0` claim.
 | Previous readiness report | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` remains accurate: no qualifying Talos-primary sessions exist. |
 | I095 runtime validation evidence update | `talos validate run` now executes built-in allowlisted profiles and records command, exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. This narrows the validation evidence gap but is not Talos-primary self-bootstrap evidence by itself. |
 | I096 governance mutation gate update | `talos governance iteration-record preview/write` now provides a narrow owner-doc preview/write gate with post-write governance validation and rollback on validation failure. This narrows owner-doc sync risk, but broad governance automation remains unimplemented. |
+| I097 controlled rehearsal | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i097-b9-nonqualification.md` records a non-qualifying rehearsal: Talos executed allowlisted validation and bounded owner-doc mutation, but Codex remained the primary executor. |
 
 ## Acceptance Assessment
 
 | REL-002 Acceptance Item | Status | 2026-07-04 Assessment |
 |---|---|---|
 | Talos can run a complete development iteration as primary runtime. | Not met | Current I090-I093 work is Codex-primary. |
-| Talos can read governance state, select work, and preserve owner docs. | Partial | Read-only governance views exist; owner-doc mutation/sync still depends on external execution. |
+| Talos can read governance state, select work, and preserve owner docs. | Partial | Read-only governance views and one bounded owner-doc mutation path exist; work selection and broad owner-doc sync still depend on external execution. |
 | Talos can implement code changes with permission-gated tools and produce validation evidence. | Not met | Runtime tools exist, but no qualifying Talos-primary implementation session is recorded. |
 | Talos can perform architecture-risk classification and route high-risk work. | Partial | ARCH-030 and governance docs classify risks, but Talos does not yet own an executable risk-classification workflow. |
-| Talos can update README/user docs/backlog/iterations/decisions/board after real change. | Not met | Updates are still performed by Codex in current evidence. |
+| Talos can update README/user docs/backlog/iterations/decisions/board after real change. | Not met | I097 proved one bounded iteration-row append only; broader docs/backlog/board updates are still performed by Codex. |
 | At least three non-trivial Talos-on-Talos development sessions are recorded. | Not met | Existing rehearsals are non-qualifying; I090-I093 are also Codex-primary. |
 | Codex is not the primary executor for qualifying sessions. | Not met | Codex remains primary. |
 | Final v1.0 release checklist names all remaining gaps. | Partial | This report updates gaps; final checklist remains future work. |
@@ -45,7 +46,7 @@ not authorize a tag, publish, GitHub Release, or `v1.0.0` claim.
 
 | Gap | Current State | Minimum Next Evidence |
 |---|---|---|
-| Talos-primary edit loop | `talos-runtime` can submit turns and stream events, but no Talos-primary repo edit session qualifies. | A documentation-only Talos-primary session where Talos plans, edits, validates, and records evidence with Codex limited to review. |
+| Talos-primary edit loop | `talos-runtime` can submit turns and stream events, and I097 used Talos for bounded validation plus one owner-doc mutation, but no Talos-primary repo edit session qualifies. | A documentation-only Talos-primary session where Talos plans, edits, validates, and records evidence with Codex limited to review. |
 | Validation execution | I095 adds `talos validate run` for built-in allowlisted profiles with durable command, output-summary, exit-status, and permission-decision records. | Use the evidence packet in a Talos-primary session; it is not enough while Codex remains the primary executor. |
 | Git/issue sync | Git push/issue comment remains external. | Explicit policy: either Talos gains permission-gated git/issue workflow or REL-002 accepts external release-operator boundary. |
 | SDK stability | `RUNTIME-001` is complete as pre-1.0 facade. | Decide which `talos-runtime` APIs graduate to stable support and which remain internal before v1.0. |
@@ -83,8 +84,8 @@ ARCH-030 remains useful as a watchlist. For REL-002, each residual root needs a 
 
 ## Minimum Next Packet
 
-The next highest-value REL-002 packet is not another broad feature. It is a controlled
-Talos-primary rehearsal:
+The next highest-value REL-002 packet remains a real Talos-primary rehearsal, not another broad
+feature:
 
 1. Select a documentation-only or read-only code audit change.
 2. Run it through Talos as the primary runtime.
