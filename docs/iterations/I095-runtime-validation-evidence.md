@@ -1,11 +1,12 @@
 # Iteration I095: Runtime Validation Evidence
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-04
 > Planned objective: add or specify durable validation execution evidence needed for Talos-primary
 > development.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: permission-bounded validation evidence records or a precise design blocker.
+> Activated: 2026-07-04
 
 ## Published Baseline
 
@@ -50,3 +51,4 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-04 | Activation | Activated after I094 closed with `gix 0.85.0`, unchanged feature scope, fallback audit, workspace validation, clippy, governance validation, and `git diff --check` passing. Scope remains runtime validation evidence only: no arbitrary shell policy expansion, scheduled execution, Guardian auto-approval, exec DSL, hidden pass/fail, release claim, tag, publish, or permission-default change. |

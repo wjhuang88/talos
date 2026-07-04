@@ -30,6 +30,10 @@ records the attempted evidence packet as non-qualifying. Talos proved only the l
 CLI version surface; Codex remained the primary executor for planning, editing, validation
 orchestration, owner-doc sync, commit, and push.
 
+I095 activation note (2026-07-04): selected as a prerequisite narrowing pass for runtime
+validation evidence. This is still non-qualifying for REL-002 by itself; Codex remains the primary
+executor for this unattended task unless a later I097 Talos-primary rehearsal proves otherwise.
+
 ## Problem
 
 Pre-1.0 releases can validate useful slices, but they do not prove that Talos has become the agent

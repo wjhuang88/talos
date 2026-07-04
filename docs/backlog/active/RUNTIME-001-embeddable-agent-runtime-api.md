@@ -15,6 +15,11 @@ keeps RUNTIME-001 at pre-1.0. Minimum gaps before REL-002 qualification are Talo
 loop evidence, autonomous validation evidence capture, git/issue sync policy, and stable SDK
 surface classification.
 
+I095 activation note (2026-07-04): selected for runtime validation evidence only. This does not
+change the "Complete (pre-1.0 facade)" status and does not authorize arbitrary shell policy
+expansion, scheduled execution, Guardian auto-approval, exec DSL, hidden pass/fail, release claim,
+tag, publish, or permission-default changes.
+
 ## Problem
 
 Talos's core turn loop is mostly isolated in `talos-agent`, and CLI/TUI crates do not own the
