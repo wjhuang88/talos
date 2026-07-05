@@ -34,7 +34,7 @@ Ordered task items:
 | A2 | Permission reference study | Reference study and taxonomy for `PERM-003` | A1 | Study cites current sources and updates acceptance | Keep implementation blocked if sources unavailable | Complete |
 | A3 | Commit/push current verified remediation and audit baseline | Stage commit on `main` | A1-A2 | fmt, focused tests, governance, clippy/workspace evidence recorded | Stop before push only on validation failure | Complete |
 | A4 | Validation internal-service design slice | Implementation plan or first internal API slice | A3 | Tests or owner-doc gate for no-host governance path | Defer to next iteration with explicit owner | Complete |
-| A5 | Model browser implementation path | Independent CLI browser plan or first slice | A3 | CLI smoke/headless navigation evidence | Keep bounded/filterable print mode as interim | Planned |
+| A5 | Model browser implementation path | Independent CLI browser plan or first slice | A3 | CLI smoke/headless navigation evidence | Keep bounded/filterable print mode as interim | Complete |
 | A6 | Git host-fallback cleanup path | Remove or gate runtime host `git status` leak | A3 | Smoke evidence without host git where feasible | Omit dirty status when internal path unavailable | Complete |
 
 Dependencies and prerequisites:
@@ -318,6 +318,88 @@ Recovery or resume instruction:
 
 - Resume from `git status --short --branch`; if A6 has not been committed, review/stage this slice
   and commit after re-running any stale validation gate.
+
+### 2026-07-05 — A5 Independent Model Browser Slice
+
+Completed task items:
+
+- Added `talos --available-models-browser` as an independent command-line terminal browser.
+- Kept `--available-models` as bounded/filterable script output; the browser is a separate opt-in
+  command.
+- Browser state lives in `crates/talos-cli/src/models_browser.rs` and does not depend on the main
+  conversation TUI state machine.
+- Browser supports `j/k`, arrows, PageUp/PageDown, `g/G`, `/` search, `Enter` selection/setup,
+  `c` provider setup, and `q`/Esc quit.
+- Authenticated model rows can be selected to save the active provider/model.
+- Unauthenticated rows route to a CLI-local API key/base URL prompt and save provider credentials
+  without printing existing API key values.
+- README and `MODEL-006` updated with usage, scope, and residual manual walkthrough.
+
+Current state and artifacts:
+
+- Code lives in `crates/talos-cli/src/models_browser.rs` and `crates/talos-cli/src/main.rs`.
+- `MODEL-006` is `In Progress` because the first implementation slice is complete, but a
+  real-terminal manual walkthrough remains before final Complete.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check` passed.
+- `cargo test -p talos-cli models_browser::tests` passed: 5 tests.
+- `cargo check -p talos-cli` passed.
+- `cargo run -p talos-cli -- --help` passed and listed `--available-models-browser`.
+- `cargo run -p talos-cli -- --available-models-browser` in non-TTY mode failed as expected with:
+  `--available-models-browser requires an interactive terminal; use --available-models for script output`.
+
+Open risks or deviations:
+
+- Real terminal walkthrough is still required to verify raw-mode UX, alternate-screen cleanup, and
+  credential prompt ergonomics.
+- No main TUI coupling was introduced.
+
+Next task item:
+
+- Run full validation gates, commit/push A5, then close the concentrated audit task with residuals.
+
+Recovery or resume instruction:
+
+- Resume from `git status --short --branch`; if A5 is not committed, re-run focused tests plus
+  full gates before staging.
+
+### 2026-07-05 — Concentrated Audit Closeout
+
+Completed task items:
+
+- A1-A6 are complete.
+- User correction on project information detection was incorporated into the `VALIDATION-001`
+  owner path: project/governance type detection must remain an extensible detector/strategy
+  registry, not a monolithic hardcoded matcher.
+- `PERM-003`, `VALIDATION-001`, `MODEL-006`, `TOOL-017`, and `GIT-001` all have owner-backed
+  implementation or residual paths.
+- Runtime behavior stayed conservative: no broad bash allow, no permission-default relaxation, no
+  release tag, no publish, no destructive cleanup, and no main-session TUI coupling for the model
+  browser.
+
+Final validation gates:
+
+- `cargo fmt --all -- --check` passed.
+- `cargo clippy --workspace -- -D warnings` passed.
+- `cargo test --workspace` passed.
+- `scripts/validate_project_governance.sh .` passed with 0 warnings.
+- `git diff --check` passed.
+
+Residual owner work:
+
+- `PERM-003`: permission UX implementation remains blocked until prompt copy, deny-precedence tests,
+  and measured repeated-approval evidence are added.
+- `VALIDATION-001`: shared service extraction, TUI/runtime caller, and adapter instruction
+  injection remain open; project type detection must stay strategy-registry based.
+- `MODEL-006`: real-terminal manual walkthrough remains before Complete.
+- `GIT-001`: write-oriented Git fallback policy remains tracked.
+
+Recovery or resume instruction:
+
+- Resume residuals from their owner docs, not from this concentrated audit task. Use a new iteration
+  ID if objectives or acceptance targets change.
 
 ## Verification Expectations For Future Work
 

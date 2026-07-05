@@ -27,6 +27,7 @@ mod mode_print;
 mod mode_runners;
 mod mode_runtime;
 mod model_lifecycle;
+mod models_browser;
 mod provider_setup;
 mod registry;
 mod runtime_adapter;
@@ -284,6 +285,12 @@ pub(crate) struct Cli {
     available_models_all: bool,
 
     #[arg(
+        long = "available-models-browser",
+        help = "Open an independent terminal browser for the built-in model catalog."
+    )]
+    available_models_browser: bool,
+
+    #[arg(
         long = "use-model",
         value_name = "MODEL_ID",
         help = "Set the active model (e.g. 'claude-sonnet-4-0'). Persists to config.toml."
@@ -388,6 +395,11 @@ async fn main() -> Result<()> {
             cli.available_models_filter.as_deref(),
             cli.available_models_limit,
             cli.available_models_all,
+        );
+    }
+    if cli.available_models_browser {
+        return models_browser::run_available_models_browser(
+            cli.available_models_filter.as_deref(),
         );
     }
     if let Some(model_id) = &cli.use_model {

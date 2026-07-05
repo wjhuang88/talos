@@ -48,6 +48,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 rmcp = "1.7.0"
 futures = "0.3"
+crossterm = "0.29"
 
 [lints]
 workspace = true

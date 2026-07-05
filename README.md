@@ -356,9 +356,12 @@ List packaged model metadata without dumping the full catalog by default:
 talos --available-models
 talos --available-models --available-models-filter openai/gpt-4
 talos --available-models --available-models-all
+talos --available-models-browser
 ```
 
-Model rows are printed as `provider/model` to avoid ambiguity.
+Model rows are printed as `provider/model` to avoid ambiguity. `--available-models` stays bounded
+for scripts and diagnostics; use `--available-models-browser` in a real terminal for a scrollable
+catalog view with `j/k`, arrows, `g/G`, `/` search, `Enter` selection/setup, and `q` quit.
 
 ### Interactive Commands
 

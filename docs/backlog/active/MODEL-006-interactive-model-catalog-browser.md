@@ -5,7 +5,7 @@
 | ID | MODEL-006 |
 | Type | Product Story |
 | Priority | P1 |
-| Status | Refinement |
+| Status | In Progress — first independent CLI browser slice implemented |
 | Source | Maintainer request 2026-07-05 — command-line `--available-models` output is too large; users need a vim-like scrollable/modifiable view before entering the main Talos TUI |
 | Depends on | MC-001, MODEL-005 |
 | Blocks | Full model-catalog UX closeout |
@@ -23,8 +23,8 @@ independent CLI mode rather than coupling to the existing session TUI state mach
 ## Product Direction
 
 Keep the script-oriented `--available-models` output bounded and filterable. Add a separate
-interactive CLI browser mode for human exploration, for example `talos --models-browser` or
-`talos models browse` after the command surface is decided.
+interactive CLI browser mode for human exploration. The first implemented command surface is
+`talos --available-models-browser`.
 
 Expected interaction shape:
 
@@ -52,14 +52,34 @@ Expected interaction shape:
 
 ## Acceptance Criteria
 
-- [ ] Browser can handle the full packaged catalog without dumping thousands of rows to stdout.
-- [ ] Search filters by provider, model id, and provider/model.
-- [ ] Current active model is visually identifiable.
-- [ ] Unauthenticated rows route to provider setup rather than appearing as selectable active models.
-- [ ] Credential/base URL updates use existing config merge behavior and preserve unrelated fields,
+- [x] Browser can handle the full packaged catalog without dumping thousands of rows to stdout.
+- [x] Search filters by provider, model id, and provider/model.
+- [x] Current active model is visually identifiable.
+- [x] Unauthenticated rows route to provider setup rather than appearing as selectable active models.
+- [x] Credential/base URL updates use existing config merge behavior and preserve unrelated fields,
       without depending on the main session TUI.
-- [ ] CLI `--available-models` remains bounded/filterable for scripts and support diagnostics.
-- [ ] Tests cover navigation, filtering, selection, provider setup routing, and no-secret rendering.
+- [x] CLI `--available-models` remains bounded/filterable for scripts and support diagnostics.
+- [x] Tests cover navigation, filtering, selection, provider setup routing, and no-secret rendering.
+
+## Implemented Slice
+
+2026-07-05: `talos --available-models-browser` opens an independent crossterm browser before the
+main conversation TUI starts. The browser:
+
+- Uses its own CLI-local state in `crates/talos-cli/src/models_browser.rs`.
+- Supports `j/k`, arrows, PageUp/PageDown, `g/G`, `/` search, `Enter` selection/setup, `c`
+  provider setup, and `q`/Esc quit.
+- Renders high-contrast provider headers, current-model markers, ready/setup status, context, and
+  pricing.
+- Keeps existing `--available-models` bounded/filterable output unchanged for scripts.
+- Refuses to run without an interactive terminal.
+- Saves active authenticated model selections directly.
+- Prompts for API key/base URL for unauthenticated rows without printing existing API key values.
+
+Residual hardening:
+
+- Add a real-terminal manual walkthrough before marking `MODEL-006` Complete.
+- Consider a subcommand alias such as `talos models browse` after the CLI command taxonomy settles.
 
 ## Current Mitigation
 
