@@ -1,6 +1,6 @@
 # VALIDATION-001: Internal Validation Service
 
-**Status**: Planned
+**Status**: In Progress — governance profile internalized in CLI validation slice
 **Priority**: P0
 **Created**: 2026-07-04
 **Source**: Maintainer correction after I095 review
@@ -22,6 +22,8 @@ That is not the right long-term boundary for Talos as a general-purpose agent ru
   model.
 - Talos should be able to infer common project types, then inject host-tool adapter instructions
   only when that project type has been identified.
+- Project-type inference must be extensible. It should use a strategy-style detector registry rather
+  than a monolithic hardcoded language check.
 - Host-tool validation may still exist, but it must be an adapter with explicit dependency,
   language, permission, and evidence metadata.
 
@@ -47,6 +49,11 @@ scripts are adapters, not the core abstraction.
 - Preserve host-tool checks as explicit adapters, not hidden runtime assumptions.
 - Add common project-type detection so validation can identify Rust, Node.js, Python, Go, Java, or
   mixed workspaces from project manifests before selecting host-tool adapters.
+- Add governance-project detection so Talos can recognize workspaces managed by Talos governance
+  docs and route governance checks through internal capabilities instead of language/toolchain
+  assumptions.
+- Implement project-type detection as an extensible strategy registry. New project or governance
+  types must be added by registering a detector, not by growing a single all-purpose conditional.
 - Add demand-driven host-tool adapter instruction injection: adapter usage guidance is loaded only
   after a matching project type is confirmed, and remains absent for unrelated ecosystems.
 - Make profiles project-configurable over time without allowing arbitrary command execution.
@@ -63,12 +70,12 @@ scripts are adapters, not the core abstraction.
 ## Acceptance Criteria
 
 - [ ] A shared internal validation API exists outside `talos-cli`.
-- [ ] `governance` profile can run without invoking `scripts/validate_project_governance.sh`.
+- [x] `governance` profile can run without invoking `scripts/validate_project_governance.sh`.
 - [ ] CLI `talos validate plan/run` uses the shared service rather than owning validation logic.
 - [ ] TUI can call at least one internal validation profile without spawning host commands.
-- [ ] Evidence records distinguish `internal` checks from `host_tool` checks.
-- [ ] Host-tool adapters record language/ecosystem metadata and unavailable-tool behavior.
-- [ ] Common project types can be inferred from manifests before host-tool adapters are selected.
+- [x] Evidence records distinguish `internal` checks from `host_tool` checks.
+- [x] Host-tool adapters record language/ecosystem metadata and unavailable-tool behavior.
+- [x] Common project types can be inferred from manifests before host-tool adapters are selected.
 - [ ] Host-tool adapter usage instructions are injected on demand only for confirmed project types.
 - [ ] Cargo is represented only as a Rust-project adapter for this repository, not as a Talos-wide
       assumption.
@@ -91,9 +98,25 @@ Project-type detection should be a separate discovery step before adapter select
 validation service should not inject Cargo, npm, pytest, or similar instructions until the matching
 project type is discovered.
 
+The discovery step should follow a strategy pattern: each detector owns the markers and matching
+logic for one project/governance type, and the validation service iterates a detector registry. This
+keeps future ecosystems and governance schemes additive instead of forcing all detection logic into
+one branch-heavy function.
+
+Governance detection is a sibling strategy, not a Rust-specific special case. A workspace with
+`.agent-governance/manifest.yaml`, `docs/sop/`, or `docs/BOARD.md` can expose internal governance
+checks even when no language toolchain is available.
+
 The first implementation should prioritize internal governance validation because it already exists
 as Rust logic through `talos-conversation` governance summary/validation code. `scripts/*.sh` can
 remain as compatibility wrappers, but they should not be the primary runtime path.
+
+2026-07-05 first slice: CLI validation now detects `talos_governance`, `rust`, `node`, `python`,
+`go`, and `java` project types through a `ProjectTypeDetector` strategy registry.
+`talos validate plan/run --profile governance` uses the internal
+`talos_conversation::collect_governance_validation` path and reports `execution_mode: "internal"`.
+Cargo checks remain `execution_mode: "host_tool"` with `ecosystem: "rust"` and are blocked when a
+Rust manifest is not detected.
 
 ## Relationship To I095
 
@@ -110,6 +133,14 @@ implementation should not be treated as the final TUI/runtime boundary.
 - Project-type detection tests covering Rust, Node.js, Python, and mixed workspaces.
 - Instruction-injection tests proving unrelated host-tool adapter guidance is not loaded.
 - Governance validation and `git diff --check`.
+
+2026-07-05 partial validation evidence:
+
+- `cargo test -p talos-cli validation` passed: 10 tests.
+- `cargo run -p talos-cli -- validate plan --profile governance --json` prints
+  `project_types:["talos_governance","rust"]` and an internal governance check.
+- `cargo run -p talos-cli -- validate run --profile governance --json` prints a passed
+  `execution_mode:"internal"` governance record.
 
 ## Required Reads
 

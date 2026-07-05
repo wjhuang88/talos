@@ -32,8 +32,8 @@ Ordered task items:
 |---|---|---|---|---|---|---|
 | A1 | Inventory open requirements and current mitigations | Audit table with owners and order | None | Owner docs linked and board updated | Record unknowns as residuals | Complete |
 | A2 | Permission reference study | Reference study and taxonomy for `PERM-003` | A1 | Study cites current sources and updates acceptance | Keep implementation blocked if sources unavailable | Complete |
-| A3 | Commit/push current verified remediation and audit baseline | Stage commit on `main` | A1-A2 | fmt, focused tests, governance, clippy/workspace evidence recorded | Stop before push only on validation failure | In Progress |
-| A4 | Validation internal-service design slice | Implementation plan or first internal API slice | A3 | Tests or owner-doc gate for no-host governance path | Defer to next iteration with explicit owner | Planned |
+| A3 | Commit/push current verified remediation and audit baseline | Stage commit on `main` | A1-A2 | fmt, focused tests, governance, clippy/workspace evidence recorded | Stop before push only on validation failure | Complete |
+| A4 | Validation internal-service design slice | Implementation plan or first internal API slice | A3 | Tests or owner-doc gate for no-host governance path | Defer to next iteration with explicit owner | In Progress |
 | A5 | Model browser implementation path | Independent CLI browser plan or first slice | A3 | CLI smoke/headless navigation evidence | Keep bounded/filterable print mode as interim | Planned |
 | A6 | Git host-fallback cleanup path | Remove or gate runtime host `git status` leak | A3 | Smoke evidence without host git where feasible | Omit dirty status when internal path unavailable | Planned |
 
@@ -204,6 +204,60 @@ Recovery or resume instruction:
 
 - Resume from this task file, run `git status --short --branch`, verify the A3 validation gates,
   then commit logical changes using the required conventional commit format.
+
+### 2026-07-05 — A4 Internal Governance And Project-Type Detection Slice
+
+Completed task items:
+
+- A3 committed and pushed:
+  - `459e214` — model catalog/runtime permission gaps.
+  - `9c1004a` — open requirement audit gate and PERM-003 reference study.
+- A4 first implementation slice started:
+  - `talos validate plan/run --profile governance` now uses an internal governance validation check
+    instead of `scripts/validate_project_governance.sh`.
+  - Validation evidence distinguishes `execution_mode: "internal"` and
+    `execution_mode: "host_tool"`.
+  - Project type detection recognizes Talos governance, Rust, Node.js, Python, Go, and Java
+    workspaces.
+  - Project type detection is implemented through a `ProjectTypeDetector` strategy registry, so
+    future project/governance types can be added by registering detectors.
+  - Cargo checks are treated as Rust host-tool adapters and are blocked when Rust is not detected.
+
+Current state and artifacts:
+
+- A4 code lives in `crates/talos-cli/src/validation.rs`.
+- A4 owner doc update lives in
+  `docs/backlog/active/VALIDATION-001-internal-validation-service.md`.
+- This is still a CLI-local service slice; the acceptance item for a shared API outside `talos-cli`
+  remains open.
+
+Commands/checks and actual results:
+
+- `cargo test -p talos-cli validation` passed: 10 tests.
+- `cargo run -p talos-cli -- validate plan --profile governance --json` printed
+  `project_types:["talos_governance","rust"]` and an internal governance check.
+- `cargo run -p talos-cli -- validate run --profile governance --json` printed a passed
+  `execution_mode:"internal"` governance record.
+- `cargo fmt --all -- --check` passed.
+- `scripts/validate_project_governance.sh .` passed with 0 warnings.
+- `git diff --check` passed.
+- `cargo clippy --workspace -- -D warnings` passed.
+- `cargo test --workspace` passed.
+
+Open risks or deviations:
+
+- The validation service has not yet moved to a shared crate.
+- TUI/runtime invocation of internal validation remains open.
+- Host-tool adapter instruction injection is still planned, not implemented.
+
+Next task item:
+
+- Commit/push this internal governance/project-type detection slice.
+
+Recovery or resume instruction:
+
+- Resume from `git status --short --branch`; run fmt, `cargo test -p talos-cli validation`, clippy,
+  workspace tests if code changed further, governance validation, and diff check before committing.
 
 ## Verification Expectations For Future Work
 
