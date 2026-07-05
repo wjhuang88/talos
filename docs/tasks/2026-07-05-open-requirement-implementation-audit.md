@@ -33,9 +33,9 @@ Ordered task items:
 | A1 | Inventory open requirements and current mitigations | Audit table with owners and order | None | Owner docs linked and board updated | Record unknowns as residuals | Complete |
 | A2 | Permission reference study | Reference study and taxonomy for `PERM-003` | A1 | Study cites current sources and updates acceptance | Keep implementation blocked if sources unavailable | Complete |
 | A3 | Commit/push current verified remediation and audit baseline | Stage commit on `main` | A1-A2 | fmt, focused tests, governance, clippy/workspace evidence recorded | Stop before push only on validation failure | Complete |
-| A4 | Validation internal-service design slice | Implementation plan or first internal API slice | A3 | Tests or owner-doc gate for no-host governance path | Defer to next iteration with explicit owner | In Progress |
+| A4 | Validation internal-service design slice | Implementation plan or first internal API slice | A3 | Tests or owner-doc gate for no-host governance path | Defer to next iteration with explicit owner | Complete |
 | A5 | Model browser implementation path | Independent CLI browser plan or first slice | A3 | CLI smoke/headless navigation evidence | Keep bounded/filterable print mode as interim | Planned |
-| A6 | Git host-fallback cleanup path | Remove or gate runtime host `git status` leak | A3 | Smoke evidence without host git where feasible | Omit dirty status when internal path unavailable | Planned |
+| A6 | Git host-fallback cleanup path | Remove or gate runtime host `git status` leak | A3 | Smoke evidence without host git where feasible | Omit dirty status when internal path unavailable | Complete |
 
 Dependencies and prerequisites:
 
@@ -258,6 +258,66 @@ Recovery or resume instruction:
 
 - Resume from `git status --short --branch`; run fmt, `cargo test -p talos-cli validation`, clippy,
   workspace tests if code changed further, governance validation, and diff check before committing.
+
+### 2026-07-05 — A6 Governance Git Runtime Leak Slice
+
+Completed task items:
+
+- `talos_tools::git_dirty_count()` added as a narrow public helper backed by the native `gix`
+  status API.
+- `talos --governance-status` now calls `git_dirty_count()` instead of spawning
+  `git status --porcelain`.
+- Governance Git state degrades to an explicit unavailable message if a repository cannot be
+  discovered; it does not silently call host Git.
+- Identity prompt now prefers built-in Git tools (`git_status`, `git_diff`, `git_log`,
+  `git_branch_list`) for read-only inspection and treats host shell Git as an explicit approved
+  fallback only.
+- `GIT-001` updated to close the runtime dirty-tree and prompt-guidance findings.
+
+Current state and artifacts:
+
+- A6 code touches `crates/talos-tools/src/git.rs`, `crates/talos-tools/src/lib.rs`,
+  `crates/talos-cli/src/governance.rs`, `crates/talos-agent/prompts/identity.txt`, and
+  `crates/talos-agent/src/prompt/tests.rs`.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check` passed.
+- `cargo test -p talos-cli governance::tests` passed: 8 tests.
+- `cargo test -p talos-tools git::tests` passed: 3 tests.
+- `cargo test -p talos-agent test_identity_prompt_prefers_builtin_git_tools_over_bash_git` passed:
+  1 test.
+- `cargo run -p talos-cli -- --governance-status` passed and printed a Git status section via the
+  internal/gix path.
+- `rg 'Command::new\("git"\)|status --porcelain' crates/talos-cli/src/governance.rs` has no
+  matches.
+
+Final validation gates:
+
+- `cargo fmt --all -- --check` passed.
+- `cargo test -p talos-cli governance::tests` passed: 8 tests.
+- `cargo test -p talos-tools git::tests` passed: 3 tests.
+- `cargo test -p talos-agent test_identity_prompt_prefers_builtin_git_tools_over_bash_git` passed:
+  1 test.
+- `cargo clippy --workspace -- -D warnings` passed.
+- `cargo test --workspace` passed.
+- `scripts/validate_project_governance.sh .` passed with 0 warnings.
+- `git diff --check` passed.
+
+Open risks or deviations:
+
+- Write-oriented Git operations still have documented structured host-`git` fallbacks.
+- A6 intentionally closes only the runtime dirty-tree leak and prompt guidance. Write-oriented Git
+  fallback policy remains tracked in `GIT-001`.
+
+Next task item:
+
+- Commit/push the runtime Git leak slice, then resume A5.
+
+Recovery or resume instruction:
+
+- Resume from `git status --short --branch`; if A6 has not been committed, review/stage this slice
+  and commit after re-running any stale validation gate.
 
 ## Verification Expectations For Future Work
 

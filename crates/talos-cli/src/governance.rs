@@ -211,17 +211,22 @@ fn print_validation_status(workspace: &Path) {
 }
 
 fn print_git_status(workspace: &Path) {
-    if let Ok(out) = std::process::Command::new("git")
-        .args(["status", "--porcelain"])
-        .current_dir(workspace)
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&out.stdout);
-        let dirty = stdout.lines().filter(|l| !l.is_empty()).count();
-        if dirty == 0 {
-            println!("Git: clean working tree");
-        } else {
-            println!("Git: {dirty} uncommitted change(s)");
+    match talos_tools::git_dirty_count(workspace) {
+        Ok(dirty) => {
+            println!("Git");
+            println!("---");
+            if dirty == 0 {
+                println!("  clean working tree");
+            } else {
+                println!("  {dirty} uncommitted change(s)");
+            }
+            println!();
+        }
+        Err(err) => {
+            println!("Git");
+            println!("---");
+            println!("  unavailable: {err}");
+            println!();
         }
     }
 }
@@ -248,6 +253,12 @@ mod tests {
     fn iterations_missing_does_not_panic() {
         let dir = tempdir().unwrap();
         print_iteration_summary(dir.path());
+    }
+
+    #[test]
+    fn git_status_unavailable_does_not_panic() {
+        let dir = tempdir().unwrap();
+        print_git_status(dir.path());
     }
 
     #[test]

@@ -4,7 +4,7 @@
 //! Write tools use a structured host git fallback while native gix write
 //! orchestration remains under evaluation.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -32,6 +32,47 @@ fn discover_repo(workspace_root: &std::path::Path) -> Result<gix::Repository, Gi
 }
 
 // ─── git_status ───
+
+/// Count dirty working-tree entries using the native `gix` status API.
+///
+/// This is used by runtime/governance status surfaces that need a small Git summary without
+/// falling back to the host `git` executable.
+pub fn git_dirty_count(workspace_root: &Path) -> Result<usize, GitToolError> {
+    Ok(git_status_lines(workspace_root)?.len())
+}
+
+fn git_status_lines(search_path: &Path) -> Result<Vec<String>, GitToolError> {
+    let repo = discover_repo(search_path)?;
+    let platform = repo
+        .status(gix::progress::Discard)
+        .map_err(|e| GitToolError::Git(e.to_string()))?
+        .untracked_files(gix::status::UntrackedFiles::Files);
+
+    let iter = platform
+        .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
+        .map_err(|e| GitToolError::Git(e.to_string()))?;
+
+    let mut output = Vec::new();
+    for item in iter {
+        let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
+        let summary = item.summary();
+        let path_str = item.rela_path().to_string();
+        let status_char = match summary {
+            Some(gix::status::index_worktree::iter::Summary::Modified) => "M",
+            Some(gix::status::index_worktree::iter::Summary::Added) => "A",
+            Some(gix::status::index_worktree::iter::Summary::Removed) => "D",
+            Some(gix::status::index_worktree::iter::Summary::Renamed) => "R",
+            Some(gix::status::index_worktree::iter::Summary::Copied) => "C",
+            Some(gix::status::index_worktree::iter::Summary::TypeChange) => "T",
+            Some(gix::status::index_worktree::iter::Summary::Conflict) => "!",
+            Some(gix::status::index_worktree::iter::Summary::IntentToAdd) => "I",
+            None => "?",
+        };
+        output.push(format!("{status_char} {path_str}"));
+    }
+
+    Ok(output)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GitStatusInput {
@@ -90,39 +131,12 @@ impl GitStatusTool {
             None => self.workspace_root.clone(),
         };
 
-        let repo = discover_repo(&search_path)?;
-        let platform = repo
-            .status(gix::progress::Discard)
-            .map_err(|e| GitToolError::Git(e.to_string()))?
-            .untracked_files(gix::status::UntrackedFiles::Files);
-
-        let iter = platform
-            .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
-            .map_err(|e| GitToolError::Git(e.to_string()))?;
-
-        let mut output = String::new();
-        for item in iter {
-            let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
-            let summary = item.summary();
-            let path_str = item.rela_path().to_string();
-            let status_char = match summary {
-                Some(gix::status::index_worktree::iter::Summary::Modified) => "M",
-                Some(gix::status::index_worktree::iter::Summary::Added) => "A",
-                Some(gix::status::index_worktree::iter::Summary::Removed) => "D",
-                Some(gix::status::index_worktree::iter::Summary::Renamed) => "R",
-                Some(gix::status::index_worktree::iter::Summary::Copied) => "C",
-                Some(gix::status::index_worktree::iter::Summary::TypeChange) => "T",
-                Some(gix::status::index_worktree::iter::Summary::Conflict) => "!",
-                Some(gix::status::index_worktree::iter::Summary::IntentToAdd) => "I",
-                None => "?",
-            };
-            output.push_str(&format!("{status_char} {path_str}\n"));
-        }
+        let output = git_status_lines(&search_path)?;
 
         if output.is_empty() {
             Ok("clean working tree".to_string())
         } else {
-            Ok(output.trim_end().to_string())
+            Ok(output.join("\n"))
         }
     }
 }

@@ -572,6 +572,14 @@ fn test_identity_prompt_still_covers_task_interruption() {
     assert!(DEFAULT_IDENTITY.contains("context drift"));
 }
 
+#[test]
+fn test_identity_prompt_prefers_builtin_git_tools_over_bash_git() {
+    assert!(DEFAULT_IDENTITY.contains("git_status"));
+    assert!(DEFAULT_IDENTITY.contains("git_diff"));
+    assert!(DEFAULT_IDENTITY.contains("Host shell Git is an explicit fallback"));
+    assert!(!DEFAULT_IDENTITY.contains("builds, tests, git, package managers"));
+}
+
 // --- Memory section tests ---
 
 #[test]

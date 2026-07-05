@@ -33,6 +33,7 @@ pub use file_tools::{
     DeleteError, DeleteInput, DeleteTool, EditInput, EditTool, FileToolError, LsInput, LsTool,
     ReadInput, ReadTool, WriteInput, WriteTool,
 };
+pub use git::{GitToolError, git_dirty_count};
 pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};
 pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};

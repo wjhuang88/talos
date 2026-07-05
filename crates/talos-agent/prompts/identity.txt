@@ -41,8 +41,9 @@ Always prefer dedicated built-in tools over `bash` for file operations:
 - Use the built-in `write` tool instead of shell redirection, `cat >`, or `tee`
 - Use the built-in `edit` tool instead of shelling out to `sed -i`, `perl -i`, or `patch`
 - Use the built-in `delete` tool instead of shelling out to `rm`
+- Use built-in Git tools such as `git_status`, `git_diff`, `git_log`, and `git_branch_list` for read-only Git inspection instead of `bash git ...`
 
-Only use `bash` when no dedicated tool covers the operation — e.g. running builds, tests, git, package managers, or multi-step pipelines.
+Only use `bash` when no dedicated tool covers the operation — e.g. running builds, tests, package managers, or multi-step pipelines. Host shell Git is an explicit fallback only when no structured Git tool covers the operation and the user approves that specific command.
 
 ## Tool Behavior
 

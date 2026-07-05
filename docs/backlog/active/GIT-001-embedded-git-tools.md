@@ -31,6 +31,12 @@ read-only `git_status` is a built-in `gix` tool. This is a product bug, not an a
 read-only runtime status must use internal/gix-backed capability or omit Git state, and prompt
 guidance must prefer built-in Git tools over host shell Git.
 
+Runtime leak closeout (2026-07-05): `talos governance status` now uses
+`talos_tools::git_dirty_count()`, which is backed by the native `gix` status API, and no longer
+spawns host `git status --porcelain`. The identity prompt now names built-in Git tools for
+read-only Git inspection and treats host shell Git as an explicit fallback only when no structured
+Git tool covers the operation and the user approves that command.
+
 ## Priority
 
 P2.
@@ -306,8 +312,8 @@ Current tracking baseline:
 | Operation family | Current Talos posture | Tracking decision |
 |---|---|---|
 | Read-only local status/diff/log/show/branches | Native `gix` direction is accepted and implemented for common reads. | Keep watching for API/output improvements, but no urgent migration gap. |
-| Governance/runtime dirty-tree status | `talos governance status` directly invokes host `git status --porcelain`. | Fix required: replace with an internal/gix-backed read path or omit Git status when unavailable. Do not keep as a silent host fallback. |
-| Agent prompt Git guidance | Identity prompt still lists `git` as a bash exception. | Fix required: prompt must prefer built-in Git tools and treat host shell Git as unavailable unless no structured tool exists and the user explicitly approves. |
+| Governance/runtime dirty-tree status | Fixed 2026-07-05. `talos governance status` uses `talos_tools::git_dirty_count()` backed by `gix::status`, and reports unavailable state instead of spawning host `git`. | Keep using the shared internal/gix-backed path; do not reintroduce direct host `git` calls in CLI/runtime status surfaces. |
+| Agent prompt Git guidance | Fixed 2026-07-05. Identity prompt prefers built-in Git tools for read-only inspection and scopes host shell Git to explicit fallback only. | Keep prompt snapshots/tests aligned when Git tool names change. |
 | Add/commit | Structured tool surface exists; native `gix` write orchestration remains under evaluation. | Re-evaluate on next Git write-tool work. |
 | Push/pull | Host `git` fallback. | High-priority tracking item because REL-002 publication workflows depend on this boundary. |
 | Checkout/switch | Host `git` fallback. | Track porcelain/worktree orchestration maturity before replacing. |
@@ -403,12 +409,12 @@ All tools will use the `ToolNature` attribute (from I025 S5) for permission clas
 
 ### Runtime Host-Git Leak Fix
 
-- [ ] `talos governance status` does not invoke host `git`.
-- [ ] Governance dirty-tree status uses a shared internal/gix-backed read path or is omitted with
+- [x] `talos governance status` does not invoke host `git`.
+- [x] Governance dirty-tree status uses a shared internal/gix-backed read path or is omitted with
       an explicit unavailable message.
-- [ ] Agent prompt guidance says to use built-in Git tools for Git inspection before `bash`.
-- [ ] Tests prove governance status works when host `git` is unavailable.
-- [ ] Tests or prompt snapshots prove `git` is no longer listed as a normal bash exception while
+- [x] Agent prompt guidance says to use built-in Git tools for Git inspection before `bash`.
+- [x] Tests prove governance status works when host `git` is unavailable.
+- [x] Tests or prompt snapshots prove `git` is no longer listed as a normal bash exception while
       `git_status` is available.
 - [ ] No permission default changes are introduced.
 
