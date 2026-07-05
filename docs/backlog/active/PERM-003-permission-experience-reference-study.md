@@ -113,12 +113,21 @@ This story should produce a permission design that balances stability and contro
 
 - Approval prompts now show the exact reusable `always` scope as a session allow rule and explicitly
   state that configured deny rules still win.
+- Bash low-risk read-only inspection and validation-build commands now use scoped command-template
+  resources loaded from `crates/talos-tools/src/bash_permission_policy.toml`. Choosing `always` for
+  an eligible template covers different target objects in the same cwd and command family, matching
+  the Codex-style prefix behavior without allowing all bash.
 - Runtime `always` rules continue to insert before the default `Ask` catch-all, not before
   configured deny policy.
 - Deny precedence is covered by `test_configured_deny_precedes_runtime_always_allow`.
 - Repeated approval reduction is recorded in
   `docs/reference/PERMISSION-LONG-TASK-TRACE-2026-07-05.md` and covered by
   `test_repeated_always_approval_reduces_same_operation_to_zero_prompts`.
+- Different-object low-risk bash approval reduction is covered by
+  `test_low_risk_bash_template_reduces_different_object_prompts` and
+  `test_bash_read_only_template_shares_across_objects_in_same_cwd`.
+- Template safety is covered by tests proving parent/absolute paths, `find -exec`, complex shell
+  operators, and mutating commands keep exact resources.
 - `TOOL-017` remains allowed only after the PERM-003 taxonomy and deny-precedence tests; its
   implementation must preserve the same scoped facets instead of adding shell-like blanket
   permission.

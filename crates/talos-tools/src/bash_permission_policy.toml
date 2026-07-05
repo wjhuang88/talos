@@ -1,0 +1,57 @@
+# Bash permission template policy.
+#
+# Commands not listed here keep exact-command permission resources. Listed commands still need to
+# pass the safety checks in bash_tool.rs: no shell control syntax, no absolute or parent paths, and
+# no wildcard/quoted/escaped tokens.
+
+read_only_programs = [
+  "cat",
+  "diff",
+  "file",
+  "grep",
+  "head",
+  "ls",
+  "rg",
+  "stat",
+  "tail",
+  "wc",
+]
+
+read_only_no_arg_programs = [
+  "pwd",
+]
+
+read_only_git_subcommands = [
+  "branch",
+  "diff",
+  "log",
+  "show",
+  "status",
+]
+
+read_only_find_denied_args = [
+  "-delete",
+  "-exec",
+  "-execdir",
+  "-ok",
+  "-okdir",
+]
+
+validation_cargo_subcommands = [
+  "build",
+  "check",
+  "clippy",
+  "test",
+]
+
+validation_go_subcommands = [
+  "build",
+  "test",
+  "vet",
+]
+
+validation_programs = [
+  "gradle",
+  "mvn",
+  "pytest",
+]

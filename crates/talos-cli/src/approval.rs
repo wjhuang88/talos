@@ -442,4 +442,29 @@ mod tests {
             .count();
         assert_eq!(repeated_asks, 0);
     }
+
+    #[test]
+    fn test_low_risk_bash_template_reduces_different_object_prompts() {
+        use talos_core::tool::AgentTool;
+
+        let tool = talos_tools::BashTool::new(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+        let first_input = serde_json::json!({ "command": "cat src/lib.rs" });
+        let second_input = serde_json::json!({ "command": "cat Cargo.toml" });
+        let first_profile = tool.permission_profile(&first_input);
+        let second_profile = tool.permission_profile(&second_input);
+        let mut engine = PermissionEngine::new();
+
+        assert_eq!(first_profile[0].resource, second_profile[0].resource);
+        assert_eq!(
+            engine.evaluate_profile("bash", &first_profile, &first_input),
+            PermissionDecision::Ask
+        );
+
+        add_always_allow_rules(&mut engine, "bash", &first_profile, &first_input);
+
+        assert_eq!(
+            engine.evaluate_profile("bash", &second_profile, &second_input),
+            PermissionDecision::Allow
+        );
+    }
 }

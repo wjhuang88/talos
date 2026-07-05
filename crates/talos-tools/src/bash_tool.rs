@@ -19,6 +19,8 @@ use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
+const BASH_PERMISSION_POLICY: &str = include_str!("bash_permission_policy.toml");
+
 /// Errors that can occur during bash tool execution.
 #[derive(Debug, Error)]
 pub enum BashError {
@@ -328,10 +330,14 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
 fn bash_permission_resource(command: &str, cwd: &PathBuf) -> String {
     let normalized = normalize_bash_command(command);
     let class = classify_bash_command(&normalized);
+    if let Some(template) = bash_permission_template(&normalized, cwd, class) {
+        return template;
+    }
+
     let mut hasher = DefaultHasher::new();
     cwd.hash(&mut hasher);
     normalized.hash(&mut hasher);
-    format!("bash:{}:{:016x}", class.as_str(), hasher.finish())
+    format!("bash:{}:exact:{:016x}", class.as_str(), hasher.finish())
 }
 
 fn normalize_bash_command(command: &str) -> String {
@@ -356,7 +362,7 @@ fn classify_bash_command(command: &str) -> BashCommandClass {
 
     match program {
         "ls" | "pwd" | "cat" | "head" | "tail" | "wc" | "grep" | "rg" | "find" | "stat"
-        | "diff" | "sed" | "awk" => BashCommandClass::ReadOnlyInspection,
+        | "file" | "diff" | "sed" | "awk" => BashCommandClass::ReadOnlyInspection,
         "cargo" => classify_cargo(&args),
         "npm" | "pnpm" | "yarn" | "bun" => classify_javascript_tool(program, &args),
         "go" => classify_go(&args),
@@ -368,6 +374,185 @@ fn classify_bash_command(command: &str) -> BashCommandClass {
         "git" => classify_git(&args),
         _ => BashCommandClass::ComplexShell,
     }
+}
+
+fn bash_permission_template(
+    command: &str,
+    cwd: &PathBuf,
+    class: BashCommandClass,
+) -> Option<String> {
+    if command.is_empty() || has_shell_control_syntax(command) {
+        return None;
+    }
+
+    let mut parts = command.split_whitespace();
+    let program = parts.next()?;
+    let args: Vec<&str> = parts.collect();
+
+    if is_env_assignment(program) || args.iter().any(|arg| !is_simple_shell_token(arg)) {
+        return None;
+    }
+
+    let template = match class {
+        BashCommandClass::ReadOnlyInspection => read_only_template_key(program, &args)?,
+        BashCommandClass::ValidationBuild => validation_template_key(program, &args)?,
+        BashCommandClass::PackageManagerOrNetwork
+        | BashCommandClass::WriteOrMutating
+        | BashCommandClass::ComplexShell => return None,
+    };
+
+    let mut hasher = DefaultHasher::new();
+    cwd.hash(&mut hasher);
+    Some(format!(
+        "bash:{}:template:{:016x}:{}",
+        class.as_str(),
+        hasher.finish(),
+        template
+    ))
+}
+
+fn is_simple_shell_token(token: &str) -> bool {
+    !token.is_empty()
+        && !token.contains('*')
+        && !token.contains('?')
+        && !token.contains('[')
+        && !token.contains(']')
+        && !token.contains('{')
+        && !token.contains('}')
+        && !token.contains('\'')
+        && !token.contains('"')
+        && !token.contains('\\')
+}
+
+fn read_only_template_key(program: &str, args: &[&str]) -> Option<String> {
+    let policy = BashPermissionPolicy::get();
+    match program {
+        _ if policy.contains_read_only_no_arg_program(program) => {
+            args.is_empty().then(|| program.to_string())
+        }
+        _ if policy.contains_read_only_program(program) => {
+            args_are_template_safe_paths_or_options(args).then(|| program.to_string())
+        }
+        "git" => match args.first().copied() {
+            Some(subcommand)
+                if policy.contains_read_only_git_subcommand(subcommand)
+                    && args_are_template_safe_paths_or_options(&args[1..]) =>
+            {
+                Some(format!("git:{subcommand}"))
+            }
+            _ => None,
+        },
+        "find" => find_args_are_template_safe(args, policy).then(|| "find".to_string()),
+        // `sed -i` writes files and awk programs can call system(); keep both exact.
+        _ => None,
+    }
+}
+
+fn validation_template_key(program: &str, args: &[&str]) -> Option<String> {
+    let policy = BashPermissionPolicy::get();
+    match program {
+        "cargo" => match args.first().copied() {
+            Some(subcommand)
+                if policy.contains_validation_cargo_subcommand(subcommand)
+                    && args_are_template_safe_paths_or_options(&args[1..]) =>
+            {
+                Some(format!("cargo:{subcommand}"))
+            }
+            _ => None,
+        },
+        "go" => match args.first().copied() {
+            Some(subcommand)
+                if policy.contains_validation_go_subcommand(subcommand)
+                    && args_are_template_safe_paths_or_options(&args[1..]) =>
+            {
+                Some(format!("go:{subcommand}"))
+            }
+            _ => None,
+        },
+        _ if policy.contains_validation_program(program)
+            && args_are_template_safe_paths_or_options(args) =>
+        {
+            Some(program.to_string())
+        }
+        // npm/pnpm/yarn/bun scripts can run arbitrary project-defined actions. Keep exact.
+        _ => None,
+    }
+}
+
+fn args_are_template_safe_paths_or_options(args: &[&str]) -> bool {
+    args.iter().all(|arg| {
+        if arg.starts_with('/') || arg == &".." || arg.starts_with("../") || arg.contains("/../") {
+            return false;
+        }
+        true
+    })
+}
+
+fn find_args_are_template_safe(args: &[&str], policy: &BashPermissionPolicy) -> bool {
+    args_are_template_safe_paths_or_options(args)
+        && !args
+            .iter()
+            .any(|arg| policy.contains_read_only_find_denied_arg(arg))
+}
+
+#[derive(Debug, Deserialize)]
+struct BashPermissionPolicy {
+    read_only_programs: Vec<String>,
+    read_only_no_arg_programs: Vec<String>,
+    read_only_git_subcommands: Vec<String>,
+    read_only_find_denied_args: Vec<String>,
+    validation_cargo_subcommands: Vec<String>,
+    validation_go_subcommands: Vec<String>,
+    validation_programs: Vec<String>,
+}
+
+impl BashPermissionPolicy {
+    fn get() -> &'static Self {
+        static POLICY: std::sync::OnceLock<BashPermissionPolicy> = std::sync::OnceLock::new();
+        POLICY.get_or_init(|| parse_bash_permission_policy(BASH_PERMISSION_POLICY))
+    }
+
+    fn contains_read_only_program(&self, value: &str) -> bool {
+        self.read_only_programs.iter().any(|item| item == value)
+    }
+
+    fn contains_read_only_no_arg_program(&self, value: &str) -> bool {
+        self.read_only_no_arg_programs
+            .iter()
+            .any(|item| item == value)
+    }
+
+    fn contains_read_only_git_subcommand(&self, value: &str) -> bool {
+        self.read_only_git_subcommands
+            .iter()
+            .any(|item| item == value)
+    }
+
+    fn contains_read_only_find_denied_arg(&self, value: &str) -> bool {
+        self.read_only_find_denied_args
+            .iter()
+            .any(|item| item == value)
+    }
+
+    fn contains_validation_cargo_subcommand(&self, value: &str) -> bool {
+        self.validation_cargo_subcommands
+            .iter()
+            .any(|item| item == value)
+    }
+
+    fn contains_validation_go_subcommand(&self, value: &str) -> bool {
+        self.validation_go_subcommands
+            .iter()
+            .any(|item| item == value)
+    }
+
+    fn contains_validation_program(&self, value: &str) -> bool {
+        self.validation_programs.iter().any(|item| item == value)
+    }
+}
+
+fn parse_bash_permission_policy(input: &str) -> BashPermissionPolicy {
+    toml::from_str(input).expect("embedded bash permission policy must be valid TOML")
 }
 
 fn has_shell_control_syntax(command: &str) -> bool {
@@ -591,6 +776,123 @@ mod tests {
         let repeated = tool.permission_profile(&serde_json::json!({ "command": " git status " }));
 
         assert_eq!(status[0].resource, repeated[0].resource);
+    }
+
+    #[test]
+    fn test_bash_permission_policy_toml_parses() {
+        let policy = BashPermissionPolicy::get();
+
+        assert!(policy.contains_read_only_program("cat"));
+        assert!(policy.contains_read_only_git_subcommand("status"));
+        assert!(policy.contains_validation_cargo_subcommand("test"));
+        assert!(policy.contains_read_only_find_denied_arg("-exec"));
+    }
+
+    #[test]
+    fn test_bash_read_only_template_shares_across_objects_in_same_cwd() {
+        let tool = BashTool::new(test_dir());
+
+        let first = tool.permission_profile(&serde_json::json!({ "command": "cat src/lib.rs" }));
+        let second = tool.permission_profile(&serde_json::json!({ "command": "cat Cargo.toml" }));
+
+        assert_eq!(first[0].resource, second[0].resource);
+        assert!(
+            first[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:read_only_inspection:template:")
+        );
+        assert!(first[0].resource.as_deref().unwrap().ends_with(":cat"));
+    }
+
+    #[test]
+    fn test_bash_read_only_template_rejects_parent_and_absolute_paths() {
+        let tool = BashTool::new(test_dir());
+
+        let normal = tool.permission_profile(&serde_json::json!({ "command": "cat src/lib.rs" }));
+        let parent = tool.permission_profile(&serde_json::json!({ "command": "cat ../secret" }));
+        let absolute =
+            tool.permission_profile(&serde_json::json!({ "command": "cat /etc/passwd" }));
+
+        assert_ne!(normal[0].resource, parent[0].resource);
+        assert_ne!(normal[0].resource, absolute[0].resource);
+        assert!(
+            parent[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:read_only_inspection:exact:")
+        );
+        assert!(
+            absolute[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:read_only_inspection:exact:")
+        );
+    }
+
+    #[test]
+    fn test_bash_validation_template_shares_cargo_test_filters() {
+        let tool = BashTool::new(test_dir());
+
+        let first =
+            tool.permission_profile(&serde_json::json!({ "command": "cargo test -p talos-tools" }));
+        let second =
+            tool.permission_profile(&serde_json::json!({ "command": "cargo test exec_tool" }));
+
+        assert_eq!(first[0].resource, second[0].resource);
+        assert!(
+            first[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:validation_build:template:")
+        );
+        assert!(
+            first[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .ends_with(":cargo:test")
+        );
+    }
+
+    #[test]
+    fn test_bash_template_rejects_find_exec_complex_shell_and_writes() {
+        let tool = BashTool::new(test_dir());
+
+        let find_exec = tool.permission_profile(&serde_json::json!({
+            "command": "find src -name main.rs -exec cat {} +"
+        }));
+        let complex = tool.permission_profile(&serde_json::json!({
+            "command": "cat src/lib.rs | wc -l"
+        }));
+        let write =
+            tool.permission_profile(&serde_json::json!({ "command": "touch generated.txt" }));
+
+        assert!(
+            find_exec[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:read_only_inspection:exact:")
+        );
+        assert!(
+            complex[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:complex_shell:exact:")
+        );
+        assert!(
+            write[0]
+                .resource
+                .as_deref()
+                .unwrap()
+                .starts_with("bash:write_or_mutating:exact:")
+        );
     }
 
     #[test]
