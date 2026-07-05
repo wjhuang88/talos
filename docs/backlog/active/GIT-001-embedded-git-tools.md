@@ -416,7 +416,20 @@ All tools will use the `ToolNature` attribute (from I025 S5) for permission clas
 - [x] Tests prove governance status works when host `git` is unavailable.
 - [x] Tests or prompt snapshots prove `git` is no longer listed as a normal bash exception while
       `git_status` is available.
-- [ ] No permission default changes are introduced.
+- [x] No permission default changes are introduced.
+
+2026-07-05 revalidation evidence:
+
+- `cargo test -p talos-cli governance` passed: 13 tests.
+- `cargo test -p talos-tools git` passed: 4 tests, including
+  `host_git_unavailable_returns_actionable_error`.
+- `cargo test -p talos-agent prompt::tests -- git_status` passed: 33 prompt tests, including
+  `test_identity_prompt_prefers_builtin_git_tools_over_bash_git`.
+- Source scan found no `std::process::Command::new("git")` or `git status --porcelain` call in
+  `crates/talos-cli/src/governance.rs`.
+- Source scan confirmed the identity prompt says to use built-in Git tools for read-only
+  inspection instead of `bash git ...`.
+- No permission policy or default permission table was changed in this revalidation.
 
 ### P1-P2 (Navigation + Write)
 - [ ] `git_checkout` switches branches
