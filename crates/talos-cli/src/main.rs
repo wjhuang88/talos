@@ -255,9 +255,33 @@ pub(crate) struct Cli {
 
     #[arg(
         long = "available-models",
-        help = "List available models from the builtin model catalog, grouped by provider with authentication status."
+        help = "List models from the builtin catalog, grouped by provider. Output is bounded unless --available-models-all is set."
     )]
     available_models: bool,
+
+    #[arg(
+        long = "available-models-filter",
+        value_name = "QUERY",
+        requires = "available_models",
+        help = "Filter --available-models output by provider, model id, or provider/model substring."
+    )]
+    available_models_filter: Option<String>,
+
+    #[arg(
+        long = "available-models-limit",
+        value_name = "N",
+        default_value_t = 120,
+        requires = "available_models",
+        help = "Maximum model rows printed by --available-models unless --available-models-all is set."
+    )]
+    available_models_limit: usize,
+
+    #[arg(
+        long = "available-models-all",
+        requires = "available_models",
+        help = "Print every matching model row from --available-models."
+    )]
+    available_models_all: bool,
 
     #[arg(
         long = "use-model",
@@ -346,6 +370,7 @@ async fn main() -> Result<()> {
             "Note: --import-models is deprecated. Use BUILD_MODELS=1 cargo build to regenerate \
              the built-in model catalog at build time. This flag no longer writes to catalog.db."
         );
+        return Ok(());
     }
 
     if cli.config_list {
@@ -359,7 +384,11 @@ async fn main() -> Result<()> {
     }
 
     if cli.available_models {
-        return run_models();
+        return run_models(
+            cli.available_models_filter.as_deref(),
+            cli.available_models_limit,
+            cli.available_models_all,
+        );
     }
     if let Some(model_id) = &cli.use_model {
         return run_use_model(model_id);
@@ -489,19 +518,44 @@ fn run_config_set(kv: &str) -> Result<()> {
     Ok(())
 }
 
-fn run_models() -> Result<()> {
+fn run_models(filter: Option<&str>, limit: usize, show_all: bool) -> Result<()> {
     let config = Config::load().context("failed to load configuration")?;
     let catalog = talos_config::model::builtin_models();
+    let filter = normalize_model_filter(filter);
+    let effective_limit = if show_all { usize::MAX } else { limit };
 
     let mut by_provider: std::collections::BTreeMap<
         String,
         Vec<&talos_config::model::ModelMetadata>,
     > = std::collections::BTreeMap::new();
     for m in &catalog {
+        if !model_matches_filter(m, filter.as_deref()) {
+            continue;
+        }
         by_provider.entry(m.provider.clone()).or_default().push(m);
     }
 
+    let matched_count = by_provider.values().map(Vec::len).sum::<usize>();
+    let shown_count = matched_count.min(effective_limit);
+    println!(
+        "Built-in model catalog: {matched_count} matching models across {} providers.",
+        by_provider.len()
+    );
+    if !show_all && matched_count > shown_count {
+        println!(
+            "Showing first {shown_count}. Use --available-models-filter <query> to narrow results or --available-models-all to print all."
+        );
+    }
+    if matched_count == 0 {
+        return Ok(());
+    }
+
+    let mut printed = 0usize;
     for (provider, models) in &by_provider {
+        if printed >= effective_limit {
+            break;
+        }
+
         let authed = config.provider_authenticated(provider);
         let status = if authed { "Ready" } else { "Setup required" };
         println!("\n{provider}  —  {status}");
@@ -509,6 +563,9 @@ fn run_models() -> Result<()> {
         let mut sorted = models.clone();
         sorted.sort_by(|a, b| a.id.cmp(&b.id));
         for m in sorted {
+            if printed >= effective_limit {
+                break;
+            }
             let ctx = m
                 .context_limit
                 .map(|c| format!("{}K", c / 1000))
@@ -522,11 +579,39 @@ fn run_models() -> Result<()> {
                     format!("  ${inp:.2}/${out:.2}/1M tok")
                 })
                 .unwrap_or_default();
-            println!("  {}  (ctx: {ctx}){pricing}", m.id);
+            println!("  {}  (ctx: {ctx}){pricing}", available_model_name(m));
+            printed += 1;
         }
     }
 
+    if !show_all && matched_count > printed {
+        println!(
+            "\n... {} more matching models omitted. Use --available-models-all to print every row.",
+            matched_count - printed
+        );
+    }
+
     Ok(())
+}
+
+fn available_model_name(model: &talos_config::model::ModelMetadata) -> String {
+    format!("{}/{}", model.provider, model.id)
+}
+
+fn normalize_model_filter(filter: Option<&str>) -> Option<String> {
+    filter
+        .map(str::trim)
+        .filter(|query| !query.is_empty())
+        .map(|query| query.to_lowercase())
+}
+
+fn model_matches_filter(model: &talos_config::model::ModelMetadata, filter: Option<&str>) -> bool {
+    let Some(query) = filter else {
+        return true;
+    };
+    model.provider.to_lowercase().contains(query)
+        || model.id.to_lowercase().contains(query)
+        || available_model_name(model).to_lowercase().contains(query)
 }
 
 fn run_use_model(model_id: &str) -> Result<()> {

@@ -5,7 +5,7 @@
 | ID | PERM-002 |
 | Type | Technical Story |
 | Priority | P1 |
-| Status | Complete; bash always-approve repeat prompt fix implemented 2026-07-04 |
+| Status | Complete for operation-scoped rule infrastructure; broader permission UX reopened in PERM-003 |
 | Depends on | PERM-001 (existing rule engine), ToolNature enum (Read/Write/Execute/Network) |
 | Blocks | — |
 
@@ -34,6 +34,11 @@ command/cwd invocations can reuse `always` while changed commands, changed cwd, 
 syntax ask again. Write `always` rules scope to the target file's parent directory, with root-level
 files remaining file-scoped. Terminal and TUI approval prompts include the reusable
 `_always_approve_scope` before the user chooses `always`.
+
+2026-07-05 maintainer follow-up: this infrastructure is still not enough for long-running Talos
+tasks. The next decision must study reference projects and balance unattended execution stability
+against explicit permission control before broadening bash or command-template approval behavior.
+Tracked in `PERM-003`.
 
 ## Problem
 

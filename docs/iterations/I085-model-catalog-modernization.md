@@ -357,7 +357,7 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 | 2026-07-03 | Review | Second acceptance review identified 3 blocking gaps against the `d7e37df` partial: (1) `/connect` used only `builtin_models()`, never `catalog.db`; (2) no optional custom `base_url` input in the connect flow; (3) MC106 group-aware search filtering was unimplemented (pickers always showed the full unfiltered list; `selected_index` had inconsistent filtered-vs-raw semantics). |
 | 2026-07-03 | Execution | All 3 gaps closed. **Gap 1 (catalog wiring)**: `model_lifecycle::CatalogSnapshot` + `open_catalog_snapshot()` open `~/.talos/catalog.db` once at TUI startup (via `talos-models`, new `talos-cli` dependency); corrupt/incompatible existing DBs degrade to `builtin_models()` and never block startup. 2026-07-04 follow-up clarified missing-file behavior: a fresh install implicitly creates and seeds `catalog.db` from packaged `models.toml` on first catalog access. `build_connect_picker_data` prefers catalog provider name/`api_base_url`/`doc_url`/model counts when present. **Gap 2 (base_url)**: `CredentialRequestData.default_base_url` and `CredentialResponseData.base_url` added; `BottomPanelState` gained a `base_url_buffer` + `CredentialField` (ApiKey/BaseUrl) two-phase flow — in `connect_mode`, Enter on the API key advances to an optional base URL field before submitting; `handle_connect` resolves the default endpoint as existing `providers.<name>.base_url` > catalog `api_base_url` > `None`, and `handle_connect_with_credential` writes `cred.base_url` only when present, leaving existing/absent values untouched otherwise (never overwrites unrelated provider fields). **Gap 3 (MC106)**: `BottomPanelState::filtered_indices` reimplements filtering as group-aware (splits on `PanelItemAction::Header`, hides a group's header when no sibling item matches, "Current" follows the same rule — hidden if it doesn't match); `select_next`/`select_prev`/rendering were rewritten so `selected_index` is always a raw index into `self.items` (never a filtered-list position), fixing a latent inconsistency in the original slash-menu implementation; picker panels (`ModelPicker`/`ConnectPicker`/`SessionPicker`) now respond to "type to filter" via a new `TuiState::panel_query()` (previously hardcoded to `""`). 1605 workspace tests pass (up from 1578); 3 pre-existing e2e failures unrelated to this work (confirmed via `git stash` diff against unmodified `main`: local `~/.talos/config.toml` has an empty `model` field on this dev machine). |
 | 2026-07-03 | Incident + Fix | Root-caused the 3 "pre-existing" e2e failures noted above: they were not actually pre-existing drift — this session's new `handle_connect_with_credential_*` tests called `Config::save()` (via the production function under test) before HOME-isolation was added, writing test-fixture data over the developer's real `~/.talos/config.toml`. Confirmed via file mtime + literal fixture strings found in the corrupted file. A stale `~/.talos/config.toml.bak-20260606` backup exists but is a month old and pre-dates the current provider-nested config schema, so the exact state between 2026-06-06 and this incident cannot be recovered; user opted to hand-edit their config rather than have it reconstructed. Separately, investigating the resulting "invalid configuration: 'model' is required" crash surfaced a real, independent, pre-existing design bug: `Config::load()` called `self.validate()` internally, so *any* on-disk config with an empty `model` (from an interrupted wizard save, manual edit, or this incident) hard-fails `Config::load()` before the three mode runners' own `needs_model_setup`/`needs_api_key` first-run-wizard logic ever gets a chance to run — and before `talos config set` (which itself calls `Config::load()` first) can be used to repair it. Fixed: `Config::load()` no longer calls `validate()`; mode runners already re-check `config.model.is_empty()` post-load (unchanged), and `run_config_set` still calls `.validate()` explicitly after applying an edit, before saving. Added regression tests `test_load_existing_file_with_empty_model_succeeds` and `test_load_then_set_model_recovers_from_empty_model_on_disk` (`talos-config/src/tests.rs`). While fixing this, discovered and fixed a second, related bug: two independent test-local `HOME`-mutation mutexes (`init_wizard.rs`'s pre-existing `ENV_MUTEX` and this session's new `mode_runners.rs` mutex) do not serialize against each other despite both mutating the same process-wide `HOME` env var, since `cargo test` runs tests in parallel threads within one process — causing flaky cross-module corruption of each other's temp-dir redirection. Consolidated into one shared `crate::test_support::HOME_ENV_MUTEX` used by both modules. 1610 workspace tests pass (up from 1605), 0 failures — the 3 previously-"pre-existing" e2e failures are now fixed and passing. |
-| 2026-07-04 | Post-review Fix | User acceptance found four UX/robustness gaps. Fixed: `/model` now omits unauthenticated provider rows entirely (provider setup belongs in `/connect`); slash-menu filtering prioritizes command-name prefix matches so typing `/mo` then Enter completes `/model` instead of executing `/help`; `/connect` fallback now uses packaged `models.toml` plus built-in provider endpoint metadata; group headers render with a higher-contrast warning accent instead of dim text. Follow-up clarification: a fresh install must not require an explicit catalog initialization step, so `open_catalog_snapshot()` now creates `~/.talos/catalog.db` on first missing-file access and seeds it from packaged `models.toml`; corrupt/incompatible existing DBs still degrade without overwrite. Added regression coverage for each behavior. |
+| 2026-07-04 | Post-review Fix | User acceptance found four UX/robustness gaps. Fixed: `/model` now omits unauthenticated provider rows entirely (provider setup belongs in `/connect`); slash-menu filtering prioritizes command-name prefix matches so typing `/mo` then Enter completes `/model` instead of executing `/help`; `/connect` fallback now uses packaged `models.toml` plus built-in provider endpoint metadata; group headers render with a higher-contrast warning accent instead of dim text. Then-current follow-up required implicit `catalog.db` seeding on first missing-file access; that runtime DB path was superseded by the 2026-07-05 maintainer decision recorded below. Added regression coverage for the 2026-07-04 behavior. |
 | 2026-07-04 | Pause | MC107 README/onboarding residual closed and catalog lifecycle verified by automated tests. I085 is paused before I090 activation because the only remaining item is a real terminal `/connect` walkthrough, which cannot be honestly claimed from the unattended/headless validation run. |
 
 ## Verification Evidence
@@ -414,6 +414,11 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 - README onboarding follow-up (2026-07-04): the Interactive Commands section now explains
   `/model` vs `/connect`, provider credential setup, optional `base_url`, implicit first-access
   `catalog.db` creation from packaged `models.toml`, and `--import-models <path>` refresh.
+- Runtime catalog supersession (2026-07-05): maintainer decision removed the runtime `catalog.db`
+  path from the accepted behavior. Current runtime uses packaged offline `models.toml` only; model
+  metadata refresh is build-time via `BUILD_MODELS=1`; `--import-models` is a no-op compatibility
+  notice. The earlier implicit-DB evidence above is historical and no longer the active product
+  contract.
 - base_url merge evidence: `handle_connect_with_credential_writes_new_provider_api_key_and_base_url`,
   `handle_connect_with_credential_preserves_unrelated_provider_fields`,
   `handle_connect_with_credential_updates_base_url_when_provided`,
@@ -438,23 +443,19 @@ so `selected_index` continues to refer to the original item list. Do not introdu
   fetch (requires models.dev reachability). Code compiles and the non-network
   path is verified. A future closeout pass should run `BUILD_MODELS=1 cargo build`
   and verify `git diff -- crates/talos-config/src/models.toml`.
-- Stage 2 is unblocked and its core acceptance gaps are closed: `/connect` reads
-  live `catalog.db` data when present (falling back to `builtin_models()`
-  otherwise), supports an optional custom `base_url` without losing unrelated
-  provider fields, and both `/model` and `/connect` support group-aware "type to
-  filter" search. I085 is paused with the single MC107 residual below.
+- Stage 2 is unblocked and its current accepted runtime path is closed: `/connect` reads
+  packaged `models.toml` provider data, supports an optional custom `base_url` without losing
+  unrelated provider fields, and both `/model` and `/connect` support group-aware "type to filter"
+  search. The earlier `catalog.db` runtime path is superseded. I085 is paused with the single MC107
+  residual below.
 - MC107 residual: manual TUI runtime verification of `/connect` end-to-end
   (real terminal session, not just unit tests) has not been performed in this
   session.
 - MC107 README residual closed: README now documents `/connect` in its own onboarding paragraph.
-- `catalog.db` is implicitly created and seeded from the packaged offline
-  `models.toml` on first catalog access. This is not a startup network fetch:
-  it gives fresh installs a durable local catalog immediately, while explicit
-  `--import-models`/future refresh flows update the DB with richer models.dev
-  provider metadata when supplied. Corrupt or incompatible existing DBs degrade
-  to built-in data without overwrite. This is expected
-  under the current non-goals ("No auto-fetch at startup") and is not a defect
-  of this pass.
+- Runtime `catalog.db` creation is no longer the accepted behavior. The active contract is
+  no runtime model-metadata DB, no startup network fetch, and no explicit user initialization step:
+  packaged `models.toml` is the runtime source, while richer models.dev metadata is incorporated by
+  rebuilding with `BUILD_MODELS=1`.
 
 ## Retrospective
 

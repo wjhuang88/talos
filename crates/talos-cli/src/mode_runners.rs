@@ -1958,7 +1958,6 @@ mod connect_tests {
     use super::*;
     use crate::test_support::HOME_ENV_MUTEX;
     use talos_config::ProviderConfig;
-    use talos_core::model::{ModelMetadata, ProviderInfo, ProviderSource};
 
     /// Runs `f` with `HOME` redirected to a fresh temp directory, restoring
     /// the original `HOME` afterward. Must be called under `HOME_ENV_MUTEX`

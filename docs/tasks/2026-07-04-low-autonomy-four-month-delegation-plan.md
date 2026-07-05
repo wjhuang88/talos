@@ -408,9 +408,9 @@ git diff --check              → clean
 
 | Check | Result |
 |---|---|
-| `rg "/connect\|/model" README.md -n` | EN README lines 362-369: narrative onboarding paragraph accurate (`/model` shows only usable models, `/connect` for credential setup, catalog.db auto-creation, `--import-models`). Slash Commands table lines 411-412: accurate. |
+| `rg "/connect\|/model" README.md -n` | EN README lines 362-369 originally still described catalog.db auto-creation and `--import-models` refresh. 2026-07-05 maintainer review corrected the active docs: runtime uses packaged `models.toml`; no `catalog.db` is created; `--import-models` is no-op compatibility. |
 | `rg "/connect\|/model" README.zh-CN.md -n` | zh-CN README: Slash Commands table entries on lines 364-365 were accurate, but **narrative onboarding paragraph was missing** (EN has it at lines 362-369, zh-CN had no equivalent). |
-| Fix | Added Chinese narrative paragraph explaining `/model` (model switching with credential-present filtering), `/connect` (provider setup with API key + optional base_url), catalog.db auto-creation, and `--import-models` refresh. |
+| Fix | Added Chinese narrative paragraph, then corrected both EN/zh-CN paragraphs on 2026-07-05 to explain `/model` (credential-present filtering), `/connect` (API key + optional base_url), packaged `models.toml`, no runtime `catalog.db`, and build-time `BUILD_MODELS=1` refresh. |
 | `--import-models <PATH>` flag | Verified exists: `talos --help` shows `--import-models <PATH>`. |
 | `/connect [provider]` syntax | Verified in `command_registry.rs` line 265: `usage: "/connect [provider]"`. |
 
@@ -732,7 +732,7 @@ Final validation gates:
 | Gate | Command | Result |
 |---|---|---|
 | Workspace tests | `cargo test --workspace` | All passing, 0 failures (1700+ tests across 50+ test binaries) |
-| Clippy | `cargo clippy --workspace -- -D warnings` | 0 warnings |
+| Clippy | `cargo clippy --workspace -- -D warnings` | Executor reported 0 warnings. 2026-07-05 maintainer revalidation found this is not currently reproducible with `--all-targets`: test-code `unwrap_used` and bool-assert findings remain in dashboard/plugin/TUI tests. |
 | Governance | `scripts/validate_project_governance.sh .` | 0 warnings |
 | Diff whitespace | `git diff --check` | Clean |
 | Formatting | `cargo fmt --all -- --check` | Clean |

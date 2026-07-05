@@ -3,6 +3,10 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -93,7 +97,7 @@ impl BashTool {
     }
 
     fn permission_resource_for_command(&self, command: &str) -> String {
-        bash_permission_resource(command)
+        bash_permission_resource(command, &self.working_dir)
     }
 
     async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
@@ -321,16 +325,13 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
     })
 }
 
-fn bash_permission_resource(command: &str) -> String {
+fn bash_permission_resource(command: &str, cwd: &PathBuf) -> String {
     let normalized = normalize_bash_command(command);
     let class = classify_bash_command(&normalized);
-    // Extract the program name (first word) for the resource identifier.
-    // When inside the workspace, only the command identity matters —
-    // working directory and arguments are intentionally excluded so
-    // that "always allow" for a given program+class survives cwd
-    // changes and argument variation across repeated invocations.
-    let program = normalized.split_whitespace().next().unwrap_or(&normalized);
-    format!("bash:{}:{program}", class.as_str())
+    let mut hasher = DefaultHasher::new();
+    cwd.hash(&mut hasher);
+    normalized.hash(&mut hasher);
+    format!("bash:{}:{:016x}", class.as_str(), hasher.finish())
 }
 
 fn normalize_bash_command(command: &str) -> String {
@@ -583,19 +584,31 @@ mod tests {
     }
 
     #[test]
-    fn test_bash_permission_profile_commands_with_same_program_share_resource() {
+    fn test_bash_permission_profile_repeated_command_shares_resource() {
         let tool = BashTool::new(test_dir());
 
         let status = tool.permission_profile(&serde_json::json!({ "command": "git status" }));
-        let log = tool.permission_profile(&serde_json::json!({ "command": "git log" }));
+        let repeated = tool.permission_profile(&serde_json::json!({ "command": " git status " }));
 
-        // Same program + same class = same resource identifier,
-        // so "always allow" survives argument variation.
-        assert_eq!(status[0].resource, log[0].resource);
+        assert_eq!(status[0].resource, repeated[0].resource);
     }
 
     #[test]
-    fn test_bash_permission_profile_same_command_across_directories() {
+    fn test_bash_permission_profile_different_subcommands_do_not_share_resource() {
+        let tool = BashTool::new(test_dir());
+
+        let search =
+            tool.permission_profile(&serde_json::json!({ "command": "cargo search serde" }));
+        let publish = tool.permission_profile(&serde_json::json!({ "command": "cargo publish" }));
+        let add = tool.permission_profile(&serde_json::json!({ "command": "git add ." }));
+        let reset = tool.permission_profile(&serde_json::json!({ "command": "git reset --hard" }));
+
+        assert_ne!(search[0].resource, publish[0].resource);
+        assert_ne!(add[0].resource, reset[0].resource);
+    }
+
+    #[test]
+    fn test_bash_permission_profile_same_command_across_directories_is_distinct() {
         let first_tool = BashTool::new(PathBuf::from("/tmp/project-a"));
         let second_tool = BashTool::new(PathBuf::from("/tmp/project-b"));
         let input = serde_json::json!({ "command": "git status" });
@@ -603,10 +616,7 @@ mod tests {
         let first = first_tool.permission_profile(&input);
         let second = second_tool.permission_profile(&input);
 
-        // Working directory is intentionally excluded from the resource
-        // identifier: "always allow" for git in any workspace directory
-        // matches the same rule.
-        assert_eq!(first[0].resource, second[0].resource);
+        assert_ne!(first[0].resource, second[0].resource);
     }
 
     #[test]

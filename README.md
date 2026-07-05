@@ -350,6 +350,16 @@ Search ingested sources:
 talos explore search --query "session management" --limit 10
 ```
 
+List packaged model metadata without dumping the full catalog by default:
+
+```bash
+talos --available-models
+talos --available-models --available-models-filter openai/gpt-4
+talos --available-models --available-models-all
+```
+
+Model rows are printed as `provider/model` to avoid ambiguity.
+
 ### Interactive Commands
 
 In the interactive TUI, type `/` at the start of the composer to open the command menu. Continue
@@ -362,11 +372,11 @@ session.
 Use `/model` to switch among models whose providers are already configured. The picker shows only
 usable models, grouped by provider, with the active model pinned in a `Current` group. Use
 `/connect` to add or update provider credentials. `/connect` shows provider setup choices from the
-local model catalog, asks for an API key, then offers an optional custom endpoint (`base_url`) for
-gateway-compatible providers. A fresh install does not need a manual catalog initialization step:
-Talos creates `~/.talos/catalog.db` on first catalog access and seeds it from the packaged offline
-`models.toml`. `talos --import-models <path>` refreshes that catalog from a models.dev JSON file
-when you want newer provider metadata.
+packaged offline `models.toml`, asks for an API key, then offers an optional custom endpoint
+(`base_url`) for gateway-compatible providers. A fresh install does not need a manual catalog
+initialization step: Talos does not create a runtime `catalog.db` for model metadata. Model/provider
+metadata updates are build-time only through `BUILD_MODELS=1`; the legacy `--import-models` flag is
+kept as a no-op compatibility notice.
 
 ## Built-In Capabilities
 

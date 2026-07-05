@@ -7,7 +7,10 @@ mod tests {
     use crate::registry;
     use crate::skill_runtime::discover_runtime_skills;
     use crate::tui_bridge::{ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop};
-    use crate::{config_get_dotted, config_set_dotted, is_secret_key, mask_secrets};
+    use crate::{
+        available_model_name, config_get_dotted, config_set_dotted, is_secret_key, mask_secrets,
+        model_matches_filter, normalize_model_filter,
+    };
     use talos_conversation::{ConversationEngine, ModelInfo, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
 
@@ -455,6 +458,60 @@ api_key_env = "ANTHROPIC_API_KEY"
         assert!(masked.contains("api_key = ***"));
         // api_key_env is a variable name, not a secret — must not be masked.
         assert!(masked.contains("ANTHROPIC_API_KEY"));
+    }
+
+    #[test]
+    fn available_model_name_is_provider_qualified() {
+        let model = talos_config::model::ModelMetadata {
+            provider: "openai".to_string(),
+            id: "gpt-4.1".to_string(),
+            context_limit: None,
+            output_limit: None,
+            pricing: None,
+            capabilities: Default::default(),
+            release_date: None,
+            source: Default::default(),
+        };
+
+        assert_eq!(available_model_name(&model), "openai/gpt-4.1");
+    }
+
+    #[test]
+    fn available_model_filter_matches_provider_model_and_qualified_id() {
+        let model = talos_config::model::ModelMetadata {
+            provider: "openai".to_string(),
+            id: "gpt-4.1".to_string(),
+            context_limit: None,
+            output_limit: None,
+            pricing: None,
+            capabilities: Default::default(),
+            release_date: None,
+            source: Default::default(),
+        };
+
+        assert!(model_matches_filter(&model, Some("openai")));
+        assert!(model_matches_filter(&model, Some("gpt-4")));
+        assert!(model_matches_filter(&model, Some("openai/gpt-4.1")));
+        assert!(!model_matches_filter(&model, Some("anthropic")));
+    }
+
+    #[test]
+    fn empty_available_model_filter_matches_everything() {
+        let model = talos_config::model::ModelMetadata {
+            provider: "openai".to_string(),
+            id: "gpt-4.1".to_string(),
+            context_limit: None,
+            output_limit: None,
+            pricing: None,
+            capabilities: Default::default(),
+            release_date: None,
+            source: Default::default(),
+        };
+
+        assert!(model_matches_filter(
+            &model,
+            normalize_model_filter(Some("   ")).as_deref()
+        ));
     }
 
     use crate::storage::{
