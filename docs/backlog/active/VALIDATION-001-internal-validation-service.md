@@ -1,6 +1,6 @@
 # VALIDATION-001: Internal Validation Service
 
-**Status**: In Progress — governance profile internalized in CLI validation slice
+**Status**: Complete for shared internal validation service slice
 **Priority**: P0
 **Created**: 2026-07-04
 **Source**: Maintainer correction after I095 review
@@ -69,17 +69,17 @@ scripts are adapters, not the core abstraction.
 
 ## Acceptance Criteria
 
-- [ ] A shared internal validation API exists outside `talos-cli`.
+- [x] A shared internal validation API exists outside `talos-cli`.
 - [x] `governance` profile can run without invoking `scripts/validate_project_governance.sh`.
-- [ ] CLI `talos validate plan/run` uses the shared service rather than owning validation logic.
-- [ ] TUI can call at least one internal validation profile without spawning host commands.
+- [x] CLI `talos validate plan/run` uses the shared service rather than owning validation logic.
+- [x] TUI can call at least one internal validation profile without spawning host commands.
 - [x] Evidence records distinguish `internal` checks from `host_tool` checks.
 - [x] Host-tool adapters record language/ecosystem metadata and unavailable-tool behavior.
 - [x] Common project types can be inferred from manifests before host-tool adapters are selected.
-- [ ] Host-tool adapter usage instructions are injected on demand only for confirmed project types.
-- [ ] Cargo is represented only as a Rust-project adapter for this repository, not as a Talos-wide
+- [x] Host-tool adapter usage instructions are injected on demand only for confirmed project types.
+- [x] Cargo is represented only as a Rust-project adapter for this repository, not as a Talos-wide
       assumption.
-- [ ] Documentation clearly explains the boundary between internal validation and host-tool
+- [x] Documentation clearly explains the boundary between internal validation and host-tool
       validation.
 
 ## Candidate Design
@@ -111,12 +111,18 @@ The first implementation should prioritize internal governance validation becaus
 as Rust logic through `talos-conversation` governance summary/validation code. `scripts/*.sh` can
 remain as compatibility wrappers, but they should not be the primary runtime path.
 
-2026-07-05 first slice: CLI validation now detects `talos_governance`, `rust`, `node`, `python`,
-`go`, and `java` project types through a `ProjectTypeDetector` strategy registry.
-`talos validate plan/run --profile governance` uses the internal
-`talos_conversation::collect_governance_validation` path and reports `execution_mode: "internal"`.
-Cargo checks remain `execution_mode: "host_tool"` with `ecosystem: "rust"` and are blocked when a
-Rust manifest is not detected.
+2026-07-05 implementation: validation logic now lives in the shared
+`talos_conversation::validation` service. CLI validation is a frontend over
+`collect_validation_plan`, `run_validation_plan`, and the text/JSON renderers. The conversation
+engine exposes `/validate governance` as a TUI-safe internal command; it rejects host-tool profiles
+from the TUI path and does not execute project scripts.
+
+Project detection now identifies `talos_governance`, `rust`, `node`, `python`, `go`, and `java`
+through a `ProjectTypeDetector` strategy registry. Adapter instructions require both a confirmed
+project type and a selected host-tool check for that ecosystem, so `governance` profile output does
+not inject Cargo guidance merely because a Rust manifest exists. Cargo checks remain
+`execution_mode: "host_tool"` with `ecosystem: "rust"` and are blocked when a Rust manifest is not
+detected.
 
 ## Relationship To I095
 
@@ -134,13 +140,20 @@ implementation should not be treated as the final TUI/runtime boundary.
 - Instruction-injection tests proving unrelated host-tool adapter guidance is not loaded.
 - Governance validation and `git diff --check`.
 
-2026-07-05 partial validation evidence:
+2026-07-05 validation evidence:
 
-- `cargo test -p talos-cli validation` passed: 10 tests.
+- `cargo fmt --all -- --check` passed.
+- `cargo test -p talos-conversation slash_validate` passed: 3 tests.
+- `cargo test -p talos-conversation validation::tests` passed: 10 tests.
+- `cargo test -p talos-cli validation` passed: 2 tests.
+- `cargo check -p talos-cli` passed.
 - `cargo run -p talos-cli -- validate plan --profile governance --json` prints
-  `project_types:["talos_governance","rust"]` and an internal governance check.
+  `project_types:["talos_governance","rust"]`, an internal governance check, and no Cargo adapter
+  instruction.
 - `cargo run -p talos-cli -- validate run --profile governance --json` prints a passed
   `execution_mode:"internal"` governance record.
+- `scripts/validate_project_governance.sh .` passed: 0 warning(s).
+- `git diff --check` passed.
 
 ## Required Reads
 

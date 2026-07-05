@@ -21,6 +21,7 @@ mod engine;
 mod engine_tests;
 mod governance_summary;
 mod types;
+mod validation;
 
 pub use command_registry::{
     AvailabilityPredicate, CommandDefinition, CommandExecutionMode, CommandOrigin, CommandRegistry,
@@ -37,4 +38,10 @@ pub use types::{
     SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
     TodoExportFormat, TodoPanelData, TodoPanelRow, ToolCallDisplay, ToolCallInfo,
     ToolResultDisplay, TurnPhase, UiOutput, UserInput,
+};
+pub use validation::{
+    EvidenceStatus, FindingSeverity, ProjectType, ValidationCheck, ValidationEvidence,
+    ValidationEvidenceRecord, ValidationExecutionMode, ValidationFinding, ValidationPlan,
+    ValidationProfile, collect_validation_plan, detect_project_types, render_json_evidence,
+    render_json_plan, render_text_evidence, render_text_plan, run_validation_plan,
 };

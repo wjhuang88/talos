@@ -1467,6 +1467,50 @@ async fn slash_agile_with_workspace_returns_governance_summary() {
     }
 }
 
+#[tokio::test]
+async fn slash_validate_without_workspace_returns_unavailable() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/validate governance");
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("unavailable") || text.contains("no workspace"));
+}
+
+#[tokio::test]
+async fn slash_validate_governance_uses_internal_profile() {
+    let dir = tempfile::tempdir().unwrap();
+    let gov_dir = dir.path().join(".agent-governance");
+    std::fs::create_dir_all(&gov_dir).unwrap();
+    std::fs::write(gov_dir.join("manifest.yaml"), "profile: product\n").unwrap();
+    let script_dir = dir.path().join("scripts");
+    std::fs::create_dir_all(&script_dir).unwrap();
+    std::fs::write(
+        script_dir.join("validate_project_governance.sh"),
+        "#!/usr/bin/env bash\ntouch executed-marker\n",
+    )
+    .unwrap();
+
+    let mut engine = ConversationEngine::new("test".to_string(), "test".to_string())
+        .with_workspace_root(dir.path().to_path_buf());
+    let outputs = engine.handle_slash_command("/validate governance");
+
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("Talos Validation Evidence"));
+    assert!(text.contains("internal:governance_validation"));
+    assert!(text.contains("execution") || text.contains("allowlisted validation profile"));
+    assert!(!dir.path().join("executed-marker").exists());
+}
+
+#[tokio::test]
+async fn slash_validate_rejects_host_tool_profiles() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/validate workspace");
+    assert_eq!(outputs.len(), 1);
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("Unsupported internal validation profile"));
+}
+
 // ---------------------------------------------------------------------------
 // Status snapshot
 // ---------------------------------------------------------------------------

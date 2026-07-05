@@ -568,6 +568,9 @@ impl ConversationEngine {
             "/agile" => {
                 outputs.extend(self.handle_agile_command(arg));
             }
+            "/validate" => {
+                outputs.extend(self.handle_validate_command(arg));
+            }
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
@@ -601,6 +604,37 @@ impl ConversationEngine {
             })];
         };
         let text = crate::governance_summary::format_governance_summary(ws);
+        vec![UiOutput::Stream(StreamMessage {
+            source: MessageSource::System,
+            stream: Box::pin(stream::once(async move { text })),
+        })]
+    }
+
+    fn handle_validate_command(&self, arg: &str) -> Vec<UiOutput> {
+        let profile = match arg.trim() {
+            "" | "governance" => crate::ValidationProfile::Governance,
+            other => {
+                let text = format!(
+                    "[Error] Unsupported internal validation profile: {other}. Usage: /validate [governance]\n"
+                );
+                return vec![UiOutput::Stream(StreamMessage {
+                    source: MessageSource::Error,
+                    stream: Box::pin(stream::once(async move { text })),
+                })];
+            }
+        };
+        let Some(ref ws) = self.workspace_root else {
+            return vec![UiOutput::Stream(StreamMessage {
+                source: MessageSource::System,
+                stream: Box::pin(stream::once(async move {
+                    "[System] /validate is unavailable — no workspace path set.\n".to_string()
+                })),
+            })];
+        };
+
+        let plan = crate::collect_validation_plan(ws, profile);
+        let evidence = crate::run_validation_plan(ws, plan);
+        let text = crate::render_text_evidence(&evidence);
         vec![UiOutput::Stream(StreamMessage {
             source: MessageSource::System,
             stream: Box::pin(stream::once(async move { text })),

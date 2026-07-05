@@ -286,6 +286,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
+        CommandDefinition {
+            name: "/validate",
+            aliases: &[],
+            usage: "/validate [governance]",
+            description: "Run internal validation evidence without host tools",
+            arg_hint: Some("[governance]"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
     ])
 });
 
