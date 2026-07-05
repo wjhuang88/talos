@@ -5,7 +5,7 @@
 | ID | PERM-003 |
 | Type | Security/UX Design Story |
 | Priority | P1 |
-| Status | In Progress — reference study complete |
+| Status | Complete — reference study, taxonomy, UX copy, and first measured trace closed |
 | Source | Maintainer request 2026-07-05 — repeated bash/tool approvals make long-running Talos tasks impractical |
 | Depends on | PERM-001, PERM-002, TOOL-017 |
 | Blocks | Any broad change to bash `always` semantics, unattended execution policy, or default permission presets |
@@ -101,11 +101,27 @@ This story should produce a permission design that balances stability and contro
 - [x] Reference-project comparison is recorded with links or local evidence paths.
 - [x] Talos permission taxonomy distinguishes exact command, command template, directory write,
       remote/network, and long-task preflight scopes.
-- [ ] UX copy for approval prompts shows the reusable scope before the user chooses `always`.
-- [ ] Repeated approval reduction is measured against at least one recorded long-task trace.
-- [ ] Security review proves deny rules still win and high-risk command families are not broadened
+- [x] UX copy for approval prompts shows the reusable scope before the user chooses `always`.
+- [x] Repeated approval reduction is measured against at least one recorded long-task trace.
+- [x] Security review proves deny rules still win and high-risk command families are not broadened
       accidentally.
-- [ ] TOOL-017 and PERM-002 are updated or superseded consistently after this design lands.
+- [x] TOOL-017 and PERM-002 are updated or superseded consistently after this design lands.
+
+## Closeout
+
+2026-07-05 implementation closeout:
+
+- Approval prompts now show the exact reusable `always` scope as a session allow rule and explicitly
+  state that configured deny rules still win.
+- Runtime `always` rules continue to insert before the default `Ask` catch-all, not before
+  configured deny policy.
+- Deny precedence is covered by `test_configured_deny_precedes_runtime_always_allow`.
+- Repeated approval reduction is recorded in
+  `docs/reference/PERMISSION-LONG-TASK-TRACE-2026-07-05.md` and covered by
+  `test_repeated_always_approval_reduces_same_operation_to_zero_prompts`.
+- `TOOL-017` remains allowed only after the PERM-003 taxonomy and deny-precedence tests; its
+  implementation must preserve the same scoped facets instead of adding shell-like blanket
+  permission.
 
 ## Required Reads
 

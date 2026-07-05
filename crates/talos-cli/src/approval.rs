@@ -205,14 +205,14 @@ pub(crate) fn always_allow_rule_descriptions(
         .map(|rule| {
             let nature = rule
                 .nature
-                .map(|nature| format!("{nature:?}"))
+                .map(|nature| format!("{nature:?}").to_ascii_lowercase())
                 .unwrap_or_else(|| tool_name.to_string());
             let resource = rule.resource.unwrap_or_else(|| "*".to_string());
             let kind = rule
                 .resource_kind
-                .map(|kind| format!("{kind:?}"))
-                .unwrap_or_else(|| "Any".to_string());
-            format!("{nature} {kind} {resource}")
+                .map(|kind| format!("{kind:?}").to_ascii_lowercase())
+                .unwrap_or_else(|| "any".to_string());
+            format!("session allow: {nature} {kind} `{resource}`; configured deny rules still win")
         })
         .collect()
 }
@@ -386,6 +386,60 @@ mod tests {
         let descriptions =
             always_allow_rule_descriptions("write", &profile, &serde_json::json!({}));
 
-        assert_eq!(descriptions, vec!["Write Path src/**"]);
+        assert_eq!(
+            descriptions,
+            vec!["session allow: write path `src/**`; configured deny rules still win"]
+        );
+    }
+
+    #[test]
+    fn test_configured_deny_precedes_runtime_always_allow() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "nature": "Execute",
+                    "resource": "bash:validation_build:*",
+                    "resource_kind": "command",
+                    "decision": {"Deny": "validation builds are blocked in this workspace"}
+                }]
+            }))
+            .unwrap();
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "bash:validation_build:abc123",
+            talos_core::tool::ToolResourceKind::Command,
+        )];
+
+        add_always_allow_rules(&mut engine, "bash", &profile, &serde_json::json!({}));
+
+        assert_eq!(
+            engine.evaluate_profile("bash", &profile, &serde_json::json!({})),
+            PermissionDecision::Deny("validation builds are blocked in this workspace".to_string())
+        );
+    }
+
+    #[test]
+    fn test_repeated_always_approval_reduces_same_operation_to_zero_prompts() {
+        let mut engine = PermissionEngine::new();
+        let input = serde_json::json!({});
+        let profile = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "bash:read_only_inspection:trace",
+            talos_core::tool::ToolResourceKind::Command,
+        )];
+
+        assert_eq!(
+            engine.evaluate_profile("bash", &profile, &input),
+            PermissionDecision::Ask
+        );
+        add_always_allow_rules(&mut engine, "bash", &profile, &input);
+
+        let repeated_asks = (0..5)
+            .filter(|_| {
+                engine.evaluate_profile("bash", &profile, &input) == PermissionDecision::Ask
+            })
+            .count();
+        assert_eq!(repeated_asks, 0);
     }
 }
