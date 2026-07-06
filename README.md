@@ -261,6 +261,24 @@ Validation execution accepts only built-in profiles. Each evidence record includ
 exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. It does not
 accept arbitrary commands, edit repository files, push, publish, or tag releases.
 
+### Permission Preflight
+
+Preview permission scopes for expected long-task tool operations without executing tools or
+installing allow rules:
+
+```bash
+talos permissions preflight \
+  --operation 'bash={"command":"cat Cargo.toml"}' \
+  --operation 'bash={"command":"cargo test approval"}'
+
+talos permissions preflight --json \
+  --operation 'bash={"command":"rm generated.txt"}'
+```
+
+The preflight packet uses the real tool permission profile and shows the reusable `always` scope
+that would be offered later. Configured deny rules still win, and high-risk shell commands remain
+exact unless the audited bash template policy classifies them as reusable.
+
 ### Governance Mutation Preview
 
 Preview a bounded governance owner-doc update before writing it:

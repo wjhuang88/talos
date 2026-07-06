@@ -200,6 +200,29 @@ pub(crate) fn always_allow_rule_descriptions(
     profile: &[ToolPermissionFacet],
     input: &serde_json::Value,
 ) -> Vec<String> {
+    always_allow_scope_entries(tool_name, profile, input)
+        .into_iter()
+        .map(|entry| {
+            format!(
+                "session allow: {} {} `{}`; configured deny rules still win",
+                entry.nature, entry.resource_kind, entry.resource
+            )
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AlwaysAllowScopeEntry {
+    pub(crate) nature: String,
+    pub(crate) resource_kind: String,
+    pub(crate) resource: String,
+}
+
+pub(crate) fn always_allow_scope_entries(
+    tool_name: &str,
+    profile: &[ToolPermissionFacet],
+    input: &serde_json::Value,
+) -> Vec<AlwaysAllowScopeEntry> {
     always_allow_rules(tool_name, profile, input)
         .into_iter()
         .map(|rule| {
@@ -208,11 +231,15 @@ pub(crate) fn always_allow_rule_descriptions(
                 .map(|nature| format!("{nature:?}").to_ascii_lowercase())
                 .unwrap_or_else(|| tool_name.to_string());
             let resource = rule.resource.unwrap_or_else(|| "*".to_string());
-            let kind = rule
+            let resource_kind = rule
                 .resource_kind
                 .map(|kind| format!("{kind:?}").to_ascii_lowercase())
                 .unwrap_or_else(|| "any".to_string());
-            format!("session allow: {nature} {kind} `{resource}`; configured deny rules still win")
+            AlwaysAllowScopeEntry {
+                nature,
+                resource_kind,
+                resource,
+            }
         })
         .collect()
 }

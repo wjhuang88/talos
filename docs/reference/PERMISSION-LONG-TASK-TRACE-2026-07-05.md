@@ -52,6 +52,29 @@ Measured prompt count after `always`: `0 / 5` repeated calls ask again.
   - `test_bash_permission_profile_repeated_command_shares_resource`
   - `test_bash_permission_profile_different_subcommands_do_not_share_resource`
   - `test_bash_permission_profile_same_command_across_directories_is_distinct`
+- `crates/talos-cli/src/permissions.rs`
+  - `preflight_packet_reports_reusable_bash_template`
+  - `preflight_packet_keeps_high_risk_bash_exact`
+  - `render_preflight_packet_explains_no_execution_or_rule_install`
+
+## Preflight Evidence
+
+I098 adds a read-only preflight surface that computes the same reusable scopes before a long task
+runs:
+
+```sh
+talos permissions preflight \
+  --operation 'bash={"command":"cat Cargo.toml"}' \
+  --operation 'bash={"command":"rm generated.txt"}'
+```
+
+Observed result:
+
+- `cat Cargo.toml` reports `current decision: ask` and a reusable
+  `bash:read_only_inspection:template:<cwd>:cat` scope.
+- `rm generated.txt` reports `current decision: ask` and an exact
+  `bash:write_or_mutating:exact:<hash>` scope.
+- The packet states that preflight is read-only and does not execute tools or install allow rules.
 
 ## Security Boundary
 

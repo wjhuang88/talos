@@ -128,6 +128,9 @@ This story should produce a permission design that balances stability and contro
   `test_bash_read_only_template_shares_across_objects_in_same_cwd`.
 - Template safety is covered by tests proving parent/absolute paths, `find -exec`, complex shell
   operators, and mutating commands keep exact resources.
+- I098 adds `talos permissions preflight`, a read-only long-task planning surface that uses the
+  real tool permission profile to show current decisions and reusable `always` scopes before a run.
+  It does not execute tools or install allow rules.
 - `TOOL-017` remains allowed only after the PERM-003 taxonomy and deny-precedence tests; its
   implementation must preserve the same scoped facets instead of adding shell-like blanket
   permission.

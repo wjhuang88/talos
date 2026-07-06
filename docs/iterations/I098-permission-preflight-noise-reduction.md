@@ -1,12 +1,13 @@
 # Iteration I098: Permission Preflight And Low-Noise Execution Policy
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-06
 > Planned objective: make long-running permission needs inspectable up front while preserving deny
 > precedence and avoiding broad bash approval.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: a test-backed long-task permission preflight packet plus approval trace evidence
 > showing lower repeated-prompt noise without weakening write/execute gates.
+> Completed: 2026-07-06
 
 ## Published Baseline
 
@@ -75,15 +76,36 @@
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 1 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until explicit activation. |
 | 2026-07-06 | Activation | Activated after maintainer direction to start the long-running task. Inventory disposition: I085 remains Paused; I086-I089 remain Planned; I099-I101 remain Planned and ordered after I098/I099/I100 respectively; MODEL-006 remains In Progress for I101 only; PERM-003 is complete but selected for refinement; PERM-001 remains In Progress with Guardian auto-approval and exec DSL disabled. Activation authorizes permission preflight/traceability only, not broad bash allow, permission-default relaxation, release action, tag, publish, or runtime `catalog.db` behavior. |
+| 2026-07-06 | Implementation | Added `talos permissions preflight` with repeated `--operation 'tool={...}'` input and `--json` output. The command uses registered tool permission profiles, prints current decisions and reusable `always` scopes, and does not execute tools or install rules. |
 
 ## Verification Evidence
 
-- Pending.
+- `cargo fmt --all`: completed after implementation.
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-cli permissions`: passed, 4 tests.
+- `cargo test -p talos-cli approval::tests`: passed, 13 tests.
+- `cargo test -p talos-tools bash_tool`: passed, 32 tests.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
+- Runtime smoke:
+  `cargo run -p talos-cli -- permissions preflight --operation 'bash={"command":"cat Cargo.toml"}' --operation 'bash={"command":"rm generated.txt"}'`
+  printed read-only preflight output with a reusable read-only `cat` template and exact mutating
+  `rm` scope.
+- Runtime smoke:
+  `cargo run -p talos-cli -- permissions preflight --json --operation 'bash={"command":"cargo test approval"}'`
+  printed JSON with `bash:validation_build:template:<cwd>:cargo:test`.
 
 ## Variance And Residuals
 
-- Pending.
+- The preflight packet is intentionally read-only. It does not pre-install approval rules; actual
+  approval still happens through the normal permission pipeline.
+- C4/I099 remains next for structured `exec` parity and bash fallback reduction.
 
 ## Retrospective
 
-- Pending.
+- Outcome: met.
+- Documentation: README, PERM-003, and the long-task permission trace were updated.
+- Lessons: no new EVOLUTION entry required.

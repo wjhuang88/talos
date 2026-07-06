@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I098 active
+> Status: In Progress — I098 complete; I099 next
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -54,8 +54,8 @@ confirmation required by the active iteration.
 |---|---|---|---|---|---|---|
 | C0 | Establish execution baseline | This task record, I098-I101 planned shells, Board, backlog, and iteration index name the new track. | Maintainer request | Governance validation and `git diff --check` pass. | Keep task Planned with exact blocker. | Planned |
 | C1 | Activate I098 | Start permission preflight/noise-reduction iteration after inventory. | C0 | I098 Active and non-terminal inventory disposition recorded. | Keep Planned if conflicting active work blocks activation. | Complete |
-| C2 | Long-task permission preflight | A readable preflight packet lists expected scoped approvals before unattended work. | C1 | Tests prove deny precedence, directory write scope, bash template scope, and no broad bash allow. | Keep current runtime rules and ship docs-only preflight guidance. | Planned |
-| C3 | Permission trace and UX evidence | Approval prompts and trace output explain why a repeated approval is or is not reused. | C2 | Recorded trace shows prompt count reduction and high-risk exact fallback behavior. | Record unresolved noisy command families in PERM-003. | Planned |
+| C2 | Long-task permission preflight | A readable preflight packet lists expected scoped approvals before unattended work. | C1 | Tests prove deny precedence, directory write scope, bash template scope, and no broad bash allow. | Keep current runtime rules and ship docs-only preflight guidance. | Complete |
+| C3 | Permission trace and UX evidence | Approval prompts and trace output explain why a repeated approval is or is not reused. | C2 | Recorded trace shows prompt count reduction and high-risk exact fallback behavior. | Record unresolved noisy command families in PERM-003. | Complete |
 | C4 | Activate I099 | Start structured exec parity iteration. | C3 | I098 closed or paused with exact residuals. | Keep I099 Planned. | Planned |
 | C5 | Exec parallel and pipe slices | `exec` supports approved parallel and pipe workflows without shell parsing. | C4 | `talos-tools` tests prove timeout/cancel/failure behavior and per-step permission facets. | Ship only parallel or only pipe if the other lacks safe semantics. | Planned |
 | C6 | Bash fallback reduction audit | Identify bash calls that should become typed tools/adapters or remain exact shell. | C5 | Audit matrix updated; no permission broadening. | Keep bash exact/template behavior and record blockers. | Planned |
@@ -252,3 +252,47 @@ Recovery or resume instruction:
 - Run `git status --short --branch`.
 - Read I098, PERM-003, PERM-001, `crates/talos-cli/src/approval.rs`,
   `crates/talos-permission/src/lib.rs`, and `crates/talos-tools/src/bash_tool.rs`.
+
+### C2/C3 — Permission Preflight And Traceability Closed (2026-07-06)
+
+Completed task items:
+
+- Added `talos permissions preflight`.
+- The preflight command accepts repeated `--operation 'tool={"json":"input"}'` entries and uses
+  the real registered tool permission profile.
+- The command prints current permission decision, reusable `always` scopes, and explicit notes that
+  preflight is read-only and does not execute tools or install allow rules.
+- Added JSON output for machine-readable long-task planning.
+- Kept configured deny precedence and existing bash exact/template policy unchanged.
+- Updated README, PERM-003, and the permission long-task trace with preflight evidence.
+
+Current state and artifacts:
+
+- I098 is complete.
+- I099 remains planned and is the next implementation phase.
+
+Commands/checks and actual results:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-cli permissions`: passed, 4 tests.
+- `cargo test -p talos-cli approval::tests`: passed, 13 tests.
+- `cargo test -p talos-tools bash_tool`: passed, 32 tests.
+- `cargo run -p talos-cli -- permissions preflight --operation 'bash={"command":"cat Cargo.toml"}' --operation 'bash={"command":"rm generated.txt"}'`: passed; printed read-only packet with reusable `cat` template and exact mutating `rm` scope.
+- `cargo run -p talos-cli -- permissions preflight --json --operation 'bash={"command":"cargo test approval"}'`: passed; printed `bash:validation_build:template:<cwd>:cargo:test`.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+
+Open risks or deviations:
+
+- I098 does not install preflight approvals. It only makes scoped permission needs inspectable before
+  a long task. This is intentional to avoid hidden authorization.
+
+Next task item:
+
+- C4: activate I099 for structured exec parity.
+
+Recovery or resume instruction:
+
+- Run `git status --short --branch`.
+- Read I099 and TOOL-017 before activating the next phase.

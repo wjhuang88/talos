@@ -28,6 +28,7 @@ mod mode_runners;
 mod mode_runtime;
 mod model_lifecycle;
 mod models_browser;
+mod permissions;
 mod provider_setup;
 mod registry;
 mod runtime_adapter;
@@ -107,6 +108,11 @@ pub(crate) enum TalosCommand {
     Governance {
         #[command(subcommand)]
         command: governance_mutation::GovernanceCommand,
+    },
+    /// Permission planning and inspection.
+    Permissions {
+        #[command(subcommand)]
+        command: permissions::PermissionsCommand,
     },
     /// Configuration operations.
     Config {
@@ -362,6 +368,10 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Governance { command }) = &cli.command {
         return crate::governance_mutation::run_governance_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Permissions { command }) = &cli.command {
+        return crate::permissions::run_permissions_command(command.clone());
     }
 
     if let Some(TalosCommand::Config { command }) = &cli.command {
