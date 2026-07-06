@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand, ValueEnum};
@@ -127,7 +126,7 @@ fn print_iteration_record_preview(workspace: &Path, plan: &IterationRecordPlan) 
     println!("================================");
     println!("Action: append iteration execution record");
     println!("Owner doc: {}", owner_doc.display());
-    println!("Validation after write: scripts/validate_project_governance.sh .");
+    println!("Validation after write: internal governance validation");
     println!();
     println!("Row:");
     println!("{}", plan.row);
@@ -237,22 +236,15 @@ fn insert_iteration_record(content: &str, row: &str) -> Result<String> {
 }
 
 fn run_governance_validation(workspace: &Path) -> Result<()> {
-    let output = Command::new("scripts/validate_project_governance.sh")
-        .arg(".")
-        .current_dir(workspace)
-        .output()
-        .context("failed to execute governance validator")?;
-
-    if output.status.success() {
+    let report = talos_conversation::collect_governance_validation(workspace);
+    if report.errors == 0 {
         Ok(())
     } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
         bail!(
-            "validator exited with status {:?}; stdout: {}; stderr: {}",
-            output.status.code(),
-            stdout.trim(),
-            stderr.trim()
+            "internal governance validation failed: {} error(s), {} warning(s): {}",
+            report.errors,
+            report.warnings,
+            report.findings.join("; ")
         )
     }
 }
@@ -310,5 +302,49 @@ mod tests {
     #[test]
     fn escape_table_cell_removes_newlines_and_escapes_pipes() {
         assert_eq!(escape_table_cell("a|b\nc"), "a\\|b c");
+    }
+
+    #[test]
+    fn apply_iteration_record_uses_internal_validation_not_host_script() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".agent-governance")).unwrap();
+        fs::write(
+            dir.path().join(".agent-governance").join("manifest.yaml"),
+            "profile: personal\nstatus: adopting\n",
+        )
+        .unwrap();
+        fs::create_dir_all(dir.path().join("docs").join("iterations")).unwrap();
+        fs::write(
+            dir.path()
+                .join("docs")
+                .join("iterations")
+                .join("I123-internal-validation.md"),
+            "# Iteration I123\n\n| Date | Type | Record |\n|---|---|---|\n",
+        )
+        .unwrap();
+        fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        fs::write(
+            dir.path()
+                .join("scripts")
+                .join("validate_project_governance.sh"),
+            "#!/usr/bin/env bash\ntouch executed-marker\nexit 42\n",
+        )
+        .unwrap();
+        let plan = build_iteration_record_plan(
+            dir.path(),
+            &IterationRecordArgs {
+                iteration: "I123".to_string(),
+                date: "2026-07-06".to_string(),
+                record_type: GovernanceRecordType::Execution,
+                record: "Internal validation path".to_string(),
+            },
+        )
+        .unwrap();
+
+        apply_iteration_record_plan(dir.path(), &plan).unwrap();
+
+        assert!(!dir.path().join("executed-marker").exists());
+        let updated = fs::read_to_string(plan.owner_doc).unwrap();
+        assert!(updated.contains("Internal validation path"));
     }
 }

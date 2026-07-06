@@ -31,6 +31,11 @@ commands. `VALIDATION-001` owns the follow-up: governance validation should run 
 Cargo should be represented only as a Rust-project host-tool adapter, not as a Talos-wide runtime
 assumption.
 
+I100 result (2026-07-06): validation remains a pre-1.0 internal service rather than a stable SDK
+surface, but callers inside Talos can now inspect project detector metadata through
+`project_type_detector_descriptors()` and governance mutation write gates use the internal
+validation service instead of invoking the compatibility shell script.
+
 ## Problem
 
 Talos's core turn loop is mostly isolated in `talos-agent`, and CLI/TUI crates do not own the

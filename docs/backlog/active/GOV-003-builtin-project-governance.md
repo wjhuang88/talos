@@ -21,14 +21,20 @@ remote dashboard mutation, release claims, publish/tag actions, or permission-de
 I096 result (2026-07-04): `talos governance iteration-record preview/write` now provides a narrow
 governance mutation gate for iteration owner docs. Preview shows the target owner doc, post-write
 validation command, and exact row. Write requires `--confirm-preview`, appends only to one resolved
-`docs/iterations/I###-*.md` execution table, runs `scripts/validate_project_governance.sh .`, and
-rolls back the file if validation fails. Broad governance automation, web writes, remote dashboard
+`docs/iterations/I###-*.md` execution table, validates through the internal Rust governance
+validation service, and rolls back the file if validation fails. Broad governance automation, web
+writes, remote dashboard
 mutation, and release authority remain out of scope.
 
 Maintainer correction (2026-07-04): governance validation should not remain dependent on
 `scripts/validate_project_governance.sh` as the primary runtime path. `VALIDATION-001` owns moving
 governance validation to an internal callable service that CLI, TUI, runtime, and future governance
 actions can share.
+
+I100 result (2026-07-06): the iteration-record write gate now uses
+`talos_conversation::collect_governance_validation` directly after writing and before confirming
+success. The compatibility script can still be run by humans or CI, but it is no longer the primary
+post-write rollback authority for this command.
 
 ## Problem
 

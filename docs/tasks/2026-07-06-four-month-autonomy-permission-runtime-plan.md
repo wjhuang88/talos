@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I100 active
+> Status: In Progress — I100 complete; I101 next
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -60,8 +60,8 @@ confirmation required by the active iteration.
 | C5 | Exec parallel and pipe slices | `exec` supports approved parallel and pipe workflows without shell parsing. | C4 | `talos-tools` tests prove timeout/cancel/failure behavior and per-step permission facets. | Ship only parallel or only pipe if the other lacks safe semantics. | Complete |
 | C6 | Bash fallback reduction audit | Identify bash calls that should become typed tools/adapters or remain exact shell. | C5 | Audit matrix updated; no permission broadening. | Keep bash exact/template behavior and record blockers. | Complete |
 | C7 | Activate I100 | Start project-intelligence and validation-adapter iteration. | C6 | I099 closed or paused with exact residuals. | Keep I100 Planned. | Complete |
-| C8 | Detector/adapters hardening | Project detectors and host-tool adapter guidance are extensible and test covered. | C7 | Tests cover Rust/Node/Python/Go/Java/mixed/governance and no unrelated adapter injection. | Keep existing detector registry and record missing ecosystem. | Planned |
-| C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Planned |
+| C8 | Detector/adapters hardening | Project detectors and host-tool adapter guidance are extensible and test covered. | C7 | Tests cover Rust/Node/Python/Go/Java/mixed/governance and no unrelated adapter injection. | Keep existing detector registry and record missing ecosystem. | Complete |
+| C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Complete |
 | C10 | Activate I101 | Start model/Git/self-bootstrap evidence closeout. | C9 | I100 closed or paused with exact residuals. | Keep I101 Planned. | Planned |
 | C11 | Model catalog browser closeout | Independent CLI browser walkthrough and docs close MODEL-006 residuals. | C10 | Real-terminal evidence, no-secret rendering, `/model` vs `/connect` separation confirmed. | Record terminal blocker without faking walkthrough. | Planned |
 | C12 | Standard-provider connect cleanup | Built-in catalog providers use catalog-defined API endpoint metadata and do not prompt for URL; custom providers still require URL. | C11 | Tests cover standard provider setup, custom provider setup, config merge, and no-secret rendering. | Keep existing prompt only with an explicit MODEL-006 blocker. | Planned |
@@ -237,6 +237,46 @@ Recovery instructions:
 - Resume from I100 implementation. If validation routing changes require arbitrary host command
   configuration or hidden TUI host-tool execution, stop and record a blocker instead of widening
   the boundary.
+
+## Checkpoint C8/C9 — Project Intelligence And Governance Routing Closed (2026-07-06)
+
+Completed items:
+
+- C8: project detectors now expose stable descriptor metadata and have fixture tests for
+  Rust/Node/Python/Go/Java/governance coverage plus independent single-marker behavior.
+- C9: governance mutation write validation now calls the internal governance validation service
+  directly and rolls back on internal validation errors, without invoking the compatibility shell
+  script.
+
+Validation evidence:
+
+```sh
+cargo fmt --all -- --check
+cargo test -p talos-conversation validation::tests
+cargo test -p talos-conversation slash_validate
+cargo test -p talos-cli validation
+cargo test -p talos-cli governance_mutation::tests
+```
+
+All listed targeted commands passed on 2026-07-06 before closeout. Full workspace validation is the
+commit gate for the I100 phase commit.
+
+Open deviations:
+
+- Node/Python/Go/Java host-tool execution profiles were not added. This phase only hardened
+  detection and demand-driven instruction injection.
+- `scripts/validate_project_governance.sh .` remains a compatibility/manual check and final
+  governance validation command, not a primary runtime mutation rollback dependency.
+
+Next item:
+
+- C10: activate I101 for model browser closeout, standard-provider connect cleanup, incremental
+  model-list rendering, continued `gix` tracking, and REL-002 evidence.
+
+Recovery instructions:
+
+- Resume from I101 activation after the I100 commit is pushed. If full validation regresses, keep
+  I101 planned and repair I100 first.
 
 ## Default Decisions For Foreseeable Ambiguity
 

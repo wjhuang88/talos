@@ -40,8 +40,9 @@ pub use types::{
     ToolResultDisplay, TurnPhase, UiOutput, UserInput,
 };
 pub use validation::{
-    EvidenceStatus, FindingSeverity, ProjectType, ValidationCheck, ValidationEvidence,
-    ValidationEvidenceRecord, ValidationExecutionMode, ValidationFinding, ValidationPlan,
-    ValidationProfile, collect_validation_plan, detect_project_types, render_json_evidence,
-    render_json_plan, render_text_evidence, render_text_plan, run_validation_plan,
+    EvidenceStatus, FindingSeverity, ProjectType, ProjectTypeDetectorDescriptor, ValidationCheck,
+    ValidationEvidence, ValidationEvidenceRecord, ValidationExecutionMode, ValidationFinding,
+    ValidationPlan, ValidationProfile, collect_validation_plan, detect_project_types,
+    project_type_detector_descriptors, render_json_evidence, render_json_plan,
+    render_text_evidence, render_text_plan, run_validation_plan,
 };

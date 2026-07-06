@@ -1,6 +1,6 @@
 # Iteration I100: Project Intelligence And Validation Routing
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-06
 > Planned objective: make project-type and governance recognition extensible and use it to route
 > validation/adapters without hardcoded Rust assumptions.
@@ -78,15 +78,25 @@
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 3 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until I099 closes or is explicitly paused. |
 | 2026-07-06 | Activation | Activated after I099 completed and was pushed. The phase starts from the existing VALIDATION-001 first slice, which already has a `ProjectTypeDetector` strategy registry and demand-driven adapter instructions. This activation selects hardening, fixture coverage, governance routing evidence, and host-tool adapter boundary cleanup. No arbitrary validation command execution, hidden TUI host-tool execution, permission-default relaxation, release action, or runtime `catalog.db` path is authorized. |
+| 2026-07-06 | Completion | Closed detector/adapters hardening and governance routing evidence. Detector descriptors are inspectable through `project_type_detector_descriptors()`, common project fixtures have independent tests, adapter guidance remains demand-driven, and governance mutation write validation now uses the internal governance validation service instead of the compatibility shell script. |
 
 ## Verification Evidence
 
-- Pending.
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-conversation validation::tests`: passed, 12 tests.
+- `cargo test -p talos-conversation slash_validate`: passed, 3 tests.
+- `cargo test -p talos-cli validation`: passed, 3 tests.
+- `cargo test -p talos-cli governance_mutation::tests`: passed, 6 tests.
 
 ## Variance And Residuals
 
-- Pending.
+- Host-tool checks remain allowlisted profile adapters. This slice did not add Node/Python/Go/Java
+  host-tool execution profiles; it hardened detection and instruction injection only.
+- The Unix governance validation script remains as a compatibility/manual governance check, but it
+  is no longer the post-write authority for `talos governance iteration-record write`.
 
 ## Retrospective
 
-- Pending.
+- The important bug was not detector breadth; it was an inconsistent boundary where read-only
+  validation was internal but the narrow mutation rollback path still shelled out. I100 closes that
+  gap while keeping arbitrary validation commands out of scope.

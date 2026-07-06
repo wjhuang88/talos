@@ -59,6 +59,17 @@ impl fmt::Display for ProjectType {
     }
 }
 
+/// Static metadata for one project-type detector strategy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectTypeDetectorDescriptor {
+    /// Stable detector identifier.
+    pub id: &'static str,
+    /// Project type this detector can report.
+    pub project_type: ProjectType,
+    /// Relative marker paths checked by this detector.
+    pub markers: &'static [&'static str],
+}
+
 /// Validation check execution mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationExecutionMode {
@@ -276,11 +287,21 @@ pub fn detect_project_types(workspace: &Path) -> Vec<ProjectType> {
         .collect()
 }
 
+/// Return the registered project-type detector metadata.
+pub fn project_type_detector_descriptors() -> Vec<ProjectTypeDetectorDescriptor> {
+    project_type_detectors()
+        .iter()
+        .map(|detector| detector.descriptor())
+        .collect()
+}
+
 trait ProjectTypeDetector {
     fn detect(&self, workspace: &Path) -> Option<ProjectType>;
+    fn descriptor(&self) -> ProjectTypeDetectorDescriptor;
 }
 
 struct MarkerDetector {
+    id: &'static str,
     project_type: ProjectType,
     markers: &'static [&'static str],
 }
@@ -292,9 +313,18 @@ impl ProjectTypeDetector for MarkerDetector {
             .any(|marker| workspace.join(marker).exists())
             .then_some(self.project_type)
     }
+
+    fn descriptor(&self) -> ProjectTypeDetectorDescriptor {
+        ProjectTypeDetectorDescriptor {
+            id: self.id,
+            project_type: self.project_type,
+            markers: self.markers,
+        }
+    }
 }
 
 const TALOS_GOVERNANCE_DETECTOR: MarkerDetector = MarkerDetector {
+    id: "talos_governance_markers",
     project_type: ProjectType::TalosGovernance,
     markers: &[
         ".agent-governance/manifest.yaml",
@@ -303,22 +333,27 @@ const TALOS_GOVERNANCE_DETECTOR: MarkerDetector = MarkerDetector {
     ],
 };
 const RUST_DETECTOR: MarkerDetector = MarkerDetector {
+    id: "rust_cargo_manifest",
     project_type: ProjectType::Rust,
     markers: &["Cargo.toml"],
 };
 const NODE_DETECTOR: MarkerDetector = MarkerDetector {
+    id: "node_package_manifest",
     project_type: ProjectType::Node,
     markers: &["package.json"],
 };
 const PYTHON_DETECTOR: MarkerDetector = MarkerDetector {
+    id: "python_project_manifest",
     project_type: ProjectType::Python,
     markers: &["pyproject.toml", "requirements.txt", "setup.py"],
 };
 const GO_DETECTOR: MarkerDetector = MarkerDetector {
+    id: "go_module_manifest",
     project_type: ProjectType::Go,
     markers: &["go.mod"],
 };
 const JAVA_DETECTOR: MarkerDetector = MarkerDetector {
+    id: "java_build_manifest",
     project_type: ProjectType::Java,
     markers: &["pom.xml", "build.gradle", "settings.gradle"],
 };
@@ -916,6 +951,57 @@ mod tests {
         assert!(detected.contains(&ProjectType::Python));
         assert!(detected.contains(&ProjectType::Go));
         assert!(detected.contains(&ProjectType::Java));
+    }
+
+    #[test]
+    fn detector_registry_descriptors_are_unique_and_cover_common_types() {
+        let descriptors = project_type_detector_descriptors();
+        let ids = descriptors
+            .iter()
+            .map(|descriptor| descriptor.id)
+            .collect::<std::collections::BTreeSet<_>>();
+        let types = descriptors
+            .iter()
+            .map(|descriptor| descriptor.project_type)
+            .collect::<std::collections::BTreeSet<_>>();
+
+        assert_eq!(ids.len(), descriptors.len());
+        assert!(types.contains(&ProjectType::TalosGovernance));
+        assert!(types.contains(&ProjectType::Rust));
+        assert!(types.contains(&ProjectType::Node));
+        assert!(types.contains(&ProjectType::Python));
+        assert!(types.contains(&ProjectType::Go));
+        assert!(types.contains(&ProjectType::Java));
+        assert!(
+            descriptors
+                .iter()
+                .all(|descriptor| !descriptor.markers.is_empty())
+        );
+    }
+
+    #[test]
+    fn project_type_detectors_are_independent_across_fixtures() {
+        let cases = [
+            ("Cargo.toml", ProjectType::Rust),
+            ("package.json", ProjectType::Node),
+            ("pyproject.toml", ProjectType::Python),
+            ("go.mod", ProjectType::Go),
+            ("pom.xml", ProjectType::Java),
+        ];
+
+        for (marker, expected) in cases {
+            let dir = tempdir().unwrap();
+            if let Some(parent) = std::path::Path::new(marker).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                fs::create_dir_all(dir.path().join(parent)).unwrap();
+            }
+            fs::write(dir.path().join(marker), "").unwrap();
+
+            let detected = detect_project_types(dir.path());
+
+            assert_eq!(detected, vec![expected], "{marker} should be isolated");
+        }
     }
 
     #[test]

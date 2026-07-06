@@ -124,6 +124,14 @@ not inject Cargo guidance merely because a Rust manifest exists. Cargo checks re
 `execution_mode: "host_tool"` with `ecosystem: "rust"` and are blocked when a Rust manifest is not
 detected.
 
+2026-07-06 I100 hardening: the detector registry now exposes
+`ProjectTypeDetectorDescriptor` metadata through
+`project_type_detector_descriptors()`, giving callers a stable way to inspect registered detector
+IDs, project types, and marker paths without duplicating detection logic. Tests now prove detector
+IDs are unique, common project types are covered, and single-manifest fixtures detect only their
+own ecosystem. Governance mutation write validation also moved from the compatibility shell script
+to the same internal governance validation service used by `/validate governance`.
+
 ## Relationship To I095
 
 I095 remains valid as a transitional evidence format and bounded CLI command. This story records the
@@ -154,6 +162,14 @@ implementation should not be treated as the final TUI/runtime boundary.
   `execution_mode:"internal"` governance record.
 - `scripts/validate_project_governance.sh .` passed: 0 warning(s).
 - `git diff --check` passed.
+
+2026-07-06 I100 validation evidence:
+
+- `cargo fmt --all -- --check` passed.
+- `cargo test -p talos-conversation validation::tests` passed: 12 tests.
+- `cargo test -p talos-conversation slash_validate` passed: 3 tests.
+- `cargo test -p talos-cli validation` passed: 3 tests.
+- `cargo test -p talos-cli governance_mutation::tests` passed: 6 tests.
 
 ## Required Reads
 
