@@ -99,11 +99,15 @@
 
 ## Verification Evidence
 
-- Pending.
+- `cargo test -p talos-cli models_browser`: passed, 8 tests.
+- `cargo test -p talos-cli connect`: passed, 6 tests.
+- `cargo test -p talos-tui connect_mode`: passed, 6 tests.
 
 ## Variance And Residuals
 
-- Pending.
+- C12/C13 are closed before C11 walkthrough evidence. This is intentional: deterministic setup and
+  viewport rendering behavior can be validated independently, while real-terminal walkthrough
+  evidence remains open under C11.
 
 ## Retrospective
 

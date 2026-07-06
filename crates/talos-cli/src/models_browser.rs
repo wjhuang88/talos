@@ -194,12 +194,17 @@ fn prompt_provider_setup(config: &mut Config, row: &CatalogBrowserRow) -> Result
     }
 
     let default_base_url = default_base_url(config, row);
-    match &default_base_url {
-        Some(url) => print!("Base URL [{url}]: "),
-        None => print!("Base URL [leave empty]: "),
-    }
-    io::stdout().flush().ok();
-    let typed_base_url = read_trimmed_line()?;
+    let typed_base_url = match &default_base_url {
+        Some(url) => {
+            println!("Endpoint: {url}");
+            String::new()
+        }
+        None => {
+            print!("Base URL (required for custom provider): ");
+            io::stdout().flush().ok();
+            read_trimmed_line()?
+        }
+    };
 
     apply_provider_setup(config, row, &api_key, typed_base_url)?;
     config.save().context("failed to save configuration")?;
@@ -224,7 +229,10 @@ fn apply_provider_setup(
     }
     if typed_base_url.trim().is_empty() {
         if provider_entry.base_url.is_none() {
-            provider_entry.base_url = default_base_url;
+            let Some(default_base_url) = default_base_url else {
+                anyhow::bail!("base URL is required for custom provider setup");
+            };
+            provider_entry.base_url = Some(default_base_url);
         }
     } else {
         provider_entry.base_url = Some(typed_base_url.trim().to_string());
@@ -661,6 +669,67 @@ mod tests {
                 .and_then(|p| p.api_key.as_deref()),
             Some("sk-anthropic-existing")
         );
+    }
+
+    #[test]
+    fn provider_setup_standard_provider_uses_default_without_typed_url() {
+        let row = sample_rows().pop().unwrap();
+        let mut config = Config::default();
+
+        apply_provider_setup(&mut config, &row, "sk-openai-new", String::new()).unwrap();
+
+        let openai = config.providers.get("openai").unwrap();
+        assert_eq!(
+            openai.base_url.as_deref(),
+            Some("https://api.openai.com/v1")
+        );
+        assert_eq!(config.provider, "openai");
+        assert_eq!(config.model, "gpt-4.1");
+    }
+
+    #[test]
+    fn provider_setup_custom_provider_requires_base_url() {
+        let mut row = sample_rows().pop().unwrap();
+        row.provider = "custom-gw".to_string();
+        row.qualified = "custom-gw/gpt-4.1".to_string();
+        row.api_base_url = None;
+        row.env_var = None;
+        let mut config = Config::default();
+
+        let err = apply_provider_setup(&mut config, &row, "custom-key", String::new())
+            .expect_err("custom provider must require a base URL");
+
+        assert!(err.to_string().contains("base URL is required"));
+    }
+
+    #[test]
+    fn render_lines_is_viewport_windowed_for_large_catalog() {
+        let mut rows = Vec::new();
+        for idx in 0..500 {
+            rows.push(CatalogBrowserRow {
+                provider: "openai".to_string(),
+                provider_name: "OpenAI".to_string(),
+                model_id: format!("model-{idx:04}"),
+                qualified: format!("openai/model-{idx:04}"),
+                authenticated: true,
+                current: false,
+                context: "128K".to_string(),
+                pricing: String::new(),
+                api_base_url: Some("https://api.openai.com/v1".to_string()),
+                env_var: Some("OPENAI_API_KEY".to_string()),
+            });
+        }
+        let mut state = CatalogBrowserState::new(rows);
+
+        let lines = state
+            .render_lines(8, 100, false)
+            .into_iter()
+            .map(|line| line.text)
+            .collect::<Vec<_>>();
+
+        assert!(lines.len() <= 8);
+        assert!(lines.iter().any(|line| line.contains("openai/model-0000")));
+        assert!(!lines.iter().any(|line| line.contains("openai/model-0499")));
     }
 
     #[test]

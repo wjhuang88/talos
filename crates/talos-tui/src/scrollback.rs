@@ -352,14 +352,20 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             return 5u16.min(self.max_height);
         }
         if self.menu.is_credential_input() {
-            let is_connect = matches!(
-                self.menu.kind,
+            let (is_connect, has_default_endpoint) = match &self.menu.kind {
                 Some(crate::state::PanelKind::CredentialInput {
                     connect_mode: true,
+                    default_base_url,
                     ..
-                })
-            );
-            return (if is_connect { 4u16 } else { 3u16 }).min(self.max_height);
+                }) => (true, default_base_url.is_some()),
+                _ => (false, false),
+            };
+            return (if is_connect && !has_default_endpoint {
+                4u16
+            } else {
+                3u16
+            })
+            .min(self.max_height);
         }
         let filtered = self.menu.filtered_items(self.query).len();
         let natural_height = if filtered == 0 {
@@ -383,14 +389,19 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         }
 
         if self.menu.is_credential_input() {
-            let (provider, model_id, connect_mode) = match &self.menu.kind {
+            let (provider, model_id, connect_mode, has_default_endpoint) = match &self.menu.kind {
                 Some(crate::state::PanelKind::CredentialInput {
                     provider,
                     model_id,
                     connect_mode,
-                    ..
-                }) => (provider.as_str(), model_id.as_deref(), *connect_mode),
-                _ => ("?", None, false),
+                    default_base_url,
+                }) => (
+                    provider.as_str(),
+                    model_id.as_deref(),
+                    *connect_mode,
+                    default_base_url.is_some(),
+                ),
+                _ => ("?", None, false, false),
             };
             let style = Style::default().bg(semantic::INPUT_BG);
             let dim = Style::default().fg(semantic::DIM_TEXT);
@@ -424,17 +435,30 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 return;
             }
 
+            if has_default_endpoint {
+                lines.push(Line::from(Span::styled(
+                    " Enter the API key for this provider and press Enter (Esc to cancel).",
+                    dim,
+                )));
+                lines.push(Line::from(Span::styled(
+                    format!(" ▸ {api_key_display}"),
+                    api_key_color,
+                )));
+                frame.render_widget(Paragraph::new(lines).style(style), area);
+                return;
+            }
+
             let is_base_url_field =
                 self.menu.credential_field == crate::state::CredentialField::BaseUrl;
             let base_url_display = if self.menu.base_url_buffer.is_empty() {
-                "(default endpoint)".to_string()
+                "(required)".to_string()
             } else {
                 self.menu.base_url_buffer.clone()
             };
 
             if is_base_url_field {
                 lines.push(Line::from(Span::styled(
-                    " Optional base URL — leave blank for the default endpoint. Enter to save (Esc to cancel).",
+                    " Base URL is required for custom providers. Enter to save (Esc to cancel).",
                     dim,
                 )));
                 lines.push(Line::from(Span::styled(
@@ -447,7 +471,7 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 )));
             } else {
                 lines.push(Line::from(Span::styled(
-                    " Enter the API key, then Enter to continue to the base URL (Esc to cancel).",
+                    " Enter the API key, then Enter to continue to the required base URL (Esc to cancel).",
                     dim,
                 )));
                 lines.push(Line::from(Span::styled(

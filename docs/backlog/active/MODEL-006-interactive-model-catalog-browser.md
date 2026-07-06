@@ -5,7 +5,7 @@
 | ID | MODEL-006 |
 | Type | Product Story |
 | Priority | P1 |
-| Status | In Progress — first independent CLI browser slice implemented |
+| Status | In Progress — setup/render residuals closed; real-terminal walkthrough remains |
 | Source | Maintainer request 2026-07-05 — command-line `--available-models` output is too large; users need a vim-like scrollable/modifiable view before entering the main Talos TUI |
 | Depends on | MC-001, MODEL-005 |
 | Blocks | Full model-catalog UX closeout |
@@ -65,9 +65,9 @@ Expected interaction shape:
       without depending on the main session TUI.
 - [x] CLI `--available-models` remains bounded/filterable for scripts and support diagnostics.
 - [x] Tests cover navigation, filtering, selection, provider setup routing, and no-secret rendering.
-- [ ] Standard packaged provider setup does not ask for URL; it uses the catalog-defined endpoint.
-- [ ] Custom provider setup requires and validates URL input.
-- [ ] Large model-list rendering is incremental or viewport-windowed and avoids all-row render on
+- [x] Standard packaged provider setup does not ask for URL; it uses the catalog-defined endpoint.
+- [x] Custom provider setup requires and validates URL input.
+- [x] Large model-list rendering is incremental or viewport-windowed and avoids all-row render on
       open/scroll.
 
 ## Implemented Slice
@@ -88,10 +88,18 @@ main conversation TUI starts. The browser:
 Residual hardening:
 
 - Add a real-terminal manual walkthrough before marking `MODEL-006` Complete.
-- Fix standard-provider connect/setup so only credentials are requested; URL is prompted only for
-  custom providers.
-- Add incremental/viewport-windowed model-list rendering to avoid full-catalog render stalls.
 - Consider a subcommand alias such as `talos models browse` after the CLI command taxonomy settles.
+
+2026-07-06 I101 update:
+
+- `/connect` and the main TUI credential panel now submit standard catalog providers after API key
+  entry when a default endpoint exists. The user is not moved to a URL field for those providers.
+- Providers without a default endpoint keep the Base URL step and require a non-empty URL before
+  submitting credentials.
+- `--available-models-browser` setup mirrors that behavior: standard rows show the default endpoint
+  and do not prompt for URL input; rows without a default endpoint require URL input.
+- Browser rendering is covered by a viewport-windowed large-catalog test: opening an 8-line view
+  over 500 rows renders only the visible window and does not include the tail row.
 
 ## Current Mitigation
 

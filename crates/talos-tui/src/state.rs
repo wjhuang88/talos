@@ -735,10 +735,9 @@ impl TuiState {
 
     /// Submits the currently focused credential field.
     ///
-    /// In `connect_mode`, the first submit (API key) advances to the base
-    /// URL field instead of closing the panel; the second submit resolves
-    /// the final `base_url` (typed value, else the request's
-    /// `default_base_url`, else `None`) and returns the full response.
+    /// In `connect_mode`, standard providers with a default endpoint submit
+    /// after the API key. Providers without a default endpoint advance to the
+    /// base URL field and require a URL before returning the response.
     /// Non-connect mode preserves the original single-field behavior.
     pub(crate) fn credential_submit(&mut self) -> Option<CredentialResponseData> {
         if !self.slash_menu.is_credential_input() {
@@ -759,11 +758,22 @@ impl TuiState {
             _ => return None,
         };
 
+        let key = self.slash_menu.credential_buffer.trim().to_string();
+        if key.is_empty() {
+            self.slash_menu.close();
+            return None;
+        }
+
         if connect_mode && self.slash_menu.credential_field == CredentialField::ApiKey {
-            let key = self.slash_menu.credential_buffer.trim().to_string();
-            if key.is_empty() {
+            if default_base_url.is_some() {
                 self.slash_menu.close();
-                return None;
+                return Some(CredentialResponseData {
+                    provider,
+                    api_key: key,
+                    model_id,
+                    connect_mode,
+                    base_url: default_base_url,
+                });
             }
             self.slash_menu.credential_field = CredentialField::BaseUrl;
             return None;
@@ -772,13 +782,13 @@ impl TuiState {
         let key = std::mem::take(&mut self.slash_menu.credential_buffer)
             .trim()
             .to_string();
-        if key.is_empty() {
-            self.slash_menu.close();
-            return None;
-        }
         let typed_base_url = std::mem::take(&mut self.slash_menu.base_url_buffer)
             .trim()
             .to_string();
+        if connect_mode && default_base_url.is_none() && typed_base_url.is_empty() {
+            self.slash_menu.credential_buffer = key;
+            return None;
+        }
         let base_url = if typed_base_url.is_empty() {
             default_base_url
         } else {
@@ -987,55 +997,10 @@ mod tests {
         assert!(!state.slash_menu.is_open);
     }
 
-    // ── /connect two-phase credential (api_key + base_url) ──────────────
+    // ── /connect credential (standard provider key-only, custom provider URL) ──────────────
 
     #[test]
-    fn connect_mode_first_submit_advances_to_base_url_field() {
-        let mut state = TuiState::new();
-        state.open_credential_input("groq", None, true, None);
-
-        state.credential_append_str("gsk-test-key");
-        let response = state.credential_submit();
-
-        assert!(
-            response.is_none(),
-            "first Enter in connect_mode must not submit yet"
-        );
-        assert!(
-            state.slash_menu.is_open,
-            "panel must stay open for base_url"
-        );
-        assert_eq!(
-            state.slash_menu.credential_field,
-            crate::state::CredentialField::BaseUrl
-        );
-        assert_eq!(state.slash_menu.credential_buffer, "gsk-test-key");
-    }
-
-    #[test]
-    fn connect_mode_second_submit_returns_typed_base_url() {
-        let mut state = TuiState::new();
-        state.open_credential_input("groq", None, true, None);
-
-        state.credential_append_str("gsk-test-key");
-        state.credential_submit();
-        state.credential_append_str("https://custom.groq.example/v1");
-        let response = state
-            .credential_submit()
-            .expect("second submit must return response");
-
-        assert_eq!(response.provider, "groq");
-        assert_eq!(response.api_key, "gsk-test-key");
-        assert!(response.connect_mode);
-        assert_eq!(
-            response.base_url.as_deref(),
-            Some("https://custom.groq.example/v1")
-        );
-        assert!(!state.slash_menu.is_open);
-    }
-
-    #[test]
-    fn connect_mode_empty_base_url_falls_back_to_default() {
+    fn connect_mode_standard_provider_submits_without_base_url_field() {
         let mut state = TuiState::new();
         state.open_credential_input(
             "groq",
@@ -1045,30 +1010,79 @@ mod tests {
         );
 
         state.credential_append_str("gsk-test-key");
-        state.credential_submit();
-        // Base URL left blank.
         let response = state
             .credential_submit()
-            .expect("blank base_url must still submit using the default");
+            .expect("standard provider should submit after API key");
 
+        assert_eq!(response.provider, "groq");
+        assert_eq!(response.api_key, "gsk-test-key");
         assert_eq!(
             response.base_url.as_deref(),
             Some("https://api.groq.com/openai/v1")
         );
+        assert!(!state.slash_menu.is_open);
     }
 
     #[test]
-    fn connect_mode_empty_base_url_with_no_default_is_none() {
+    fn connect_mode_custom_provider_first_submit_advances_to_base_url_field() {
         let mut state = TuiState::new();
-        state.open_credential_input("groq", None, true, None);
+        state.open_credential_input("custom-gw", None, true, None);
 
-        state.credential_append_str("gsk-test-key");
+        state.credential_append_str("custom-key");
+        let response = state.credential_submit();
+
+        assert!(
+            response.is_none(),
+            "custom provider must collect base URL before submit"
+        );
+        assert!(
+            state.slash_menu.is_open,
+            "panel must stay open for base_url"
+        );
+        assert_eq!(
+            state.slash_menu.credential_field,
+            crate::state::CredentialField::BaseUrl
+        );
+        assert_eq!(state.slash_menu.credential_buffer, "custom-key");
+    }
+
+    #[test]
+    fn connect_mode_custom_provider_second_submit_returns_typed_base_url() {
+        let mut state = TuiState::new();
+        state.open_credential_input("custom-gw", None, true, None);
+
+        state.credential_append_str("custom-key");
         state.credential_submit();
+        state.credential_append_str("https://custom.example/v1");
         let response = state
             .credential_submit()
-            .expect("blank base_url with no default must still submit");
+            .expect("second submit must return response");
 
-        assert!(response.base_url.is_none());
+        assert_eq!(response.provider, "custom-gw");
+        assert_eq!(response.api_key, "custom-key");
+        assert!(response.connect_mode);
+        assert_eq!(
+            response.base_url.as_deref(),
+            Some("https://custom.example/v1")
+        );
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn connect_mode_custom_provider_empty_base_url_stays_open() {
+        let mut state = TuiState::new();
+        state.open_credential_input("custom-gw", None, true, None);
+
+        state.credential_append_str("custom-key");
+        state.credential_submit();
+        let response = state.credential_submit();
+
+        assert!(response.is_none());
+        assert!(state.slash_menu.is_open);
+        assert_eq!(
+            state.slash_menu.credential_field,
+            crate::state::CredentialField::BaseUrl
+        );
     }
 
     #[test]

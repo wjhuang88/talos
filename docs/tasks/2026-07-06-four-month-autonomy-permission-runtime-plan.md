@@ -64,8 +64,8 @@ confirmation required by the active iteration.
 | C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Complete |
 | C10 | Activate I101 | Start model/Git/self-bootstrap evidence closeout. | C9 | I100 closed or paused with exact residuals. | Keep I101 Planned. | Complete |
 | C11 | Model catalog browser closeout | Independent CLI browser walkthrough and docs close MODEL-006 residuals. | C10 | Real-terminal evidence, no-secret rendering, `/model` vs `/connect` separation confirmed. | Record terminal blocker without faking walkthrough. | Planned |
-| C12 | Standard-provider connect cleanup | Built-in catalog providers use catalog-defined API endpoint metadata and do not prompt for URL; custom providers still require URL. | C11 | Tests cover standard provider setup, custom provider setup, config merge, and no-secret rendering. | Keep existing prompt only with an explicit MODEL-006 blocker. | Planned |
-| C13 | Incremental model-list rendering | Model browser/listing renders only the visible/search window or scroll-loaded chunks instead of the full catalog at once. | C11 | Tests or terminal smoke evidence prove large catalogs remain responsive and selection/search state stays correct. | Keep bounded `--available-models` output and record browser performance blocker. | Planned |
+| C12 | Standard-provider connect cleanup | Built-in catalog providers use catalog-defined API endpoint metadata and do not prompt for URL; custom providers still require URL. | C11 | Tests cover standard provider setup, custom provider setup, config merge, and no-secret rendering. | Keep existing prompt only with an explicit MODEL-006 blocker. | Complete |
+| C13 | Incremental model-list rendering | Model browser/listing renders only the visible/search window or scroll-loaded chunks instead of the full catalog at once. | C11 | Tests or terminal smoke evidence prove large catalogs remain responsive and selection/search state stays correct. | Keep bounded `--available-models` output and record browser performance blocker. | Complete |
 | C14 | Git fallback tracking | Re-check `gix` capability and reduce host fallback only when safe. | C10 | GIT-001 matrix updated; any dependency update has full workspace validation. | Keep host fallback and record replacement trigger. | Planned |
 | C15 | Final self-bootstrap evidence packet | REL-002 evidence says exactly what is and is not Talos-primary. | C11, C12, C13, C14 | Full validation and closeout docs pass; no release overclaim. | Mark Partial with residual owners. | Planned |
 
@@ -300,6 +300,36 @@ Recovery instructions:
 
 - Resume from MODEL-006 implementation. If terminal walkthrough evidence is unavailable, keep that
   residual explicit while still landing deterministic tests for setup and rendering behavior.
+
+## Checkpoint C12/C13 — Model Setup And Viewport Rendering Closed (2026-07-06)
+
+Completed items:
+
+- C12: standard catalog provider setup no longer asks users to fill a URL. The TUI connect flow and
+  independent model browser submit after API-key entry when a default endpoint exists. Providers
+  without a default endpoint require a URL before submitting.
+- C13: model browser rendering has a viewport-windowed large-catalog test proving an 8-line render
+  over 500 rows only emits the visible window and excludes the tail row.
+
+Validation evidence:
+
+```sh
+cargo test -p talos-cli models_browser
+cargo test -p talos-cli connect
+cargo test -p talos-tui connect_mode
+```
+
+All listed targeted commands passed on 2026-07-06 before this checkpoint.
+
+Open deviations:
+
+- C11 remains open for real-terminal walkthrough evidence.
+- C14 and C15 remain planned.
+
+Next item:
+
+- Continue I101 with real terminal model-browser evidence, GIT-001 tracking, and REL-002 evidence
+  classification.
 
 ## Default Decisions For Foreseeable Ambiguity
 
