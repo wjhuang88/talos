@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I099 complete; I100 next
+> Status: In Progress — I100 active
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -59,7 +59,7 @@ confirmation required by the active iteration.
 | C4 | Activate I099 | Start structured exec parity iteration. | C3 | I098 closed or paused with exact residuals. | Keep I099 Planned. | Complete |
 | C5 | Exec parallel and pipe slices | `exec` supports approved parallel and pipe workflows without shell parsing. | C4 | `talos-tools` tests prove timeout/cancel/failure behavior and per-step permission facets. | Ship only parallel or only pipe if the other lacks safe semantics. | Complete |
 | C6 | Bash fallback reduction audit | Identify bash calls that should become typed tools/adapters or remain exact shell. | C5 | Audit matrix updated; no permission broadening. | Keep bash exact/template behavior and record blockers. | Complete |
-| C7 | Activate I100 | Start project-intelligence and validation-adapter iteration. | C6 | I099 closed or paused with exact residuals. | Keep I100 Planned. | Planned |
+| C7 | Activate I100 | Start project-intelligence and validation-adapter iteration. | C6 | I099 closed or paused with exact residuals. | Keep I100 Planned. | Complete |
 | C8 | Detector/adapters hardening | Project detectors and host-tool adapter guidance are extensible and test covered. | C7 | Tests cover Rust/Node/Python/Go/Java/mixed/governance and no unrelated adapter injection. | Keep existing detector registry and record missing ecosystem. | Planned |
 | C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Planned |
 | C10 | Activate I101 | Start model/Git/self-bootstrap evidence closeout. | C9 | I100 closed or paused with exact residuals. | Keep I101 Planned. | Planned |
@@ -213,6 +213,30 @@ Recovery instructions:
 
 - Resume from I100 activation unless I099 validation regresses. If it regresses, keep I100 planned
   and repair TOOL-017/I099 first.
+
+## Checkpoint C7 — I100 Activated (2026-07-06)
+
+Completed item:
+
+- C7: I100 is active after I099 completion and push. The active scope is detector/adapters
+  hardening and governance routing evidence on top of the existing VALIDATION-001 first slice.
+
+Activation inventory:
+
+- I098: Complete.
+- I099: Complete.
+- I100: Active.
+- I101: Planned.
+
+Next item:
+
+- C8: harden project detectors and adapter-instruction behavior with focused tests and docs.
+
+Recovery instructions:
+
+- Resume from I100 implementation. If validation routing changes require arbitrary host command
+  configuration or hidden TUI host-tool execution, stop and record a blocker instead of widening
+  the boundary.
 
 ## Default Decisions For Foreseeable Ambiguity
 

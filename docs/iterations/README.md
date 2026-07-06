@@ -136,7 +136,7 @@ docs/iterations/
 | I097 | Controlled Self-Bootstrap Rehearsal | **Complete (2026-07-04)** | Closed with non-qualifying REL-002 evidence: Talos executed bounded validation and owner-doc mutation commands, but Codex remained primary. See `I097-controlled-self-bootstrap-rehearsal.md`. |
 | I098 | Permission Preflight And Low-Noise Execution Policy | **Complete (2026-07-06)** | Month 1 of the 2026-07-06 autonomy/permission/runtime hardening plan. `talos permissions preflight` landed as read-only planning output; no broad bash allow or permission-default relaxation. See `I098-permission-preflight-noise-reduction.md`. |
 | I099 | Structured Exec And Bash Fallback Reduction | **Complete (2026-07-06)** | Month 2 of the 2026-07-06 plan. Closed bounded direct-argv `exec` parallel steps, pipe chains, parallel pipe chains, per-step permission facets, and bash fallback matrix without shell parsing. See `I099-structured-exec-and-bash-reduction.md`. |
-| I100 | Project Intelligence And Validation Routing | **Planned (2026-07-06)** | Month 3 of the 2026-07-06 plan. Harden detector-registry project recognition, host-tool adapter guidance, and internal-first governance validation routing. See `I100-project-intelligence-validation-routing.md`. |
+| I100 | Project Intelligence And Validation Routing | **Active (2026-07-06)** | Month 3 of the 2026-07-06 plan. Harden detector-registry project recognition, host-tool adapter guidance, and internal-first governance validation routing. See `I100-project-intelligence-validation-routing.md`. |
 | I101 | Model, Git, And Self-Bootstrap Evidence Closeout | **Planned (2026-07-06)** | Month 4 of the 2026-07-06 plan. Close model-browser walkthrough residuals, standard-provider no-URL connect, incremental model-list rendering, continued `gix` fallback tracking, and honest REL-002 evidence without release overclaim. See `I101-model-git-self-bootstrap-evidence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
@@ -189,7 +189,7 @@ rewrite published iteration baselines.
 | I096 | Complete | Closed 2026-07-04 with narrow iteration-record preview/write gate and full validation. |
 | I097 | Complete | Closed 2026-07-04 with non-qualifying REL-002 evidence and explicit primary-executor boundary. |
 | I098 | Complete | Closed 2026-07-06 with read-only permission preflight and full validation. |
-| I100 | Planned | Depends on I099 closure or explicit pause; project detection must remain strategy/registry based. Ready for activation after I099 completion. |
+| I100 | Active | Activated 2026-07-06 after I099 completion. Scope is detector/adapters hardening and governance routing evidence; project detection must remain strategy/registry based. |
 | I101 | Planned | Depends on I100 closure or explicit pause; no runtime `catalog.db`, no release claim, and no Git fallback replacement without proof. |
 | I035 | Complete | Removed from non-terminal inventory. |
 | I036 | Complete | Removed from non-terminal inventory (activation record in I039). |

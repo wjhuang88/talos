@@ -1,6 +1,6 @@
 # Iteration I100: Project Intelligence And Validation Routing
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-06
 > Planned objective: make project-type and governance recognition extensible and use it to route
 > validation/adapters without hardcoded Rust assumptions.
@@ -77,6 +77,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 3 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until I099 closes or is explicitly paused. |
+| 2026-07-06 | Activation | Activated after I099 completed and was pushed. The phase starts from the existing VALIDATION-001 first slice, which already has a `ProjectTypeDetector` strategy registry and demand-driven adapter instructions. This activation selects hardening, fixture coverage, governance routing evidence, and host-tool adapter boundary cleanup. No arbitrary validation command execution, hidden TUI host-tool execution, permission-default relaxation, release action, or runtime `catalog.db` path is authorized. |
 
 ## Verification Evidence
 
