@@ -2,7 +2,7 @@
 
 Type: Product Story (aesthetic enhancement)
 Parent Epic: None
-Status: Planned
+Status: Complete (SB111, 2026-07-06)
 
 ## Identity / Goal / Value
 
@@ -34,3 +34,12 @@ the option is a deliberate choice, not a forgotten one.
   When rendered in scrollback
   Then added/removed lines carry the theme's diff background tints, existing detection tests
   pass unchanged, and both built-in themes define the new colors.
+
+## Implementation (SB111, 2026-07-06)
+
+- `diff_added_bg` / `diff_removed_bg` added to `Theme` struct with subtle tints (Nord: `rgb(52,64,52)` / `rgb(64,48,52)`, Solarized: `rgb(12,49,48)` / `rgb(16,38,50)`).
+- `semantic::DIFF_ADDED_BG` / `semantic::DIFF_REMOVED_BG` constants wired.
+- `render_diff` now applies `.bg()` on `+`/`-` content lines in addition to existing `.fg()`.
+- `render_diff_styles_added_and_removed_lines` test extended with `bg` assertions.
+- All 13 existing diff tests pass unchanged; 243 total TUI tests pass.
+- Commit: `36c14db fix(tui): unify todo panel status icons and add themed diff line backgrounds (#TUI-022, #TUI-023)`

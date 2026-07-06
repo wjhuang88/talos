@@ -5,7 +5,7 @@
 | ID | PERF-001 |
 | Type | Product/Performance Story |
 | Priority | P1 |
-| Status | Planned |
+| Status | Partial — Phase 2 (bash_permission_policy.toml) complete (SB121, 2026-07-06); Phase 1 (models.toml) remains Planned |
 | Source | Maintainer request 2026-07-06 — embedded TOML should be parsed at build time instead of consuming runtime startup/workflow cost |
 | Depends on | MC-001, PERM-003 |
 | Blocks | Large model catalog startup/interaction polish; lower-noise permission runtime follow-up |
@@ -70,19 +70,19 @@ and all current safety boundaries.
 
 ## Acceptance Criteria
 
-- [ ] `builtin_models()` no longer parses embedded `models.toml` at runtime.
-- [ ] `builtin_providers()` no longer reparses embedded `models.toml` at runtime.
-- [ ] `bash_permission_policy.toml` no longer has to be parsed at runtime for the production
+- [x] `bash_permission_policy.toml` no longer has to be parsed at runtime for the production
       embedded policy path.
-- [ ] User config TOML and plugin manifest TOML still parse at runtime.
-- [ ] Normal builds remain offline and deterministic.
+- [ ] `builtin_models()` no longer parses embedded `models.toml` at runtime. (Phase 1 — future)
+- [ ] `builtin_providers()` no longer reparses embedded `models.toml` at runtime. (Phase 1 — future)
+- [x] User config TOML and plugin manifest TOML still parse at runtime.
+- [x] Normal builds remain offline and deterministic.
 - [ ] `BUILD_MODELS=1` still refreshes `src/models.toml` and fails safely without writing an empty
-      catalog.
-- [ ] Generated code is confined to `OUT_DIR`; committed source remains readable and reviewable.
-- [ ] Tests prove model/provider counts and representative entries match the committed TOML.
-- [ ] Tests prove bash permission classification is unchanged for representative read-only,
-      validation, network/package-manager, write/mutating, and complex-shell commands.
-- [ ] Workspace validation passes.
+      catalog. (Phase 1 — future)
+- [x] Generated code is confined to `OUT_DIR`; committed source remains readable and reviewable.
+- [ ] Tests prove model/provider counts and representative entries match the committed TOML. (Phase 1 — future)
+- [x] Tests prove bash permission classification is unchanged for representative read-only,
+      validation, network/package-manager, write/mutating, and complex-shell commands. (33 bash tests pass)
+- [x] Workspace validation passes.
 
 ## Validation Plan
 

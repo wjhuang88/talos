@@ -2,7 +2,7 @@
 
 Type: Product Story
 Parent Epic: TODO-001 (Complete) follow-up
-Status: Planned
+Status: Complete (SB110, 2026-07-06)
 
 ## Identity / Goal / Value
 
@@ -45,3 +45,10 @@ Goal: the todo panel uses the same checkbox iconography as the other two surface
   When the todo panel renders
   Then each row shows the same checkbox glyph as the todo tool output for that status, and
   `cargo test -p talos-tui` panel tests assert the new format.
+
+## Implementation (SB110, 2026-07-06)
+
+- Mapping placed upstream in `todo_view.rs::todo_panel_rows()` — uses `talos_session::status_icon()` directly.
+- TUI rendering in `build_todo_panel_lines()` uses `row.status` as-is (no bracket wrapping since checkbox icons already include brackets).
+- Priority display `[priority]` kept — only `[status]` brackets replaced.
+- Commit: `36c14db fix(tui): unify todo panel status icons and add themed diff line backgrounds (#TUI-022, #TUI-023)`
