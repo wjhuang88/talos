@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn ready_models_have_correct_provider_and_context_limit() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-0".to_string();
+        config.model = "claude-sonnet-4-5".to_string();
         config.provider = "anthropic".to_string();
         config.providers.insert(
             "anthropic".to_string(),
@@ -495,7 +495,7 @@ mod tests {
     #[test]
     fn unauthenticated_providers_are_omitted_from_model_picker() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-0".to_string();
+        config.model = "claude-sonnet-4-5".to_string();
         config.provider = "anthropic".to_string();
         config.providers.insert(
             "anthropic".to_string(),
@@ -531,7 +531,7 @@ mod tests {
     #[test]
     fn is_current_flags_active_model_and_provider() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-0".to_string();
+        config.model = "claude-sonnet-4-5".to_string();
         config.provider = "anthropic".to_string();
         config.providers.insert(
             "anthropic".to_string(),
@@ -551,8 +551,8 @@ mod tests {
             current_models.len()
         );
         assert_eq!(
-            current_models[0].model_id, "claude-sonnet-4-0",
-            "Current model should be claude-sonnet-4-0"
+            current_models[0].model_id, "anthropic/claude-sonnet-4-5",
+            "Current model should be provider-qualified because the ID is duplicated"
         );
         assert_eq!(
             current_models[0].provider, "anthropic",
@@ -560,7 +560,7 @@ mod tests {
         );
 
         for m in &data.ready_models {
-            if m.model_id != "claude-sonnet-4-0" || m.provider != "anthropic" {
+            if m.model_id != "anthropic/claude-sonnet-4-5" || m.provider != "anthropic" {
                 assert!(
                     !m.is_current,
                     "Model {} ({}) should not be current",
@@ -584,7 +584,7 @@ mod tests {
     #[test]
     fn provider_setup_target_falls_back_to_first_provider_model() {
         let mut config = Config::default();
-        config.model = "claude-sonnet-4-0".to_string();
+        config.model = "claude-sonnet-4-5".to_string();
         config.provider = "anthropic".to_string();
 
         let target = provider_setup_target_model(&config, "anthropic").expect("target model");
@@ -597,6 +597,6 @@ mod tests {
             .expect("target exists in catalog");
         assert_eq!(found.provider, "anthropic");
         // provider_setup_target_model for current provider returns the exact current model
-        assert_eq!(found.id, "claude-sonnet-4-0");
+        assert_eq!(found.id, "claude-sonnet-4-5");
     }
 }

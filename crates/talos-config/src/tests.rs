@@ -284,6 +284,58 @@ fn test_base_url_parsed_from_toml() {
 }
 
 #[test]
+fn test_anthropic_catalog_endpoint_normalized_for_legacy_minimax_config() {
+    let config = Config {
+        provider: "minimax-coding-plan".to_string(),
+        model: "MiniMax-M2.7".to_string(),
+        providers: HashMap::from([(
+            "minimax-coding-plan".to_string(),
+            ProviderConfig {
+                base_url: Some("https://api.minimax.io/anthropic/v1".to_string()),
+                api_key: Some("minimax-secret".to_string()),
+                ..Default::default()
+            },
+        )]),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        config.provider_protocol(),
+        ProviderProtocol::AnthropicMessages
+    );
+    assert_eq!(
+        config.base_url().as_deref(),
+        Some("https://api.minimax.io/anthropic/v1/messages")
+    );
+}
+
+#[test]
+fn test_builtin_anthropic_custom_endpoint_keeps_anthropic_protocol() {
+    let config = Config {
+        provider: "anthropic".to_string(),
+        model: "claude-test".to_string(),
+        providers: HashMap::from([(
+            "anthropic".to_string(),
+            ProviderConfig {
+                base_url: Some("https://gateway.example.com/v1/messages".to_string()),
+                api_key: Some("sk-ant".to_string()),
+                ..Default::default()
+            },
+        )]),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        config.provider_protocol(),
+        ProviderProtocol::AnthropicMessages
+    );
+    assert_eq!(
+        config.base_url().as_deref(),
+        Some("https://gateway.example.com/v1/messages")
+    );
+}
+
+#[test]
 fn test_custom_provider_api_key_env() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::set_var("DASHSCOPE_API_KEY", "dashscope-key") };
@@ -840,8 +892,10 @@ fn test_provider_authenticated_returns_false_when_no_key() {
 #[test]
 fn test_set_active_model_sets_provider_from_catalog() {
     let mut config = Config::default();
-    config.set_active_model("claude-sonnet-4-0").unwrap();
-    assert_eq!(config.model, "claude-sonnet-4-0");
+    config
+        .set_active_model("anthropic/claude-sonnet-4-5")
+        .unwrap();
+    assert_eq!(config.model, "claude-sonnet-4-5");
     assert_eq!(config.provider, "anthropic");
     assert!(config.providers.contains_key("anthropic"));
 }
@@ -1104,10 +1158,9 @@ fn test_set_active_model_unique_bare_id_still_works() {
         providers: HashMap::new(),
         ..Default::default()
     };
-    // claude-sonnet-4-0 is unique to anthropic — bare ID should resolve.
-    config.set_active_model("claude-sonnet-4-0").unwrap();
-    assert_eq!(config.model, "claude-sonnet-4-0");
-    assert_eq!(config.provider, "anthropic");
+    config.set_active_model("gpt-4o-2024-05-13").unwrap();
+    assert_eq!(config.model, "gpt-4o-2024-05-13");
+    assert_eq!(config.provider, "openai");
 }
 
 #[test]

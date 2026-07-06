@@ -276,7 +276,19 @@ async fn handle_connect(ui_tx: &mpsc::UnboundedSender<UiOutput>, config: &Config
             talos_config::model::builtin_providers()
                 .iter()
                 .find(|p| p.id == provider)
-                .and_then(|p| p.api_base_url.clone())
+                .and_then(|p| {
+                    let base_url = p.api_base_url.as_deref()?;
+                    Some(match p.protocol {
+                        Some(talos_config::ProviderProtocol::AnthropicMessages) => {
+                            let mut url = base_url.trim().trim_end_matches('/').to_string();
+                            if !url.to_ascii_lowercase().ends_with("/messages") {
+                                url.push_str("/messages");
+                            }
+                            url
+                        }
+                        _ => talos_config::normalize_provider_endpoint(base_url).base_url,
+                    })
+                })
         })
         .or_else(|| talos_config::builtin_provider_config(provider).and_then(|p| p.base_url));
 
@@ -314,7 +326,9 @@ async fn handle_connect_with_credential(
     // `None` here means neither was available, so the existing (or absent)
     // `base_url` is left untouched — never overwritten with an empty value.
     if let Some(base_url) = cred.base_url.as_ref() {
-        provider_entry.base_url = Some(base_url.clone());
+        let endpoint = talos_config::normalize_provider_endpoint(base_url);
+        provider_entry.protocol = endpoint.protocol;
+        provider_entry.base_url = Some(endpoint.base_url);
     }
 
     if let Err(e) = new_config.save() {
@@ -2149,6 +2163,63 @@ mod connect_tests {
         assert_eq!(
             default_base_url.as_deref(),
             Some("https://api.groq.com/openai/v1")
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_minimax_coding_plan_uses_anthropic_messages_endpoint() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+
+        handle_connect(&tx, &config, "minimax-coding-plan").await;
+        drop(tx);
+
+        let mut default_base_url = None;
+        while let Some(output) = rx.recv().await {
+            if let UiOutput::CredentialRequest(req) = output {
+                default_base_url = req.default_base_url;
+            }
+        }
+
+        assert_eq!(
+            default_base_url.as_deref(),
+            Some("https://api.minimax.io/anthropic/v1/messages")
+        );
+    }
+
+    #[tokio::test]
+    async fn handle_connect_with_credential_sets_anthropic_protocol_for_minimax_endpoint() {
+        let _lock = HOME_ENV_MUTEX.lock().unwrap();
+        let new_config = with_isolated_home(|| async {
+            let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+            let config = Config::default();
+            let cred = talos_conversation::CredentialResponseData {
+                provider: "minimax-coding-plan".to_string(),
+                api_key: "minimax-secret".to_string(),
+                model_id: None,
+                connect_mode: true,
+                base_url: Some("https://api.minimax.io/anthropic/v1/messages".to_string()),
+            };
+
+            let result = handle_connect_with_credential(&tx, &config, cred).await;
+            drop(tx);
+            while rx.recv().await.is_some() {}
+            result
+        })
+        .await
+        .expect("minimax coding plan connect must succeed");
+
+        let minimax = new_config
+            .providers
+            .get("minimax-coding-plan")
+            .expect("minimax coding plan entry created");
+        assert_eq!(
+            minimax.protocol,
+            talos_config::ProviderProtocol::AnthropicMessages
+        );
+        assert_eq!(
+            minimax.base_url.as_deref(),
+            Some("https://api.minimax.io/anthropic/v1/messages")
         );
     }
 

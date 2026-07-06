@@ -9,7 +9,7 @@ use crossterm::{
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use talos_config::Config;
+use talos_config::{Config, ProviderProtocol};
 
 pub(crate) fn run_available_models_browser(initial_filter: Option<&str>) -> Result<()> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
@@ -232,10 +232,14 @@ fn apply_provider_setup(
             let Some(default_base_url) = default_base_url else {
                 anyhow::bail!("base URL is required for custom provider setup");
             };
-            provider_entry.base_url = Some(default_base_url);
+            let (protocol, base_url) = normalize_row_endpoint(row, &default_base_url);
+            provider_entry.protocol = protocol;
+            provider_entry.base_url = Some(base_url);
         }
     } else {
-        provider_entry.base_url = Some(typed_base_url.trim().to_string());
+        let (protocol, base_url) = normalize_row_endpoint(row, typed_base_url.trim());
+        provider_entry.protocol = protocol;
+        provider_entry.base_url = Some(base_url);
     }
     config.set_active_model(&row.qualified)?;
     Ok(())
@@ -255,7 +259,21 @@ fn default_base_url(config: &Config, row: &CatalogBrowserRow) -> Option<String> 
         .get(&row.provider)
         .and_then(|p| p.base_url.clone())
         .or_else(|| row.api_base_url.clone())
+        .map(|url| normalize_row_endpoint(row, &url).1)
         .or_else(|| talos_config::builtin_provider_config(&row.provider).and_then(|p| p.base_url))
+}
+
+fn normalize_row_endpoint(row: &CatalogBrowserRow, url: &str) -> (ProviderProtocol, String) {
+    if row.protocol == Some(ProviderProtocol::AnthropicMessages) {
+        let mut base_url = url.trim().trim_end_matches('/').to_string();
+        if !base_url.to_ascii_lowercase().ends_with("/messages") {
+            base_url.push_str("/messages");
+        }
+        return (ProviderProtocol::AnthropicMessages, base_url);
+    }
+
+    let endpoint = talos_config::normalize_provider_endpoint(url);
+    (endpoint.protocol, endpoint.base_url)
 }
 
 fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
@@ -296,6 +314,7 @@ fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
                 pricing,
                 api_base_url: meta.and_then(|p| p.api_base_url.clone()),
                 env_var: meta.and_then(|p| p.env_var.clone()),
+                protocol: meta.and_then(|p| p.protocol.clone()),
             }
         })
         .collect::<Vec<_>>();
@@ -320,6 +339,7 @@ struct CatalogBrowserRow {
     pricing: String,
     api_base_url: Option<String>,
     env_var: Option<String>,
+    protocol: Option<ProviderProtocol>,
 }
 
 #[derive(Debug, Clone)]
@@ -579,6 +599,7 @@ mod tests {
                 pricing: "$3.00/$15.00/1M".to_string(),
                 api_base_url: None,
                 env_var: Some("ANTHROPIC_API_KEY".to_string()),
+                protocol: Some(ProviderProtocol::AnthropicMessages),
             },
             CatalogBrowserRow {
                 provider: "openai".to_string(),
@@ -591,6 +612,7 @@ mod tests {
                 pricing: String::new(),
                 api_base_url: Some("https://api.openai.com/v1".to_string()),
                 env_var: Some("OPENAI_API_KEY".to_string()),
+                protocol: Some(ProviderProtocol::OpenAIChat),
             },
         ]
     }
@@ -688,6 +710,65 @@ mod tests {
     }
 
     #[test]
+    fn provider_setup_minimax_coding_plan_uses_anthropic_messages_endpoint() {
+        let row = CatalogBrowserRow {
+            provider: "minimax-coding-plan".to_string(),
+            provider_name: "MiniMax Token Plan".to_string(),
+            model_id: "MiniMax-M2.7".to_string(),
+            qualified: "minimax-coding-plan/MiniMax-M2.7".to_string(),
+            authenticated: false,
+            current: false,
+            context: "204K".to_string(),
+            pricing: String::new(),
+            api_base_url: Some("https://api.minimax.io/anthropic/v1".to_string()),
+            env_var: Some("MINIMAX_API_KEY".to_string()),
+            protocol: Some(ProviderProtocol::AnthropicMessages),
+        };
+        let mut config = Config::default();
+
+        apply_provider_setup(&mut config, &row, "minimax-secret", String::new()).unwrap();
+
+        let minimax = config.providers.get("minimax-coding-plan").unwrap();
+        assert_eq!(
+            minimax.protocol,
+            talos_config::ProviderProtocol::AnthropicMessages
+        );
+        assert_eq!(
+            minimax.base_url.as_deref(),
+            Some("https://api.minimax.io/anthropic/v1/messages")
+        );
+        assert_eq!(config.provider, "minimax-coding-plan");
+        assert_eq!(config.model, "MiniMax-M2.7");
+    }
+
+    #[test]
+    fn provider_setup_uses_catalog_protocol_when_url_does_not_reveal_protocol() {
+        let row = CatalogBrowserRow {
+            provider: "kimi-for-coding".to_string(),
+            provider_name: "Kimi For Coding".to_string(),
+            model_id: "k2p7".to_string(),
+            qualified: "kimi-for-coding/k2p7".to_string(),
+            authenticated: false,
+            current: false,
+            context: "256K".to_string(),
+            pricing: String::new(),
+            api_base_url: Some("https://api.kimi.com/coding/v1".to_string()),
+            env_var: Some("KIMI_API_KEY".to_string()),
+            protocol: Some(ProviderProtocol::AnthropicMessages),
+        };
+        let mut config = Config::default();
+
+        apply_provider_setup(&mut config, &row, "kimi-secret", String::new()).unwrap();
+
+        let kimi = config.providers.get("kimi-for-coding").unwrap();
+        assert_eq!(kimi.protocol, ProviderProtocol::AnthropicMessages);
+        assert_eq!(
+            kimi.base_url.as_deref(),
+            Some("https://api.kimi.com/coding/v1/messages")
+        );
+    }
+
+    #[test]
     fn provider_setup_custom_provider_requires_base_url() {
         let mut row = sample_rows().pop().unwrap();
         row.provider = "custom-gw".to_string();
@@ -717,6 +798,7 @@ mod tests {
                 pricing: String::new(),
                 api_base_url: Some("https://api.openai.com/v1".to_string()),
                 env_var: Some("OPENAI_API_KEY".to_string()),
+                protocol: Some(ProviderProtocol::OpenAIChat),
             });
         }
         let mut state = CatalogBrowserState::new(rows);

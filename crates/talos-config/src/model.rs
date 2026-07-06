@@ -9,8 +9,8 @@
 //! `talos_core::model` and re-exported here for backward compatibility.
 
 pub use talos_core::model::{
-    ModelCapabilities, ModelMetadata, ModelPricing, ModelSource, find_model,
-    find_model_by_provider, models_with_id,
+    CatalogProviderProtocol, ModelCapabilities, ModelMetadata, ModelPricing, ModelSource,
+    find_model, find_model_by_provider, models_with_id,
 };
 
 use serde::Deserialize;
@@ -52,6 +52,8 @@ pub struct BuiltinProvider {
     pub name: String,
     /// Default API endpoint from models.dev, e.g. "https://api.anthropic.com/v1/messages".
     pub api_base_url: Option<String>,
+    /// API protocol advertised by the catalog, if known.
+    pub protocol: Option<crate::ProviderProtocol>,
     /// Canonical env var for the API key, e.g. "ANTHROPIC_API_KEY".
     pub env_var: Option<String>,
     /// Documentation URL.
@@ -70,6 +72,7 @@ pub fn builtin_providers() -> Vec<BuiltinProvider> {
             id: p.id,
             name: p.name,
             api_base_url: p.api_base_url,
+            protocol: p.protocol.map(catalog_protocol_to_config),
             env_var: p.env_var,
             doc_url: p.doc_url,
         })
@@ -90,8 +93,16 @@ struct TomlProviderEntry {
     #[serde(default)]
     name: String,
     api_base_url: Option<String>,
+    protocol: Option<CatalogProviderProtocol>,
     env_var: Option<String>,
     doc_url: Option<String>,
+}
+
+fn catalog_protocol_to_config(protocol: CatalogProviderProtocol) -> crate::ProviderProtocol {
+    match protocol {
+        CatalogProviderProtocol::AnthropicMessages => crate::ProviderProtocol::AnthropicMessages,
+        CatalogProviderProtocol::OpenAIChat => crate::ProviderProtocol::OpenAIChat,
+    }
 }
 
 /// Internal TOML dataset wrapper (legacy name kept for the old struct above).
@@ -362,7 +373,7 @@ mod tests {
         let models = builtin_models();
         // Should find some model with the given ID (note: bare ID lookup returns
         // the first match across all providers).
-        let found = find_model(&models, "claude-sonnet-4-0");
+        let found = find_model(&models, "claude-sonnet-4-5");
         assert!(found.is_some());
 
         // Should not find a nonexistent model
@@ -497,8 +508,8 @@ mod tests {
     fn test_find_model_case_sensitive() {
         let models = builtin_models();
         // Exact match required
-        assert!(find_model(&models, "claude-sonnet-4-0").is_some());
-        assert!(find_model(&models, "Claude-Sonnet-4-0").is_none());
+        assert!(find_model(&models, "claude-sonnet-4-5").is_some());
+        assert!(find_model(&models, "Claude-Sonnet-4-5").is_none());
     }
 
     #[test]
@@ -546,15 +557,14 @@ mod tests {
     #[test]
     fn test_find_model_by_provider_returns_none_for_wrong_provider() {
         let models = builtin_models();
-        // claude-sonnet-4-0 is anthropic-only.
-        assert!(find_model_by_provider(&models, "openai", "claude-sonnet-4-0").is_none());
-        assert!(find_model_by_provider(&models, "anthropic", "claude-sonnet-4-0").is_some());
+        assert!(find_model_by_provider(&models, "openai", "claude-sonnet-4-5").is_none());
+        assert!(find_model_by_provider(&models, "anthropic", "claude-sonnet-4-5").is_some());
     }
 
     #[test]
     fn test_models_with_id_detects_ambiguity() {
         let models = builtin_models();
-        let unique = models_with_id(&models, "claude-sonnet-4-0");
+        let unique = models_with_id(&models, "gpt-4o-2024-05-13");
         assert_eq!(unique.len(), 1);
 
         let ambiguous = models_with_id(&models, "glm-5.2");

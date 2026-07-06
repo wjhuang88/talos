@@ -41,7 +41,7 @@ fn print_non_interactive_instructions() {
     println!();
     println!("3. Select a model:");
     println!("   talos --available-models          # list all models");
-    println!("   talos --use-model claude-sonnet-4-0");
+    println!("   talos --use-model anthropic/claude-sonnet-4-5");
     println!();
     println!("4. Or use the interactive wizard:");
     println!("   talos init");
@@ -105,10 +105,13 @@ async fn run_wizard_interactive<R: BufRead, W: Write>(
     }
 
     let model_id = prompt_model(writer, reader, &provider_models)?;
+    let qualified_model_id = format!("{provider_name}/{model_id}");
 
-    config.set_active_model(&model_id).with_context(|| {
-        format!("failed to set active model '{model_id}' for provider '{provider_name}'")
-    })?;
+    config
+        .set_active_model(&qualified_model_id)
+        .with_context(|| {
+            format!("failed to set active model '{model_id}' for provider '{provider_name}'")
+        })?;
 
     match &credential_type {
         CredentialType::EnvVar(env_name) => {
@@ -429,7 +432,7 @@ mod tests {
         std::fs::write(
             &config_path,
             r#"provider = "anthropic"
-model = "claude-sonnet-4-0"
+model = "claude-sonnet-4-5"
 "#,
         )
         .unwrap();
@@ -445,7 +448,7 @@ model = "claude-sonnet-4-0"
 
         // Config should be unchanged
         let config_content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(config_content.contains("claude-sonnet-4-0"));
+        assert!(config_content.contains("claude-sonnet-4-5"));
 
         unsafe { std::env::remove_var("HOME") };
     }

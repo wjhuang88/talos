@@ -1,6 +1,7 @@
 use crate::{
     Config, ConfigError, Credentials, ModelConfig, ProviderConfig, ProviderProtocol,
-    builtin_provider_config, home_dir, model, opencode, substitute_env_vars,
+    builtin_provider_config, home_dir, model, normalize_provider_endpoint, opencode,
+    substitute_env_vars,
 };
 use std::env;
 use std::fs;
@@ -109,10 +110,7 @@ impl Config {
     /// `Some(url)` is sent verbatim to the provider's HTTP client via
     /// `with_base_url()`. Honored for both OpenAI and Anthropic providers.
     pub fn base_url(&self) -> Option<String> {
-        self.providers
-            .get(&self.provider)
-            .and_then(|p| p.base_url.clone())
-            .or_else(|| builtin_provider_config(&self.provider).and_then(|p| p.base_url))
+        self.active_provider_config().base_url
     }
 
     /// Returns the active provider protocol.
@@ -202,7 +200,20 @@ impl Config {
                 config.protocol = user_config.protocol.clone();
             }
             if user_config.base_url.is_some() {
-                config.base_url = user_config.base_url.clone();
+                let endpoint = normalize_provider_endpoint(
+                    user_config.base_url.as_deref().unwrap_or_default(),
+                );
+                if endpoint.protocol == ProviderProtocol::AnthropicMessages
+                    || config.protocol == ProviderProtocol::OpenAIChat
+                {
+                    config.protocol = endpoint.protocol;
+                    config.base_url = Some(endpoint.base_url);
+                } else {
+                    config.base_url = user_config
+                        .base_url
+                        .as_deref()
+                        .map(|url| url.trim().trim_end_matches('/').to_string());
+                }
             }
             if user_config.api_key.is_some() {
                 config.api_key = user_config.api_key.clone();

@@ -10,6 +10,7 @@ pub mod opencode;
 mod builtin;
 mod config;
 mod credentials;
+mod endpoint;
 mod env;
 mod error;
 #[cfg(test)]
@@ -18,6 +19,7 @@ mod tests;
 mod types;
 
 pub use credentials::Credentials;
+pub use endpoint::{NormalizedProviderEndpoint, normalize_provider_endpoint};
 pub use error::ConfigError;
 pub use types::{
     Config, DashboardConfig, HookConfig, LogConfig, LogFileConfig, LogFormat, LogRotation,

@@ -65,6 +65,8 @@ struct ApiProvider {
     name: Option<String>,
     #[serde(default)]
     api: Option<String>,
+    #[serde(default)]
+    npm: Option<String>,
     #[serde(default, deserialize_with = "deser_env")]
     env: Option<String>,
     #[serde(default)]
@@ -134,6 +136,7 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
         // Provider-level metadata from api.json
         let name = provider.name.clone().unwrap_or_else(|| provider_id.clone());
         let api_base_url = provider.api.clone();
+        let protocol = infer_provider_protocol(provider.npm.as_deref(), api_base_url.as_deref());
         let env_var = provider.env.clone();
         let doc_url = provider.doc.clone();
 
@@ -141,6 +144,7 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
             id: provider_id.clone(),
             name,
             api_base_url,
+            protocol,
             env_var,
             doc_url,
         });
@@ -212,9 +216,40 @@ struct TomlProvider {
     #[serde(skip_serializing_if = "Option::is_none")]
     api_base_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    protocol: Option<TomlProviderProtocol>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     env_var: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     doc_url: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+enum TomlProviderProtocol {
+    #[serde(rename = "anthropic-messages")]
+    AnthropicMessages,
+    #[serde(rename = "openai-chat")]
+    OpenAIChat,
+}
+
+fn infer_provider_protocol(
+    npm_package: Option<&str>,
+    api_base_url: Option<&str>,
+) -> Option<TomlProviderProtocol> {
+    let package = npm_package.unwrap_or_default().to_ascii_lowercase();
+    if package.contains("anthropic") {
+        return Some(TomlProviderProtocol::AnthropicMessages);
+    }
+
+    let url = api_base_url.unwrap_or_default().to_ascii_lowercase();
+    if url.contains("/anthropic/") {
+        return Some(TomlProviderProtocol::AnthropicMessages);
+    }
+
+    if npm_package.is_some() || api_base_url.is_some() {
+        return Some(TomlProviderProtocol::OpenAIChat);
+    }
+
+    None
 }
 
 #[derive(Serialize)]

@@ -1,6 +1,7 @@
 use crate::error::CatalogError;
 use talos_core::model::{
-    ModelCapabilities, ModelMetadata, ModelPricing, ModelSource, ProviderInfo, ProviderSource,
+    CatalogProviderProtocol, ModelCapabilities, ModelMetadata, ModelPricing, ModelSource,
+    ProviderInfo, ProviderSource,
 };
 
 /// Result of importing models.dev data — contains both provider and model metadata.
@@ -14,7 +15,8 @@ pub struct ImportResult {
 /// Returns both provider metadata (name, env var, API base URL, docs URL) and
 /// model metadata (limits, pricing, capabilities). The top level is an object
 /// keyed by provider id; each provider value contains `name`, `env`, `npm`,
-/// `api`, `doc`, and a nested `models` object map.
+/// `api`, `doc`, and a nested `models` object map. The `npm` package is used
+/// as the primary provider protocol signal when present.
 pub fn import_models_dev_api(json: &str, refreshed_at: &str) -> Result<ImportResult, CatalogError> {
     let root: serde_json::Value =
         serde_json::from_str(json).map_err(|e| CatalogError::ParseError(e.to_string()))?;
@@ -179,6 +181,8 @@ fn parse_provider_info(
         .to_string();
 
     let api_base_url = obj.get("api").and_then(|v| v.as_str()).map(String::from);
+    let npm_package = obj.get("npm").and_then(|v| v.as_str());
+    let protocol = infer_provider_protocol(npm_package, api_base_url.as_deref());
 
     let env_var = obj
         .get("env")
@@ -193,12 +197,34 @@ fn parse_provider_info(
         id: provider_id.to_string(),
         name,
         api_base_url,
+        protocol,
         env_var,
         doc_url,
         source: ProviderSource::ModelsDev {
             refreshed_at: refreshed_at.to_string(),
         },
     }
+}
+
+fn infer_provider_protocol(
+    npm_package: Option<&str>,
+    api_base_url: Option<&str>,
+) -> Option<CatalogProviderProtocol> {
+    let package = npm_package.unwrap_or_default().to_ascii_lowercase();
+    if package.contains("anthropic") {
+        return Some(CatalogProviderProtocol::AnthropicMessages);
+    }
+
+    let url = api_base_url.unwrap_or_default().to_ascii_lowercase();
+    if url.contains("/anthropic/") {
+        return Some(CatalogProviderProtocol::AnthropicMessages);
+    }
+
+    if npm_package.is_some() || api_base_url.is_some() {
+        return Some(CatalogProviderProtocol::OpenAIChat);
+    }
+
+    None
 }
 
 fn parse_capabilities(obj: &serde_json::Map<String, serde_json::Value>) -> ModelCapabilities {
@@ -289,6 +315,33 @@ mod tests {
         assert_eq!(
             pi.api_base_url.as_deref(),
             Some("https://api.openai.com/v1")
+        );
+    }
+
+    #[test]
+    fn test_import_api_json_provider_protocol_from_npm_package() {
+        let json = r#"{
+            "kimi-for-coding": {
+                "name": "Kimi For Coding",
+                "env": ["KIMI_API_KEY"],
+                "npm": "@ai-sdk/anthropic",
+                "api": "https://api.kimi.com/coding/v1",
+                "doc": "https://www.kimi.com/code/docs",
+                "models": {
+                    "k2p7": { "limit": { "context": 262144 }, "tool_call": true }
+                }
+            }
+        }"#;
+
+        let result = import_models_dev_api(json, REFRESHED_AT).expect("parse");
+        let pi = &result.providers[0];
+        assert_eq!(
+            pi.protocol,
+            Some(CatalogProviderProtocol::AnthropicMessages)
+        );
+        assert_eq!(
+            pi.api_base_url.as_deref(),
+            Some("https://api.kimi.com/coding/v1")
         );
     }
 

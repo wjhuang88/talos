@@ -159,7 +159,7 @@ pub(crate) struct Cli {
     #[arg(
         short,
         long,
-        help = "Override the model name (e.g., `claude-sonnet-4-0`)."
+        help = "Override the model name (e.g., `claude-sonnet-4-5`)."
     )]
     model: Option<String>,
 
@@ -256,7 +256,7 @@ pub(crate) struct Cli {
         long,
         value_name = "KEY=VALUE",
         conflicts_with_all = ["config_list", "config_get"],
-        help = "Set a configuration value (e.g. 'model=claude-sonnet-4-0')."
+        help = "Set a configuration value (e.g. 'model=claude-sonnet-4-5')."
     )]
     config_set: Option<String>,
 
@@ -299,7 +299,7 @@ pub(crate) struct Cli {
     #[arg(
         long = "use-model",
         value_name = "MODEL_ID",
-        help = "Set the active model (e.g. 'claude-sonnet-4-0'). Persists to config.toml."
+        help = "Set the active model (e.g. 'anthropic/claude-sonnet-4-5'). Persists to config.toml."
     )]
     use_model: Option<String>,
 

@@ -328,14 +328,14 @@ mod tests {
     fn model_metadata_context_includes_model_info_without_secret() {
         let mut config = talos_config::Config::default();
         config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4-0".to_string();
+        config.model = "claude-sonnet-4-5".to_string();
         config.set_provider_credential("anthropic", "sk-secret-value");
 
         let file = crate::mode_runtime::model_metadata_context_file(&config);
 
         assert_eq!(file.path, "TALOS_MODEL.md");
         assert!(file.content.contains("Provider: anthropic"));
-        assert!(file.content.contains("Model: claude-sonnet-4-0"));
+        assert!(file.content.contains("Model: claude-sonnet-4-5"));
         assert!(file.content.contains("Context limit:"));
         assert!(!file.content.contains("sk-secret-value"));
     }
@@ -362,7 +362,7 @@ mod tests {
 
         let mut config = talos_config::Config::default();
         config.provider = "anthropic".to_string();
-        config.model = "claude-sonnet-4-0".to_string();
+        config.model = "claude-sonnet-4-5".to_string();
 
         crate::mode_runtime::apply_session_model_to_config(&mut config, &session);
 

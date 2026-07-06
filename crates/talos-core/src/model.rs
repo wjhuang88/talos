@@ -48,6 +48,17 @@ pub struct ModelCapabilities {
     pub image_input: bool,
 }
 
+/// Provider API protocol advertised by catalog metadata.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub enum CatalogProviderProtocol {
+    /// Anthropic Messages-compatible API.
+    #[serde(rename = "anthropic-messages")]
+    AnthropicMessages,
+    /// OpenAI Chat Completions-compatible API.
+    #[serde(rename = "openai-chat")]
+    OpenAIChat,
+}
+
 /// Static metadata for a known model.
 ///
 /// Represents model knowledge (context limits, pricing, capabilities)
@@ -119,6 +130,9 @@ pub struct ProviderInfo {
     pub name: String,
     /// Default API base URL, if known.
     pub api_base_url: Option<String>,
+    /// API protocol, if known from catalog metadata.
+    #[serde(default)]
+    pub protocol: Option<CatalogProviderProtocol>,
     /// Environment variable name for the API key, if conventional.
     pub env_var: Option<String>,
     /// Documentation URL, if known.
@@ -248,6 +262,7 @@ mod tests {
         assert!(info.id.is_empty());
         assert!(info.name.is_empty());
         assert!(info.api_base_url.is_none());
+        assert!(info.protocol.is_none());
         assert!(info.env_var.is_none());
         assert!(info.doc_url.is_none());
         assert_eq!(info.source, ProviderSource::Builtin);
