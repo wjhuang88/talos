@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TOOL-017 |
 | Priority | P2 |
-| Status | M1 Complete; M2-M4 Planned |
+| Status | M1-M4 Complete for bounded direct-argv slice |
 | Source | Maintainer request 2026-08-05 — bash 授权频率不可接受，需要让 exec 覆盖大部分 bash 场景 |
 | Depends on | TOOL-016 (exec 基础实现) |
 | Blocks | — |
@@ -69,6 +69,43 @@ They should not be inferred from the M1 schema or output.
 
 - `cargo fmt --all` completed.
 - `cargo test -p talos-tools exec_tool` passed: 15 tests.
+
+## 2026-07-06 I099 Implementation
+
+`exec` now supports the remaining bounded direct-argv slices:
+
+- `mode: "parallel"` for independent `steps`.
+- `pipes` with one or more pipe chains.
+- `mode: "parallel"` for independent pipe chains.
+- Permission profile coverage for every step in both `steps` and `pipes`.
+
+Pipe chains stay inside the no-shell boundary. Each step is still spawned with
+`tokio::process::Command`; no shell parsing, glob expansion, redirection, command substitution,
+background jobs, or arbitrary script syntax is introduced. The current pipe implementation passes
+bounded retained stdout from one step to the next step's stdin. This is intentionally safer than a
+general shell pipe and is not an unbounded streaming pipe.
+
+M4 permission alignment is closed as per-step facets, not a combined blanket approval. A multi-step
+or pipe request exposes an `Execute` command facet for every spawned command plus each explicit cwd
+`Read` facet. `always` reuse therefore remains scoped by the normal permission engine and preflight
+surface rather than granting a broad `exec` or `bash` capability.
+
+## 2026-07-06 Bash Fallback Matrix
+
+| Scenario | Preferred Surface | Reason |
+|---|---|---|
+| One direct command with argv args | `exec` single command | No shell parser needed. |
+| Build/test/lint sequence | `exec` `steps` sequential | Stops on first failure and records each step. |
+| Independent checks | `exec` `steps` with `mode: "parallel"` | Runs concurrently while preserving per-step facets. |
+| Simple stdout-to-stdin transform | `exec` `pipes` | Bounded direct-argv pipe chain without shell syntax. |
+| Glob expansion, redirection, heredoc, shell loops, conditionals | `bash` exact/template policy | Requires shell semantics and remains explicit fallback. |
+| File writes/edits/deletes | Typed file tools where possible | Keeps write permission at file/path level instead of shell. |
+
+## 2026-07-06 Validation
+
+- `cargo fmt --all -- --check` passed.
+- `cargo test -p talos-tools exec_tool` passed: 20 tests.
+- `cargo check -p talos-tools` passed.
 
 ## Required Reads
 

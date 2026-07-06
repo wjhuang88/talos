@@ -1,6 +1,6 @@
 # Iteration I099: Structured Exec And Bash Fallback Reduction
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-06
 > Planned objective: reduce shell fallback pressure by completing safe structured `exec` workflows.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -76,15 +76,28 @@
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 2 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until I098 closes or is explicitly paused. |
 | 2026-07-06 | Activation | Activated after I098 completed and was pushed. TOOL-017 remains the owner: M1 sequential steps are complete; M2 parallel, M3 pipe chains, and M4 permission strategy alignment are selected. Activation does not authorize shell parsing, glob expansion, redirection, background jobs, arbitrary scripts, broad bash permission changes, release actions, or permission-default relaxation. |
+| 2026-07-06 | Completion | Closed the bounded direct-argv slice: `exec` now supports parallel steps, bounded pipe chains, parallel pipe chains, and per-step permission facets without shell parsing. Bash fallback matrix recorded in TOOL-017. |
 
 ## Verification Evidence
 
-- Pending.
+- `cargo fmt --all -- --check`: passed.
+- `cargo test -p talos-tools exec_tool`: passed, 20 tests.
+- `cargo check -p talos-tools`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
 
 ## Variance And Residuals
 
-- Pending.
+- `steps` and `pipes` are mutually exclusive in this slice. The mixed shape in the proposal remains
+  deferred because it adds scheduling semantics without improving the immediate bash fallback
+  reduction gate.
+- Pipe chains use bounded in-memory stdout-to-stdin transfer rather than unbounded streaming pipes.
+  This preserves output/resource bounds.
 
 ## Retrospective
 
-- Pending.
+- Structured `exec` can now absorb common multi-command and stdout-to-stdin workflows that
+  previously pushed users toward `bash`, while still exposing every spawned process to permission
+  evaluation. The remaining shell fallback cases are explicit shell-language features, not hidden
+  gaps in the direct execution path.

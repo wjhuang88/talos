@@ -13,8 +13,9 @@ use talos_core::tool::{
     AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
+use tokio::task::JoinSet;
 
 use crate::file_tools::{FileToolError, resolve_workspace_path};
 
@@ -34,6 +35,9 @@ pub enum ExecError {
     /// Single-command and multi-step fields were mixed.
     #[error("command and steps are mutually exclusive")]
     MixedCommandAndSteps,
+    /// Step and pipe fields were mixed.
+    #[error("steps and pipes are mutually exclusive")]
+    MixedStepsAndPipes,
     /// The requested execution mode is not supported by this slice.
     #[error("unsupported exec mode: {0}")]
     UnsupportedMode(String),
@@ -67,7 +71,10 @@ pub struct ExecInput {
     /// Sequential execution steps. When provided, top-level command fields must be omitted.
     #[serde(default)]
     pub steps: Vec<ExecStep>,
-    /// Execution mode for steps. This slice supports only `sequential`.
+    /// Pipe chains. Each chain connects step stdout to the next step stdin.
+    #[serde(default)]
+    pub pipes: Vec<PipeSpec>,
+    /// Execution mode for steps or pipe chains.
     #[serde(default)]
     pub mode: ExecMode,
 }
@@ -92,6 +99,14 @@ pub struct ExecStep {
     pub timeout_secs: Option<u64>,
 }
 
+/// One direct argv-style pipe chain.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct PipeSpec {
+    /// Ordered steps forming stdout-to-stdin pipes.
+    #[serde(default)]
+    pub steps: Vec<ExecStep>,
+}
+
 /// Multi-step execution mode.
 #[derive(Debug, Default, Clone, Copy, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -99,7 +114,7 @@ pub enum ExecMode {
     /// Run steps one after another, stopping on the first failure.
     #[default]
     Sequential,
-    /// Reserved for a later TOOL-017 slice.
+    /// Run independent steps or pipe chains concurrently.
     Parallel,
 }
 
@@ -143,7 +158,7 @@ impl ExecTool {
             .as_deref()
             .is_some_and(|command| !command.trim().is_empty());
         if parsed.steps.is_empty() {
-            if !has_command {
+            if parsed.pipes.is_empty() && !has_command {
                 return Err(ExecError::EmptyCommand);
             }
         } else {
@@ -151,11 +166,12 @@ impl ExecTool {
                 || !parsed.args.is_empty()
                 || parsed.cwd.is_some()
                 || !parsed.env.is_empty()
+                || !parsed.pipes.is_empty()
             {
+                if !parsed.pipes.is_empty() {
+                    return Err(ExecError::MixedStepsAndPipes);
+                }
                 return Err(ExecError::MixedCommandAndSteps);
-            }
-            if parsed.mode != ExecMode::Sequential {
-                return Err(ExecError::UnsupportedMode("parallel".to_string()));
             }
             if parsed
                 .steps
@@ -165,12 +181,33 @@ impl ExecTool {
                 return Err(ExecError::EmptyCommand);
             }
         }
+        if !parsed.pipes.is_empty() {
+            if has_command
+                || !parsed.args.is_empty()
+                || parsed.cwd.is_some()
+                || !parsed.env.is_empty()
+            {
+                return Err(ExecError::MixedCommandAndSteps);
+            }
+            if parsed.pipes.iter().any(|pipe| {
+                pipe.steps.len() < 2 || pipe.steps.iter().any(|step| step.command.trim().is_empty())
+            }) {
+                return Err(ExecError::EmptyCommand);
+            }
+        }
         if let Some(name) = parsed.env.keys().find(|name| is_sensitive_env_name(name)) {
             return Err(ExecError::SensitiveEnv(name.clone()));
         }
         for step in &parsed.steps {
             if let Some(name) = step.env.keys().find(|name| is_sensitive_env_name(name)) {
                 return Err(ExecError::SensitiveEnv(name.clone()));
+            }
+        }
+        for pipe in &parsed.pipes {
+            for step in &pipe.steps {
+                if let Some(name) = step.env.keys().find(|name| is_sensitive_env_name(name)) {
+                    return Err(ExecError::SensitiveEnv(name.clone()));
+                }
             }
         }
         Ok(parsed)
@@ -191,6 +228,9 @@ impl ExecTool {
     async fn run(&self, input: ExecInput) -> ToolResult {
         if !input.steps.is_empty() {
             return self.run_steps(input).await;
+        }
+        if !input.pipes.is_empty() {
+            return self.run_pipes(input).await;
         }
 
         let step = ExecStep {
@@ -216,6 +256,13 @@ impl ExecTool {
     }
 
     async fn run_steps(&self, input: ExecInput) -> ToolResult {
+        match input.mode {
+            ExecMode::Sequential => self.run_sequential_steps(input).await,
+            ExecMode::Parallel => self.run_parallel_steps(input).await,
+        }
+    }
+
+    async fn run_sequential_steps(&self, input: ExecInput) -> ToolResult {
         let started = Instant::now();
         let mut content = String::new();
         content.push_str("mode: sequential\n");
@@ -252,94 +299,266 @@ impl ExecTool {
         }
     }
 
+    async fn run_parallel_steps(&self, input: ExecInput) -> ToolResult {
+        let started = Instant::now();
+        let mut set = JoinSet::new();
+
+        for (index, step) in input.steps.iter().cloned().enumerate() {
+            let workspace_root = self.workspace_root.clone();
+            let default_timeout = self.timeout;
+            let max_stream_bytes = self.max_stream_bytes;
+            let request_timeout_secs = input.timeout_secs;
+            set.spawn(async move {
+                let step_started = Instant::now();
+                let result = run_step_inner(
+                    workspace_root,
+                    default_timeout,
+                    max_stream_bytes,
+                    step,
+                    request_timeout_secs,
+                    step_started,
+                    None,
+                )
+                .await;
+                (index, result)
+            });
+        }
+
+        let mut results: Vec<Option<(ExecStep, Result<StepExecution, ToolResult>)>> =
+            (0..input.steps.len()).map(|_| None).collect();
+        while let Some(joined) = set.join_next().await {
+            match joined {
+                Ok((index, result)) => {
+                    results[index] = Some((input.steps[index].clone(), result));
+                }
+                Err(e) => {
+                    return ToolResult::error(format!("parallel step task failed: {e}"));
+                }
+            }
+        }
+
+        let mut content = String::new();
+        content.push_str(&format!("duration_ms: {}\n", started.elapsed().as_millis()));
+        content.push_str("mode: parallel\n");
+        content.push_str(&format!("steps: {}\n", input.steps.len()));
+        let mut is_error = false;
+
+        for (index, result) in results.into_iter().enumerate() {
+            let Some((step, result)) = result else {
+                return ToolResult::error(format!("parallel step {index} did not report a result"));
+            };
+            let result = match result {
+                Ok(result) => result,
+                Err(result) => return result,
+            };
+            content.push_str(&format!("\nstep[{index}]\n"));
+            content.push_str("-------\n");
+            content.push_str(&format_step_output(&step, &result));
+            content.push('\n');
+            is_error |= !result.success;
+        }
+
+        ToolResult {
+            content,
+            is_error,
+            continuations: Vec::new(),
+        }
+    }
+
+    async fn run_pipes(&self, input: ExecInput) -> ToolResult {
+        match input.mode {
+            ExecMode::Sequential => self.run_sequential_pipes(input).await,
+            ExecMode::Parallel => self.run_parallel_pipes(input).await,
+        }
+    }
+
+    async fn run_sequential_pipes(&self, input: ExecInput) -> ToolResult {
+        let started = Instant::now();
+        let mut content = String::new();
+        content.push_str("mode: pipes\n");
+        content.push_str("pipe_mode: sequential\n");
+        content.push_str(&format!("pipes: {}\n", input.pipes.len()));
+        let mut is_error = false;
+
+        for (index, pipe) in input.pipes.iter().enumerate() {
+            let result = match self.run_pipe(pipe, input.timeout_secs).await {
+                Ok(result) => result,
+                Err(result) => return result,
+            };
+            content.push_str(&format!("\npipe[{index}]\n"));
+            content.push_str("-------\n");
+            content.push_str(&format_pipe_output(pipe, &result));
+            content.push('\n');
+            is_error |= !result.success;
+            if !result.success {
+                content.push_str(&format!(
+                    "\n[stopped after failed pipe {index}; later pipes were not executed]\n"
+                ));
+                break;
+            }
+        }
+        content.insert_str(
+            0,
+            &format!("duration_ms: {}\n", started.elapsed().as_millis()),
+        );
+
+        ToolResult {
+            content,
+            is_error,
+            continuations: Vec::new(),
+        }
+    }
+
+    async fn run_parallel_pipes(&self, input: ExecInput) -> ToolResult {
+        let started = Instant::now();
+        let mut set = JoinSet::new();
+
+        for (index, pipe) in input.pipes.iter().cloned().enumerate() {
+            let tool = self.clone_for_task();
+            let request_timeout_secs = input.timeout_secs;
+            set.spawn(async move {
+                let result = tool.run_pipe(&pipe, request_timeout_secs).await;
+                (index, pipe, result)
+            });
+        }
+
+        let mut results: Vec<Option<(PipeSpec, Result<PipeExecution, ToolResult>)>> =
+            (0..input.pipes.len()).map(|_| None).collect();
+        while let Some(joined) = set.join_next().await {
+            match joined {
+                Ok((index, pipe, result)) => {
+                    results[index] = Some((pipe, result));
+                }
+                Err(e) => return ToolResult::error(format!("parallel pipe task failed: {e}")),
+            }
+        }
+
+        let mut content = String::new();
+        content.push_str(&format!("duration_ms: {}\n", started.elapsed().as_millis()));
+        content.push_str("mode: pipes\n");
+        content.push_str("pipe_mode: parallel\n");
+        content.push_str(&format!("pipes: {}\n", input.pipes.len()));
+        let mut is_error = false;
+
+        for (index, result) in results.into_iter().enumerate() {
+            let Some((pipe, result)) = result else {
+                return ToolResult::error(format!("parallel pipe {index} did not report a result"));
+            };
+            let result = match result {
+                Ok(result) => result,
+                Err(result) => return result,
+            };
+            content.push_str(&format!("\npipe[{index}]\n"));
+            content.push_str("-------\n");
+            content.push_str(&format_pipe_output(&pipe, &result));
+            content.push('\n');
+            is_error |= !result.success;
+        }
+
+        ToolResult {
+            content,
+            is_error,
+            continuations: Vec::new(),
+        }
+    }
+
     async fn run_step(
         &self,
         step: &ExecStep,
         request_timeout_secs: Option<u64>,
         started: Instant,
     ) -> Result<StepExecution, ToolResult> {
-        let cwd = match self.resolve_cwd(step.cwd.as_deref()) {
-            Ok(cwd) => cwd,
-            Err(e) => return Err(ToolResult::error(e.to_string())),
-        };
-        let timeout = step
-            .timeout_secs
-            .or(request_timeout_secs)
+        run_step_inner(
+            self.workspace_root.clone(),
+            self.timeout,
+            self.max_stream_bytes,
+            step.clone(),
+            request_timeout_secs,
+            started,
+            None,
+        )
+        .await
+    }
+
+    fn clone_for_task(&self) -> Self {
+        Self {
+            workspace_root: self.workspace_root.clone(),
+            timeout: self.timeout,
+            max_stream_bytes: self.max_stream_bytes,
+        }
+    }
+
+    async fn run_pipe(
+        &self,
+        pipe: &PipeSpec,
+        request_timeout_secs: Option<u64>,
+    ) -> Result<PipeExecution, ToolResult> {
+        let started = Instant::now();
+        let timeout = request_timeout_secs
             .map(|secs| Duration::from_secs(secs.clamp(1, MAX_TIMEOUT_SECS)))
             .unwrap_or(self.timeout);
+        let mut previous_stdout = None;
+        let mut step_results = Vec::new();
 
-        let mut cmd = Command::new(&step.command);
-        cmd.args(&step.args)
-            .current_dir(&cwd)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
-            cmd.env_remove(name);
-        }
-        for (name, value) in &step.env {
-            cmd.env(name, value);
-        }
-
-        let mut child = match cmd.spawn() {
-            Ok(child) => child,
-            Err(e) => {
-                return Err(ToolResult::error(format!(
-                    "failed to spawn '{}': {e}",
-                    step.command
-                )));
-            }
-        };
-
-        let stdout = child.stdout.take().expect("stdout is piped");
-        let stderr = child.stderr.take().expect("stderr is piped");
-        let stdout_limit = self.max_stream_bytes;
-        let stderr_limit = self.max_stream_bytes;
-        let stdout_task = tokio::spawn(read_bounded(stdout, stdout_limit));
-        let stderr_task = tokio::spawn(read_bounded(stderr, stderr_limit));
-
-        let wait_status = tokio::select! {
-            status = child.wait() => {
-                match status {
-                    Ok(status) => Some(status),
-                    Err(e) => return Err(ToolResult::error(format!("failed to wait for child: {e}"))),
-                }
-            }
-            _ = tokio::time::sleep(timeout) => {
-                let _ = child.kill().await;
-                let _ = child.wait().await;
-                None
-            }
-        };
-
-        let stdout = stdout_task
+        for step in &pipe.steps {
+            let result = match tokio::time::timeout(
+                timeout,
+                self.run_step_with_stdin(step, request_timeout_secs, previous_stdout.take()),
+            )
             .await
-            .unwrap_or_else(|e| BoundedOutput::from_error(format!("stdout reader failed: {e}")));
-        let stderr = stderr_task
-            .await
-            .unwrap_or_else(|e| BoundedOutput::from_error(format!("stderr reader failed: {e}")));
-        let duration_ms = started.elapsed().as_millis();
+            {
+                Ok(Ok(result)) => result,
+                Ok(Err(result)) => return Err(result),
+                Err(_) => StepExecution {
+                    cwd: self
+                        .resolve_cwd(step.cwd.as_deref())
+                        .unwrap_or_else(|_| self.workspace_root.clone()),
+                    duration_ms: started.elapsed().as_millis(),
+                    exit_code: None,
+                    success: false,
+                    marker: Some("timeout"),
+                    stdout: BoundedOutput::empty(),
+                    stderr: BoundedOutput::empty(),
+                },
+            };
+            previous_stdout = Some(result.stdout.content.clone());
+            let success = result.success;
+            step_results.push(result);
+            if !success {
+                break;
+            }
+        }
 
-        let Some(status) = wait_status else {
-            return Ok(StepExecution {
-                cwd,
-                duration_ms,
-                exit_code: None,
-                success: false,
-                marker: Some("timeout"),
-                stdout,
-                stderr,
-            });
-        };
-        let exit_code = status.code().unwrap_or(-1);
-        Ok(StepExecution {
-            cwd,
-            duration_ms,
-            exit_code: Some(exit_code),
-            success: status.success(),
-            marker: None,
-            stdout,
-            stderr,
+        let timed_out = step_results
+            .iter()
+            .any(|result| result.marker == Some("timeout"));
+        let success = !timed_out
+            && step_results.len() == pipe.steps.len()
+            && step_results.iter().all(|result| result.success);
+        Ok(PipeExecution {
+            duration_ms: started.elapsed().as_millis(),
+            success,
+            timed_out,
+            steps: step_results,
         })
+    }
+
+    async fn run_step_with_stdin(
+        &self,
+        step: &ExecStep,
+        request_timeout_secs: Option<u64>,
+        stdin_data: Option<Vec<u8>>,
+    ) -> Result<StepExecution, ToolResult> {
+        run_step_inner(
+            self.workspace_root.clone(),
+            self.timeout,
+            self.max_stream_bytes,
+            step.clone(),
+            request_timeout_secs,
+            Instant::now(),
+            stdin_data,
+        )
+        .await
     }
 }
 
@@ -350,7 +569,7 @@ impl AgentTool for ExecTool {
     }
 
     fn description(&self) -> &str {
-        "Execute one program, or sequential argv-style steps, with direct process spawning. No shell parsing, pipelines, redirection, glob expansion, or background jobs are performed."
+        "Execute one program, argv-style steps, or pipe chains with direct process spawning. No shell parsing, redirection, glob expansion, or background jobs are performed."
     }
 
     fn parameters(&self) -> Value {
@@ -374,6 +593,14 @@ impl AgentTool for ExecTool {
         if let Some(steps) = input.get("steps").and_then(Value::as_array) {
             for step in steps {
                 push_step_permission_profile(&mut profile, step);
+            }
+        } else if let Some(pipes) = input.get("pipes").and_then(Value::as_array) {
+            for pipe in pipes {
+                if let Some(steps) = pipe.get("steps").and_then(Value::as_array) {
+                    for step in steps {
+                        push_step_permission_profile(&mut profile, step);
+                    }
+                }
             }
         } else {
             push_step_permission_profile(&mut profile, input);
@@ -404,12 +631,27 @@ struct StepExecution {
     stderr: BoundedOutput,
 }
 
+struct PipeExecution {
+    duration_ms: u128,
+    success: bool,
+    timed_out: bool,
+    steps: Vec<StepExecution>,
+}
+
+#[derive(Clone)]
 struct BoundedOutput {
     content: Vec<u8>,
     total_bytes: usize,
 }
 
 impl BoundedOutput {
+    fn empty() -> Self {
+        Self {
+            content: Vec::new(),
+            total_bytes: 0,
+        }
+    }
+
     fn from_error(message: String) -> Self {
         Self {
             content: message.into_bytes(),
@@ -423,6 +665,128 @@ impl BoundedOutput {
 
     fn truncated(&self) -> bool {
         self.total_bytes > self.content.len()
+    }
+}
+
+async fn run_step_inner(
+    workspace_root: PathBuf,
+    default_timeout: Duration,
+    max_stream_bytes: usize,
+    step: ExecStep,
+    request_timeout_secs: Option<u64>,
+    started: Instant,
+    stdin_data: Option<Vec<u8>>,
+) -> Result<StepExecution, ToolResult> {
+    let cwd = match resolve_exec_cwd(&workspace_root, step.cwd.as_deref()) {
+        Ok(cwd) => cwd,
+        Err(e) => return Err(ToolResult::error(e.to_string())),
+    };
+    let timeout = step
+        .timeout_secs
+        .or(request_timeout_secs)
+        .map(|secs| Duration::from_secs(secs.clamp(1, MAX_TIMEOUT_SECS)))
+        .unwrap_or(default_timeout);
+
+    let mut cmd = Command::new(&step.command);
+    cmd.args(&step.args)
+        .current_dir(&cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if stdin_data.is_some() {
+        cmd.stdin(Stdio::piped());
+    }
+    scrub_and_apply_env(&mut cmd, &step.env);
+
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            return Err(ToolResult::error(format!(
+                "failed to spawn '{}': {e}",
+                step.command
+            )));
+        }
+    };
+
+    let stdout = child.stdout.take().expect("stdout is piped");
+    let stderr = child.stderr.take().expect("stderr is piped");
+    let stdin_task = stdin_data.map(|data| {
+        let mut stdin = child.stdin.take().expect("stdin is piped");
+        tokio::spawn(async move {
+            let _ = stdin.write_all(&data).await;
+        })
+    });
+    let stdout_task = tokio::spawn(read_bounded(stdout, max_stream_bytes));
+    let stderr_task = tokio::spawn(read_bounded(stderr, max_stream_bytes));
+
+    let wait_status = tokio::select! {
+        status = child.wait() => {
+            match status {
+                Ok(status) => Some(status),
+                Err(e) => return Err(ToolResult::error(format!("failed to wait for child: {e}"))),
+            }
+        }
+        _ = tokio::time::sleep(timeout) => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            None
+        }
+    };
+
+    let stdout = stdout_task
+        .await
+        .unwrap_or_else(|e| BoundedOutput::from_error(format!("stdout reader failed: {e}")));
+    let stderr = stderr_task
+        .await
+        .unwrap_or_else(|e| BoundedOutput::from_error(format!("stderr reader failed: {e}")));
+    if let Some(task) = stdin_task {
+        let _ = task.await;
+    }
+    let duration_ms = started.elapsed().as_millis();
+
+    let Some(status) = wait_status else {
+        return Ok(StepExecution {
+            cwd,
+            duration_ms,
+            exit_code: None,
+            success: false,
+            marker: Some("timeout"),
+            stdout,
+            stderr,
+        });
+    };
+    let exit_code = status.code().unwrap_or(-1);
+    Ok(StepExecution {
+        cwd,
+        duration_ms,
+        exit_code: Some(exit_code),
+        success: status.success(),
+        marker: None,
+        stdout,
+        stderr,
+    })
+}
+
+fn resolve_exec_cwd(
+    workspace_root: &std::path::Path,
+    cwd: Option<&str>,
+) -> Result<PathBuf, ExecError> {
+    let cwd = cwd.unwrap_or(".");
+    let resolved = resolve_workspace_path(workspace_root, cwd)
+        .map_err(|e| ExecError::InvalidCwd(e.to_string()))?;
+    if !resolved.is_dir() {
+        return Err(ExecError::InvalidCwd(
+            FileToolError::FileNotFound(cwd.to_string()).to_string(),
+        ));
+    }
+    Ok(resolved)
+}
+
+fn scrub_and_apply_env(cmd: &mut Command, env: &BTreeMap<String, String>) {
+    for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
+        cmd.env_remove(name);
+    }
+    for (name, value) in env {
+        cmd.env(name, value);
     }
 }
 
@@ -497,6 +861,22 @@ fn format_step_output(step: &ExecStep, result: &StepExecution) -> String {
             "\n[stderr truncated at {} bytes]",
             result.stderr.content.len()
         ));
+    }
+    output
+}
+
+fn format_pipe_output(pipe: &PipeSpec, result: &PipeExecution) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("steps: {}\n", pipe.steps.len()));
+    output.push_str(&format!("duration_ms: {}\n", result.duration_ms));
+    if result.timed_out {
+        output.push_str("[timeout]\n");
+    }
+    for (index, (step, step_result)) in pipe.steps.iter().zip(&result.steps).enumerate() {
+        output.push_str(&format!("\npipe_step[{index}]\n"));
+        output.push_str("------------\n");
+        output.push_str(&format_step_output(step, step_result));
+        output.push('\n');
     }
     output
 }
@@ -593,6 +973,31 @@ mod tests {
         assert_eq!(profile[3].resource.as_deref(), Some("crates/talos-tools"));
     }
 
+    #[test]
+    fn permission_profile_exposes_each_pipe_step() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let profile = tool.permission_profile(&serde_json::json!({
+            "pipes": [
+                {
+                    "steps": [
+                        {"command": "printf", "args": ["hello"], "cwd": "."},
+                        {"command": "wc", "args": ["-c"], "cwd": "."}
+                    ]
+                }
+            ]
+        }));
+
+        assert_eq!(profile.len(), 4);
+        assert_eq!(profile[0].nature, ToolNature::Execute);
+        assert_eq!(profile[0].resource.as_deref(), Some("printf"));
+        assert_eq!(profile[1].nature, ToolNature::Read);
+        assert_eq!(profile[1].resource.as_deref(), Some("."));
+        assert_eq!(profile[2].nature, ToolNature::Execute);
+        assert_eq!(profile[2].resource.as_deref(), Some("wc"));
+        assert_eq!(profile[3].nature, ToolNature::Read);
+        assert_eq!(profile[3].resource.as_deref(), Some("."));
+    }
+
     #[tokio::test]
     async fn sensitive_env_names_are_denied_before_spawn() {
         let (tool, _temp) = tool_with_temp_workspace();
@@ -642,6 +1047,24 @@ mod tests {
             result
                 .content
                 .contains("command and steps are mutually exclusive")
+        );
+    }
+
+    #[tokio::test]
+    async fn steps_and_pipes_are_mutually_exclusive() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tool
+            .execute(serde_json::json!({
+                "steps": [{"command": "printf"}],
+                "pipes": [{"steps": [{"command": "printf"}, {"command": "wc"}]}]
+            }))
+            .await;
+
+        assert!(result.is_error);
+        assert!(
+            result
+                .content
+                .contains("steps and pipes are mutually exclusive")
         );
     }
 
@@ -724,6 +1147,82 @@ mod tests {
         assert!(result.content.contains("first"));
         assert!(result.content.contains("step[1]"));
         assert!(result.content.contains("second"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn parallel_steps_run_without_shell() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tool
+            .execute(serde_json::json!({
+                "mode": "parallel",
+                "steps": [
+                    {"command": "printf", "args": ["%s", "alpha"]},
+                    {"command": "printf", "args": ["%s", "beta"]}
+                ]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("mode: parallel"));
+        assert!(result.content.contains("step[0]"));
+        assert!(result.content.contains("alpha"));
+        assert!(result.content.contains("step[1]"));
+        assert!(result.content.contains("beta"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn pipe_chain_passes_stdout_to_next_step_without_shell() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tool
+            .execute(serde_json::json!({
+                "pipes": [
+                    {
+                        "steps": [
+                            {"command": "printf", "args": ["%s", "hello"]},
+                            {"command": "tr", "args": ["a-z", "A-Z"]}
+                        ]
+                    }
+                ]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("mode: pipes"));
+        assert!(result.content.contains("pipe_step[0]"));
+        assert!(result.content.contains("pipe_step[1]"));
+        assert!(result.content.contains("HELLO"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn parallel_pipes_run_without_shell() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tool
+            .execute(serde_json::json!({
+                "mode": "parallel",
+                "pipes": [
+                    {
+                        "steps": [
+                            {"command": "printf", "args": ["%s", "a"]},
+                            {"command": "wc", "args": ["-c"]}
+                        ]
+                    },
+                    {
+                        "steps": [
+                            {"command": "printf", "args": ["%s", "abcd"]},
+                            {"command": "wc", "args": ["-c"]}
+                        ]
+                    }
+                ]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("pipe_mode: parallel"));
+        assert!(result.content.contains("pipe[0]"));
+        assert!(result.content.contains("pipe[1]"));
     }
 
     #[cfg(unix)]

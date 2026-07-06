@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I099 active
+> Status: In Progress — I099 complete; I100 next
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -57,8 +57,8 @@ confirmation required by the active iteration.
 | C2 | Long-task permission preflight | A readable preflight packet lists expected scoped approvals before unattended work. | C1 | Tests prove deny precedence, directory write scope, bash template scope, and no broad bash allow. | Keep current runtime rules and ship docs-only preflight guidance. | Complete |
 | C3 | Permission trace and UX evidence | Approval prompts and trace output explain why a repeated approval is or is not reused. | C2 | Recorded trace shows prompt count reduction and high-risk exact fallback behavior. | Record unresolved noisy command families in PERM-003. | Complete |
 | C4 | Activate I099 | Start structured exec parity iteration. | C3 | I098 closed or paused with exact residuals. | Keep I099 Planned. | Complete |
-| C5 | Exec parallel and pipe slices | `exec` supports approved parallel and pipe workflows without shell parsing. | C4 | `talos-tools` tests prove timeout/cancel/failure behavior and per-step permission facets. | Ship only parallel or only pipe if the other lacks safe semantics. | Planned |
-| C6 | Bash fallback reduction audit | Identify bash calls that should become typed tools/adapters or remain exact shell. | C5 | Audit matrix updated; no permission broadening. | Keep bash exact/template behavior and record blockers. | Planned |
+| C5 | Exec parallel and pipe slices | `exec` supports approved parallel and pipe workflows without shell parsing. | C4 | `talos-tools` tests prove timeout/cancel/failure behavior and per-step permission facets. | Ship only parallel or only pipe if the other lacks safe semantics. | Complete |
+| C6 | Bash fallback reduction audit | Identify bash calls that should become typed tools/adapters or remain exact shell. | C5 | Audit matrix updated; no permission broadening. | Keep bash exact/template behavior and record blockers. | Complete |
 | C7 | Activate I100 | Start project-intelligence and validation-adapter iteration. | C6 | I099 closed or paused with exact residuals. | Keep I100 Planned. | Planned |
 | C8 | Detector/adapters hardening | Project detectors and host-tool adapter guidance are extensible and test covered. | C7 | Tests cover Rust/Node/Python/Go/Java/mixed/governance and no unrelated adapter injection. | Keep existing detector registry and record missing ecosystem. | Planned |
 | C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Planned |
@@ -174,6 +174,45 @@ to temporary test fixtures and must be covered by tests.
 - If `gix` does not safely replace a host fallback, retain the fallback and record the replacement
   trigger.
 - If self-bootstrap evidence remains Codex-primary, record it as non-qualifying evidence.
+
+## Checkpoint C5/C6 — Structured Exec And Bash Fallback Reduction Closed (2026-07-06)
+
+Completed items:
+
+- C5: `exec` now supports direct-argv sequential steps, parallel steps, bounded pipe chains, and
+  parallel pipe chains. The implementation does not invoke shell parsing, glob expansion,
+  redirection, command substitution, background jobs, or shell condition syntax.
+- C6: TOOL-017 now records the bash fallback matrix. Common single-command, sequential,
+  independent parallel, and simple stdout-to-stdin workflows are routed to `exec`; shell-language
+  features remain exact bash fallback; file writes remain typed tool work.
+
+Validation evidence:
+
+```sh
+cargo fmt --all -- --check
+cargo test -p talos-tools exec_tool
+cargo check -p talos-tools
+cargo check --workspace
+cargo clippy --workspace -- -D warnings
+cargo test --workspace
+```
+
+All commands passed on 2026-07-06 before closeout.
+
+Open deviations:
+
+- `steps` and `pipes` are mutually exclusive in this slice. Mixed graph scheduling remains deferred.
+- Pipe chains use bounded retained stdout as the next step's stdin. Unbounded streaming pipes remain
+  out of scope.
+
+Next item:
+
+- C7: activate I100 for project-intelligence and validation-adapter routing.
+
+Recovery instructions:
+
+- Resume from I100 activation unless I099 validation regresses. If it regresses, keep I100 planned
+  and repair TOOL-017/I099 first.
 
 ## Default Decisions For Foreseeable Ambiguity
 
