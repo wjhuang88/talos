@@ -280,7 +280,7 @@ fn todo_panel_rows(items: &[talos_session::TodoItem]) -> Vec<TodoPanelRow> {
         .iter()
         .map(|item| TodoPanelRow {
             id: short_id(item.id),
-            status: todo_status_label(item.status).to_string(),
+            status: talos_session::status_icon(item.status).to_string(),
             priority: todo_priority_label(item.priority).to_string(),
             title: item.title.clone(),
             detail: item.description.clone(),

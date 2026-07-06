@@ -1079,6 +1079,16 @@ pub(crate) fn preview_text_for_state(
     stream_preview.to_string()
 }
 
+/// Map a panel row status string to its display form.
+/// Known checkbox icons (`[ ]`, `[~]`, `[x]`, `[!]`) pass through as-is.
+/// Unknown strings get the bracket fallback `[{status}]`.
+fn status_display(status: &str) -> String {
+    match status {
+        "[ ]" | "[~]" | "[x]" | "[!]" => status.to_string(),
+        other => format!("[{other}]"),
+    }
+}
+
 pub(crate) fn build_todo_panel_lines(data: &TodoPanelData) -> Vec<ScrollbackLine> {
     let header = ScrollbackLine::styled(
         vec![
@@ -1121,7 +1131,7 @@ pub(crate) fn build_todo_panel_lines(data: &TodoPanelData) -> Vec<ScrollbackLine
                     HistoryAttrs::default(),
                 ),
                 HistorySegment::styled(
-                    format!("[{}]", row.status),
+                    status_display(&row.status),
                     to_crossterm_color(semantic::TEXT_ACCENT),
                     HistoryAttrs::default(),
                 ),

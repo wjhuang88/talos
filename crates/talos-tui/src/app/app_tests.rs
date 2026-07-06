@@ -94,7 +94,7 @@ fn todo_panel_renders_read_only_history_lines() {
         title: "Session Todos".to_string(),
         rows: vec![TodoPanelRow {
             id: "abc12345".to_string(),
-            status: "in_progress".to_string(),
+            status: "[~]".to_string(),
             priority: "high".to_string(),
             title: "Wire slash view".to_string(),
             detail: Some("read-only".to_string()),
@@ -104,9 +104,41 @@ fn todo_panel_renders_read_only_history_lines() {
 
     assert_eq!(lines[0].text, "   TODO Session Todos");
     assert!(lines[1].text.contains("abc12345"));
-    assert!(lines[1].text.contains("[in_progress]"));
+    assert!(lines[1].text.contains("[~]"));
     assert!(lines[1].text.contains("Wire slash view"));
     assert_eq!(lines[2].text, "      1 item");
+}
+
+#[test]
+fn todo_panel_unknown_status_uses_bracket_fallback() {
+    let lines = build_todo_panel_lines(&TodoPanelData {
+        title: "Session Todos".to_string(),
+        rows: vec![
+            TodoPanelRow {
+                id: "abc12345".to_string(),
+                status: "custom".to_string(),
+                priority: "medium".to_string(),
+                title: "Fallback test".to_string(),
+                detail: None,
+            },
+        ],
+        footer: Some("1 item".to_string()),
+    });
+    // Unknown status "custom" should render as "[custom]", not bare "custom"
+    assert!(lines[1].text.contains("[custom]"));
+    // Known statuses should still render as checkbox icons
+    let lines2 = build_todo_panel_lines(&TodoPanelData {
+        title: "Session Todos".to_string(),
+        rows: vec![TodoPanelRow {
+            id: "def67890".to_string(),
+            status: "[x]".to_string(),
+            priority: "low".to_string(),
+            title: "Completed item".to_string(),
+            detail: None,
+        }],
+        footer: Some("1 item".to_string()),
+    });
+    assert!(lines2[1].text.contains("[x]"));
 }
 
 #[test]
@@ -943,6 +975,7 @@ fn preview_text_uses_phase_priority_states() {
         "running tool: bash..."
     );
 }
+
 #[test]
 fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
     assert_eq!(
