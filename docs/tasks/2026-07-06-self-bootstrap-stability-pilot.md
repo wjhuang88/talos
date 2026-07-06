@@ -2,7 +2,7 @@
 
 > Created: 2026-07-06
 > Trigger: Maintainer wants another Talos self-bootstrap experiment handed to a separate runtime.
-> Status: Planned
+> Status: Complete
 
 ## Outcome
 
@@ -53,7 +53,7 @@ Success means:
 | SSP120 | Implement `TODO-002` idempotent create slice | Repeated `todo_create` for same session/title returns or updates one item instead of creating duplicates. | SSP110 | Targeted `talos-session` todo tests cover same-title retry, different-title create, and cross-session non-dedup. | If existing API makes update semantics ambiguous, implement return-existing only and record batch/update residual. | Complete |
 | SSP130 | Implement `TUI-028` stale preview clear slice | New user message start clears stale cancel/processing preview state before live content. | SSP120 | Targeted `talos-tui` tests cover Ctrl+C/cancel residue followed by new submit and no regression to live thinking/tool preview. | If exact Ctrl+C path is hard to simulate, add state-level regression around the preview-clearing function and record manual-test residual. | Complete |
 | SSP140 | Implement `RUNTIME-002` terminal error cleanup slice | Provider failure after tool result produces visible terminal error and clears processing state. | SSP130 | Targeted `talos-conversation` or runtime tests prove `is_processing` clears on error after `ToolUse`/`ToolResult`. | If full runtime reproduction is unstable, add deterministic engine-level test and document remaining integration gap. | Complete |
-| SSP150 | Closeout, validation, and owner sync | Task checkpoints, owner docs, Board, Product Backlog, and REL-002 evidence reflect actual status and residuals. | SSP110-SSP140 attempted | `cargo fmt --all -- --check`, targeted crate tests, `cargo check --workspace`, `scripts/validate_project_governance.sh .`, `git diff --check`; run `cargo test --workspace` before marking Complete unless a recorded environment failure blocks it. | If a gate fails, leave task Partial with exact command, failure, next repair step, and owner doc. | Planned |
+| SSP150 | Closeout, validation, and owner sync | Task checkpoints, owner docs, Board, Product Backlog, and REL-002 evidence reflect actual status and residuals. | SSP110-SSP140 attempted | `cargo fmt --all -- --check`, targeted crate tests, `cargo check --workspace`, `scripts/validate_project_governance.sh .`, `git diff --check`; run `cargo test --workspace` before marking Complete unless a recorded environment failure blocks it. | If a gate fails, leave task Partial with exact command, failure, next repair step, and owner doc. | Complete |
 
 ## Dependencies And Prerequisites
 
@@ -277,4 +277,34 @@ Commands/checks and actual results:
 Open risks or deviations: None. Deterministic engine-level tests per task preference. Full runtime integration test not included (explicitly in-scope as engine-level).
 Next task item: SSP150 (Closeout)
 Recovery or resume instruction: SSP140 committed at b66caca. Continue with SSP150 closeout.
+
+## SSP150 — Closeout, Validation, and Owner Sync (2026-07-06)
+
+Completed task items: SSP150
+Current state and artifacts:
+- 5 commits on `main`:
+  - `0451ba0` — `fix(tools): classify expected bash exit statuses (#TOOL-019)`
+  - `e60955e` — `fix(session): make todo create idempotent (#TODO-002)`
+  - `04cb15a` — `fix(tui): clear stale preview before new turns (#TUI-028)`
+  - `b66caca` — `fix(conversation): verify is_processing clears on provider errors (#RUNTIME-002)`
+  - `5551495` — `chore(workspace): cargo fmt fixup`
+- Changed files: 4 source files across 4 crates (talos-tools, talos-session, talos-tui, talos-conversation) + 1 task doc
+Commands/checks and actual results:
+- `cargo fmt --all -- --check`: passed
+- `git diff --check`: passed
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings
+- `cargo check --workspace`: passed
+- `cargo test -p talos-tools bash`: 41 passed, 0 failed
+- `cargo test -p talos-session`: 93 passed, 0 failed
+- `cargo test -p talos-tui`: 249 passed, 0 failed
+- `cargo test -p talos-conversation`: 115 passed, 0 failed
+- `cargo test --workspace`: all 60 test suites passed, 0 failed
+Open risks or deviations: None. All gates pass.
+Residuals recorded:
+- TOOL-019: exit-code classification limited to grep/rg/diff/cargo-fmt-check; broader classification remains future work.
+- TODO-002: return-existing idempotency only; batch/delete/schema residuals stay in owner doc.
+- TUI-028: Ctrl+C path not directly simulated (manual-test residual); broader preview/animation/thinking/dashboard/status-bar items remain in owner doc.
+- RUNTIME-002: deterministic engine-level tests only; full runtime integration test and health-check task/auto-recovery remain in owner doc.
+- REL-002 evidence: Talos was primary runtime for all implementation and validation in this pilot.
+Recovery or resume instruction: All SSP100-SSP150 complete. Final status: Complete.
 
