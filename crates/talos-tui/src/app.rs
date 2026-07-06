@@ -1056,6 +1056,11 @@ pub(crate) fn preview_text_for_state(
     if let Some(TurnPhase::Retrying { attempt }) = phase {
         return format!("retrying (attempt {attempt})...");
     }
+    if let Some(TurnPhase::RunningTool { name }) = phase
+        && is_processing
+    {
+        return format!("running tool: {name}...");
+    }
 
     if let Some(thinking) = thinking_preview
         && is_processing

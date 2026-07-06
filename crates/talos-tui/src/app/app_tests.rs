@@ -929,8 +929,20 @@ fn preview_text_uses_phase_priority_states() {
         preview_text_for_state(None, Some(&TurnPhase::Connecting), None, true, "", 0),
         "connecting..."
     );
+    assert_eq!(
+        preview_text_for_state(
+            None,
+            Some(&TurnPhase::RunningTool {
+                name: "bash".to_string()
+            }),
+            None,
+            true,
+            "",
+            0,
+        ),
+        "running tool: bash..."
+    );
 }
-
 #[test]
 fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
     assert_eq!(

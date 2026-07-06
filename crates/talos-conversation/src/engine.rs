@@ -309,7 +309,7 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolCallStarted { name } => {
-                self.current_phase = Some(TurnPhase::Generating);
+                self.current_phase = Some(TurnPhase::RunningTool { name: name.clone() });
                 self.close_stream();
                 outputs.push(UiOutput::ToolCallStarted {
                     name: name.to_string(),
@@ -321,6 +321,9 @@ impl ConversationEngine {
                 provenance,
                 summary_fields,
             } => {
+                self.current_phase = Some(TurnPhase::RunningTool {
+                    name: call.name.clone(),
+                });
                 self.close_stream();
                 self.record_provenance(provenance);
                 self.messages.push(ChatMessage {
@@ -342,6 +345,7 @@ impl ConversationEngine {
                     provenance: provenance.clone(),
                     summary_fields: summary_fields.clone(),
                 }));
+                outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolResult { result } => {
                 self.close_stream();
@@ -351,6 +355,8 @@ impl ConversationEngine {
                     is_error: result.is_error,
                     content: result.content.clone(),
                 }));
+                self.current_phase = Some(TurnPhase::Generating);
+                outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::TurnEnd { usage, stop_reason } => {
                 self.close_stream();

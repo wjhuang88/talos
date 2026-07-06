@@ -130,6 +130,7 @@ pub enum TurnPhase {
     Retrying { attempt: u32 },
     Thinking,
     Generating,
+    RunningTool { name: String },
     TimedOut,
     Failed,
     Cancelled,

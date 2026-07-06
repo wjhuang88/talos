@@ -923,12 +923,19 @@ mod tests {
         };
         let cancelled = StatusSnapshot {
             phase: Some(TurnPhase::Cancelled),
+            ..base.clone()
+        };
+        let running_tool = StatusSnapshot {
+            phase: Some(TurnPhase::RunningTool {
+                name: "bash".to_string(),
+            }),
             ..base
         };
 
         assert!(format!("{:?}", build_status_text(&timed_out, 120)).contains("timed out"));
         assert!(format!("{:?}", build_status_text(&failed, 120)).contains("failed"));
         assert!(format!("{:?}", build_status_text(&cancelled, 120)).contains("cancelled"));
+        assert!(format!("{:?}", build_status_text(&running_tool, 120)).contains("tool: bash"));
     }
 
     #[test]

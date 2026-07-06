@@ -182,10 +182,17 @@ async fn tool_call_produces_stream_and_message() {
         summary_fields: vec![],
     });
 
-    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs.len(), 2);
     let display = find_tool_call(&outputs).unwrap();
     assert_eq!(display.tool_name, "bash");
     assert_eq!(display.provenance, ToolProvenance::Native);
+    let status = find_status(&outputs).expect("tool call status");
+    assert_eq!(
+        status.phase,
+        Some(TurnPhase::RunningTool {
+            name: "bash".to_string()
+        })
+    );
 
     assert_eq!(engine.messages.len(), 1);
     let msg = &engine.messages[0];
@@ -225,7 +232,7 @@ async fn tool_call_closes_previous_stream() {
     let text: String = chunks.join("");
     assert_eq!(text, "partial");
 
-    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs.len(), 2);
     let display = find_tool_call(&outputs).unwrap();
     assert!(matches!(display.provenance, ToolProvenance::Native));
 }
@@ -248,11 +255,13 @@ async fn tool_result_produces_stream_and_updates_message() {
         result: make_tool_result("file contents", false),
     });
 
-    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs.len(), 2);
     let display = find_tool_result(&outputs).unwrap();
     assert_eq!(display.tool_name.as_deref(), Some("read_file"));
     assert!(!display.is_error);
     assert_eq!(display.content, "file contents");
+    let status = find_status(&outputs).expect("tool result status");
+    assert_eq!(status.phase, Some(TurnPhase::Generating));
 
     let msg = &engine.messages[0];
     let tc = msg.tool_call.as_ref().unwrap();

@@ -6,9 +6,9 @@ use ratatui::{
 use crate::scrollback::truncate_end_to_width;
 use crate::theme::semantic;
 
-struct StatusFlags<'a> {
+struct StatusFlags {
     queue_total: usize,
-    phase_label: Option<&'a str>,
+    phase_label: Option<String>,
 }
 
 pub(crate) fn build_status_text(
@@ -105,7 +105,7 @@ fn build_compact_status(
     provider: &str,
     workspace: &str,
     output_usage_label: &str,
-    flags: &StatusFlags<'_>,
+    flags: &StatusFlags,
     width: u16,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
@@ -120,6 +120,7 @@ fn build_compact_status(
     };
     let phase_part = flags
         .phase_label
+        .as_deref()
         .map(|label| format!(" · {label}"))
         .unwrap_or_default();
     let ctx_len = if context_label.is_empty() {
@@ -180,7 +181,7 @@ fn build_expanded_status(
     provider: &str,
     workspace: &str,
     output_usage_label: &str,
-    flags: &StatusFlags<'_>,
+    flags: &StatusFlags,
     width: u16,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
@@ -195,6 +196,7 @@ fn build_expanded_status(
     };
     let phase_part = flags
         .phase_label
+        .as_deref()
         .map(|label| format!(" · {label}"))
         .unwrap_or_default();
 
@@ -273,11 +275,12 @@ pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {
     format!("{truncated}…")
 }
 
-fn phase_status_label(status: &talos_conversation::StatusSnapshot) -> Option<&'static str> {
+fn phase_status_label(status: &talos_conversation::StatusSnapshot) -> Option<String> {
     match status.phase.as_ref() {
-        Some(talos_conversation::TurnPhase::TimedOut) => Some("timed out"),
-        Some(talos_conversation::TurnPhase::Failed) => Some("failed"),
-        Some(talos_conversation::TurnPhase::Cancelled) => Some("cancelled"),
+        Some(talos_conversation::TurnPhase::TimedOut) => Some("timed out".to_string()),
+        Some(talos_conversation::TurnPhase::Failed) => Some("failed".to_string()),
+        Some(talos_conversation::TurnPhase::Cancelled) => Some("cancelled".to_string()),
+        Some(talos_conversation::TurnPhase::RunningTool { name }) => Some(format!("tool: {name}")),
         _ => None,
     }
 }
