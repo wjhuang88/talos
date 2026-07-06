@@ -298,12 +298,16 @@ pub(crate) fn render_diff(content: &str) -> Option<Vec<Line<'static>>> {
         } else if line.starts_with('+') && !line.starts_with("+++") {
             Line::from(Span::styled(
                 line.to_string(),
-                Style::default().fg(semantic::TEXT_SUCCESS),
+                Style::default()
+                    .fg(semantic::TEXT_SUCCESS)
+                    .bg(semantic::DIFF_ADDED_BG),
             ))
         } else if line.starts_with('-') && !line.starts_with("---") {
             Line::from(Span::styled(
                 line.to_string(),
-                Style::default().fg(semantic::TEXT_ERROR),
+                Style::default()
+                    .fg(semantic::TEXT_ERROR)
+                    .bg(semantic::DIFF_REMOVED_BG),
             ))
         } else {
             Line::from(Span::styled(
@@ -403,8 +407,10 @@ mod tests {
         let lines = render_diff(content).unwrap();
         assert_eq!(line_text(&lines[1]), "+added line");
         assert_eq!(line_style(&lines[1]).fg, Some(semantic::TEXT_SUCCESS));
+        assert_eq!(line_style(&lines[1]).bg, Some(semantic::DIFF_ADDED_BG));
         assert_eq!(line_text(&lines[2]), "-removed line");
         assert_eq!(line_style(&lines[2]).fg, Some(semantic::TEXT_ERROR));
+        assert_eq!(line_style(&lines[2]).bg, Some(semantic::DIFF_REMOVED_BG));
     }
 
     #[test]

@@ -109,6 +109,8 @@ pub struct Theme {
     pub approval_button: Color,
     pub approval_button_bg: Color,
     pub approval_prompt: Color,
+    pub diff_added_bg: Color,
+    pub diff_removed_bg: Color,
     pub logo_gradient: [Color; 6],
     pub logo_badge_1: Color,
     pub logo_badge_2: Color,
@@ -167,6 +169,8 @@ pub const NORD_THEME: &Theme = &Theme {
     approval_button: nord::NORD0,
     approval_button_bg: nord::NORD8,
     approval_prompt: nord::NORD14,
+    diff_added_bg: Color::Rgb(52, 64, 52),
+    diff_removed_bg: Color::Rgb(64, 48, 52),
     logo_gradient: [
         nord::NORD10,
         nord::NORD9,
@@ -235,6 +239,8 @@ pub const SOLARIZED_DARK_THEME: &Theme = &Theme {
     approval_button: solarized_dark::BASE03,
     approval_button_bg: solarized_dark::CYAN,
     approval_prompt: solarized_dark::GREEN,
+    diff_added_bg: Color::Rgb(12, 49, 48),
+    diff_removed_bg: Color::Rgb(16, 38, 50),
     logo_gradient: [
         solarized_dark::BLUE,
         solarized_dark::CYAN,
@@ -303,6 +309,8 @@ pub(crate) mod semantic {
     #[allow(dead_code)]
     pub(crate) const APPROVAL_BUTTON_BG: Color = THEME.approval_button_bg;
     pub(crate) const APPROVAL_PROMPT: Color = THEME.approval_prompt;
+    pub(crate) const DIFF_ADDED_BG: Color = THEME.diff_added_bg;
+    pub(crate) const DIFF_REMOVED_BG: Color = THEME.diff_removed_bg;
     pub(crate) const LOGO_GRADIENT: [Color; 6] = THEME.logo_gradient;
     pub(crate) const LOGO_BADGE_1: Color = THEME.logo_badge_1;
     pub(crate) const LOGO_BADGE_2: Color = THEME.logo_badge_2;
