@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I101 active
+> Status: Complete
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -63,18 +63,19 @@ confirmation required by the active iteration.
 | C8 | Detector/adapters hardening | Project detectors and host-tool adapter guidance are extensible and test covered. | C7 | Tests cover Rust/Node/Python/Go/Java/mixed/governance and no unrelated adapter injection. | Keep existing detector registry and record missing ecosystem. | Complete |
 | C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Complete |
 | C10 | Activate I101 | Start model/Git/self-bootstrap evidence closeout. | C9 | I100 closed or paused with exact residuals. | Keep I101 Planned. | Complete |
-| C11 | Model catalog browser closeout | Independent CLI browser walkthrough and docs close MODEL-006 residuals. | C10 | Real-terminal evidence, no-secret rendering, `/model` vs `/connect` separation confirmed. | Record terminal blocker without faking walkthrough. | Planned |
+| C11 | Model catalog browser closeout | Independent CLI browser walkthrough and docs close MODEL-006 residuals. | C10 | Real-terminal evidence, no-secret rendering, `/model` vs `/connect` separation confirmed. | Record terminal blocker without faking walkthrough. | Complete |
 | C12 | Standard-provider connect cleanup | Built-in catalog providers use catalog-defined API endpoint metadata and do not prompt for URL; custom providers still require URL. | C11 | Tests cover standard provider setup, custom provider setup, config merge, and no-secret rendering. | Keep existing prompt only with an explicit MODEL-006 blocker. | Complete |
 | C13 | Incremental model-list rendering | Model browser/listing renders only the visible/search window or scroll-loaded chunks instead of the full catalog at once. | C11 | Tests or terminal smoke evidence prove large catalogs remain responsive and selection/search state stays correct. | Keep bounded `--available-models` output and record browser performance blocker. | Complete |
-| C14 | Git fallback tracking | Re-check `gix` capability and reduce host fallback only when safe. | C10 | GIT-001 matrix updated; any dependency update has full workspace validation. | Keep host fallback and record replacement trigger. | Planned |
-| C15 | Final self-bootstrap evidence packet | REL-002 evidence says exactly what is and is not Talos-primary. | C11, C12, C13, C14 | Full validation and closeout docs pass; no release overclaim. | Mark Partial with residual owners. | Planned |
+| C14 | Git fallback tracking | Re-check `gix` capability and reduce host fallback only when safe. | C10 | GIT-001 matrix updated; any dependency update has full workspace validation. | Keep host fallback and record replacement trigger. | Complete |
+| C15 | Final self-bootstrap evidence packet | REL-002 evidence says exactly what is and is not Talos-primary. | C11, C12, C13, C14 | Full validation and closeout docs pass; no release overclaim. | Mark Partial with residual owners. | Complete |
 
 ## Dependencies And Prerequisites
 
 - PERM-003 is complete as the current permission taxonomy and trace baseline.
 - TOOL-017 M1 is complete; M2-M4 remain planned.
 - VALIDATION-001 is complete for the first internal validation service slice.
-- MODEL-006 is in progress and requires real-terminal walkthrough evidence.
+- MODEL-006 is complete as of I101; future model catalog residuals return to MC-001 or a new
+  model story if acceptance changes.
 - GIT-001 remains the owner for continuing `gix` tracking and host fallback decisions.
 - REL-002 remains No-go until Talos is primary for planning, implementation, validation, docs, and
   evidence capture.
@@ -330,6 +331,56 @@ Next item:
 
 - Continue I101 with real terminal model-browser evidence, GIT-001 tracking, and REL-002 evidence
   classification.
+
+## Checkpoint C11/C14/C15 — I101 And Long Task Closed (2026-07-06)
+
+Completed items:
+
+- C11: MODEL-006 is complete. A real PTY walkthrough opened
+  `target/debug/talos --available-models-browser` on the packaged catalog at `1/4190`, showed only
+  the viewport slice, exercised search mode, and exited cleanly without credential entry, config
+  write, or provider network request.
+- C14: GIT-001 was rechecked against the current `gix 0.85.0` lockfile and feature graph. No
+  dependency update or feature expansion was made; structured host-`git` fallbacks remain for
+  write/publication workflows.
+- C15: `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` records the
+  full track as useful but non-qualifying REL-002 evidence.
+
+Validation evidence:
+
+```sh
+cargo tree --invert gix@0.85.0 -e features
+rg -n "Command::new\\(\"git\"\\)|git status --porcelain|bash git|git_status|gix =" crates docs/backlog/active/GIT-001-embedded-git-tools.md Cargo.toml Cargo.lock
+```
+
+Both commands passed on 2026-07-06 before final workspace validation. Full workspace validation is
+the final commit gate for this closeout.
+
+Final validation evidence:
+
+```sh
+cargo fmt --all -- --check
+cargo check --workspace
+cargo clippy --workspace -- -D warnings
+cargo test --workspace
+scripts/validate_project_governance.sh .
+git diff --check
+```
+
+All final validation commands passed on 2026-07-06. Governance validation reported 0 warnings.
+
+Open deviations:
+
+- REL-002 remains No-go. This was a Codex-primary hardening track, not a Talos-primary
+  self-bootstrap session.
+- Git write/publication fallbacks remain structured host-`git` bridges until a future scoped
+  replacement proves behavior and permission equivalence.
+
+Recovery instructions:
+
+- Resume future autonomy/runtime work from the residual owner docs: PERM-003/PERM-001 for
+  permission UX, TOOL-017 for structured execution, VALIDATION-001/GOV-003 for validation routing,
+  GIT-001 for fallback replacement, and REL-002 for qualifying self-bootstrap evidence.
 
 ## Default Decisions For Foreseeable Ambiguity
 

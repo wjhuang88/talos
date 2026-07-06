@@ -5,7 +5,7 @@
 | ID | MODEL-006 |
 | Type | Product Story |
 | Priority | P1 |
-| Status | In Progress — setup/render residuals closed; real-terminal walkthrough remains |
+| Status | Complete |
 | Source | Maintainer request 2026-07-05 — command-line `--available-models` output is too large; users need a vim-like scrollable/modifiable view before entering the main Talos TUI |
 | Depends on | MC-001, MODEL-005 |
 | Blocks | Full model-catalog UX closeout |
@@ -87,7 +87,6 @@ main conversation TUI starts. The browser:
 
 Residual hardening:
 
-- Add a real-terminal manual walkthrough before marking `MODEL-006` Complete.
 - Consider a subcommand alias such as `talos models browse` after the CLI command taxonomy settles.
 
 2026-07-06 I101 update:
@@ -100,6 +99,14 @@ Residual hardening:
   and do not prompt for URL input; rows without a default endpoint require URL input.
 - Browser rendering is covered by a viewport-windowed large-catalog test: opening an 8-line view
   over 500 rows renders only the visible window and does not include the tail row.
+- Real terminal walkthrough evidence was recorded with `target/debug/talos --available-models-browser`.
+  The browser opened on the packaged catalog at `1/4190` rows, showed provider `302.AI`, setup
+  rows, and only the current terminal viewport instead of dumping the full catalog. In-browser
+  search was exercised with `/`; a mistyped search reduced the visible result set to `0/0` without
+  crashing, and `Enter` then `q` exited search/browser mode and restored the terminal. No provider
+  network request, credential entry, or config write was performed.
+- `/model` versus `/connect` separation remains covered by regression tests: unauthenticated
+  providers are omitted from the model picker and routed through setup surfaces instead.
 
 ## Current Mitigation
 

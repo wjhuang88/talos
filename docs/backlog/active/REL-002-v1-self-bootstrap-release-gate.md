@@ -58,6 +58,12 @@ I094-I097 closeout (2026-07-04): the direct high-risk execution set is complete 
 No-go release posture. No `v1.0.0` claim, tag, publish, release, or permission-default change
 occurred.
 
+I098-I101 closeout (2026-07-06): `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md`
+records the autonomy/permission/runtime hardening track as useful but non-qualifying REL-002
+evidence. Talos gained permission preflight, structured exec, internal governance validation,
+model browser closeout, and continued `gix` tracking, but Codex remained primary for planning,
+editing, validation orchestration, evidence interpretation, commit, and push.
+
 Maintainer correction (2026-07-04): self-bootstrap validation evidence must not assume Talos is a
 Rust-only agent. `VALIDATION-001` records the requirement for a language-neutral internal
 validation service. Cargo-based checks may remain a host-tool adapter for this repository, but they
@@ -134,6 +140,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-04 | I095-B5 | `docs/iterations/I095-runtime-validation-evidence.md` | Does not qualify by itself. The allowlisted validation evidence mechanism exists, but this implementation and validation were Codex-primary. |
 | 2026-07-04 | I096-B7 | `docs/iterations/I096-governance-mutation-gates.md` | Does not qualify by itself. The owner-doc mutation gate exists, but this implementation and validation were Codex-primary. |
 | 2026-07-04 | I097-B9 | `docs/tasks/2026-07-04-self-bootstrap-rehearsal-i097-b9-nonqualification.md` | Does not qualify. Talos executed bounded validation and owner-doc mutation commands, but Codex remained primary for planning, evidence interpretation, docs editing, broader validation orchestration, commit, and push. |
+| 2026-07-06 | I098-I101 | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` | Does not qualify. Talos capabilities improved, but this long task was Codex-primary; Talos was the implementation target and validation subject, not the primary autonomous executor. |
 
 ## Readiness Reports
 
@@ -141,6 +148,7 @@ Each qualifying self-bootstrap session must record:
 |---|---|---|
 | 2026-07-02 | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` | Not ready for `v1.0.0`; pre-1.0 releases may continue with explicit posture. |
 | 2026-07-04 | `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md` | Not ready for `v1.0.0`; runtime/governance/architecture prerequisites improved, but no qualifying Talos-primary sessions exist. |
+| 2026-07-06 | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` | Not ready for `v1.0.0`; autonomy/runtime prerequisites improved, but no qualifying Talos-primary development session exists. |
 
 ## Relationship To Other Work
 

@@ -1,6 +1,6 @@
 # Iteration I101: Model, Git, And Self-Bootstrap Evidence Closeout
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-06
 > Planned objective: close user-facing model catalog residuals, continue Git fallback tracking, and
 > produce honest self-bootstrap qualification evidence.
@@ -96,19 +96,38 @@
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 4 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until I100 closes or is explicitly paused. |
 | 2026-07-06 | Activation | Activated after I100 completed and was pushed. This phase selects MODEL-006 residuals, GIT-001 tracking, and REL-002 evidence classification. Standard catalog providers must not ask for URL during connect/setup; custom providers still require URL. Large model list rendering must be viewport-windowed or incremental. No runtime `catalog.db`, provider network request, release action, or Git fallback replacement is authorized without separate proof. |
+| 2026-07-06 | Model closeout | Standard packaged provider setup now uses catalog-defined endpoint metadata and does not ask for URL; custom provider setup still requires URL. The browser has viewport-windowed rendering coverage for large lists. A real PTY walkthrough opened `target/debug/talos --available-models-browser` on the packaged catalog at `1/4190`, exercised search, and exited cleanly without credential entry, config write, or provider network request. |
+| 2026-07-06 | Git tracking | GIT-001 was rechecked against `gix 0.85.0`. No feature expansion or dependency update was made. Governance dirty-tree status remains internal/gix-backed; write/publication flows retain structured host-`git` fallbacks until a scoped replacement proves equivalence. |
+| 2026-07-06 | REL-002 evidence | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` records this track as non-qualifying self-bootstrap evidence because Codex remained the primary executor. |
 
 ## Verification Evidence
 
 - `cargo test -p talos-cli models_browser`: passed, 8 tests.
 - `cargo test -p talos-cli connect`: passed, 6 tests.
 - `cargo test -p talos-tui connect_mode`: passed, 6 tests.
+- `cargo tree --invert gix@0.85.0 -e features`: passed.
+- Source scan for direct runtime host `git status` leakage and prompt `bash git` guidance:
+  passed; retained matches are owner-doc history and the prompt's explicit "use built-in Git
+  tools instead of `bash git ...`" guidance.
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo clippy --workspace -- -D warnings`: passed.
+- `cargo test --workspace`: passed.
+- `scripts/validate_project_governance.sh .`: passed, 0 warnings.
+- `git diff --check`: clean.
 
 ## Variance And Residuals
 
-- C12/C13 are closed before C11 walkthrough evidence. This is intentional: deterministic setup and
-  viewport rendering behavior can be validated independently, while real-terminal walkthrough
-  evidence remains open under C11.
+- No runtime `catalog.db` path was reintroduced.
+- No provider network request, real credential entry, release action, permission-default
+  relaxation, or Git fallback replacement occurred.
+- REL-002 remains No-go; this was Codex-primary hardening, not Talos-primary self-development.
 
 ## Retrospective
 
-- Pending.
+- Splitting `--available-models-browser` from the main session TUI was the right boundary: the CLI
+  can provide scroll/search/setup before session startup without coupling to conversation state.
+- The connect/setup rule is now explicit: catalog-standard providers use packaged endpoint
+  metadata; custom providers carry the URL burden.
+- `gix` tracking should continue, but reducing approval noise must not be confused with silently
+  broadening Git write or publication authority.

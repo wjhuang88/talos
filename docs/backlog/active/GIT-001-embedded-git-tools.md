@@ -352,6 +352,22 @@ Sources inspected: `cargo info gix`, docs.rs `gix 0.85.0`, local registry source
 `gix-0.85.0/Cargo.toml`, `src/push.rs`, `src/repository/checkout.rs`,
 `src/repository/remote.rs`, and `src/worktree/mod.rs`.
 
+Tracking update (2026-07-06, I101 closeout):
+
+| Item | Observation | Decision |
+|---|---|---|
+| Current Talos dependency | `Cargo.lock` still resolves `gix 0.85.0`; `crates/talos-tools` still requests `gix = "0.85"` with `default-features = false` and features `basic`, `status`, `revision`, `blob-diff`, `index`, and `sha1`. | No dependency update in I101. Keep the I094 feature posture. |
+| Feature surface | `cargo tree --invert gix@0.85.0 -e features` shows the same local read/index/diff/status/revision surface. No network or worktree-mutation feature was enabled by this phase. | Do not expand features just to reduce host prompts. Feature expansion still requires a scoped Git-tool iteration. |
+| Runtime host Git leak | Source scan found no current `std::process::Command::new("git")` or `git status --porcelain` use in `crates/talos-cli/src/governance.rs`; the identity prompt still says to prefer built-in Git tools for read-only inspection. | Keep the runtime leak fix closed. Any future direct host-`git` CLI/runtime call outside `talos-tools/src/git.rs` is a regression. |
+| Push/pull/checkout/add/commit | No new evidence in this pass that `gix 0.85.0` supplies Talos-ready porcelain push, pull, branch switch, or behavior-equivalent staging/commit flows under the current feature set. | Retain structured host-`git` fallbacks for write/publication workflows. Replacement remains future GIT-001 work with unavailable-host and permission regressions. |
+| REL-002 dependency | Publication workflows remain dependent on explicit host fallback behavior. | REL-002 cannot treat Git publication as fully self-contained until push/pull/checkout fallback decisions are replaced or qualified with stronger evidence. |
+
+I101 tracking evidence:
+
+- `cargo tree --invert gix@0.85.0 -e features`: passed.
+- Source scan for `Command::new("git")`, `git status --porcelain`, prompt `bash git`, and `git_status`
+  confirmed the current runtime leak fix remains in place.
+
 ## Permission Model
 
 | Tool | Nature | Default Permission | Rationale |
