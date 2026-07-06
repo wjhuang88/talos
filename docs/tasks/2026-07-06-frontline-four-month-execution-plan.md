@@ -303,3 +303,62 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the F0 kickoff commit (to be created next). Resume by running F1 audit with the `rg` command above and classifying each hit. Do not implement before the audit table is complete.
+
+## Checkpoint F1 - Catalog Residual Audit (2026-07-06)
+
+Audit command:
+- `rg "catalog\.db|ModelCatalog|talos_models|models\.toml" crates docs README.md README.zh-CN.md`
+
+Findings table (classification: Active / Dead residual / Historical / This requirement):
+
+| # | Location | Reference | Classification | Notes |
+|---|---|---|---|---|
+| A1 | `Cargo.toml:28` | workspace member `crates/talos-models` | **Dead residual** | No other workspace crate lists `talos-models` as a dependency or dev-dependency |
+| A2 | `crates/talos-models/src/lib.rs` | `pub use store::ModelCatalog; pub use import::import_models_dev_*` | **Dead residual** | lib.rs doc comment claims CLI/TUI constructs `ModelCatalog`, but no `use talos_models` / `talos_models::` exists anywhere in `crates/` outside the crate itself |
+| A3 | `crates/talos-models/src/store.rs` (1038 lines) | SQLite-backed `ModelCatalog::open(&db_path)`, `open_memory`, `seed`, `upsert_*`, `find_model`, `search_*`; test on `catalog.db` file at `dir.path().join("catalog.db")` | **Dead residual** | Entire SQLite store. No production crate depends on it. Runtime path was superseded by 2026-07-05 maintainer decision |
+| A4 | `crates/talos-models/src/import.rs` (462 lines) | `import_models_dev_api` / `import_models_dev_models` parsers with test fixtures | **Dead residual** | `talos-config/build.rs` has its OWN inline `parse_api_json` rewrite — does not use `talos-models::import`. The two parsers are independent |
+| A5 | `crates/talos-models/src/error.rs` (29 lines) | `CatalogError` | **Dead residual** | Only consumed by `store.rs` and `import.rs` |
+| A6 | `crates/talos-cli/src/main.rs:388` | `--import-models` help text: "This flag no longer writes to catalog.db." | **Dead residual (text)** | Informative notice. No runtime logic. F2 may refine wording to clarify it never wrote to any catalog in current builds |
+| A7 | `crates/talos-config/src/model.rs:33,46,65` | `include_str!("models.toml")` for `builtin_models()` and `builtin_providers()` | **Active** | Packaged runtime catalog — the accepted path |
+| A8 | `crates/talos-config/build.rs` | `BUILD_MODELS=1` refresh via `curl`; inline `parse_api_json`/`generate_toml`; writes `src/models.toml` | **Active** | Build-time refresh — must be preserved per MC-002 Out Of Scope |
+| A9 | `crates/talos-cli/src/mode_runners.rs:269,356,2150` | `models.toml` provider default + built-in display name/endpoint metadata | **Active** | Runtime reads packaged `models.toml` metadata, not `catalog.db` |
+| A10 | `crates/talos-cli/src/model_lifecycle.rs` and `models_browser.rs` | No hits for `catalog.db`/`ModelCatalog`/`talos_models`/`catalog_snapshot` | **Active (confirmed clean)** | These files use packaged `models.toml` and user config only — DB-free |
+| A11 | `docs/BOARD.md:53`, `docs/backlog/PRODUCT-BACKLOG.md:22,46` | MC-002 story descriptions | **This requirement** | Stay as-is until F2 closes; updated at F4 |
+| A12 | `docs/iterations/I085-model-catalog-modernization.md` | I085 historical execution log; `ModelCatalog`, `catalog.db` pervasive | **Historical** | Immutable iteration record. Do not rewrite. F2 may add a terminal status note pointing to MC-002 |
+| A13 | `docs/tasks/2026-07-03-programmer-handoff-i085-model-catalog.md` | I085 handoff; line 180 "catalog.db when available and readable" in Stage 1 plan | **Historical** | Immutable task record describing superseded Stage 2 intent. Do not rewrite. |
+| A14 | `docs/tasks/2026-07-05-open-requirement-implementation-audit.md:157,158,178` | Audit confirming `--import-models` no-op, no `catalog.db` runtime path | **Active (correct)** | Already reflects current accepted behavior. Leave unchanged |
+| A15 | `docs/decisions/034-reasoning-thinking-boundary.md:81,329` | `models.toml` carries `capabilities.reasoning` | **Active** | References packaged catalog correctly |
+| A16 | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md:80` | "no `catalog.db` resurrection" prohibition statement | **Active** | Records the right prohibition — keep |
+| A17 | `README.md:396-398`, `README.zh-CN.md:379` | "Talos does not create a runtime `catalog.db` for model metadata" + `/connect` uses packaged `models.toml` | **Active (correct)** | README already states the accepted behavior. F3 verifies these entries are consistent with `/model` and `/connect` docs |
+| A18 | `docs/backlog/active/MC-002-*.md` | self-references in Scope and Required Reads | **This requirement** | Owner doc; updated by F2 |
+| A19 | `docs/backlog/active/MC-001-*.md` | MC-001 epic description mentions `talos-models`, `catalog.db` runtime integration | **Historical** | Epic owner doc. F2 may add a short "2026-07-06 status: runtime catalog.db path superseded; see MC-002" note without rewriting history |
+| A20 | `docs/backlog/PRODUCT-BACKLOG.md:44` | MC-001 epic row in the summary table | **Owner-doc state** | Updated by F2/F4 to reflect MC-002 closure |
+
+Cross-crate dependency check (decisive):
+- `rg "talos-models|talos_models" crates/*/Cargo.toml` → only `crates/talos-models/Cargo.toml` itself lists the name. No other crate depends on it.
+- `rg "use talos_models|extern crate talos_models|talos_models::" crates --type rust` → 0 hits outside `crates/talos-models/`.
+- `crates/talos-models/Cargo.toml` depends on `talos-core` + `rusqlite` (bundled). No other crate pulls it in.
+- `crates/talos-config/build.rs` has its OWN inline `parse_api_json`/`generate_toml` — does not import `talos-models::import`.
+
+Classification summary:
+- **Active library capability** (preserve, do not touch): A7, A8, A9, A10, A14, A15, A16, A17
+- **Dead residual** requiring cleanup in F2: A1 (workspace member), A2/A3/A4/A5 (crate source — quarantine, not delete, per confirmation), A6 (help text wording)
+- **Historical docs** (immutable records — do not rewrite, optional short status note only): A12, A13, A19
+- **This requirement** (owner docs, updated at F2/F4 closeout): A11, A18, A20
+
+No runtime dependency on `catalog.db` was found. F2 can proceed with the quarantine + guard-test approach without risk to the running CLI/TUI.
+
+Commands/checks and actual results:
+- `rg "catalog\.db|ModelCatalog|talos_models|models\.toml" crates --type rust --type toml` → hits classified above.
+- `rg "use talos_models|talos_models::" crates --type rust -g '!crates/talos-models/**'` → 0 hits.
+- `rg "talos-models" crates/*/Cargo.toml` → only self.
+- `cargo test -p talos-models --no-run` → Compiles; only depends on `talos-core` + `rusqlite`.
+
+Open risks or deviations:
+- None blocking. F2 quarantine approach confirmed safe by the dependency check.
+
+Next task item:
+- F2: quarantine `talos-models` as non-runtime, add `# Non-runtime` status note to its lib.rs/header, ensure `Cargo.toml` member annotation reflects quarantine, add a guard test proving `~/.talos/catalog.db` is never created at CLI startup, clean stale wording in `crates/talos-cli/src/main.rs` help text, and optionally add terminal status notes on MC-001 epic owner doc and I085 record. Do NOT delete the crate.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the F1 audit commit (to be created next). Resume by applying F2 cleanup per the table above; quarantine (do not delete) `talos-models`; add the guard test under `crates/talos-cli/tests/` and run `cargo check --workspace`.
