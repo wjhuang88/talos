@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I100 complete; I101 next
+> Status: In Progress — I101 active
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -62,7 +62,7 @@ confirmation required by the active iteration.
 | C7 | Activate I100 | Start project-intelligence and validation-adapter iteration. | C6 | I099 closed or paused with exact residuals. | Keep I100 Planned. | Complete |
 | C8 | Detector/adapters hardening | Project detectors and host-tool adapter guidance are extensible and test covered. | C7 | Tests cover Rust/Node/Python/Go/Java/mixed/governance and no unrelated adapter injection. | Keep existing detector registry and record missing ecosystem. | Complete |
 | C9 | Governance routing evidence | Talos can recognize governance tasks and use internal validation/mutation gates. | C8 | `/validate governance` and governance preview/write paths remain internal-first and tested. | Keep governance read-only for any risky mutation class. | Complete |
-| C10 | Activate I101 | Start model/Git/self-bootstrap evidence closeout. | C9 | I100 closed or paused with exact residuals. | Keep I101 Planned. | Planned |
+| C10 | Activate I101 | Start model/Git/self-bootstrap evidence closeout. | C9 | I100 closed or paused with exact residuals. | Keep I101 Planned. | Complete |
 | C11 | Model catalog browser closeout | Independent CLI browser walkthrough and docs close MODEL-006 residuals. | C10 | Real-terminal evidence, no-secret rendering, `/model` vs `/connect` separation confirmed. | Record terminal blocker without faking walkthrough. | Planned |
 | C12 | Standard-provider connect cleanup | Built-in catalog providers use catalog-defined API endpoint metadata and do not prompt for URL; custom providers still require URL. | C11 | Tests cover standard provider setup, custom provider setup, config merge, and no-secret rendering. | Keep existing prompt only with an explicit MODEL-006 blocker. | Planned |
 | C13 | Incremental model-list rendering | Model browser/listing renders only the visible/search window or scroll-loaded chunks instead of the full catalog at once. | C11 | Tests or terminal smoke evidence prove large catalogs remain responsive and selection/search state stays correct. | Keep bounded `--available-models` output and record browser performance blocker. | Planned |
@@ -277,6 +277,29 @@ Recovery instructions:
 
 - Resume from I101 activation after the I100 commit is pushed. If full validation regresses, keep
   I101 planned and repair I100 first.
+
+## Checkpoint C10 — I101 Activated (2026-07-06)
+
+Completed item:
+
+- C10: I101 is active after I100 completion and push.
+
+Activation inventory:
+
+- I098: Complete.
+- I099: Complete.
+- I100: Complete.
+- I101: Active.
+
+Next item:
+
+- C11-C13: close MODEL-006 residuals, including standard-provider no-URL connect/setup and
+  viewport-windowed large model-list rendering.
+
+Recovery instructions:
+
+- Resume from MODEL-006 implementation. If terminal walkthrough evidence is unavailable, keep that
+  residual explicit while still landing deterministic tests for setup and rendering behavior.
 
 ## Default Decisions For Foreseeable Ambiguity
 

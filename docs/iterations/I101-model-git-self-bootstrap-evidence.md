@@ -1,6 +1,6 @@
 # Iteration I101: Model, Git, And Self-Bootstrap Evidence Closeout
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-06
 > Planned objective: close user-facing model catalog residuals, continue Git fallback tracking, and
 > produce honest self-bootstrap qualification evidence.
@@ -95,6 +95,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 4 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until I100 closes or is explicitly paused. |
+| 2026-07-06 | Activation | Activated after I100 completed and was pushed. This phase selects MODEL-006 residuals, GIT-001 tracking, and REL-002 evidence classification. Standard catalog providers must not ask for URL during connect/setup; custom providers still require URL. Large model list rendering must be viewport-windowed or incremental. No runtime `catalog.db`, provider network request, release action, or Git fallback replacement is authorized without separate proof. |
 
 ## Verification Evidence
 
