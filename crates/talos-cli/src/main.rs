@@ -383,9 +383,17 @@ async fn main() -> Result<()> {
     }
 
     if let Some(_path) = &cli.import_models {
+        // 2026-07-05 maintainer decision (MC-002): the runtime `catalog.db`
+        // path is superseded. `--import-models` is a no-op compatibility
+        // notice only; it never opens, creates, or writes any model-metadata
+        // database. Model metadata refresh is build-time only via
+        // `BUILD_MODELS=1 cargo build` which regenerates
+        // `crates/talos-config/src/models.toml`.
         eprintln!(
-            "Note: --import-models is deprecated. Use BUILD_MODELS=1 cargo build to regenerate \
-             the built-in model catalog at build time. This flag no longer writes to catalog.db."
+            "Note: --import-models is deprecated and is a no-op. Use \
+             BUILD_MODELS=1 cargo build to regenerate the packaged model \
+             catalog (crates/talos-config/src/models.toml) at build time. \
+             Talos does not create or read ~/.talos/catalog.db at runtime."
         );
         return Ok(());
     }

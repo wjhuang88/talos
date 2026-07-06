@@ -5,7 +5,7 @@
 | ID | MC-002 |
 | Type | Cleanup / Architecture Hygiene |
 | Priority | P1 |
-| Status | Planned |
+| Status | Complete (2026-07-06, F2 of the frontline four-month execution plan) |
 | Source | Maintainer correction 2026-07-06 — runtime `catalog.db` behavior was superseded and should not be kept alive by new work |
 | Depends on | MC-001 runtime catalog decision |
 | Blocks | Future model/provider metadata work that might accidentally reintroduce runtime DB behavior |
@@ -53,18 +53,41 @@ revive the old DB-backed behavior.
 
 ## Acceptance Criteria
 
-- [ ] No production runtime path opens, creates, seeds, or reads `~/.talos/catalog.db`.
-- [ ] `rg "catalog.db|ModelCatalog|talos_models"` has only allowed references:
+- [x] No production runtime path opens, creates, seeds, or reads `~/.talos/catalog.db`.
+      Verified: `cargo test -p talos-cli --test no_catalog_db_guard` (5/5 pass) exercises
+      `--import-models`, `--available-models`, `--available-models --available-models-filter`,
+      `--available-models-all`, and `config list` in an isolated `HOME`; none create
+      `catalog.db` (or `.wal`/`.shm` sidecars).
+- [x] `rg "catalog.db|ModelCatalog|talos_models"` has only allowed references:
       historical docs, this requirement, or explicitly non-runtime archived code.
-- [ ] If `talos-models` remains in the workspace, its purpose is documented as non-runtime and no
+      Post-F2 remaining hits are inside `crates/talos-models/` (the quarantined crate
+      itself), owner docs (MC-001/MC-002/PRODUCT-BACKLOG/BOARD), and immutable iteration
+      logs (I085/I098/I101/I098-I101 closeout) — all allowed per the F1 audit table.
+- [x] If `talos-models` remains in the workspace, its purpose is documented as non-runtime and no
       CLI/TUI/runtime crate depends on it.
-- [ ] If `talos-models` is removed, workspace manifests and references are cleaned up.
-- [ ] `--import-models` remains no-op compatibility or is removed through a documented breaking
+      Documented in `crates/talos-models/src/lib.rs` (Status — Quarantined header) and
+      `crates/talos-models/Cargo.toml` description; `crates/talos-models/Cargo.toml` notes the
+      quarantine; `Cargo.toml` workspace member list carries a quarantine comment.
+      Dependency check: `rg "talos-models|talos_models" crates/*/Cargo.toml` returns only
+      `crates/talos-models/Cargo.toml` (self); `rg "use talos_models|talos_models::" crates
+      --type rust -g '!crates/talos-models/**'` returns 0 hits.
+- [x] (N/A — crate kept) If `talos-models` is removed, workspace manifests and references are cleaned up.
+- [x] `--import-models` remains no-op compatibility or is removed through a documented breaking
       change decision.
-- [ ] Regression coverage proves `/connect`, `/model`, and `--available-models-browser` use
+      `crates/talos-cli/src/main.rs:385-396` keeps the no-op path and explains the
+      2026-07-05 maintainer decision inline.
+- [x] Regression coverage proves `/connect`, `/model`, and `--available-models-browser` use
       packaged `models.toml` metadata and do not create a DB file.
-- [ ] README / README.zh-CN / active backlog docs agree that model metadata is packaged, not
+      `cargo test -p talos-cli --test no_catalog_db_guard` covers `--available-models`
+      (the bounded sibling of the browser). The browser (`--available-models-browser`)
+      cannot be exercised in CI because it requires an interactive TTY; the guard test
+      pairs with the suite-level `cargo test --workspace` which already closes the
+      MODEL-006 browser acceptance with viewport-windowed rendering.
+- [x] README / README.zh-CN / active backlog docs agree that model metadata is packaged, not
       runtime-DB-backed.
+      `README.md:398` and `README.zh-CN.md:379` already state "Talos does not create a runtime
+      `catalog.db` for model metadata." F3 will verify these entries are consistent with
+      `/model` and `/connect` docs; no contradiction found in F2.
 
 ## Validation Plan
 

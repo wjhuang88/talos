@@ -25,6 +25,9 @@ members = [
     "crates/talos-exploration",
     "crates/talos-runtime",
     "crates/talos-dashboard",
+    # Quarantined non-runtime member (MC-002, 2026-07-06): no production crate
+    # depends on `talos-models`; kept to avoid a semver-breaking removal. Do
+    # not wire it into any CLI/TUI/runtime path.
     "crates/talos-models",
 ]
 

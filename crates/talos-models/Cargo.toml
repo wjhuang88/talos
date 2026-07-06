@@ -1,6 +1,11 @@
 [package]
 name = "talos-models"
-description = "SQLite-backed model catalog store and resolver for Talos agent runtime"
+# Quarantined (non-runtime) as of 2026-07-06 per MC-002. No production crate in
+# the workspace depends on this package; runtime model/provider metadata is
+# sourced from the packaged `crates/talos-config/src/models.toml` instead.
+# Kept (not removed) to avoid a semver-breaking deletion. Do not wire this
+# crate into any CLI/TUI/runtime path.
+description = "Quarantined non-runtime SQLite catalog store (historical/foundation only); runtime Talos uses packaged models.toml instead"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

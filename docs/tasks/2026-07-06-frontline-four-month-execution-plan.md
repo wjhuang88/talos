@@ -362,3 +362,38 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the F1 audit commit (to be created next). Resume by applying F2 cleanup per the table above; quarantine (do not delete) `talos-models`; add the guard test under `crates/talos-cli/tests/` and run `cargo check --workspace`.
+
+## Checkpoint F2 - Catalog Residual Cleanup (2026-07-06)
+
+Completed items:
+- F2: catalog residual cleanup (quarantine, not delete).
+
+Current state and artifacts:
+- `crates/talos-models/src/lib.rs` — Status header rewritten as "Quarantined (non-runtime, 2026-07-06)" with explicit invariant and MC-002/MC-001 references.
+- `crates/talos-models/Cargo.toml` — description now reads "Quarantined non-runtime SQLite catalog store (historical/foundation only)…" plus comment block.
+- `Cargo.toml` — workspace member list carries a 4-line quarantine comment above the `talos-models` entry.
+- `crates/talos-cli/src/main.rs:385-396` — `--import-models` no-op help text clarified; it now states Talos does not create/read `~/.talos/catalog.db` at runtime.
+- `crates/talos-cli/tests/no_catalog_db_guard.rs` — NEW regression guard test file (5 tests).
+- `docs/backlog/active/MC-002-remove-runtime-catalog-db-residuals.md` — Status flipped to Complete; all 6 applicable acceptance criteria checked off and justified.
+
+Commands/checks and actual results:
+- `cargo check --workspace` → exit 0 (compiled `talos-models` + `talos-cli`).
+- `cargo build --tests -p talos-cli` → exit 0; guard test compiles.
+- `cargo test -p talos-cli --test no_catalog_db_guard` → **5 passed; 0 failed**: `import_models_does_not_create_catalog_db`, `available_models_does_not_create_catalog_db`, `available_models_filter_does_not_create_catalog_db`, `available_models_all_does_not_create_catalog_db`, `config_list_does_not_create_catalog_db`.
+- `cargo test -p talos-cli model` → exit 0 (no regression in catalog tests).
+- `cargo test -p talos-cli connect` → exit 0 (no regression in connect tests).
+- `cargo test -p talos-models` → 37 passed (quarantined crate still compiles and tests).
+- `rg "catalog.db|ModelCatalog|talos_models" crates docs` → only allowed references (quarantined crate internals, owner docs, immutable iteration logs).
+
+Open risks or deviations:
+- The `--available-models-browser` path cannot be exercised in CI (interactive TTY required); `--available-models` is the bounded sibling used by the guard test. MODEL-006 viewport-windowed rendering acceptance is closed workspace-wide already.
+- MC-001 epic Status field cannot move below Paused because of the open MC107 residual (manual TUI `/connect` walkthrough). The 2026-07-05 maintainer decision in the MC-001 owner doc is unchanged.
+
+Residual owner:
+- MC-001/MC107 real terminal `/connect` walkthrough remains under MC-001 owner doc — not in scope for this frontline plan.
+
+Next task item:
+- F3: `/model` and `/connect` docs sync. Verify `README.md` / `README.zh-CN.md` / active docs describe `/model` as credential-present models only and `/connect` as the provider setup owner; record any behavior gap instead of documenting false behavior.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the F2 cleanup commit (to be created next). Resume by running F3's `rg "/model|/connect" README.md README.zh-CN.md docs -n` to inventory documentation references, then close any text drift.
