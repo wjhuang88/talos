@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: Planned
+> Status: In Progress — I098 active
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -53,7 +53,7 @@ confirmation required by the active iteration.
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | C0 | Establish execution baseline | This task record, I098-I101 planned shells, Board, backlog, and iteration index name the new track. | Maintainer request | Governance validation and `git diff --check` pass. | Keep task Planned with exact blocker. | Planned |
-| C1 | Activate I098 | Start permission preflight/noise-reduction iteration after inventory. | C0 | I098 Active and non-terminal inventory disposition recorded. | Keep Planned if conflicting active work blocks activation. | Planned |
+| C1 | Activate I098 | Start permission preflight/noise-reduction iteration after inventory. | C0 | I098 Active and non-terminal inventory disposition recorded. | Keep Planned if conflicting active work blocks activation. | Complete |
 | C2 | Long-task permission preflight | A readable preflight packet lists expected scoped approvals before unattended work. | C1 | Tests prove deny precedence, directory write scope, bash template scope, and no broad bash allow. | Keep current runtime rules and ship docs-only preflight guidance. | Planned |
 | C3 | Permission trace and UX evidence | Approval prompts and trace output explain why a repeated approval is or is not reused. | C2 | Recorded trace shows prompt count reduction and high-risk exact fallback behavior. | Record unresolved noisy command families in PERM-003. | Planned |
 | C4 | Activate I099 | Start structured exec parity iteration. | C3 | I098 closed or paused with exact residuals. | Keep I099 Planned. | Planned |
@@ -216,3 +216,39 @@ Recovery or resume instruction:
 - Run `git status --short --branch`.
 - Read this task file, I098, PERM-003, TOOL-017, VALIDATION-001, MODEL-006, GIT-001, and REL-002
   before activating work.
+
+### C1 — I098 Activated (2026-07-06)
+
+Completed task items:
+
+- Activated I098 after maintainer direction to start executing the long-running task.
+- Recorded non-terminal inventory disposition:
+  - I085 remains Paused with MC107 real-terminal `/connect` walkthrough residual and is not
+    reopened.
+  - I086-I089 remain planned product-hardening shells.
+  - I099-I101 remain planned and depend on I098/I099/I100 completion or explicit pause.
+  - MODEL-006 remains In Progress and is selected only for I101.
+  - PERM-003 remains Complete but is selected for I098 refinement under its existing taxonomy.
+  - PERM-001 remains In Progress with Guardian auto-approval and exec DSL still disabled.
+  - No permission-default relaxation, broad bash allow, release action, tag, publish, or runtime
+    `catalog.db` path is authorized by this activation.
+
+Current state and artifacts:
+
+- I098 is Active.
+- This task is In Progress.
+- Implementation starts with permission preflight and traceability only.
+
+Commands/checks and actual results:
+
+- Pending activation-document validation.
+
+Next task item:
+
+- C2: implement the long-task permission preflight packet without weakening permission facets.
+
+Recovery or resume instruction:
+
+- Run `git status --short --branch`.
+- Read I098, PERM-003, PERM-001, `crates/talos-cli/src/approval.rs`,
+  `crates/talos-permission/src/lib.rs`, and `crates/talos-tools/src/bash_tool.rs`.

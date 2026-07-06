@@ -1,6 +1,6 @@
 # Iteration I098: Permission Preflight And Low-Noise Execution Policy
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-06
 > Planned objective: make long-running permission needs inspectable up front while preserving deny
 > precedence and avoiding broad bash approval.
@@ -74,6 +74,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 1 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until explicit activation. |
+| 2026-07-06 | Activation | Activated after maintainer direction to start the long-running task. Inventory disposition: I085 remains Paused; I086-I089 remain Planned; I099-I101 remain Planned and ordered after I098/I099/I100 respectively; MODEL-006 remains In Progress for I101 only; PERM-003 is complete but selected for refinement; PERM-001 remains In Progress with Guardian auto-approval and exec DSL disabled. Activation authorizes permission preflight/traceability only, not broad bash allow, permission-default relaxation, release action, tag, publish, or runtime `catalog.db` behavior. |
 
 ## Verification Evidence
 
