@@ -65,6 +65,10 @@ docs/proposals/
 - [Talos Crate Distribution Architecture](talos-crate-distribution-architecture.md) — proposal for
   making Talos-owned capabilities independently publishable as crates while keeping
   `talos-runtime` as the SDK facade.
+- [Talos Desktop](talos-desktop.md) — proposal sourced from GitHub issue #29 for a future desktop
+  shell; requires requirement intake and ADR before implementation.
+- [Multi-Agent Architecture](multi-agent-architecture.md) — proposal sourced from GitHub issue #30
+  for bounded orchestrator/worker agents under ADR-006 and permission constraints.
 - [Unified Event Stream](unified-event-stream.md) — event stream proposal retained as reference.
 - [Remote Session Protocol](remote-session-protocol.md) — far-future research proposal for remote
   session query and command protocol (mobile app, web dashboard, cross-device continuity).

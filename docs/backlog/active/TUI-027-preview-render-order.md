@@ -5,13 +5,17 @@
 | Story ID | TUI-027 |
 | Priority | P1 |
 | Status | Refinement |
-| Source | Maintainer request 2026-08-05 — 预览区偶尔出现残留文本/顺序错乱 |
+| Source | Maintainer request 2026-07-06; [GitHub Issue #27](https://github.com/wjhuang88/talos/issues/27) — 预览区偶尔出现残留文本/顺序错乱 |
 | Depends on | TUI-004 (state model), TUI-020 (thinking preview) |
 | Blocks | — |
 
 ## 问题
 
 TUI 预览区（scrollback 的最后一个 block，显示正在流式输出的 Agent 响应）偶尔出现渲染顺序错乱：
+
+2026-07-06 issue sync: #27 adds a concrete cancellation/new-input residue case. The broader
+preview/status polish cluster is tracked in `TUI-028`; this story remains responsible for the
+ordering/generation guard and stale-preview correctness boundary.
 
 **已观察到的异常表现**：
 

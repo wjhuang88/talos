@@ -42,13 +42,13 @@ Success means:
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| SB100 | Startup inventory | A checkpoint recording current branch, working tree, active/review/planned/blocked iteration disposition, selected owner docs, and Talos runtime/version used. | None | `git status --short`, `scripts/validate_project_governance.sh .`, and owner-doc inventory are recorded in this task before code edits. | If Talos cannot run the inventory without external help, record a non-qualifying blocker and stop. | Planned |
-| SB101 | Self-bootstrap evidence frame | A new checkpoint section using the REL-002 evidence vocabulary: primary runtime, human interventions, tool calls, validations, and disqualifiers. | SB100 | Evidence frame is appended before implementation and references `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`. | If REL-002 cannot be read, stop and ask for maintainer direction. | Planned |
-| SB110 | Implement `TUI-022` | Todo panel checkbox rendering uses the same status icon mapping as todo tools and `/todo`; unknown statuses keep the existing bracket fallback. | SB101 | Targeted TUI/todo tests pass; no session persistence or todo mutation behavior changes; owner doc updated to Review/Complete as appropriate. | If existing code shape is unclear after one focused inspection pass, leave a precise analysis note and move to SB120 instead. | Planned |
-| SB111 | Implement `TUI-023` | Diff rendering uses theme-aware background tint for added/removed lines without changing diff detection logic. | SB110 | Existing diff tests still pass; new/updated rendering test proves plus/minus styling; owner doc updated. | If terminal styling risk is higher than expected, document the blocker and skip to SB120. | Planned |
-| SB120 | Prepare `PERF-001` bash policy slice | Current runtime parsing behavior for `bash_permission_policy.toml` is captured with a focused test or documented fixture count. | SB101 | Test or evidence confirms policy load count and representative rules before build-time materialization. | If reliable behavior capture is not possible, stop before implementation and record the exact missing seam. | Planned |
-| SB121 | Implement `PERF-001` bash policy build-time materialization | `bash_permission_policy.toml` is parsed during build for `talos-tools`; runtime behavior and policy data remain equivalent. | SB120 | `cargo test -p talos-tools`, `cargo check --workspace`, and `cargo fmt --all -- --check` pass; no user/plugin TOML path is changed. | Revert only this slice through a normal patch if behavior equivalence fails; keep SB120 evidence. | Planned |
-| SB130 | Closeout and owner sync | Task checkpoints, owner docs, `docs/BOARD.md`, and `docs/backlog/PRODUCT-BACKLOG.md` reflect actual status. | SB110-SB121 attempted | Governance validation and `git diff --check` pass; residuals have owner docs; REL-002 evidence states whether this is qualifying, partial, or non-qualifying. | If validation fails, leave task Partial with the failing command and exact next repair step. | Planned |
+| SB100 | Startup inventory | A checkpoint recording current branch, working tree, active/review/planned/blocked iteration disposition, selected owner docs, and Talos runtime/version used. | None | `git status --short`, `scripts/validate_project_governance.sh .`, and owner-doc inventory are recorded in this task before code edits. | If Talos cannot run the inventory without external help, record a non-qualifying blocker and stop. | Complete |
+| SB101 | Self-bootstrap evidence frame | A new checkpoint section using the REL-002 evidence vocabulary: primary runtime, human interventions, tool calls, validations, and disqualifiers. | SB100 | Evidence frame is appended before implementation and references `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`. | If REL-002 cannot be read, stop and ask for maintainer direction. | Complete |
+| SB110 | Implement `TUI-022` | Todo panel checkbox rendering uses the same status icon mapping as todo tools and `/todo`; unknown statuses keep the existing bracket fallback. | SB101 | Targeted TUI/todo tests pass; no session persistence or todo mutation behavior changes; owner doc updated to Review/Complete as appropriate. | If existing code shape is unclear after one focused inspection pass, leave a precise analysis note and move to SB120 instead. | Complete |
+| SB111 | Implement `TUI-023` | Diff rendering uses theme-aware background tint for added/removed lines without changing diff detection logic. | SB110 | Existing diff tests still pass; new/updated rendering test proves plus/minus styling; owner doc updated. | If terminal styling risk is higher than expected, document the blocker and skip to SB120. | Complete |
+| SB120 | Prepare `PERF-001` bash policy slice | Current runtime parsing behavior for `bash_permission_policy.toml` is captured with a focused test or documented fixture count. | SB101 | Test or evidence confirms policy load count and representative rules before build-time materialization. | If reliable behavior capture is not possible, stop before implementation and record the exact missing seam. | Complete |
+| SB121 | Implement `PERF-001` bash policy build-time materialization | `bash_permission_policy.toml` is parsed during build for `talos-tools`; runtime behavior and policy data remain equivalent. | SB120 | `cargo test -p talos-tools`, `cargo check --workspace`, and `cargo fmt --all -- --check` pass; no user/plugin TOML path is changed. | Revert only this slice through a normal patch if behavior equivalence fails; keep SB120 evidence. | Complete |
+| SB130 | Closeout and owner sync | Task checkpoints, owner docs, `docs/BOARD.md`, and `docs/backlog/PRODUCT-BACKLOG.md` reflect actual status. | SB110-SB121 attempted | Governance validation and `git diff --check` pass; residuals have owner docs; REL-002 evidence states whether this is qualifying, partial, or non-qualifying. | If validation fails, leave task Partial with the failing command and exact next repair step. | Complete |
 
 ## Dependencies And Prerequisites
 
@@ -164,7 +164,10 @@ force-push, delete branches, delete user data, migrate local stores, or rewrite 
   - `crates/talos-tui/src/app/app_tests.rs`: Added preview text test for `RunningTool`
   - `crates/talos-tui/src/scrollback_status.rs`: Added `RunningTool` status label, changed `StatusFlags` lifetime from `'a` to owned `String`
   - `crates/talos-tui/src/tests.rs`: Added `RunningTool` status bar test
-- These changes are NOT part of this pilot; they pre-exist and appear to be an in-flight feature adding RunningTool status to the conversation/TUI pipeline.
+- At SB100 these changes were pre-existing and outside the originally selected pilot slices. During the
+  2026-07-06 remediation pass they were accepted into the closeout scope because HEAD otherwise
+  referenced `TurnPhase::RunningTool` inconsistently; commit `c3a07f6` records the completed
+  `RunningTool` turn-phase slice.
 
 **Owner doc inventory (from BOARD.md)**:
 - Now: R27 High-Risk Governance Gate (standing), Four-Month Product Hardening Plan (Active, I085 paused)
@@ -310,11 +313,11 @@ This evidence frame uses the vocabulary defined in
 - `scripts/validate_project_governance.sh .`: 0 warnings
 - `cargo fmt --all -- --check`: clean
 - `git diff --check`: clean
-- `cargo test -p talos-tui`: 243 passed
+- `cargo test -p talos-tui`: 244 passed after remediation
 - `cargo test -p talos-tools -- bash`: 33 passed
 - `cargo check --workspace`: clean
 
-**REL-002 qualification**: **Partial.** Talos was the primary runtime for all SB100-SB130 phases. Three code changes across 3 crates, 2 commits. Zero Codex/senior-agent interventions. PERF-001 Phase 1 (models.toml) is residual. This session satisfies the REL-002 evidence vocabulary (work item, owner docs, runtime, interventions, tool calls, validations) and proves Talos can execute a complete development loop (plan → implement → test → commit → sync) on low-ambiguity display/perf slices.
+**REL-002 qualification**: **Partial.** Talos was the primary runtime for all SB100-SB130 phases. Four code changes across 4 crates, 4 code commits. Zero Codex/senior-agent interventions are recorded in the Talos-authored execution evidence; the later Codex review/remediation only corrected closeout defects and does not upgrade this from partial to full REL-002 qualification. PERF-001 Phase 1 (models.toml) is residual. This session satisfies the REL-002 evidence vocabulary (work item, owner docs, runtime, interventions, tool calls, validations) and proves Talos can execute a complete development loop (plan → implement → test → commit → sync) on low-ambiguity display/perf slices.
 
 **Residual work**:
 - PERF-001 Phase 1: models.toml build-time materialization → `PERF-001` owner doc
