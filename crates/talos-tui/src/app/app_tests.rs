@@ -1011,19 +1011,21 @@ fn preview_text_ignores_stream_preview_when_not_processing() {
     // stale content from a previous cancelled turn.
     let stale_preview = "stale stream preview from previous turn";
     let result = preview_text_for_state(
-        None,           // no hold
-        None,           // no phase
-        None,           // no thinking preview
-        false,          // not processing
-        stale_preview,  // stream_render.preview() from previous stream
+        None,          // no hold
+        None,          // no phase
+        None,          // no thinking preview
+        false,         // not processing
+        stale_preview, // stream_render.preview() from previous stream
         0,
     );
     // When is_processing=false, preview_text_for_state falls through to stream_preview.
     // This is the bug: stale preview from cancelled/resume displays.
     // The fix is at the call site: stream_render.reset() before sending new message.
     // This test documents current behavior; actual prevention is at submit time.
-    assert_eq!(result, stale_preview,
-        "stale preview would display unless cleared before submit");
+    assert_eq!(
+        result, stale_preview,
+        "stale preview would display unless cleared before submit"
+    );
 }
 
 #[test]
@@ -1042,6 +1044,8 @@ fn preview_clearing_resets_both_stream_render_and_thinking() {
     thinking_preview = None;
 
     assert_eq!(stream_render.preview(), "");
-    assert!(thinking_preview.is_none(),
-        "thinking preview should be cleared on new submit");
+    assert!(
+        thinking_preview.is_none(),
+        "thinking preview should be cleared on new submit"
+    );
 }

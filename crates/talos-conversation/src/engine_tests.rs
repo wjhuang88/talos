@@ -1873,7 +1873,10 @@ fn error_after_tool_call_clears_processing() {
     let outputs = engine.handle_agent_event(&AgentEvent::Error {
         message: "provider connection reset after tool call".to_string(),
     });
-    assert!(!engine.is_processing(), "is_processing should be false after Error");
+    assert!(
+        !engine.is_processing(),
+        "is_processing should be false after Error"
+    );
     assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
     // Verify a Status output is emitted with is_processing=false.
     let status = find_status(&outputs).expect("error must emit status");
@@ -1900,7 +1903,10 @@ fn error_after_tool_result_clears_processing() {
     let outputs = engine.handle_agent_event(&AgentEvent::Error {
         message: "provider internal error after tool results".to_string(),
     });
-    assert!(!engine.is_processing(), "is_processing should be false after Error");
+    assert!(
+        !engine.is_processing(),
+        "is_processing should be false after Error"
+    );
     assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
     let status = find_status(&outputs).expect("error must emit status");
     assert!(!status.is_processing);
@@ -1915,7 +1921,10 @@ fn error_without_prior_turn_clears_processing() {
     let outputs = engine.handle_agent_event(&AgentEvent::Error {
         message: "unexpected error before turn start".to_string(),
     });
-    assert!(!engine.is_processing(), "is_processing should clear even without prior turn");
+    assert!(
+        !engine.is_processing(),
+        "is_processing should clear even without prior turn"
+    );
     assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
     let status = find_status(&outputs).expect("error must emit status");
     assert!(!status.is_processing);
@@ -1955,8 +1964,8 @@ fn error_message_becomes_tip_and_error_stream() {
     });
     assert!(has_tip, "error must emit a Tip with the error message");
     // Must include a Stream with MessageSource::Error
-    let has_error_stream = outputs.iter().any(|o| {
-        matches!(o, UiOutput::Stream(msg) if msg.source == MessageSource::Error)
-    });
+    let has_error_stream = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::Stream(msg) if msg.source == MessageSource::Error));
     assert!(has_error_stream, "error must emit an Error stream");
 }

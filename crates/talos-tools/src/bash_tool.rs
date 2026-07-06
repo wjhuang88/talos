@@ -583,7 +583,9 @@ fn is_expected_exit_code(command: &str, exit_code: i32) -> bool {
         "diff" => exit_code == 1,
         // cargo fmt --check: exit 1 = formatting differences found
         "cargo" => {
-            args.first().copied() == Some("fmt") && args.iter().any(|a| *a == "--check") && exit_code == 1
+            args.first().copied() == Some("fmt")
+                && args.iter().any(|a| *a == "--check")
+                && exit_code == 1
         }
         _ => false,
     }
