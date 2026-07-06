@@ -397,3 +397,40 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the F2 cleanup commit (to be created next). Resume by running F3's `rg "/model|/connect" README.md README.zh-CN.md docs -n` to inventory documentation references, then close any text drift.
+
+## Checkpoint F3 - /model and /connect Docs Sync (2026-07-06)
+
+Completed items:
+- F3: `/model` and `/connect` docs sync.
+
+Current state and artifacts:
+- `README.md:393-402` — `/model` / `/connect` paragraph closed a text drift: it previously
+  said only that `/connect` "offers an optional custom endpoint (`base_url`) for
+  gateway-compatible providers", without stating the standard-provider URL-skip behavior.
+  Added: "Standard providers whose catalog metadata supplies a default endpoint submit after
+  the API key without prompting for a URL; custom providers (or any row without a built-in
+  endpoint) still require a non-empty `base_url`." Matches the I101 closeout evidence.
+- `README.zh-CN.md:379` — Chinese version closed the same drift with a matching clause
+  (English / Chinese semantic symmetry preserved; English content unchanged outside the
+  URL-skip clarification).
+- Slash command table rows `/model` (README.md:442 / README.zh-CN.md:367) and `/connect`
+  (README.md:443 / README.zh-CN.md:368) already accurately describe the split (model picker
+  for configured providers; provider setup for `/connect` with optional custom endpoint).
+  No change needed.
+- No behavior gap was found (no false behavior was being documented). The fix is purely
+  additive text to make the standard-provider URL-skip behavior explicit in the same
+  paragraph that already mentions custom endpoints.
+
+Commands/checks and actual results:
+- `rg "/model|/connect" README.md README.zh-CN.md docs -n` → all references reviewed;
+  only one text drift (the standard/custom endpoint asymmetry) is closed above.
+- `scripts/validate_project_governance.sh .` → "Governance validation passed: 0 warning(s)."
+
+Open risks or deviations:
+- None.
+
+Next task item:
+- F4: Month 1 closeout — full validation matrix run, month-1 commit, then checkpoint appended.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the F3 docs-sync commit (to be created next). Resume by running the Month 1 closeout validation matrix (`cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test -p talos-cli`, `cargo test -p talos-config`, governance, `git diff --check`), then commit and append the F4 checkpoint.
