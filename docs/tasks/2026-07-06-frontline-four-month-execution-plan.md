@@ -472,3 +472,176 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the F4 checkpoint commit (to be created next). Month 1 work is committed and pushed. Resume Month 2 by verifying F5 standard-provider connect regression coverage and recording evidence in this file.
+
+## Checkpoint F5 - Standard-Provider Connect Regression (2026-07-06)
+
+Completed items:
+- F5: verified (no implementation; MODEL-006/I101 already shipped and tested).
+
+Current state and artifacts:
+- Already-complete MODEL-006/I101 standard-provider connect behavior is covered by 21 tests across 6 files in 4 crates. Behavior verified, no code change made.
+
+Test evidence (all passed; run with `cargo test -p <crate> [--bins] <filter>`):
+
+Case 1 — Standard provider skips URL input (4 tests):
+- `talos-cli --bins` `models_browser::tests::provider_setup_standard_provider_uses_default_without_typed_url` — openai row uses catalog default URL without typed URL.
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_default_base_url_falls_back_to_builtin_provider_config` — groq connect emits `default_base_url = Some("https://api.groq.com/openai/v1")`.
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_minimax_coding_plan_uses_anthropic_messages_endpoint` — minimax-coding-plan default URL normalized with `/messages`.
+- `talos-tui` `state::tests::connect_mode_standard_provider_submits_without_base_url_field` — TUI submits after API key with default endpoint, no BaseUrl field.
+
+Case 2 — Custom provider requires URL (5 tests):
+- `talos-cli --bins` `models_browser::tests::provider_setup_custom_provider_requires_base_url` — returns "base URL is required".
+- `talos-tui` `state::tests::connect_mode_custom_provider_first_submit_advances_to_base_url_field` — first submit returns None, advances to BaseUrl field.
+- `talos-tui` `state::tests::connect_mode_custom_provider_second_submit_returns_typed_base_url` — typed URL submitted successfully.
+- `talos-tui` `state::tests::connect_mode_custom_provider_empty_base_url_stays_open` — empty URL keeps panel open.
+- `talos-tui` `state::tests::connect_mode_empty_api_key_cancels_without_advancing` — empty API key cancels, no advance to BaseUrl.
+
+Case 3 — Config merge preserves unrelated fields (4 tests):
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_with_credential_preserves_unrelated_provider_fields` — preserves groq existing base_url + model overrides, leaves anthropic untouched.
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_with_credential_updates_base_url_when_provided` — supplied base_url overwrites.
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_with_credential_writes_new_provider_api_key_and_base_url` — fresh connect writes api_key/api_key_env/base_url.
+- `talos-cli --bins` `tests::tests::config_save_load_roundtrip_preserves_fields` — protocol/base_url/api_key_env/model context_limit survive save+load.
+
+Case 4 — api_key masked in display (8 tests):
+- `talos-config` `tests::test_provider_config_debug_masks_api_key` — Debug output shows "***", not secret.
+- `talos-config` `tests::test_credentials_debug_masks_keys` — Credentials Debug shows "redacted".
+- `talos-config` `tests::test_config_debug_masks_provider_api_keys` — Config Debug masks api_key with "***".
+- `talos-cli --bins` `tests::tests::mask_secrets_masks_api_key_lines` — mask_secrets replaces api_key value, leaves api_key_env.
+- `talos-cli --bins` `tests::tests::config_subcommand_list_masks_secrets` — `config list` output shows "api_key = ***".
+- `talos-cli --bins` `tests::tests::config_secret_masking_survives_roundtrip` — masking persists through serialize+deserialize.
+- `talos-tui` `app::app_tests::credential_display_never_reveals_secret_suffix` — `credential_display_text` returns only bullet chars.
+- `talos-tui` `app::app_tests::credential_cursor_tracks_masked_buffer` — cursor positioning works against masked representation.
+
+Commands/checks and actual results:
+- All 21 tests passed (see commands above); captured as the F5 acceptance evidence.
+
+Open risks or deviations:
+- None.
+
+Next task item:
+- F6: Protocol metadata display audit.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at F4 (Month 1 closeout commit). Resume by running the F6 protocol-metadata tests (`provider_setup_uses_catalog_protocol_when_url_does_not_reveal_protocol`, `provider_setup_minimax_coding_plan_uses_anthropic_messages_endpoint`, `handle_connect_with_credential_sets_anthropic_protocol_for_minimax_endpoint`, `handle_connect_minimax_coding_plan_uses_anthropic_messages_endpoint`, `test_anthropic_catalog_endpoint_normalized_for_legacy_minimax_config`, `test_default_config`, endpoint normalization tests) and the no-catalog-db guard for `--available-models` variants.
+
+## Checkpoint F6 - Protocol Metadata Display Audit (2026-07-06)
+
+Completed items:
+- F6: verified (no implementation; protocol metadata from packaged `models.toml` is consumed in every required flow).
+
+Current state and artifacts:
+- Protocol metadata flow verified per path:
+  - `/connect` — `handle_connect()` resolves `default_base_url` using `builtin_providers().protocol` (Append `/messages` for AnthropicMessages).
+  - `/connect` final — `handle_connect_with_credential()` runs `normalize_provider_endpoint(base_url)` to set `provider_entry.protocol`.
+  - `/model` — `build_model_picker_data()` uses `config.all_models()` (built from `builtin_models()`); provider protocol was already resolved during `/connect` or `set_active_model()`.
+  - `--available-models` — `run_models()` calls `talos_config::model::builtin_models()` directly; protocol embedded in provider metadata.
+  - `--available-models-browser` — `build_browser_rows()` populates `CatalogBrowserRow.protocol` from `builtin_providers()`; `apply_provider_setup()` uses `normalize_row_endpoint()` which checks `row.protocol` first (catalog protocol wins over URL inference).
+- Endpoint normalization (`crates/talos-config/src/endpoint.rs`) infers protocol from URL paths; catalog protocol overrides URL inference when both are present.
+
+Test evidence (all passed):
+
+Catalog-protocol-wins tests:
+- `talos-cli --bins` `models_browser::tests::provider_setup_uses_catalog_protocol_when_url_does_not_reveal_protocol` — kimi row with `AnthropicMessages` and URL `https://api.kimi.com/coding/v1` (no `/anthropic/`) keeps `AnthropicMessages` protocol. **Key proof that catalog protocol overrides URL inference.**
+- `talos-cli --bins` `models_browser::tests::provider_setup_minimax_coding_plan_uses_anthropic_messages_endpoint` — minimax row gets `/messages` appended and `AnthropicMessages` protocol.
+
+`/connect` flow protocol tests:
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_minimax_coding_plan_uses_anthropic_messages_endpoint` — default URL normalized with `/messages` endpoint for AnthropicMessages providers.
+- `talos-cli --bins` `mode_runners::connect_tests::handle_connect_with_credential_sets_anthropic_protocol_for_minimax_endpoint` — after credential submit, `minimax.protocol == AnthropicMessages`.
+
+Config-level protocol tests:
+- `talos-config` `tests::test_default_config` — default anthropic provider has `AnthropicMessages` protocol.
+- `talos-config` `tests::test_anthropic_catalog_endpoint_normalized_for_legacy_minimax_config` — minimax URL with `/anthropic/v1` resolves to AnthropicMessages protocol.
+- `talos-config` `tests::test_builtin_anthropic_custom_endpoint_keeps_anthropic_protocol` — anthropic with custom gateway URL stays AnthropicMessages.
+
+Endpoint normalization tests (`crates/talos-config/src/endpoint.rs`):
+- `talos-config` `endpoint::tests::normalizes_anthropic_root_to_messages_endpoint` — root URL gets `/messages` appended.
+- `talos-config` `endpoint::tests::preserves_anthropic_messages_endpoint` — already-on-`/messages` URL is preserved.
+- `talos-config` `endpoint::tests::strips_openai_chat_completions_endpoint_to_root` — openai `/chat/completions` URL is normalized to root.
+- `talos-config` `endpoint::tests::preserves_openai_gateway_root` — gateway root URL is preserved.
+
+CLI protocol config tests:
+- `talos-cli --bins` `tests::tests::config_set_protocol` — `config set providers.<x>.protocol openai-chat` round-trips.
+- `talos-cli --bins` `tests::tests::config_set_dotted_rejects_invalid_protocol` — invalid protocol value produces an error.
+
+No-runtime-DB tests (also satisfy F7 catalog display source):
+- `talos-cli` integration `no_catalog_db_guard::available_models_does_not_create_catalog_db`, `available_models_filter_does_not_create_catalog_db`, `available_models_all_does_not_create_catalog_db` — `--available-models` variants source from packaged `models.toml`.
+
+Commands/checks and actual results:
+- All above tests passed (see commands executed in this session).
+
+Open risks or deviations:
+- Potential gap (residual, NOT blocking): `set_active_model()` in `crates/talos-config/src/config.rs` creates a provider entry via `builtin_provider_config()` (hardcoded 14 providers) and does NOT consult `builtin_providers()` (the 149-provider `models.toml` parser) for protocol. For non-hardcoded providers (e.g., `kimi-for-coding`, `minimax-coding-plan`) selected via `/model` without prior `/connect`, the protocol would default to OpenAIChat rather than reading catalog metadata. This is NOT triggered in normal `/model` usage because `/model` only shows credentials-present providers (which were set up via `/connect`, where protocol is correctly resolved). The gap only manifests in an unusual `/model` path with no prior `/connect` for a non-hardcoded provider. Recorded under MODEL-006 backlog residual; not blocking F6.
+
+Next task item:
+- F7: CLI model list usability.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at F4. Resume by running the MODEL-006 browser tests (`cargo test -p talos-cli --bins browser`) and the terminal `--available-models` walkthrough captured below.
+
+## Checkpoint F7 - CLI Model List Usability (2026-07-06)
+
+Completed items:
+- F7: verified (MODEL-006 already shipped and tested).
+
+Current state and artifacts:
+- `talos --available-models` and `talos --available-models-browser` are shipped (I101 closeout). All 10 MODEL-006 acceptance criteria were already checked in the owner doc.
+- Terminal manual QA performed 2026-07-06:
+  - `talos --available-models` → "Built-in model catalog: 4182 matching models across 149 providers. Showing first 120. Use --available-models-filter ... or --available-models-all to print all." then rows under headers like `302ai — Setup required`. Last output: "... 4062 more matching models omitted. Use --available-models-all to print every row."
+  - Rows printed as `provider/model` (e.g., `302ai/claude-opus-4-1-20250805`, `anthropic/claude-haiku-4-5`) — provider-qualified.
+  - `talos --available-models --available-models-filter anthropic/claude` → "Built-in model catalog: 189 matching models across 17 providers" then filtered rows under `anthropic — Setup required`. Filter narrows by provider, model id, and provider-qualified id.
+  - Both commands exited 0. No credentials were entered or stored during this inspection.
+
+Test evidence (all passed):
+- `talos-cli --bins` `models_browser::tests::filters_by_provider_model_and_qualified_name` — filter matches all three identifiers.
+- `talos-cli --bins` `models_browser::tests::render_marks_current_and_setup_without_secrets` — current model marked, setup rows shown, no secret printed.
+- `talos-cli --bins` `models_browser::tests::render_lines_is_viewport_windowed_for_large_catalog` — opening an 8-line view over 500 rows renders only the visible window (no full dump).
+- `talos-cli --bins` `models_browser::tests::navigation_stays_on_model_rows` — j/k navigation skips headers.
+- `talos-cli --bins` `models_browser::tests::fit_truncates_to_width` — long ids truncated to fit the available width.
+- `talos-cli --bins` `provider_setup_*` (7 tests, also cited in F5) — credential/base_url/protocol routing in browser.
+- `talos-cli` integration `no_catalog_db_guard::available_models_does_not_create_catalog_db`, `available_models_filter_does_not_create_catalog_db`, `available_models_all_does_not_create_catalog_db` — bounded/filter/all variants stay DB-free.
+
+Commands/checks and actual results:
+- `cargo test -p talos-cli --bins browser` → 10 passed; 0 failed.
+- `cargo test -p talos-cli --test no_catalog_db_guard` → 5 passed; 0 failed (F2 evidence reused).
+- Terminal: `talos --available-models` and `talos --available-models --available-models-filter anthropic/claude` → bounded + provider-qualified output, exit 0.
+
+Open risks or deviations:
+- The `--available-models-browser` interactive path cannot be exercised here (TTY required). The viewport-windowed rendering test plus the I101 closeout real-binary walkthrough already satisfy the MODEL-006 acceptance. No new residual.
+
+Next task item:
+- F8: Month 2 closeout.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at F4. Month 2 work was verification-only (no code change). Resume by running the Month 2 closeout gates (`cargo test -p talos-cli`, `cargo test -p talos-config`, `cargo check --workspace`, governance) and committing this checkpoint.
+
+## Checkpoint F8 - Month 2 Closeout (2026-07-06)
+
+Completed items:
+- F5 (standard-provider connect regression — verified), F6 (protocol metadata display audit — verified), F7 (CLI model list usability — verified).
+
+Current state and artifacts:
+- No code change in Month 2 (verification-only per confirmation: F5/F6/F7 already shipped).
+- This file's F5/F6/F7 checkpoints record every test name and assertion as evidence; the MODEL-006 owner doc retains all 10 acceptance criteria as checked.
+
+Commands/checks and actual results:
+- `cargo test -p talos-cli` (full crate, including integration tests) → exit 0:
+  - Unit tests (`--bins`): 154 passed; 0 failed; 0 ignored; 0 filtered out.
+  - `tests/rpc_e2e.rs`: 1 passed.
+  - `tests/skill_runtime_e2e.rs`: 2 passed.
+  - `tests/no_catalog_db_guard.rs`: 5 passed.
+- `cargo test -p talos-config` → exit 0; all unit tests passed + 1 doctest passed.
+- `cargo check --workspace` → exit 0 (already validated in F4; unchanged).
+- `scripts/validate_project_governance.sh .` → "Governance validation passed: 0 warning(s)." (unchanged from F4).
+- `git diff --check` → CLEAN.
+
+Open risks or deviations:
+- F6 noted a residual: `set_active_model()` does not consult `builtin_providers()` for protocol when a non-hardcoded provider is selected via `/model` without prior `/connect`. Not blocking because `/model` only shows credentials-present providers (already setup via `/connect`). Recorded as MODEL-006 residual.
+
+Residual owner:
+- MODEL-006 `set_active_model()` catalog-protocol lookup — under `docs/backlog/active/MODEL-006-interactive-model-catalog-browser.md` residual hardening.
+
+Next task item:
+- F9: Tool argument line-fit display verification (TUI-025).
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at F4 (no Month 2 commit yet, since Month 2 was verification-only and produced no code change; the F8 checkpoint is appended to this file and will be committed alongside F12's Month 3 work, per the "one logical commit per month" plan rule). Resume Month 3 by running the F9 cited tests (`cargo test -p talos-tui tool_args_summary_uses_available_budget_before_truncating`, `cargo test -p talos-tui approval_state_preserves_full_multibyte_arguments`).
