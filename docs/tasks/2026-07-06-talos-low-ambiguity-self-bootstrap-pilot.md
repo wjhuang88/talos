@@ -318,8 +318,13 @@ This evidence frame uses the vocabulary defined in
 
 **Residual work**:
 - PERF-001 Phase 1: models.toml build-time materialization → `PERF-001` owner doc
-- Full `cargo test --workspace` was not run (runtime cost). Targeted crate tests all pass.
 
-**Commits**:
-- `36c14db` fix(tui): TUI-022 + TUI-023
-- `924bc96` perf(tools): PERF-001 bash policy build-time materialization
+**P0-2 workspace test**: `cargo test --workspace` passed — all crates, all test suites exit 0 (2026-07-06 remediation).
+
+**Commits** (post-remediation):
+- `c3a07f6` feat(conversation): RunningTool turn phase
+- `476c275` fix(tui): TUI-022 — todo panel checkbox unification (+ unknown fallback)
+- `b4d21b0` fix(tui): TUI-023 — diff background highlights
+- `b8df171` perf(tools): PERF-001 — bash policy build-time materialization
+- `2a92b57` docs(workspace): SB130 closeout + owner sync
+- `47b2a82` chore(workspace): fmt fixup
