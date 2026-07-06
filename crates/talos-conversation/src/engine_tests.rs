@@ -1852,3 +1852,111 @@ fn model_picker_item_unauthenticated_flag() {
     assert!(!item.authenticated);
     assert!(item.pricing.is_none());
 }
+
+// --- RUNTIME-002: is_processing clears on terminal error paths ---
+
+#[test]
+fn error_after_tool_call_clears_processing() {
+    let mut engine = new_engine();
+    // Simulate: TurnStart → ToolCall → Error (provider failure after tool use)
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+
+    // Emit a ToolCall (phase becomes RunningTool, processing stays true).
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call("bash", ToolProvenance::Native),
+        provenance: ToolProvenance::Native,
+        summary_fields: vec![],
+    });
+    assert!(engine.is_processing(), "still processing after ToolCall");
+
+    // Provider error after tool call — is_processing must clear.
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "provider connection reset after tool call".to_string(),
+    });
+    assert!(!engine.is_processing(), "is_processing should be false after Error");
+    assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
+    // Verify a Status output is emitted with is_processing=false.
+    let status = find_status(&outputs).expect("error must emit status");
+    assert!(!status.is_processing);
+}
+
+#[test]
+fn error_after_tool_result_clears_processing() {
+    let mut engine = new_engine();
+    // Simulate: TurnStart → ToolCall → ToolResult → Error (provider failure after results)
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+
+    engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call("bash", ToolProvenance::Native),
+        provenance: ToolProvenance::Native,
+        summary_fields: vec![],
+    });
+    engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: make_tool_result("ok", false),
+    });
+    assert!(engine.is_processing(), "still processing after ToolResult");
+
+    // Provider error after tool result — is_processing must clear.
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "provider internal error after tool results".to_string(),
+    });
+    assert!(!engine.is_processing(), "is_processing should be false after Error");
+    assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
+    let status = find_status(&outputs).expect("error must emit status");
+    assert!(!status.is_processing);
+}
+
+#[test]
+fn error_without_prior_turn_clears_processing() {
+    let mut engine = new_engine();
+    // Error event may arrive without any prior TurnStart (edge case).
+    engine.is_processing = true;
+
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "unexpected error before turn start".to_string(),
+    });
+    assert!(!engine.is_processing(), "is_processing should clear even without prior turn");
+    assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
+    let status = find_status(&outputs).expect("error must emit status");
+    assert!(!status.is_processing);
+}
+
+#[test]
+fn error_sets_visible_terminal_phase() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: make_tool_result("done", false),
+    });
+
+    // Generic provider error → Failed
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "provider error".to_string(),
+    });
+    assert_eq!(engine.current_phase, Some(TurnPhase::Failed));
+
+    // Timeout error → TimedOut
+    engine.is_processing = true; // reset for test
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "request timed out after 10s".to_string(),
+    });
+    assert_eq!(engine.current_phase, Some(TurnPhase::TimedOut));
+}
+
+#[test]
+fn error_message_becomes_tip_and_error_stream() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_agent_event(&AgentEvent::Error {
+        message: "connection reset by peer".to_string(),
+    });
+    // Must include a Tip with the error message
+    let has_tip = outputs.iter().any(|o| {
+        matches!(o, UiOutput::Tip { text, kind: TipKind::Error } if text == "connection reset by peer")
+    });
+    assert!(has_tip, "error must emit a Tip with the error message");
+    // Must include a Stream with MessageSource::Error
+    let has_error_stream = outputs.iter().any(|o| {
+        matches!(o, UiOutput::Stream(msg) if msg.source == MessageSource::Error)
+    });
+    assert!(has_error_stream, "error must emit an Error stream");
+}
