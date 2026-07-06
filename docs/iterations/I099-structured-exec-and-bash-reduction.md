@@ -1,6 +1,6 @@
 # Iteration I099: Structured Exec And Bash Fallback Reduction
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-06
 > Planned objective: reduce shell fallback pressure by completing safe structured `exec` workflows.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -75,6 +75,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-06 | Planning | Created as Month 2 of the 2026-07-06 autonomy/permission/runtime hardening plan. Not active until I098 closes or is explicitly paused. |
+| 2026-07-06 | Activation | Activated after I098 completed and was pushed. TOOL-017 remains the owner: M1 sequential steps are complete; M2 parallel, M3 pipe chains, and M4 permission strategy alignment are selected. Activation does not authorize shell parsing, glob expansion, redirection, background jobs, arbitrary scripts, broad bash permission changes, release actions, or permission-default relaxation. |
 
 ## Verification Evidence
 

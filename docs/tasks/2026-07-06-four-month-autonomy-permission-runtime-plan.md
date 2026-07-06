@@ -1,6 +1,6 @@
 # 2026-07-06 Four-Month Autonomy, Permission, Runtime Hardening Plan
 
-> Status: In Progress — I098 complete; I099 next
+> Status: In Progress — I099 active
 > Created: 2026-07-06
 > Timebox: 16 weeks / roughly 4 months
 > Owner boundary: senior-agent owned; permission/runtime/governance slices require direct review
@@ -56,7 +56,7 @@ confirmation required by the active iteration.
 | C1 | Activate I098 | Start permission preflight/noise-reduction iteration after inventory. | C0 | I098 Active and non-terminal inventory disposition recorded. | Keep Planned if conflicting active work blocks activation. | Complete |
 | C2 | Long-task permission preflight | A readable preflight packet lists expected scoped approvals before unattended work. | C1 | Tests prove deny precedence, directory write scope, bash template scope, and no broad bash allow. | Keep current runtime rules and ship docs-only preflight guidance. | Complete |
 | C3 | Permission trace and UX evidence | Approval prompts and trace output explain why a repeated approval is or is not reused. | C2 | Recorded trace shows prompt count reduction and high-risk exact fallback behavior. | Record unresolved noisy command families in PERM-003. | Complete |
-| C4 | Activate I099 | Start structured exec parity iteration. | C3 | I098 closed or paused with exact residuals. | Keep I099 Planned. | Planned |
+| C4 | Activate I099 | Start structured exec parity iteration. | C3 | I098 closed or paused with exact residuals. | Keep I099 Planned. | Complete |
 | C5 | Exec parallel and pipe slices | `exec` supports approved parallel and pipe workflows without shell parsing. | C4 | `talos-tools` tests prove timeout/cancel/failure behavior and per-step permission facets. | Ship only parallel or only pipe if the other lacks safe semantics. | Planned |
 | C6 | Bash fallback reduction audit | Identify bash calls that should become typed tools/adapters or remain exact shell. | C5 | Audit matrix updated; no permission broadening. | Keep bash exact/template behavior and record blockers. | Planned |
 | C7 | Activate I100 | Start project-intelligence and validation-adapter iteration. | C6 | I099 closed or paused with exact residuals. | Keep I100 Planned. | Planned |
@@ -296,3 +296,33 @@ Recovery or resume instruction:
 
 - Run `git status --short --branch`.
 - Read I099 and TOOL-017 before activating the next phase.
+
+### C4 — I099 Activated (2026-07-06)
+
+Completed task items:
+
+- Activated I099 after I098 completed and was pushed.
+- Confirmed TOOL-017 status: M1 sequential steps complete; M2 parallel, M3 pipe chains, and M4
+  permission strategy alignment remain planned.
+- Preserved the no-shell-parser boundary: I099 may add direct argv parallel and pipe behavior only;
+  it may not add glob expansion, redirection, background jobs, arbitrary scripts, or broad bash
+  permission changes.
+
+Current state and artifacts:
+
+- I099 is Active.
+- I100-I101 remain Planned.
+
+Commands/checks and actual results:
+
+- Pending activation-document validation.
+
+Next task item:
+
+- C5: implement or safely defer structured exec parallel/pipe slices with tests.
+
+Recovery or resume instruction:
+
+- Run `git status --short --branch`.
+- Read I099, TOOL-017, `docs/proposals/exec-multi-command-parallel-pipe.md`, and
+  `crates/talos-tools/src/exec_tool.rs`.
