@@ -370,12 +370,18 @@ impl TodoRepository {
         Ok(())
     }
 
-    /// Create a todo item.
+    /// Create a todo item, or return an existing item with the same title
+    /// in the same session (idempotent create).
     ///
     /// # Errors
     ///
-    /// Returns an error when the item cannot be persisted.
+    /// Returns an error when the item cannot be persisted or looked up.
     pub fn create(&self, input: CreateTodo) -> Result<TodoItem, TodoError> {
+        // Idempotency: return existing item with same title in this session.
+        if let Some(existing) = self.find_by_title(input.session_id, &input.title)? {
+            return Ok(existing);
+        }
+
         let item = TodoItem {
             id: Uuid::new_v4(),
             session_id: input.session_id,
@@ -634,6 +640,25 @@ impl TodoRepository {
             .query_map(params![session_id.to_string()], map_todo_item)?
             .collect::<RusqliteResult<Vec<_>>>()?;
         Ok(items)
+    }
+
+    /// Find a todo item by session and exact title match (case-sensitive).
+    /// Used for idempotent create — repeated `todo_create` for the same
+    /// title in the same session returns the existing item.
+    fn find_by_title(&self, session_id: Uuid, title: &str) -> Result<Option<TodoItem>, TodoError> {
+        self.conn
+            .query_row(
+                r#"
+                SELECT id, session_id, title, description, status, priority, created_at,
+                       completed_at, assigned_to_turn, tags_json
+                FROM todo_items
+                WHERE session_id = ?1 AND title = ?2
+                "#,
+                params![session_id.to_string(), title],
+                map_todo_item,
+            )
+            .optional()
+            .map_err(TodoError::from)
     }
 
     fn require_item(&self, session_id: Uuid, id: Uuid) -> Result<(), TodoError> {
@@ -1776,5 +1801,110 @@ mod tests {
             write_profile[0].resource.as_deref(),
             Some(expected.as_str())
         );
+    }
+
+    // --- TODO-002: Idempotent todo_create ---
+
+    #[test]
+    fn create_same_title_idempotent_same_session() {
+        let repo = repo();
+        let session_id = Uuid::new_v4();
+
+        let first = repo
+            .create(CreateTodo {
+                session_id,
+                title: "idempotent test".to_string(),
+                description: Some("first description".to_string()),
+                priority: TodoPriority::High,
+                assigned_to_turn: None,
+                tags: vec!["test".to_string()],
+            })
+            .expect("first create");
+
+        // Second create with same session + title returns existing item.
+        let second = repo
+            .create(CreateTodo {
+                session_id,
+                title: "idempotent test".to_string(),
+                description: None,
+                priority: TodoPriority::Low,
+                assigned_to_turn: None,
+                tags: vec![],
+            })
+            .expect("second create");
+
+        // Same id — no duplicate created.
+        assert_eq!(first.id, second.id);
+        // Original fields preserved (no merge/update).
+        assert_eq!(second.description.as_deref(), Some("first description"));
+        assert_eq!(second.priority, TodoPriority::High);
+        assert_eq!(second.tags, vec!["test"]);
+
+        // Only one row in the session.
+        let all = repo.list_all(session_id).expect("list");
+        assert_eq!(all.len(), 1);
+    }
+
+    #[test]
+    fn create_different_title_creates_new_item_same_session() {
+        let repo = repo();
+        let session_id = Uuid::new_v4();
+
+        let first = create(&repo, session_id, "item one");
+        let second = create(&repo, session_id, "item two");
+
+        assert_ne!(first.id, second.id);
+        let all = repo.list_all(session_id).expect("list");
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn create_same_title_different_session_not_deduped() {
+        let repo = repo();
+        let s1 = Uuid::new_v4();
+        let s2 = Uuid::new_v4();
+
+        let first = create(&repo, s1, "shared title");
+        let second = create(&repo, s2, "shared title");
+
+        // Different sessions — different items.
+        assert_ne!(first.id, second.id);
+        assert_eq!(first.title, second.title);
+
+        // Each session has exactly one item.
+        assert_eq!(repo.list_all(s1).expect("list").len(), 1);
+        assert_eq!(repo.list_all(s2).expect("list").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn todo_create_tool_idempotent_same_title() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let session_id = Uuid::new_v4();
+        let create_tool = TodoCreateTool::new(db_path, session_id);
+
+        let first = create_tool
+            .execute(serde_json::json!({
+                "title": "idempotent tool test",
+                "priority": "high",
+                "tags": ["test"]
+            }))
+            .await;
+        assert!(!first.is_error, "{}", first.content);
+        let first_id = extract_uuid_from_text(&first.content);
+
+        // Repeated create — same title, same session — returns existing.
+        let second = create_tool
+            .execute(serde_json::json!({
+                "title": "idempotent tool test",
+                "priority": "low"
+            }))
+            .await;
+        assert!(!second.is_error, "{}", second.content);
+        let second_id = extract_uuid_from_text(&second.content);
+
+        assert_eq!(first_id, second_id);
+        // Original priority preserved (high, not low).
+        assert!(second.content.contains("(high)"));
     }
 }
