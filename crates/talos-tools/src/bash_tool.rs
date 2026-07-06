@@ -19,8 +19,6 @@ use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-const BASH_PERMISSION_POLICY: &str = include_str!("bash_permission_policy.toml");
-
 /// Errors that can occur during bash tool execution.
 #[derive(Debug, Error)]
 pub enum BashError {
@@ -495,8 +493,8 @@ fn find_args_are_template_safe(args: &[&str], policy: &BashPermissionPolicy) -> 
             .any(|arg| policy.contains_read_only_find_denied_arg(arg))
 }
 
-#[derive(Debug, Deserialize)]
-struct BashPermissionPolicy {
+#[derive(Debug)]
+pub(crate) struct BashPermissionPolicy {
     read_only_programs: Vec<String>,
     read_only_no_arg_programs: Vec<String>,
     read_only_git_subcommands: Vec<String>,
@@ -509,7 +507,7 @@ struct BashPermissionPolicy {
 impl BashPermissionPolicy {
     fn get() -> &'static Self {
         static POLICY: std::sync::OnceLock<BashPermissionPolicy> = std::sync::OnceLock::new();
-        POLICY.get_or_init(|| parse_bash_permission_policy(BASH_PERMISSION_POLICY))
+        POLICY.get_or_init(|| include!(concat!(env!("OUT_DIR"), "/bash_permission_policy_data.rs")))
     }
 
     fn contains_read_only_program(&self, value: &str) -> bool {
@@ -549,10 +547,6 @@ impl BashPermissionPolicy {
     fn contains_validation_program(&self, value: &str) -> bool {
         self.validation_programs.iter().any(|item| item == value)
     }
-}
-
-fn parse_bash_permission_policy(input: &str) -> BashPermissionPolicy {
-    toml::from_str(input).expect("embedded bash permission policy must be valid TOML")
 }
 
 fn has_shell_control_syntax(command: &str) -> bool {
@@ -786,6 +780,22 @@ mod tests {
         assert!(policy.contains_read_only_git_subcommand("status"));
         assert!(policy.contains_validation_cargo_subcommand("test"));
         assert!(policy.contains_read_only_find_denied_arg("-exec"));
+    }
+
+    #[test]
+    fn test_bash_permission_policy_fixture_counts() {
+        let policy = BashPermissionPolicy::get();
+
+        // Exact fixture counts from bash_permission_policy.toml (SB120 baseline).
+        // These assertions protect against accidental policy changes during
+        // build-time materialization (SB121/PERF-001).
+        assert_eq!(policy.read_only_programs.len(), 10);
+        assert_eq!(policy.read_only_no_arg_programs.len(), 1);
+        assert_eq!(policy.read_only_git_subcommands.len(), 5);
+        assert_eq!(policy.read_only_find_denied_args.len(), 5);
+        assert_eq!(policy.validation_cargo_subcommands.len(), 4);
+        assert_eq!(policy.validation_go_subcommands.len(), 3);
+        assert_eq!(policy.validation_programs.len(), 3);
     }
 
     #[test]
