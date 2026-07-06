@@ -1142,23 +1142,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_cargo_fmt_check_difference_is_not_error() {
-        // Requires at least one unformatted file — create one temporarily
-        let dir = test_dir();
-        // First run cargo fmt to ensure baseline formatting, then compare.
-        // This test only exercises the classification path; the exit code depends
-        // on the actual repository state.
-        let tool = BashTool::new(dir.clone());
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"fmt_check_fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        )
+        .expect("write Cargo.toml");
+        std::fs::create_dir(dir.path().join("src")).expect("create src");
+        std::fs::write(
+            dir.path().join("src/main.rs"),
+            "fn main(){println!(\"hi\");}\n",
+        )
+        .expect("write unformatted main");
+
+        let tool = BashTool::new(dir.path().to_path_buf());
         let result = tool
             .execute(serde_json::json!({
-                "command": "cargo fmt --check 2>&1 || true"
+                "command": "cargo fmt --check"
             }))
             .await;
-        // With `|| true`, the subshell always exits 0 — this test verifies no
-        // false error from the classification path when the command uses
-        // shell operators (which are excluded from classification).
-        // For a real `cargo fmt --check` without `|| true`, classification
-        // depends on output exit code 1 => not error.
-        assert!(result.content.contains("[exit 0]"));
+
+        assert!(!result.is_error);
+        assert!(result.content.contains("[exit 1]"));
     }
 
     #[tokio::test]

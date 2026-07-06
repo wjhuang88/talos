@@ -1005,17 +1005,11 @@ impl Tui {
                     }
                     KeyCode::Enter => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        // Clear stale preview state from any prior cancellation/resume before
-                        // the new user message starts (TUI-028). This prevents cancelled-stream
-                        // preview content and old thinking text from persisting into the new turn.
-                        self.stream_render.reset();
-                        self.state.thinking_preview = None;
-                        let input = self.state.input_submit();
-                        if !input.is_empty()
-                            && let Some(ref tx) = self.user_input_tx
-                        {
-                            let _ = tx.send(UserInput::Message(input));
-                        }
+                        submit_input_message(
+                            &mut self.state,
+                            &mut self.stream_render,
+                            self.user_input_tx.as_ref(),
+                        );
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
@@ -1035,6 +1029,31 @@ impl Tui {
     fn restore(&self) {
         self.terminal.restore();
     }
+}
+
+fn submit_input_message(
+    state: &mut TuiState,
+    stream_render: &mut StreamRenderState,
+    user_input_tx: Option<&mpsc::UnboundedSender<UserInput>>,
+) -> bool {
+    let input = state.input_submit();
+    if input.is_empty() {
+        return false;
+    }
+
+    let Some(tx) = user_input_tx else {
+        return false;
+    };
+
+    if tx.send(UserInput::Message(input)).is_err() {
+        return false;
+    }
+
+    // Clear stale preview state from any prior cancellation/resume only after a
+    // new user message has actually been accepted for dispatch (TUI-028).
+    stream_render.reset();
+    state.thinking_preview = None;
+    true
 }
 
 pub(crate) fn preview_text_for_state(

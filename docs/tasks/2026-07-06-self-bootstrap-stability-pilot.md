@@ -308,3 +308,22 @@ Residuals recorded:
 - REL-002 evidence: Talos was primary runtime for all implementation and validation in this pilot.
 Recovery or resume instruction: All SSP100-SSP150 complete. Final status: Complete.
 
+## SSP151 — Maintainer Acceptance Remediation (2026-07-06)
+
+Completed task items: SSP151
+Current state and artifacts:
+- `TOOL-019`: replaced the weak `cargo fmt --check 2>&1 || true` test with a temporary Cargo
+  project that produces a real `cargo fmt --check` exit 1 and asserts `is_error == false` while
+  preserving `[exit 1]`.
+- `TUI-028`: moved stale-preview clearing behind successful `UserInput::Message` dispatch so empty
+  Enter, missing channels, or failed sends do not erase active preview state.
+- `TUI-028`: added direct submit-path tests proving successful sends clear stale preview/thinking
+  and empty/unsent input preserves existing preview.
+Commands/checks and actual results:
+- `cargo test -p talos-tools test_cargo_fmt_check_difference_is_not_error -- --nocapture`: passed
+- `cargo test -p talos-tui submit_input_message -- --nocapture`: passed
+Open risks or deviations:
+- `TUI-028` still has broader residuals for animation cadence, dashboard info copy, status bar
+  model-name stability, and thinking visual design; those remain outside this pilot slice.
+Next task item: final validation after remediation.
+Recovery or resume instruction: Run closeout gates again before final acceptance.

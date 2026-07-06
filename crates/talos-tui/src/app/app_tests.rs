@@ -1,10 +1,14 @@
 use crossterm::style::Color as CColor;
-use talos_conversation::{MessageSource, TodoPanelData, TodoPanelRow, ToolResultDisplay};
+use talos_conversation::{
+    MessageSource, TodoPanelData, TodoPanelRow, ToolResultDisplay, UserInput,
+};
 use talos_core::message::Message;
+use tokio::sync::mpsc;
 
-use crate::app::preview_text_for_state;
 use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
+use crate::app::{preview_text_for_state, submit_input_message};
 use crate::scrollback;
+use crate::state::TuiState;
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
@@ -1048,4 +1052,48 @@ fn preview_clearing_resets_both_stream_render_and_thinking() {
         thinking_preview.is_none(),
         "thinking preview should be cleared on new submit"
     );
+}
+
+#[test]
+fn submit_input_message_clears_preview_only_after_successful_send() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    state.input_append_char('h');
+    state.input_append_char('i');
+    state.thinking_preview = Some("old thinking".to_string());
+    let mut stream_render = StreamRenderState::default();
+    assert!(stream_render.start(MessageSource::Assistant).is_empty());
+    assert!(stream_render.push_chunk("old preview").is_empty());
+
+    assert!(submit_input_message(
+        &mut state,
+        &mut stream_render,
+        Some(&tx)
+    ));
+
+    match rx.try_recv().expect("message should be sent") {
+        UserInput::Message(text) => assert_eq!(text, "hi"),
+        other => panic!("unexpected input: {other:?}"),
+    }
+    assert_eq!(stream_render.preview(), "");
+    assert!(state.thinking_preview.is_none());
+}
+
+#[test]
+fn submit_input_message_keeps_preview_for_empty_or_unsent_input() {
+    let mut state = TuiState::new();
+    state.thinking_preview = Some("old thinking".to_string());
+    let mut stream_render = StreamRenderState::default();
+    assert!(stream_render.start(MessageSource::Assistant).is_empty());
+    assert!(stream_render.push_chunk("old preview").is_empty());
+
+    assert!(!submit_input_message(&mut state, &mut stream_render, None));
+    assert_eq!(stream_render.preview(), "old preview");
+    assert_eq!(state.thinking_preview.as_deref(), Some("old thinking"));
+
+    state.input_append_char('h');
+    state.input_append_char('i');
+    assert!(!submit_input_message(&mut state, &mut stream_render, None));
+    assert_eq!(stream_render.preview(), "old preview");
+    assert_eq!(state.thinking_preview.as_deref(), Some("old thinking"));
 }
