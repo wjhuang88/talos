@@ -1,6 +1,6 @@
 # 2026-07-06 Frontline Four-Month Execution Plan
 
-**Status**: Planned
+**Status**: In Progress
 **Created**: 2026-07-06
 **Timebox**: 16 weeks / roughly 4 months
 **Owner boundary**: frontline implementation package; maintainer reviews phase closeouts
@@ -251,3 +251,55 @@ Do not push unless explicitly instructed.
   `docs/backlog/active/WEB-004-site-theme-branding.md`.
 - Any permission/tool-execution concern: do not implement here; record under the relevant
   permission/tool backlog item for maintainer-owned planning.
+
+## Consolidated Confirmation (recorded 2026-07-06)
+
+Executed as one long-running task per `docs/sop/LONG-RUNNING-TASK.md`. One consolidated
+confirmation covers the full F0-F16 cycle. Approved contract:
+
+| Decision | Resolution |
+|---|---|
+| Already-complete tasks (F5-F11) | Verify + run cited tests + record evidence + close. No re-implementation. |
+| `talos-models` crate (F2) | Quarantine + document as non-runtime. Ensure no CLI/TUI/runtime crate depends on it. Add a guard test proving `~/.talos/catalog.db` is never created. Do NOT remove the crate (avoids semver/stop-and-ask). |
+| Branch / commits | Stay on `main`. Commit at F4 / F8 / F12 / F16 (and F0 kickoff). |
+| Push | Push to `origin/main` after each phase commit (user instruction 2026-07-06: "请每个阶段进行一次提交和推送"). |
+| Pacing | F0-F16 continuous; stop only on the plan's defined Stop-And-Ask conditions. |
+| Model name in commits | `[model:glm-5.2]` |
+
+Key codebase facts discovered during confirmation (affecting plan shape):
+
+- F7 (MODEL-006 CLI model browser): **already Complete** — `--available-models-browser` shipped with viewport-windowed large-catalog rendering and all 10 acceptance criteria checked (I101).
+- F9 (TUI-025 tool argument line-fit): **already Complete** (2026-07-04). Tests `tool_args_summary_uses_available_budget_before_truncating` and `approval_state_preserves_full_multibyte_arguments` exist.
+- F10 (TUI-015 head-tail 3/3): **already Complete** — retained lines changed to 3/3 on 2026-07-04.
+- F11 (TUI-019 tool output visual hierarchy): **already Complete** in I076/T105.
+- F5/F6 (standard-provider connect): **already Complete** per MODEL-006 I101 update — standard catalog providers skip URL input; custom providers require it.
+- F13/F14 (site i18n): `site/zh/` already contains all 7 pages, but WEB-003 acceptance (language switcher on every page, `validate_public_site.sh` coverage of `site/zh/`, `site/README.md` docs) is unchecked — real work remains.
+- F1/F2 (catalog.db cleanup): genuinely remaining — `talos-models` crate with SQLite `store.rs` still present; `catalog.db`/`ModelCatalog` references remain in `crates/talos-models/`, `crates/talos-cli/src/main.rs`, READMEs, and historical docs.
+- TUI-025 ID collision: two backlog files share `TUI-025` (`composer-multiline-wrap` and `tool-argument-line-fit-display`). Cosmetic only; does not block execution.
+- MODEL-005 status drift: marked Planned with unchecked acceptance criteria, but its `/model` + `/connect` behavior is delivered via MODEL-006/I101. Status not yet synced in the owner doc.
+
+## Checkpoint F0 - Kickoff (2026-07-06)
+
+Completed items:
+- F0: start inventory.
+
+Current state and artifacts:
+- Working tree clean on `main` (`7dea613`), 18 commits ahead of `origin/main`, not pushed.
+- Required reads completed: `AGENTS.md`, `docs/sop/LONG-RUNNING-TASK.md`, `docs/sop/ITERATION-WORKFLOW.md`, `docs/sop/GIT-WORKFLOW.md`, `docs/sop/DOC-CHECK.md`, `docs/BOARD.md`, `docs/backlog/PRODUCT-BACKLOG.md`, and the active backlog items MC-002, MODEL-005/006, TUI-015/019/025, WEB-003/004.
+- Confirmed overlap with already-complete work cataloged in the Consolidated Confirmation table above.
+
+Commands/checks and actual results:
+- `scripts/validate_project_governance.sh .` → "Governance validation passed: 0 warning(s)." (exit 0).
+- `git diff --check` → CLEAN.
+- `git status` → on `main`, nothing to commit, working tree clean.
+
+Open risks or deviations:
+- F5-F11 reference already-complete backlog items. Resolution per confirmation: verify + record evidence + close, do not re-implement.
+- `talos-models` crate remains in the workspace. F2 will quarantine (not remove) per confirmation.
+- User added per-phase push requirement after initial plan said "do not push." Pushing to `origin/main` after each phase commit.
+
+Next task item:
+- F1: Catalog residual audit — `rg "catalog\\.db|ModelCatalog|models.toml" crates docs README.md README.zh-CN.md`, classify each hit as active library capability, planned removal, or dead residual; record findings.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the F0 kickoff commit (to be created next). Resume by running F1 audit with the `rg` command above and classifying each hit. Do not implement before the audit table is complete.
