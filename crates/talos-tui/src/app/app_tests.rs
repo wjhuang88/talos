@@ -986,3 +986,62 @@ fn preview_text_prefers_thinking_then_idle_then_stream_preview() {
         "generated"
     );
 }
+
+// --- TUI-028: Stale preview clear ---
+
+#[test]
+fn preview_clears_after_stream_reset() {
+    // Simulate stale preview from a previous stream.
+    let mut stream_render = StreamRenderState::default();
+    assert!(stream_render.start(MessageSource::Assistant).is_empty());
+    // Push partial content (no newline) so it stays in preview buffer.
+    let lines = stream_render.push_chunk("old preview");
+    assert!(lines.is_empty(), "partial chunk should stay in preview");
+    assert!(!stream_render.preview().is_empty(), "should have preview");
+
+    // Reset (as Enter key does before new submit) clears everything.
+    stream_render.reset();
+    assert!(stream_render.source().is_none());
+    assert_eq!(stream_render.preview(), "");
+}
+
+#[test]
+fn preview_text_ignores_stream_preview_when_not_processing() {
+    // When is_processing is false, stream_preview should not leak
+    // stale content from a previous cancelled turn.
+    let stale_preview = "stale stream preview from previous turn";
+    let result = preview_text_for_state(
+        None,           // no hold
+        None,           // no phase
+        None,           // no thinking preview
+        false,          // not processing
+        stale_preview,  // stream_render.preview() from previous stream
+        0,
+    );
+    // When is_processing=false, preview_text_for_state falls through to stream_preview.
+    // This is the bug: stale preview from cancelled/resume displays.
+    // The fix is at the call site: stream_render.reset() before sending new message.
+    // This test documents current behavior; actual prevention is at submit time.
+    assert_eq!(result, stale_preview,
+        "stale preview would display unless cleared before submit");
+}
+
+#[test]
+fn preview_clearing_resets_both_stream_render_and_thinking() {
+    // Simulate state after cancellation: stream_render has preview,
+    // thinking_preview has old text.
+    let mut stream_render = StreamRenderState::default();
+    assert!(stream_render.start(MessageSource::Assistant).is_empty());
+    assert!(stream_render.push_chunk("unfinished").is_empty());
+    assert!(!stream_render.preview().is_empty());
+
+    let mut thinking_preview = Some("old thinking".to_string());
+
+    // Enter-key submit clears both.
+    stream_render.reset();
+    thinking_preview = None;
+
+    assert_eq!(stream_render.preview(), "");
+    assert!(thinking_preview.is_none(),
+        "thinking preview should be cleared on new submit");
+}

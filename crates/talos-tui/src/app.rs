@@ -1005,6 +1005,11 @@ impl Tui {
                     }
                     KeyCode::Enter => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        // Clear stale preview state from any prior cancellation/resume before
+                        // the new user message starts (TUI-028). This prevents cancelled-stream
+                        // preview content and old thinking text from persisting into the new turn.
+                        self.stream_render.reset();
+                        self.state.thinking_preview = None;
                         let input = self.state.input_submit();
                         if !input.is_empty()
                             && let Some(ref tx) = self.user_input_tx
