@@ -113,15 +113,13 @@ fn todo_panel_renders_read_only_history_lines() {
 fn todo_panel_unknown_status_uses_bracket_fallback() {
     let lines = build_todo_panel_lines(&TodoPanelData {
         title: "Session Todos".to_string(),
-        rows: vec![
-            TodoPanelRow {
-                id: "abc12345".to_string(),
-                status: "custom".to_string(),
-                priority: "medium".to_string(),
-                title: "Fallback test".to_string(),
-                detail: None,
-            },
-        ],
+        rows: vec![TodoPanelRow {
+            id: "abc12345".to_string(),
+            status: "custom".to_string(),
+            priority: "medium".to_string(),
+            title: "Fallback test".to_string(),
+            detail: None,
+        }],
         footer: Some("1 item".to_string()),
     });
     // Unknown status "custom" should render as "[custom]", not bare "custom"

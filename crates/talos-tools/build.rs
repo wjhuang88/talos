@@ -37,9 +37,9 @@ fn main() {
             panic!("bash_permission_policy.toml: missing required field [{field}]")
         });
 
-        let arr = value.as_array().unwrap_or_else(|| {
-            panic!("bash_permission_policy.toml: [{field}] must be an array")
-        });
+        let arr = value
+            .as_array()
+            .unwrap_or_else(|| panic!("bash_permission_policy.toml: [{field}] must be an array"));
 
         for (i, item) in arr.iter().enumerate() {
             let _ = item.as_str().unwrap_or_else(|| {
@@ -60,7 +60,11 @@ fn main() {
 fn get_strs(root: &toml::Table, key: &str) -> Vec<String> {
     root.get(key)
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
