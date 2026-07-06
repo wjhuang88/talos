@@ -434,3 +434,41 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the F3 docs-sync commit (to be created next). Resume by running the Month 1 closeout validation matrix (`cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test -p talos-cli`, `cargo test -p talos-config`, governance, `git diff --check`), then commit and append the F4 checkpoint.
+
+## Checkpoint F4 - Month 1 Closeout (2026-07-06)
+
+Completed items:
+- F0 (kickoff), F1 (audit), F2 (cleanup), F3 (docs sync).
+
+Current state and artifacts:
+- All four Month 1 commits live on `origin/main`:
+  - `6ad5894` F0 kickoff inventory + consolidated confirmation contract
+  - `9325aec` F1 catalog residual audit (findings table)
+  - `3cda7ad` F2 quarantine `talos-models` as non-runtime + 5-test `no_catalog_db_guard.rs`; MC-002 owner doc closed
+  - `8f5ee58` F3 README URL-skip text drift closed
+- Owner docs updated ahead of derived docs:
+  - `docs/backlog/active/MC-002-remove-runtime-catalog-db-residuals.md` — Status Complete, acceptance criteria [x].
+  - `docs/backlog/active/MC-001-model-catalog-modernization.md` — unchanged (already records the 2026-07-05 maintainer decision and the MC107 real-terminal residual).
+- Talos owner docs/READMEs agree that model metadata is packaged (no runtime `catalog.db`).
+- Standard providers' URL-skip behavior is now explicitly documented in both README languages.
+
+Commands/checks and actual results:
+- `cargo fmt --all -- --check` → exit 0 (clean).
+- `cargo check --workspace` → exit 0.
+- `cargo test -p talos-cli` → exit 0; new guard test 5/5 pass; pre-existing `rpc_e2e` 1/1, `skill_runtime_e2e` 2/2 pass.
+- `cargo test -p talos-config` → exit 0; doc-tests 1/1 pass; all unit tests pass.
+- `scripts/validate_project_governance.sh .` → "Governance validation passed: 0 warning(s)."
+- `git diff --check` → CLEAN.
+
+Open risks or deviations:
+- None for Month 1.
+- The MC-001 MC107 real-terminal `/connect` walkthrough residual remains parked under its owner doc; it is out of scope for this frontline plan.
+
+Residual owner:
+- MC-001 / MC107 real-terminal `/connect` walkthrough — under MC-001 owner doc (out of scope here).
+
+Next task item:
+- F5: Standard-provider connect regression — verify built-in providers skip URL, custom requires URL, config merge works, secrets are masked. Run/verify cited tests for MODEL-006/I101 already-shipped behavior.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the F4 checkpoint commit (to be created next). Month 1 work is committed and pushed. Resume Month 2 by verifying F5 standard-provider connect regression coverage and recording evidence in this file.
