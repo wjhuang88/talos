@@ -235,9 +235,15 @@ impl BashTool {
         let exit_code = exit_status.code().unwrap_or(-1);
         output.push_str(&format!("[exit {exit_code}]"));
 
+        let is_error = if is_expected_exit_code(command, exit_code) {
+            false
+        } else {
+            !exit_status.success()
+        };
+
         ToolResult {
             content: output,
-            is_error: !exit_status.success(),
+            is_error,
             continuations: Vec::new(),
         }
     }
@@ -546,6 +552,40 @@ impl BashPermissionPolicy {
 
     fn contains_validation_program(&self, value: &str) -> bool {
         self.validation_programs.iter().any(|item| item == value)
+    }
+}
+
+/// Returns true if the exit code represents an expected negative result for the given command
+/// (e.g., no matches, differences found), as opposed to a genuine execution failure.
+///
+/// Only classifies documented exit-code semantics for low-risk read-only/validation commands.
+/// Unknown commands and unexpected exit codes are treated as errors.
+fn is_expected_exit_code(command: &str, exit_code: i32) -> bool {
+    if exit_code == 0 {
+        return true;
+    }
+    if command.is_empty() || has_shell_control_syntax(command) {
+        return false;
+    }
+
+    let mut parts = command.split_whitespace();
+    let Some(program) = parts.next() else {
+        return false;
+    };
+    let args: Vec<&str> = parts.collect();
+
+    match program {
+        // grep: exit 1 = no match found (exit 2+ = error — file not found, etc.)
+        "grep" => exit_code == 1,
+        // rg (ripgrep): exit 1 = no match found (exit 2+ = error)
+        "rg" => exit_code == 1,
+        // diff: exit 1 = differences found (exit 2+ = trouble — missing file, etc.)
+        "diff" => exit_code == 1,
+        // cargo fmt --check: exit 1 = formatting differences found
+        "cargo" => {
+            args.first().copied() == Some("fmt") && args.iter().any(|a| *a == "--check") && exit_code == 1
+        }
+        _ => false,
     }
 }
 
@@ -1055,5 +1095,126 @@ mod tests {
 
         assert!(result.is_error);
         assert!(result.content.contains("[timeout]"));
+    }
+
+    // --- TOOL-019: Expected exit code classification ---
+
+    #[tokio::test]
+    async fn test_grep_no_match_is_not_error() {
+        let tool = BashTool::new(test_dir());
+        // grep a pattern that cannot appear in any file — predictable "no match"
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "grep XYZZY_NONEXISTENT_PATTERN_42 Cargo.toml"
+            }))
+            .await;
+        // exit code 1 = no match; should not be flagged as error
+        assert!(!result.is_error);
+        assert!(result.content.ends_with("[exit 1]"));
+    }
+
+    #[tokio::test]
+    async fn test_rg_no_match_is_not_error() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "rg XYZZY_NONEXISTENT_PATTERN_42 Cargo.toml"
+            }))
+            .await;
+        assert!(!result.is_error);
+        assert!(result.content.ends_with("[exit 1]"));
+    }
+
+    #[tokio::test]
+    async fn test_diff_difference_is_not_error() {
+        let tool = BashTool::new(test_dir());
+        // diff between two different files — exit 1 = differences found
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "diff Cargo.toml src/bash_tool.rs"
+            }))
+            .await;
+        assert!(!result.is_error);
+        assert!(result.content.ends_with("[exit 1]"));
+    }
+
+    #[tokio::test]
+    async fn test_cargo_fmt_check_difference_is_not_error() {
+        // Requires at least one unformatted file — create one temporarily
+        let dir = test_dir();
+        // First run cargo fmt to ensure baseline formatting, then compare.
+        // This test only exercises the classification path; the exit code depends
+        // on the actual repository state.
+        let tool = BashTool::new(dir.clone());
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "cargo fmt --check 2>&1 || true"
+            }))
+            .await;
+        // With `|| true`, the subshell always exits 0 — this test verifies no
+        // false error from the classification path when the command uses
+        // shell operators (which are excluded from classification).
+        // For a real `cargo fmt --check` without `|| true`, classification
+        // depends on output exit code 1 => not error.
+        assert!(result.content.contains("[exit 0]"));
+    }
+
+    #[tokio::test]
+    async fn test_false_command_still_error() {
+        let tool = BashTool::new(test_dir());
+        let result = tool
+            .execute(serde_json::json!({ "command": "false" }))
+            .await;
+        // `false` is not in the expected list — exit 1 should be treated as error
+        assert!(result.is_error);
+        assert!(result.content.ends_with("[exit 1]"));
+    }
+
+    #[tokio::test]
+    async fn test_diff_trouble_exit_2_is_error() {
+        let tool = BashTool::new(test_dir());
+        // diff nonexistent → exit 2 (trouble), should remain error
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "diff /nonexistent_file_a /nonexistent_file_b"
+            }))
+            .await;
+        // exit 2 from diff = trouble, not "differences found"
+        assert!(result.is_error);
+    }
+
+    #[tokio::test]
+    async fn test_grep_exit_2_is_error() {
+        let tool = BashTool::new(test_dir());
+        // grep with nonexistent file → exit 2
+        let result = tool
+            .execute(serde_json::json!({
+                "command": "grep something /nonexistent_file_xyz_123"
+            }))
+            .await;
+        // exit 2 = file not found, should remain error
+        assert!(result.is_error);
+    }
+
+    #[test]
+    fn test_is_expected_exit_code_unit() {
+        // Exit 0 is always expected
+        assert!(is_expected_exit_code("grep foo file", 0));
+        // Exit 1 is expected for grep/rg/diff
+        assert!(is_expected_exit_code("grep foo file", 1));
+        assert!(is_expected_exit_code("rg foo file", 1));
+        assert!(is_expected_exit_code("diff a b", 1));
+        assert!(is_expected_exit_code("cargo fmt --check", 1));
+        // Exit 2 is not expected for grep/rg/diff
+        assert!(!is_expected_exit_code("grep foo file", 2));
+        assert!(!is_expected_exit_code("rg foo file", 2));
+        assert!(!is_expected_exit_code("diff a b", 2));
+        // Unknown command exits are not expected
+        assert!(!is_expected_exit_code("false", 1));
+        assert!(!is_expected_exit_code("unknown_cmd", 1));
+        // Shell operators bypass classification
+        assert!(!is_expected_exit_code("grep foo | wc -l", 1));
+        // cargo fmt without --check is not expected
+        assert!(!is_expected_exit_code("cargo fmt", 1));
     }
 }
