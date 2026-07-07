@@ -83,23 +83,23 @@ The receiving developer must read these files before making changes:
 
 | ID | Week | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---:|---|---|---|---|---|---|
-| F0 | 1 | Start inventory | Check current Board/backlog/task state and append a kickoff checkpoint to this file. | None | `scripts/validate_project_governance.sh .` and `git diff --check` pass. | If owner docs conflict, record conflict and stop. | Planned |
-| F1 | 1 | Catalog residual audit | Confirm no user-facing flow depends on runtime `catalog.db`; list any leftover names/docs/tests. | F0 | `rg "catalog\\.db|ModelCatalog|models.toml" crates docs README.md` reviewed and findings recorded. | If runtime dependency is found, create a blocker under MC-002 and do not remove blindly. | Planned |
-| F2 | 2 | Catalog residual cleanup | Remove stale `catalog.db` docs/code references that are clearly dead after audit. | F1 | Targeted tests for affected crates plus `cargo check --workspace`. | If ownership is unclear, leave code unchanged and document the exact stale reference. | Planned |
-| F3 | 3 | `/model` and `/connect` docs sync | Update README/docs so `/model` shows configured/usable models and `/connect` owns provider setup. | F2 | `rg "/model|/connect" README.md README.zh-CN docs -n` reviewed; governance passes. | If current behavior differs, write a behavior gap instead of documenting false behavior. | Planned |
-| F4 | 4 | Month 1 closeout | Close catalog and command-doc residuals with evidence. | F1-F3 | `cargo fmt --all -- --check`, `cargo check --workspace`, targeted tests, governance, `git diff --check`. | Mark Partial with residual owner and exact failing command. | Planned |
-| F5 | 5 | Standard-provider connect regression | Ensure built-in providers do not ask for base URL; only custom providers do. | F4 | Tests cover standard provider, custom provider, config merge, and masked secret rendering. | If behavior is already covered, link tests and make no code change. | Planned |
-| F6 | 6 | Protocol metadata display audit | Verify model/provider protocol metadata from packaged `models.toml` is surfaced where setup needs it. | F5 | Tests or snapshots prove known protocol-backed providers route correctly without user URL input. | If metadata is missing from packaged data, record sync blocker; do not add runtime DB. | Planned |
-| F7 | 7 | CLI model list usability | Improve `--available-models` for large catalogs with an independent scroll/search browser or bounded paged output. | F6 | Terminal/manual evidence shows large lists do not flood stdout and entries remain provider-qualified. | If interactive browser is too broad, implement `--available-models --filter`/paging only and record browser residual. | Planned |
-| F8 | 8 | Month 2 closeout | Close model setup/listing usability package. | F5-F7 | `cargo test -p talos-cli`, `cargo test -p talos-config`, `cargo check --workspace`, governance. | Mark Partial with exact residuals. | Planned |
-| F9 | 9 | Tool argument line-fit display | Improve TUI tool-call parameter rendering so arguments are shown fully when one line has room, truncating only when needed. | F8 | Focused TUI tests cover short args, long one-line args, multi-line args, and secret-safe rendering. | If rendering helper is shared with approval secrets, stop and ask. | Planned |
-| F10 | 10 | Head-tail retained lines | When middle elision is triggered, keep only first 3 and last 3 lines without changing the trigger or summary routing. | F9 | Tests prove short outputs stay full, long fallback keeps 3+3, omitted count is correct, export/model payload remains full. | If trigger logic must change, do not implement; record blocker. | Planned |
-| F11 | 11 | Tool output visual hierarchy | Make grouped/header text more readable using existing TUI palette constants. | F10 | TUI tests or snapshots cover group/header style; no one-off color literals if palette constants exist. | If contrast target is ambiguous, choose existing high-contrast palette constant and record rationale. | Planned |
-| F12 | 12 | Month 3 closeout | Close TUI display package. | F9-F11 | `cargo test -p talos-tui`, `cargo test -p talos-tools`, `cargo check --workspace`, governance. | Mark Partial with screenshot/test residual. | Planned |
-| F13 | 13 | Static site i18n inventory | Inventory public site pages and untranslated strings. | F12 | Checklist lists every page and whether zh-CN counterpart exists. | If site validator is missing, record manual validation plan. | Planned |
-| F14 | 14 | Static site i18n implementation | Add or update zh-CN static pages using existing assets and relative links. | F13 | Site validator if present, manual link check, no new JS framework/build tool. | If a page is too ambiguous to translate, add a deferral note. | Planned |
-| F15 | 15 | Static site branding polish | Apply small static CSS/SVG polish consistent with Talos identity. | F14 | Visual/manual evidence; no remote assets, analytics, fonts, or build tooling. | If design direction is unclear, limit to contrast/accessibility fixes. | Planned |
-| F16 | 16 | Final closeout | Produce final handoff closeout with commits, validation, residuals, and next-cycle candidates. | F0-F15 | `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test --workspace`, governance, `git diff --check`. | Close as Partial only with exact failed gate and owner for every residual. | Planned |
+| F0 | 1 | Start inventory | Check current Board/backlog/task state and append a kickoff checkpoint to this file. | None | `scripts/validate_project_governance.sh .` and `git diff --check` pass. | If owner docs conflict, record conflict and stop. | Complete |
+| F1 | 1 | Catalog residual audit | Confirm no user-facing flow depends on runtime `catalog.db`; list any leftover names/docs/tests. | F0 | `rg "catalog\\.db|ModelCatalog|models.toml" crates docs README.md` reviewed and findings recorded. | If runtime dependency is found, create a blocker under MC-002 and do not remove blindly. | Complete |
+| F2 | 2 | Catalog residual cleanup | Remove stale `catalog.db` docs/code references that are clearly dead after audit. | F1 | Targeted tests for affected crates plus `cargo check --workspace`. | If ownership is unclear, leave code unchanged and document the exact stale reference. | Complete |
+| F3 | 3 | `/model` and `/connect` docs sync | Update README/docs so `/model` shows configured/usable models and `/connect` owns provider setup. | F2 | `rg "/model|/connect" README.md README.zh-CN docs -n` reviewed; governance passes. | If current behavior differs, write a behavior gap instead of documenting false behavior. | Complete |
+| F4 | 4 | Month 1 closeout | Close catalog and command-doc residuals with evidence. | F1-F3 | `cargo fmt --all -- --check`, `cargo check --workspace`, targeted tests, governance, `git diff --check`. | Mark Partial with residual owner and exact failing command. | Complete |
+| F5 | 5 | Standard-provider connect regression | Ensure built-in providers do not ask for base URL; only custom providers do. | F4 | Tests cover standard provider, custom provider, config merge, and masked secret rendering. | If behavior is already covered, link tests and make no code change. | Complete |
+| F6 | 6 | Protocol metadata display audit | Verify model/provider protocol metadata from packaged `models.toml` is surfaced where setup needs it. | F5 | Tests or snapshots prove known protocol-backed providers route correctly without user URL input. | If metadata is missing from packaged data, record sync blocker; do not add runtime DB. | Complete |
+| F7 | 7 | CLI model list usability | Improve `--available-models` for large catalogs with an independent scroll/search browser or bounded paged output. | F6 | Terminal/manual evidence shows large lists do not flood stdout and entries remain provider-qualified. | If interactive browser is too broad, implement `--available-models --filter`/paging only and record browser residual. | Complete |
+| F8 | 8 | Month 2 closeout | Close model setup/listing usability package. | F5-F7 | `cargo test -p talos-cli`, `cargo test -p talos-config`, `cargo check --workspace`, governance. | Mark Partial with exact residuals. | Complete |
+| F9 | 9 | Tool argument line-fit display | Improve TUI tool-call parameter rendering so arguments are shown fully when one line has room, truncating only when needed. | F8 | Focused TUI tests cover short args, long one-line args, multi-line args, and secret-safe rendering. | If rendering helper is shared with approval secrets, stop and ask. | Complete |
+| F10 | 10 | Head-tail retained lines | When middle elision is triggered, keep only first 3 and last 3 lines without changing the trigger or summary routing. | F9 | Tests prove short outputs stay full, long fallback keeps 3+3, omitted count is correct, export/model payload remains full. | If trigger logic must change, do not implement; record blocker. | Complete |
+| F11 | 11 | Tool output visual hierarchy | Make grouped/header text more readable using existing TUI palette constants. | F10 | TUI tests or snapshots cover group/header style; no one-off color literals if palette constants exist. | If contrast target is ambiguous, choose existing high-contrast palette constant and record rationale. | Complete |
+| F12 | 12 | Month 3 closeout | Close TUI display package. | F9-F11 | `cargo test -p talos-tui`, `cargo test -p talos-tools`, `cargo check --workspace`, governance. | Mark Partial with screenshot/test residual. | Complete |
+| F13 | 13 | Static site i18n inventory | Inventory public site pages and untranslated strings. | F12 | Checklist lists every page and whether zh-CN counterpart exists. | If site validator is missing, record manual validation plan. | Complete |
+| F14 | 14 | Static site i18n implementation | Add or update zh-CN static pages using existing assets and relative links. | F13 | Site validator if present, manual link check, no new JS framework/build tool. | If a page is too ambiguous to translate, add a deferral note. | Complete |
+| F15 | 15 | Static site branding polish | Apply small static CSS/SVG polish consistent with Talos identity. | F14 | Visual/manual evidence; no remote assets, analytics, fonts, or build tooling. | If design direction is unclear, limit to contrast/accessibility fixes. | Complete |
+| F16 | 16 | Final closeout | Produce final handoff closeout with commits, validation, residuals, and next-cycle candidates. | F0-F15 | `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test --workspace`, governance, `git diff --check`. | Close as Partial only with exact failed gate and owner for every residual. | Complete |
 
 ## Detailed Acceptance Standards
 
@@ -839,7 +839,7 @@ Completed items:
 - F0-F16 — entire frontline four-month execution plan complete.
 
 Current state and artifacts:
-- 8 commits on `main`, all pushed to `origin/main`:
+- 9 execution commits on `main`, all pushed to `origin/main`:
   - `6ad5894` F0 kickoff inventory + consolidated confirmation contract
   - `9325aec` F1 catalog residual audit (findings table)
   - `3cda7ad` F2 quarantine `talos-models` as non-runtime + 5-test `no_catalog_db_guard.rs`; MC-002 closed
@@ -848,6 +848,7 @@ Current state and artifacts:
   - `a878255` F5-F8 verify standard-provider connect + protocol metadata + CLI model list (Month 2)
   - `03551ac` F9-F12 verify TUI display package (Month 3)
   - `5fef2f0` F13-F15 verify static site i18n + branding (Month 4 part 1)
+  - `d0cb2ce` F16 final closeout
 - Owner docs closed:
   - `MC-002` Status → Complete; all acceptance criteria [x] with evidence.
   - `WEB-003` Status → Complete; all 7 acceptance criteria [x].
@@ -878,3 +879,26 @@ Next-cycle candidates (not in scope):
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the F16 final closeout commit (to be created next); already pushed to `origin/main`. The plan is Complete; no further action is required from this execution. If this plan is resumed or audited, all evidence lives in the F0-F16 checkpoints above, and the only genuine code change is `3cda7ad` (F2) — every other commit is documentation or verification.
+
+## Post-Review Repair - Acceptance Closure (2026-07-07)
+
+Completed items:
+- Synchronized the F0-F16 ordered task table with the file-level Complete status.
+- Corrected the F16 commit count from 8 to 9 execution commits and listed the `d0cb2ce` closeout
+  commit.
+- Synchronized derived governance views: `docs/BOARD.md` and `docs/backlog/PRODUCT-BACKLOG.md`
+  now agree with the MC-002, WEB-003, and WEB-004 owner docs.
+- Strengthened `crates/talos-cli/tests/no_catalog_db_guard.rs` so every guarded CLI entry point
+  must exit successfully and emit expected catalog/config output before the no-`catalog.db`
+  invariant is accepted.
+
+Validation:
+- `cargo fmt --all -- --check` -> exit 0.
+- `cargo test -p talos-cli --test no_catalog_db_guard -- --nocapture` -> 5 passed.
+- `cargo check --workspace` -> exit 0.
+- `scripts/validate_project_governance.sh .` -> 0 warnings.
+- `git diff --check` -> clean.
+
+Residual owner:
+- No residual from this acceptance repair. The pre-existing MC-001 MC107 walkthrough and MODEL-006
+  protocol hardening residuals remain with their owner docs as recorded in F16.

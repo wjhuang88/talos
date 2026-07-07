@@ -11,7 +11,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output};
 
 /// Returns the absolute path to the freshly built `talos` binary, as Cargo
 /// exposes via the `CARGO_BIN_EXE_<name>` environment variable for `[bin]`
@@ -51,7 +51,7 @@ impl IsolatedHome {
         self.talos_dir.join("catalog.db")
     }
 
-    fn run(&self, args: &[&str]) {
+    fn run_success(&self, args: &[&str]) -> String {
         let output = Command::new(talos_bin())
             .args(args)
             .env("HOME", &self.home)
@@ -61,17 +61,32 @@ impl IsolatedHome {
             .env("BUILD_MODELS", "")
             .output()
             .expect("run talos binary");
-        // The invariant is purely "no catalog.db created"; it must hold
-        // regardless of the CLI's own exit status, so we intentionally do not
-        // assert success here.
-        let _ = output.status;
+        assert_success(args, &output);
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
     }
+}
+
+fn assert_success(args: &[&str], output: &Output) {
+    assert!(
+        output.status.success(),
+        "talos {:?} failed with status {:?}\nstdout:\n{}\nstderr:\n{}",
+        args,
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
 fn import_models_does_not_create_catalog_db() {
     let home = IsolatedHome::new();
-    home.run(&["--import-models", "/nonexistent/path.toml"]);
+    let stdout = home.run_success(&["--import-models", "/nonexistent/path.toml"]);
+    assert!(stdout.contains("--import-models is deprecated"));
+    assert!(stdout.contains("Talos does not create or read ~/.talos/catalog.db"));
     assert!(
         !home.catalog_db_path().exists(),
         "MC-002 regression: --import-models created ~/.talos/catalog.db"
@@ -85,7 +100,9 @@ fn import_models_does_not_create_catalog_db() {
 #[test]
 fn available_models_does_not_create_catalog_db() {
     let home = IsolatedHome::new();
-    home.run(&["--available-models"]);
+    let stdout = home.run_success(&["--available-models"]);
+    assert!(stdout.contains("Built-in model catalog:"));
+    assert!(stdout.contains("Showing first"));
     assert!(
         !home.catalog_db_path().exists(),
         "MC-002 regression: --available-models created ~/.talos/catalog.db"
@@ -95,11 +112,13 @@ fn available_models_does_not_create_catalog_db() {
 #[test]
 fn available_models_filter_does_not_create_catalog_db() {
     let home = IsolatedHome::new();
-    home.run(&[
+    let stdout = home.run_success(&[
         "--available-models",
         "--available-models-filter",
         "anthropic/claude-sonnet-4",
     ]);
+    assert!(stdout.contains("matching models across"));
+    assert!(stdout.contains("anthropic/claude-sonnet-4"));
     assert!(
         !home.catalog_db_path().exists(),
         "MC-002 regression: --available-models-filter created ~/.talos/catalog.db"
@@ -109,7 +128,9 @@ fn available_models_filter_does_not_create_catalog_db() {
 #[test]
 fn available_models_all_does_not_create_catalog_db() {
     let home = IsolatedHome::new();
-    home.run(&["--available-models", "--available-models-all"]);
+    let stdout = home.run_success(&["--available-models", "--available-models-all"]);
+    assert!(stdout.contains("Built-in model catalog:"));
+    assert!(stdout.contains('/'));
     assert!(
         !home.catalog_db_path().exists(),
         "MC-002 regression: --available-models-all created ~/.talos/catalog.db"
@@ -119,7 +140,9 @@ fn available_models_all_does_not_create_catalog_db() {
 #[test]
 fn config_list_does_not_create_catalog_db() {
     let home = IsolatedHome::new();
-    home.run(&["config", "list"]);
+    let output = home.run_success(&["config", "list"]);
+    assert!(output.contains("provider ="));
+    assert!(output.contains("model ="));
     assert!(
         !home.catalog_db_path().exists(),
         "MC-002 regression: `config list` created ~/.talos/catalog.db"
