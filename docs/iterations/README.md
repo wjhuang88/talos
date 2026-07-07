@@ -138,6 +138,10 @@ docs/iterations/
 | I099 | Structured Exec And Bash Fallback Reduction | **Complete (2026-07-06)** | Month 2 of the 2026-07-06 plan. Closed bounded direct-argv `exec` parallel steps, pipe chains, parallel pipe chains, per-step permission facets, and bash fallback matrix without shell parsing. See `I099-structured-exec-and-bash-reduction.md`. |
 | I100 | Project Intelligence And Validation Routing | **Complete (2026-07-06)** | Month 3 of the 2026-07-06 plan. Closed detector descriptor metadata, independent project-type fixture tests, demand-driven adapter guidance evidence, and internal governance mutation validation. See `I100-project-intelligence-validation-routing.md`. |
 | I101 | Model, Git, And Self-Bootstrap Evidence Closeout | **Complete (2026-07-06)** | Month 4 of the 2026-07-06 plan. Closed model-browser walkthrough residuals, standard-provider no-URL connect, custom-provider URL requirement, viewport-windowed model-list rendering, continued `gix` fallback tracking, and honest non-qualifying REL-002 evidence without release overclaim. See `I101-model-git-self-bootstrap-evidence.md` and `../reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md`. |
+| I102 | Provider Runtime Reliability Gate | **Planned (2026-07-07)** | Month 1 of the 2026-07-07 developer operating plan. Provider streaming fixtures, agent tool-use invariants, terminal status visibility, and stuck-processing evidence. See `I102-provider-runtime-reliability-gate.md`. |
+| I103 | First-Run Model And Diagnostics | **Planned (2026-07-07)** | Month 2 of the 2026-07-07 developer operating plan. Standard/custom provider setup, large model browsing, redacted diagnostics, and first-run docs. See `I103-first-run-model-diagnostics.md`. |
+| I104 | Long-Session Stability And Permission Evidence | **Planned (2026-07-07)** | Month 3 of the 2026-07-07 developer operating plan. Permission-noise evidence, validation routing, and display-only tool-output ergonomics without security-policy drift. See `I104-long-session-stability-and-permission-evidence.md`. |
+| I105 | Trial Readiness Closeout | **Planned (2026-07-07)** | Month 4 of the 2026-07-07 developer operating plan. Trial docs, smoke checklist, REL-002 classification, final go/no-go report, and handoff. See `I105-trial-readiness-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -178,6 +182,10 @@ rewrite published iteration baselines.
 | I084 | Complete | UX100-UX106 complete and release-facing validation evidence recorded. Removed from non-terminal inventory after this release closeout. |
 | I085 | Paused | Stage 1 and Stage 2 code/docs acceptance are closed except MC107 real terminal `/connect` walkthrough. Paused 2026-07-04 so I090 can activate without erasing this residual. |
 | I086 | Planned | Experience polish and retry visibility follow-up from the 2026-07-03 hardening plan. |
+| I102 | Planned | New Month-1 developer operating shell. Activate first unless maintainer explicitly selects a later month; does not bypass I085 residual or release gates. |
+| I103 | Planned | New Month-2 developer operating shell. Blocked on I102 closeout or explicit maintainer replan. |
+| I104 | Planned | New Month-3 developer operating shell. Blocked on I103 closeout or explicit maintainer replan. |
+| I105 | Planned | New Month-4 developer operating shell. Blocked on I104 closeout or explicit maintainer replan. |
 | I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
 | I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
 | I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |
