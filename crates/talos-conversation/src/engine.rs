@@ -61,6 +61,28 @@ fn parse_todo_command(arg: &str) -> Result<TodoCommandRequest, String> {
                 TodoCommandAction::Show { id: id.to_string() }
             }
             "stats" => TodoCommandAction::Stats,
+            "delete" => {
+                let id = tokens
+                    .next()
+                    .ok_or_else(|| "Usage: /todo delete <id> --confirm".to_string())?;
+                let mut confirm = false;
+                let mut pending = tokens.next();
+                while let Some(flag) = pending.take() {
+                    match flag {
+                        "--confirm" | "--yes" | "-y" => confirm = true,
+                        other => {
+                            return Err(format!(
+                                "Unknown /todo delete option: {other}. Usage: /todo delete <id> --confirm"
+                            ));
+                        }
+                    }
+                    pending = tokens.next();
+                }
+                TodoCommandAction::Delete {
+                    id: id.to_string(),
+                    confirm,
+                }
+            }
             "export" => {
                 let format = match tokens.next() {
                     None | Some("markdown") | Some("md") => TodoExportFormat::Markdown,
@@ -74,7 +96,7 @@ fn parse_todo_command(arg: &str) -> Result<TodoCommandRequest, String> {
             other if other.starts_with("--") => TodoCommandAction::List,
             other => {
                 return Err(format!(
-                    "Unknown todo command: {other}. Usage: /todo [list|show|stats|export]"
+                    "Unknown todo command: {other}. Usage: /todo [list|show|stats|delete|export]"
                 ));
             }
         },

@@ -369,3 +369,64 @@ Recovery instructions:
   `crates/talos-conversation/src/engine.rs` `TurnEnd` handler (the `!matches!(stop_reason, StopReason::ToolUse)`
   condition); the regression guard is `turn_end_tool_use_keeps_processing_for_continuation` in
   `engine_tests.rs`.
+
+## Checkpoint FS08 - Month 2 Closeout: TUI Preview/Status + Todo Reliability (2026-07-07)
+
+Completed task items:
+- FS05: TUI-028 inventory complete. All 6 issues mapped: #24-#28 already implemented (stale preview
+  clear, 50ms animation timer, dashboard System-source rendering, truncate_str model formatting,
+  thinking label animation), #31 out-of-scope (thinking persistence decision gap, ADR-034).
+- FS06: No display-state code work needed — all TUI-028 acceptance items were already implemented.
+  Per Default Decisions, did not rewrite. Verified via 251 TUI tests.
+- FS07: `/todo delete <id> --confirm` implemented (TodoCommandAction::Delete, short-ID resolution,
+  ambiguity detection, --confirm guard). `TodoRepository::create_batch` added with idempotent
+  deduplication. UUID hiding verified already implemented.
+
+Commits:
+- FS04 commit: `3d3c3dd` (Month 1 closeout).
+- FS08 commit: (will be created at this checkpoint).
+
+Changed files (since FS04):
+- `crates/talos-conversation/src/types.rs` — `TodoCommandAction::Delete { id, confirm }`.
+- `crates/talos-conversation/src/engine.rs` — `parse_todo_command` delete subcommand + --confirm.
+- `crates/talos-conversation/src/engine_tests.rs` — 3 delete parse tests.
+- `crates/talos-cli/src/todo_view.rs` — `handle_todo_delete` + `resolve_todo_id` + 3 view tests.
+- `crates/talos-session/src/todo.rs` — `create_batch` method + 4 batch tests.
+- `README.md` — `/todo delete` slash-command table row.
+- `docs/backlog/active/TUI-028-*.md` — FS05 issue inventory.
+- `docs/backlog/active/TODO-002-*.md` — FS07 execution evidence.
+- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` — this checkpoint.
+
+Validation (all run in this worktree on 2026-07-07):
+- `cargo fmt --all -- --check`: PASS (clean).
+- `cargo check --workspace`: PASS.
+- `cargo test -p talos-tui`: PASS, 251 tests (249 unit + 2 doc), 0 failed.
+- `cargo test -p talos-session`: PASS, 97 tests (93 original + 4 batch), 0 failed.
+- `cargo test -p talos-conversation`: PASS, 120 tests (117 + 3 delete parse), 0 failed.
+- `cargo test -p talos-cli --bin talos`: PASS, 162 tests (159 + 3 delete view), 0 failed.
+- `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
+- `git diff --check`: PASS.
+
+Open deviations:
+- None. `/todo delete` is the first mutating user slash command; it requires `--confirm` as the
+  acceptance demands. Batch agent tool registration is a residual, not a deviation.
+
+Residual owner:
+- `docs/backlog/active/TODO-002-todo-mutation-reliability.md` owns the batch agent tool
+  registration residual and the README help-text clarification for mutating vs read-only `/todo`
+  subcommands.
+- `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md` owns the #31 thinking
+  persistence decision gap.
+
+Next item:
+- FS09: Implement `TOOL-015` write/edit result visibility. Owner doc says Complete (I076/T104);
+  per Default Decisions, verify existing implementation + add evidence pointer at FS12 closeout.
+
+Recovery instructions:
+- Owning record: this file.
+- Git state at FS08 close: branch `main`, HEAD will be the FS08 commit (after `git commit`).
+- Resume by reading this checkpoint, verifying targeted tests pass, then starting FS09 by reading
+  `docs/backlog/active/TOOL-015-write-edit-result-visibility.md`.
+- If `/todo delete` needs revisiting, the key files are `crates/talos-conversation/src/types.rs`
+  (Delete variant), `crates/talos-conversation/src/engine.rs` (parse_todo_command delete branch),
+  and `crates/talos-cli/src/todo_view.rs` (handle_todo_delete + resolve_todo_id).

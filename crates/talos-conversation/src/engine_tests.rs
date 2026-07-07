@@ -1449,6 +1449,57 @@ fn slash_todo_export_json_produces_read_only_request() {
 }
 
 #[test]
+fn slash_todo_delete_with_confirm_parses_request() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/todo delete abc12345 --confirm");
+
+    match &outputs[0] {
+        UiOutput::TodoCommand(req) => {
+            assert_eq!(
+                req.action,
+                TodoCommandAction::Delete {
+                    id: "abc12345".to_string(),
+                    confirm: true,
+                }
+            );
+        }
+        _ => panic!("expected todo command request"),
+    }
+}
+
+#[test]
+fn slash_todo_delete_without_confirm_parses_request() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/todo delete abc12345");
+
+    match &outputs[0] {
+        UiOutput::TodoCommand(req) => {
+            assert_eq!(
+                req.action,
+                TodoCommandAction::Delete {
+                    id: "abc12345".to_string(),
+                    confirm: false,
+                }
+            );
+        }
+        _ => panic!("expected todo command request"),
+    }
+}
+
+#[tokio::test]
+async fn slash_todo_delete_without_id_returns_error() {
+    let mut engine = new_engine();
+
+    let outputs = engine.handle_slash_command("/todo delete");
+
+    let (source, text) = collect_stream(outputs).await.unwrap();
+    assert_eq!(source, MessageSource::Error);
+    assert!(text.contains("Usage: /todo delete"));
+}
+
+#[test]
 fn thinking_delta_updates_preview_without_history() {
     let mut engine = new_engine();
     engine.handle_agent_event(&AgentEvent::TurnStart);

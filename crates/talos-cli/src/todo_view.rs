@@ -13,7 +13,7 @@ pub(crate) fn handle_todo_command(
     req: TodoCommandRequest,
 ) {
     let session = session_watch_rx.borrow().clone();
-    let repo = match session_manager.todo_repository() {
+    let mut repo = match session_manager.todo_repository() {
         Ok(repo) => repo,
         Err(error) => {
             send_stream(
@@ -32,6 +32,18 @@ pub(crate) fn handle_todo_command(
             return;
         }
     };
+
+    if let TodoCommandAction::Delete { id, confirm } = &req.action {
+        match handle_todo_delete(&mut repo, session.id, id, *confirm) {
+            Ok(text) => {
+                send_stream(ui_tx, MessageSource::System, text);
+            }
+            Err(error) => {
+                send_stream(ui_tx, MessageSource::Error, format!("[Error] {error}\n"));
+            }
+        }
+        return;
+    }
 
     match render_todo_view(&repo, session.id, req, query) {
         Ok(rendered) => {
@@ -78,6 +90,77 @@ fn todo_query_from_request(req: &TodoCommandRequest) -> Result<talos_session::To
     })
 }
 
+fn resolve_todo_id(
+    repo: &talos_session::TodoRepository,
+    session_id: Uuid,
+    id_input: &str,
+) -> Result<Uuid> {
+    if let Ok(uuid) = Uuid::parse_str(id_input) {
+        return Ok(uuid);
+    }
+    let prefix = id_input.trim();
+    if prefix.len() < 4 {
+        bail!("todo id prefix too short (minimum 4 characters): {prefix}");
+    }
+    let items = repo.list(session_id, talos_session::TodoQuery::default())?;
+    let matches: Vec<_> = items
+        .iter()
+        .filter(|item| item.id.to_string().starts_with(prefix))
+        .collect();
+    match matches.as_slice() {
+        [] => bail!("no todo item matches id prefix: {prefix}"),
+        [one] => Ok(one.id),
+        _ => {
+            let matched_ids: Vec<String> = matches.iter().map(|m| short_id(m.id)).collect();
+            bail!(
+                "ambiguous todo id prefix {prefix}; matches: {}",
+                matched_ids.join(", ")
+            );
+        }
+    }
+}
+
+fn handle_todo_delete(
+    repo: &mut talos_session::TodoRepository,
+    session_id: Uuid,
+    id_input: &str,
+    confirm: bool,
+) -> Result<String> {
+    if !confirm {
+        let count = repo
+            .list(session_id, talos_session::TodoQuery::default())?
+            .iter()
+            .filter(|item| {
+                item.id.to_string().starts_with(id_input) || item.id.to_string() == id_input
+            })
+            .count();
+        let hint = if count == 1 {
+            format!("Pass --confirm to delete: /todo delete {id_input} --confirm")
+        } else {
+            "Pass --confirm to delete: /todo delete <id> --confirm".to_string()
+        };
+        return Ok(format!(
+            "[System] /todo delete requires --confirm. {hint}\n"
+        ));
+    }
+    let id = resolve_todo_id(repo, session_id, id_input)?;
+    let item = repo
+        .get(session_id, id)?
+        .ok_or_else(|| anyhow!("todo item not found: {id}"))?;
+    let deleted = repo.delete(session_id, id)?;
+    if deleted {
+        Ok(format!(
+            "[System] Deleted todo: {} {}\n",
+            talos_session::status_icon(item.status),
+            item.title,
+        ))
+    } else {
+        Ok(format!(
+            "[System] Todo item not found (already deleted?): {id}\n"
+        ))
+    }
+}
+
 fn render_todo_view(
     repo: &talos_session::TodoRepository,
     session_id: Uuid,
@@ -107,6 +190,9 @@ fn render_todo_view(
             sort_todo_items(&mut items, req.sort.as_deref())?;
             let dependencies = repo.list_dependencies(session_id)?;
             render_todo_export(&items, &dependencies, format)
+        }
+        TodoCommandAction::Delete { .. } => {
+            bail!("/todo delete is handled by the command handler before rendering")
         }
     }
 }
@@ -440,5 +526,103 @@ mod tests {
         assert!(rendered.text.contains("\"dependencies\""));
         assert!(rendered.text.contains(&parent.id.to_string()));
         assert!(rendered.text.contains(&child.id.to_string()));
+    }
+
+    #[test]
+    fn todo_delete_without_confirm_shows_warning() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut repo =
+            talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
+        repo.init_schema().unwrap();
+        let session_id = Uuid::new_v4();
+        let item = repo
+            .create(talos_session::CreateTodo {
+                session_id,
+                title: "doomed".to_string(),
+                description: None,
+                priority: talos_session::TodoPriority::Medium,
+                assigned_to_turn: None,
+                tags: vec![],
+            })
+            .unwrap();
+        let prefix: String = item.id.to_string().chars().take(8).collect();
+
+        let result = handle_todo_delete(&mut repo, session_id, &prefix, false).unwrap();
+
+        assert!(result.contains("--confirm"));
+        assert!(repo.get(session_id, item.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn todo_delete_with_confirm_removes_item() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut repo =
+            talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
+        repo.init_schema().unwrap();
+        let session_id = Uuid::new_v4();
+        let item = repo
+            .create(talos_session::CreateTodo {
+                session_id,
+                title: "gone".to_string(),
+                description: None,
+                priority: talos_session::TodoPriority::High,
+                assigned_to_turn: None,
+                tags: vec![],
+            })
+            .unwrap();
+        let prefix: String = item.id.to_string().chars().take(8).collect();
+
+        let result = handle_todo_delete(&mut repo, session_id, &prefix, true).unwrap();
+
+        assert!(result.contains("Deleted todo"));
+        assert!(result.contains("gone"));
+        assert!(repo.get(session_id, item.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn todo_delete_ambiguous_prefix_rejects() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut repo =
+            talos_session::TodoRepository::new(&dir.path().join("todos.sqlite")).unwrap();
+        repo.init_schema().unwrap();
+        let session_id = Uuid::new_v4();
+
+        // Create items and find a common 4-char prefix.
+        let mut items = Vec::new();
+        for i in 0..200 {
+            if let Ok(item) = repo.create(talos_session::CreateTodo {
+                session_id,
+                title: format!("item{i}"),
+                description: None,
+                priority: talos_session::TodoPriority::Medium,
+                assigned_to_turn: None,
+                tags: vec![],
+            }) {
+                items.push(item);
+            }
+        }
+        // Find a pair sharing a 4-char prefix.
+        let mut ambiguous_prefix = String::new();
+        'outer: for len in (4..8).rev() {
+            for i in 0..items.len() {
+                let prefix_i: String = items[i].id.to_string().chars().take(len).collect();
+                for j in (i + 1)..items.len() {
+                    let prefix_j: String = items[j].id.to_string().chars().take(len).collect();
+                    if prefix_i == prefix_j {
+                        ambiguous_prefix = prefix_i;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        if ambiguous_prefix.is_empty() {
+            return;
+        }
+
+        let err = handle_todo_delete(&mut repo, session_id, &ambiguous_prefix, true)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("ambiguous"), "got: {err}");
     }
 }

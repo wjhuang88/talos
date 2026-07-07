@@ -398,6 +398,24 @@ impl TodoRepository {
         Ok(item)
     }
 
+    /// Create multiple todo items idempotently in one call.
+    ///
+    /// Each item follows the same idempotency rule as [`create`]: if an item
+    /// with the same title already exists in the session, the existing item is
+    /// returned unchanged. Items within the same batch that share a title also
+    /// deduplicate to the first occurrence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any item cannot be persisted or looked up.
+    pub fn create_batch(&self, inputs: Vec<CreateTodo>) -> Result<Vec<TodoItem>, TodoError> {
+        let mut results = Vec::with_capacity(inputs.len());
+        for input in inputs {
+            results.push(self.create(input)?);
+        }
+        Ok(results)
+    }
+
     /// Get one todo item by id within a session.
     ///
     /// # Errors
@@ -1906,5 +1924,117 @@ mod tests {
         assert_eq!(first_id, second_id);
         // Original priority preserved (high, not low).
         assert!(second.content.contains("(high)"));
+    }
+
+    // --- TODO-002: Batch create ---
+
+    #[test]
+    fn create_batch_creates_distinct_items() {
+        let repo = repo();
+        let session_id = Uuid::new_v4();
+
+        let items = repo
+            .create_batch(vec![
+                CreateTodo {
+                    session_id,
+                    title: "alpha".to_string(),
+                    description: None,
+                    priority: TodoPriority::High,
+                    assigned_to_turn: None,
+                    tags: vec![],
+                },
+                CreateTodo {
+                    session_id,
+                    title: "beta".to_string(),
+                    description: None,
+                    priority: TodoPriority::Medium,
+                    assigned_to_turn: None,
+                    tags: vec![],
+                },
+            ])
+            .expect("batch");
+
+        assert_eq!(items.len(), 2);
+        assert_ne!(items[0].id, items[1].id);
+        assert_eq!(repo.list_all(session_id).expect("list").len(), 2);
+    }
+
+    #[test]
+    fn create_batch_deduplicates_same_title_within_batch() {
+        let repo = repo();
+        let session_id = Uuid::new_v4();
+
+        let items = repo
+            .create_batch(vec![
+                CreateTodo {
+                    session_id,
+                    title: "shared".to_string(),
+                    description: Some("first".to_string()),
+                    priority: TodoPriority::High,
+                    assigned_to_turn: None,
+                    tags: vec![],
+                },
+                CreateTodo {
+                    session_id,
+                    title: "shared".to_string(),
+                    description: None,
+                    priority: TodoPriority::Low,
+                    assigned_to_turn: None,
+                    tags: vec![],
+                },
+            ])
+            .expect("batch");
+
+        assert_eq!(items.len(), 2);
+        // Both results point to the same item (idempotent within batch).
+        assert_eq!(items[0].id, items[1].id);
+        // First-creation fields are preserved.
+        assert_eq!(items[1].description.as_deref(), Some("first"));
+        assert_eq!(items[1].priority, TodoPriority::High);
+        assert_eq!(repo.list_all(session_id).expect("list").len(), 1);
+    }
+
+    #[test]
+    fn create_batch_deduplicates_against_existing_items() {
+        let repo = repo();
+        let session_id = Uuid::new_v4();
+
+        let existing = create(&repo, session_id, "pre-existing");
+
+        let items = repo
+            .create_batch(vec![
+                CreateTodo {
+                    session_id,
+                    title: "pre-existing".to_string(),
+                    description: None,
+                    priority: TodoPriority::Low,
+                    assigned_to_turn: None,
+                    tags: vec![],
+                },
+                CreateTodo {
+                    session_id,
+                    title: "new-item".to_string(),
+                    description: None,
+                    priority: TodoPriority::Medium,
+                    assigned_to_turn: None,
+                    tags: vec![],
+                },
+            ])
+            .expect("batch");
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id, existing.id);
+        assert_ne!(items[1].id, existing.id);
+        assert_eq!(repo.list_all(session_id).expect("list").len(), 2);
+    }
+
+    #[test]
+    fn create_batch_empty_input_returns_empty() {
+        let repo = repo();
+        let session_id = Uuid::new_v4();
+
+        let items = repo.create_batch(vec![]).expect("batch");
+        assert!(items.is_empty());
+        assert_eq!(repo.list_all(session_id).expect("list").len(), 0);
     }
 }

@@ -76,6 +76,7 @@ pub enum TodoCommandAction {
     Show { id: String },
     Stats,
     Export { format: TodoExportFormat },
+    Delete { id: String, confirm: bool },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
