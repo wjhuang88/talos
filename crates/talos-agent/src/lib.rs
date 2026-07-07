@@ -33,7 +33,8 @@ pub mod session;
 mod tool_execution;
 
 use talos_core::message::{
-    AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, ToolCall,
+    AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, StopReason,
+    ToolCall,
 };
 use talos_core::provider::{LanguageModel, ProviderError};
 use talos_core::tool::{ToolPresentationPolicy, ToolProvenance, ToolRegistry};
@@ -434,6 +435,7 @@ impl Agent {
             let mut turn_text = String::new();
             let mut turn_reasoning_blocks: Option<Vec<ReasoningBlock>> = None;
             let mut saw_turn_end = false;
+            let mut turn_stop_reason: Option<StopReason> = None;
             let mut usage = talos_core::message::Usage::default();
 
             while let Some(event) = rx.recv().await {
@@ -484,6 +486,7 @@ impl Agent {
                         usage: turn_usage,
                     } => {
                         saw_turn_end = true;
+                        turn_stop_reason = Some(stop_reason.clone());
                         usage = turn_usage;
                         if usage.cache_read_tokens > 0 || usage.cache_write_tokens > 0 {
                             tracing::debug!(
@@ -538,6 +541,15 @@ impl Agent {
                 break 'turn_loop (
                     Err(AgentError::UnexpectedEvent(
                         "channel closed before TurnEnd".into(),
+                    )),
+                    TurnStatus::UnexpectedEvent,
+                );
+            }
+
+            if matches!(turn_stop_reason, Some(StopReason::ToolUse)) && turn_tool_calls.is_empty() {
+                break 'turn_loop (
+                    Err(AgentError::UnexpectedEvent(
+                        "provider ended with tool_use but emitted no tool calls".into(),
                     )),
                     TurnStatus::UnexpectedEvent,
                 );

@@ -509,6 +509,29 @@ async fn test_run_handles_channel_close_without_turn_end() {
 
 #[tokio::test]
 #[allow(deprecated)] // Agent::new is correct for unit tests
+async fn test_run_rejects_tool_use_without_tool_calls() {
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta {
+            delta: "I will inspect files.".into(),
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
+    let result = agent.run("Analyze".into()).await;
+
+    let err = result.expect_err("tool_use without tool calls must be terminal error");
+    assert!(
+        matches!(err, AgentError::UnexpectedEvent(message) if message.contains("emitted no tool calls"))
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)] // Agent::new is correct for unit tests
 async fn test_run_streaming_forwards_events() {
     let events = vec![
         AgentEvent::TurnStart,

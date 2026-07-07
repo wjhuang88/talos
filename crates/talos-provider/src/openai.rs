@@ -516,15 +516,18 @@ async fn parse_sse_stream(
                     _ => StopReason::EndTurn,
                 };
 
-                // Emit accumulated tool calls
+                // Emit accumulated tool calls. Some OpenAI-compatible providers stream
+                // function name/arguments but omit the tool call id; synthesize a stable
+                // per-response id so the following tool result can still be paired.
                 for i in 0..tool_call_ids.len() {
-                    if !tool_call_ids[i].is_empty() && !tool_call_names[i].is_empty() {
+                    if !tool_call_names[i].is_empty() {
+                        let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
                         let args: Value =
                             serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
-                                    id: tool_call_ids[i].clone(),
+                                    id: tool_call_id,
                                     name: tool_call_names[i].clone(),
                                     input: args,
                                 },
@@ -595,15 +598,16 @@ async fn parse_sse_stream(
             .await;
     }
 
-    // Emit any accumulated native tool calls
+    // Emit any accumulated native tool calls.
     for i in 0..tool_call_ids.len() {
-        if !tool_call_ids[i].is_empty() && !tool_call_names[i].is_empty() {
+        if !tool_call_names[i].is_empty() {
+            let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
             let args: Value =
                 serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
             let _ = tx
                 .send(AgentEvent::ToolCall {
                     call: ToolCall {
-                        id: tool_call_ids[i].clone(),
+                        id: tool_call_id,
                         name: tool_call_names[i].clone(),
                         input: args,
                     },
@@ -626,6 +630,14 @@ async fn parse_sse_stream(
             },
         })
         .await;
+}
+
+fn finalized_tool_call_id(raw_id: &str, index: usize) -> String {
+    if raw_id.is_empty() {
+        format!("call_{index}")
+    } else {
+        raw_id.to_string()
+    }
 }
 
 fn extract_event_data(event_text: &str) -> Value {
@@ -1251,6 +1263,53 @@ mod tests {
         assert_eq!(usage.input_tokens, 123);
         assert_eq!(usage.output_tokens, 45);
         assert_eq!(usage.reasoning_tokens, 9);
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_synthesizes_missing_tool_call_id() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"tree\",\"arguments\":\"{\\\"path\\\":\\\".\\\"}\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut tool_call = None;
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ToolCall { call, .. } => tool_call = Some(call),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        let call = tool_call.expect("missing-id tool call should still be emitted");
+        assert_eq!(call.id, "call_0");
+        assert_eq!(call.name, "tree");
+        assert_eq!(call.input, json!({ "path": "." }));
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
     }
 
     #[tokio::test]

@@ -144,3 +144,24 @@ Audit source: `crates/talos-conversation/src/engine.rs` (`handle_agent_event` li
 - No health-check watchdog task was added; per RUNTIME-002 acceptance and the frontline plan,
   deterministic state transitions are preferred over background polling loops.
 
+## Post-Closeout Regression Fix (2026-07-07)
+
+### Alibaba/OpenAI-Compatible ToolUse With Missing Tool IDs
+
+- **Observed path:** an Alibaba-compatible provider streamed `tool_calls` function names
+  (`tree`, `read`) and ended with `stop_reason == ToolUse`, but no complete `ToolCall` reached the
+  agent because the streaming delta omitted `tool_call.id`. The TUI received
+  `ToolCallStarted -> TurnEnd(ToolUse)` and correctly kept `is_processing == true` for the expected
+  tool continuation, but no tool execution followed, leaving the UI stuck.
+- **Provider fix:** `crates/talos-provider/src/openai.rs` now synthesizes a stable per-response id
+  (`call_0`, `call_1`, ...) when an OpenAI-compatible streaming tool call has name/arguments but no
+  id. This keeps assistant tool calls and following tool results pairable in the next request.
+- **Agent guard:** `crates/talos-agent/src/lib.rs` now rejects `TurnEnd(ToolUse)` with zero
+  collected tool calls as `AgentError::UnexpectedEvent` instead of treating it as a successful
+  text-only turn.
+- **Regression tests:**
+  - `talos-provider::openai::tests::parse_sse_stream_synthesizes_missing_tool_call_id`
+  - `talos-agent::tests::test_run_rejects_tool_use_without_tool_calls`
+- **Validation:** `cargo test -p talos-provider parse_sse_stream_synthesizes_missing_tool_call_id`;
+  `cargo test -p talos-agent tool_use`; `cargo fmt --all -- --check`;
+  `cargo check --workspace`.
