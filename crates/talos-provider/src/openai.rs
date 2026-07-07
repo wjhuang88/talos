@@ -414,6 +414,31 @@ async fn parse_sse_stream(
                         })
                         .await;
                 }
+                // Emit accumulated native tool calls. Some OpenAI-compatible
+                // providers stream function name/arguments but close the stream
+                // with `[DONE]` and no `finish_reason` chunk; without this
+                // fallback the accumulated tool calls would be silently dropped
+                // after `ToolCallStarted`, leaving the UI in a stuck
+                // `ToolCallStarted -> TurnEnd` state with no `ToolCall`.
+                let has_native_tool_calls = tool_call_names.iter().any(|name| !name.is_empty());
+                for i in 0..tool_call_ids.len() {
+                    if !tool_call_names[i].is_empty() {
+                        let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
+                        let args: Value =
+                            serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
+                        let _ = tx
+                            .send(AgentEvent::ToolCall {
+                                call: ToolCall {
+                                    id: tool_call_id,
+                                    name: tool_call_names[i].clone(),
+                                    input: args,
+                                },
+                                provenance: Default::default(),
+                                summary_fields: vec![],
+                            })
+                            .await;
+                    }
+                }
                 if !reasoning_text.is_empty() {
                     let _ = tx
                         .send(AgentEvent::ReasoningComplete {
@@ -425,7 +450,11 @@ async fn parse_sse_stream(
                 }
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
-                        stop_reason: StopReason::EndTurn,
+                        stop_reason: if has_native_tool_calls {
+                            StopReason::ToolUse
+                        } else {
+                            StopReason::EndTurn
+                        },
                         usage: Usage {
                             input_tokens,
                             output_tokens,
@@ -1309,6 +1338,323 @@ mod tests {
         assert_eq!(call.id, "call_0");
         assert_eq!(call.name, "tree");
         assert_eq!(call.input, json!({ "path": "." }));
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_accumulates_split_id_name_args_chunks() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_abc\",\"type\":\"function\"}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"get_weather\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"loc\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"ation\\\":\\\"Paris\\\"}\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut tool_call = None;
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ToolCall { call, .. } => tool_call = Some(call),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        let call = tool_call.expect("split-chunk tool call should be accumulated and emitted");
+        assert_eq!(call.id, "call_abc");
+        assert_eq!(call.name, "get_weather");
+        assert_eq!(call.input, json!({ "location": "Paris" }));
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_empty_final_delta_clean_end_turn() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut text = String::new();
+        let mut stop_reason = None;
+        let mut tool_call_started = false;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                AgentEvent::ToolCallStarted { .. } => tool_call_started = true,
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "hello");
+        assert_eq!(stop_reason, Some(StopReason::EndTurn));
+        assert!(
+            !tool_call_started,
+            "empty final delta must not produce a dangling ToolCallStarted"
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_done_after_tool_calls_emits_tool_use() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_xyz\",\"type\":\"function\",\"function\":{\"name\":\"tree\",\"arguments\":\"{\\\"path\\\":\\\".\\\"}\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+
+        let tool_call_started_count = events
+            .iter()
+            .filter(|e| matches!(e, AgentEvent::ToolCallStarted { .. }))
+            .count();
+        let tool_call = events
+            .iter()
+            .find_map(|e| match e {
+                AgentEvent::ToolCall { call, .. } => Some(call.clone()),
+                _ => None,
+            })
+            .expect("[DONE] after tool_calls must still emit a complete ToolCall");
+        let stop_reason = events.iter().find_map(|e| match e {
+            AgentEvent::TurnEnd { stop_reason, .. } => Some(stop_reason.clone()),
+            _ => None,
+        });
+
+        assert_eq!(tool_call_started_count, 1);
+        assert_eq!(tool_call.id, "call_xyz");
+        assert_eq!(tool_call.name, "tree");
+        assert_eq!(tool_call.input, json!({ "path": "." }));
+        assert_eq!(
+            stop_reason,
+            Some(StopReason::ToolUse),
+            "[DONE] after native tool calls must set ToolUse, not EndTurn"
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_malformed_tool_arguments_becomes_empty_object() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_bad\",\"type\":\"function\",\"function\":{\"name\":\"bash\",\"arguments\":\"not valid json{\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut tool_call = None;
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ToolCall { call, .. } => tool_call = Some(call),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        let call = tool_call.expect("malformed-args tool call should still be emitted");
+        assert_eq!(call.id, "call_bad");
+        assert_eq!(call.name, "bash");
+        assert_eq!(
+            call.input,
+            json!({}),
+            "malformed JSON arguments should degrade to empty object, not panic"
+        );
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_usage_chunk_interleaved_with_tool_calls() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_u\",\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\\\"a\\\"}\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":5,\"completion_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":55}}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut tool_call = None;
+        let mut final_usage = None;
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ToolCall { call, .. } => tool_call = Some(call),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    usage,
+                } => {
+                    stop_reason = Some(reason);
+                    final_usage = Some(usage);
+                }
+                _ => {}
+            }
+        }
+
+        let call = tool_call.expect("tool call should be emitted despite interleaved usage chunk");
+        assert_eq!(call.id, "call_u");
+        assert_eq!(call.name, "read");
+        assert_eq!(call.input, json!({ "path": "a" }));
+        let usage = final_usage.expect("usage should be retained");
+        assert_eq!(usage.input_tokens, 50);
+        assert_eq!(usage.output_tokens, 5);
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_multi_tool_missing_ids_synthesizes_unique_indices() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"{\\\"p\\\":1}\"}},{\"index\":1,\"type\":\"function\",\"function\":{\"name\":\"write\",\"arguments\":\"{\\\"p\\\":2}\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut tool_calls = Vec::new();
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::ToolCall { call, .. } => tool_calls.push(call),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        assert_eq!(
+            tool_calls.len(),
+            2,
+            "both missing-id tool calls should be emitted"
+        );
+        assert_eq!(tool_calls[0].id, "call_0");
+        assert_eq!(tool_calls[0].name, "read");
+        assert_eq!(tool_calls[1].id, "call_1");
+        assert_eq!(tool_calls[1].name, "write");
         assert_eq!(stop_reason, Some(StopReason::ToolUse));
     }
 
