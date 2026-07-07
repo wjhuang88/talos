@@ -645,3 +645,110 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at F4 (no Month 2 commit yet, since Month 2 was verification-only and produced no code change; the F8 checkpoint is appended to this file and will be committed alongside F12's Month 3 work, per the "one logical commit per month" plan rule). Resume Month 3 by running the F9 cited tests (`cargo test -p talos-tui tool_args_summary_uses_available_budget_before_truncating`, `cargo test -p talos-tui approval_state_preserves_full_multibyte_arguments`).
+
+## Checkpoint F9 - Tool Argument Line-Fit Display (2026-07-06)
+
+Completed items:
+- F9: verified (no implementation; TUI-025 already shipped 2026-07-04).
+
+Current state and artifacts:
+- `crates/talos-tui/src/app/app_tests.rs:65 tool_args_summary_uses_available_budget_before_truncating` asserts that a long line-fit command argument renders the complete summary when the budget allows.
+- `crates/talos-tui/src/state.rs approval_state_preserves_full_multibyte_arguments` asserts that approval state stores the full argument and leaves truncation to render time.
+
+Test evidence (all passed):
+- `talos-tui` `app::app_tests::tool_args_summary_uses_available_budget_before_truncating` → ok.
+- `talos-tui` `state::tests::approval_state_preserves_full_multibyte_arguments` → ok.
+
+Open risks or deviations:
+- None.
+
+Next task item:
+- F10: Head-tail retained 3/3.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 2 closeout commit. Resume F10 by running `cargo test -p talos-tui head_tail` plus the under-threshold tests.
+
+## Checkpoint F10 - Head-Tail Retained 3/3 (2026-07-06)
+
+Completed items:
+- F10: verified (no implementation; TUI-015 already shipped with 3/3 retained lines on 2026-07-04).
+
+Current state and artifacts:
+- `crates/talos-tui/src/tool_display.rs` constants: `HEAD_LINES = 3`, `TAIL_LINES = 3`, `SUMMARIZE_OUTPUT_THRESHOLD_LINES = 30`. These are the exact retained-line values F10 requires.
+- `build_head_tail_scrollback_lines` (line 303) renders `HEAD_LINES` head lines + a `⋯ {omitted} lines omitted` separator + `TAIL_LINES` tail lines.
+- Decision pipeline (line 282): only triggers head-tail when `all_lines.len() > SUMMARIZE_OUTPUT_THRESHOLD_LINES` (30) AND the tool is not in the summarize set. Summarize-eligible tools (read/grep/glob/ls/find_symbol/list_imports) still take the one-line summary path. Unchanged.
+
+Test evidence (all passed):
+- `talos-tui` `app::app_tests::head_tail_omitted_count_is_correct` → ok. For totals {31, 32, 50, 100}: renders exactly 7 lines (3 head + 1 separator + 3 tail); the separator carries `expected_omitted = total - 3 - 3` count.
+- `talos-tui` `app::app_tests::head_tail_truncation_does_not_affect_export_content` → ok. The display is borrowed immutably, so export content survives head-tail truncation.
+- Short-output full render (unchanged trigger):
+  - `talos-tui` `app::app_tests::glob_under_threshold_not_summarized` → ok.
+  - `talos-tui` `app::app_tests::ls_under_threshold_not_summarized` → ok.
+  - `talos-tui` `app::app_tests::list_imports_under_threshold_not_summarized` → ok.
+  - `talos-tui` `app::app_tests::grep_under_threshold_renders_inline` → ok.
+  - `talos-tui` `app::app_tests::bash_under_threshold_renders_full` → ok.
+
+Open risks or deviations:
+- Summary routing orthogonality preserved: head-tail is the non-summarize fallback; the summarize path is unchanged.
+
+Next task item:
+- F11: Tool output visual hierarchy.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 2 closeout commit. Resume F11 by running `cargo test -p talos-tui tool_result`.
+
+## Checkpoint F11 - Tool Output Visual Hierarchy (2026-07-06)
+
+Completed items:
+- F11: verified (no implementation; TUI-019 already shipped in I076/T105 on 2026-07-01).
+
+Current state and artifacts:
+- `crates/talos-tui/src/tool_display.rs` `result_line_style()` classifies primary vs secondary result lines; primary result lines use the result color (typically the success/error color), detail/preview lines use the existing dim/secondary semantic style (`secondary_result_color()` = `Rgb(0x9A, 0xA4, 0xB2)`).
+- No one-off color literals introduced; the palette constant `secondary_result_color()` is reused.
+
+Test evidence (all passed, 7 tests via `cargo test -p talos-tui tool_result`):
+- `talos-tui` `tool_display::tests::tool_result_success_single_line_rendering` → ok.
+- `talos-tui` `tool_display::tests::tool_result_error_rendering_unchanged` → ok.
+- `talos-tui` `tool_display::tests::tool_result_success_special_cases_rendering` → ok (empty output "(no output)" and suppressed-read cases).
+- `talos-tui` `app::app_tests::read_tool_result_hides_content_from_scrollback` → ok.
+- `talos-tui` `app::app_tests::tool_result_error_detail_lines_keep_error_style` → ok (error style preserved on detail lines).
+- `talos-tui` `app::app_tests::tool_result_scrollback_styles_primary_and_detail_lines` → ok (primary vs detail line styling).
+- `talos-tui` `app::app_tests::tool_result_scrollback_keeps_multiple_lines` → ok.
+
+Open risks or deviations:
+- None.
+
+Next task item:
+- F12: Month 3 closeout.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 2 closeout commit. Resume F12 by running `cargo test -p talos-tui`, `cargo test -p talos-tools`, `cargo check --workspace`, governance, then commit + push.
+
+## Checkpoint F12 - Month 3 Closeout (2026-07-06)
+
+Completed items:
+- F9 (tool argument line-fit — verified), F10 (head-tail retained 3/3 — verified), F11 (tool output visual hierarchy — verified).
+
+Current state and artifacts:
+- No code change in Month 3 (verification-only per confirmation: F9/F10/F11 already shipped).
+- Owner docs `TUI-015`, `TUI-019`, `TUI-025` retain their Complete status with the cited tests as evidence.
+
+Commands/checks and actual results:
+- `cargo test -p talos-tui --lib` → **249 passed; 0 failed; 0 ignored**.
+- `cargo test -p talos-tui` (doctests) → 2 passed (format_tokens, format_duration).
+- `cargo test -p talos-tools` → all unit tests passed + 0 doctests.
+- `cargo check --workspace` → exit 0 (unchanged from F4/F8).
+- `scripts/validate_project_governance.sh .` → "Governance validation passed: 0 warning(s)." (unchanged).
+- `git diff --check` → CLEAN.
+
+Open risks or deviations:
+- None.
+
+Residual owner:
+- None for Month 3.
+
+Next task item:
+- F13: Static site i18n inventory — inventory public site pages and check whether each page has a zh-CN counterpart, plus whether a language switcher and `validate_public_site.sh` coverage of `site/zh/` are in place.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 3 closeout commit (to be created next). Resume Month 4 by running F13 inventory against `site/` and `site/zh/`, then update the validation harness and language switcher per F14.
