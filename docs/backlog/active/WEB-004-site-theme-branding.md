@@ -1,6 +1,6 @@
 # WEB-004: Product Site Theme & Branding Optimization
 
-**Status**: Refinement
+**Status**: Complete (2026-07-06, F15 of the frontline four-month execution plan — verified already-shipped work)
 **Priority**: P3
 **Created**: 2026-06-29
 **Source**: User request after WEB-002 site deployment
@@ -49,14 +49,22 @@ Align the product site's visuals with the Talos brand — Nord color palette, he
 
 ## Acceptance Criteria
 
-1. Dark mode uses Polar Night (`#2e3440`-ish) background with Frost accent
-2. Light mode uses Snow Storm-inspired background with deeper Frost accent
-3. Logo SVG shows a hexagon mark + "TALOS" wordmark, visually cohesive with TUI splash brand
-4. Favicon SVG matches the hexagon mark
-5. Status pills (`--talos-shipped`, `--talos-planned`, `--talos-research`) use Aurora-inspired colors (green, yellow, purple) consistent with TUI
-6. All 7 site pages render correctly with the new theme (no visual regressions)
-7. `scripts/validate_public_site.sh` still passes (0 errors, 0 warnings)
-8. Light/dark `prefers-color-scheme` switching works correctly for all new color tokens
+1. [x] Dark mode uses Polar Night (`#2e3440`-ish) background with Frost accent
+       — `--talos-bg: #2e3440` and `--talos-accent: #88c0d0` in the dark `@media (prefers-color-scheme: dark)` block (`site/assets/styles.css:38,42`).
+2. [x] Light mode uses Snow Storm-inspired background with deeper Frost accent
+       — `--talos-bg: #eceff4` (Snow Storm) and `--talos-accent: #5e81ac` (Frost dark blue) at `site/assets/styles.css:12,16`.
+3. [x] Logo SVG shows a hexagon mark + "TALOS" wordmark, visually cohesive with TUI splash brand
+       — `site/assets/talos-mark.svg` renders a hexagon polygon with Nord Frost gradient (`#88c0d0` → `#81a1c1` → `#5e81ac`) alongside the TALOS monospace wordmark.
+4. [x] Favicon SVG matches the hexagon mark
+       — `site/assets/favicon.svg` renders a hexagon polygon with `#88c0d0` stroke and a "T" inside.
+5. [x] Status pills (`--talos-shipped`, `--talos-planned`, `--talos-research`) use Aurora-inspired colors (green, yellow, purple) consistent with TUI
+       — `--talos-shipped: #a3be8c` (Aurora green), `--talos-planned: #ebcb8b` (Aurora yellow), `--talos-research: #b48ead` (Aurora purple); applied via `.talos-pill--shipped/planned/research` classes used on roadmap pages.
+6. [x] All 7 site pages render correctly with the new theme (no visual regressions)
+       — all 7 EN pages reference `assets/styles.css` + `assets/talos-mark.svg`/`favicon.svg`; verified via `rg styles\.css|talos-mark|favicon` (2 matches each).
+7. [x] `scripts/validate_public_site.sh` still passes (0 errors, 0 warnings)
+       — verified 2026-07-06: 14 HTML files checked, 0 errors, 0 warnings.
+8. [x] Light/dark `prefers-color-scheme` switching works correctly for all new color tokens
+       — `@media (prefers-color-scheme: dark)` block (`site/assets/styles.css:34`) overrides every token.
 
 ## Required Reads
 

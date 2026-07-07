@@ -752,3 +752,83 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the Month 3 closeout commit (to be created next). Resume Month 4 by running F13 inventory against `site/` and `site/zh/`, then update the validation harness and language switcher per F14.
+
+## Checkpoint F13 - Static Site i18n Inventory (2026-07-06)
+
+Completed items:
+- F13: inventory performed. Result: WEB-003 already fully shipped.
+
+Current state and artifacts:
+- 7 EN pages under `site/`: index, install, capabilities, safety, roadmap, releases, 404.
+- 7 ZH pages under `site/zh/`: same set, 1:1.
+- Language switcher: every EN page links to its ZH counterpart (`<a href="zh/index.html">中文</a>`); every ZH page links back to EN (`href="../index.html">EN`). The 404 pages keep a brand link to their own index (consistent with the static 404 convention).
+- `scripts/validate_public_site.sh` already enumerates all 7 `zh/*.html` paths in its required-files list (line 46) and uses recursive `find` (line 55) to walk every HTML page under `site/`, so ZH pages get the same href/src/asset checks as EN pages.
+- `site/README.md` already documents the `zh/` mirror, shared `../assets/`, the language switcher, and the EN fallback.
+
+Commands/checks and actual results:
+- `bash scripts/validate_public_site.sh` → "HTML files checked: 14, Errors: 0, Warnings: 0" (exit 0). The 14 count confirms ZH pages are in scope.
+- `rg "中文|EN" site/*.html site/zh/*.html` → all 14 pages carry a switcher link.
+
+Open risks or deviations:
+- None. WEB-003 is already shipped and verified; F14 implementation is therefore also already complete.
+
+Next task item:
+- F14: Static site i18n implementation (already shipped, recorded as evidence).
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 3 closeout commit. Resume F14 by confirming the WEB-003 acceptance checkboxes are now closed in the owner doc and recording the same `validate_public_site.sh` evidence here.
+
+## Checkpoint F14 - Static Site i18n Implementation (2026-07-06)
+
+Completed items:
+- F14: verified already shipped. No code change required.
+
+Current state and artifacts:
+- All 7 WEB-003 acceptance criteria checked off in `docs/backlog/active/WEB-003-site-internationalization.md` with concrete evidence (page paths, validator line numbers, switcher markup).
+- WEB-003 owner doc Status flipped from "Refinement" to "Complete (2026-07-06, F13/F14 of the frontline four-month execution plan — verified already-shipped work)".
+
+Commands/checks and actual results:
+- `bash scripts/validate_public_site.sh` → 14 files checked, 0 errors, 0 warnings (re-confirmed after the owner-doc edit; site assets untouched).
+- `rg "中文|EN" site/*.html site/zh/*.html` → switcher present on all 14 pages.
+- Shared-asset check: ZH pages reference `../assets/styles.css` / `../assets/site.js` (validated by the recursive walk in the validator).
+
+Open risks or deviations:
+- None.
+
+Next task item:
+- F15: Static site branding polish.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 3 closeout commit. Resume F15 by verifying WEB-004 Nord palette + hexagon brand assets.
+
+## Checkpoint F15 - Static Site Branding Polish (2026-07-06)
+
+Completed items:
+- F15: verified already shipped. No code change required.
+
+Current state and artifacts:
+- WEB-004 design fully implemented in `site/assets/styles.css`, `site/assets/talos-mark.svg`, `site/assets/favicon.svg`:
+  - Color tokens: `--talos-accent` light `#5e81ac` (Frost dark blue), dark `#88c0d0` (Frost cyan). `--talos-bg` light `#eceff4` (Snow Storm), dark `#2e3440` (Polar Night). Status pills use Aurora colors: `--talos-shipped: #a3be8c`, `--talos-planned: #ebcb8b`, `--talos-research: #b48ead`.
+  - Logo SVG (`talos-mark.svg`): hexagon polygon with Nord Frost linear gradient + TALOS monospace wordmark.
+  - Favicon SVG (`favicon.svg`): hexagon polygon with `#88c0d0` stroke + "T".
+  - `@media (prefers-color-scheme: dark)` overrides every token.
+- All 8 WEB-004 acceptance criteria checked off in `docs/backlog/active/WEB-004-site-theme-branding.md` with concrete evidence (CSS line numbers, hex color values, SVG structure).
+- WEB-004 owner doc Status flipped from "Refinement" to "Complete (2026-07-06, F15 of the frontline four-month execution plan — verified already-shipped work)".
+
+Commands/checks and actual results:
+- `rg --talos-accent|talos-bg|talos-shipped site/assets/styles.css` → all Nord token names present.
+- `rg talos-pill--shipped|planned|research site/roadmap.html site/zh/roadmap.html` → Aurora pill classes used.
+- `rg styles\.css|talos-mark|favicon site/*.html` → all 7 EN pages reference brand assets (2 matches each).
+- `bash scripts/validate_public_site.sh` → 14 files, 0 errors, 0 warnings (unchanged after owner-doc edit; assets untouched).
+
+Open risks or deviations:
+- None. Brand polish already met the WEB-004 design notes; no further CSS/SVG change required by this plan.
+
+Residual owner:
+- None.
+
+Next task item:
+- F16: Final closeout — full validation matrix (`cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test --workspace`, governance, `git diff --check`), append final checkpoint with recovery info, commit + push.
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the Month 3 closeout commit. Resume F16 by running the full closeout matrix, then commit + push the F13/F14/F15 + F16 checkpoints together.

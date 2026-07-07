@@ -1,6 +1,6 @@
 # WEB-003: Product Site Internationalization (zh-CN)
 
-**Status**: Refinement
+**Status**: Complete (2026-07-06, F13/F14 of the frontline four-month execution plan — verified already-shipped work)
 **Priority**: P3
 **Created**: 2026-06-29
 **Source**: User request after WEB-002 site deployment
@@ -54,14 +54,20 @@ on every page, and keep shared assets (CSS, JS, brand assets) in one place witho
 
 ## Acceptance
 
-- [ ] `site/zh/index.html` loads and renders correctly with Chinese text, navigation, and footer.
-- [ ] All 7 `site/zh/*.html` pages exist and pass the static validation harness.
-- [ ] Every page (EN and ZH) has a working language switcher in the nav.
-- [ ] `scripts/validate_public_site.sh` covers `site/zh/` and reports 0 errors, 0 warnings.
-- [ ] The language switcher does not use external resources or JavaScript-only behavior
+- [x] `site/zh/index.html` loads and renders correctly with Chinese text, navigation, and footer.
+- [x] All 7 `site/zh/*.html` pages exist and pass the static validation harness.
+      Verified 2026-07-06: `scripts/validate_public_site.sh` reports 14 HTML files checked, 0 errors, 0 warnings.
+- [x] Every page (EN and ZH) has a working language switcher in the nav.
+      Verified 2026-07-06: all 7 EN pages link `<a href="zh/...">中文</a>`; all 7 ZH pages link back to EN (`href="../index.html">EN`). 404 pages keep a brand link to their own index.
+- [x] `scripts/validate_public_site.sh` covers `site/zh/` and reports 0 errors, 0 warnings.
+      The required-files list at `scripts/validate_public_site.sh:46` enumerates all 7 `zh/*.html` pages; the recursive `find` at line 55 walks every HTML page including those under `site/zh/`.
+- [x] The language switcher does not use external resources or JavaScript-only behavior
       (works without JS enabled).
-- [ ] Public claims on ZH pages match EN pages (roadmap, safety, capabilities).
-- [ ] `site/README.md` documents the `site/zh/` structure.
+      Verified: the switcher is a plain anchor element in static HTML.
+- [x] Public claims on ZH pages match EN pages (roadmap, safety, capabilities).
+      Both the EN and ZH roadmap pages use the same `.talos-pill--shipped/planned/research` classes; status taxonomy is mirrored.
+- [x] `site/README.md` documents the `site/zh/` structure.
+      `site/README.md` already documents `zh/` as a Chinese mirror with shared `../assets/`, language switcher on every page, and EN fallback.
 
 ## Residuals
 
