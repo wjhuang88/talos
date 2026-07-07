@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TODO-002 |
 | Priority | P1 |
-| Status | In Progress (FS07: /todo delete + batch create repo method complete; batch tool registration residual) |
+| Status | Complete (FS07: idempotent create, /todo delete --confirm, batch create tool, UUID hiding) |
 | Source | [GitHub Issue #19](https://github.com/wjhuang88/talos/issues/19), [GitHub Issue #33](https://github.com/wjhuang88/talos/issues/33), [GitHub Issue #34](https://github.com/wjhuang88/talos/issues/34) |
 | Depends On | `TODO-001`, `CMD-001`, `PERM-002` |
 
@@ -58,10 +58,8 @@ users cannot directly delete a todo even though the agent tool can.
 
 ### Residuals
 
-- **Batch agent tool**: `create_batch` repository method is the foundation; a `todo_create_batch`
-  agent tool + tool-builder registration is not yet wired. The model currently issues repeated
-  `todo_create` calls for batch planning (which is idempotent and safe, just less efficient). A
-  future iteration can add the batch tool without changing the single-item tool shape.
-- **README help text**: `/todo delete` should be documented in the README slash-command table as
-  the first mutating `/todo` subcommand. This is a doc-only residual for the next closeout.
+- **Batch update tool**: only batch create is wired as an agent tool (`todo_create_batch`); batch
+  update (`todo_update_batch`) is not yet implemented. The model issues repeated `todo_update`
+  calls for batch updates, which is functional but less efficient. A future iteration can add the
+  batch update tool without changing the single-item shape.
 

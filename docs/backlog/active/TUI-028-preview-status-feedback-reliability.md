@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-028 |
 | Priority | P1 |
-| Status | In Progress (FS05: frontline-scope inventory complete; #24-#28 implemented, #31 out-of-scope decision gap) |
+| Status | Complete (FS05-FS06: frontline-scope items verified; #24-#28 implemented, #31 out-of-scope) |
 | Source | [GitHub Issue #24](https://github.com/wjhuang88/talos/issues/24), [GitHub Issue #25](https://github.com/wjhuang88/talos/issues/25), [GitHub Issue #26](https://github.com/wjhuang88/talos/issues/26), [GitHub Issue #27](https://github.com/wjhuang88/talos/issues/27), [GitHub Issue #28](https://github.com/wjhuang88/talos/issues/28), [GitHub Issue #31](https://github.com/wjhuang88/talos/issues/31) |
 | Depends On | `TUI-027`, `TUI-020`, `TUI-024`, `RUNTIME-002` |
 

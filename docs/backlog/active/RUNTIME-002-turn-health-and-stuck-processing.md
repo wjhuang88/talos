@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | RUNTIME-002 |
 | Priority | P0 |
-| Status | In Progress (FS04: runtime-level integration coverage + MaxTokens clearing fix + visible signal verification complete) |
+| Status | Complete (FS04: MaxTokens fix + runtime integration coverage + visible signal verification) |
 | Source | [GitHub Issue #18](https://github.com/wjhuang88/talos/issues/18), [GitHub Issue #32](https://github.com/wjhuang88/talos/issues/32) |
 | Depends On | `RUNTIME-001`, `TUI-027`, `PROVIDER-002` |
 

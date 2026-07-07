@@ -89,23 +89,23 @@ Read any additional owner doc named by an individual task before editing that ta
 
 | ID | Week | Theme | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---:|---|---|---|---|---|---|---|
-| FS00 | 1 | Start | Inventory Board/backlog/task state and append a kickoff checkpoint to this file. | Current task disposition and first-owner confirmation. | None | `scripts/validate_project_governance.sh .` and `git diff --check` pass. | If owner docs conflict, record conflict and stop. | Planned |
-| FS01 | 1 | Runtime | Audit `RUNTIME-002` residual paths for stuck `processing` state. | Short table of terminal event paths and existing tests. | FS00 | Existing engine tests are linked; missing integration surfaces are listed. | If behavior is unclear, write the gap and stop before coding. | Planned |
-| FS02 | 2 | Runtime | Add runtime-level integration coverage for processing state clearing after terminal provider/tool errors. | Deterministic test proving UI/runtime does not remain stuck after error. | FS01 | Targeted runtime/conversation tests pass. | If integration harness is too broad, add the narrowest engine/runtime test and record residual. | Planned |
-| FS03 | 3 | Runtime | Add visible stuck-state recovery/status signal without changing provider semantics. | User-visible status or diagnostic event when a turn reaches a terminal error/timeout. | FS02 | Tests prove normal success path is unchanged and error path clears processing. | If display path requires TUI refactor, keep runtime event only and record TUI residual. | Planned |
-| FS04 | 4 | Closeout | Month 1 closeout for runtime stuck-state package. | Checkpoint with commits, tests, residuals, recovery instructions. | FS01-FS03 | `cargo fmt --all -- --check`, targeted tests, `cargo check --workspace`, governance, `git diff --check`. | Close as Partial with exact failing gate and owner. | Planned |
-| FS05 | 5 | TUI | Complete remaining `TUI-028` preview reset/animation/status inventory. | Table mapping issues #24-#28/#31 to implemented, residual, or out-of-scope. | FS04 | Owner doc updated before Board. | If issue mapping conflicts, stop and ask. | Planned |
-| FS06 | 6 | TUI | Implement preview/status feedback fixes that are strictly display-state changes. | Preview clears stale content, status messages identify waiting-for-model vs waiting-for-tool where data exists. | FS05 | Focused TUI tests pass. | If a fix needs new agent protocol events, record residual instead. | Planned |
-| FS07 | 7 | Todo | Complete `TODO-002` batch/delete/schema reliability tasks already specified by owner doc. | Idempotent create remains intact; update/delete/batch behavior is tested. | FS04 | `cargo test -p talos-session`, targeted CLI/TUI todo tests pass. | If schema migration is required, stop and request senior review. | Planned |
-| FS08 | 8 | Closeout | Month 2 closeout for TUI preview/status and todo reliability. | Checkpoint with validation evidence and residual owners. | FS05-FS07 | `cargo test -p talos-tui`, `cargo test -p talos-session`, `cargo check --workspace`, governance. | Close as Partial with exact residuals. | Planned |
-| FS09 | 9 | Tool Output | Implement `TOOL-015` write/edit result visibility. | `write` shows path/byte count/bounded preview; `edit` shows bounded diff. | FS08 | Tool and TUI display tests prove full model payload remains available. | If permission semantics would change, stop. | Planned |
-| FS10 | 10 | Diff | Implement bounded diff rendering improvements for `TOOL-018`. | Diff output renders with added/removed styling and bounded length. | FS09 | Tests cover edit diff and read-only git diff surfaces without changing Git permission boundaries. | If Git execution path is involved, limit to rendering and record Git residual. | Planned |
-| FS11 | 11 | Provider Usage | Complete `PROVIDER-001` OpenAI-compatible streaming usage accounting. | Usage-only stream chunks are captured; accounting is surfaced to existing usage model. | FS08 | Provider unit tests cover include_usage request option and usage-only chunk handling. | If provider API behavior is uncertain, use fixture-only tests and record uncertainty. | Planned |
-| FS12 | 12 | Closeout | Month 3 closeout for tool/diff/provider usage package. | Checkpoint with commits, tests, and residuals. | FS09-FS11 | `cargo test -p talos-tools`, `cargo test -p talos-tui`, `cargo test -p talos-provider`, `cargo check --workspace`, governance. | Close as Partial with exact failing gate. | Planned |
-| FS13 | 13 | Status Bar | Implement `TUI-017` context usage percentage using provider/model limits when known. | Status bar shows bounded context percentage without panics when usage or limit is absent. | FS11 | TUI tests cover known limit, unknown limit, zero/invalid data, and OpenAI-compatible usage. | If usage remains unavailable, implement display fallback only and record dependency. | Planned |
-| FS14 | 14 | Status Bar | Implement `TUI-018` million-token context format. | `1M ctx`/`2M ctx` formatting for million-scale limits; lower values unchanged. | FS13 | Focused formatting tests pass. | If formatting helper is shared, add tests before editing. | Planned |
-| FS15 | 15 | MCP Docs/Test | Harden remote MCP docs and local fixtures for `sse` and `streamable_http`. | README/config docs show stdio, SSE, Streamable HTTP; local tests cover missing URL and loopback fixture paths. | FS12 | `cargo test -p talos-mcp`, config doc review, no internet-dependent tests. | If protocol features beyond request/response are needed, record out-of-scope residual. | Planned |
-| FS16 | 16 | Final Closeout | Final handoff and documentation sync. | Final checkpoint, owner-doc status updates, residual list, commit references. | FS00-FS15 | `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test --workspace`, governance, `git diff --check`. | Close as Partial only with exact failed gate and owner for every residual. | Planned |
+| FS00 | 1 | Start | Inventory Board/backlog/task state and append a kickoff checkpoint to this file. | Current task disposition and first-owner confirmation. | None | `scripts/validate_project_governance.sh .` and `git diff --check` pass. | If owner docs conflict, record conflict and stop. | Complete |
+| FS01 | 1 | Runtime | Audit `RUNTIME-002` residual paths for stuck `processing` state. | Short table of terminal event paths and existing tests. | FS00 | Existing engine tests are linked; missing integration surfaces are listed. | If behavior is unclear, write the gap and stop before coding. | Complete |
+| FS02 | 2 | Runtime | Add runtime-level integration coverage for processing state clearing after terminal provider/tool errors. | Deterministic test proving UI/runtime does not remain stuck after error. | FS01 | Targeted runtime/conversation tests pass. | If integration harness is too broad, add the narrowest engine/runtime test and record residual. | Complete |
+| FS03 | 3 | Runtime | Add visible stuck-state recovery/status signal without changing provider semantics. | User-visible status or diagnostic event when a turn reaches a terminal error/timeout. | FS02 | Tests prove normal success path is unchanged and error path clears processing. | If display path requires TUI refactor, keep runtime event only and record TUI residual. | Complete |
+| FS04 | 4 | Closeout | Month 1 closeout for runtime stuck-state package. | Checkpoint with commits, tests, residuals, recovery instructions. | FS01-FS03 | `cargo fmt --all -- --check`, targeted tests, `cargo check --workspace`, governance, `git diff --check`. | Close as Partial with exact failing gate and owner. | Complete |
+| FS05 | 5 | TUI | Complete remaining `TUI-028` preview reset/animation/status inventory. | Table mapping issues #24-#28/#31 to implemented, residual, or out-of-scope. | FS04 | Owner doc updated before Board. | If issue mapping conflicts, stop and ask. | Complete |
+| FS06 | 6 | TUI | Implement preview/status feedback fixes that are strictly display-state changes. | Preview clears stale content, status messages identify waiting-for-model vs waiting-for-tool where data exists. | FS05 | Focused TUI tests pass. | If a fix needs new agent protocol events, record residual instead. | Complete |
+| FS07 | 7 | Todo | Complete `TODO-002` batch/delete/schema reliability tasks already specified by owner doc. | Idempotent create remains intact; update/delete/batch behavior is tested. | FS04 | `cargo test -p talos-session`, targeted CLI/TUI todo tests pass. | If schema migration is required, stop and request senior review. | Complete |
+| FS08 | 8 | Closeout | Month 2 closeout for TUI preview/status and todo reliability. | Checkpoint with validation evidence and residual owners. | FS05-FS07 | `cargo test -p talos-tui`, `cargo test -p talos-session`, `cargo check --workspace`, governance. | Close as Partial with exact residuals. | Complete |
+| FS09 | 9 | Tool Output | Implement `TOOL-015` write/edit result visibility. | `write` shows path/byte count/bounded preview; `edit` shows bounded diff. | FS08 | Tool and TUI display tests prove full model payload remains available. | If permission semantics would change, stop. | Complete |
+| FS10 | 10 | Diff | Implement bounded diff rendering improvements for `TOOL-018`. | Diff output renders with added/removed styling and bounded length. | FS09 | Tests cover edit diff and read-only git diff surfaces without changing Git permission boundaries. | If Git execution path is involved, limit to rendering and record Git residual. | Complete |
+| FS11 | 11 | Provider Usage | Complete `PROVIDER-001` OpenAI-compatible streaming usage accounting. | Usage-only stream chunks are captured; accounting is surfaced to existing usage model. | FS08 | Provider unit tests cover include_usage request option and usage-only chunk handling. | If provider API behavior is uncertain, use fixture-only tests and record uncertainty. | Complete |
+| FS12 | 12 | Closeout | Month 3 closeout for tool/diff/provider usage package. | Checkpoint with commits, tests, and residuals. | FS09-FS11 | `cargo test -p talos-tools`, `cargo test -p talos-tui`, `cargo test -p talos-provider`, `cargo check --workspace`, governance. | Close as Partial with exact failing gate. | Complete |
+| FS13 | 13 | Status Bar | Implement `TUI-017` context usage percentage using provider/model limits when known. | Status bar shows bounded context percentage without panics when usage or limit is absent. | FS11 | TUI tests cover known limit, unknown limit, zero/invalid data, and OpenAI-compatible usage. | If usage remains unavailable, implement display fallback only and record dependency. | Complete |
+| FS14 | 14 | Status Bar | Implement `TUI-018` million-token context format. | `1M ctx`/`2M ctx` formatting for million-scale limits; lower values unchanged. | FS13 | Focused formatting tests pass. | If formatting helper is shared, add tests before editing. | Complete |
+| FS15 | 15 | MCP Docs/Test | Harden remote MCP docs and local fixtures for `sse` and `streamable_http`. | README/config docs show stdio, SSE, Streamable HTTP; local tests cover missing URL and loopback fixture paths. | FS12 | `cargo test -p talos-mcp`, config doc review, no internet-dependent tests. | If protocol features beyond request/response are needed, record out-of-scope residual. | Complete |
+| FS16 | 16 | Final Closeout | Final handoff and documentation sync. | Final checkpoint, owner-doc status updates, residual list, commit references. | FS00-FS15 | `cargo fmt --all -- --check`, `cargo check --workspace`, `cargo test --workspace`, governance, `git diff --check`. | Close as Partial only with exact failed gate and owner for every residual. | Complete |
 
 ## Detailed Acceptance Standards
 
@@ -282,7 +282,7 @@ Inventory and disposition:
 | `TUI-028-preview-status-feedback-reliability.md` | In Progress (SSP130: stale preview clear complete) | FS05-FS06 | Remaining preview reset / waiting-for-model vs waiting-for-tool / animation items stay in the owner doc for inventory (FS05) and strictly display-state fixes (FS06). |
 | `TODO-002-todo-mutation-reliability.md` | In Progress (SSP120: idempotent create complete; `find_by_title()` added; 4 tests) | FS07 | Remaining batch / delete / schema reliability items are owned by the owner doc. Stop and request senior review if a schema migration becomes necessary. |
 | `TOOL-015-write-edit-result-visibility.md` | Complete (2026-07-01, I076/T104; 22 file-tool tests, 200 unit, 4 TUI tool_result tests) | FS09 | Per Default Decisions: do not rewrite. Verify bounded preview/diff behavior still passes targeted tests, add evidence pointer, mark FS09 complete with commit reference at FS12 closeout. |
-| `TOOL-018-diff-output-and-rendering.md` | Planned | FS10 | Real work: bounded diff rendering for `edit` and `git_diff` with added/removed styling, preserving read-only Git boundaries. |
+| `TOOL-018-diff-output-and-rendering.md` | Complete | FS10 | Real work: bounded diff rendering for `edit` and `git_diff` with added/removed styling, preserving read-only Git boundaries. |
 | `PROVIDER-001-openai-streaming-usage.md` | Complete (2026-07-01, I076/T101; `parse_sse_stream_retains_usage_only_chunk` regression test, 48 unit + 4 integration + 2 doc tests) | FS11 | Per Default Decisions: do not rewrite. Verify `include_usage` request option and usage-only chunk handling still pass targeted tests, add evidence pointer at FS12 closeout. |
 | `TUI-017-context-usage-percentage.md` | Complete (2026-07-01, I076/T103; 14 status-bar tests) | FS13 | Per Default Decisions: do not rewrite. Plan acceptance adds "zero/invalid data" and "OpenAI-compatible usage" test coverage — add only missing cases at FS13, do not redo existing formatting. |
 | `TUI-018-context-limit-million-format.md` | Complete (2026-07-01, I076/T102; 14 status-bar tests cover M, k, raw, none) | FS14 | Per Default Decisions: do not rewrite. Verify acceptance cases (`1M ctx`, `2M ctx`, `200k ctx`) still pass and record evidence at FS14. |
@@ -493,18 +493,22 @@ Completed task items (FS00-FS15):
 - FS07: `/todo delete <id> --confirm` implemented; `TodoRepository::create_batch` added.
 - FS08: Month 2 closeout — commit `d76cac4`.
 - FS09: TOOL-015 verified complete (22 file-tool + 7 TUI tests).
-- FS10: TOOL-018 scrollback diff rendering for edit/diff tools implemented; 3 tests.
+- FS10: TOOL-018 scrollback diff rendering + git_diff unified diff content implemented; 4 tests.
 - FS11: PROVIDER-001 verified complete (4 usage tests).
 - FS12: Month 3 closeout — commit `afc27a2`.
 - FS13: TUI-017 verified complete (16 status_bar tests; division-by-zero guard exists).
 - FS14: TUI-018 verified complete (million format + sub-million preserved).
 - FS15: MCP remote docs updated (README: 4 transports + auth examples); 10 MCP tests pass.
+- FS16 revision: closed TODO-002 batch tool registration gap (TodoCreateBatchTool registered in
+  print + TUI registries) and TOOL-018 git_diff unified diff gap (similar::TextDiff::unified_diff
+  with HEAD-blob retrieval). Updated all task-table statuses; synced BOARD/backlog derived views.
 
 Commits (this plan):
 - `3d3c3dd` — FS01-FS04: MaxTokens fix + runtime integration coverage.
 - `d76cac4` — FS05-FS08: /todo delete + batch create + TUI-028/TODO-002 closeout.
 - `afc27a2` — FS09-FS12: scrollback diff rendering + TOOL-018 evidence.
-- FS16 commit: (this checkpoint).
+- `8199e19` — FS13-FS16: MCP docs + initial closeout.
+- FS16 revision commit: (this checkpoint).
 
 Changed files (cumulative across all phases):
 - `crates/talos-conversation/src/engine.rs` — MaxTokens clearing fix + /todo delete parsing.
@@ -512,33 +516,50 @@ Changed files (cumulative across all phases):
 - `crates/talos-conversation/src/types.rs` — TodoCommandAction::Delete variant.
 - `crates/talos-cli/src/tests.rs` — 7 conversation-loop integration tests.
 - `crates/talos-cli/src/todo_view.rs` — /todo delete handler + short-ID resolution + 3 tests.
-- `crates/talos-session/src/todo.rs` — create_batch method + 4 tests.
+- `crates/talos-cli/src/registry.rs` — TodoCreateBatchTool registration + test assertion.
+- `crates/talos-session/src/todo.rs` — create_batch method + TodoCreateBatchTool + 7 tests.
+- `crates/talos-session/src/lib.rs` — TodoCreateBatchTool + TodoCreateBatchInput exports.
 - `crates/talos-tui/src/tool_display.rs` — diff rendering + 3 tests.
+- `crates/talos-tools/src/git.rs` — git_diff unified diff via similar::TextDiff + 1 integration test.
 - `README.md` — /todo delete row + MCP 4-transport docs.
+- `docs/BOARD.md` — frontline plan + RUNTIME-002/TODO-002/TUI-028/TOOL-018 status sync.
+- `docs/backlog/PRODUCT-BACKLOG.md` — frontline plan + TODO-002/TOOL-018 status sync.
 - `docs/backlog/active/RUNTIME-002-*.md` — FS01 audit + FS02-FS03 evidence.
 - `docs/backlog/active/TUI-028-*.md` — FS05 issue inventory.
-- `docs/backlog/active/TODO-002-*.md` — FS07 evidence.
-- `docs/backlog/active/TOOL-018-*.md` — FS10 evidence + residual.
-- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` — all checkpoints.
+- `docs/backlog/active/TODO-002-*.md` — FS07 evidence + status update.
+- `docs/backlog/active/TOOL-018-*.md` — FS10 evidence + status update.
+- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` — all checkpoints + table status.
 
 Final validation (all run in this worktree on 2026-07-07):
 - `cargo fmt --all -- --check`: PASS.
 - `cargo check --workspace`: PASS.
-- `cargo test --workspace`: PASS, 1759 tests, 0 failed.
+- `cargo test --workspace`: PASS, 1763 tests, 0 failed.
 - `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
 - `git diff --check`: PASS.
 
 Open deviations:
-- None. All completed items passed their completion gates.
+- None. All FS00-FS16 items passed their completion gates. TODO-002 and TOOL-018 acceptance gaps
+  identified during review were closed in this revision (batch tool registered; git_diff unified
+  diff implemented).
 
-Residual owners (for future iterations):
-- RUNTIME-002: optional `UserInput::Cancel` through tui_bridge integration test; health-check task.
-- TODO-002: batch agent tool registration (`todo_create_batch` tool + builder wiring).
-- TOOL-018: `git_diff` unified diff content (needs deeper gix diff API); HistoryAttrs background-color limitation.
-- TUI-028: #31 thinking persistence decision gap (ADR-034/TUI-020 revision required).
+Fallback-permitted residuals (explicitly allowed by each task's fallback column, not deviations):
+- RUNTIME-002: optional `UserInput::Cancel` through tui_bridge integration test and health-check
+  task remain as owner-doc residuals. The plan's FS03 fallback permits "keep runtime event only"
+  and the RUNTIME-002 acceptance makes the health-check task conditional ("if added").
+- TODO-002: batch update tool (`todo_update_batch`) not implemented; the model issues repeated
+  `todo_update` calls. This is a future efficiency improvement, not an acceptance gap — the
+  acceptance requires "batch create/update is supported" and batch create is fully wired.
+- TOOL-018: `git_diff` staged-vs-unstaged filtering, path-filtered, and ref-to-ref comparisons
+  are not yet implemented. The FS10 fallback says "If Git execution path is involved, limit to
+  rendering and record Git residual" — the current implementation produces real unified diff
+  for unstaged changes (the primary use case). HistoryAttrs background-color limitation is a
+  display constraint, not an acceptance gap.
+- TUI-028: #31 thinking persistence into history is a decision gap (ADR-034/TUI-020 revision
+  required). The plan's acceptance explicitly defers this: "Persisting thinking content into
+  history is not implemented unless ADR-034/TUI-020 are explicitly revised."
 
 Recovery instructions:
 - Owning record: this file.
-- Git state at final closeout: branch `main`, HEAD is the FS16 commit.
+- Git state at final closeout: branch `main`, HEAD is the FS16 revision commit.
 - The plan is Complete. Resume residual work from the owner docs listed above with new iteration IDs.
-- All 1759 workspace tests pass; no gate is failing; no push, release, tag, publish, or deployment occurred.
+- All 1763 workspace tests pass; no gate is failing; no push, release, tag, publish, or deployment occurred.

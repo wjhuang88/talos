@@ -423,6 +423,11 @@ impl GitDiffTool {
         let max_lines = git_input.max_lines.unwrap_or(200) as usize;
 
         let repo = discover_repo(&self.workspace_root)?;
+        let workdir = repo
+            .workdir()
+            .ok_or_else(|| GitToolError::Git("no workdir".into()))?
+            .to_path_buf();
+
         let platform = repo
             .status(gix::progress::Discard)
             .map_err(|e| GitToolError::Git(e.to_string()))?
@@ -433,18 +438,43 @@ impl GitDiffTool {
             .map_err(|e| GitToolError::Git(e.to_string()))?;
 
         let mut output = String::new();
-        let mut line_count = 0;
+        let mut line_count = 0usize;
 
         for item in iter {
             let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
             let path_str = item.rela_path().to_string();
 
-            output.push_str(&format!("diff -- {path_str}\n"));
-            line_count += 1;
+            let old_content = read_head_blob_content(&repo, &path_str);
+            let new_content = std::fs::read_to_string(workdir.join(&path_str)).ok();
 
-            if line_count >= max_lines {
-                output.push_str(&format!("\n... (truncated at {max_lines} entries)"));
-                break;
+            match (old_content, new_content) {
+                (Some(old), Some(new)) => {
+                    let diff = similar::TextDiff::from_lines(&old, &new);
+                    let patch = diff
+                        .unified_diff()
+                        .header(&format!("--- a/{path_str}"), &format!("+++ b/{path_str}"))
+                        .context_radius(3)
+                        .to_string();
+
+                    output.push_str(&format!("diff --git a/{path_str} b/{path_str}\n"));
+                    for line in patch.lines() {
+                        if line_count >= max_lines {
+                            output.push_str(&format!("\n... (truncated at {max_lines} lines)\n"));
+                            return Ok(output.trim_end().to_string());
+                        }
+                        output.push_str(line);
+                        output.push('\n');
+                        line_count += 1;
+                    }
+                }
+                _ => {
+                    if line_count >= max_lines {
+                        output.push_str(&format!("\n... (truncated at {max_lines} lines)\n"));
+                        return Ok(output.trim_end().to_string());
+                    }
+                    output.push_str(&format!("diff -- {path_str} (binary or unreadable)\n"));
+                    line_count += 1;
+                }
             }
         }
 
@@ -454,6 +484,14 @@ impl GitDiffTool {
             Ok(output.trim_end().to_string())
         }
     }
+}
+
+fn read_head_blob_content(repo: &gix::Repository, path: &str) -> Option<String> {
+    use gix::bstr::ByteSlice;
+    let spec = format!("HEAD:{path}");
+    let blob_id = repo.rev_parse_single(spec.as_bytes().as_bstr()).ok()?;
+    let blob = repo.find_object(blob_id).ok()?;
+    String::from_utf8(blob.data.to_vec()).ok()
 }
 
 // ─── git_show ───
@@ -1039,6 +1077,66 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "git error: git not installed. Install git or use read-only tools."
+        );
+    }
+
+    #[tokio::test]
+    async fn git_diff_produces_unified_diff_content() {
+        if std::process::Command::new("git")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("skipping: host git not available");
+            return;
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let run = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .expect("git command")
+        };
+        run(&["init"]);
+        run(&["config", "user.email", "test@test.com"]);
+        run(&["config", "user.name", "Test"]);
+
+        std::fs::write(dir.path().join("test.txt"), "line1\nline2\nline3\n").unwrap();
+        run(&["add", "test.txt"]);
+        run(&["commit", "-m", "initial"]);
+
+        std::fs::write(dir.path().join("test.txt"), "line1\nmodified\nline3\n").unwrap();
+
+        let tool = GitDiffTool::new(dir.path().to_path_buf());
+        let result = tool.execute(serde_json::json!({})).await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(
+            result.content.contains("diff --git a/test.txt b/test.txt"),
+            "expected diff --git header, got: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("--- a/test.txt"),
+            "expected --- header, got: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("+++ b/test.txt"),
+            "expected +++ header, got: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("-line2"),
+            "expected removed line, got: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("+modified"),
+            "expected added line, got: {}",
+            result.content
         );
     }
 }

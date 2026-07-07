@@ -15,8 +15,8 @@ use talos_core::tool::{
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_session::{
-    SessionManager, TodoAddDependencyTool, TodoCreateTool, TodoDeleteTool, TodoQueryTool,
-    TodoRemoveDependencyTool, TodoUpdateStatusTool, TodoUpdateTool,
+    SessionManager, TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool,
+    TodoQueryTool, TodoRemoveDependencyTool, TodoUpdateStatusTool, TodoUpdateTool,
 };
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
@@ -132,6 +132,10 @@ fn default_todo_tools(session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
 fn todo_tools_for_sessions_dir(sessions_dir: &Path, session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
     vec![
         Arc::new(TodoCreateTool::from_sessions_dir(sessions_dir, session_id)),
+        Arc::new(TodoCreateBatchTool::from_sessions_dir(
+            sessions_dir,
+            session_id,
+        )),
         Arc::new(TodoUpdateStatusTool::from_sessions_dir(
             sessions_dir,
             session_id,
@@ -808,6 +812,7 @@ mod tests {
             print_registry.register(tool);
         }
         assert!(print_registry.get("todo_create").is_some());
+        assert!(print_registry.get("todo_create_batch").is_some());
         assert!(print_registry.get("todo_update_status").is_some());
         assert!(print_registry.get("todo_update").is_some());
         assert!(print_registry.get("todo_delete").is_some());
@@ -825,6 +830,7 @@ mod tests {
             }));
         }
         assert!(tui_registry.get("todo_create").is_some());
+        assert!(tui_registry.get("todo_create_batch").is_some());
         assert!(tui_registry.get("todo_update_status").is_some());
         assert!(tui_registry.get("todo_update").is_some());
         assert!(tui_registry.get("todo_delete").is_some());

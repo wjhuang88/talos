@@ -787,6 +787,103 @@ impl AgentTool for TodoCreateTool {
     }
 }
 
+/// Input for the `todo_create_batch` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoCreateBatchInput {
+    /// Items to create (idempotent per title within the session).
+    #[serde(default)]
+    pub items: Vec<TodoCreateInput>,
+}
+
+/// Agent tool that creates multiple session todo items in one call.
+#[derive(Debug, Clone)]
+pub struct TodoCreateBatchTool {
+    db_path: PathBuf,
+    session_id: Uuid,
+}
+
+impl TodoCreateBatchTool {
+    /// Create a batch todo creation tool bound to one session's SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf, session_id: Uuid) -> Self {
+        Self {
+            db_path,
+            session_id,
+        }
+    }
+
+    /// Create a batch todo creation tool bound to one session, using the standard
+    /// database path under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path, session_id: Uuid) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"), session_id)
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoCreateBatchTool {
+    fn name(&self) -> &str {
+        "todo_create_batch"
+    }
+
+    fn description(&self) -> &str {
+        "Create multiple session-scoped todo items in one call (idempotent per title)"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoCreateBatchInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoCreateBatchInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => {
+                return ToolResult::error(format!("Invalid todo_create_batch input: {err}"));
+            }
+        };
+        if input.items.is_empty() {
+            return ToolResult::error("todo_create_batch requires at least one item");
+        }
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let create_inputs: Vec<CreateTodo> = input
+            .items
+            .into_iter()
+            .map(|item| CreateTodo {
+                session_id: self.session_id,
+                title: item.title,
+                description: item.description,
+                priority: item.priority,
+                assigned_to_turn: item.assigned_to_turn,
+                tags: item.tags,
+            })
+            .collect();
+        match repo.create_batch(create_inputs) {
+            Ok(items) => {
+                let created_count = items.len();
+                let action = format!("Created {created_count} todo(s)");
+                let all = repo.list_all(self.session_id).unwrap_or_default();
+                ToolResult::success(format_mutation_result(&action, &all))
+            }
+            Err(err) => ToolResult::error(err.to_string()),
+        }
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(self.session_id)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["items"]
+    }
+}
+
 /// Agent tool that updates a session todo status.
 #[derive(Debug, Clone)]
 pub struct TodoUpdateStatusTool {
@@ -2036,5 +2133,68 @@ mod tests {
         let items = repo.create_batch(vec![]).expect("batch");
         assert!(items.is_empty());
         assert_eq!(repo.list_all(session_id).expect("list").len(), 0);
+    }
+
+    #[tokio::test]
+    async fn todo_create_batch_tool_creates_multiple_items() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let session_id = Uuid::new_v4();
+        let batch_tool = TodoCreateBatchTool::new(db_path.clone(), session_id);
+        let query_tool = TodoQueryTool::new(db_path, session_id);
+
+        let result = batch_tool
+            .execute(serde_json::json!({
+                "items": [
+                    {"title": "first", "priority": "high"},
+                    {"title": "second", "priority": "low"},
+                    {"title": "third"}
+                ]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("Created 3 todo(s)"));
+
+        let queried = query_tool.execute(serde_json::json!({})).await;
+        assert!(queried.content.contains("first"));
+        assert!(queried.content.contains("second"));
+        assert!(queried.content.contains("third"));
+    }
+
+    #[tokio::test]
+    async fn todo_create_batch_tool_rejects_empty_input() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let session_id = Uuid::new_v4();
+        let batch_tool = TodoCreateBatchTool::new(db_path, session_id);
+
+        let result = batch_tool.execute(serde_json::json!({"items": []})).await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("at least one item"));
+    }
+
+    #[tokio::test]
+    async fn todo_create_batch_tool_idempotent_within_batch() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let session_id = Uuid::new_v4();
+        let batch_tool = TodoCreateBatchTool::new(db_path.clone(), session_id);
+        let query_tool = TodoQueryTool::new(db_path, session_id);
+
+        let result = batch_tool
+            .execute(serde_json::json!({
+                "items": [
+                    {"title": "dup", "priority": "high"},
+                    {"title": "dup", "priority": "low"}
+                ]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        // Only 1 item despite 2 inputs (same title dedup)
+        let queried = query_tool.execute(serde_json::json!({})).await;
+        assert!(queried.content.contains("1 todo(s)"));
     }
 }

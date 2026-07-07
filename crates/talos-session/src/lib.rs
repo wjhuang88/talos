@@ -42,11 +42,11 @@ pub use manager::{
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 pub use todo::{
-    CreateTodo, TodoAddDependencyTool, TodoCreateInput, TodoCreateTool, TodoDeleteInput,
-    TodoDeleteTool, TodoDependency, TodoDependencyInput, TodoError, TodoItem, TodoPriority,
-    TodoQuery, TodoQueryInput, TodoQueryTool, TodoRemoveDependencyTool, TodoRepository, TodoStatus,
-    TodoUpdate, TodoUpdateInput, TodoUpdateStatusInput, TodoUpdateStatusTool, TodoUpdateTool,
-    status_icon,
+    CreateTodo, TodoAddDependencyTool, TodoCreateBatchInput, TodoCreateBatchTool, TodoCreateInput,
+    TodoCreateTool, TodoDeleteInput, TodoDeleteTool, TodoDependency, TodoDependencyInput,
+    TodoError, TodoItem, TodoPriority, TodoQuery, TodoQueryInput, TodoQueryTool,
+    TodoRemoveDependencyTool, TodoRepository, TodoStatus, TodoUpdate, TodoUpdateInput,
+    TodoUpdateStatusInput, TodoUpdateStatusTool, TodoUpdateTool, status_icon,
 };
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 
