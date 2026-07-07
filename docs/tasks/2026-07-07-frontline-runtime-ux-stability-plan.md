@@ -430,3 +430,52 @@ Recovery instructions:
 - If `/todo delete` needs revisiting, the key files are `crates/talos-conversation/src/types.rs`
   (Delete variant), `crates/talos-conversation/src/engine.rs` (parse_todo_command delete branch),
   and `crates/talos-cli/src/todo_view.rs` (handle_todo_delete + resolve_todo_id).
+
+## Checkpoint FS12 - Month 3 Closeout: Tool/Diff/Provider Usage (2026-07-07)
+
+Completed task items:
+- FS09: TOOL-015 verified complete (I076/T104). 22 file-tool tests + 7 TUI tool_result tests pass.
+  Per Default Decisions, no rewrite; evidence confirmed.
+- FS10: TOOL-018 scrollback diff rendering implemented. `tool_display.rs` now applies semantic
+  +/- styling (green/red foreground) for `edit`/`diff` tool results and unified diff markers.
+  False-positive prevention: prose with `-`/`+` bullets is NOT styled for non-diff tools.
+  3 new tests. `git_diff` unified diff content recorded as residual (needs deeper gix API work).
+- FS11: PROVIDER-001 verified complete (I076/T101). 4 usage tests pass:
+  `include_usage` request option, usage-only chunk handling, null-usage guard, SSE retention.
+
+Commits:
+- FS12 commit: (will be created at this checkpoint).
+
+Changed files (since FS08):
+- `crates/talos-tui/src/tool_display.rs` — `is_diff_content` + `diff_line_style` + rendering loop
+  modification + 3 tests.
+- `docs/backlog/active/TOOL-018-diff-output-and-rendering.md` — FS10 evidence + residuals.
+- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` — this checkpoint.
+
+Validation (all run in this worktree on 2026-07-07):
+- `cargo fmt --all -- --check`: PASS.
+- `cargo check --workspace`: PASS.
+- `cargo test -p talos-tools`: PASS, 255 tests, 0 failed.
+- `cargo test -p talos-tui`: PASS, 254 tests (252 unit + 2 doc), 0 failed.
+- `cargo test -p talos-provider`: PASS, 73 tests, 0 failed.
+- `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
+- `git diff --check`: PASS.
+
+Open deviations:
+- None. TOOL-015 and PROVIDER-001 were already complete per Default Decisions. TOOL-018 scrollback
+  rendering is new work; git_diff unified content is a residual, not a deviation.
+
+Residual owner:
+- `docs/backlog/active/TOOL-018-diff-output-and-rendering.md` owns the git_diff unified diff
+  content residual and the HistoryAttrs background-color limitation.
+
+Next item:
+- FS13: TUI-017 context usage percentage. Verified complete (I076/T103). 16 status_bar tests pass
+  including known/unknown limit and compact mode. Per Default Decisions, verify + add any missing
+  edge-case test at FS13.
+
+Recovery instructions:
+- Owning record: this file.
+- Git state at FS12 close: branch `main`, HEAD will be the FS12 commit.
+- Resume by reading this checkpoint, verifying `cargo test -p talos-tui` passes, then starting
+  FS13 by confirming TUI-017 status_bar tests and proceeding to FS15 MCP docs/tests.

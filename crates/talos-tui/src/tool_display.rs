@@ -283,10 +283,15 @@ pub(crate) fn build_tool_result_scrollback_lines(
         return build_head_tail_scrollback_lines(display, &all_lines, icon, color);
     }
 
+    let diff_aware = is_diff_content(&display.content, display.tool_name.as_deref());
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
         let truncated = truncate_single_line(line, MAX_RESULT_LINE_CHARS);
-        let (line_color, attrs) = result_line_style(display, idx, color);
+        let (line_color, attrs) = if diff_aware {
+            diff_line_style(line).unwrap_or_else(|| result_line_style(display, idx, color))
+        } else {
+            result_line_style(display, idx, color)
+        };
         lines.push(ScrollbackLine::styled(
             vec![HistorySegment::styled(
                 format!("{}{truncated}", result_line_prefix(icon, idx == 0)),
@@ -355,6 +360,39 @@ fn build_head_tail_scrollback_lines(
     }
 
     lines
+}
+
+fn is_diff_content(content: &str, tool_name: Option<&str>) -> bool {
+    match tool_name {
+        Some("edit") | Some("diff") => true,
+        _ => content.lines().any(|line| {
+            line.starts_with("diff --git")
+                || line.starts_with("@@")
+                || line.starts_with("--- ")
+                || line.starts_with("+++ ")
+        }),
+    }
+}
+
+fn diff_line_style(line: &str) -> Option<(Option<CColor>, HistoryAttrs)> {
+    if line.starts_with('+') && !line.starts_with("+++") {
+        Some((
+            to_crossterm_color(semantic::TEXT_SUCCESS),
+            HistoryAttrs::default(),
+        ))
+    } else if line.starts_with('-') && !line.starts_with("---") {
+        Some((
+            to_crossterm_color(semantic::TEXT_ERROR),
+            HistoryAttrs::default(),
+        ))
+    } else if line.starts_with("@@") {
+        Some((
+            to_crossterm_color(semantic::TEXT_ACCENT),
+            HistoryAttrs::default(),
+        ))
+    } else {
+        None
+    }
 }
 
 fn result_line_style(
@@ -547,5 +585,74 @@ mod tests {
         assert!(lines_suppressed[0].text.starts_with("   read 2 lines"));
         assert_eq!(lines_suppressed[0].segments[0].fg, secondary_result_color());
         assert!(!lines_suppressed[0].segments[0].attrs.bold);
+    }
+
+    #[test]
+    fn tool_result_edit_diff_gets_semantic_styling() {
+        let display = ToolResultDisplay {
+            tool_name: Some("edit".to_string()),
+            content: "edited src/main.rs\ndiff:\n- old line\n+ new line".to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+        assert_eq!(lines.len(), 4);
+
+        // "edited src/main.rs" — not a diff line, default styling
+        assert_eq!(lines[0].segments[0].fg, secondary_result_color());
+
+        // "diff:" — not a diff line, default styling
+        assert_eq!(lines[1].segments[0].fg, secondary_result_color());
+
+        // "- old line" — removed, red foreground
+        assert_eq!(
+            lines[2].segments[0].fg,
+            to_crossterm_color(semantic::TEXT_ERROR)
+        );
+
+        // "+ new line" — added, green foreground
+        assert_eq!(
+            lines[3].segments[0].fg,
+            to_crossterm_color(semantic::TEXT_SUCCESS)
+        );
+    }
+
+    #[test]
+    fn tool_result_unified_diff_gets_semantic_styling() {
+        let display = ToolResultDisplay {
+            tool_name: Some("git_diff".to_string()),
+            content: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n context line".to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+        assert_eq!(lines.len(), 7);
+
+        // "-old" — removed
+        assert_eq!(
+            lines[4].segments[0].fg,
+            to_crossterm_color(semantic::TEXT_ERROR)
+        );
+        // "+new" — added
+        assert_eq!(
+            lines[5].segments[0].fg,
+            to_crossterm_color(semantic::TEXT_SUCCESS)
+        );
+        // " context line" — not a diff line, default
+        assert_eq!(lines[6].segments[0].fg, secondary_result_color());
+    }
+
+    #[test]
+    fn tool_result_prose_with_dash_not_styled_as_diff() {
+        let display = ToolResultDisplay {
+            tool_name: Some("bash".to_string()),
+            content: "- this is a bullet\n+ another bullet\nnormal text".to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+        assert_eq!(lines.len(), 3);
+
+        // All lines use default styling — no diff markers present and tool is not edit/diff
+        for line in &lines {
+            assert_eq!(line.segments[0].fg, secondary_result_color());
+        }
     }
 }
