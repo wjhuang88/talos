@@ -30,7 +30,7 @@ Original acceptance required ref-to-ref comparisons in addition to the above. Re
 (enumerating changed files between two arbitrary refs and diffing their blobs) requires a gix
 tree-diff or host-git `git diff --name-only` fallback that is out of scope for this frontline
 package. Unstaged, staged, and path-filtered comparisons cover the primary review-before-commit
-workflow. Ref-to-ref is deferred to a future iteration under a separate story.
+workflow. Ref-to-ref is deferred to `TOOL-020` under a separate owner doc.
 
 ## Non-Goals
 
@@ -66,5 +66,5 @@ workflow. Ref-to-ref is deferred to a future iteration under a separate story.
 
 - **Background coloring**: `HistoryAttrs` does not support background colors; foreground green/red
   is the primary visual signal.
-- **Ref-to-ref comparison**: formally deferred per Acceptance Change above.
-
+- **Ref-to-ref comparison**: formally deferred per Acceptance Change above and retained as
+  `TOOL-020`.

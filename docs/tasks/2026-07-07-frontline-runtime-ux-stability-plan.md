@@ -551,11 +551,11 @@ Fallback-permitted residuals (explicitly allowed by each task's fallback column,
 - RUNTIME-002: optional `UserInput::Cancel` through tui_bridge integration test and health-check
   task remain as owner-doc residuals. The plan's FS03 fallback permits "keep runtime event only"
   and the RUNTIME-002 acceptance makes the health-check task conditional ("if added").
-- TODO-002: batch update tool (`todo_update_batch`) not implemented; the model issues repeated
-  `todo_update` calls. This is a future efficiency improvement, not an acceptance gap — the
-  acceptance requires "batch create/update is supported" and batch create is fully wired.
+- TODO-002: no residual. `todo_create_batch` and `todo_update_batch` are implemented and registered
+  in both print and TUI tool registries.
 - TOOL-018: `git_diff` ref-to-ref comparison formally deferred via documented acceptance change
-  (see TOOL-018 owner doc). Unstaged, staged, and path-filtered modes are implemented and tested.
+  (see TOOL-018 owner doc). The deferred work is retained as `TOOL-020` so it is not lost during
+  later planning. Unstaged, staged, and path-filtered modes are implemented and tested.
   HistoryAttrs background-color limitation is a display constraint.
 - TUI-028: #31 thinking persistence into history is a decision gap (ADR-034/TUI-020 revision
   required). The plan's acceptance explicitly defers this: "Persisting thinking content into
@@ -565,4 +565,4 @@ Recovery instructions:
 - Owning record: this file.
 - Git state at final closeout: branch `main`, HEAD is the FS16 revision commit.
 - The plan is Complete. Resume residual work from the owner docs listed above with new iteration IDs.
-- All 1763 workspace tests pass; no gate is failing; no push, release, tag, publish, or deployment occurred.
+- All 1767 workspace tests pass; no gate is failing; no push, release, tag, publish, or deployment occurred.
