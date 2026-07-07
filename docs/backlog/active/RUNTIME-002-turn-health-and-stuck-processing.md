@@ -192,7 +192,8 @@ Source: `docs/tasks/2026-07-07-provider-runtime-hardening-next-phase.md` (PRH01/
 - **Guard added:** `run_inner` now rejects duplicate tool call ids within a single provider response
   as `AgentError::UnexpectedEvent`. Text-based tool calls are unaffected (`parse_json_tool_call`
   assigns unique UUIDs).
-- **Invariant tests added** (`cargo test -p talos-agent tool_use` + targeted, 4 total):
+- **Invariant tests added** (covered by full `cargo test -p talos-agent`; the `tool_use` filter
+  matches `test_run_rejects_tool_use_without_tool_calls`):
   - `test_run_rejects_duplicate_tool_call_ids` (new guard)
   - `test_run_end_turn_with_tool_calls_executes_recoverably` (`EndTurn` + tool_calls is bounded-
     recoverable: tools execute, turn continues; not rejected because text-based tools legitimately
