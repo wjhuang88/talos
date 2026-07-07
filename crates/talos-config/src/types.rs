@@ -377,7 +377,7 @@ pub struct McpServerConfig {
     // I009-S3 begin
     /// Stable MCP server name.
     pub name: String,
-    /// Transport kind (`stdio` or `http`).
+    /// Transport kind (`stdio`, `sse`, `streamable_http`, or `http` alias).
     pub transport: String,
     /// Executable command for stdio transport.
     #[serde(default)]
@@ -391,6 +391,23 @@ pub struct McpServerConfig {
     /// Working directory for stdio transport.
     #[serde(default)]
     pub cwd: Option<PathBuf>,
+    /// Remote MCP endpoint URL for SSE or Streamable HTTP transports.
+    #[serde(default)]
+    pub url: Option<String>,
+    /// Explicit JSON-RPC POST URL for legacy SSE transports.
+    ///
+    /// When unset, Talos reads the initial SSE `endpoint` event.
+    #[serde(default)]
+    pub sse_post_url: Option<String>,
+    /// Non-secret custom HTTP headers for remote MCP transports.
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
+    /// Environment variable containing a bearer token.
+    #[serde(default)]
+    pub auth_token_env: Option<String>,
+    /// Environment variable containing the full Authorization header value.
+    #[serde(default)]
+    pub authorization_env: Option<String>,
     // I009-S3 end
 }
 

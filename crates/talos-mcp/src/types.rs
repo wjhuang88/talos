@@ -35,11 +35,11 @@ pub struct McpCallRequest {
 /// Talos-owned replacement for `talos_config::McpServerConfig`.
 ///
 /// Launch configuration for one MCP server.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct McpServerLaunchConfig {
     /// Stable MCP server name.
     pub name: String,
-    /// Transport kind (`stdio` or `http`).
+    /// Transport kind (`stdio`, `sse`, `streamable_http`, or `http` alias).
     pub transport: String,
     /// Executable command for stdio transport.
     pub command: String,
@@ -49,6 +49,16 @@ pub struct McpServerLaunchConfig {
     pub env: HashMap<String, String>,
     /// Working directory for stdio transport.
     pub cwd: Option<PathBuf>,
+    /// Remote MCP endpoint URL for SSE or Streamable HTTP transports.
+    pub url: Option<String>,
+    /// Explicit JSON-RPC POST URL for legacy SSE transports.
+    pub sse_post_url: Option<String>,
+    /// Non-secret custom HTTP headers for remote MCP transports.
+    pub headers: HashMap<String, String>,
+    /// Environment variable containing a bearer token.
+    pub auth_token_env: Option<String>,
+    /// Environment variable containing the full Authorization header value.
+    pub authorization_env: Option<String>,
 }
 
 /// Talos-owned replacement for `talos_config::McpConfig`.

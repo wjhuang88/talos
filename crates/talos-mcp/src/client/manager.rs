@@ -8,7 +8,7 @@ use tokio::process::Child;
 
 use crate::client::adapter::{McpRemoteTool, McpToolAdapter};
 use crate::client::dispatcher::McpDispatcher;
-use crate::client::transport::spawn_stdio_transport;
+use crate::client::transport::{McpTransport, build_remote_headers, spawn_stdio_transport};
 use crate::error::{McpError, Result};
 use crate::types::{McpClientConfig, McpServerLaunchConfig, McpServerStatus, McpToolDescriptor};
 
@@ -24,7 +24,7 @@ pub struct McpStartupFailure {
 struct ManagedClient {
     dispatcher: Arc<McpDispatcher>,
     tools: Vec<McpToolDescriptor>,
-    _child: Child,
+    _child: Option<Child>,
 }
 
 /// Owns MCP clients and exposes remote tools as Talos tools.
@@ -42,15 +42,23 @@ impl McpClientManager {
 
         for server in &config.servers {
             match Self::start_one(server).await {
-                Ok(mut client) => match client.dispatcher.list_tools().await {
-                    Ok(tools) => {
-                        client.tools = tools;
-                        clients.push(client);
+                Ok(mut client) => match client.dispatcher.initialize().await {
+                    Ok(()) => match client.dispatcher.list_tools().await {
+                        Ok(tools) => {
+                            client.tools = tools;
+                            clients.push(client);
+                        }
+                        Err(error) => startup_failures.push(McpStartupFailure {
+                            server: server.name.clone(),
+                            error: error.to_string(),
+                        }),
+                    },
+                    Err(error) => {
+                        startup_failures.push(McpStartupFailure {
+                            server: server.name.clone(),
+                            error: error.to_string(),
+                        });
                     }
-                    Err(error) => startup_failures.push(McpStartupFailure {
-                        server: server.name.clone(),
-                        error: error.to_string(),
-                    }),
                 },
                 Err(error) => startup_failures.push(McpStartupFailure {
                     server: server.name.clone(),
@@ -67,13 +75,18 @@ impl McpClientManager {
     }
 
     async fn start_one(server: &McpServerLaunchConfig) -> Result<ManagedClient> {
-        if server.transport != "stdio" {
-            // TODO: I009-future support HTTP transport.
-            return Err(McpError::InvalidConfig(format!(
-                "server '{}' has unsupported transport '{}'; only stdio is supported",
-                server.name, server.transport
-            )));
+        match server.transport.as_str() {
+            "stdio" => Self::start_stdio(server).await,
+            "streamable_http" | "http" => Self::start_streamable_http(server).await,
+            "sse" => Self::start_legacy_sse(server).await,
+            unsupported => Err(McpError::InvalidConfig(format!(
+                "server '{}' has unsupported transport '{}'; supported transports are stdio, sse, streamable_http",
+                server.name, unsupported
+            ))),
         }
+    }
+
+    async fn start_stdio(server: &McpServerLaunchConfig) -> Result<ManagedClient> {
         if server.command.trim().is_empty() {
             return Err(McpError::InvalidConfig(format!(
                 "server '{}' missing stdio command",
@@ -102,7 +115,56 @@ impl McpClientManager {
         Ok(ManagedClient {
             dispatcher,
             tools: Vec::new(),
-            _child: child,
+            _child: Some(child),
+        })
+    }
+
+    async fn start_streamable_http(server: &McpServerLaunchConfig) -> Result<ManagedClient> {
+        let url = server.url.as_deref().ok_or_else(|| {
+            McpError::InvalidConfig(format!(
+                "server '{}' missing URL for streamable_http transport",
+                server.name
+            ))
+        })?;
+        let headers = build_remote_headers(
+            &server.headers,
+            server.auth_token_env.as_deref(),
+            server.authorization_env.as_deref(),
+        )?;
+        let transport =
+            McpTransport::streamable_http(server.name.clone(), url.to_string(), headers)?;
+        let dispatcher = Arc::new(McpDispatcher::new(server.name.clone(), transport));
+        Ok(ManagedClient {
+            dispatcher,
+            tools: Vec::new(),
+            _child: None,
+        })
+    }
+
+    async fn start_legacy_sse(server: &McpServerLaunchConfig) -> Result<ManagedClient> {
+        let url = server.url.as_deref().ok_or_else(|| {
+            McpError::InvalidConfig(format!(
+                "server '{}' missing URL for sse transport",
+                server.name
+            ))
+        })?;
+        let headers = build_remote_headers(
+            &server.headers,
+            server.auth_token_env.as_deref(),
+            server.authorization_env.as_deref(),
+        )?;
+        let transport = McpTransport::connect_legacy_sse(
+            server.name.clone(),
+            url.to_string(),
+            server.sse_post_url.clone(),
+            headers,
+        )
+        .await?;
+        let dispatcher = Arc::new(McpDispatcher::new(server.name.clone(), transport));
+        Ok(ManagedClient {
+            dispatcher,
+            tools: Vec::new(),
+            _child: None,
         })
     }
 
@@ -171,6 +233,7 @@ mod tests {
                 args: Vec::new(),
                 env: HashMap::new(),
                 cwd: None,
+                ..McpServerLaunchConfig::default()
             }],
         };
 
@@ -188,6 +251,31 @@ mod tests {
                 .error
                 .as_deref()
                 .is_some_and(|error| error.contains("missing"))
+        );
+    }
+
+    #[tokio::test]
+    async fn remote_server_missing_url_is_reported_without_failing_manager_startup() {
+        let config = McpClientConfig {
+            servers: vec![McpServerLaunchConfig {
+                name: "remote".to_string(),
+                transport: "streamable_http".to_string(),
+                ..McpServerLaunchConfig::default()
+            }],
+        };
+
+        let manager = McpClientManager::start(&config, Arc::new(HookRegistry::new()))
+            .await
+            .expect("manager startup should degrade per server");
+
+        let status = &manager.server_statuses()[0];
+        assert_eq!(status.server, "remote");
+        assert!(!status.connected);
+        assert!(
+            status
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("missing URL"))
         );
     }
 }

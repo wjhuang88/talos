@@ -26,11 +26,26 @@ model = "claude-sonnet-4-20250514"
 # ── MCP Servers ───────────────────────────────────────────────────────────────
 # [[mcp.servers]]
 # name = "my-mcp-server"
-# transport = "stdio"                   # currently only "stdio" is supported
+# transport = "stdio"                   # "stdio", "sse", "streamable_http"; "http" aliases streamable_http
 # command = "npx"
 # args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 # env = { }                             # extra environment variables
 # cwd = "/optional/working/directory"
+#
+# [[mcp.servers]]
+# name = "remote-streamable"
+# transport = "streamable_http"
+# url = "https://mcp.example.com/mcp"
+# headers = { "X-Client-Name" = "talos" } # non-secret custom headers
+# auth_token_env = "REMOTE_MCP_TOKEN"      # sends Authorization: Bearer $REMOTE_MCP_TOKEN
+# # authorization_env = "REMOTE_MCP_AUTH"  # optional full Authorization header value
+#
+# [[mcp.servers]]
+# name = "remote-sse"
+# transport = "sse"
+# url = "https://mcp.example.com/sse"
+# # sse_post_url = "https://mcp.example.com/message" # optional; normally discovered from endpoint event
+# auth_token_env = "REMOTE_MCP_TOKEN"
 
 # ── JSON-RPC ──────────────────────────────────────────────────────────────────
 # [rpc]

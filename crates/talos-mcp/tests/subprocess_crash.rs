@@ -19,6 +19,7 @@ async fn subprocess_crash_is_reported_and_other_servers_continue() {
                 args: Vec::new(),
                 env: HashMap::new(),
                 cwd: None,
+                ..McpServerLaunchConfig::default()
             },
             McpServerLaunchConfig {
                 name: "ok".to_string(),
@@ -27,6 +28,7 @@ async fn subprocess_crash_is_reported_and_other_servers_continue() {
                 args: Vec::new(),
                 env: HashMap::from([("ECHO_PREFIX".to_string(), "ok".to_string())]),
                 cwd: std::env::current_dir().ok(),
+                ..McpServerLaunchConfig::default()
             },
         ],
     };

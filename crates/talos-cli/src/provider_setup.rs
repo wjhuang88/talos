@@ -17,6 +17,11 @@ pub(crate) fn config_to_mcp_client_config(config: &McpConfig) -> McpClientConfig
                 args: s.args.clone(),
                 env: s.env.clone(),
                 cwd: s.cwd.clone(),
+                url: s.url.clone(),
+                sse_post_url: s.sse_post_url.clone(),
+                headers: s.headers.clone(),
+                auth_token_env: s.auth_token_env.clone(),
+                authorization_env: s.authorization_env.clone(),
             })
             .collect(),
     }

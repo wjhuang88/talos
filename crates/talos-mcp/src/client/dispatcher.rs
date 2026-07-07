@@ -25,6 +25,33 @@ impl McpDispatcher {
         }
     }
 
+    /// Performs the MCP initialize handshake when the server requires it.
+    pub async fn initialize(&self) -> Result<()> {
+        let params = json!({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "talos",
+                "version": env!("CARGO_PKG_VERSION"),
+            }
+        });
+        match self.transport.request("initialize", Some(params)).await {
+            Ok(_) => {
+                self.transport
+                    .notify("notifications/initialized", None)
+                    .await
+                    .map_err(|error| self.method_error("notifications/initialized", error))?;
+                Ok(())
+            }
+            Err(McpError::Rpc { message, .. })
+                if message.contains("-32601") || message.contains("unknown method") =>
+            {
+                Ok(())
+            }
+            Err(error) => Err(self.method_error("initialize", error)),
+        }
+    }
+
     /// Lists tools exposed by the remote server.
     pub async fn list_tools(&self) -> Result<Vec<McpToolDescriptor>> {
         let result = self

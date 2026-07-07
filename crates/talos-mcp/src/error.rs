@@ -56,6 +56,10 @@ pub enum McpError {
     #[error("MCP IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// HTTP transport failure.
+    #[error("MCP HTTP error: {0}")]
+    Http(#[from] reqwest::Error),
+
     /// MCP protocol-level error (code + message from the remote).
     #[error("MCP protocol error: {message}")]
     Protocol {

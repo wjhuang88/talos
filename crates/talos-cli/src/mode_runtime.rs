@@ -285,6 +285,11 @@ pub(crate) fn apply_mcp_fixture_config(config: &mut Config, cli: &Cli) {
                 "fixture".to_string(),
             )]),
             cwd: std::env::current_dir().ok(),
+            url: None,
+            sse_post_url: None,
+            headers: std::collections::HashMap::new(),
+            auth_token_env: None,
+            authorization_env: None,
         }];
     }
 
