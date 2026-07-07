@@ -531,6 +531,152 @@ async fn test_run_rejects_tool_use_without_tool_calls() {
 }
 
 #[tokio::test]
+#[allow(deprecated)]
+async fn test_run_rejects_duplicate_tool_call_ids() {
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "dup_id".into(),
+                name: "read".into(),
+                input: serde_json::json!({ "path": "a" }),
+            },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        },
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "dup_id".into(),
+                name: "read".into(),
+                input: serde_json::json!({ "path": "b" }),
+            },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "read".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("ok"),
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+
+    let agent = Agent::new(Arc::new(MockModel::new(vec![events])), registry);
+    let result = agent.run("dup".into()).await;
+
+    let err = result.expect_err("duplicate tool call ids must be terminal error");
+    assert!(
+        matches!(&err, AgentError::UnexpectedEvent(msg) if msg.contains("duplicate tool call id")),
+        "expected duplicate-id error, got: {err:?}"
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_run_end_turn_with_tool_calls_executes_recoverably() {
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "call_1".into(),
+                    name: "echo".into(),
+                    input: serde_json::json!({ "message": "hi" }),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: talos_core::message::Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "recovered".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: talos_core::message::Usage::default(),
+            },
+        ],
+    ];
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "echo".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("ok"),
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+
+    let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+    let result = agent.run("mixed".into()).await;
+
+    let response = result.expect("EndTurn + tool_calls should recover by executing tools");
+    assert_eq!(
+        response, "recovered",
+        "turn should continue after tool execution despite EndTurn stop reason"
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_run_provider_error_after_tool_results_is_terminal() {
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "call_1".into(),
+                    name: "echo".into(),
+                    input: serde_json::json!({ "message": "probe" }),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: talos_core::message::Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::Error {
+                message: "provider rejected request after tool results".into(),
+            },
+        ],
+    ];
+
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "echo".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("ok"),
+        execution_log: Arc::new(Mutex::new(Vec::new())),
+    }));
+
+    let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+    let result = agent.run("probe".into()).await;
+
+    let err = result.expect_err("provider rejection after tool results must be terminal");
+    assert!(
+        matches!(&err, AgentError::UnexpectedEvent(msg) if msg.contains("provider rejected")),
+        "expected UnexpectedEvent for post-tool-result provider rejection, got: {err:?}"
+    );
+}
+
+#[tokio::test]
 #[allow(deprecated)] // Agent::new is correct for unit tests
 async fn test_run_streaming_forwards_events() {
     let events = vec![

@@ -555,6 +555,22 @@ impl Agent {
                 );
             }
 
+            if !turn_tool_calls.is_empty() {
+                let mut seen_ids: HashSet<&str> = HashSet::new();
+                let duplicate_id = turn_tool_calls
+                    .iter()
+                    .find(|pending| !seen_ids.insert(pending.call.id.as_str()))
+                    .map(|pending| pending.call.id.clone());
+                if let Some(id) = duplicate_id {
+                    break 'turn_loop (
+                        Err(AgentError::UnexpectedEvent(format!(
+                            "provider emitted duplicate tool call id: {id}"
+                        ))),
+                        TurnStatus::UnexpectedEvent,
+                    );
+                }
+            }
+
             if turn_tool_calls.is_empty() {
                 let reasoning = turn_reasoning_blocks
                     .take()
