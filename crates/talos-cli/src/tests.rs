@@ -249,6 +249,248 @@ mod tests {
         loop_handle.abort();
     }
 
+    // FS02 / RUNTIME-002: runtime-level integration coverage proving the conversation loop
+    // forwards a terminal `UiOutput::Status { is_processing: false }` after provider/tool errors,
+    // timeouts, and MaxTokens turn ends. These tests drive the full bridge path
+    // (`AgentEvent` -> `run_conversation_loop` -> `UiOutput`) rather than the engine in isolation.
+
+    fn spawn_loop_for_runtime_tests(
+        engine: ConversationEngine,
+    ) -> (
+        tokio::task::JoinHandle<()>,
+        tokio::sync::mpsc::UnboundedSender<AgentEvent>,
+        tokio::sync::mpsc::UnboundedReceiver<UiOutput>,
+    ) {
+        let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (_user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                submit_tx,
+                sq_tx_watch: sq_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+            },
+        ));
+        (handle, agent_tx, ui_rx)
+    }
+
+    async fn collect_terminal_status(
+        ui_rx: &mut tokio::sync::mpsc::UnboundedReceiver<UiOutput>,
+    ) -> talos_conversation::StatusSnapshot {
+        let statuses = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            let mut collected = Vec::new();
+            while let Some(output) = ui_rx.recv().await {
+                if let UiOutput::Status(status) = output {
+                    collected.push(status);
+                }
+            }
+            collected
+        })
+        .await
+        .expect("timed out waiting for conversation loop to drain");
+        statuses
+            .last()
+            .expect("conversation loop emitted at least one status")
+            .clone()
+    }
+
+    #[tokio::test]
+    async fn conversation_loop_clears_processing_on_provider_error_after_tool_result() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::ToolCall {
+                call: talos_core::message::ToolCall {
+                    id: "tc-1".to_string(),
+                    name: "bash".to_string(),
+                    input: serde_json::json!({}),
+                },
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec![],
+            })
+            .unwrap();
+        agent_tx
+            .send(AgentEvent::ToolResult {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "tc-1".to_string(),
+                    content: "ok".to_string(),
+                    is_error: false,
+                },
+            })
+            .unwrap();
+        agent_tx
+            .send(AgentEvent::Error {
+                message: "provider connection reset after tool results".to_string(),
+            })
+            .unwrap();
+        drop(agent_tx);
+
+        let status = collect_terminal_status(&mut ui_rx).await;
+        assert!(
+            !status.is_processing,
+            "runtime must not remain stuck after provider error"
+        );
+        assert_eq!(status.phase, Some(talos_conversation::TurnPhase::Failed));
+
+        loop_handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn conversation_loop_clears_processing_on_timeout_error() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::Error {
+                message: "request timed out after 30s".to_string(),
+            })
+            .unwrap();
+        drop(agent_tx);
+
+        let status = collect_terminal_status(&mut ui_rx).await;
+        assert!(
+            !status.is_processing,
+            "runtime must not remain stuck after timeout"
+        );
+        assert_eq!(status.phase, Some(talos_conversation::TurnPhase::TimedOut));
+
+        loop_handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn conversation_loop_clears_processing_on_max_tokens_turn_end() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TextDelta {
+                delta: "partial".to_string(),
+            })
+            .unwrap();
+        agent_tx
+            .send(AgentEvent::TurnEnd {
+                stop_reason: talos_core::message::StopReason::MaxTokens,
+                usage: talos_core::message::Usage::default(),
+            })
+            .unwrap();
+        drop(agent_tx);
+
+        let status = collect_terminal_status(&mut ui_rx).await;
+        assert!(
+            !status.is_processing,
+            "runtime must not remain stuck after MaxTokens turn end"
+        );
+
+        loop_handle.await.unwrap();
+    }
+
+    // FS03 / RUNTIME-002: prove the visible diagnostic signals (error Tip + Error stream) are
+    // forwarded by the conversation loop on terminal failure, and that the normal success path
+    // (EndTurn) remains unchanged after the MaxTokens clearing fix.
+
+    #[tokio::test]
+    async fn conversation_loop_emits_visible_error_signals_on_terminal_failure() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+
+        let error_message = "provider connection reset".to_string();
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::Error {
+                message: error_message.clone(),
+            })
+            .unwrap();
+        drop(agent_tx);
+
+        let mut saw_error_tip = false;
+        let mut saw_error_stream = false;
+        let mut saw_terminal_status = false;
+        while let Some(output) = ui_rx.recv().await {
+            match output {
+                UiOutput::Tip { kind, text }
+                    if kind == talos_conversation::TipKind::Error && text == error_message =>
+                {
+                    saw_error_tip = true;
+                }
+                UiOutput::Stream(msg) if msg.source == talos_conversation::MessageSource::Error => {
+                    saw_error_stream = true;
+                }
+                UiOutput::Status(status) if !status.is_processing => {
+                    saw_terminal_status = true;
+                }
+                _ => {}
+            }
+        }
+
+        assert!(
+            saw_error_tip,
+            "terminal error must emit a visible error Tip"
+        );
+        assert!(
+            saw_error_stream,
+            "terminal error must emit a visible Error stream"
+        );
+        assert!(
+            saw_terminal_status,
+            "terminal error must emit a terminal Status with is_processing=false"
+        );
+
+        loop_handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn conversation_loop_normal_end_turn_success_path_unchanged() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TextDelta {
+                delta: "completed reply".to_string(),
+            })
+            .unwrap();
+        agent_tx
+            .send(AgentEvent::TurnEnd {
+                stop_reason: talos_core::message::StopReason::EndTurn,
+                usage: talos_core::message::Usage::default(),
+            })
+            .unwrap();
+        drop(agent_tx);
+
+        let status = collect_terminal_status(&mut ui_rx).await;
+        assert!(
+            !status.is_processing,
+            "normal EndTurn success must clear processing"
+        );
+        assert_eq!(
+            status.phase, None,
+            "normal EndTurn success must reset phase to None"
+        );
+
+        loop_handle.await.unwrap();
+    }
+
     #[tokio::test]
     async fn conversation_loop_routes_skill_activation_to_session_op() {
         let dir = tempfile::tempdir().unwrap();

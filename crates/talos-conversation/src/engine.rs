@@ -360,7 +360,10 @@ impl ConversationEngine {
             }
             AgentEvent::TurnEnd { usage, stop_reason } => {
                 self.close_stream();
-                if matches!(stop_reason, StopReason::EndTurn) {
+                // A `ToolUse` stop reason signals the turn continues with a tool call; any other
+                // stop reason (`EndTurn`, `MaxTokens`) is terminal for this turn and must clear
+                // `is_processing` so the UI does not remain stuck on a spinner with no phase label.
+                if !matches!(stop_reason, StopReason::ToolUse) {
                     self.is_processing = false;
                 }
                 self.current_phase = None;

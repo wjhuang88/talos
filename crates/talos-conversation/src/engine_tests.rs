@@ -348,9 +348,48 @@ async fn turn_end_with_empty_text_still_produces_status() {
     assert!(find_status(&outputs).is_some());
 }
 
-// ---------------------------------------------------------------------------
-// handle_agent_event: Error
-// ---------------------------------------------------------------------------
+#[test]
+fn turn_end_max_tokens_clears_processing() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: "partial response cut off".to_string(),
+    });
+    assert!(engine.is_processing);
+
+    let outputs = engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::MaxTokens,
+        usage: Usage::default(),
+    });
+
+    assert!(!engine.is_processing);
+    assert_eq!(engine.current_phase, None);
+    let status = find_status(&outputs).expect("max-tokens turn end must emit status");
+    assert!(!status.is_processing);
+    assert!(
+        engine
+            .messages
+            .iter()
+            .any(|m| m.role == MessageRole::Assistant && m.content == "partial response cut off")
+    );
+}
+
+#[test]
+fn turn_end_tool_use_keeps_processing_for_continuation() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    assert!(engine.is_processing);
+
+    let _ = engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::ToolUse,
+        usage: Usage::default(),
+    });
+
+    assert!(
+        engine.is_processing,
+        "ToolUse stop reason must keep processing so the following ToolCall continuation is not lost"
+    );
+}
 
 #[tokio::test]
 async fn error_clears_turn_and_produces_stream_and_status() {

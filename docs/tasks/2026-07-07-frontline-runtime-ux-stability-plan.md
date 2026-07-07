@@ -262,3 +262,110 @@ Stop and ask the maintainer before continuing if any task appears to require:
   `docs/backlog/active/TUI-018-context-limit-million-format.md`
 - MCP remote residuals: create a new backlog item only if the residual changes scope beyond the
   2026-07-07 fast-track request/response transport implementation.
+
+## Checkpoint FS00 - Kickoff Inventory (2026-07-07)
+
+Completed task items:
+- FS00: Board/backlog/task state inventoried; no owner-doc conflicts requiring stop-and-ask.
+
+Commits:
+- None. Doc-only kickoff checkpoint; first code commit lands at FS04 per the branch plan.
+
+Changed files:
+- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` (this checkpoint).
+
+Inventory and disposition:
+
+| Owner doc | Status at kickoff | FS item | Disposition |
+|---|---|---|---|
+| `RUNTIME-002-turn-health-and-stuck-processing.md` | In Progress (SSP140: engine-level `is_processing` verification complete with 5 deterministic tests in `engine_tests.rs`) | FS01-FS03 | Real work remains: runtime-level integration coverage (FS02) and visible stuck-state recovery signal (FS03). Engine-level clearing is already proven; do not rewrite it. |
+| `TUI-028-preview-status-feedback-reliability.md` | In Progress (SSP130: stale preview clear complete) | FS05-FS06 | Remaining preview reset / waiting-for-model vs waiting-for-tool / animation items stay in the owner doc for inventory (FS05) and strictly display-state fixes (FS06). |
+| `TODO-002-todo-mutation-reliability.md` | In Progress (SSP120: idempotent create complete; `find_by_title()` added; 4 tests) | FS07 | Remaining batch / delete / schema reliability items are owned by the owner doc. Stop and request senior review if a schema migration becomes necessary. |
+| `TOOL-015-write-edit-result-visibility.md` | Complete (2026-07-01, I076/T104; 22 file-tool tests, 200 unit, 4 TUI tool_result tests) | FS09 | Per Default Decisions: do not rewrite. Verify bounded preview/diff behavior still passes targeted tests, add evidence pointer, mark FS09 complete with commit reference at FS12 closeout. |
+| `TOOL-018-diff-output-and-rendering.md` | Planned | FS10 | Real work: bounded diff rendering for `edit` and `git_diff` with added/removed styling, preserving read-only Git boundaries. |
+| `PROVIDER-001-openai-streaming-usage.md` | Complete (2026-07-01, I076/T101; `parse_sse_stream_retains_usage_only_chunk` regression test, 48 unit + 4 integration + 2 doc tests) | FS11 | Per Default Decisions: do not rewrite. Verify `include_usage` request option and usage-only chunk handling still pass targeted tests, add evidence pointer at FS12 closeout. |
+| `TUI-017-context-usage-percentage.md` | Complete (2026-07-01, I076/T103; 14 status-bar tests) | FS13 | Per Default Decisions: do not rewrite. Plan acceptance adds "zero/invalid data" and "OpenAI-compatible usage" test coverage — add only missing cases at FS13, do not redo existing formatting. |
+| `TUI-018-context-limit-million-format.md` | Complete (2026-07-01, I076/T102; 14 status-bar tests cover M, k, raw, none) | FS14 | Per Default Decisions: do not rewrite. Verify acceptance cases (`1M ctx`, `2M ctx`, `200k ctx`) still pass and record evidence at FS14. |
+| `2026-07-07-mcp-remote-http-sse-streamable.md` | Complete (commit `a7cc14c`: stdio + sse + streamable_http + http alias implemented) | FS15 | Implementation shipped. FS15 work is docs/test hardening only: README/config docs distinguishing the four transports and local loopback fixture tests for missing URL and existing fixture paths. No internet-dependent tests. |
+
+Conflict check:
+- No owner doc conflicts with the plan. The "already complete" items (TOOL-015, PROVIDER-001, TUI-017, TUI-018, MCP remote) are handled by the plan's Default Decisions: do not rewrite; add missing tests/evidence and mark complete with commit references.
+- BOARD.md lists this plan as `Planned` with the correct exclusion gate; no permission, sandbox, release, storage-format, plugin, Git transport, or protocol redesign is authorized here.
+- Branch: working on `main` (1 commit ahead of `origin/main`, the plan-file commit `7f6ea5d`). No maintainer-provided branch/worktree was named; proceeding on `main` with commits only at FS04/FS08/FS12/FS16 per the branch plan.
+
+Validation (baseline, before any code change):
+- `git diff --check`: PASS (clean working tree).
+- `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
+
+Open deviations:
+- None. The "already complete" owner docs are not a deviation; they are handled by Default Decisions and recorded in the per-task evidence at the corresponding FS closeout.
+
+Residual owner:
+- None new at FS00. Per-task residuals stay in their owner docs as listed under Residual Work Destination above.
+
+Next item:
+- FS01: audit `RUNTIME-002` residual paths for stuck `processing` state. Produce a short table of terminal event paths and existing tests; list missing integration surfaces. Owner reads: `crates/talos-conversation/src/engine.rs`, `crates/talos-conversation/src/engine_tests.rs`, `crates/talos-cli/src/tui_bridge.rs`, `crates/talos-tui/src/app.rs`, ADR-006.
+
+Recovery instructions:
+- Owning record: this file (`docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md`).
+- Git state at FS00 close: branch `main`, HEAD `7f6ea5d` (plan-file commit), working tree has only this checkpoint edit pending.
+- Resume by reading this checkpoint, then start FS01 by auditing `crates/talos-conversation/src/engine.rs` terminal event handlers against the 5 existing engine-level tests in `engine_tests.rs`.
+- Completion gate for FS00 (governance + `git diff --check`) must pass before advancing to FS01.
+
+## Checkpoint FS04 - Month 1 Closeout: Runtime Stuck-State (2026-07-07)
+
+Completed task items:
+- FS00: Board/backlog/task state inventoried; kickoff checkpoint appended; no owner-doc conflicts.
+- FS01: Terminal event paths audited; 6 terminal paths mapped to existing tests; MaxTokens clearing
+  gap identified and documented in `RUNTIME-002` owner doc; missing integration surfaces listed.
+- FS02: MaxTokens stuck-processing bug fixed in `engine.rs` (clear `is_processing` on any
+  non-`ToolUse` stop reason); 2 engine tests + 3 conversation-loop integration tests added.
+- FS03: Visible signal chain verified as already implemented at TUI level (`preview_text_for_state`,
+  status-bar phase text, error Tip coloring); 2 integration tests added proving the conversation
+  loop forwards visible error Tip + Error stream on terminal failure, and that the normal EndTurn
+  success path is unchanged.
+
+Commits:
+- (will be created at this checkpoint — see `git log` after commit)
+
+Changed files:
+- `crates/talos-conversation/src/engine.rs` — MaxTokens clearing fix (1 condition change + comment).
+- `crates/talos-conversation/src/engine_tests.rs` — 2 new engine tests (MaxTokens, ToolUse continuation).
+- `crates/talos-cli/src/tests.rs` — 5 new conversation-loop integration tests + 2 test helpers.
+- `docs/backlog/active/RUNTIME-002-turn-health-and-stuck-processing.md` — FS01 audit table,
+  FS02-FS03 execution evidence, status update, Required Reads expanded.
+- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` — FS00 kickoff checkpoint,
+  this FS04 closeout checkpoint.
+
+Validation (all run in this worktree on 2026-07-07):
+- `cargo fmt --all -- --check`: PASS (clean).
+- `cargo check --workspace`: PASS.
+- `cargo test -p talos-conversation`: PASS, 117 tests (115 original + 2 new), 0 failed.
+- `cargo test -p talos-cli --bin talos`: PASS, 159 tests (154 original + 5 new), 0 failed.
+- `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
+- `git diff --check`: PASS.
+
+Open deviations:
+- None. The MaxTokens clearing change is a bug fix within RUNTIME-002 acceptance ("every terminal
+  path clears `is_processing`"), not a provider-semantics change. Normal success path is proven
+  unchanged by `conversation_loop_normal_end_turn_success_path_unchanged`.
+
+Residual owner:
+- `docs/backlog/active/RUNTIME-002-turn-health-and-stuck-processing.md` owns the optional
+  `UserInput::Cancel` through `tui_bridge` integration test and any future health-check task.
+  These are recorded as residuals in the owner doc and are not blockers for FS04 closeout.
+
+Next item:
+- FS05: Complete remaining `TUI-028` preview reset/animation/status inventory. Owner doc:
+  `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md`. Map issues #24-#28/#31 to
+  implemented, residual, or out-of-scope.
+
+Recovery instructions:
+- Owning record: this file.
+- Git state at FS04 close: branch `main`, HEAD will be the FS04 commit (after `git commit`).
+- Resume by reading this checkpoint, verifying `cargo test -p talos-conversation -p talos-cli` still
+  passes, then starting FS05 by reading the TUI-028 owner doc and inventorying its remaining items.
+- If the MaxTokens fix needs revisiting, the key file is
+  `crates/talos-conversation/src/engine.rs` `TurnEnd` handler (the `!matches!(stop_reason, StopReason::ToolUse)`
+  condition); the regression guard is `turn_end_tool_use_keeps_processing_for_continuation` in
+  `engine_tests.rs`.
