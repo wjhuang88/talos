@@ -74,15 +74,32 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-07 | Planning | Created as Month 1 shell for the four-month developer operating plan. |
+| 2026-07-07 | D100 Start-gate | Repo surveyed clean at commit `96dc2fc` (`fix(tools): skip rg test when ripgrep is not installed (#RUNTIME-002) [model:deepseek-v4-flash-free]`). Branch `main`, no working-tree changes. Owner docs (`I102`, `I103`, `I104`, `I105`, `RUNTIME-002`, `PROVIDER-002`, `AGENTS.md`, `BOARD.md`, `PRODUCT-BACKLOG.md`) read before D100 ran. Four-month developer operating plan (`2026-07-07-four-month-developer-operating-plan.md`) and handoff (`2026-07-07-programmer-handoff-four-month-developer-operating-plan.md`) exist and are consistent. D101/D102/D103 dependencies satisfied: `RUNTIME-002` is Complete (FS04 MaxTokens fix + integration tests), `PROVIDER-002` is Complete (UX103-UX105), and prior FP1-FP2 (`bf79b39`, `c26b79a`) already shipped SSE `[DONE]`-after-tool-call handling + duplicate-id guard. Hard boundaries re-confirmed: no tag/push/publish, no permission/sandbox/credential/storage-default change, no runtime catalog.db resurrection, no new dependency, every behavior change must carry runtime evidence. Baseline verification snapshot recorded in `## Verification Evidence` and the only residual (`bash_tool.rs` format drift) recorded in `## Variance And Residuals`. |
 
 ## Verification Evidence
 
-- Planned.
+- `git status --short`: clean (empty output).
+- `git rev-parse HEAD`: `96dc2fcaa66d78be1f8a293d8ccb4e3d46cacb23`.
+- `git log --oneline -3`: `96dc2fc fix(tools): skip rg test when ripgrep is not installed (#RUNTIME-002)` → `b05f71e docs(workspace): add four-month developer operating plan (#D100)` → `27626d9 chore(tools): replace iter().any() with contains() in clippy fix (#RUNTIME-002)`.
+- `cargo check --workspace`: passed (exit 0). 19 crates checked (`talos-core`, `talos-agent`, `talos-cli`, `talos-runtime`, `talos-tools`, plus all dependents).
+- `cargo test --workspace`: passed, 1778 passed / 0 failed / 0 ignored across 61 active test binaries; doctests embedded (`talos-provider` x2, `talos-sandbox` x2, `talos-skill` x2, `talos-tui` x2, `talos-permission` x1) all green.
+- `cargo clippy --workspace -- -D warnings`: passed (exit 0).
+- `scripts/validate_project_governance.sh .`: passed, 0 governance warnings; `manifest.yaml` profile still `high-risk`, `status` still `conformant`.
+- `cargo fmt --all -- --check`: reports a single pre-existing diff in `crates/talos-tools/src/bash_tool.rs:583` (joined-line variant of `args.first().copied() == Some("fmt") && args.contains(&"--check") && exit_code == 1` introduced by `27626d9`). Existing test suite stays green because rustfmt is presentation-only, but the diff exits non-zero (exit 1) — see `## Variance And Residuals` for ownership.
+- Owner-doc cross-check: `I102` references `RUNTIME-002` and `PROVIDER-002` as `Planned` parents under `Selected Stories`, but the active backlog owner docs mark both as `Complete`. The component-level work for D101/D102/D103 is already landed (FP1-FP2 commit pair `bf79b39` + `c26b79a`), so D101/D102 are now *coverage-deliberate* reopens of the same vectors (extra fixtures, dedicated invariant tests, evidence trails), not first-pass bug fixes. I will not rewrite the planned baseline — the starting gate is the executed parent stories + their recorded residuals, and D101/D102/D103 will strengthen/extend rather than re-do them.
 
 ## Variance And Residuals
 
-- Planned.
+### Pre-existing `bash_tool.rs` format drift (out of I102 scope)
 
-## Retrospective
+- `crates/talos-tools/src/bash_tool.rs:583` carries one rustfmt diff (multi-line `&&` chain collapsed by `27626d9`). D100 must not silently fix unrelated code; this stays a residual for the next owner whose scope touches `talos-tools`. `cargo fmt` will resolve it in one line. Tests still pass.
+- This is the only baseline drift found by the start-gate sweep.
 
-- Pending.
+### Owner-doc status disagreements inherited by I102
+
+- `RUNTIME-002` and `PROVIDER-002` are recorded as `Complete` in their owner docs, but `I102` `## Selected Stories` lists D101/D102/D103 as `Planned`. Per the iteration published-baseline rule, I will not rewrite the plan; D101-D103 become *coverage-extension* packets on the same provider/agent invariants, not first-pass bug fixes. Acceptance criteria in `I102` still hold (see `## Acceptance`).
+- The 2026-07-07 provider-runtime hardening next-phase task and the 2026-07-07 frontline runtime/UX stability plan both fed I102. `I102` does not supersede their closeouts; it inherits their residuals and packetises the remaining work.
+
+### Residuals exposed by D104 / month-1 closeout to track
+
+- Nothing D100 itself uncovered. D104 will produce the month-1 closeout residual set.
