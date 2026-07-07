@@ -165,3 +165,57 @@ Audit source: `crates/talos-conversation/src/engine.rs` (`handle_agent_event` li
 - **Validation:** `cargo test -p talos-provider parse_sse_stream_synthesizes_missing_tool_call_id`;
   `cargo test -p talos-agent tool_use`; `cargo fmt --all -- --check`;
   `cargo check --workspace`.
+
+## FP1-FP2 Provider Runtime Hardening (2026-07-07)
+
+Source: `docs/tasks/2026-07-07-provider-runtime-hardening-next-phase.md` (PRH01/PRH02).
+
+### FP1 Provider SSE Fixtures
+
+- **Bug found and fixed:** the `[DONE]` path in `parse_sse_stream` silently dropped accumulated
+  native tool calls when a provider streamed `tool_calls` deltas but closed the stream with
+  `[DONE]` and no `finish_reason` chunk. This produced `ToolCallStarted -> TurnEnd(EndTurn)` with
+  no `ToolCall` — a stuck path. The `[DONE]` path now emits accumulated native tool calls (mirroring
+  the stream-end fallback) and sets `stop_reason` to `ToolUse` when any are present.
+- **Fixture tests added** (`cargo test -p talos-provider openai::tests::parse_sse_stream`, 8 total):
+  - `parse_sse_stream_accumulates_split_id_name_args_chunks`
+  - `parse_sse_stream_empty_final_delta_clean_end_turn`
+  - `parse_sse_stream_done_after_tool_calls_emits_tool_use` (proves the fix)
+  - `parse_sse_stream_malformed_tool_arguments_becomes_empty_object`
+  - `parse_sse_stream_usage_chunk_interleaved_with_tool_calls`
+  - `parse_sse_stream_multi_tool_missing_ids_synthesizes_unique_indices`
+- **Acceptance met:** no fixture produces `ToolCallStarted -> TurnEnd(ToolUse)` without `ToolCall`.
+- **Commit:** `bf79b39`.
+
+### FP2 Agent ToolUse Invariants
+
+- **Guard added:** `run_inner` now rejects duplicate tool call ids within a single provider response
+  as `AgentError::UnexpectedEvent`. Text-based tool calls are unaffected (`parse_json_tool_call`
+  assigns unique UUIDs).
+- **Invariant tests added** (`cargo test -p talos-agent tool_use` + targeted, 4 total):
+  - `test_run_rejects_duplicate_tool_call_ids` (new guard)
+  - `test_run_end_turn_with_tool_calls_executes_recoverably` (`EndTurn` + tool_calls is bounded-
+    recoverable: tools execute, turn continues; not rejected because text-based tools legitimately
+    produce this pattern)
+  - `test_run_provider_error_after_tool_results_is_terminal` (tool result then provider `Error`
+    produces terminal `UnexpectedEvent`, not stuck)
+  - `test_run_rejects_tool_use_without_tool_calls` (existing regression guard, unchanged)
+- **Valid multi-tool turn semantics unchanged:** 201 agent unit tests pass.
+- **Commit:** `c26b79a`.
+
+### Residuals (FP1-FP2)
+
+- SSE comment lines (`: keepalive`) and `retry:` directives from proxies/gateways are handled
+  implicitly by `extract_event_data` (lines without `data:` prefix are skipped) but are not
+  covered by an explicit fixture. A future iteration can add fixtures if a real provider sends
+  these and breaks parsing.
+- `data: DONE` (without brackets, emitted by some legacy stubs) is not matched by the `[DONE]`
+  check; the stream-end fallback still emits a terminal `TurnEnd`, so it is not a stuck path, but
+  it is not optimally handled. Future fixture candidate.
+- Rejecting `EndTurn`/`MaxTokens` + non-empty tool calls was deliberately deferred: text-based tool
+  calls (`parse_text_tool_calls`) legitimately produce `EndTurn + ToolCall` events, so a blanket
+  rejection would break that path. If text-based and native tool calls need different stop_reason
+  semantics, a future design must distinguish them first.
+- FP3-FP8 packets (processing status visibility, session evidence, connect diagnostics, large model
+  UX, tool output ergonomics, trial docs) are not started; they remain in the task doc for future
+  frontline assignment.
