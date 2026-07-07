@@ -13,7 +13,7 @@ session history, built-in coding tools, explicit permissions, runtime Skills, MC
 and project-governance support while keeping the default core local and auditable.
 
 Talos has published its first stable pre-1.0 release line. The current release version in this
-workspace is `v0.2.2`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+workspace is `v0.3.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
 user-facing behavior; research tracks such as web control expansion beyond the read-only loopback
 dashboard, dotagents shared Skills, WASM plugins, and advanced document ingestion are tracked separately under
@@ -33,7 +33,7 @@ dashboard, dotagents shared Skills, WASM plugins, and advanced document ingestio
 
 ## Current Release Boundary
 
-`v0.2.2` is suitable for local developer use where the operator reviews tool actions and keeps
+`v0.3.0` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
 automation surface, or autonomous background daemon.
 
@@ -572,9 +572,9 @@ Release tags drive the GitHub release workflow:
 
 The release workflow builds Linux, macOS, and Windows artifacts from a macOS runner.
 
-The post-v0.2.0 hardening notes that fed this patch release are collected in
+The post-v0.2.0 hardening notes that fed the pre-0.3 release line are collected in
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). GitHub Releases
-is the source of truth for the published `v0.2.2` release announcement and downloads.
+is the source of truth for the published `v0.3.0` release announcement and downloads.
 
 ## Project Status
 

@@ -17,6 +17,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | R27 High-Risk Governance Gate | In Progress (standing gate) | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | Standing governance gate, not an active work item. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
+| Release 0.3.0 Closeout | In Progress | [v0.3.0 closeout](tasks/2026-07-07-release-0.3.0-closeout.md) | Complete version bump and validation, then push only the `v0.3.0` tag. No crates.io publish or manual GitHub Release. |
 | Four-Month Product Hardening Plan | Active (I085 paused; I086-I089 planned) | [hardening plan](tasks/2026-07-03-four-month-product-hardening-plan.md) | `v0.2.2` tag pushed 2026-07-03 and I085 activated 2026-07-03. I085 Stage 1/2 code and README acceptance are closed; I085 is paused with only MC107 real terminal walkthrough residual. I086-I089 remain planned shells. No branch push, crate publish, remote dashboard, browser automation, remote plugin install, write-capable plugin tools, or permission-default change without a separate gate. |
 
 ## Review

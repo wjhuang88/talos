@@ -12,8 +12,8 @@ rust-version.workspace = true
 wasm = ["dep:wasmtime"]
 
 [dependencies]
-talos-core = { version = "0.2.2", path = "../talos-core" }
-talos-permission = { version = "0.2.2", path = "../talos-permission" }
+talos-core = { version = "0.3.0", path = "../talos-core" }
+talos-permission = { version = "0.3.0", path = "../talos-permission" }
 async-trait = "0.1"
 futures-util = "0.3"
 serde = { version = "1", features = ["derive"] }
