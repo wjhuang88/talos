@@ -16,7 +16,8 @@ use talos_core::tool::{
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_session::{
     SessionManager, TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool,
-    TodoQueryTool, TodoRemoveDependencyTool, TodoUpdateStatusTool, TodoUpdateTool,
+    TodoQueryTool, TodoRemoveDependencyTool, TodoUpdateBatchTool, TodoUpdateStatusTool,
+    TodoUpdateTool,
 };
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
@@ -141,6 +142,10 @@ fn todo_tools_for_sessions_dir(sessions_dir: &Path, session_id: Uuid) -> Vec<Arc
             session_id,
         )),
         Arc::new(TodoUpdateTool::from_sessions_dir(sessions_dir, session_id)),
+        Arc::new(TodoUpdateBatchTool::from_sessions_dir(
+            sessions_dir,
+            session_id,
+        )),
         Arc::new(TodoDeleteTool::from_sessions_dir(sessions_dir, session_id)),
         Arc::new(TodoAddDependencyTool::from_sessions_dir(
             sessions_dir,
@@ -815,6 +820,7 @@ mod tests {
         assert!(print_registry.get("todo_create_batch").is_some());
         assert!(print_registry.get("todo_update_status").is_some());
         assert!(print_registry.get("todo_update").is_some());
+        assert!(print_registry.get("todo_update_batch").is_some());
         assert!(print_registry.get("todo_delete").is_some());
         assert!(print_registry.get("todo_add_dependency").is_some());
         assert!(print_registry.get("todo_remove_dependency").is_some());
@@ -833,6 +839,7 @@ mod tests {
         assert!(tui_registry.get("todo_create_batch").is_some());
         assert!(tui_registry.get("todo_update_status").is_some());
         assert!(tui_registry.get("todo_update").is_some());
+        assert!(tui_registry.get("todo_update_batch").is_some());
         assert!(tui_registry.get("todo_delete").is_some());
         assert!(tui_registry.get("todo_add_dependency").is_some());
         assert!(tui_registry.get("todo_remove_dependency").is_some());

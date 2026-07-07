@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TODO-002 |
 | Priority | P1 |
-| Status | Complete (FS07: idempotent create, /todo delete --confirm, batch create tool, UUID hiding) |
+| Status | Complete (FS07: idempotent create, /todo delete --confirm, batch create + update tools, UUID hiding) |
 | Source | [GitHub Issue #19](https://github.com/wjhuang88/talos/issues/19), [GitHub Issue #33](https://github.com/wjhuang88/talos/issues/33), [GitHub Issue #34](https://github.com/wjhuang88/talos/issues/34) |
 | Depends On | `TODO-001`, `CMD-001`, `PERM-002` |
 
@@ -58,8 +58,7 @@ users cannot directly delete a todo even though the agent tool can.
 
 ### Residuals
 
-- **Batch update tool**: only batch create is wired as an agent tool (`todo_create_batch`); batch
-  update (`todo_update_batch`) is not yet implemented. The model issues repeated `todo_update`
-  calls for batch updates, which is functional but less efficient. A future iteration can add the
-  batch update tool without changing the single-item shape.
+- None. All acceptance criteria are met: idempotent create, batch create (`todo_create_batch`),
+  batch update (`todo_update_batch`), `/todo delete --confirm`, and UUID hiding are all implemented
+  and tested.
 

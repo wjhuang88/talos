@@ -884,6 +884,111 @@ impl AgentTool for TodoCreateBatchTool {
     }
 }
 
+/// Input for the `todo_update_batch` tool.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TodoUpdateBatchInput {
+    /// Items to update (each must include `id`; remaining fields are optional).
+    #[serde(default)]
+    pub items: Vec<TodoUpdateInput>,
+}
+
+/// Agent tool that updates multiple session todo items in one call.
+#[derive(Debug, Clone)]
+pub struct TodoUpdateBatchTool {
+    db_path: PathBuf,
+    session_id: Uuid,
+}
+
+impl TodoUpdateBatchTool {
+    /// Create a batch todo update tool bound to one session's SQLite database path.
+    #[must_use]
+    pub fn new(db_path: PathBuf, session_id: Uuid) -> Self {
+        Self {
+            db_path,
+            session_id,
+        }
+    }
+
+    /// Create a batch todo update tool bound to one session, using the standard
+    /// database path under a sessions directory.
+    #[must_use]
+    pub fn from_sessions_dir(sessions_dir: &Path, session_id: Uuid) -> Self {
+        Self::new(sessions_dir.join("todos.sqlite"), session_id)
+    }
+}
+
+#[async_trait]
+impl AgentTool for TodoUpdateBatchTool {
+    fn name(&self) -> &str {
+        "todo_update_batch"
+    }
+
+    fn description(&self) -> &str {
+        "Update mutable fields on multiple session-scoped todo items in one call"
+    }
+
+    fn parameters(&self) -> Value {
+        tool_parameters!(TodoUpdateBatchInput)
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        let input: TodoUpdateBatchInput = match serde_json::from_value(input) {
+            Ok(input) => input,
+            Err(err) => {
+                return ToolResult::error(format!("Invalid todo_update_batch input: {err}"));
+            }
+        };
+        if input.items.is_empty() {
+            return ToolResult::error("todo_update_batch requires at least one item");
+        }
+        let repo = match open_tool_repo(&self.db_path) {
+            Ok(repo) => repo,
+            Err(err) => return ToolResult::error(err.to_string()),
+        };
+        let mut updated_count = 0usize;
+        for item in input.items {
+            let id = match parse_tool_uuid("id", &item.id) {
+                Ok(id) => id,
+                Err(err) => return ToolResult::error(err),
+            };
+            let update = TodoUpdate {
+                title: item.title,
+                description: if item.clear_description {
+                    Some(None)
+                } else {
+                    item.description.map(Some)
+                },
+                priority: item.priority,
+                assigned_to_turn: if item.clear_assigned_to_turn {
+                    Some(None)
+                } else {
+                    item.assigned_to_turn.map(Some)
+                },
+                tags: item.tags,
+            };
+            match repo.update(self.session_id, id, update) {
+                Ok(_) => updated_count += 1,
+                Err(err) => return ToolResult::error(err.to_string()),
+            }
+        }
+        let action = format!("Updated {updated_count} todo(s)");
+        let all = repo.list_all(self.session_id).unwrap_or_default();
+        ToolResult::success(format_mutation_result(&action, &all))
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn permission_profile(&self, _input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![todo_permission_facet(self.session_id)]
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["items"]
+    }
+}
+
 /// Agent tool that updates a session todo status.
 #[derive(Debug, Clone)]
 pub struct TodoUpdateStatusTool {
@@ -2196,5 +2301,53 @@ mod tests {
         // Only 1 item despite 2 inputs (same title dedup)
         let queried = query_tool.execute(serde_json::json!({})).await;
         assert!(queried.content.contains("1 todo(s)"));
+    }
+
+    #[tokio::test]
+    async fn todo_update_batch_tool_updates_multiple_items() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let session_id = Uuid::new_v4();
+        let create_tool = TodoCreateTool::new(db_path.clone(), session_id);
+        let batch_update_tool = TodoUpdateBatchTool::new(db_path.clone(), session_id);
+        let query_tool = TodoQueryTool::new(db_path, session_id);
+
+        let r1 = create_tool
+            .execute(serde_json::json!({"title": "item-a", "priority": "low"}))
+            .await;
+        let id_a = extract_uuid_from_text(&r1.content);
+        let r2 = create_tool
+            .execute(serde_json::json!({"title": "item-b", "priority": "low"}))
+            .await;
+        let id_b = extract_uuid_from_text(&r2.content);
+
+        let result = batch_update_tool
+            .execute(serde_json::json!({
+                "items": [
+                    {"id": id_a, "priority": "high"},
+                    {"id": id_b, "title": "renamed-b", "priority": "critical"}
+                ]
+            }))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("Updated 2 todo(s)"));
+
+        let queried = query_tool.execute(serde_json::json!({})).await;
+        assert!(queried.content.contains("(high)"));
+        assert!(queried.content.contains("renamed-b"));
+        assert!(queried.content.contains("(critical)"));
+    }
+
+    #[tokio::test]
+    async fn todo_update_batch_tool_rejects_empty_input() {
+        let dir = tempdir().expect("temp dir");
+        let db_path = dir.path().join("todos.sqlite");
+        let session_id = Uuid::new_v4();
+        let tool = TodoUpdateBatchTool::new(db_path, session_id);
+
+        let result = tool.execute(serde_json::json!({"items": []})).await;
+        assert!(result.is_error);
+        assert!(result.content.contains("at least one item"));
     }
 }

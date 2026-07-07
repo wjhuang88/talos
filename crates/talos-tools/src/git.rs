@@ -369,10 +369,16 @@ impl GitBranchListTool {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GitDiffInput {
+    /// When true, show staged changes (HEAD vs index). When false (default), show
+    /// all changes (HEAD vs worktree).
     #[serde(default)]
     pub staged: bool,
+    /// Maximum diff lines to output (default 200).
     #[serde(default)]
     pub max_lines: Option<u32>,
+    /// Optional path prefix filter — only files whose path starts with this value are included.
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 pub struct GitDiffTool {
@@ -421,6 +427,8 @@ impl GitDiffTool {
         let git_input: GitDiffInput =
             serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
         let max_lines = git_input.max_lines.unwrap_or(200) as usize;
+        let path_filter = git_input.path.as_deref();
+        let staged = git_input.staged;
 
         let repo = discover_repo(&self.workspace_root)?;
         let workdir = repo
@@ -444,11 +452,24 @@ impl GitDiffTool {
             let item = item.map_err(|e| GitToolError::Git(e.to_string()))?;
             let path_str = item.rela_path().to_string();
 
-            let old_content = read_head_blob_content(&repo, &path_str);
-            let new_content = std::fs::read_to_string(workdir.join(&path_str)).ok();
+            if let Some(filter) = path_filter
+                && !path_str.starts_with(filter)
+            {
+                continue;
+            }
+
+            let old_content = read_blob_at_ref(&repo, "HEAD", &path_str);
+            let new_content = if staged {
+                read_index_blob_content(&repo, &path_str)
+            } else {
+                std::fs::read_to_string(workdir.join(&path_str)).ok()
+            };
 
             match (old_content, new_content) {
                 (Some(old), Some(new)) => {
+                    if old == new {
+                        continue;
+                    }
                     let diff = similar::TextDiff::from_lines(&old, &new);
                     let patch = diff
                         .unified_diff()
@@ -486,10 +507,19 @@ impl GitDiffTool {
     }
 }
 
-fn read_head_blob_content(repo: &gix::Repository, path: &str) -> Option<String> {
+fn read_blob_at_ref(repo: &gix::Repository, rev: &str, path: &str) -> Option<String> {
     use gix::bstr::ByteSlice;
-    let spec = format!("HEAD:{path}");
+    let spec = format!("{rev}:{path}");
     let blob_id = repo.rev_parse_single(spec.as_bytes().as_bstr()).ok()?;
+    let blob = repo.find_object(blob_id).ok()?;
+    String::from_utf8(blob.data.to_vec()).ok()
+}
+
+fn read_index_blob_content(repo: &gix::Repository, path: &str) -> Option<String> {
+    use gix::bstr::ByteSlice;
+    let blob_id = repo
+        .rev_parse_single(format!(":{path}").as_bytes().as_bstr())
+        .ok()?;
     let blob = repo.find_object(blob_id).ok()?;
     String::from_utf8(blob.data.to_vec()).ok()
 }
@@ -1136,6 +1166,119 @@ mod tests {
         assert!(
             result.content.contains("+modified"),
             "expected added line, got: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn git_diff_staged_shows_head_vs_index() {
+        if std::process::Command::new("git")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("skipping: host git not available");
+            return;
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let run = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .expect("git command")
+        };
+        run(&["init"]);
+        run(&["config", "user.email", "test@test.com"]);
+        run(&["config", "user.name", "Test"]);
+
+        std::fs::write(dir.path().join("file.txt"), "original\n").unwrap();
+        run(&["add", "file.txt"]);
+        run(&["commit", "-m", "initial"]);
+
+        // Stage a change, then add an additional unstaged change so the
+        // status iterator picks up the file.
+        std::fs::write(dir.path().join("file.txt"), "staged\n").unwrap();
+        run(&["add", "file.txt"]);
+        std::fs::write(dir.path().join("file.txt"), "staged\nunstaged\n").unwrap();
+
+        let tool = GitDiffTool::new(dir.path().to_path_buf());
+        let staged_result = tool.execute(serde_json::json!({"staged": true})).await;
+        assert!(!staged_result.is_error, "{}", staged_result.content);
+        assert!(
+            staged_result.content.contains("-original"),
+            "expected -original in staged diff, got: {}",
+            staged_result.content
+        );
+        assert!(
+            staged_result.content.contains("+staged"),
+            "expected +staged in staged diff, got: {}",
+            staged_result.content
+        );
+        assert!(
+            !staged_result.content.contains("+unstaged"),
+            "staged diff must exclude unstaged changes, got: {}",
+            staged_result.content
+        );
+
+        let all_result = tool.execute(serde_json::json!({})).await;
+        assert!(
+            all_result.content.contains("+unstaged"),
+            "default diff should include unstaged changes, got: {}",
+            all_result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn git_diff_path_filter_excludes_non_matching() {
+        if std::process::Command::new("git")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("skipping: host git not available");
+            return;
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let run = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(dir.path())
+                .output()
+                .expect("git command")
+        };
+        run(&["init"]);
+        run(&["config", "user.email", "test@test.com"]);
+        run(&["config", "user.name", "Test"]);
+
+        std::fs::create_dir_all(dir.path().join("src")).unwrap();
+        std::fs::create_dir_all(dir.path().join("docs")).unwrap();
+        std::fs::write(dir.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+        std::fs::write(dir.path().join("docs/readme.md"), "# README\n").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-m", "initial"]);
+
+        std::fs::write(
+            dir.path().join("src/main.rs"),
+            "fn main() { println!(); }\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("docs/readme.md"), "# README Updated\n").unwrap();
+
+        let tool = GitDiffTool::new(dir.path().to_path_buf());
+        let result = tool.execute(serde_json::json!({"path": "src/"})).await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(
+            result.content.contains("src/main.rs"),
+            "expected src/main.rs in filtered diff, got: {}",
+            result.content
+        );
+        assert!(
+            !result.content.contains("docs/readme.md"),
+            "docs/readme.md should be filtered out, got: {}",
             result.content
         );
     }

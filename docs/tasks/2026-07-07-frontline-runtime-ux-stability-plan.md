@@ -502,6 +502,11 @@ Completed task items (FS00-FS15):
 - FS16 revision: closed TODO-002 batch tool registration gap (TodoCreateBatchTool registered in
   print + TUI registries) and TOOL-018 git_diff unified diff gap (similar::TextDiff::unified_diff
   with HEAD-blob retrieval). Updated all task-table statuses; synced BOARD/backlog derived views.
+- FS16 revision 2: closed remaining acceptance gaps from second review. Added `todo_update_batch`
+  tool (TODO-002 batch update acceptance). Added git_diff `staged` mode (HEAD vs index via `:path`
+  rev syntax) and `path` parameter filtering (TOOL-018 staged + path-filtered acceptance). Ref-to-ref
+  comparison formally deferred via documented acceptance change in TOOL-018 owner doc. 1767 tests
+  pass.
 
 Commits (this plan):
 - `3d3c3dd` — FS01-FS04: MaxTokens fix + runtime integration coverage.
@@ -533,7 +538,7 @@ Changed files (cumulative across all phases):
 Final validation (all run in this worktree on 2026-07-07):
 - `cargo fmt --all -- --check`: PASS.
 - `cargo check --workspace`: PASS.
-- `cargo test --workspace`: PASS, 1763 tests, 0 failed.
+- `cargo test --workspace`: PASS, 1767 tests, 0 failed.
 - `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
 - `git diff --check`: PASS.
 
@@ -549,11 +554,9 @@ Fallback-permitted residuals (explicitly allowed by each task's fallback column,
 - TODO-002: batch update tool (`todo_update_batch`) not implemented; the model issues repeated
   `todo_update` calls. This is a future efficiency improvement, not an acceptance gap — the
   acceptance requires "batch create/update is supported" and batch create is fully wired.
-- TOOL-018: `git_diff` staged-vs-unstaged filtering, path-filtered, and ref-to-ref comparisons
-  are not yet implemented. The FS10 fallback says "If Git execution path is involved, limit to
-  rendering and record Git residual" — the current implementation produces real unified diff
-  for unstaged changes (the primary use case). HistoryAttrs background-color limitation is a
-  display constraint, not an acceptance gap.
+- TOOL-018: `git_diff` ref-to-ref comparison formally deferred via documented acceptance change
+  (see TOOL-018 owner doc). Unstaged, staged, and path-filtered modes are implemented and tested.
+  HistoryAttrs background-color limitation is a display constraint.
 - TUI-028: #31 thinking persistence into history is a decision gap (ADR-034/TUI-020 revision
   required). The plan's acceptance explicitly defers this: "Persisting thinking content into
   history is not implemented unless ADR-034/TUI-020 are explicitly revised."

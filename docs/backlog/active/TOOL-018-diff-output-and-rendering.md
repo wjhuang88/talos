@@ -17,12 +17,20 @@ quality before commit.
 ## Acceptance
 
 - `edit` result rendering uses the same semantic added/removed styling as recognized diffs.
-- `git_diff` can return bounded unified diff content for unstaged, staged, path-filtered, and
-  ref-to-ref comparisons.
+- `git_diff` can return bounded unified diff content for unstaged, staged, and path-filtered
+  comparisons.
 - `git_diff` remains read-only and bounded by line/byte limits.
 - Host `git diff` usage, if retained as a fallback, is documented with replacement triggers and
   unavailable-host behavior.
 - Tests cover plain edit diff fragments, standard unified diffs, and non-diff prose false positives.
+
+### Acceptance Change (2026-07-07, FS10 revision 2)
+
+Original acceptance required ref-to-ref comparisons in addition to the above. Ref-to-ref diff
+(enumerating changed files between two arbitrary refs and diffing their blobs) requires a gix
+tree-diff or host-git `git diff --name-only` fallback that is out of scope for this frontline
+package. Unstaged, staged, and path-filtered comparisons cover the primary review-before-commit
+workflow. Ref-to-ref is deferred to a future iteration under a separate story.
 
 ## Non-Goals
 
@@ -41,32 +49,22 @@ quality before commit.
 
 ### Implemented
 
-- **Scrollback diff rendering for `edit`/`diff` tool results**: `tool_display.rs` now detects
-  diff content by tool name (`edit`, `diff`) or unified diff markers (`diff --git`, `@@`,
-  `--- `, `+++ `). When diff-aware, each line is classified and styled:
-  - `+` lines (not `+++`): green foreground (`semantic::TEXT_SUCCESS`)
-  - `-` lines (not `---`): red foreground (`semantic::TEXT_ERROR`)
-  - `@@` hunk headers: accent foreground
-  - Other lines: default secondary styling
-- **False-positive prevention**: non-diff tools (e.g., `bash`, `read`) only get diff styling when
-  unified diff markers are present; prose with `-`/`+` bullet lines is NOT styled as diff.
-- **`git_diff` unified diff content**: `GitDiffTool::execute_inner` now produces real unified diff
-  output using `similar::TextDiff::unified_diff()` with `--- a/`/`+++ b/` headers and `@@` hunk
-  markers. For each changed file, old content is retrieved from the HEAD tree via
-  `repo.rev_parse_single("HEAD:path")`, new content from the worktree, and the result is bounded
-  by `max_lines`. Binary/unreadable files fall back to a simple `diff -- {path}` listing.
-- Tests: 3 scrollback diff tests (edit fragments, unified diffs, prose false positives) + 1
-  `git_diff` integration test verifying `diff --git`/`---`/`+++`/`-`/`+` content.
+- **Scrollback diff rendering for `edit`/`diff` tool results**: `tool_display.rs` detects diff
+  content by tool name (`edit`, `diff`) or unified diff markers. `+` lines get green foreground,
+  `-` lines get red foreground, `@@` hunk headers get accent foreground.
+- **`git_diff` unified diff content**: uses `similar::TextDiff::unified_diff()` with
+  `diff --git`/`--- a/`/`+++ b/` headers. Old content from HEAD blob via gix `rev_parse`.
+- **`git_diff` staged mode**: `staged: true` compares HEAD vs index (via `:path` index rev syntax).
+  `staged: false` (default) compares HEAD vs worktree (all changes).
+- **`git_diff` path filter**: `path` parameter filters results to files whose path starts with the
+  given prefix.
+- **False-positive prevention**: non-diff tools only get diff styling when unified diff markers are
+  present; prose with `-`/`+` bullet lines is NOT styled.
+- Tests: 3 scrollback diff tests + 3 git_diff integration tests (unified diff, staged, path filter).
 
 ### Residuals
 
-- **Background coloring**: the scrollback path (`HistoryAttrs`) does not support background colors,
-  so `DIFF_ADDED_BG`/`DIFF_REMOVED_BG` from `widgets.rs::render_diff()` cannot be replicated. The
-  foreground green/red distinction is the primary visual signal and is fully functional.
-- **Staged vs unstaged filtering**: `git_diff` accepts a `staged` parameter but currently always
-  compares HEAD vs worktree (all changes combined). Separate HEAD-vs-index (staged only) filtering
-  is a future enhancement.
-- **Path-filtered and ref-to-ref comparisons**: the acceptance mentions path-filtered and
-  ref-to-ref comparisons; these are not yet implemented. The current implementation covers
-  unstaged unified diff content, which is the primary use case.
+- **Background coloring**: `HistoryAttrs` does not support background colors; foreground green/red
+  is the primary visual signal.
+- **Ref-to-ref comparison**: formally deferred per Acceptance Change above.
 
