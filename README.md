@@ -47,7 +47,7 @@ Currently shipped:
 - Built-in coding tools with permission gating.
 - Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.
 - Runtime Skills from `.talos/skills/`, `~/.talos/skills/`, and inherited parent `.talos/skills/`.
-- MCP stdio tools and JSON-RPC infrastructure.
+- MCP tools via stdio, SSE, and Streamable HTTP transports.
 - Initial Rust embedding facade in the `talos-runtime` crate.
 
 Not shipped yet:
@@ -473,7 +473,11 @@ history, and reference paths must stay inside the active Skill directory.
 
 ## MCP Tools
 
-Configure local stdio MCP servers in `~/.talos/config.toml`:
+Configure MCP servers in `~/.talos/config.toml`. Talos supports four transport types: `stdio`
+(local process), `sse` (legacy HTTP/SSE), `streamable_http` (Streamable HTTP), and `http` (alias
+for `streamable_http`).
+
+Local stdio:
 
 ```toml
 [[mcp.servers]]
@@ -484,16 +488,43 @@ args = ["/path/to/workspace"]
 env = {}
 ```
 
+Streamable HTTP (recommended for remote servers):
+
+```toml
+[[mcp.servers]]
+name = "remote-streamable"
+transport = "streamable_http"
+url = "https://mcp.example.com/mcp"
+auth_token_env = "REMOTE_MCP_TOKEN"   # sends Authorization: Bearer $REMOTE_MCP_TOKEN
+```
+
+Legacy SSE:
+
+```toml
+[[mcp.servers]]
+name = "remote-sse"
+transport = "sse"
+url = "https://mcp.example.com/sse"
+# sse_post_url is optional; auto-discovered from the endpoint event when omitted
+auth_token_env = "REMOTE_MCP_TOKEN"
+```
+
+Auth examples prefer `auth_token_env` or `authorization_env` over inline secrets. `auth_token_env`
+sends `Authorization: Bearer <token>`; `authorization_env` sends the full `Authorization` header
+value. The `headers` field accepts non-secret HTTP headers.
+
 Talos starts configured servers and discovers their tools before the first model turn in TUI,
 print, inline, interactive, and RPC modes. Tool names use the
 `mcp:<server>:<tool>` form. Read-only annotations are honored; other MCP tools use the normal
 approval path and are denied when interactive approval is unavailable. Startup failures are
-reported without aborting the session, and each MCP request has a bounded timeout. Use `/mcp`
+reported without aborting the session, and each MCP request has a bounded timeout. Per-server
+remote startup failures do not affect other servers. Use `/mcp`
 in the TUI to inspect the startup connection snapshot and observed tool provenance.
 
 The MCP tool set is fixed for the lifetime of a session so the model-visible tool definitions and
-prompt cache prefix remain stable. Restart the session after changing MCP configuration. Only
-local stdio transport is currently supported.
+prompt cache prefix remain stable. Restart the session after changing MCP configuration.
+Streamable HTTP resumable sessions and long-lived server-to-client notification channels are not
+yet supported.
 
 ## Embedding Talos In Rust
 

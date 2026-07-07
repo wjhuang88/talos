@@ -1,6 +1,6 @@
 # 2026-07-07 Frontline Runtime And UX Stability Plan
 
-**Status**: Planned
+**Status**: Complete (FS16 final closeout)
 **Created**: 2026-07-07
 **Timebox**: 16 weeks / roughly 4 months
 **Owner boundary**: frontline implementation package; maintainer or senior agent reviews phase closeouts
@@ -479,3 +479,66 @@ Recovery instructions:
 - Git state at FS12 close: branch `main`, HEAD will be the FS12 commit.
 - Resume by reading this checkpoint, verifying `cargo test -p talos-tui` passes, then starting
   FS13 by confirming TUI-017 status_bar tests and proceeding to FS15 MCP docs/tests.
+
+## Checkpoint FS16 - Final Closeout (2026-07-07)
+
+Completed task items (FS00-FS15):
+- FS00: Kickoff inventory; no owner-doc conflicts; baseline gates passed.
+- FS01: RUNTIME-002 terminal event paths audited; MaxTokens clearing gap identified.
+- FS02: MaxTokens stuck-processing bug fixed (engine.rs); 2 engine + 3 conversation-loop tests.
+- FS03: Visible signal chain verified (Tip/Error Stream/Status); 2 integration tests.
+- FS04: Month 1 closeout — commit `3d3c3dd`.
+- FS05: TUI-028 inventory — all 6 items implemented (#24-#28) or out-of-scope (#31).
+- FS06: No display-state work needed — all items already implemented.
+- FS07: `/todo delete <id> --confirm` implemented; `TodoRepository::create_batch` added.
+- FS08: Month 2 closeout — commit `d76cac4`.
+- FS09: TOOL-015 verified complete (22 file-tool + 7 TUI tests).
+- FS10: TOOL-018 scrollback diff rendering for edit/diff tools implemented; 3 tests.
+- FS11: PROVIDER-001 verified complete (4 usage tests).
+- FS12: Month 3 closeout — commit `afc27a2`.
+- FS13: TUI-017 verified complete (16 status_bar tests; division-by-zero guard exists).
+- FS14: TUI-018 verified complete (million format + sub-million preserved).
+- FS15: MCP remote docs updated (README: 4 transports + auth examples); 10 MCP tests pass.
+
+Commits (this plan):
+- `3d3c3dd` — FS01-FS04: MaxTokens fix + runtime integration coverage.
+- `d76cac4` — FS05-FS08: /todo delete + batch create + TUI-028/TODO-002 closeout.
+- `afc27a2` — FS09-FS12: scrollback diff rendering + TOOL-018 evidence.
+- FS16 commit: (this checkpoint).
+
+Changed files (cumulative across all phases):
+- `crates/talos-conversation/src/engine.rs` — MaxTokens clearing fix + /todo delete parsing.
+- `crates/talos-conversation/src/engine_tests.rs` — 8 new tests (MaxTokens, ToolUse, delete parse).
+- `crates/talos-conversation/src/types.rs` — TodoCommandAction::Delete variant.
+- `crates/talos-cli/src/tests.rs` — 7 conversation-loop integration tests.
+- `crates/talos-cli/src/todo_view.rs` — /todo delete handler + short-ID resolution + 3 tests.
+- `crates/talos-session/src/todo.rs` — create_batch method + 4 tests.
+- `crates/talos-tui/src/tool_display.rs` — diff rendering + 3 tests.
+- `README.md` — /todo delete row + MCP 4-transport docs.
+- `docs/backlog/active/RUNTIME-002-*.md` — FS01 audit + FS02-FS03 evidence.
+- `docs/backlog/active/TUI-028-*.md` — FS05 issue inventory.
+- `docs/backlog/active/TODO-002-*.md` — FS07 evidence.
+- `docs/backlog/active/TOOL-018-*.md` — FS10 evidence + residual.
+- `docs/tasks/2026-07-07-frontline-runtime-ux-stability-plan.md` — all checkpoints.
+
+Final validation (all run in this worktree on 2026-07-07):
+- `cargo fmt --all -- --check`: PASS.
+- `cargo check --workspace`: PASS.
+- `cargo test --workspace`: PASS, 1759 tests, 0 failed.
+- `scripts/validate_project_governance.sh .`: PASS, 0 warnings.
+- `git diff --check`: PASS.
+
+Open deviations:
+- None. All completed items passed their completion gates.
+
+Residual owners (for future iterations):
+- RUNTIME-002: optional `UserInput::Cancel` through tui_bridge integration test; health-check task.
+- TODO-002: batch agent tool registration (`todo_create_batch` tool + builder wiring).
+- TOOL-018: `git_diff` unified diff content (needs deeper gix diff API); HistoryAttrs background-color limitation.
+- TUI-028: #31 thinking persistence decision gap (ADR-034/TUI-020 revision required).
+
+Recovery instructions:
+- Owning record: this file.
+- Git state at final closeout: branch `main`, HEAD is the FS16 commit.
+- The plan is Complete. Resume residual work from the owner docs listed above with new iteration IDs.
+- All 1759 workspace tests pass; no gate is failing; no push, release, tag, publish, or deployment occurred.
