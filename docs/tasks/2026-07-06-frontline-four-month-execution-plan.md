@@ -1,6 +1,6 @@
 # 2026-07-06 Frontline Four-Month Execution Plan
 
-**Status**: In Progress
+**Status**: Complete (2026-07-06, F0-F16 all closed; full closeout matrix passed)
 **Created**: 2026-07-06
 **Timebox**: 16 weeks / roughly 4 months
 **Owner boundary**: frontline implementation package; maintainer reviews phase closeouts
@@ -832,3 +832,49 @@ Next task item:
 
 Recovery or resume instruction:
 - Owner record: this file. Git state: `main` at the Month 3 closeout commit. Resume F16 by running the full closeout matrix, then commit + push the F13/F14/F15 + F16 checkpoints together.
+
+## Checkpoint F16 - Final Closeout (2026-07-06)
+
+Completed items:
+- F0-F16 — entire frontline four-month execution plan complete.
+
+Current state and artifacts:
+- 8 commits on `main`, all pushed to `origin/main`:
+  - `6ad5894` F0 kickoff inventory + consolidated confirmation contract
+  - `9325aec` F1 catalog residual audit (findings table)
+  - `3cda7ad` F2 quarantine `talos-models` as non-runtime + 5-test `no_catalog_db_guard.rs`; MC-002 closed
+  - `8f5ee58` F3 README `/model` + `/connect` standard-provider URL-skip text drift closed
+  - `9fdb7e1` F4 Month 1 closeout checkpoint
+  - `a878255` F5-F8 verify standard-provider connect + protocol metadata + CLI model list (Month 2)
+  - `03551ac` F9-F12 verify TUI display package (Month 3)
+  - `5fef2f0` F13-F15 verify static site i18n + branding (Month 4 part 1)
+- Owner docs closed:
+  - `MC-002` Status → Complete; all acceptance criteria [x] with evidence.
+  - `WEB-003` Status → Complete; all 7 acceptance criteria [x].
+  - `WEB-004` Status → Complete; all 8 acceptance criteria [x].
+- `MC-001` owner doc unchanged (already records the 2026-07-05 maintainer decision and the MC107 real-terminal residual as parked).
+- `MODEL-005`, `MODEL-006`, `TUI-015`, `TUI-019`, `TUI-025` remain Complete in their owner docs; their acceptance evidence is re-cited in the F5-F11 checkpoints of this file.
+
+Commands/checks and actual results (full closeout matrix):
+- `cargo fmt --all -- --check` → exit 0 (clean).
+- `cargo check --workspace` → exit 0.
+- `cargo test --workspace` → exit 0; **no failures, no panics, no errors across every crate**. Notable per-crate pass counts: talos-agent 197, talos-cli 154 unit + integration (5 new `no_catalog_db_guard`, 1 rpc_e2e, 2 skill_runtime_e2e), talos-config 115, talos-tui 249, talos-session 255, talos-tools 93, talos-models 37 (quarantined crate still compiles). All doctests pass.
+- `scripts/validate_project_governance.sh .` → "Governance validation passed: 0 warning(s)."
+- `scripts/validate_public_site.sh` → "HTML files checked: 14, Errors: 0, Warnings: 0."
+- `git diff --check` → CLEAN.
+- `git status` → on `main`, up to date with `origin/main`, working tree clean.
+
+Open risks or deviations:
+- None blocking. The plan completed as a mix of one genuine cleanup (F2 catalog quarantine + guard test) and documentation/verification work, because F5-F15 referenced backlog items that had already shipped before this plan was written (2026-07-04/05 vs plan date 2026-07-06). The confirmation contract resolved this by treating already-complete items as verify + record + close.
+
+Residual owner (carried forward, out of scope for this plan):
+- MC-001 / MC107 — real-terminal `/connect` walkthrough. Owner: `docs/backlog/active/MC-001-model-catalog-modernization.md` (Paused).
+- MODEL-006 — `set_active_model()` does not consult `builtin_providers()` for protocol when a non-hardcoded provider is selected via `/model` without prior `/connect`. Not triggered by normal `/model` usage. Owner: `docs/backlog/active/MODEL-006-interactive-model-catalog-browser.md` residual hardening.
+
+Next-cycle candidates (not in scope):
+- Close the MC-001 MC107 real-terminal `/connect` walkthrough.
+- Tighten the MODEL-006 `set_active_model()` catalog-protocol lookup residual.
+- Consider a CLI command-taxonomy alias `talos models browse` (already noted as a MODEL-006 residual).
+
+Recovery or resume instruction:
+- Owner record: this file. Git state: `main` at the F16 final closeout commit (to be created next); already pushed to `origin/main`. The plan is Complete; no further action is required from this execution. If this plan is resumed or audited, all evidence lives in the F0-F16 checkpoints above, and the only genuine code change is `3cda7ad` (F2) — every other commit is documentation or verification.
