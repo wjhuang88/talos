@@ -1117,6 +1117,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_rg_no_match_is_not_error() {
+        // rg (ripgrep) is not pre-installed on all CI runners (macOS 14+).
+        // Skip the test when rg is unavailable rather than failing on exit 127.
+        if std::process::Command::new("rg")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("rg not found in PATH; skipping test_rg_no_match_is_not_error");
+            return;
+        }
+
         let tool = BashTool::new(test_dir());
         let result = tool
             .execute(serde_json::json!({
