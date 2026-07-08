@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | RUNTIME-002 |
 | Priority | P0 |
-| Status | Complete (FS04: MaxTokens fix + runtime integration coverage + visible signal verification) |
+| Status | Partial — #18 request-dispatch timeout still open |
 | Source | [GitHub Issue #18](https://github.com/wjhuang88/talos/issues/18), [GitHub Issue #32](https://github.com/wjhuang88/talos/issues/32) |
 | Depends On | `RUNTIME-001`, `TUI-027`, `PROVIDER-002` |
 
@@ -16,8 +16,10 @@ provider, running a tool, or already wedged.
 
 ## Acceptance
 
-- Reproduce or simulate the #18 path where a tool result/error is followed by provider failure.
-- Ensure every terminal error path clears `is_processing` and emits a user-visible terminal status.
+- [ ] Reproduce or simulate the #18 path where a tool result/error is followed by provider failure,
+      including provider HTTP request dispatch that never returns response headers.
+- [x] Ensure terminal `AgentEvent::Error`, timeout, cancellation, `EndTurn`, and `MaxTokens` paths
+      clear `is_processing` and emit a user-visible terminal status.
 - Add bounded health/status evidence for long-running turns: provider wait, tool execution, idle
   waiting, timeout, cancelled, and failed.
 - If a health-check task is added, it must be an internal `tokio` task with a single owner and no
@@ -30,6 +32,33 @@ provider, running a tool, or already wedged.
 - No release gate change.
 - No permission relaxation.
 - No new background OS process.
+
+## 2026-07-08 Status Correction: #18 Not Fully Fixed
+
+GitHub Issue #18 was closed incorrectly on 2026-07-08. The FS02/FS03 work fixed real stuck-state
+paths in the conversation engine and bridge, but it did not fix the #18 root cause identified in
+the issue comments: provider HTTP request dispatch can hang before response headers arrive.
+
+Current code evidence:
+
+- `crates/talos-provider/src/openai.rs` still constructs `reqwest::Client` with `Client::new()`.
+- `crates/talos-provider/src/lib.rs` still constructs `reqwest::Client` with `Client::new()`.
+- `ProviderTimeoutConfig` only contains `first_packet_timeout_secs` and
+  `stream_idle_timeout_secs`; these protect stream parsing after a response exists, not
+  `send().await` before response headers.
+
+Required follow-up:
+
+- Add a request-dispatch timeout for OpenAI-compatible and Anthropic providers, either by
+  configuring `reqwest::Client::builder().timeout(...)` carefully or by wrapping provider
+  `send().await` in `tokio::time::timeout`.
+- Preserve stream-idle semantics for long streaming responses; do not accidentally impose a total
+  response-body timeout that breaks valid long streams.
+- Add deterministic runtime evidence for a provider call that accepts the request but never returns
+  response headers, proving Talos emits a terminal provider timeout/error and clears processing.
+
+This follow-up is selected into the 2026-07-08 Talos self-bootstrap plan before any lower-priority
+feature polish.
 
 ## Required Reads
 

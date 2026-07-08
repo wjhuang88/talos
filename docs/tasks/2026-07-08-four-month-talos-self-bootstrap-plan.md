@@ -60,6 +60,9 @@ record exactly where the self-bootstrap attempt failed.
 - Real binary smoke harness for Talos development sessions.
 - Owner-doc and board synchronization performed by Talos-owned commands or Talos-guided edits.
 - One low-risk user-facing feature or polish change selected from existing backlog.
+- Corrective work for issue-audit findings that were closed inaccurately: #18 request-dispatch
+  timeout, #28/#39 dashboard notification behavior, #24/#31 visual/runtime evidence gaps, and #26
+  thinking history policy.
 - One architecture-sensitive bounded change, audit, or diagnostic selected from existing owner docs.
 - REL-002 evidence updates, readiness report, and final go/no-go classification.
 
@@ -87,6 +90,9 @@ published baselines and does not silently re-scope older iterations.
 | I085 | Paused | MC107 walkthrough remains residual; may be used only if selected explicitly by I107. |
 | I086-I089 | Planned product-hardening shells | Keep planned; I106-I109 are the new Talos-primary REL-002 attempt. |
 | I102-I105 | Complete | Starting evidence baseline; useful controlled-local-trial evidence, non-qualifying for REL-002. |
+| RUNTIME-002 / PROVIDER-002 | Partial after 2026-07-08 audit | #18 request-dispatch timeout remains open; select before lower-priority feature polish. |
+| TUI-028 | Partial after 2026-07-08 audit | #28 reopened as #39; #24/#31 need visual/runtime evidence; #26 split to TUI-029. |
+| TUI-029 | Planned — decision required | #26 thinking content history archive requires ADR-034/TUI-020 policy decision before implementation. |
 | TOOL-020 | Planned | Candidate for I107 user-facing/read-only polish if Talos can execute it safely. |
 | ARCH-032 | Planned | Candidate for I108 architecture-sensitive audit/routing work. |
 | SESSION-004 | Ready for Implementation | Do not activate unless the maintainer explicitly accepts the storage-default migration gate. |
@@ -101,8 +107,8 @@ published baselines and does not silently re-scope older iterations.
 | SBT102 | 2 | I106 | Runtime smoke | Repeatable Talos binary smoke harness covers version, validation, governance preview/write dry run, provider failure, and session resume evidence. | real `talos` commands or Talos-owned tests | Planned |
 | SBT103 | 3 | I106 | Governance rehearsal | Talos performs a bounded owner-doc update through the accepted governance path and records rollback evidence. | governance validation; diff review | Planned |
 | SBT104 | 4 | I106 | Closeout | Month-1 harness result classified for REL-002 without overclaiming. | workspace validation as needed; REL-002 update | Planned |
-| SBT110 | 5 | I107 | Selection | Select one low-risk user-facing feature or polish story, preferring TOOL-020 or I085 MC107 if still relevant. | owner-doc activation note | Planned |
-| SBT111 | 6 | I107 | Implementation | Talos implements the selected change using permission-gated tools and existing patterns. | targeted tests; real binary evidence | Planned |
+| SBT110 | 5 | I107 | Selection | Select from the issue-audit corrective queue first: #18 request-dispatch timeout, #39 dashboard transient notification, #24/#31 visual evidence, then TOOL-020/I085 only if higher-priority residuals are closed. | owner-doc activation note | Planned |
+| SBT111 | 6 | I107 | Implementation | Talos implements the selected corrective change using existing patterns and permission-gated tools. | targeted tests; real binary evidence | Planned |
 | SBT112 | 7 | I107 | Docs sync | Talos updates user docs, backlog, iteration, and board in owner-first order. | governance validation; docs diff review | Planned |
 | SBT113 | 8 | I107 | Closeout | First non-trivial Talos-primary feature/polish session classified for REL-002. | workspace tests or recorded fallback | Planned |
 | SBT120 | 9 | I108 | Risk routing | Activate ARCH-032 or another bounded architecture-sensitive item with explicit risk classification. | owner-doc activation note | Planned |
@@ -119,7 +125,7 @@ published baselines and does not silently re-scope older iterations.
 | Month | Exit Criteria |
 |---|---|
 | Month 1 / I106 | Talos-primary execution can be measured repeatably, and non-qualifying external intervention cannot be hidden. |
-| Month 2 / I107 | Talos completes at least one user-facing feature or polish change as primary executor, or records a precise blocker. |
+| Month 2 / I107 | Talos closes at least the P0 #18 request-dispatch timeout residual or records a precise blocker; lower-priority polish follows only after that gate. |
 | Month 3 / I108 | Talos routes and completes one architecture-sensitive session without bypassing review, or records a precise blocker. |
 | Month 4 / I109 | REL-002 has an evidence-backed GO/NO-GO report and no `v1.0` claim unless every acceptance criterion is met. |
 
@@ -137,7 +143,11 @@ Before starting any task, the Talos executor must read:
 8. `docs/backlog/PRODUCT-BACKLOG.md`
 9. `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`
 10. `docs/tasks/2026-07-07-four-month-developer-operating-plan.md`
-11. Candidate owner docs for the selected I107 and I108 work items.
+11. `docs/backlog/active/RUNTIME-002-turn-health-and-stuck-processing.md`
+12. `docs/backlog/active/PROVIDER-002-response-reliability-timeout-retry.md`
+13. `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md`
+14. `docs/backlog/active/TUI-029-thinking-history-archive.md`
+15. Candidate owner docs for the selected I107 and I108 work items.
 
 ## Operating Rules For Talos
 
@@ -206,8 +216,12 @@ credential migration, permission policy migration, or storage default migration.
 
 ## Default Decisions For Foreseeable Ambiguity
 
-- If TOOL-020 and I085 MC107 are both viable for I107, prefer TOOL-020 because it is a bounded,
-  read-only user-facing tool improvement with clearer testability.
+- For I107, select #18 request-dispatch timeout before TOOL-020, I085 MC107, or TUI polish. A P0
+  stuck-processing residual outranks lower-risk feature polish.
+- After #18 is closed, prefer #39 dashboard transient notification before #24/#31 visual evidence,
+  because it has a concrete open issue and bounded behavior change.
+- If TOOL-020 and I085 MC107 are both viable after the corrective queue is closed, prefer TOOL-020
+  because it is a bounded, read-only user-facing tool improvement with clearer testability.
 - If ARCH-032 and SESSION-004 are both proposed for I108, prefer ARCH-032 unless the maintainer
   explicitly accepts the session-storage default migration gate.
 - If a candidate requires a new dependency, permission-default change, sandbox change, or release

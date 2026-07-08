@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | PROVIDER-002 |
 | Priority | P1 |
-| Status | Complete (I084/UX103-UX105, 2026-07-03) |
+| Status | Partial — request-dispatch timeout gap reopened by #18 |
 | Origin | UX-001, maintainer feedback 2026-07-03 |
 | Relates To | UX-001, MODEL-003, PROVIDER-001, TUI-020 |
 
@@ -22,6 +22,8 @@ and user-visible retry/failure states.
   event. Default target: 30 seconds, configurable later if needed.
 - Add a **stream-idle timeout**: maximum duration between stream packets after the first packet.
   Default target: 90 seconds for provider streams, with tests using small durations.
+- Add a **request-dispatch timeout**: maximum duration for HTTP request send/response-header wait
+  before stream parsing begins. This is distinct from first-packet timeout and is still open.
 - Treat user cancellation as higher priority than timeout/retry.
 - Convert timeout into a structured provider error and TUI-visible state; do not panic or silently
   drop the stream.
@@ -87,7 +89,9 @@ Provider runtime should support these states without requiring TUI-specific code
 
 - [x] OpenAI-compatible provider has first-packet timeout, idle timeout, retry classification, and
       backoff tests. (UX103/UX104)
-- [x] Anthropic provider has equivalent timeout/retry coverage. (UX103/UX104)
+- [x] Anthropic provider has equivalent first-packet/idle timeout and retry coverage. (UX103/UX104)
+- [ ] OpenAI-compatible and Anthropic providers bound HTTP request dispatch / response-header wait
+      so `send().await` cannot hang forever before stream parsing begins. (#18)
 - [x] Retrying is not attempted after assistant text/tool-call output has begun unless a later ADR
       explicitly introduces resumable streams. (Retry only in send_request, before streaming starts)
 - [x] TUI/conversation can display retry and timeout states without duplicating assistant messages.
@@ -128,3 +132,13 @@ Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D101).
 - No provider behavior change; no new timeout/retry behavior. These fixtures are regression
   guards for the timeout/retry pipeline's downstream `StopReason` mapping and stream-idle
   passthrough. The full I102 evidence lives in `RUNTIME-002` and `I102`.
+
+## 2026-07-08 Status Correction: Request Timeout Gap
+
+The original I084 slice delivered first-packet and stream-idle timeouts, but GitHub Issue #18
+identified a different gap: `reqwest::Client::new()` has no request-level timeout, and the
+provider can hang in `send().await` before response headers arrive. That path is not protected by
+the parser-level first-packet/idle timeout code.
+
+This owner doc is therefore Partial until a request-dispatch timeout is implemented with tests for
+both OpenAI-compatible and Anthropic providers.

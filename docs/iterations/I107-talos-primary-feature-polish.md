@@ -2,11 +2,12 @@
 
 > Document status: Planned
 > Published plan date: 2026-07-08
-> Planned objective: have Talos complete one low-risk user-facing feature or polish change as the
-> primary development executor.
+> Planned objective: have Talos close the highest-priority issue-audit residual, then complete one
+> low-risk user-facing feature or polish change as the primary development executor if capacity
+> remains.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
-> MVP deliverable: a tested user-visible improvement with Talos-primary implementation, validation,
-> documentation, and REL-002 classification.
+> MVP deliverable: a tested corrective reliability/UX change with Talos-primary implementation,
+> validation, documentation, and REL-002 classification.
 
 ## Published Baseline
 
@@ -14,15 +15,18 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `SBT110` | 2026-07-08 self-bootstrap plan | Planned | I106 closeout | Low-risk feature/polish owner selected and activated. |
-| `SBT111` | 2026-07-08 self-bootstrap plan | Planned | SBT110 | Talos implements the selected change through permission-gated tools. |
+| `SBT110` | 2026-07-08 self-bootstrap plan | Planned | I106 closeout | Highest-priority issue-audit residual selected and activated, starting with #18. |
+| `SBT111` | 2026-07-08 self-bootstrap plan | Planned | SBT110 | Talos implements the selected corrective change through permission-gated tools. |
 | `SBT112` | 2026-07-08 self-bootstrap plan | Planned | SBT111 | User docs, backlog, iteration, and board are synchronized owner-first. |
 | `SBT113` | 2026-07-08 self-bootstrap plan | Planned | SBT112 | Session is classified against REL-002. |
 
 ### Scope
 
-- Select one existing low-risk story, preferring `TOOL-020` or the I085 MC107 walkthrough residual
-  if still relevant.
+- Select from the issue-audit corrective queue before new polish:
+  `RUNTIME-002`/`PROVIDER-002` #18 request-dispatch timeout, then `TUI-028` #39 dashboard transient
+  notification, then #24/#31 visual evidence, then `TUI-029` #26 decision work.
+- Select `TOOL-020` or the I085 MC107 walkthrough residual only after higher-priority corrective
+  residuals are closed or explicitly blocked.
 - Require real runtime evidence for any behavior change.
 - Preserve permission, sandbox, credential, dependency, and storage boundaries.
 
@@ -34,7 +38,7 @@
 
 ### Acceptance
 
-- Given a low-risk user-facing story is selected
+- Given a corrective reliability or UX story is selected
   When Talos implements and validates it as primary executor
   Then the owner docs identify the changed behavior and runtime evidence.
 - Given external review finds issues
