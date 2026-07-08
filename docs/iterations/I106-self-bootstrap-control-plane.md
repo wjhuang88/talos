@@ -254,3 +254,70 @@ This session's own checkpoint:
 ### Next Task
 
 SBT102: Build the repeatable runtime smoke harness.
+
+## SBT102: Repeatable Runtime Smoke Harness
+
+### Activation Date
+
+2026-07-09
+
+### Deliverable
+
+`scripts/talos_smoke.sh` — a repeatable, non-mutating smoke harness for Talos development sessions.
+
+### Smoke Coverage
+
+| # | Surface | Command | Result |
+|---|---|---|---|
+| 1 | Version | `talos --version` | `talos 0.3.0` |
+| 2 | Validation plan (read-only) | `talos validate plan` | Lists `cargo fmt`, `cargo check`, `cargo test --workspace`, and governance validation |
+| 3 | Validation run (governance profile) | `talos validate run --profile governance` | `governance_validation` passed, exit_status: 0 |
+| 4 | Governance status | `talos --governance-status` | Manifest/profile/board/validation/Git state present; I106 shown as active |
+| 5 | Governance iteration-record preview (dry run) | `talos governance iteration-record preview ...` | Mutation preview shown; **no file modification** verified via `git diff` |
+| 6 | Mock provider (print mode) | `talos -p --mock --no-init --no-context "Say hello"` | Mock LLM produced output |
+| 7 | Session list (resume evidence) | `talos --list --limit 3` | Session list with IDs, message counts, timestamps |
+| 8 | Config list (secret masking) | `talos --config-list` | Secrets masked as `***` |
+
+### Harness Run Evidence
+
+```
+scripts/talos_smoke.sh
+```
+
+Output (2026-07-09):
+```
+Passed: 9
+Failed: 0
+Skipped: 0
+```
+
+### Provider Failure Coverage
+
+Provider failure paths are covered by the checked-in integration test suite (no real API key
+needed for smoke):
+
+| Smoke Surface | Test Command | Result |
+|---|---|---|
+| Provider error after tool result | `cargo test -p talos-cli --bin talos -- conversation_loop_clears_processing_on_provider_error_after_tool_result` | ✅ Clears `is_processing`, emits terminal status |
+| Provider error visible signals | `cargo test -p talos-cli --bin talos -- conversation_loop_emits_visible_error_signals_on_terminal_failure` | ✅ Emits `Tip`, `Stream`, and terminal `Status` |
+| SSE error chunk terminal error | `cargo test -p talos-provider openai::tests::parse_sse_stream_error_chunk_emits_terminal_error` | ✅ Error chunk produces terminal `AgentEvent::Error` |
+
+### Session Resume Coverage
+
+| Smoke Surface | Test Command | Result |
+|---|---|---|
+| Resume invalid/nonexistent sessions | `cargo test -p talos-cli --bin talos -- session_manager_resume` | ✅ Rejects invalid sessions |
+| History hydration on resume | `cargo test -p talos-agent session::tests::test_initial_history_from_jsonl_resume` | ✅ Hydrates persisted history |
+| Model metadata preserved on resume | `cargo test -p talos-cli --bin talos -- session_model_metadata_overrides_config_on_resume` | ✅ Session model metadata overrides config |
+
+### Design Properties
+
+- **Non-mutating**: no files written, no commits, no push, no real API calls (mock provider).
+- **Repeatable**: deterministic output; safe to run any number of times.
+- **Self-contained**: all checks use only the `talos` binary and local repo state.
+- **No external dependencies**: no network, no API keys, no paid resources.
+- **Secret-safe**: config list masking verified.
+
+### Next Task
+
+SBT103: Perform bounded governance rehearsal with rollback evidence.
