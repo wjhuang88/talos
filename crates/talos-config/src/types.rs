@@ -68,6 +68,14 @@ impl Default for ReasoningOptions {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(default)]
 pub struct ProviderTimeoutConfig {
+    /// Maximum seconds from request dispatch (`send().await`) to the arrival of
+    /// response headers. This protects against providers that accept the TCP
+    /// connection but never return headers, which would cause `send().await` to
+    /// hang indefinitely. This timeout covers only the dispatch → headers phase;
+    /// stream parsing after headers is protected by `first_packet_timeout_secs`
+    /// and `stream_idle_timeout_secs`.
+    /// Default: 60 seconds.
+    pub dispatch_timeout_secs: u64,
     /// Maximum seconds from request dispatch to first stream event.
     /// Default: 30 seconds.
     pub first_packet_timeout_secs: u64,
@@ -88,6 +96,7 @@ pub struct ProviderTimeoutConfig {
 impl Default for ProviderTimeoutConfig {
     fn default() -> Self {
         Self {
+            dispatch_timeout_secs: 60,
             first_packet_timeout_secs: 30,
             stream_idle_timeout_secs: 90,
             max_attempts: 3,
