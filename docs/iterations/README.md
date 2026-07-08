@@ -141,7 +141,7 @@ docs/iterations/
 | I102 | Provider Runtime Reliability Gate | **Complete (2026-07-08)** | Month 1 of the 2026-07-07 developer operating plan. Closed SSE fixture matrix extension (D101), agent degenerate-tool-call invariant + MaxTokens boundary guard (D102), conversation-loop cancel integration (D103), month-1 closeout (D104), and architecture-review provider error chunk fix. 1791 workspace tests pass. See `I102-provider-runtime-reliability-gate.md`. |
 | I103 | First-Run Model And Diagnostics | **Complete (2026-07-08)** | Month 2 of the 2026-07-07 developer operating plan. D110-D113 verified complete: standard/custom provider connect UX, bounded model browsing, redacted diagnostics. 1791 workspace tests pass. See `I103-first-run-model-diagnostics.md`. |
 | I104 | Long-Session Stability And Permission Evidence | **Complete (2026-07-08)** | Month 3 of the 2026-07-07 developer operating plan. D120-D123 verified complete: permission-noise evidence with deny precedence preserved, validation routing, tool display readability. 1791 workspace tests pass. See `I104-long-session-stability-and-permission-evidence.md`. |
-| I105 | Trial Readiness Closeout | **Planned (2026-07-07)** | Month 4 of the 2026-07-07 developer operating plan. Trial docs, smoke checklist, REL-002 classification, final go/no-go report, and handoff. See `I105-trial-readiness-closeout.md`. |
+| I105 | Trial Readiness Closeout | **Complete (2026-07-08)** | Month 4 of the 2026-07-07 developer operating plan. D130-D133 closed: trial docs (README troubleshooting section), smoke checklist (6 steps recorded), REL-002 non-qualifying classification, final go/no-go report (GO for controlled local trial, NO-GO for v1.0). 1791 workspace tests pass. See `I105-trial-readiness-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -185,7 +185,7 @@ rewrite published iteration baselines.
 | I102 | Complete | Month-1 developer operating plan closed 2026-07-08. D100-D104 delivered; architecture-review provider error chunk fix landed; 1791 workspace tests pass. I103 is the next to activate. |
 | I103 | Complete | Month-2 developer operating plan closed 2026-07-08. D110-D113 verified (all behavior shipped in I101). I104 is the next to activate. |
 | I104 | Complete | Month-3 developer operating plan closed 2026-07-08. D120-D123 verified (all behavior shipped in PERM-002/003, VALIDATION-001, TUI-015/019/025). I105 is the final iteration. |
-| I105 | Planned | New Month-4 developer operating shell. Blocked on I104 closeout or explicit maintainer replan. |
+| I105 | Complete | Month-4 developer operating plan closed 2026-07-08. D130-D133 closed. GO for controlled local trial, NO-GO for v1.0 (REL-002 not met). Four-month plan complete. |
 | I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
 | I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
 | I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |

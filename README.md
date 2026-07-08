@@ -554,6 +554,57 @@ manifest-ready but blocked by dependency closure; see
 - Local secrets should live in environment variables or private config files, never in source.
 - Talos does not auto-commit changes. Git commits happen only through explicit tool/user action.
 
+## Troubleshooting And Bug Reports
+
+### Reporting Issues
+
+File bugs and feature requests on [GitHub Issues](https://github.com/wjhuang88/talos/issues).
+
+Include the following diagnostic information in your bug report:
+
+```bash
+talos --version                    # version and build info
+talos config list                  # redacted config (secrets masked as ***)
+talos storage status               # local data directory sizes and session counts
+talos --governance-status          # governance manifest and board disposition
+```
+
+All diagnostic commands mask secrets. `config list` replaces `api_key` values with `***` while
+preserving `api_key_env` variable names so you can share output safely.
+
+### Debug Logging
+
+Talos writes logs to `~/.talos/logs/talos.log`. Check the log directory size with:
+
+```bash
+talos storage status
+```
+
+Increase log verbosity by setting the `RUST_LOG` environment variable:
+
+```bash
+RUST_LOG=talos=debug talos
+```
+
+### Common Issues
+
+- **Provider connection fails**: verify `api_key` or `api_key_env` is set. Use `talos config list`
+  to confirm the credential source. Standard providers (Anthropic, OpenAI, DeepSeek, etc.) have
+  built-in endpoints; custom providers require an explicit `base_url`.
+- **Permission prompts repeat**: use `always` scope when approving repeated low-risk operations.
+  Deny rules always take precedence over `always` rules.
+- **Session not resuming**: ensure the session UUID exists with `talos storage status`. Use
+  `talos --continue` to resume the most recent workspace session.
+- **Model picker is empty**: unauthenticated providers are omitted from `/model`. Use `/connect`
+  to set up credentials first.
+
+### Known Limitations
+
+- Pre-1.0: APIs, command surfaces, and storage formats may change.
+- No remote multi-user service, marketplace, or browser automation.
+- No WASM plugin runtime or PDF/Office document extraction.
+- Self-bootstrap qualification (REL-002) is not yet met; `v1.0` is not claimable.
+
 ## Contributing And Local Checks
 
 Common checks:

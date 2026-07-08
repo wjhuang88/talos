@@ -100,10 +100,10 @@ rewrite existing baselines.
 | D121 | 10 | I104 | Validation routing | Internal validation/project detection adapters are exercised for Rust and one non-Rust fixture. | validation tests | Complete |
 | D122 | 11 | I104 | Tool display | Long output and argument display stay readable without changing model-visible payloads. | TUI/tool tests | Complete |
 | D123 | 12 | I104 | Closeout | Long-session stability evidence and security residuals recorded. | workspace tests; governance | Complete |
-| D130 | 13 | I105 | Trial docs | Install, first-run, provider, permission, local-data, and bug-report docs are trial-ready. | docs checklist | Planned |
-| D131 | 14 | I105 | Smoke suite | Repeatable smoke checklist covers first run, `/connect`, `/model`, tool use, provider failure, resume, exit. | recorded smoke evidence | Planned |
-| D132 | 15 | I105 | Self-bootstrap evidence | One Talos-primary attempt is classified honestly against REL-002. | REL-002 owner update | Planned |
-| D133 | 16 | I105 | Final gate | Market-trial readiness report gives go/no-go, residual risks, rollback, and next owners. | workspace tests; clippy; governance | Planned |
+| D130 | 13 | I105 | Trial docs | Install, first-run, provider, permission, local-data, and bug-report docs are trial-ready. | docs checklist | Complete |
+| D131 | 14 | I105 | Smoke suite | Repeatable smoke checklist covers first run, `/connect`, `/model`, tool use, provider failure, resume, exit. | recorded smoke evidence | Complete |
+| D132 | 15 | I105 | Self-bootstrap evidence | One Talos-primary attempt is classified honestly against REL-002. | REL-002 owner update | Complete |
+| D133 | 16 | I105 | Final gate | Market-trial readiness report gives go/no-go, residual risks, rollback, and next owners. | workspace tests; clippy; governance | Complete |
 
 ## Monthly Exit Gates
 
