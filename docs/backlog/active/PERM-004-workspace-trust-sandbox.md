@@ -6,7 +6,7 @@
 | Priority | P1 |
 | Status | Planned — ADR required |
 | Source | [GitHub Issue #22](https://github.com/wjhuang88/talos/issues/22) |
-| Depends On | `PERM-002`, `PERM-003`, `TOOL-017` |
+| Depends On | `PERM-002`, `PERM-003`, `TOOL-017`, `VALIDATION-001` |
 
 ## Problem
 
@@ -14,14 +14,37 @@ Permission prompts remain too noisy for normal development, but broad permanent 
 The desired model is coarse-grained trust inside a normalized workspace boundary and strict,
 non-persistent approval outside that boundary.
 
+`VALIDATION-001` already owns project-type detection and can distinguish whether a workspace is a
+Git repository. PERM-004 should use that signal when selecting the workspace trust mode:
+
+- **Non-Git workspace:** keep the current stricter permission mode. Approvals remain
+  operation-scoped or directory-scoped, and Talos must not infer a repository-sized trust boundary.
+- **Git workspace:** after explicit user approval, Talos may treat the Git repository root as the
+  workspace sandbox boundary. Repo-internal file operations may use a coarse repo-scoped sandbox
+  approval instead of repeated per-file prompts, similar to Codex-style workspace trust.
+- **Always strict outside the repo:** paths outside the canonical Git root, symlink escapes,
+  parent-directory traversal, credentials, network, publish/release/push, destructive cleanup, and
+  configured Deny rules remain separately gated. Repo-sandbox trust is not a global `bash = Allow`
+  and does not bypass the permission pipeline.
+
+The repo-sandbox mode is a policy design target, not an implementation authorization. It requires
+the ADR, tests, and `PERM-005` sandbox-observability follow-up before broad bash/exec relaxation.
+
 ## Acceptance
 
 - Produce an ADR before implementation, covering workspace root selection, path canonicalization,
   symlink/`..` escape handling, trust persistence, deny precedence, and out-of-workspace behavior.
+- Use `VALIDATION-001` project-type detection before selecting a trust mode: non-Git workspaces use
+  the stricter existing permission behavior; Git workspaces may opt into canonical repo-root
+  sandbox trust after explicit user approval.
 - Define directory-scoped write approvals for workspace paths.
+- Define repo-scoped sandbox approvals for Git workspaces without weakening high-risk gates for
+  network, credentials, push/publish/release, destructive cleanup, or out-of-repo access.
 - Keep out-of-workspace write/execute/network approvals strict and non-persistent unless explicitly
   configured by a reviewed policy.
 - Define how bash/exec command permissions compose with file-resource permissions.
+- Defer broad bash/exec repo-sandbox execution until `PERM-005` can observe or enforce touched
+  files/directories for command execution.
 - Include tests for workspace boundary traversal and deny-rule precedence.
 
 ## Non-Goals
@@ -29,12 +52,16 @@ non-persistent approval outside that boundary.
 - No permission-default relaxation before ADR acceptance.
 - No silent trust of the entire home directory.
 - No bypass of the existing permission pipeline for write-capable tools.
+- No repo-sandbox trust for a directory that has not been positively detected as a Git repository.
+- No claim that logical permission checks are a process sandbox; real enforcement is tracked by
+  `PERM-005`.
 
 ## Required Reads
 
 - `docs/backlog/active/PERM-002-operation-scoped-permissions.md`
 - `docs/backlog/active/PERM-003-permission-experience-reference-study.md`
+- `docs/backlog/active/PERM-005-logical-tool-sandbox-enforcement.md`
+- `docs/backlog/active/VALIDATION-001-internal-validation-service.md`
 - `crates/talos-permission/src/lib.rs`
 - `crates/talos-cli/src/approval.rs`
 - `crates/talos-tools/src/bash_tool.rs`
-
