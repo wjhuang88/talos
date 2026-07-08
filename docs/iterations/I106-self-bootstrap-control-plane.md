@@ -321,3 +321,99 @@ needed for smoke):
 ### Next Task
 
 SBT103: Perform bounded governance rehearsal with rollback evidence.
+
+## SBT103: Bounded Governance Rehearsal With Rollback Evidence
+
+### Activation Date
+
+2026-07-09
+
+### Purpose
+
+Prove that the `talos governance iteration-record write` path can safely mutate an owner doc,
+that post-write governance validation runs, and that a rollback restores the pre-write state
+cleanly.
+
+### Rehearsal Steps And Evidence
+
+#### Step 1: Preview (read-only)
+
+```
+target/debug/talos governance iteration-record preview \
+  --iteration I106 \
+  --date 2026-07-09 \
+  --record-type execution \
+  --record "SBT103 governance rehearsal: exercising iteration-record write path"
+```
+
+Result: `Mutation Preview` shown, row formatted correctly, no file modified.
+
+#### Step 2: Write (mutation)
+
+```
+target/debug/talos governance iteration-record write \
+  --iteration I106 \
+  --date 2026-07-09 \
+  --record-type execution \
+  --record "SBT103 governance rehearsal: exercising iteration-record write path" \
+  --confirm-preview
+```
+
+Result: `Write: applied`, `Validation: passed`.
+
+Diff produced:
+```
++| 2026-07-09 | Execution | SBT103 governance rehearsal: exercising iteration-record write path |
+```
+
+The row was correctly appended to the top of the Actual Activation And Execution table in
+`docs/iterations/I106-self-bootstrap-control-plane.md`.
+
+#### Step 3: Post-write governance validation
+
+```
+scripts/validate_project_governance.sh .
+```
+
+Result: `Governance validation passed: 0 warning(s).`
+
+#### Step 4: Rollback
+
+```
+cp /tmp/I106-before-sbt103-write.md docs/iterations/I106-self-bootstrap-control-plane.md
+```
+
+Result: `git diff --stat` shows no changes; `git status --short` clean. The file was restored to
+its pre-write state.
+
+#### Step 5: Post-rollback governance validation
+
+```
+scripts/validate_project_governance.sh .
+```
+
+Result: `Governance validation passed: 0 warning(s).`
+
+### Findings
+
+1. **Write path is correct**: the governance tool appends an execution row to the correct table
+   in the correct owner doc, identified by iteration ID.
+2. **Post-write validation is automatic**: the tool runs governance validation after writing and
+   reports the result. This is a safety gate — if validation failed, the tool should have rolled
+   back automatically (per I096 design).
+3. **Manual rollback is clean**: restoring the pre-write file state produces a clean worktree with
+   no governance validation warnings.
+4. **The rehearsal row was intentionally rolled back**: it was a dry-run exercise, not a permanent
+   record. The real SBT103 evidence is this section, added through normal file editing and
+   committed via git.
+
+### REL-002 Classification Note
+
+This rehearsal proved the governance mutation mechanism works. However, the rehearsal itself was
+driven by an external runtime (glm-5.2), not by the `talos` binary acting autonomously. The
+evidence is therefore non-qualifying for REL-002 but demonstrates that the mechanism is ready for
+a Talos-primary session to use.
+
+### Next Task
+
+SBT104: Month-1 closeout classified for REL-002.
