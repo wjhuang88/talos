@@ -142,3 +142,11 @@ the parser-level first-packet/idle timeout code.
 
 This owner doc is therefore Partial until a request-dispatch timeout is implemented with tests for
 both OpenAI-compatible and Anthropic providers.
+
+## I107 SBT111: Dispatch Timeout Implementation (2026-07-09)
+
+The #18 request-dispatch timeout gap identified in the 2026-07-08 Status Correction is now fixed. The fix adds a `dispatch_timeout_secs` field to `ProviderTimeoutConfig` (default 60s) and wraps the provider `send().await` call in `tokio::time::timeout`, so providers that accept the TCP connection but never return response headers now produce a terminal `ProviderError::NetworkError("request dispatch timeout: no response headers within Ns")`. The dispatch timeout is retryable via existing `classify_retry_with_backoff`.
+
+Stream-idle semantics are preserved: the timeout does not cover the streaming body, which remains protected by `first_packet_timeout_secs` and `stream_idle_timeout_secs`.
+
+Evidence: 4 deterministic tests (2 per provider), 1795 workspace tests, fmt/clippy/governance/smoke all green. Runtime: glm-5.2 external → non-qualifying for REL-002.

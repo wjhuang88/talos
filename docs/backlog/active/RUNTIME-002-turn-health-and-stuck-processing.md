@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | RUNTIME-002 |
 | Priority | P0 |
-| Status | Partial — #18 request-dispatch timeout still open |
+| Status | Resolved — #18 request-dispatch timeout fixed in I107 SBT111 (non-qualifying REL-002 evidence) |
 | Source | [GitHub Issue #18](https://github.com/wjhuang88/talos/issues/18), [GitHub Issue #32](https://github.com/wjhuang88/talos/issues/32) |
 | Depends On | `RUNTIME-001`, `TUI-027`, `PROVIDER-002` |
 
@@ -16,7 +16,7 @@ provider, running a tool, or already wedged.
 
 ## Acceptance
 
-- [ ] Reproduce or simulate the #18 path where a tool result/error is followed by provider failure,
+- [x] Reproduce or simulate the #18 path where a tool result/error is followed by provider failure,
       including provider HTTP request dispatch that never returns response headers.
 - [x] Ensure terminal `AgentEvent::Error`, timeout, cancellation, `EndTurn`, and `MaxTokens` paths
       clear `is_processing` and emit a user-visible terminal status.
@@ -323,3 +323,30 @@ Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D103).
   `cargo test --workspace` → 1789 passed (was 1788); clippy/fmt/governance clean.
 - No production code change. The existing FS03 visible-signal surfaces were already verified
   in the FS03 closeout.
+
+## I107 SBT111: Request-Dispatch Timeout Fix (2026-07-09)
+
+### Problem Solved
+The #18 root cause — `reqwest::Client::new()` had no request-level timeout, so `send().await` could hang indefinitely before response headers arrive — is now fixed.
+
+### Implementation
+- Added `dispatch_timeout_secs: u64` (default: 60) to `ProviderTimeoutConfig` (`crates/talos-config/src/types.rs`)
+- Wrapped `send().await` in `tokio::time::timeout(dispatch_timeout, request_fut)` in both `OpenAIProvider::send_request` and `AnthropicProvider::send_request`
+- Dispatch timeout errors classify as `ProviderError::NetworkError("request dispatch timeout: no response headers within Ns")` — retryable via `classify_retry_with_backoff`
+- Stream-idle semantics preserved: timeout covers ONLY dispatch → headers, NOT streaming body (still protected by `first_packet_timeout_secs` and `stream_idle_timeout_secs`)
+
+### Tests
+- `test_dispatch_timeout_openai` — deterministic proof that a server that accepts connection but never returns headers emits a terminal dispatch timeout error
+- `test_normal_request_not_dispatch_timed_out_openai` — regression guard: normal requests with fast responses are NOT timed out
+- `test_dispatch_timeout_anthropic` — same for Anthropic provider
+- `test_normal_request_not_dispatch_timed_out_anthropic` — same regression guard for Anthropic
+
+### Validation
+- 1795 workspace tests pass (was 1791; +4 new dispatch timeout tests)
+- cargo fmt --all -- --check: clean
+- cargo clippy --workspace -- -D warnings: no warnings
+- scripts/validate_project_governance.sh .: 0 warnings
+- scripts/talos_smoke.sh: 9/9 passed
+
+### REL-002 Classification
+Runtime: glm-5.2 via zai-coding-plan (external, NOT Talos). Per REL-002 criterion 7 ("Codex is not the primary executor for qualifying sessions"), this is NON-QUALIFYING evidence. The fix is real and useful for future Talos-primary sessions, but this session does not prove self-bootstrap capability.

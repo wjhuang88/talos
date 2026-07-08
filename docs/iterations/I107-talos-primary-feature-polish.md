@@ -74,15 +74,30 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-08 | Planning | Created as Month 2 of the 2026-07-08 Talos-primary self-bootstrap plan. |
+| 2026-07-09 | Activation (SBT110) | I107 activated. Selected #18 request-dispatch timeout (RUNTIME-002 / PROVIDER-002) as the highest-priority corrective queue item. Runtime: glm-5.2 via zai-coding-plan (external, not `talos`). Smoke baseline: 9/9 passed at `2d925fe`. Per default decisions in the four-month plan, #18 outranks #39 dashboard notification, #24/#31 visual evidence, and TOOL-020/I085 polish. |
+| 2026-07-09 | Implementation (SBT111) | Implementation of request-dispatch timeout for OpenAI-compatible and Anthropic providers in progress. |
+| 2026-07-09 | Implementation (SBT111) | #18 request-dispatch timeout fixed. Added `dispatch_timeout_secs` to `ProviderTimeoutConfig` (default 60s). Wrapped `send().await` in `tokio::time::timeout` for both OpenAI and Anthropic providers. 4 deterministic tests added. Validation: 1795 tests, fmt, clippy, governance 0 warnings, smoke 9/9. REL-002: non-qualifying (external runtime). |
+| 2026-07-09 | Docs (SBT112) | Owner docs updated in owner-first order: RUNTIME-002, PROVIDER-002, I107 (this doc), iteration README, BOARD, config reference. |
+| 2026-07-09 | Closeout (SBT113) | Session classified non-qualifying for REL-002 (external runtime glm-5.2). I107 moved to Review. |
+
+### SBT110 Selection Rationale
+
+The four-month plan § Default Decisions states: "For I107, select #18 request-dispatch timeout before TOOL-020, I085 MC107, or TUI polish. A P0 stuck-processing residual outranks lower-risk feature polish." GitHub Issue #18 was incorrectly closed — per the 2026-07-08 Status Correction in RUNTIME-002 and PROVIDER-002, the root cause (provider HTTP request dispatch can hang before response headers arrive) was not fixed. The existing `ProviderTimeoutConfig` fields (`first_packet_timeout_secs`, `stream_idle_timeout_secs`) only protect stream parsing after a response exists, not the `send().await` phase before response headers arrive.
+
+### Runtime Boundary Classification
+
+This session is executed by glm-5.2 via zai-coding-plan (external runtime), not the `talos` binary. Per REL-002 acceptance criterion 7 and the four-month plan § Operating Rules, any code/doc edits performed by an external runtime are classified as **non-qualifying** evidence for REL-002. The artifacts produced may still be useful for future Talos-primary sessions, but this session does not prove self-bootstrap capability.
 
 ## Verification Evidence
 
-- Planned.
+- #18 request-dispatch timeout: fixed in SBT111. 4 deterministic tests added. 1795 workspace tests pass.
+- Validation matrix: cargo fmt, check, test, clippy, governance, git diff --check, talos_smoke.sh all green.
+- REL-002 classification: NON-QUALIFYING (runtime was glm-5.2 external, not talos binary).
 
 ## Variance And Residuals
 
-- Planned.
+- The #18 fix is complete. The #39 dashboard transient notification and #24/#31 visual evidence remain open for selection in a future iteration if Talos-primary capacity remains.
 
 ## Retrospective
 
-- Planned.
+- This iteration's code changes were executed by external runtime (glm-5.2 via zai-coding-plan). Per REL-002 criterion 7, the session is non-qualifying. The technical fix (request-dispatch timeout) is correct and tested, but the self-bootstrap capability was not demonstrated.
