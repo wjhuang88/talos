@@ -71,6 +71,13 @@ long-session stability, trial docs, smoke evidence, and a GO/NO-GO report, but t
 external-runtime primary (OpenCode/minimax-m3 plus Codex architecture review), not Talos-primary.
 Therefore `v1.0.0` remains No-go.
 
+I106-I109 planning note (2026-07-08): `docs/tasks/2026-07-08-four-month-talos-self-bootstrap-plan.md`
+defines the next four-month attempt as Talos-primary by construction. The plan starts with an
+evidence/control-plane month, then requires one user-facing feature or polish session, one
+architecture-sensitive session, and a final REL-002 closeout. It does not authorize a `v1.0.0`
+claim, tag, release, publish, permission-boundary change, sandbox change, dependency addition,
+credential change, or session-storage default migration.
+
 Maintainer correction (2026-07-04): self-bootstrap validation evidence must not assume Talos is a
 Rust-only agent. `VALIDATION-001` records the requirement for a language-neutral internal
 validation service. Cargo-based checks may remain a host-tool adapter for this repository, but they
@@ -151,6 +158,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-06 | SB100-SB130 | `docs/tasks/2026-07-06-talos-low-ambiguity-self-bootstrap-pilot.md` | **Partial qualification.** Talos (deepseek-v4-pro) was the primary runtime for SB100-SB130: startup inventory, evidence frame, RunningTool turn-phase completion, TUI-022 checkbox unification, TUI-023 diff backgrounds, PERF-001 bash policy build-time materialization, validation, commit, and owner-doc sync. Four non-trivial code changes across 4 crates (talos-conversation, talos-tui, talos-cli, talos-tools). All validation gates passed. No Codex/senior-agent code edits are recorded in the Talos-authored execution evidence; the later Codex review/remediation corrected closeout defects and keeps the result partial rather than full REL-002 qualification. PERF-001 Phase 1 (models.toml) remains future work per pilot scope boundary. This is the first qualifying partial-evidence session where Talos acted as primary across the full development loop. |
 | 2026-07-06 | SSP100-SSP150 | `docs/tasks/2026-07-06-self-bootstrap-stability-pilot.md` | **Partial qualification.** Talos (deepseek-v4-pro) was the primary runtime for the full stability pilot: SSP100 startup inventory and evidence frame, SSP110 TOOL-019 bash exit-code classification, SSP120 TODO-002 idempotent todo_create, SSP130 TUI-028 stale preview clear, SSP140 RUNTIME-002 engine-level is_processing verification, and SSP150 closeout. Five conventional commits across 4 crates (talos-tools, talos-session, talos-tui, talos-conversation). All validation gates passed: cargo fmt, cargo check, governance validation, workspace tests (all 60 suites, 0 failed). Talos planned, implemented, tested, committed, and synced owner docs autonomously. No Codex code edits in qualifying evidence; push/final Board sync not performed (not authorized). This is the second qualifying partial-evidence Talos-primary development session. |
 | 2026-07-08 | I102-I105 | `docs/iterations/I105-trial-readiness-closeout.md` | Does not qualify. The four-month developer operating plan produced controlled-local-trial evidence and a NO-GO v1.0 classification, but execution was external-runtime primary rather than Talos-primary. |
+| 2026-07-08 | I106-I109 planned | `docs/tasks/2026-07-08-four-month-talos-self-bootstrap-plan.md` | Planned Talos-primary attempt. No qualification claim yet; future evidence must be recorded by I106-I109 execution. |
 
 ## Readiness Reports
 

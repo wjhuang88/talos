@@ -142,6 +142,10 @@ docs/iterations/
 | I103 | First-Run Model And Diagnostics | **Complete (2026-07-08)** | Month 2 of the 2026-07-07 developer operating plan. D110-D113 verified complete: standard/custom provider connect UX, bounded model browsing, redacted diagnostics. 1791 workspace tests pass. See `I103-first-run-model-diagnostics.md`. |
 | I104 | Long-Session Stability And Permission Evidence | **Complete (2026-07-08)** | Month 3 of the 2026-07-07 developer operating plan. D120-D123 verified complete: permission-noise evidence with deny precedence preserved, validation routing, tool display readability. 1791 workspace tests pass. See `I104-long-session-stability-and-permission-evidence.md`. |
 | I105 | Trial Readiness Closeout | **Complete (2026-07-08)** | Month 4 of the 2026-07-07 developer operating plan. D130-D133 closed: trial docs (README troubleshooting section), smoke checklist (6 direct binary commands plus integration coverage for interactive/failure paths), REL-002 non-qualifying classification, final go/no-go report (GO for controlled local trial, NO-GO for v1.0). 1791 workspace tests pass. See `I105-trial-readiness-closeout.md`. |
+| I106 | Self-Bootstrap Control Plane | Planned | Month 1 of the 2026-07-08 Talos-primary self-bootstrap plan. Establish execution contract, evidence schema, runtime smoke harness, and governance rehearsal before claiming any REL-002 progress. See `I106-self-bootstrap-control-plane.md`. |
+| I107 | Talos-Primary Feature Polish | Planned | Month 2 of the 2026-07-08 Talos-primary self-bootstrap plan. Talos must complete one low-risk user-facing feature or polish change as primary executor. See `I107-talos-primary-feature-polish.md`. |
+| I108 | Architecture-Sensitive Self-Bootstrap | Planned | Month 3 of the 2026-07-08 Talos-primary self-bootstrap plan. Talos must route and complete one bounded architecture-sensitive session with review gates preserved. See `I108-architecture-sensitive-self-bootstrap.md`. |
+| I109 | REL-002 Self-Bootstrap Closeout | Planned | Month 4 of the 2026-07-08 Talos-primary self-bootstrap plan. Final session, evidence audit, and v1.0 go/no-go report without release overclaim. See `I109-rel002-self-bootstrap-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -186,6 +190,10 @@ rewrite published iteration baselines.
 | I103 | Complete | Month-2 developer operating plan closed 2026-07-08. D110-D113 verified (all behavior shipped in I101). I104 is the next to activate. |
 | I104 | Complete | Month-3 developer operating plan closed 2026-07-08. D120-D123 verified (all behavior shipped in PERM-002/003, VALIDATION-001, TUI-015/019/025). I105 is the final iteration. |
 | I105 | Complete | Month-4 developer operating plan closed 2026-07-08. D130-D133 closed. GO for controlled local trial, NO-GO for v1.0 (REL-002 not met). Four-month plan complete. |
+| I106 | Planned | Month-1 Talos-primary self-bootstrap control plane. Activate only by assigning Talos as primary executor and preserving evidence/disqualification rules. |
+| I107 | Planned | Month-2 Talos-primary feature/polish session. Activate after I106 closeout; prefer TOOL-020 unless a safer owner is selected. |
+| I108 | Planned | Month-3 architecture-sensitive self-bootstrap session. Activate after I107 closeout; prefer ARCH-032 unless maintainer selects a different bounded owner. |
+| I109 | Planned | Month-4 REL-002 closeout. Activate after I108 closeout; no v1.0 claim unless every REL-002 criterion is met. |
 | I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
 | I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
 | I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |
