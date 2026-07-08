@@ -1,6 +1,6 @@
 # Iteration I106: Self-Bootstrap Control Plane
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-08
 > Planned objective: establish the Talos-primary execution contract, runtime smoke harness, and
 > evidence classification needed before another REL-002 self-bootstrap attempt.
@@ -417,3 +417,116 @@ a Talos-primary session to use.
 ### Next Task
 
 SBT104: Month-1 closeout classified for REL-002.
+
+## SBT104: Month-1 Closeout Classified For REL-002
+
+### Activation Date
+
+2026-07-09
+
+### Validation Matrix (Run In This Worktree)
+
+| Check | Command | Result |
+|---|---|---|
+| `cargo fmt --all -- --check` | format check | ✅ Clean (after fixing pre-existing `bash_tool.rs` formatting) |
+| `cargo check --workspace` | workspace compilation | ✅ Passed |
+| `cargo test --workspace` | workspace tests | ✅ 1791 passed, 0 failed |
+| `cargo clippy --workspace -- -D warnings` | lint check | ✅ Passed, no warnings |
+| `scripts/validate_project_governance.sh .` | governance validation | ✅ 0 warnings |
+| `git diff --check` | whitespace/conflict check | ✅ Clean |
+| `scripts/talos_smoke.sh` | runtime smoke harness | ✅ 9/9 checks passed |
+
+### Commits In This Session
+
+| Commit | Task | Description |
+|---|---|---|
+| `81854af` | SBT100 | Execution contract, inventory, disqualification rules. I106 activated. |
+| `66a46a8` | SBT101 | Evidence schema and checkpoint template for session classification. |
+| `785e4af` | SBT102 | Repeatable runtime smoke harness (`scripts/talos_smoke.sh`). |
+| `d7e4964` | SBT103 | Governance rehearsal with rollback evidence. |
+| *(this commit)* | SBT104 | Month-1 closeout, REL-002 classification, pre-existing fmt fix. |
+
+### REL-002 Classification
+
+**Classification: Non-qualifying.**
+
+**Rationale**: The primary executor for this session was glm-5.2 via zai-coding-plan (external
+runtime), not the `talos` binary itself. All planning, file editing, validation orchestration,
+evidence interpretation, and commits were performed by the external runtime. The `talos` binary
+was used as a validation subject (smoke commands, governance commands) but not as the autonomous
+primary executor.
+
+**What was proven**:
+1. The execution evidence harness can distinguish qualifying, partial, and non-qualifying sessions
+   (SBT100/SBT101).
+2. The `talos` binary has a repeatable smoke harness covering version, validation, governance
+   preview/write, provider mock, session list, and secret masking (SBT102).
+3. The governance mutation path works correctly: preview → write → post-write validation →
+   rollback (SBT103).
+4. The validation matrix (fmt, check, test, clippy, governance, diff-check) passes cleanly.
+
+**What was NOT proven**:
+1. Talos did not act as the primary development executor.
+2. No Talos-autonomous planning, implementation, or evidence interpretation occurred.
+3. The REL-002 acceptance criteria remain unmet.
+
+**Useful artifacts for future qualifying sessions**:
+- `scripts/talos_smoke.sh` — ready for any Talos-primary session to run.
+- Evidence schema and checkpoint template — ready for any Talos-primary session to use.
+- Governance mutation path — proven safe and rollback-capable.
+
+### Pre-Existing Fix
+
+`crates/talos-tools/src/bash_tool.rs:585-588` had a pre-existing `cargo fmt` violation (multi-line
+condition that rustfmt wanted on a single line). Fixed during closeout to make the validation
+matrix fully green. No behavior change.
+
+### Iteration Status
+
+I106 moves to **Review**. All SBT100-SBT104 tasks are complete. The deliverable — execution
+contract, evidence schema, smoke harness, and governance rehearsal — is verified. The REL-002
+classification is non-qualifying, recorded honestly.
+
+### Next Iteration
+
+I107 (Talos-Primary Feature Polish) may be activated after I106 Review is accepted. Per the plan's
+default decisions, I107 must first address #18 request-dispatch timeout before lower-priority
+polish. However, I107 activation requires a Talos-primary runtime; if the runtime remains external,
+I107 will also be non-qualifying.
+
+## Verification Evidence
+
+- SBT100-SBT104 complete; validation matrix green; REL-002 classification recorded as
+  non-qualifying.
+
+## Variance And Residuals
+
+- Pre-existing `bash_tool.rs` fmt violation fixed during closeout (not a session variance).
+- Push to remote not performed (not authorized).
+- I107-I109 remain Planned pending I106 Review acceptance and Talos-primary runtime availability.
+
+## Retrospective
+
+**What worked**:
+- The execution contract and evidence schema provide a clear, honest framework for classifying
+  self-bootstrap sessions. The non-qualifying classification was immediate and unambiguous because
+  the runtime was external.
+- The smoke harness is lightweight (9 checks, <30 seconds) and non-mutating, making it safe to run
+  repeatedly.
+- The governance mutation path is well-designed: preview → confirm → write → validate → rollback
+  is a clean safety chain.
+
+**What didn't work**:
+- The session cannot qualify for REL-002 because the runtime is external. This is a structural
+  limitation, not a process failure — the plan correctly anticipated this and requires honest
+  classification.
+- A pre-existing `cargo fmt` violation was discovered during closeout validation. This suggests the
+  previous session's closeout validation may not have included `cargo fmt --check`, or the violation
+  was introduced after the last fmt pass.
+
+**Lessons for future sessions**:
+- Always run `cargo fmt --all -- --check` as the first validation step, not just at closeout.
+- The smoke harness should be run at the start of every self-bootstrap session to establish a
+  runtime baseline.
+- A Talos-primary session requires the `talos` binary to be invoked with a configured provider,
+  making its own autonomous decisions through the full development loop.

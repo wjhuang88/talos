@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-06-24"
-status_note: "Governance refresh (2026-06-24): I045 Complete (model lifecycle + config + observability). Closed in ~4 hours. All 48 test groups pass; clippy clean on all changed crates; 0 validator warnings. Next iteration TBD."
+last_audited_at: "2026-07-09"
+status_note: "I106 Review (2026-07-09): Self-bootstrap control plane SBT100-SBT104 complete. Execution contract, evidence schema, smoke harness, and governance rehearsal delivered. REL-002 non-qualifying (external runtime glm-5.2). Full validation matrix green: 1791 tests, clippy clean, 0 governance warnings."
 
 governance:
   skill_name: "agent-project-governance"

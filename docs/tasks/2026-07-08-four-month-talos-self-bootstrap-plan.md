@@ -240,3 +240,4 @@ credential migration, permission policy migration, or storage default migration.
 |---|---|
 | 2026-07-08 | Created planned Talos-primary self-bootstrap package with I106-I109 shells and REL-002 qualification boundaries. |
 | 2026-07-09 | SBT100 activated. Runtime: glm-5.2 via zai-coding-plan (external, not Talos). Baseline: 1791 tests pass, governance 0 warnings, `talos 0.3.0` binary available, clean worktree. Session classified non-qualifying for REL-002. I106 moved to Active. |
+| 2026-07-09 | SBT101-SBT104 complete. Evidence schema, smoke harness (`scripts/talos_smoke.sh`), governance rehearsal with rollback all delivered. Pre-existing `bash_tool.rs` fmt violation fixed. Full validation matrix green: fmt, check, 1791 tests, clippy, governance, diff-check. I106 moved to Review. REL-002 classification: non-qualifying (external runtime). I107 pending Review acceptance and Talos-primary runtime. |

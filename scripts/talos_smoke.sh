@@ -76,6 +76,8 @@ echo ""
 
 # --- 5. Governance Iteration-Record Preview (dry run, no write) ---
 echo "5. Governance Iteration-Record Preview (dry run)"
+# Save file hash before preview (macOS uses md5 -q, Linux uses md5sum)
+BEFORE_HASH=$(if command -v md5 &>/dev/null; then md5 -q docs/iterations/I106-self-bootstrap-control-plane.md; else md5sum docs/iterations/I106-self-bootstrap-control-plane.md | awk '{print $1}'; fi)
 PREVIEW_OUTPUT=$("$BINARY" governance iteration-record preview \
   --iteration I106 \
   --date 2026-07-09 \
@@ -86,11 +88,12 @@ if echo "$PREVIEW_OUTPUT" | grep -q "Mutation Preview" && echo "$PREVIEW_OUTPUT"
 else
   fail "governance preview did not produce expected output"
 fi
-# Verify no write occurred: the preview should not modify the file
-if git diff --quiet docs/iterations/I106-self-bootstrap-control-plane.md 2>/dev/null; then
-  ok "no file modification from preview"
+# Verify no write occurred: compare file hash after preview
+AFTER_HASH=$(if command -v md5 &>/dev/null; then md5 -q docs/iterations/I106-self-bootstrap-control-plane.md; else md5sum docs/iterations/I106-self-bootstrap-control-plane.md | awk '{print $1}'; fi)
+if [ "$BEFORE_HASH" = "$AFTER_HASH" ]; then
+  ok "no file modification from preview (hash unchanged)"
 else
-  fail "preview modified the owner doc unexpectedly"
+  fail "preview modified the owner doc unexpectedly (hash changed)"
 fi
 echo ""
 
