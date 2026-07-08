@@ -269,3 +269,21 @@ Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D102).
   already shipped in FP1 — the stream simply terminates without `TurnEnd`, which the agent
   invariant `channel closed before TurnEnd` (lib.rs:540-547) already converts to a terminal
   `UnexpectedEvent`. So the residual is bounded, not stuck.
+
+## I102 D103 Conversation-Loop Cancel Integration (2026-07-08)
+
+Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D103).
+
+- Closed the FS01 surface #3 optional residual: added integration-level coverage proving
+  `UserInput::Cancel` through the full conversation-loop bridge produces a terminal
+  `UiOutput::Status { is_processing: false, phase: Cancelled }`.
+- The engine-level `cancel_turn_clears_processing_state` test already covered the engine in
+  isolation; the new test `conversation_loop_cancel_emits_terminal_cancelled_status` in
+  `crates/talos-cli/src/tests.rs` drives the full bridge path
+  (`UserInput::Cancel` → `run_conversation_loop` → `engine.cancel_turn()` → `UiOutput`).
+- All five terminal phases now have conversation-loop integration coverage: Failed (FS02),
+  TimedOut (FS02), Cancelled (D103), MaxTokens-clear (FS02), normal-EndTurn (FS03).
+- Validation: `cargo test -p talos-cli --bin talos -- conversation_loop` → 9 passed (was 8);
+  `cargo test --workspace` → 1789 passed (was 1788); clippy/fmt/governance clean.
+- No production code change. The existing FS03 visible-signal surfaces were already verified
+  in the FS03 closeout.

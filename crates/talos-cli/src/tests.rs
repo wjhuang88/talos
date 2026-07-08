@@ -491,6 +491,77 @@ mod tests {
         loop_handle.await.unwrap();
     }
 
+    // D103 / RUNTIME-002 FS01 surface #3: prove the conversation loop forwards a terminal
+    // `UiOutput::Status { is_processing: false, phase: Cancelled }` when the user cancels
+    // mid-turn. The engine-level `cancel_turn_clears_processing_state` test covers the
+    // engine in isolation; this test drives the full bridge path
+    // (`UserInput::Cancel` -> `run_conversation_loop` -> `engine.cancel_turn()` -> `UiOutput`).
+
+    #[tokio::test]
+    async fn conversation_loop_cancel_emits_terminal_cancelled_status() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                submit_tx,
+                sq_tx_watch: sq_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+            },
+        ));
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::TextDelta {
+                delta: "generating".to_string(),
+            })
+            .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        user_tx.send(UserInput::Cancel).unwrap();
+
+        let mut saw_cancelled_status = false;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+        while let Ok(Some(output)) = tokio::time::timeout_at(deadline, ui_rx.recv()).await {
+            if let UiOutput::Status(status) = output {
+                if !status.is_processing
+                    && status.phase == Some(talos_conversation::TurnPhase::Cancelled)
+                {
+                    saw_cancelled_status = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            saw_cancelled_status,
+            "cancel must emit terminal Status with is_processing=false and phase=Cancelled"
+        );
+
+        drop(agent_tx);
+        drop(user_tx);
+        loop_handle.await.unwrap();
+    }
+
     #[tokio::test]
     async fn conversation_loop_routes_skill_activation_to_session_op() {
         let dir = tempfile::tempdir().unwrap();
