@@ -220,3 +220,23 @@ Source: `docs/tasks/2026-07-07-provider-runtime-hardening-next-phase.md` (PRH01/
 - FP3-FP8 packets (processing status visibility, session evidence, connect diagnostics, large model
   UX, tool output ergonomics, trial docs) are not started; they remain in the task doc for future
   frontline assignment.
+
+## I102 D101 SSE Fixture Matrix Extension (2026-07-07)
+
+Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D101).
+
+- Six additional deterministic `parse_sse_stream_*` fixtures landed in
+  `crates/talos-provider/src/openai.rs::tests` covering paths FP1-FP2 did not have an explicit
+  fixture for: `finish_reason="length" → StopReason::MaxTokens`, role-only first chunk consumed
+  without spurious emit, SSE `: keepalive` / `retry:` / empty `data: ` passthrough, mixed
+  content + tool_calls in one delta, and multi-byte UTF-8 round-trip.
+- No production parser change was needed; these are pure regression guards. The full fixture
+  matrix now covers split chunks, missing ids, duplicate ids (agent-side), `[DONE]`-after-tool-call,
+  usage interleaving, malformed args degradation, multi-tool missing ids, MaxTokens surfacing,
+  keepalive/comment lines, empty data events, mixed-delta tool+text, and UTF-8 round-trip.
+- Validation: `cargo test -p talos-provider openai::tests::parse_sse_stream` → 14 passed;
+  `cargo test --workspace` → 1784 passed (was 1778 at D100 baseline); clippy/fmt/governance clean.
+- Residual: D102 will extend the agent-layer invariant (rejecting malformed provider event
+  sequences that the SSE fixtures cannot themselves prevent, e.g. a provider error chunk mid-stream
+  that is silently consumed because `chunk.choices.is_empty()` returns true). That residual is
+  already recorded under I102 `## Variance And Residuals`.

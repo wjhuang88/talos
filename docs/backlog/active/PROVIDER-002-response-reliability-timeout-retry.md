@@ -115,3 +115,16 @@ Provider runtime should support these states without requiring TUI-specific code
 - `crates/talos-tui/src/app.rs`
 - `docs/backlog/active/MODEL-003-reasoning-thinking-support.md`
 - `docs/backlog/active/PROVIDER-001-openai-streaming-usage.md`
+
+## I102 D101 Cross-Reference (2026-07-07)
+
+Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D101).
+
+- The OpenAI-compatible SSE fixture matrix was extended with six deterministic
+  `parse_sse_stream_*` cases that lock protocol paths the original UX103/UX104 fixtures did not
+  have an explicit case for: `finish_reason="length" → StopReason::MaxTokens`, role-only first
+  chunk, SSE `: keepalive` / `retry:` / empty `data: ` passthrough, mixed content + tool_calls
+  in one delta, and multi-byte UTF-8 round-trip.
+- No provider behavior change; no new timeout/retry behavior. These fixtures are regression
+  guards for the timeout/retry pipeline's downstream `StopReason` mapping and stream-idle
+  passthrough. The full I102 evidence lives in `RUNTIME-002` and `I102`.

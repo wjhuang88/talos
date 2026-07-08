@@ -1800,6 +1800,320 @@ mod tests {
         assert!(!saw_timeout_error);
     }
 
+    // --- D101 coverage-extension fixtures (I102 / PROVIDER-002 / RUNTIME-002) ---
+    // These lock already-implemented parser paths that FP1-FP2 did not have an
+    // explicit fixture for. No production-code change should be required to make
+    // any of these pass — they are deterministic regression guards.
+
+    #[tokio::test]
+    async fn parse_sse_stream_finish_reason_length_emits_max_tokens() {
+        // `finish_reason: "length"` must surface as StopReason::MaxTokens so the
+        // engine MaxTokens fix (FS04) actually fires when a provider hits the
+        // token cap instead of `stop`.
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"truncated\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut stop_reason = None;
+        let mut text = String::new();
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "truncated");
+        assert_eq!(
+            stop_reason,
+            Some(StopReason::MaxTokens),
+            "finish_reason=length must surface as StopReason::MaxTokens"
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_role_only_first_chunk_does_not_emit_or_hang() {
+        // Many OpenAI-compatible providers send a leading delta carrying only
+        // `role: "assistant"`. The parser must consume it without emitting a
+        // spurious event and without blocking the rest of the stream.
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+
+        let text: String = events
+            .iter()
+            .filter_map(|e| match e {
+                AgentEvent::TextDelta { delta } => Some(delta.clone()),
+                _ => None,
+            })
+            .collect();
+        let stop_reason = events.iter().find_map(|e| match e {
+            AgentEvent::TurnEnd { stop_reason, .. } => Some(stop_reason.clone()),
+            _ => None,
+        });
+
+        assert_eq!(text, "ok");
+        assert_eq!(stop_reason, Some(StopReason::EndTurn));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_keepalive_comment_lines_pass_through() {
+        // SSE spec allows `: comment` lines and proxies often inject
+        // `: keepalive` / `retry: 1500` directives. They must not break parsing
+        // or be mistaken for an event payload.
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            ": keepalive\n\n",
+            "retry: 1500\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n",
+            ": still alive\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut text = String::new();
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "hi");
+        assert_eq!(stop_reason, Some(StopReason::EndTurn));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_empty_data_event_is_skipped() {
+        // `data: ` (with no payload) or empty event blocks must not crash the
+        // parser nor produce a spurious TurnEnd.
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: \n\n",
+            "\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut text = String::new();
+        let mut stop_reason = None;
+        let mut error_events = 0;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                AgentEvent::Error { .. } => error_events += 1,
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "ok");
+        assert_eq!(stop_reason, Some(StopReason::EndTurn));
+        assert_eq!(error_events, 0, "empty data events must not raise errors");
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_mixed_text_and_tool_call_in_same_delta_emits_both() {
+        // Some providers stream content and tool_calls in the same delta chunk.
+        // The parser must emit both the text delta and the tool call.
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"thinking...\",\"tool_calls\":[{\"index\":0,\"id\":\"call_mix\",\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"{\\\"p\\\":1}\"}}]},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut text = String::new();
+        let mut tool_call = None;
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::ToolCall { call, .. } => tool_call = Some(call),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "thinking...");
+        let call = tool_call.expect("mixed-delta tool call must be emitted");
+        assert_eq!(call.id, "call_mix");
+        assert_eq!(call.name, "read");
+        assert_eq!(call.input, json!({ "p": 1 }));
+        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_utf8_multibyte_content_round_trips() {
+        // Multi-byte UTF-8 content split across chunks must re-assemble without
+        // mojibake. The parser reads `String::from_utf8(bytes)` per network
+        // chunk, so a chunk boundary inside a multi-byte code point would
+        // historically produce `continue`. This fixture confirms the current
+        // behavior: if a chunk ends mid-code-point, that partial bytes are
+        // dropped (lossy), but complete code points are preserved. We feed
+        // whole-code-point chunks to keep this a regression guard, not a bug
+        // hunt.
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"你好\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"世界\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut text = String::new();
+        let mut stop_reason = None;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::TurnEnd {
+                    stop_reason: reason,
+                    ..
+                } => stop_reason = Some(reason),
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "你好世界");
+        assert_eq!(stop_reason, Some(StopReason::EndTurn));
+    }
+
     #[test]
     fn openai_message_struct_serialization() {
         let msg = OpenAIMessage {
