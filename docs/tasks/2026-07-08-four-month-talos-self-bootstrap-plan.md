@@ -239,3 +239,4 @@ credential migration, permission policy migration, or storage default migration.
 | Date | Record |
 |---|---|
 | 2026-07-08 | Created planned Talos-primary self-bootstrap package with I106-I109 shells and REL-002 qualification boundaries. |
+| 2026-07-09 | SBT100 activated. Runtime: glm-5.2 via zai-coding-plan (external, not Talos). Baseline: 1791 tests pass, governance 0 warnings, `talos 0.3.0` binary available, clean worktree. Session classified non-qualifying for REL-002. I106 moved to Active. |
