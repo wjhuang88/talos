@@ -94,7 +94,7 @@ Read any additional owner doc named by an individual task before editing that ta
 | FS02 | 2 | Runtime | Add runtime-level integration coverage for processing state clearing after terminal provider/tool errors. | Deterministic test proving UI/runtime does not remain stuck after error. | FS01 | Targeted runtime/conversation tests pass. | If integration harness is too broad, add the narrowest engine/runtime test and record residual. | Complete |
 | FS03 | 3 | Runtime | Add visible stuck-state recovery/status signal without changing provider semantics. | User-visible status or diagnostic event when a turn reaches a terminal error/timeout. | FS02 | Tests prove normal success path is unchanged and error path clears processing. | If display path requires TUI refactor, keep runtime event only and record TUI residual. | Complete |
 | FS04 | 4 | Closeout | Month 1 closeout for runtime stuck-state package. | Checkpoint with commits, tests, residuals, recovery instructions. | FS01-FS03 | `cargo fmt --all -- --check`, targeted tests, `cargo check --workspace`, governance, `git diff --check`. | Close as Partial with exact failing gate and owner. | Complete |
-| FS05 | 5 | TUI | Complete remaining `TUI-028` preview reset/animation/status inventory. | Table mapping issues #24-#28/#31 to implemented, residual, or out-of-scope. | FS04 | Owner doc updated before Board. | If issue mapping conflicts, stop and ask. | Complete |
+| FS05 | 5 | TUI | Complete remaining `TUI-028` preview reset/animation/status inventory. | Table mapping issues #24/#25/#27/#28/#31 to implemented, and #26 to a separate decision-required owner. | FS04 | Owner doc updated before Board. | If issue mapping conflicts, stop and ask. | Complete |
 | FS06 | 6 | TUI | Implement preview/status feedback fixes that are strictly display-state changes. | Preview clears stale content, status messages identify waiting-for-model vs waiting-for-tool where data exists. | FS05 | Focused TUI tests pass. | If a fix needs new agent protocol events, record residual instead. | Complete |
 | FS07 | 7 | Todo | Complete `TODO-002` batch/delete/schema reliability tasks already specified by owner doc. | Idempotent create remains intact; update/delete/batch behavior is tested. | FS04 | `cargo test -p talos-session`, targeted CLI/TUI todo tests pass. | If schema migration is required, stop and request senior review. | Complete |
 | FS08 | 8 | Closeout | Month 2 closeout for TUI preview/status and todo reliability. | Checkpoint with validation evidence and residual owners. | FS05-FS07 | `cargo test -p talos-tui`, `cargo test -p talos-session`, `cargo check --workspace`, governance. | Close as Partial with exact residuals. | Complete |
@@ -357,8 +357,9 @@ Residual owner:
 
 Next item:
 - FS05: Complete remaining `TUI-028` preview reset/animation/status inventory. Owner doc:
-  `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md`. Map issues #24-#28/#31 to
-  implemented, residual, or out-of-scope.
+  `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md`. Map issues
+  #24/#25/#27/#28/#31 to implemented, and keep #26 outside TUI-028 unless the reasoning-history
+  decision boundary changes.
 
 Recovery instructions:
 - Owning record: this file.
@@ -373,10 +374,12 @@ Recovery instructions:
 ## Checkpoint FS08 - Month 2 Closeout: TUI Preview/Status + Todo Reliability (2026-07-07)
 
 Completed task items:
-- FS05: TUI-028 inventory complete. All 6 issues mapped: #24-#28 already implemented (stale preview
-  clear, 50ms animation timer, dashboard System-source rendering, truncate_str model formatting,
-  thinking label animation), #31 out-of-scope (thinking persistence decision gap, ADR-034).
-- FS06: No display-state code work needed — all TUI-028 acceptance items were already implemented.
+- FS05: TUI-028 inventory complete. Frontline-scope issues #24/#25/#27/#28/#31 are implemented
+  (50ms animation timer, thinking label animation, stale preview clear, dashboard System-source
+  rendering, truncate_str model formatting). #26 is not implemented by TUI-028 and is tracked by
+  TUI-029 as a decision-required reasoning-history archive.
+- FS06: No display-state code work needed — all TUI-028 frontline-scope acceptance items were
+  already implemented.
   Per Default Decisions, did not rewrite. Verified via 251 TUI tests.
 - FS07: `/todo delete <id> --confirm` implemented (TodoCommandAction::Delete, short-ID resolution,
   ambiguity detection, --confirm guard). `TodoRepository::create_batch` added with idempotent
@@ -415,8 +418,8 @@ Residual owner:
 - `docs/backlog/active/TODO-002-todo-mutation-reliability.md` owns the batch agent tool
   registration residual and the README help-text clarification for mutating vs read-only `/todo`
   subcommands.
-- `docs/backlog/active/TUI-028-preview-status-feedback-reliability.md` owns the #31 thinking
-  persistence decision gap.
+- `docs/backlog/active/TUI-029-thinking-history-archive.md` owns the #26 thinking persistence
+  decision gap.
 
 Next item:
 - FS09: Implement `TOOL-015` write/edit result visibility. Owner doc says Complete (I076/T104);
@@ -488,7 +491,8 @@ Completed task items (FS00-FS15):
 - FS02: MaxTokens stuck-processing bug fixed (engine.rs); 2 engine + 3 conversation-loop tests.
 - FS03: Visible signal chain verified (Tip/Error Stream/Status); 2 integration tests.
 - FS04: Month 1 closeout — commit `3d3c3dd`.
-- FS05: TUI-028 inventory — all 6 items implemented (#24-#28) or out-of-scope (#31).
+- FS05: TUI-028 inventory — #24/#25/#27/#28/#31 implemented; #26 split to TUI-029 as
+  decision-required.
 - FS06: No display-state work needed — all items already implemented.
 - FS07: `/todo delete <id> --confirm` implemented; `TodoRepository::create_batch` added.
 - FS08: Month 2 closeout — commit `d76cac4`.
@@ -557,7 +561,7 @@ Fallback-permitted residuals (explicitly allowed by each task's fallback column,
   (see TOOL-018 owner doc). The deferred work is retained as `TOOL-020` so it is not lost during
   later planning. Unstaged, staged, and path-filtered modes are implemented and tested.
   HistoryAttrs background-color limitation is a display constraint.
-- TUI-028: #31 thinking persistence into history is a decision gap (ADR-034/TUI-020 revision
+- TUI-028: #26 thinking persistence into history is a decision gap (ADR-034/TUI-020 revision
   required). The plan's acceptance explicitly defers this: "Persisting thinking content into
   history is not implemented unless ADR-034/TUI-020 are explicitly revised."
 
