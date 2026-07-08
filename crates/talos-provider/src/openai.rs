@@ -130,16 +130,48 @@ impl OpenAIProvider {
 
     async fn send_request(&self, body: &Value) -> ProviderResult<reqwest::Response> {
         let max_attempts = self.timeout_config.max_attempts;
+        let dispatch_timeout = Duration::from_secs(self.timeout_config.dispatch_timeout_secs);
         let mut attempt = 0u32;
         loop {
-            let response = self
+            let request_fut = self
                 .client
                 .post(self.endpoint_url())
                 .header("Authorization", format!("Bearer {}", &self.api_key))
                 .header("Content-Type", "application/json")
                 .json(&body)
-                .send()
-                .await;
+                .send();
+
+            let response = match tokio::time::timeout(dispatch_timeout, request_fut).await {
+                Ok(result) => result,
+                Err(_) => {
+                    let error = ProviderError::NetworkError(format!(
+                        "request dispatch timeout: no response headers within {}s",
+                        self.timeout_config.dispatch_timeout_secs
+                    ));
+                    match classify_retry_with_backoff(
+                        &error,
+                        attempt,
+                        max_attempts,
+                        self.timeout_config.backoff_base_ms,
+                        self.timeout_config.backoff_max_ms,
+                    ) {
+                        RetryDecision::Retry {
+                            attempt: new_attempt,
+                            delay_ms,
+                        } => {
+                            tracing::warn!(
+                                attempt = new_attempt,
+                                delay_ms,
+                                "retrying openai dispatch timeout"
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = new_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
+                }
+            };
 
             match response {
                 Ok(resp) if resp.status().is_success() => return Ok(resp),
@@ -2234,5 +2266,100 @@ mod tests {
         assert_eq!(json["type"], "function");
         assert_eq!(json["function"]["name"], "bash");
         assert_eq!(json["function"]["arguments"], "{\"command\": \"ls\"}");
+    }
+
+    async fn spawn_never_responding_server() -> String {
+        use tokio::io::AsyncReadExt;
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            loop {
+                if let Ok((mut socket, _)) = listener.accept().await {
+                    let mut buf = [0u8; 1024];
+                    let _ = socket.read(&mut buf).await;
+                    tokio::time::sleep(Duration::from_secs(300)).await;
+                }
+            }
+        });
+
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_timeout_openai() {
+        let url = spawn_never_responding_server().await;
+        let timeout_config = ProviderTimeoutConfig {
+            dispatch_timeout_secs: 1,
+            first_packet_timeout_secs: 30,
+            stream_idle_timeout_secs: 90,
+            max_attempts: 1,
+            backoff_base_ms: 500,
+            backoff_max_ms: 8_000,
+        };
+        let provider = OpenAIProvider::new("sk-test", "gpt-4o")
+            .with_base_url(&url)
+            .with_timeout_config(timeout_config);
+
+        let messages = vec![Message::User {
+            content: "hello".into(),
+        }];
+        let result = provider.stream(&messages).await;
+
+        assert!(result.is_err(), "dispatch timeout must produce an error");
+        let err = result.unwrap_err();
+        match err {
+            ProviderError::NetworkError(msg) => {
+                assert!(
+                    msg.contains("dispatch timeout"),
+                    "error must mention dispatch timeout, got: {msg}"
+                );
+                assert!(
+                    msg.contains("1s"),
+                    "error must mention the configured timeout duration, got: {msg}"
+                );
+            }
+            other => panic!("expected NetworkError for dispatch timeout, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_normal_request_not_dispatch_timed_out_openai() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let _mock = server
+            .mock("POST", "/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+
+        let timeout_config = ProviderTimeoutConfig {
+            dispatch_timeout_secs: 5,
+            first_packet_timeout_secs: 30,
+            stream_idle_timeout_secs: 90,
+            max_attempts: 1,
+            backoff_base_ms: 500,
+            backoff_max_ms: 8_000,
+        };
+        let provider = OpenAIProvider::new("sk-test", "gpt-4o")
+            .with_base_url(server.url())
+            .with_timeout_config(timeout_config);
+
+        let messages = vec![Message::User {
+            content: "hello".into(),
+        }];
+        let result = provider.stream(&messages).await;
+        assert!(
+            result.is_ok(),
+            "normal request must not be dispatch-timed-out"
+        );
     }
 }
