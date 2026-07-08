@@ -1,12 +1,14 @@
 # Iteration I102: Provider Runtime Reliability Gate
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-07-07
 > Planned objective: Execute Month 1 of the 2026-07-07 four-month developer operating plan by
 > closing provider/tool-use stuck-processing risks before additional trial-facing work.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: malformed provider/tool-use streams become complete tool calls or visible
 > terminal errors, with runtime evidence proving no silent processing tail.
+> Activated: 2026-07-07
+> Completed: 2026-07-08
 
 ## Published Baseline
 
@@ -78,6 +80,7 @@
 | 2026-07-07 | D101 Fixtures | Extended the OpenAI-compatible SSE fixture matrix in `crates/talos-provider/src/openai.rs::tests` with six new `parse_sse_stream_*` cases that lock already-implemented parser paths not covered by FP1-FP2: `finish_reason="length" → StopReason::MaxTokens`, role-only first chunk consumed without spurious emit, SSE `: keepalive` / `retry:` / `data: ` empty passthrough, mixed content + tool_calls in one delta, and multi-byte UTF-8 round-trip. No production parser change was needed — these are deterministic regression guards. D102 must now extend the agent-layer invariant (no-silent-stuck-on-`ToolUse`-without-tool-calls) so any future malformed path the fixtures do not yet exercise is still bounded. |
 | 2026-07-08 | D102 Invariants | Extended the agent turn-loop invariant set in `crates/talos-agent/src/lib.rs::run_inner` with a new defensive guard rejecting degenerate `ToolCall`s (empty id or empty/whitespace name) before they enter tool execution or the next provider request. The OpenAI SSE parser already synthesizes ids and skips empty names, but other providers (Anthropic, MCP bridging, future runtimes) must not be able to silently push a degenerate ToolCall that would later fail tool lookup or produce ambiguous request/response pairing. Also added a regression guard that `StopReason::MaxTokens` without tool calls is treated as a successful (truncated) agent turn, locking the boundary between the agent invariant guards (degenerate tool paths only) and the engine-level FS04 fix that clears `is_processing` on MaxTokens. Four new invariant tests added in `crates/talos-agent/src/tests.rs`: `test_run_rejects_tool_call_with_empty_name`, `test_run_rejects_tool_call_with_empty_id`, `test_run_rejects_whitespace_only_tool_call_name`, `test_run_max_tokens_stop_reason_without_tool_calls_is_terminal_success`. |
 | 2026-07-08 | D103 Status | Closed the RUNTIME-002 FS01 surface #3 optional residual: added integration-level coverage proving `UserInput::Cancel` through the full conversation-loop bridge produces a terminal `UiOutput::Status { is_processing: false, phase: Cancelled }`. The engine-level `cancel_turn_clears_processing_state` test already covered the engine in isolation; this test drives the full bridge (`UserInput::Cancel` → `run_conversation_loop` → `engine.cancel_turn()` → `UiOutput`). All five terminal phases (Failed, TimedOut, Cancelled, MaxTokens-clear, normal-EndTurn) now have conversation-loop integration coverage. No production code change — the existing FS03 visible-signal surfaces (preview text, status bar, error Tip/Stream) were already verified in the FS03 closeout. |
+| 2026-07-08 | D104 Closeout | Month-1 closeout validation matrix passed: `cargo check --workspace` exit 0; `cargo test --workspace` 1789 passed / 0 failed / 0 ignored across 61 test binaries (was 1778 at D100 baseline → +11 from D101/D102/D103); `cargo clippy --workspace -- -D warnings` exit 0; `scripts/validate_project_governance.sh .` 0 warnings; `git diff --check` clean. One pre-existing residual (`bash_tool.rs:583` fmt drift from `27626d9`) recorded but out of I102 scope. All three I102 acceptance criteria satisfied: (1) malformed SSE streams produce complete ToolCalls or terminal errors; (2) degenerate ToolUse sequences (empty ids/names, duplicates, zero calls) are rejected explicitly; (3) all five terminal phases reach the TUI with visible status. I102 marked Complete. BOARD.md updated to reflect the state change. |
 
 ## Verification Evidence
 
@@ -133,4 +136,15 @@
 
 ### Residuals exposed by D104 / month-1 closeout to track
 
-- Nothing D100 itself uncovered. D104 will produce the month-1 closeout residual set.
+- **Pre-existing `bash_tool.rs:583` fmt drift** (from commit `27626d9`, out of I102 scope). One-line `cargo fmt` fix. No behavioral impact. Will be resolved when the next iteration touches `talos-tools`.
+- **Mid-stream provider error chunk silently consumed** (provider sends HTTP 200 stream with `{"error": ...}` chunk, `choices: []`). Not a silent-stuck path: the stream terminates without `TurnEnd`, and the agent invariant `channel closed before TurnEnd` (lib.rs:540-547) converts this to a terminal `UnexpectedEvent`. A future iteration may add a parser-level `data.error` detection in `talos-provider` to emit a proper `AgentEvent::Error` before stream termination, but this is an enhancement, not a safety gap.
+- **SSE comment/retry directives**: handled implicitly by `extract_event_data` (lines without `data:` prefix are skipped) and locked by D101 fixture `parse_sse_stream_keepalive_comment_lines_pass_through`. Future enhancement: explicit fixture for `data: DONE` (without brackets) emitted by some legacy stubs.
+- **Text-based vs native tool-call stop_reason semantics**: rejecting `EndTurn`/`MaxTokens` + non-empty tool calls was deliberately deferred (text-based tool calls legitimately produce `EndTurn + ToolCall`). Future design must distinguish text-based and native tool calls first.
+
+## Retrospective
+
+- **What worked**: The four-month developer operating plan's packetized D100-D104 structure kept each task focused and independently verifiable. The D100 start-gate inventory caught the pre-existing fmt drift and established a clean baseline (1778 tests), making regression detection trivial for D101-D103.
+- **What worked**: D101 (fixtures) and D102 (invariants) were correctly scoped as coverage extensions on top of the already-shipped FP1-FP2 work, not first-pass bug fixes. This avoided scope creep and let each packet add deterministic value.
+- **What didn't**: The pre-existing `bash_tool.rs:583` fmt drift was discovered at D100 but couldn't be fixed without scope creep. It remained a visible `cargo fmt --check` failure throughout the iteration. Future iterations that touch `talos-tools` should resolve it.
+- **Lesson**: The conversation-loop cancel test (D103 / FS01 surface #3) was marked "optional" in the RUNTIME-002 closeout but proved valuable: it closed the last terminal-phase coverage gap and made the I102 acceptance criterion #3 provable. "Optional" residuals should be re-evaluated when they block acceptance criteria.
+- **Lesson**: The agent-layer degenerate-tool-call invariant (D102) was not covered by any existing provider test because the OpenAI SSE parser already synthesizes ids and skips empty names. The defense-in-depth principle (agent must not trust provider to always produce valid ToolCalls) was worth the 20 lines of production code.
