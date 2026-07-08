@@ -169,3 +169,88 @@ A session is **qualifying** only if ALL acceptance criteria in REL-002 are met:
 ### Next Task
 
 SBT101: Define the evidence schema / checkpoint template for session classification.
+
+## SBT101: Evidence Schema And Checkpoint Template
+
+### Activation Date
+
+2026-07-09
+
+### Purpose
+
+Every self-bootstrap session checkpoint must follow a structured template that allows reviewers to
+determine: (a) whether Talos or an external runtime was the primary executor, (b) what was
+actually done, and (c) whether the session qualifies for REL-002.
+
+### Checkpoint Template
+
+Every checkpoint record in this iteration must contain these fields:
+
+```markdown
+### Checkpoint: SBT<NNN> — <task title>
+
+**Date**: YYYY-MM-DD
+**Runtime**: <model name> via <provider> (Talos / external)
+**Primary executor**: Talos | External
+**REL-002 classification**: Qualifying | Partial | Non-qualifying
+
+**Completed task items**:
+- <SBT item IDs completed>
+
+**Current state and artifacts**:
+- <files changed, commits, test counts>
+
+**Commands/checks and actual results**:
+- `<command>` → <exit status and summary>
+
+**Open risks or deviations**:
+- <any deviations from the plan>
+
+**External assistance used**:
+- <explicit list of any external edits, or "None">
+
+**Next task item**:
+- <next SBT ID and task>
+
+**Recovery or resume instruction**:
+- <owning record, git state, next gate>
+```
+
+### Session Classification Rubric
+
+| Classification | Required Conditions |
+|---|---|
+| **Qualifying** | (1) Talos binary is the primary executor for planning, implementation, validation, documentation, and governance sync. (2) External assistance is explicitly limited to review commentary. (3) Real runtime evidence through `talos` binary is recorded. (4) No unauthorized release/tag/publish/permission/sandbox/credential/dependency changes. |
+| **Partial** | (1) Talos is primary for most of the session, but external review corrected defects in Talos-authored work. (2) OR Talos completed the core development loop but push/Board sync/bounded non-code tasks were not performed. |
+| **Non-qualifying** | (1) Primary executor is not the `talos` binary. (2) OR external runtime performed planning/editing/validation/docs/commit as primary. (3) OR evidence claims unverified commands. (4) OR behavior change lacks runtime evidence. |
+
+### Required Evidence Fields (Per REL-002)
+
+Each qualifying session must record:
+
+1. **Work item and owner document** — story ID, iteration ID, task doc.
+2. **Runtime used** — model name, provider, whether `talos` binary was the executor.
+3. **Commands/tests run** — exact commands, exit codes, output summaries.
+4. **Files changed** — full list with line counts.
+5. **Governance synchronization evidence** — `validate_project_governance.sh` output, owner-doc updates.
+6. **Residual work** — incomplete items with owners.
+7. **External agent assistance** — explicit "None" or detailed list with role (review vs. implementation).
+
+### Sample Record (This Session)
+
+This session's own checkpoint:
+
+- **Runtime**: glm-5.2 via zai-coding-plan (external)
+- **Primary executor**: External (glm-5.2 agent runtime)
+- **REL-002 classification**: Non-qualifying
+- **Rationale**: The executor is not the `talos` binary; it is an external agent runtime using a
+  different model provider. All code/doc changes were performed by the external runtime, not by
+  `talos` acting autonomously.
+- **Useful artifacts produced**: execution contract (SBT100), evidence schema (SBT101), smoke
+  harness design (SBT102), governance rehearsal (SBT103).
+- **What would make a future session qualifying**: Talos binary invoked with a configured provider,
+  making its own planning/editing/validation decisions without an external runtime as primary.
+
+### Next Task
+
+SBT102: Build the repeatable runtime smoke harness.
