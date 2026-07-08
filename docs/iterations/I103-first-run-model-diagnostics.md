@@ -75,6 +75,7 @@
 |---|---|---|
 | 2026-07-07 | Planning | Created as Month 2 shell for the four-month developer operating plan. |
 | 2026-07-08 | D110 Verification | Verified `/connect` standard-vs-custom provider base-url behavior is fully implemented and tested. The behavior was shipped in I101 (2026-07-06) across three layers: (1) CLI handler `mode_runners.rs::handle_connect()` resolves `default_base_url` via 3-tier precedence (user config → `models.toml` `api_base_url` → `builtin_provider_config()` hardcoded fallbacks → `None`); (2) TUI credential panel `state.rs::credential_submit()` implements two-phase flow — standard providers with `default_base_url` submit after API key only, custom providers without it advance to `BaseUrl` field requiring non-empty URL; (3) config persistence `handle_connect_with_credential()` saves credential + resolved base_url and auto-detects protocol from URL path. 15 existing tests confirm all paths: 8 CLI tests in `mode_runners::connect_tests` (credential write, field preservation, base_url update, default fallback, minimax protocol detection, already-authenticated skip, picker construction) + 8 TUI tests in `state::tests` (standard submit, custom first/second submit, empty URL rejection, empty API key cancel, non-connect mode, credential append/backspace, picker filtering/search). No new code needed — D110 is pure verification. |
+| 2026-07-08 | D111 Verification | Verified model browsing for large inventories is fully implemented and tested. The `--available-models-browser` (shipped I101) uses viewport-windowed rendering, vim-like navigation, and provider-qualified search. 28 tests pass: 10 `models_browser::tests` (viewport windowing over 500 rows, provider/model/qualified-name filtering, navigation, no-secret rendering, standard/custom provider setup routing, minimax protocol detection, config preservation) + 18 `model_lifecycle::tests` and `tests::tests` (model picker, unauthenticated provider omission, duplicate ID qualification, context limits, model switch markers, session round-trip). Acceptance criterion 3 satisfied: large model lists remain bounded and provider-qualified. No new code needed — D111 is pure verification. |
 
 ## Verification Evidence
 
@@ -89,6 +90,12 @@
 - `cargo fmt --all -- --check`: only pre-existing `bash_tool.rs:583` drift (I102 residual, out of scope).
 - `scripts/validate_project_governance.sh .`: passed, 0 governance warnings.
 - Acceptance criteria 1 & 2 for I103 are satisfied: standard providers skip base URL, custom providers require it, secret masking is preserved.
+
+### D111 verification evidence
+
+- `cargo test -p talos-cli --bin talos -- model`: 28 passed / 0 failed / 0 ignored. Key tests: `render_lines_is_viewport_windowed_for_large_catalog` (viewport windowing over 500 rows), `filters_by_provider_model_and_qualified_name` (search bounding), `navigation_stays_on_model_rows`, `render_marks_current_and_setup_without_secrets`, `provider_setup_standard_provider_uses_default_without_typed_url`, `provider_setup_custom_provider_requires_base_url`, `unauthenticated_providers_are_omitted_from_model_picker`, `duplicate_model_ids_get_provider_qualified_values`.
+- `cargo test -p talos-cli --bin talos -- browser`: 10 passed / 0 failed / 0 ignored (subset of above, focused on `models_browser::tests`).
+- Acceptance criterion 3 for I103 is satisfied: large model lists remain bounded and provider-qualified.
 
 ## Variance And Residuals
 
