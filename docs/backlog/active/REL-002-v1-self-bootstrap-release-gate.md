@@ -64,6 +64,13 @@ evidence. Talos gained permission preflight, structured exec, internal governanc
 model browser closeout, and continued `gix` tracking, but Codex remained primary for planning,
 editing, validation orchestration, evidence interpretation, commit, and push.
 
+I102-I105 closeout (2026-07-08): `docs/iterations/I105-trial-readiness-closeout.md` records the
+four-month developer operating plan as useful controlled-local-trial evidence but
+non-qualifying for REL-002. The work closed provider runtime reliability, first-run setup,
+long-session stability, trial docs, smoke evidence, and a GO/NO-GO report, but the execution was
+external-runtime primary (OpenCode/minimax-m3 plus Codex architecture review), not Talos-primary.
+Therefore `v1.0.0` remains No-go.
+
 Maintainer correction (2026-07-04): self-bootstrap validation evidence must not assume Talos is a
 Rust-only agent. `VALIDATION-001` records the requirement for a language-neutral internal
 validation service. Cargo-based checks may remain a host-tool adapter for this repository, but they
@@ -143,6 +150,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-06 | I098-I101 | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` | Does not qualify. Talos capabilities improved, but this long task was Codex-primary; Talos was the implementation target and validation subject, not the primary autonomous executor. |
 | 2026-07-06 | SB100-SB130 | `docs/tasks/2026-07-06-talos-low-ambiguity-self-bootstrap-pilot.md` | **Partial qualification.** Talos (deepseek-v4-pro) was the primary runtime for SB100-SB130: startup inventory, evidence frame, RunningTool turn-phase completion, TUI-022 checkbox unification, TUI-023 diff backgrounds, PERF-001 bash policy build-time materialization, validation, commit, and owner-doc sync. Four non-trivial code changes across 4 crates (talos-conversation, talos-tui, talos-cli, talos-tools). All validation gates passed. No Codex/senior-agent code edits are recorded in the Talos-authored execution evidence; the later Codex review/remediation corrected closeout defects and keeps the result partial rather than full REL-002 qualification. PERF-001 Phase 1 (models.toml) remains future work per pilot scope boundary. This is the first qualifying partial-evidence session where Talos acted as primary across the full development loop. |
 | 2026-07-06 | SSP100-SSP150 | `docs/tasks/2026-07-06-self-bootstrap-stability-pilot.md` | **Partial qualification.** Talos (deepseek-v4-pro) was the primary runtime for the full stability pilot: SSP100 startup inventory and evidence frame, SSP110 TOOL-019 bash exit-code classification, SSP120 TODO-002 idempotent todo_create, SSP130 TUI-028 stale preview clear, SSP140 RUNTIME-002 engine-level is_processing verification, and SSP150 closeout. Five conventional commits across 4 crates (talos-tools, talos-session, talos-tui, talos-conversation). All validation gates passed: cargo fmt, cargo check, governance validation, workspace tests (all 60 suites, 0 failed). Talos planned, implemented, tested, committed, and synced owner docs autonomously. No Codex code edits in qualifying evidence; push/final Board sync not performed (not authorized). This is the second qualifying partial-evidence Talos-primary development session. |
+| 2026-07-08 | I102-I105 | `docs/iterations/I105-trial-readiness-closeout.md` | Does not qualify. The four-month developer operating plan produced controlled-local-trial evidence and a NO-GO v1.0 classification, but execution was external-runtime primary rather than Talos-primary. |
 
 ## Readiness Reports
 
@@ -151,6 +159,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-02 | `docs/reference/REL-002-READINESS-REPORT-2026-07-02.md` | Not ready for `v1.0.0`; pre-1.0 releases may continue with explicit posture. |
 | 2026-07-04 | `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md` | Not ready for `v1.0.0`; runtime/governance/architecture prerequisites improved, but no qualifying Talos-primary sessions exist. |
 | 2026-07-06 | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` | Not ready for `v1.0.0`; autonomy/runtime prerequisites improved, but no qualifying Talos-primary development session exists. |
+| 2026-07-08 | `docs/iterations/I105-trial-readiness-closeout.md` | Not ready for `v1.0.0`; controlled local trial can proceed, but REL-002 remains unmet because I102-I105 were external-runtime primary. |
 
 ## Relationship To Other Work
 

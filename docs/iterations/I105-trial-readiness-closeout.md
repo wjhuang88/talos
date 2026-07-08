@@ -77,8 +77,8 @@
 |---|---|---|
 | 2026-07-07 | Planning | Created as Month 4 shell for the four-month developer operating plan. |
 | 2026-07-08 | D130 Trial Docs | Verified and extended trial-facing documentation. README.md already had install instructions, provider configuration, permission preflight, local storage management, safety model, and contributing sections. Added a new "Troubleshooting And Bug Reports" section covering: GitHub Issues reporting with diagnostic commands (`talos --version`, `config list`, `storage status`, `--governance-status`), debug logging via `RUST_LOG`, common issues (provider connection, permission prompts, session resume, empty model picker), and known limitations (pre-1.0, no remote service, no WASM plugins, REL-002 not met). All diagnostic commands mask secrets. |
-| 2026-07-08 | D131 Smoke Suite | Recorded repeatable smoke checklist evidence using the real `target/debug/talos` binary: (1) `talos --version` → `talos 0.3.0`; (2) `talos config list` → secrets masked as `***`, provider/model/protocol/base_url visible; (3) `talos storage status` → 95 sessions, 380 KB JSONL, workspace breakdown, 26.1 MB index DB; (4) `talos --governance-status` → manifest high-risk/conformant, board disposition; (5) `talos --available-models` → 4182 models across 149 providers, bounded to first 120; (6) `talos permissions preflight` → requires `--operation` arg (expected). All commands exit cleanly with redacted output. |
-| 2026-07-08 | D132 REL-002 Classification | The current execution session used OpenCode (not Talos) as the primary agent runtime. Per REL-002 criteria, this is **non-qualifying evidence**: `v1.0.0` requires 100% self-bootstrap development with Talos as the primary runtime for planning, implementing, validating, and documenting its own repository changes. Previous non-qualifying rehearsals (I093, I097, I101) reached the same conclusion. The four-month developer operating plan was executed by an external agent runtime, not by Talos itself. REL-002 remains **No-go**. |
+| 2026-07-08 | D131 Smoke Suite | Recorded repeatable smoke checklist evidence. Non-mutating diagnostics were run with the real `target/debug/talos` binary: (1) `talos --version` → `talos 0.3.0`; (2) `talos config list` → secrets masked as `***`, provider/model/protocol/base_url visible; (3) `talos storage status` → 95 sessions, 380 KB JSONL, workspace breakdown, 26.1 MB index DB; (4) `talos --governance-status` → manifest high-risk/conformant, board disposition; (5) `talos --available-models` → 4182 models across 149 providers, bounded to first 120; (6) `talos permissions preflight` → requires `--operation` arg (expected). Interactive/failure smoke surfaces are covered by repeatable integration tests in the same validation run: `/connect`, `/model`, tool use, provider failure visibility, session resume, and exit summary. |
+| 2026-07-08 | D132 REL-002 Classification | The current execution session used OpenCode (not Talos) as the primary agent runtime. Per REL-002 criteria, this is **non-qualifying evidence**: `v1.0.0` requires 100% self-bootstrap development with Talos as the primary runtime for planning, implementing, validating, and documenting its own repository changes. Previous non-qualifying rehearsals (I093, I097, I101) reached the same conclusion. The four-month developer operating plan was executed by an external agent runtime, not by Talos itself. REL-002 remains **No-go**. The REL-002 owner doc now records this I102-I105 non-qualification. |
 | 2026-07-08 | D133 Final Gate | Produced final readiness report. Decision: **GO for controlled local trial** (not v1.0 release). The system is usable for local developer workflows with known limitations. See `## Verification Evidence` for the full go/no-go report. |
 
 ## Verification Evidence
@@ -91,7 +91,7 @@
 
 ### D131 smoke checklist evidence
 
-Recorded using `target/debug/talos` binary:
+Non-mutating commands recorded using `target/debug/talos` binary:
 
 | Step | Command | Result |
 |---|---|---|
@@ -102,10 +102,23 @@ Recorded using `target/debug/talos` binary:
 | 5. Model list (bounded) | `talos --available-models` | 4182 models / 149 providers, bounded to first 120 |
 | 6. Permission preflight | `talos permissions preflight` | Requires `--operation` arg (expected behavior) |
 
+Interactive and failure-path smoke coverage is repeatable through the checked-in test suite:
+
+| Smoke Surface | Evidence | Result |
+|---|---|---|
+| `/connect` standard/custom setup | `cargo test -p talos-cli --bin talos -- connect`; `cargo test -p talos-tui connect` | Standard providers skip base URL; custom providers require non-empty base URL; secrets remain masked. |
+| `/model` browsing/selection | `cargo test -p talos-cli --bin talos -- model`; `cargo test -p talos-cli --bin talos -- browser` | Large lists are viewport-windowed, searchable, provider-qualified, and hide unauthenticated providers. |
+| Tool use | `cargo test -p talos-cli --test mcp_client_e2e`; `cargo test -p talos-agent test_tool_execution_loop_single_call` | Tool proposals and tool execution round-trip through provider/runtime paths. |
+| Provider failure visibility | `cargo test -p talos-cli --bin talos -- conversation_loop_clears_processing_on_provider_error_after_tool_result`; `cargo test -p talos-cli --bin talos -- conversation_loop_emits_visible_error_signals_on_terminal_failure`; `cargo test -p talos-provider openai::tests::parse_sse_stream_error_chunk_emits_terminal_error` | Provider/tool failures clear processing and emit visible terminal error signals; OpenAI-compatible error chunks produce terminal `AgentEvent::Error`. |
+| Session resume | `cargo test -p talos-cli --bin talos -- session_manager_resume`; `cargo test -p talos-agent session::tests::test_initial_history_from_jsonl_resume`; `cargo test -p talos-cli --bin talos -- session_model_metadata_overrides_config_on_resume` | Resume rejects invalid/nonexistent sessions, hydrates persisted history, and preserves session model metadata. |
+| Exit summary | `cargo test -p talos-tui exit_summary` | Exit summary includes session/model/cost data when available and omits cost when pricing is unavailable. |
+
 ### D132 REL-002 classification
 
 - **Classification**: Non-qualifying.
 - **Reason**: The four-month developer operating plan (I102-I105) was executed by an external agent runtime (OpenCode/glm-5.2), not by Talos itself. REL-002 requires Talos to be the primary runtime for 100% of self-bootstrap development.
+- **REL-002 owner update**: `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`
+  records I102-I105 as non-qualifying evidence.
 - **Previous non-qualifying attempts**: I093 (2026-07-04), I097 (2026-07-04), I101 (2026-07-06). All reached the same conclusion.
 - **REL-002 status**: Remains **No-go**. `v1.0.0` is not claimable.
 
@@ -117,18 +130,19 @@ Recorded using `target/debug/talos` binary:
 
 | Dimension | Status | Evidence |
 |---|---|---|
-| Provider runtime reliability | ✅ Ready | I102: SSE fixture matrix (14 tests), agent invariants (degenerate tool call rejection, MaxTokens boundary), all 5 terminal phases covered |
+| Provider runtime reliability | ✅ Ready | I102: SSE fixture matrix (15 tests), agent invariants (degenerate tool call rejection, MaxTokens boundary), all 5 terminal phases covered |
 | First-run setup | ✅ Ready | I103: `/connect` standard/custom provider flow (15 tests), model browsing viewport-windowed (28 tests), redacted diagnostics (4 masking tests) |
 | Long-session stability | ✅ Ready | I104: permission noise reduction with deny precedence preserved (13 approval + 3 deny tests), validation routing (3 tests), tool display (9 tests) |
 | Trial documentation | ✅ Ready | I105: README has install, configure, run, troubleshoot, bug-report, safety model, known limitations |
-| Smoke evidence | ✅ Ready | I105: 6-step smoke checklist recorded with real binary |
+| Smoke evidence | ✅ Ready | I105: 6 direct binary smoke commands plus repeatable integration coverage for `/connect`, `/model`, tool use, provider failure visibility, resume, and exit summary |
 | REL-002 self-bootstrap | ❌ Not met | I105: Non-qualifying (external runtime used) |
 | Release authorization | ❌ Not authorized | No tag, push, publish, deploy, or external trial invitation |
 
 #### Residual Risks
 
 1. **Pre-existing `bash_tool.rs:583` fmt drift** — one-line `cargo fmt` fix, no behavioral impact.
-2. **Mid-stream provider error chunk** — bounded by agent `channel closed before TurnEnd` invariant, not a stuck path. Future parser enhancement.
+2. **Mid-stream provider error chunk** — fixed in commit `3211fc3`; OpenAI-compatible SSE
+   `data.error` chunks now emit terminal `AgentEvent::Error` before any success fallback.
 3. **Text-based vs native tool-call stop_reason semantics** — deliberately deferred; future design needed.
 4. **REL-002 not met** — Talos cannot claim v1.0 until it performs 100% self-bootstrap development as the primary runtime.
 
