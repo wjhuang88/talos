@@ -96,10 +96,10 @@ rewrite existing baselines.
 | D111 | 6 | I103 | Model browsing | Large provider/model inventories remain searchable and bounded. | CLI/TUI model tests; manual evidence | Complete |
 | D112 | 7 | I103 | Diagnostics | Redacted doctor output reports config, provider protocol, credential source, data dirs, validation adapters. | CLI tests; redaction check | Complete |
 | D113 | 8 | I103 | Closeout | First-run docs and setup evidence are current. | docs review; governance | Complete |
-| D120 | 9 | I104 | Permission evidence | Repeated-approval traces identify noise without changing deny precedence. | permission tests; trace artifact | Planned |
-| D121 | 10 | I104 | Validation routing | Internal validation/project detection adapters are exercised for Rust and one non-Rust fixture. | validation tests | Planned |
-| D122 | 11 | I104 | Tool display | Long output and argument display stay readable without changing model-visible payloads. | TUI/tool tests | Planned |
-| D123 | 12 | I104 | Closeout | Long-session stability evidence and security residuals recorded. | workspace tests; governance | Planned |
+| D120 | 9 | I104 | Permission evidence | Repeated-approval traces identify noise without changing deny precedence. | permission tests; trace artifact | Complete |
+| D121 | 10 | I104 | Validation routing | Internal validation/project detection adapters are exercised for Rust and one non-Rust fixture. | validation tests | Complete |
+| D122 | 11 | I104 | Tool display | Long output and argument display stay readable without changing model-visible payloads. | TUI/tool tests | Complete |
+| D123 | 12 | I104 | Closeout | Long-session stability evidence and security residuals recorded. | workspace tests; governance | Complete |
 | D130 | 13 | I105 | Trial docs | Install, first-run, provider, permission, local-data, and bug-report docs are trial-ready. | docs checklist | Planned |
 | D131 | 14 | I105 | Smoke suite | Repeatable smoke checklist covers first run, `/connect`, `/model`, tool use, provider failure, resume, exit. | recorded smoke evidence | Planned |
 | D132 | 15 | I105 | Self-bootstrap evidence | One Talos-primary attempt is classified honestly against REL-002. | REL-002 owner update | Planned |

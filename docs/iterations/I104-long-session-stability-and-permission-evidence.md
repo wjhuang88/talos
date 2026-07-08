@@ -1,12 +1,14 @@
 # Iteration I104: Long-Session Stability And Permission Evidence
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-07-07
 > Planned objective: Execute Month 3 of the 2026-07-07 four-month developer operating plan by
 > improving long-session ergonomics without weakening permission or validation boundaries.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: long development sessions have bounded approval noise evidence, readable tool
 > output, and validation routing coverage without security-policy drift.
+> Activated: 2026-07-08
+> Completed: 2026-07-08
 
 ## Published Baseline
 
@@ -74,15 +76,44 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-07 | Planning | Created as Month 3 shell for the four-month developer operating plan. |
+| 2026-07-08 | D120 Verification | Verified permission-noise evidence and deny precedence are fully implemented and tested. The PERM-003 reference study (Complete) delivered the taxonomy, approval copy, and deny-precedence tests. The PERM-002 bash always-approve repeat prompt fix (Complete 2026-07-04) delivered runtime `always` rules that precede default Ask without overriding Deny. 13 approval tests + 3 deny tests + 58 permission tests all pass. Key tests: `test_repeated_always_approval_reduces_same_operation_to_zero_prompts` (noise reduction), `test_configured_deny_precedes_runtime_always_allow` (deny precedence), `test_always_allow_root_write_stays_file_scoped` (write scope), `test_low_risk_bash_template_reduces_different_object_prompts` (template noise reduction). Acceptance criterion 1 satisfied: repeated low-risk actions have bounded approval noise without weakening write/deny behavior. |
+| 2026-07-08 | D121 Verification | Verified validation routing covers Rust and non-Rust project types. The VALIDATION-001 internal validation service (Complete) provides strategy-based project detection with demand-driven adapter instruction injection. 3 CLI validation tests pass: `cli_profile_maps_to_shared_service_profile` (profile routing), `validation_status_does_not_execute_workspace_script` (no host script execution), `apply_iteration_record_uses_internal_validation_not_host_script` (internal validation boundary). 25 talos-config provider tests confirm model/provider routing. Acceptance criterion 2 satisfied: adapter selection is explicit and Cargo guidance is not injected for unrelated project types. |
+| 2026-07-08 | D122 Verification | Verified tool display for long output and arguments is bounded and readable. 9 `tool_display::tests` pass: `tool_result_success_single_line_rendering` (bounded output), `tool_result_edit_diff_gets_semantic_styling` (diff rendering), `tool_result_unified_diff_gets_semantic_styling` (unified diff), `tool_result_error_rendering_unchanged` (error display), provenance markers (native/MCP/plugin). TUI-025 (tool argument line-fit display) is Complete. TUI-015 (head/tail truncation) and TUI-019 (tool output visual hierarchy) are Complete. Acceptance criterion 3 satisfied: long output/arguments render readably while export/model payload semantics unchanged. |
+| 2026-07-08 | D123 Closeout | Month-3 closeout validation matrix passed: `cargo check --workspace` exit 0; `cargo test --workspace` 1791 passed / 0 failed / 0 ignored; `cargo clippy --workspace -- -D warnings` exit 0; `scripts/validate_project_governance.sh .` 0 warnings. All 3 I104 acceptance criteria satisfied. I104 marked Complete. BOARD.md updated. |
 
 ## Verification Evidence
 
-- Planned.
+### D120 verification evidence
+
+- `cargo test -p talos-permission`: 58 passed / 0 failed / 0 ignored + 1 doctest.
+- `cargo test -p talos-cli --bin talos -- approval`: 13 passed / 0 failed / 0 ignored. Key tests: `test_repeated_always_approval_reduces_same_operation_to_zero_prompts`, `test_configured_deny_precedes_runtime_always_allow`, `test_always_allow_root_write_stays_file_scoped`, `test_always_allow_write_scopes_to_parent_directory`, `test_low_risk_bash_template_reduces_different_object_prompts`, `test_always_allow_descriptions_show_reusable_scope`.
+- `cargo test -p talos-permission -- deny`: 3 passed / 0 failed. Tests: `test_runtime_allow_rule_does_not_override_deny`, `test_custom_rule_deny_write_to_sensitive_path`, `test_path_pattern_deny_outside_src`.
+
+### D121 verification evidence
+
+- `cargo test -p talos-cli --bin talos -- validation`: 3 passed / 0 failed / 0 ignored. Tests: `cli_profile_maps_to_shared_service_profile`, `validation_status_does_not_execute_workspace_script`, `apply_iteration_record_uses_internal_validation_not_host_script`.
+- `cargo test -p talos-config provider`: 25 passed / 0 failed / 0 ignored.
+
+### D122 verification evidence
+
+- `cargo test -p talos-tui tool_display`: 9 passed / 0 failed / 0 ignored. Tests: `tool_result_success_single_line_rendering`, `tool_result_success_special_cases_rendering`, `tool_result_edit_diff_gets_semantic_styling`, `tool_result_unified_diff_gets_semantic_styling`, `tool_result_prose_with_dash_not_styled_as_diff`, `tool_result_error_rendering_unchanged`, `native_provenance_has_no_marker`, `mcp_provenance_scrollback_marker_unchanged`, `plugin_provenance_scrollback_marker`.
+
+### D123 closeout evidence
+
+- `cargo check --workspace`: passed (exit 0).
+- `cargo test --workspace`: 1791 passed / 0 failed / 0 ignored across 61 test binaries.
+- `cargo clippy --workspace -- -D warnings`: passed (exit 0).
+- `cargo fmt --all -- --check`: only pre-existing `bash_tool.rs:583` drift (I102 residual).
+- `scripts/validate_project_governance.sh .`: passed, 0 governance warnings.
 
 ## Variance And Residuals
 
-- Planned.
+- I104 was a verification-only iteration: all four tasks (D120-D123) confirmed already-shipped behavior from PERM-002/PERM-003 (Complete), VALIDATION-001 (Complete), and TUI-015/TUI-019/TUI-025 (Complete). No new production code or tests were needed.
+- Pre-existing `bash_tool.rs:583` fmt drift (from I102, out of scope).
+- No I104-specific residuals.
 
 ## Retrospective
 
-- Pending.
+- **What worked**: I104 followed the same verification-first pattern as I103. The permission, validation, and tool-display work was already shipped and tested in prior iterations. D120-D122 each took minutes.
+- **Lesson**: The four-month plan's structure (I102 = implementation, I103-I104 = verification) worked well. The implementation-heavy months delivered the code, and the verification months confirmed it without redundant work.
+- **Security note**: D120 explicitly verified that deny precedence is preserved — `test_configured_deny_precedes_runtime_always_allow` is the key guard. No permission boundary was weakened.
