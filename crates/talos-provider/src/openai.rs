@@ -467,6 +467,11 @@ async fn parse_sse_stream(
                 return;
             }
 
+            if let Some(message) = extract_openai_stream_error(&data) {
+                let _ = tx.send(AgentEvent::Error { message }).await;
+                return;
+            }
+
             let chunk: OpenAIStreamChunk = match serde_json::from_value(data.clone()) {
                 Ok(c) => c,
                 Err(_) => continue,
@@ -702,6 +707,23 @@ fn extract_openai_usage(data: &Value) -> Option<(u32, u32, u32)> {
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as u32;
     Some((input_tokens, output_tokens, reasoning_tokens))
+}
+
+fn extract_openai_stream_error(data: &Value) -> Option<String> {
+    let error = data.get("error")?;
+    let message = error
+        .get("message")
+        .and_then(Value::as_str)
+        .or_else(|| error.as_str())
+        .unwrap_or("unknown provider stream error");
+    let kind = error.get("type").and_then(Value::as_str);
+
+    Some(match kind {
+        Some(kind) if !kind.is_empty() => {
+            format!("provider stream error ({kind}): {message}")
+        }
+        _ => format!("provider stream error: {message}"),
+    })
 }
 
 #[cfg(test)]
@@ -1253,6 +1275,22 @@ mod tests {
         assert_eq!(extract_openai_usage(&data), None);
     }
 
+    #[test]
+    fn extract_openai_stream_error_reads_object_error() {
+        let data = json!({
+            "error": {
+                "message": "upstream failed",
+                "type": "server_error"
+            },
+            "choices": []
+        });
+
+        assert_eq!(
+            extract_openai_stream_error(&data),
+            Some("provider stream error (server_error): upstream failed".to_string())
+        );
+    }
+
     #[tokio::test]
     async fn parse_sse_stream_retains_usage_only_chunk() {
         let mut server = mockito::Server::new_async().await;
@@ -1292,6 +1330,56 @@ mod tests {
         assert_eq!(usage.input_tokens, 123);
         assert_eq!(usage.output_tokens, 45);
         assert_eq!(usage.reasoning_tokens, 9);
+    }
+
+    #[tokio::test]
+    async fn parse_sse_stream_error_chunk_emits_terminal_error() {
+        let mut server = mockito::Server::new_async().await;
+        let stream_body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"error\":{\"message\":\"gateway aborted\",\"type\":\"server_error\"},\"choices\":[]}\n\n"
+        );
+        let _mock = server
+            .mock("GET", "/stream")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(stream_body)
+            .create_async()
+            .await;
+        let response = reqwest::get(format!("{}/stream", server.url()))
+            .await
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+
+        parse_sse_stream(
+            response,
+            tx,
+            Duration::from_secs(30),
+            Duration::from_secs(90),
+        )
+        .await;
+
+        let mut text = String::new();
+        let mut error = None;
+        let mut saw_turn_end = false;
+        while let Some(event) = rx.recv().await {
+            match event {
+                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::Error { message } => error = Some(message),
+                AgentEvent::TurnEnd { .. } => saw_turn_end = true,
+                _ => {}
+            }
+        }
+
+        assert_eq!(text, "partial");
+        assert_eq!(
+            error.as_deref(),
+            Some("provider stream error (server_error): gateway aborted")
+        );
+        assert!(
+            !saw_turn_end,
+            "provider error chunks must not be converted to successful TurnEnd"
+        );
     }
 
     #[tokio::test]

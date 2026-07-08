@@ -81,6 +81,7 @@
 | 2026-07-08 | D102 Invariants | Extended the agent turn-loop invariant set in `crates/talos-agent/src/lib.rs::run_inner` with a new defensive guard rejecting degenerate `ToolCall`s (empty id or empty/whitespace name) before they enter tool execution or the next provider request. The OpenAI SSE parser already synthesizes ids and skips empty names, but other providers (Anthropic, MCP bridging, future runtimes) must not be able to silently push a degenerate ToolCall that would later fail tool lookup or produce ambiguous request/response pairing. Also added a regression guard that `StopReason::MaxTokens` without tool calls is treated as a successful (truncated) agent turn, locking the boundary between the agent invariant guards (degenerate tool paths only) and the engine-level FS04 fix that clears `is_processing` on MaxTokens. Four new invariant tests added in `crates/talos-agent/src/tests.rs`: `test_run_rejects_tool_call_with_empty_name`, `test_run_rejects_tool_call_with_empty_id`, `test_run_rejects_whitespace_only_tool_call_name`, `test_run_max_tokens_stop_reason_without_tool_calls_is_terminal_success`. |
 | 2026-07-08 | D103 Status | Closed the RUNTIME-002 FS01 surface #3 optional residual: added integration-level coverage proving `UserInput::Cancel` through the full conversation-loop bridge produces a terminal `UiOutput::Status { is_processing: false, phase: Cancelled }`. The engine-level `cancel_turn_clears_processing_state` test already covered the engine in isolation; this test drives the full bridge (`UserInput::Cancel` → `run_conversation_loop` → `engine.cancel_turn()` → `UiOutput`). All five terminal phases (Failed, TimedOut, Cancelled, MaxTokens-clear, normal-EndTurn) now have conversation-loop integration coverage. No production code change — the existing FS03 visible-signal surfaces (preview text, status bar, error Tip/Stream) were already verified in the FS03 closeout. |
 | 2026-07-08 | D104 Closeout | Month-1 closeout validation matrix passed: `cargo check --workspace` exit 0; `cargo test --workspace` 1789 passed / 0 failed / 0 ignored across 61 test binaries (was 1778 at D100 baseline → +11 from D101/D102/D103); `cargo clippy --workspace -- -D warnings` exit 0; `scripts/validate_project_governance.sh .` 0 warnings; `git diff --check` clean. One pre-existing residual (`bash_tool.rs:583` fmt drift from `27626d9`) recorded but out of I102 scope. All three I102 acceptance criteria satisfied: (1) malformed SSE streams produce complete ToolCalls or terminal errors; (2) degenerate ToolUse sequences (empty ids/names, duplicates, zero calls) are rejected explicitly; (3) all five terminal phases reach the TUI with visible status. I102 marked Complete. BOARD.md updated to reflect the state change. |
+| 2026-07-08 | Architecture Review Fix | Architecture review found the recorded mid-stream provider-error residual was incorrectly described: an HTTP 200 SSE `{"error": ...}` chunk with `choices: []` was silently consumed and could fall through to the EOF `TurnEnd(EndTurn)` fallback rather than triggering `channel closed before TurnEnd`. Fixed `crates/talos-provider/src/openai.rs::parse_sse_stream` to detect `data.error`, emit terminal `AgentEvent::Error`, and return before the success fallback. Added `parse_sse_stream_error_chunk_emits_terminal_error` and `extract_openai_stream_error_reads_object_error` to lock the behavior. |
 
 ## Verification Evidence
 
@@ -122,6 +123,23 @@
 - `scripts/validate_project_governance.sh .`: passed, 0 governance warnings.
 - Runtime-evidence hard boundary: D103 adds no production code change — the existing FS03 visible-signal surfaces (`preview_text_for_state`, `scrollback_status.rs`, `TipKind::Error`) were already verified in the FS03 closeout. The new test is a coverage extension that closes the FS01 surface #3 optional residual by proving `UserInput::Cancel` through the full conversation-loop bridge produces a terminal Cancelled status. All five terminal phases (Failed, TimedOut, Cancelled, MaxTokens-clear, normal-EndTurn) now have conversation-loop integration coverage, satisfying I102 acceptance criterion #3.
 
+### Architecture review fix verification evidence
+
+- `cargo test -p talos-provider openai::tests::parse_sse_stream_error_chunk_emits_terminal_error`:
+  1 passed / 0 failed / 0 ignored. This drives a real mockito HTTP SSE stream with partial text
+  followed by `{"error":{"message":"gateway aborted","type":"server_error"},"choices":[]}` and
+  asserts the parser emits `AgentEvent::Error` and no successful `TurnEnd`.
+- `cargo test -p talos-provider openai::tests::extract_openai_stream_error_reads_object_error`:
+  1 passed / 0 failed / 0 ignored.
+- `cargo test -p talos-provider openai::tests::parse_sse_stream`: 15 passed / 0 failed /
+  0 ignored.
+- `cargo check --workspace`: passed (exit 0).
+- `cargo test --workspace`: passed, 1791 passed / 0 failed / 0 ignored.
+- `cargo clippy -p talos-provider -- -D warnings`: passed (exit 0).
+- `rustfmt --edition 2024 --check crates/talos-provider/src/openai.rs`: passed (exit 0).
+- `scripts/validate_project_governance.sh .`: passed, 0 governance warnings.
+- `git diff --check`: clean.
+
 ## Variance And Residuals
 
 ### Pre-existing `bash_tool.rs` format drift (out of I102 scope)
@@ -137,7 +155,12 @@
 ### Residuals exposed by D104 / month-1 closeout to track
 
 - **Pre-existing `bash_tool.rs:583` fmt drift** (from commit `27626d9`, out of I102 scope). One-line `cargo fmt` fix. No behavioral impact. Will be resolved when the next iteration touches `talos-tools`.
-- **Mid-stream provider error chunk silently consumed** (provider sends HTTP 200 stream with `{"error": ...}` chunk, `choices: []`). Not a silent-stuck path: the stream terminates without `TurnEnd`, and the agent invariant `channel closed before TurnEnd` (lib.rs:540-547) converts this to a terminal `UnexpectedEvent`. A future iteration may add a parser-level `data.error` detection in `talos-provider` to emit a proper `AgentEvent::Error` before stream termination, but this is an enhancement, not a safety gap.
+- **Mid-stream provider error chunk** (provider sends HTTP 200 stream with `{"error": ...}` chunk,
+  `choices: []`) was fixed after architecture review. The previous residual note incorrectly
+  claimed this path would terminate without `TurnEnd` and be caught by the agent's
+  `channel closed before TurnEnd` invariant; in reality the parser skipped empty choices and could
+  fall through to the EOF `TurnEnd(EndTurn)` fallback. The parser now detects `data.error`, emits a
+  terminal `AgentEvent::Error`, and returns before any success fallback.
 - **SSE comment/retry directives**: handled implicitly by `extract_event_data` (lines without `data:` prefix are skipped) and locked by D101 fixture `parse_sse_stream_keepalive_comment_lines_pass_through`. Future enhancement: explicit fixture for `data: DONE` (without brackets) emitted by some legacy stubs.
 - **Text-based vs native tool-call stop_reason semantics**: rejecting `EndTurn`/`MaxTokens` + non-empty tool calls was deliberately deferred (text-based tool calls legitimately produce `EndTurn + ToolCall`). Future design must distinguish text-based and native tool calls first.
 

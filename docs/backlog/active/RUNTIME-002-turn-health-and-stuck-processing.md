@@ -262,13 +262,20 @@ Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D102).
   `test_run_max_tokens_stop_reason_without_tool_calls_is_terminal_success`.
 - Validation: `cargo test -p talos-agent` → 205 passed (was 201); `cargo test --workspace` →
   1788 passed (was 1784); clippy/fmt/governance clean.
-- Residual: the mid-stream provider-error-chunk-silently-consumed path (provider sends an HTTP
-  200 stream that includes a `{"error": ...}` chunk with `choices: []`) remains outside D102
-  scope because fixing it requires a parser-level change in `talos-provider`, not an agent-layer
-  invariant. It is not a silent-stuck path under the SSE `[DONE]` and `finish_reason` invariants
-  already shipped in FP1 — the stream simply terminates without `TurnEnd`, which the agent
-  invariant `channel closed before TurnEnd` (lib.rs:540-547) already converts to a terminal
-  `UnexpectedEvent`. So the residual is bounded, not stuck.
+- Architecture review correction: the mid-stream provider-error-chunk path (provider sends an HTTP
+  200 stream that includes a `{"error": ...}` chunk with `choices: []`) was not correctly bounded
+  by the agent's `channel closed before TurnEnd` invariant. The parser skipped empty choices and
+  could fall through to its EOF `TurnEnd(EndTurn)` fallback. The fix is now parser-level:
+  `crates/talos-provider/src/openai.rs::parse_sse_stream` detects `data.error`, emits terminal
+  `AgentEvent::Error`, and returns before any success fallback.
+- Regression evidence:
+  `cargo test -p talos-provider openai::tests::parse_sse_stream_error_chunk_emits_terminal_error`
+  → 1 passed; `cargo test -p talos-provider
+  openai::tests::extract_openai_stream_error_reads_object_error` → 1 passed.
+- Post-fix validation: `cargo test -p talos-provider openai::tests::parse_sse_stream` →
+  15 passed; `cargo check --workspace` → passed; `cargo test --workspace` → 1791 passed /
+  0 failed / 0 ignored; `cargo clippy -p talos-provider -- -D warnings` → passed;
+  `scripts/validate_project_governance.sh .` → 0 warnings; `git diff --check` → clean.
 
 ## I102 D103 Conversation-Loop Cancel Integration (2026-07-08)
 
