@@ -94,8 +94,8 @@ rewrite existing baselines.
 | D104 | 4 | I102 | Closeout | Month-1 reliability evidence and residuals recorded. | workspace tests; governance | Complete |
 | D110 | 5 | I103 | Connect UX | Standard providers do not ask for base URL; custom providers require it. | CLI/TUI connect tests | Complete |
 | D111 | 6 | I103 | Model browsing | Large provider/model inventories remain searchable and bounded. | CLI/TUI model tests; manual evidence | Complete |
-| D112 | 7 | I103 | Diagnostics | Redacted doctor output reports config, provider protocol, credential source, data dirs, validation adapters. | CLI tests; redaction check | Planned |
-| D113 | 8 | I103 | Closeout | First-run docs and setup evidence are current. | docs review; governance | Planned |
+| D112 | 7 | I103 | Diagnostics | Redacted doctor output reports config, provider protocol, credential source, data dirs, validation adapters. | CLI tests; redaction check | Complete |
+| D113 | 8 | I103 | Closeout | First-run docs and setup evidence are current. | docs review; governance | Complete |
 | D120 | 9 | I104 | Permission evidence | Repeated-approval traces identify noise without changing deny precedence. | permission tests; trace artifact | Planned |
 | D121 | 10 | I104 | Validation routing | Internal validation/project detection adapters are exercised for Rust and one non-Rust fixture. | validation tests | Planned |
 | D122 | 11 | I104 | Tool display | Long output and argument display stay readable without changing model-visible payloads. | TUI/tool tests | Planned |

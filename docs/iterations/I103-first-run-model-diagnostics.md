@@ -1,6 +1,6 @@
 # Iteration I103: First-Run Model And Diagnostics
 
-> Document status: In Progress
+> Document status: Complete
 > Published plan date: 2026-07-07
 > Planned objective: Execute Month 2 of the 2026-07-07 four-month developer operating plan by
 > making first-run provider setup, model selection, and diagnostics usable for controlled trials.
@@ -8,6 +8,7 @@
 > MVP deliverable: a new developer can configure a standard provider, browse/select a model, and
 > produce a redacted diagnostic report without editing source files.
 > Activated: 2026-07-08
+> Completed: 2026-07-08
 
 ## Published Baseline
 
@@ -76,6 +77,8 @@
 | 2026-07-07 | Planning | Created as Month 2 shell for the four-month developer operating plan. |
 | 2026-07-08 | D110 Verification | Verified `/connect` standard-vs-custom provider base-url behavior is fully implemented and tested. The behavior was shipped in I101 (2026-07-06) across three layers: (1) CLI handler `mode_runners.rs::handle_connect()` resolves `default_base_url` via 3-tier precedence (user config → `models.toml` `api_base_url` → `builtin_provider_config()` hardcoded fallbacks → `None`); (2) TUI credential panel `state.rs::credential_submit()` implements two-phase flow — standard providers with `default_base_url` submit after API key only, custom providers without it advance to `BaseUrl` field requiring non-empty URL; (3) config persistence `handle_connect_with_credential()` saves credential + resolved base_url and auto-detects protocol from URL path. 15 existing tests confirm all paths: 8 CLI tests in `mode_runners::connect_tests` (credential write, field preservation, base_url update, default fallback, minimax protocol detection, already-authenticated skip, picker construction) + 8 TUI tests in `state::tests` (standard submit, custom first/second submit, empty URL rejection, empty API key cancel, non-connect mode, credential append/backspace, picker filtering/search). No new code needed — D110 is pure verification. |
 | 2026-07-08 | D111 Verification | Verified model browsing for large inventories is fully implemented and tested. The `--available-models-browser` (shipped I101) uses viewport-windowed rendering, vim-like navigation, and provider-qualified search. 28 tests pass: 10 `models_browser::tests` (viewport windowing over 500 rows, provider/model/qualified-name filtering, navigation, no-secret rendering, standard/custom provider setup routing, minimax protocol detection, config preservation) + 18 `model_lifecycle::tests` and `tests::tests` (model picker, unauthenticated provider omission, duplicate ID qualification, context limits, model switch markers, session round-trip). Acceptance criterion 3 satisfied: large model lists remain bounded and provider-qualified. No new code needed — D111 is pure verification. |
+| 2026-07-08 | D112 Verification | Verified redacted diagnostic output is fully implemented and tested. Four existing diagnostic commands cover all required surfaces: (1) `talos config list` — full config with secrets masked as `***`, shows provider protocol, credential source (`api_key` vs `api_key_env`), base_url, timeout config; (2) `talos storage status` — local data dirs including sessions count/size, workspace breakdown, session index DB, log directory, memory DB, model cache; (3) `talos --governance-status` — manifest profile/status, board disposition, active/planned/blocked iterations; (4) `talos validate` — validation adapters and project detection (VALIDATION-001 complete). 4 masking tests confirm secret redaction: `mask_secrets_masks_api_key_lines` (api_key masked, api_key_env preserved), `config_subcommand_list_masks_secrets`, `config_subcommand_get_secret_masks`, `config_secret_masking_survives_roundtrip`. Manual QA confirmed: `config list` output shows `api_key = ***` and `api_key_env = "DEEPSEEK_API_KEY"` (credential source clear, secret masked). Acceptance criterion 4 satisfied: secrets masked, local paths/config status clear. No new code needed — D112 is pure verification. |
+| 2026-07-08 | D113 Closeout | Month-2 closeout validation matrix passed: `cargo check --workspace` exit 0; `cargo test --workspace` 1791 passed / 0 failed / 0 ignored across 61 test binaries; `cargo clippy --workspace -- -D warnings` exit 0; `scripts/validate_project_governance.sh .` 0 warnings. All 4 I103 acceptance criteria satisfied: (1) standard providers skip base URL; (2) custom providers require URL with secret masking; (3) large model lists bounded and provider-qualified; (4) diagnostic commands mask secrets and show clear config/data status. I103 marked Complete. BOARD.md updated. |
 
 ## Verification Evidence
 
@@ -97,10 +100,33 @@
 - `cargo test -p talos-cli --bin talos -- browser`: 10 passed / 0 failed / 0 ignored (subset of above, focused on `models_browser::tests`).
 - Acceptance criterion 3 for I103 is satisfied: large model lists remain bounded and provider-qualified.
 
+### D112 verification evidence
+
+- `cargo test -p talos-cli --bin talos -- mask`: 4 passed / 0 failed / 0 ignored. Tests: `mask_secrets_masks_api_key_lines` (api_key → `***`, api_key_env preserved), `config_subcommand_list_masks_secrets`, `config_subcommand_get_secret_masks`, `config_secret_masking_survives_roundtrip`.
+- Manual QA: `talos config list` — output shows `api_key = ***` (masked), `api_key_env = "DEEPSEEK_API_KEY"` (source clear), `protocol = "openai-chat"` (provider protocol), `base_url = "https://api.deepseek.com"` (endpoint). No raw secret visible.
+- Manual QA: `talos storage status` — output shows sessions count/size, workspace breakdown, session index DB (26.1 MB), log directory, memory DB. Local paths clear.
+- Manual QA: `talos --governance-status` — output shows manifest profile/status, board disposition, active/planned/blocked iterations.
+- Acceptance criterion 4 for I103 is satisfied: secrets masked, local paths/config status clear.
+
+### D113 closeout evidence
+
+- `cargo check --workspace`: passed (exit 0).
+- `cargo test --workspace`: 1791 passed / 0 failed / 0 ignored across 61 test binaries (same as I102 closeout — no new tests needed for I103 since all behavior was already shipped in I101).
+- `cargo clippy --workspace -- -D warnings`: passed (exit 0).
+- `cargo fmt --all -- --check`: only pre-existing `bash_tool.rs:583` drift (I102 residual).
+- `scripts/validate_project_governance.sh .`: passed, 0 governance warnings.
+- Manual QA: `talos config list` — secrets masked, provider protocol and credential source visible.
+- Manual QA: `talos storage status` — local data dirs and paths clear.
+- Manual QA: `talos --governance-status` — governance state and board disposition clear.
+
 ## Variance And Residuals
 
-- Planned.
+- I103 was a verification-only iteration: all four tasks (D110-D113) confirmed already-shipped behavior from I101 (2026-07-06). No new production code or tests were needed. This is consistent with the four-month plan's design — I102 was the implementation-heavy month, I103 was verification/diagnostics.
+- Pre-existing `bash_tool.rs:583` fmt drift (from I102, out of scope).
+- No I103-specific residuals.
 
 ## Retrospective
 
-- Pending.
+- **What worked**: I103's verification-first approach was efficient — the I101 closeout had already shipped and tested all the behavior. D110-D112 each took minutes rather than hours because the work was already done.
+- **What worked**: Manual QA (running `talos config list`, `talos storage status`, `talos --governance-status` with the real binary) provided the runtime evidence the hard boundary requires, not just unit tests.
+- **Lesson**: When a subsequent iteration verifies already-shipped work, the acceptance criteria should explicitly state "verified" rather than "implemented" to avoid confusion about whether new code was expected.
