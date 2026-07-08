@@ -580,6 +580,123 @@ async fn test_run_rejects_duplicate_tool_call_ids() {
 
 #[tokio::test]
 #[allow(deprecated)]
+async fn test_run_rejects_tool_call_with_empty_name() {
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call_a".into(),
+                name: "".into(),
+                input: serde_json::json!({}),
+            },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
+    let result = agent.run("empty-name".into()).await;
+
+    let err = result.expect_err("empty tool call name must be terminal error");
+    assert!(
+        matches!(&err, AgentError::UnexpectedEvent(msg) if msg.contains("empty id or name")),
+        "expected empty-name error, got: {err:?}"
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_run_rejects_tool_call_with_empty_id() {
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "".into(),
+                name: "read".into(),
+                input: serde_json::json!({ "path": "a" }),
+            },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
+    let result = agent.run("empty-id".into()).await;
+
+    let err = result.expect_err("empty tool call id must be terminal error");
+    assert!(
+        matches!(&err, AgentError::UnexpectedEvent(msg) if msg.contains("empty id or name")),
+        "expected empty-id error, got: {err:?}"
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_run_rejects_whitespace_only_tool_call_name() {
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::ToolCall {
+            call: ToolCall {
+                id: "call_w".into(),
+                name: "   ".into(),
+                input: serde_json::json!({}),
+            },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
+    let result = agent.run("ws-name".into()).await;
+
+    let err = result.expect_err("whitespace-only tool call name must be terminal error");
+    assert!(
+        matches!(&err, AgentError::UnexpectedEvent(msg) if msg.contains("empty id or name")),
+        "expected whitespace-name error, got: {err:?}"
+    );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_run_max_tokens_stop_reason_without_tool_calls_is_terminal_success() {
+    // Regression guard: MaxTokens without any tool calls should NOT be
+    // treated as an error — the engine-level FS04 fix clears is_processing
+    // on MaxTokens, and the agent should surface the truncated text as a
+    // successful (if short) turn. This locks the boundary between the
+    // agent invariant guards (which only reject degenerate tool paths)
+    // and the engine terminal-state plumbing.
+    let events = vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta {
+            delta: "truncated".into(),
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::MaxTokens,
+            usage: talos_core::message::Usage::default(),
+        },
+    ];
+
+    let agent = Agent::new(Arc::new(MockModel::new(vec![events])), ToolRegistry::new());
+    let result = agent.run("max-tokens".into()).await;
+
+    let response = result.expect("MaxTokens without tool calls is not an agent error");
+    assert_eq!(response, "truncated");
+}
+
+#[tokio::test]
+#[allow(deprecated)]
 async fn test_run_end_turn_with_tool_calls_executes_recoverably() {
     let responses = vec![
         vec![

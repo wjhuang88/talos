@@ -240,3 +240,32 @@ Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D101).
   sequences that the SSE fixtures cannot themselves prevent, e.g. a provider error chunk mid-stream
   that is silently consumed because `chunk.choices.is_empty()` returns true). That residual is
   already recorded under I102 `## Variance And Residuals`.
+
+## I102 D102 Agent Turn-Loop Invariant Extension (2026-07-08)
+
+Source: `docs/iterations/I102-provider-runtime-reliability-gate.md` (D102).
+
+- Extended the agent turn-loop invariant set in
+  `crates/talos-agent/src/lib.rs::run_inner` with a defensive guard that rejects degenerate
+  `ToolCall`s (empty id or empty/whitespace name) before they enter tool execution or the next
+  provider request. The OpenAI SSE parser already synthesizes ids and skips empty names, but
+  other providers (Anthropic, MCP bridging, future runtimes) must not be able to silently push a
+  degenerate ToolCall that would later fail tool lookup or produce ambiguous request/response
+  pairing.
+- Added regression guard that `StopReason::MaxTokens` without tool calls is a successful
+  (truncated) agent turn, locking the boundary between agent invariant guards (degenerate tool
+  paths only) and the engine-level FS04 fix that clears `is_processing` on MaxTokens.
+- Four new invariant tests in `crates/talos-agent/src/tests.rs`:
+  `test_run_rejects_tool_call_with_empty_name`,
+  `test_run_rejects_tool_call_with_empty_id`,
+  `test_run_rejects_whitespace_only_tool_call_name`,
+  `test_run_max_tokens_stop_reason_without_tool_calls_is_terminal_success`.
+- Validation: `cargo test -p talos-agent` → 205 passed (was 201); `cargo test --workspace` →
+  1788 passed (was 1784); clippy/fmt/governance clean.
+- Residual: the mid-stream provider-error-chunk-silently-consumed path (provider sends an HTTP
+  200 stream that includes a `{"error": ...}` chunk with `choices: []`) remains outside D102
+  scope because fixing it requires a parser-level change in `talos-provider`, not an agent-layer
+  invariant. It is not a silent-stuck path under the SSE `[DONE]` and `finish_reason` invariants
+  already shipped in FP1 — the stream simply terminates without `TurnEnd`, which the agent
+  invariant `channel closed before TurnEnd` (lib.rs:540-547) already converts to a terminal
+  `UnexpectedEvent`. So the residual is bounded, not stuck.

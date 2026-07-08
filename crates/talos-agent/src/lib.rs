@@ -569,6 +569,26 @@ impl Agent {
                         TurnStatus::UnexpectedEvent,
                     );
                 }
+
+                // Defensive invariant: every emitted ToolCall must carry a
+                // non-empty id and name. The OpenAI-compatible SSE parser
+                // already synthesizes ids and skips empty names, but other
+                // providers (Anthropic, MCP bridging, future runtimes) must
+                // not be able to silently push a degenerate ToolCall that
+                // would later fail tool lookup or produce ambiguous
+                // request/response pairing on the next provider turn.
+                let degenerate = turn_tool_calls.iter().find(|pending| {
+                    pending.call.id.trim().is_empty() || pending.call.name.trim().is_empty()
+                });
+                if let Some(pending) = degenerate {
+                    break 'turn_loop (
+                        Err(AgentError::UnexpectedEvent(format!(
+                            "provider emitted tool call with empty id or name (id={:?}, name={:?})",
+                            pending.call.id, pending.call.name
+                        ))),
+                        TurnStatus::UnexpectedEvent,
+                    );
+                }
             }
 
             if turn_tool_calls.is_empty() {
