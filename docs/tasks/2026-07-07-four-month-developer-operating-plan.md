@@ -92,7 +92,7 @@ rewrite existing baselines.
 | D102 | 2 | I102 | Agent invariants | Agent rejects malformed `ToolUse` sequences without stuck processing. | agent invariant tests | Complete |
 | D103 | 3 | I102 | Runtime status | TUI/conversation can distinguish model wait, tool wait, timeout, failure, and cancellation. | conversation/TUI tests | Complete |
 | D104 | 4 | I102 | Closeout | Month-1 reliability evidence and residuals recorded. | workspace tests; governance | Complete |
-| D110 | 5 | I103 | Connect UX | Standard providers do not ask for base URL; custom providers require it. | CLI/TUI connect tests | Planned |
+| D110 | 5 | I103 | Connect UX | Standard providers do not ask for base URL; custom providers require it. | CLI/TUI connect tests | Complete |
 | D111 | 6 | I103 | Model browsing | Large provider/model inventories remain searchable and bounded. | CLI/TUI model tests; manual evidence | Planned |
 | D112 | 7 | I103 | Diagnostics | Redacted doctor output reports config, provider protocol, credential source, data dirs, validation adapters. | CLI tests; redaction check | Planned |
 | D113 | 8 | I103 | Closeout | First-run docs and setup evidence are current. | docs review; governance | Planned |

@@ -1,12 +1,13 @@
 # Iteration I103: First-Run Model And Diagnostics
 
-> Document status: Planned
+> Document status: In Progress
 > Published plan date: 2026-07-07
 > Planned objective: Execute Month 2 of the 2026-07-07 four-month developer operating plan by
 > making first-run provider setup, model selection, and diagnostics usable for controlled trials.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: a new developer can configure a standard provider, browse/select a model, and
 > produce a redacted diagnostic report without editing source files.
+> Activated: 2026-07-08
 
 ## Published Baseline
 
@@ -73,10 +74,21 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-07 | Planning | Created as Month 2 shell for the four-month developer operating plan. |
+| 2026-07-08 | D110 Verification | Verified `/connect` standard-vs-custom provider base-url behavior is fully implemented and tested. The behavior was shipped in I101 (2026-07-06) across three layers: (1) CLI handler `mode_runners.rs::handle_connect()` resolves `default_base_url` via 3-tier precedence (user config → `models.toml` `api_base_url` → `builtin_provider_config()` hardcoded fallbacks → `None`); (2) TUI credential panel `state.rs::credential_submit()` implements two-phase flow — standard providers with `default_base_url` submit after API key only, custom providers without it advance to `BaseUrl` field requiring non-empty URL; (3) config persistence `handle_connect_with_credential()` saves credential + resolved base_url and auto-detects protocol from URL path. 15 existing tests confirm all paths: 8 CLI tests in `mode_runners::connect_tests` (credential write, field preservation, base_url update, default fallback, minimax protocol detection, already-authenticated skip, picker construction) + 8 TUI tests in `state::tests` (standard submit, custom first/second submit, empty URL rejection, empty API key cancel, non-connect mode, credential append/backspace, picker filtering/search). No new code needed — D110 is pure verification. |
 
 ## Verification Evidence
 
-- Planned.
+### D110 verification evidence
+
+- `cargo test -p talos-tui connect`: 8 passed / 0 failed / 0 ignored. Tests: `connect_mode_standard_provider_submits_without_base_url_field`, `connect_mode_custom_provider_first_submit_advances_to_base_url_field`, `connect_mode_custom_provider_second_submit_returns_typed_base_url`, `connect_mode_custom_provider_empty_base_url_stays_open`, `connect_mode_empty_api_key_cancels_without_advancing`, `non_connect_mode_ignores_base_url_and_submits_single_phase`, `connect_picker_is_picker_and_supports_filtering`, `connect_picker_search_matches_provider_group`.
+- `cargo test -p talos-cli --bin talos -- connect`: 8 passed / 0 failed / 0 ignored. Tests: `handle_connect_with_credential_writes_new_provider_api_key_and_base_url`, `handle_connect_with_credential_preserves_unrelated_provider_fields`, `handle_connect_with_credential_updates_base_url_when_provided`, `handle_connect_default_base_url_falls_back_to_builtin_provider_config`, `handle_connect_minimax_coding_plan_uses_anthropic_messages_endpoint`, `handle_connect_with_credential_sets_anthropic_protocol_for_minimax_endpoint`, `handle_connect_already_authenticated_does_not_request_credential`, `build_connect_picker_data_none_falls_back_without_blocking`.
+- `cargo test -p talos-config provider`: 25 passed / 0 failed / 0 ignored (provider config, model limits, credential write).
+- `cargo check --workspace`: passed (exit 0).
+- `cargo clippy --workspace -- -D warnings`: passed (exit 0).
+- `cargo test --workspace`: 1791 passed / 0 failed / 0 ignored across 61 test binaries (was 1789 at I102 closeout → +2 from commit `3211fc3` mid-stream error chunk fix).
+- `cargo fmt --all -- --check`: only pre-existing `bash_tool.rs:583` drift (I102 residual, out of scope).
+- `scripts/validate_project_governance.sh .`: passed, 0 governance warnings.
+- Acceptance criteria 1 & 2 for I103 are satisfied: standard providers skip base URL, custom providers require it, secret masking is preserved.
 
 ## Variance And Residuals
 
