@@ -1,5 +1,5 @@
 use crate::sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
-use crate::store::{JsonlSessionStore, SessionStore};
+use crate::store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
 use crate::todo::{TodoError, TodoRepository};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
 use crate::{Session, SessionError, SessionInfo};
@@ -8,6 +8,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
+
+const KNOWN_EXTENSIONS: &[&str] = &["jsonl", "tlog"];
 
 /// Policy for selecting session cleanup candidates.
 #[derive(Debug, Clone, Default)]
@@ -55,6 +57,7 @@ pub struct SessionManager {
     pub(crate) sessions_dir: PathBuf,
     index: Arc<Mutex<Option<SessionIndex>>>,
     store: Arc<dyn SessionStore>,
+    jsonl_store: Arc<dyn SessionStore>,
 }
 
 impl std::fmt::Debug for SessionManager {
@@ -71,6 +74,7 @@ impl Clone for SessionManager {
             sessions_dir: self.sessions_dir.clone(),
             index: Arc::clone(&self.index),
             store: Arc::clone(&self.store),
+            jsonl_store: Arc::clone(&self.jsonl_store),
         }
     }
 }
@@ -82,7 +86,8 @@ impl SessionManager {
         let manager = Self {
             sessions_dir: dir,
             index: Arc::new(Mutex::new(None)),
-            store: Arc::new(JsonlSessionStore),
+            store: Arc::new(CompactTextSessionStore),
+            jsonl_store: Arc::new(JsonlSessionStore),
         };
         let _ = manager.reconcile_index();
         Ok(manager)
@@ -103,7 +108,8 @@ impl SessionManager {
         Self {
             sessions_dir,
             index: Arc::new(Mutex::new(None)),
-            store: Arc::new(JsonlSessionStore),
+            store: Arc::new(CompactTextSessionStore),
+            jsonl_store: Arc::new(JsonlSessionStore),
         }
     }
 
@@ -111,6 +117,19 @@ impl SessionManager {
     #[must_use]
     pub fn sessions_dir(&self) -> &Path {
         &self.sessions_dir
+    }
+
+    fn is_session_file(&self, path: &Path) -> bool {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| KNOWN_EXTENSIONS.contains(&ext))
+    }
+
+    fn store_for_path(&self, path: &Path) -> &dyn SessionStore {
+        match path.extension().and_then(|e| e.to_str()) {
+            Some("tlog") => self.store.as_ref(),
+            _ => self.jsonl_store.as_ref(),
+        }
     }
 
     /// Open the colocated session todo repository and initialize its schema.
@@ -175,8 +194,9 @@ impl SessionManager {
 
     /// Load an existing session by ID.
     ///
-    /// Scans all workspace directories (both old basename and new hashed layouts)
-    /// for a file matching `<id>.jsonl`.
+    /// Scans all workspace directories for a file matching `<id>.<ext>`
+    /// where `<ext>` is any known session file extension (`.tlog` or `.jsonl`).
+    /// If both exist for the same UUID, returns a duplicate-format error.
     pub fn get_session(&self, id: &Uuid) -> Result<Session, SessionError> {
         if !self.sessions_dir.exists() {
             return Err(SessionError::SessionNotFound(*id));
@@ -194,8 +214,25 @@ impl SessionManager {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let file_path = project_dir.join(format!("{id}.{}", self.store.file_extension()));
-            if file_path.exists() {
+            let mut found: Option<(PathBuf, Arc<dyn SessionStore>)> = None;
+            for ext in KNOWN_EXTENSIONS {
+                let candidate = project_dir.join(format!("{id}.{ext}"));
+                if candidate.exists() {
+                    if found.is_some() {
+                        return Err(SessionError::ParseError(format!(
+                            "duplicate session files for {id}: both .tlog and .jsonl exist"
+                        )));
+                    }
+                    let store = if ext == &"tlog" {
+                        Arc::clone(&self.store)
+                    } else {
+                        Arc::clone(&self.jsonl_store)
+                    };
+                    found = Some((candidate, store));
+                }
+            }
+
+            if let Some((file_path, store)) = found {
                 let metadata = fs::metadata(&file_path)?;
                 let created_at = metadata
                     .modified()
@@ -203,11 +240,12 @@ impl SessionManager {
                     .map(DateTime::<Utc>::from)
                     .unwrap_or_else(Utc::now);
 
-                let mut session = Session::new(
+                let mut session = Session::with_store(
                     *id,
                     dir_name.clone(),
                     workspace_root_from_dir_name(&dir_name),
                     file_path,
+                    store,
                 );
                 session.created_at = created_at;
 
@@ -248,7 +286,7 @@ impl SessionManager {
             for file_entry in fs::read_dir(&project_dir)? {
                 let file_entry = file_entry?;
                 let path = file_entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some(self.store.file_extension()) {
+                if !self.is_session_file(&path) {
                     continue;
                 }
 
@@ -265,7 +303,8 @@ impl SessionManager {
                         .map(DateTime::<Utc>::from)
                         .unwrap_or_else(Utc::now);
 
-                    let info = self.store.scan_file(&path)?;
+                    let store = self.store_for_path(&path);
+                    let info = store.scan_file(&path)?;
 
                     sessions.push(SessionInfo {
                         id,
@@ -292,28 +331,11 @@ impl SessionManager {
             return Ok(Vec::new());
         }
 
-        Self::scan_workspace_sessions(workspace_root, &workspace_dir, self.store.as_ref())
-    }
-
-    /// Return the most recently modified session for one workspace directory.
-    pub fn latest_workspace_session(
-        &self,
-        workspace_root: &str,
-    ) -> Result<Option<SessionInfo>, SessionError> {
-        let sessions = self.list_workspace_sessions(workspace_root)?;
-        Ok(sessions.into_iter().max_by_key(|s| s.timestamp))
-    }
-
-    fn scan_workspace_sessions(
-        workspace_root: &str,
-        workspace_dir: &Path,
-        store: &dyn SessionStore,
-    ) -> Result<Vec<SessionInfo>, SessionError> {
         let mut sessions = Vec::new();
-        for file_entry in fs::read_dir(workspace_dir)? {
+        for file_entry in fs::read_dir(&workspace_dir)? {
             let file_entry = file_entry?;
             let path = file_entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some(store.file_extension()) {
+            if !self.is_session_file(&path) {
                 continue;
             }
 
@@ -330,6 +352,7 @@ impl SessionManager {
                     .map(DateTime::<Utc>::from)
                     .unwrap_or_else(Utc::now);
 
+                let store = self.store_for_path(&path);
                 let info = store.scan_file(&path)?;
 
                 sessions.push(SessionInfo {
@@ -346,7 +369,16 @@ impl SessionManager {
         Ok(sessions)
     }
 
-    /// Resume a session by ID, loading all entries from the JSONL file.
+    /// Return the most recently modified session for one workspace directory.
+    pub fn latest_workspace_session(
+        &self,
+        workspace_root: &str,
+    ) -> Result<Option<SessionInfo>, SessionError> {
+        let sessions = self.list_workspace_sessions(workspace_root)?;
+        Ok(sessions.into_iter().max_by_key(|s| s.timestamp))
+    }
+
+    /// Resume a session by ID, loading all entries from the session file.
     ///
     /// This is equivalent to [`SessionManager::get_session`] but with a clearer
     /// name for the "resume" use case.
@@ -445,9 +477,7 @@ impl SessionManager {
                 for file_entry in fs::read_dir(&ws_dir)? {
                     let file_entry = file_entry?;
                     let path = file_entry.path();
-                    if path.extension().and_then(|e| e.to_str())
-                        != Some(self.store.file_extension())
-                    {
+                    if !self.is_session_file(&path) {
                         continue;
                     }
                     let stem = match path.file_stem().and_then(|s| s.to_str()) {
@@ -457,7 +487,8 @@ impl SessionManager {
                     on_disk_ids.insert(stem.clone());
 
                     let existing = index.get_session_info(&stem)?;
-                    let info = self.store.scan_file(&path).unwrap_or(SessionInfo {
+                    let store = self.store_for_path(&path);
+                    let info = store.scan_file(&path).unwrap_or(SessionInfo {
                         id: Uuid::nil(),
                         project: String::new(),
                         workspace_root: String::new(),
@@ -477,8 +508,18 @@ impl SessionManager {
                                 .and_then(|n| n.to_str())
                                 .unwrap_or("unknown")
                                 .to_string();
-                            let mut session =
-                                Session::new(id, project, workspace_root.to_string(), path.clone());
+                            let session_store = if path.extension().and_then(|e| e.to_str()) == Some("tlog") {
+                                Arc::clone(&self.store)
+                            } else {
+                                Arc::clone(&self.jsonl_store)
+                            };
+                            let mut session = Session::with_store(
+                                id,
+                                project,
+                                workspace_root.to_string(),
+                                path.clone(),
+                                session_store,
+                            );
                             if let Ok(entries) = session.read_entries() {
                                 if let Some(branch) =
                                     session.branches.get_mut(&session.current_branch)
@@ -624,11 +665,20 @@ impl SessionManager {
                 if !ws_entry.file_type()?.is_dir() {
                     continue;
                 }
-                let candidate = ws_entry
-                    .path()
-                    .join(format!("{id}.{}", self.store.file_extension()));
-                if candidate.exists() {
-                    return Ok(candidate);
+                let mut found: Option<PathBuf> = None;
+                for ext in KNOWN_EXTENSIONS {
+                    let candidate = ws_entry.path().join(format!("{id}.{ext}"));
+                    if candidate.exists() {
+                        if found.is_some() {
+                            return Err(SessionError::ParseError(format!(
+                                "duplicate session files for {id}: both .tlog and .jsonl exist"
+                            )));
+                        }
+                        found = Some(candidate);
+                    }
+                }
+                if let Some(path) = found {
+                    return Ok(path);
                 }
             }
         }
@@ -649,11 +699,10 @@ impl SessionManager {
         if let Some(target) = &policy.workspace_root {
             let workspace_dir = self.sessions_dir.join(workspace_dir_name(target));
             if workspace_dir.exists() {
-                Self::collect_cleanup_workspace(
+                self.collect_cleanup_workspace(
                     target,
                     &workspace_dir,
                     &mut by_workspace,
-                    self.store.as_ref(),
                 )?;
             }
             return Ok(by_workspace);
@@ -668,11 +717,10 @@ impl SessionManager {
             let workspace_root = workspace_root_from_dir_name(
                 &ws_dir.file_name().unwrap_or_default().to_string_lossy(),
             );
-            Self::collect_cleanup_workspace(
+            self.collect_cleanup_workspace(
                 &workspace_root,
                 &ws_dir,
                 &mut by_workspace,
-                self.store.as_ref(),
             )?;
         }
 
@@ -680,15 +728,15 @@ impl SessionManager {
     }
 
     fn collect_cleanup_workspace(
+        &self,
         workspace_root: &str,
         workspace_dir: &Path,
         by_workspace: &mut std::collections::HashMap<String, Vec<CleanupSession>>,
-        store: &dyn SessionStore,
     ) -> Result<(), SessionError> {
         for file_entry in fs::read_dir(workspace_dir)? {
             let file_entry = file_entry?;
             let path = file_entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some(store.file_extension()) {
+            if !self.is_session_file(&path) {
                 continue;
             }
             let Some(id) = path
@@ -734,7 +782,8 @@ impl Default for SessionManager {
         Self {
             sessions_dir: PathBuf::from(home).join(".talos").join("sessions"),
             index: Arc::new(Mutex::new(None)),
-            store: Arc::new(JsonlSessionStore),
+            store: Arc::new(CompactTextSessionStore),
+            jsonl_store: Arc::new(JsonlSessionStore),
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::SessionError;
-use crate::store::{JsonlSessionStore, SessionStore};
+use crate::store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -174,6 +174,8 @@ impl Session {
             },
         );
 
+        let store = store_for_path(&file_path);
+
         Self {
             id,
             project,
@@ -185,7 +187,7 @@ impl Session {
             persisted: true,
             last_entry_id: Arc::new(Mutex::new(None)),
             write_lock: Arc::new(Mutex::new(())),
-            store: Arc::new(JsonlSessionStore),
+            store,
         }
     }
 
@@ -199,6 +201,21 @@ impl Session {
     ) -> Self {
         let mut session = Self::new(id, project, workspace_root, file_path);
         session.persisted = false;
+        session
+    }
+
+    /// Create a session with an explicit store, chosen by the caller.
+    /// Used by `SessionManager::get_session` when loading an existing file
+    /// whose format is determined by extension.
+    pub fn with_store(
+        id: Uuid,
+        project: String,
+        workspace_root: String,
+        file_path: PathBuf,
+        store: Arc<dyn SessionStore>,
+    ) -> Self {
+        let mut session = Self::new(id, project, workspace_root, file_path);
+        session.store = store;
         session
     }
 
@@ -316,5 +333,16 @@ impl Session {
     /// Returns the file extension used by this session's store.
     pub fn file_extension(&self) -> &'static str {
         self.store.file_extension()
+    }
+}
+
+/// Select the appropriate [`SessionStore`] based on a file path's extension.
+///
+/// `.tlog` → [`CompactTextSessionStore`], `.jsonl` → [`JsonlSessionStore`],
+/// unknown or missing → [`JsonlSessionStore`] (legacy default).
+pub(crate) fn store_for_path(file_path: &std::path::Path) -> Arc<dyn SessionStore> {
+    match file_path.extension().and_then(|e| e.to_str()) {
+        Some("tlog") => Arc::new(CompactTextSessionStore),
+        _ => Arc::new(JsonlSessionStore),
     }
 }

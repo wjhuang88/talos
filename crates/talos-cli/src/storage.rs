@@ -329,7 +329,11 @@ pub(crate) fn collect_storage_status(talos_root: &Path) -> StorageStatus {
                     if let Ok(file_entries) = std::fs::read_dir(ws_entry.path()) {
                         for file_entry in file_entries.flatten() {
                             let path = file_entry.path();
-                            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                            let is_session = path
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .is_some_and(|ext| ext == "jsonl" || ext == "tlog");
+                            if !is_session {
                                 continue;
                             }
                             if let Ok(meta) = std::fs::metadata(&path) {

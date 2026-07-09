@@ -19,7 +19,7 @@ fn create_session_creates_file() {
 
     assert!(session.file_path.exists());
     assert_eq!(session.project, "test-project");
-    assert!(session.file_path.to_string_lossy().ends_with(".jsonl"));
+    assert!(session.file_path.to_string_lossy().ends_with(".tlog"));
 }
 
 #[test]
@@ -781,12 +781,17 @@ fn list_sessions_preview_handles_utf8_char_boundary() {
 #[test]
 fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let id = Uuid::new_v4();
+    let project_dir = manager.sessions_dir.join(workspace_dir_name(""));
+    std::fs::create_dir_all(&project_dir).unwrap();
+    let file_path = project_dir.join(format!("{id}.jsonl"));
+    std::fs::File::create(&file_path).unwrap();
+
     let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
 
     let mut file = OpenOptions::new()
         .append(true)
-        .open(&session.file_path)
+        .open(&file_path)
         .unwrap();
     let old_entry = serde_json::json!({
         "type": "message",
@@ -800,7 +805,7 @@ fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
     let sessions = manager.list_sessions().unwrap();
     let info = sessions
         .iter()
-        .find(|info| info.id == session.id)
+        .find(|info| info.id == id)
         .expect("session should be listed");
     assert!(info.last_message_preview.ends_with("..."));
     assert!(
@@ -812,12 +817,15 @@ fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
 #[test]
 fn backward_compatibility_with_old_jsonl_format() {
     let manager = test_manager();
-    let session = manager.create_session("test-project", "").unwrap();
+    let id = Uuid::new_v4();
+    let project_dir = manager.sessions_dir.join(workspace_dir_name(""));
+    std::fs::create_dir_all(&project_dir).unwrap();
+    let file_path = project_dir.join(format!("{id}.jsonl"));
+    std::fs::File::create(&file_path).unwrap();
 
-    // Manually write old-format JSONL lines
     let mut file = OpenOptions::new()
         .append(true)
-        .open(&session.file_path)
+        .open(&file_path)
         .unwrap();
 
     let old_entry1 = serde_json::json!({
@@ -839,6 +847,7 @@ fn backward_compatibility_with_old_jsonl_format() {
     writeln!(file, "{}", serde_json::to_string(&old_entry2).unwrap()).unwrap();
 
     // Read entries - should parse old format correctly
+    let session = manager.get_session(&id).unwrap();
     let entries = session.read_entries().unwrap();
     assert_eq!(entries.len(), 2);
 
@@ -1289,7 +1298,7 @@ fn fork_durable_history_clone_source_bytes_unchanged() {
     let child_path = dir
         .path()
         .join("fork-clone-test")
-        .join(format!("{child_id}.jsonl"));
+        .join(format!("{child_id}.tlog"));
     std::fs::create_dir_all(child_path.parent().unwrap()).unwrap();
     std::fs::write(&child_path, &source_bytes_before).unwrap();
 
