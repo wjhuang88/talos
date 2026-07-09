@@ -3,8 +3,13 @@
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use serde::Deserialize;
-use talos_core::tool::{ToolDefinition, ToolNature};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
+use talos_core::tool_parameters;
 
 use super::{GitToolError, discover_repo};
 
@@ -18,7 +23,7 @@ async fn get_workdir(workspace_root: &std::path::Path) -> Result<PathBuf, GitToo
         .unwrap_or_else(|| workspace_root.to_path_buf()))
 }
 
-async fn run_host_git_with_program(
+pub(crate) async fn run_host_git_with_program(
     program: &str,
     workdir: &std::path::Path,
     args: &[&str],

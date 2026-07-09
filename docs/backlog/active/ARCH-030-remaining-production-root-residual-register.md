@@ -25,16 +25,40 @@ speculative rewrites without concrete acceptance criteria.
 
 ## Residual Roots
 
-| Root | Current Evidence | Next Safe Slice | Activation Trigger |
+Updated 2026-07-09 after four-month architecture cleanup plan execution.
+
+| Root | Current Lines | Previous | Status | Notes |
+|---|---|---|---|---|
+| `crates/talos-cli/src/mode_runners.rs` | **2118** (1797 prod + 321 test) | 2290 | Partially decomposed | Dashboard helpers extracted; session/provider handlers remain |
+| `crates/talos-tui/src/app.rs` | 1005 | 1005 | Unchanged | Frame/input/cursor flows are visual-risk sensitive |
+| `crates/talos-session/src/sqlite.rs` | 986 | 983 | Unchanged | SQLite schema + FTS search + fork metadata |
+| `crates/talos-exploration/src/lib.rs` | 958 | 958 | Unchanged | Store SQL and citation validation |
+| `crates/talos-tools/src/git.rs` | **660** ✅ | 1285 | Decomposed | Write tools extracted to git_write.rs (454 lines) |
+| `crates/talos-provider/src/openai.rs` | **313** ✅ | 2365 | Decomposed | SSE parsing extracted to openai_sse.rs |
+| `crates/talos-provider/src/lib.rs` | **291** ✅ | 1677 | Decomposed | Request assembly + stream parsing extracted |
+| `crates/talos-tui/src/state.rs` | **450** ✅ | 1469 | Decomposed | BottomPanelState extracted to panel_state.rs |
+| `crates/talos-permission/src/lib.rs` | **451** ✅ | 1630 | Decomposed | Rule + resource types extracted; tests separated |
+| `crates/talos-exploration/src/ingestion.rs` | 799 | 799 | Unchanged | Ingestion/chunking/synthesis together |
+
+### Resolved Roots (below 800-line threshold)
+
+| Root | Final Lines | Decomposition |
+|---|---|---|
+| `openai.rs` | 313 | openai_sse.rs (2065), openai_request.rs (262) |
+| `lib.rs` (provider) | 291 | anthropic_request.rs (462), anthropic_stream.rs (961) |
+| `state.rs` (tui) | 450 | panel_state.rs (537), state_tests.rs (500) |
+| `lib.rs` (permission) | 451 | rule.rs (162), resource.rs (76), workspace_trust.rs (206), permission_tests.rs (970) |
+| `git.rs` (tools) | 660 | git_write.rs (454), git_tests.rs (227) |
+
+### Remaining Over-Threshold Roots
+
+| Root | Lines | Gap | Recommended Next Slice |
 |---|---|---|---|
-| `crates/talos-cli/src/mode_runners.rs` | 1500 lines after ARCH-024/I069; remaining mode orchestration is still large. | Split one mode orchestration or lifecycle helper behind stable `run_*` exports. | Next CLI feature touches mode setup, session lifecycle, model lifecycle, or inline/TUI handoff. |
-| `crates/talos-tui/src/app.rs` | 1005 lines after ARCH-025/I070; frame/input/cursor flows are visual-risk sensitive. | Extract one frame/input helper with screenshot or focused TUI state tests. | Next TUI work touches frame rendering, cursor placement, bottom panel, or approval UI. |
-| `crates/talos-session/src/sqlite.rs` | 983 lines; SQLite schema, FTS search, fork metadata, and tests are in one module. | Split schema/migration SQL or fork/query helpers without changing SQL semantics. | Next session-index feature touches SQLite schema, search, fork records, cleanup, or maintenance. |
-| `crates/talos-exploration/src/lib.rs` | 958 lines after ARCH-029/I074; store SQL and citation validation remain together. | Split schema/migration SQL or citation validation helpers. | Next exploration storage feature touches schema, claims, syntheses, FTS, or citation checks. |
-| `crates/talos-tools/src/git.rs` | 868 lines; read-only gix tools and write-capable host-git fallback tools share one module. | Split read-only tool group or host-git write helpers while preserving permission metadata. | Next Git tool feature touches push/pull/checkout/write operations or host fallback behavior. |
-| `crates/talos-provider/src/openai.rs` | 848 lines after ARCH-028/I073; request assembly is split but SSE parsing/retry remain in root. | Split SSE stream parser or retry/error mapping helpers with provider tests. | Next provider protocol feature touches OpenAI streaming, usage extraction, retry, or tool-call chunks. |
-| `crates/talos-provider/src/lib.rs` | 833 lines; Anthropic provider root still combines request assembly, transport, and stream parsing. | Split Anthropic request assembly or stream parser. | Next Anthropic protocol feature touches cache-control, thinking fields, request body, or stream parsing. |
-| `crates/talos-exploration/src/ingestion.rs` | 799 lines; ingestion, chunking, extraction, and synthesis workflows are still together. | Split chunking helpers or synthesis builder. | Next ingestion feature touches fetched content, chunk budgets, claim extraction, or synthesis formatting. |
+| `mode_runners.rs` | 1797 prod | 997 over | Extract session handlers (handle_session_new/resume/fork/model) + provider setup functions |
+| `app.rs` (tui) | 1005 | 205 over | Extract frame/cursor/output queue helpers with visual-risk tests |
+| `sqlite.rs` | 986 | 186 over | Split schema/migration SQL from fork/query helpers |
+| `lib.rs` (exploration) | 958 | 158 over | Split schema/migration SQL from citation validation |
+| `ingestion.rs` | 799 | At threshold | Split chunking helpers or synthesis builder |
 
 ## Acceptance Criteria
 
