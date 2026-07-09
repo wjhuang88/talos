@@ -39,6 +39,7 @@ pub mod sqlite;
 mod store;
 pub mod todo;
 mod topology;
+mod transcript;
 mod types;
 
 pub use error::SessionError;
@@ -56,6 +57,7 @@ pub use todo::{
     TodoUpdateTool, status_icon,
 };
 pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
+pub use transcript::{TranscriptEntry, export_json, export_markdown, read_transcript};
 
 #[cfg(test)]
 #[allow(warnings)]
