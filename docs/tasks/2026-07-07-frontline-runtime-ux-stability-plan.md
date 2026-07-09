@@ -391,9 +391,10 @@ Recovery instructions:
 ## Checkpoint FS08 - Month 2 Closeout: TUI Preview/Status + Todo Reliability (2026-07-07)
 
 Completed task items:
-- FS05: TUI-028 inventory originally marked #24/#25/#27/#28/#31 implemented. 2026-07-08 audit
-  corrected this: #25/#27 have implementation evidence; #28 is reopened as #39; #24/#31 need
-  runtime/visual evidence; #26 is tracked by TUI-029 as decision-required.
+- FS05: TUI-028 inventory originally marked #24/#25/#27/#28/#31 implemented. Later audits
+  corrected this: #27 has implementation evidence; #25 is still open because current code only
+  animates a gradient label, not the requested two-color three-segment ripple; #28 is reopened as
+  #39; #24/#31 need runtime/visual evidence; #26 is tracked by TUI-029 as decision-required.
 - FS06: Original closeout claimed no display-state code work was needed. 2026-07-08 audit corrected
   this: #28/#39 still needs a transient dashboard notification, and #24/#31 need real
   runtime/visual evidence. The 251 TUI tests did not prove those UX claims.
@@ -507,8 +508,9 @@ Completed task items (FS00-FS15):
 - FS02: MaxTokens stuck-processing bug fixed (engine.rs); 2 engine + 3 conversation-loop tests.
 - FS03: Visible signal chain verified (Tip/Error Stream/Status); 2 integration tests.
 - FS04: Month 1 closeout — commit `3d3c3dd`.
-- FS05: TUI-028 inventory — originally marked #24/#25/#27/#28/#31 implemented; 2026-07-08 audit
-  corrected #28 to #39 open and #24/#31 to evidence gaps. #26 split to TUI-029 as decision-required.
+- FS05: TUI-028 inventory — originally marked #24/#25/#27/#28/#31 implemented; later audits
+  corrected #25 to open implementation gap, #28 to #39 open, and #24/#31 to evidence gaps. #26
+  split to TUI-029 as decision-required.
 - FS06: Original closeout claimed no display-state work was needed. 2026-07-08 audit corrected
   this: #28/#39 still needs implementation, and #24/#31 need runtime/visual evidence.
 - FS07: `/todo delete <id> --confirm` implemented; `TodoRepository::create_batch` added.
@@ -564,23 +566,23 @@ Final validation (all run in this worktree on 2026-07-07):
 - `git diff --check`: PASS.
 
 Open deviations:
-- `#18` request-dispatch timeout was not fixed by FS04; the MaxTokens/terminal-status fixes do not
-  cover provider `send().await` hanging before response headers.
+- `#18` request-dispatch timeout was not fixed by FS04; it was later resolved in I107 by
+  `dispatch_timeout_secs` plus provider, agent, and conversation-loop tests.
 - `#28` was not fully fixed and is reopened as `#39`; System-source scrollback output is not the
   requested transient dashboard notification.
 - `#24` and `#31` need real runtime/visual evidence before the UX claims can be closed.
 
 Fallback-permitted residuals (explicitly allowed by each task's fallback column, not deviations):
-- RUNTIME-002/PROVIDER-002: #18 request-dispatch timeout is an open P0 residual selected into I107.
-  Optional `UserInput::Cancel` through tui_bridge integration test and health-check task remain as
-  secondary residuals.
+- RUNTIME-002/PROVIDER-002: #18 request-dispatch timeout was an open P0 residual from this plan and
+  is resolved by I107. Optional health-check task remains as a secondary residual.
 - TODO-002: no residual. `todo_create_batch` and `todo_update_batch` are implemented and registered
   in both print and TUI tool registries.
 - TOOL-018: `git_diff` ref-to-ref comparison formally deferred via documented acceptance change
   (see TOOL-018 owner doc). The deferred work is retained as `TOOL-020` so it is not lost during
   later planning. Unstaged, staged, and path-filtered modes are implemented and tested.
   HistoryAttrs background-color limitation is a display constraint.
-- TUI-028: #28/#39 transient dashboard notification is open; #24/#31 need runtime/visual evidence.
+- TUI-028: #25 thinking ripple animation and #28/#39 transient dashboard notification are open;
+  #24/#31 need runtime/visual evidence.
 - TUI-029: #26 thinking persistence into history is a decision gap (ADR-034/TUI-020 revision
   required). The plan's acceptance explicitly defers this: "Persisting thinking content into
   history is not implemented unless ADR-034/TUI-020 are explicitly revised."

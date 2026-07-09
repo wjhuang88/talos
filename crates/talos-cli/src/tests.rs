@@ -378,6 +378,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn conversation_loop_clears_processing_on_dispatch_timeout_error() {
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+
+        agent_tx.send(AgentEvent::TurnStart).unwrap();
+        agent_tx
+            .send(AgentEvent::Error {
+                message: "network error: request dispatch timeout: no response headers within 1s"
+                    .to_string(),
+            })
+            .unwrap();
+        drop(agent_tx);
+
+        let status = collect_terminal_status(&mut ui_rx).await;
+        assert!(
+            !status.is_processing,
+            "runtime must not remain stuck after provider dispatch timeout"
+        );
+        assert_eq!(status.phase, Some(talos_conversation::TurnPhase::TimedOut));
+
+        loop_handle.await.unwrap();
+    }
+
+    #[tokio::test]
     async fn conversation_loop_clears_processing_on_max_tokens_turn_end() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);

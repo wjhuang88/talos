@@ -1,6 +1,6 @@
 # Iteration I109: REL-002 Self-Bootstrap Closeout
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-07-08
 > Planned objective: complete the final Talos-primary self-bootstrap session and close REL-002 with
 > an evidence-backed go/no-go report.

@@ -421,6 +421,11 @@ impl Agent {
             {
                 Ok(rx) => rx,
                 Err(error) => {
+                    if let Some(ref tx) = event_tx {
+                        let _ = tx.send(AgentEvent::Error {
+                            message: error.to_string(),
+                        });
+                    }
                     let _ = self
                         .run_hook(&hook_ctx, HookEvent::OnProviderError { error: &error })
                         .await;

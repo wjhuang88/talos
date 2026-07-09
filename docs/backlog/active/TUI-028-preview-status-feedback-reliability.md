@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-028 |
 | Priority | P1 |
-| Status | Partial — #28 reopened as #39; #24/#31 need real visual evidence |
+| Status | Partial — #25, #28/#39, #24, and #31 remain open |
 | Source | [GitHub Issue #24](https://github.com/wjhuang88/talos/issues/24), [GitHub Issue #25](https://github.com/wjhuang88/talos/issues/25), [GitHub Issue #27](https://github.com/wjhuang88/talos/issues/27), [GitHub Issue #28](https://github.com/wjhuang88/talos/issues/28), [GitHub Issue #31](https://github.com/wjhuang88/talos/issues/31), [GitHub Issue #39](https://github.com/wjhuang88/talos/issues/39) |
 | Depends On | `TUI-027`, `TUI-020`, `TUI-024`, `RUNTIME-002` |
 
@@ -49,7 +49,7 @@ Audit of `crates/talos-tui/src/app.rs`, `scrollback_status.rs`, `scrollback.rs`,
 | Issue | Acceptance criterion | Disposition | Evidence |
 |---|---|---|---|
 | #24 | Animation cadence driven by stable timer, not heavy rendering | Partial — evidence gap | `app.rs:385` uses `tokio::time::interval(Duration::from_millis(50))` as the render timer. `processing_tick` increments per render frame and `processing_frame` advances every 3 ticks (150ms), but no runtime/visual evidence proves cadence stability under heavy rendering or long-output load. |
-| #25 | Thinking animation redesign is visual-only, no persistence change | Implemented | `app.rs:732-737` computes `thinking_label_frame` from `processing_frame` when `thinking_preview` is present and processing. `preview_text_for_state` (app.rs:1089-1093) renders `"thinking: {text}"`. No thinking content is persisted into history (TUI-020 boundary preserved). |
+| #25 | Thinking animation redesign is visual-only, no persistence change | Partial — implementation gap | `app.rs:732-737` computes `thinking_label_frame` from `processing_frame` when `thinking_preview` is present and processing, and `preview_line_spans` applies a moving gradient to the word `"thinking"`. This preserves TUI-020 persistence semantics, but it does not implement the issue's requested two-color three-segment center-out ripple block animation. |
 | #27 | Preview state cleared on new message / Ctrl+C cancel / `/resume` | Implemented (SSP130) | Engine `cancel_turn` (engine.rs:256-275) and `Error` handler (engine.rs:378-417) clear `current_turn_text`, `current_thinking_text`, and emit `ThinkingPreview { text: None }`. `TurnStart` clears `current_turn_text` (engine.rs:284) so a new turn replaces stale preview. FS02/FS03 further proved terminal error paths clear `is_processing` end-to-end. |
 | #28 | Dashboard availability rendered as non-blocking info, not error-like | Partial — reopened as #39 | `mode_runners.rs:1054` emits dashboard-available as `MessageSource::System` (`[System] Dashboard available at {url}...`). Only dashboard *failure* (line 1073) uses `MessageSource::Error`, but #39 requires a transient `UiOutput::Tip` that does not enter persistent scrollback/history. |
 | #31 | Status bar model-name changes do not visibly jump | Partial — evidence gap | `scrollback_status.rs:147` uses `truncate_str(model_name, model_limit)` with `model_limit` derived from terminal width and clamped. Provider and context parts use fixed-width formatting, but no runtime/visual evidence proves a model-switch transition is free of visible layout jumps. |
@@ -61,7 +61,7 @@ history/scrollback. Current code intentionally keeps thinking preview transient 
 turn end/error/cancel. That behavior is governed by `TUI-020` and ADR-034. The requirement is now
 tracked separately as `TUI-029`.
 
-### Correction: Issues #24, #28/#39, And #31
+### Correction: Issues #24, #25, #28/#39, And #31
 
 The 2026-07-08 issue audit found that TUI-028's closeout overclaimed several UX fixes:
 
@@ -71,14 +71,16 @@ The 2026-07-08 issue audit found that TUI-028's closeout overclaimed several UX 
   not enter scrollback/history.
 - **#24:** The code has a 50ms render interval, but there is no runtime or visual evidence proving
   animation cadence remains stable under heavy rendering/load. This remains a validation gap.
+- **#25:** The code has a label-gradient animation, but not the requested two-color three-segment
+  center-out ripple block animation. This remains an implementation gap.
 - **#31:** The code truncates status-bar model names and avoids repeated provider labels, but there
   is no runtime or visual evidence proving model-switch transitions do not visibly jump. This
   remains a validation gap.
 
 ### Conclusion
 
-TUI-028 is Partial. #25 and #27 have sufficient implementation evidence; #26 is split to TUI-029;
-#28/#39 needs implementation; #24 and #31 need real runtime/visual evidence before they can be
+TUI-028 is Partial. #27 has sufficient implementation evidence; #26 is split to TUI-029;
+#25 and #28/#39 need implementation; #24 and #31 need real runtime/visual evidence before they can be
 closed confidently. The TUI already
 distinguishes waiting-for-model (`Connecting`/`Generating`/`Thinking` phases) from waiting-for-tool
 (`RunningTool { name }` phase) via `preview_text_for_state` (app.rs:1083-1093), and stale preview
@@ -88,6 +90,8 @@ content is cleared on new submit, cancellation, terminal error, and turn end.
 
 - #24 requires runtime/visual evidence that the processing animation cadence stays stable under a
   heavy rendering or long-output scenario.
+- #25 requires the requested two-color three-segment center-out ripple block animation, or a
+  documented requirement change.
 - #28/#39 requires implementation as a transient dashboard notification, not a persistent
   scrollback line.
 - #31 requires runtime/visual evidence that model switching does not create visible status-bar

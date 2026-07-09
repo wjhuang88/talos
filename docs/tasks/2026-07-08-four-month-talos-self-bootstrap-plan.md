@@ -90,8 +90,8 @@ published baselines and does not silently re-scope older iterations.
 | I085 | Paused | MC107 walkthrough remains residual; may be used only if selected explicitly by I107. |
 | I086-I089 | Planned product-hardening shells | Keep planned; I106-I109 are the new Talos-primary REL-002 attempt. |
 | I102-I105 | Complete | Starting evidence baseline; useful controlled-local-trial evidence, non-qualifying for REL-002. |
-| RUNTIME-002 / PROVIDER-002 | Partial after 2026-07-08 audit | #18 request-dispatch timeout remains open; select before lower-priority feature polish. |
-| TUI-028 | Partial after 2026-07-08 audit | #28 reopened as #39; #24/#31 need visual/runtime evidence; #26 split to TUI-029. |
+| RUNTIME-002 / PROVIDER-002 | Resolved by I107 | #18 request-dispatch timeout fixed; GitHub issue #18 closed after final status audit. |
+| TUI-028 | Partial after issue audit | #25 remains open; #28 reopened as #39; #24/#31 need visual/runtime evidence; #26 split to TUI-029. |
 | TUI-029 | Planned — decision required | #26 thinking content history archive requires ADR-034/TUI-020 policy decision before implementation. |
 | TOOL-020 | Planned | Candidate for I107 user-facing/read-only polish if Talos can execute it safely. |
 | ARCH-032 | Planned | Candidate for I108 architecture-sensitive audit/routing work. |
@@ -102,23 +102,23 @@ published baselines and does not silently re-scope older iterations.
 
 | ID | Week | Iteration | Track | Deliverable | Validation | Status |
 |---|---:|---|---|---|---|---|
-| SBT100 | 1 | I106 | Start gate | Talos-primary execution contract, inventory, and disqualification rules recorded. | governance validation; clean worktree evidence | Planned |
-| SBT101 | 1 | I106 | Evidence schema | Checkpoint template classifies qualifying, partial, and non-qualifying sessions. | owner-doc review; sample record | Planned |
-| SBT102 | 2 | I106 | Runtime smoke | Repeatable Talos binary smoke harness covers version, validation, governance preview/write dry run, provider failure, and session resume evidence. | real `talos` commands or Talos-owned tests | Planned |
-| SBT103 | 3 | I106 | Governance rehearsal | Talos performs a bounded owner-doc update through the accepted governance path and records rollback evidence. | governance validation; diff review | Planned |
-| SBT104 | 4 | I106 | Closeout | Month-1 harness result classified for REL-002 without overclaiming. | workspace validation as needed; REL-002 update | Planned |
-| SBT110 | 5 | I107 | Selection | Select from the issue-audit corrective queue first: #18 request-dispatch timeout, #39 dashboard transient notification, #24/#31 visual evidence, then TOOL-020/I085 only if higher-priority residuals are closed. | owner-doc activation note | Planned |
-| SBT111 | 6 | I107 | Implementation | Talos implements the selected corrective change using existing patterns and permission-gated tools. | targeted tests; real binary evidence | Planned |
-| SBT112 | 7 | I107 | Docs sync | Talos updates user docs, backlog, iteration, and board in owner-first order. | governance validation; docs diff review | Planned |
-| SBT113 | 8 | I107 | Closeout | First non-trivial Talos-primary feature/polish session classified for REL-002. | workspace tests or recorded fallback | Planned |
-| SBT120 | 9 | I108 | Risk routing | Activate ARCH-032 or another bounded architecture-sensitive item with explicit risk classification. | owner-doc activation note | Planned |
-| SBT121 | 10 | I108 | Architecture work | Talos performs the audit or bounded diagnostic/change without crossing permission/storage/dependency gates. | architecture evidence; targeted tests if code changes | Planned |
-| SBT122 | 11 | I108 | Review gate | External review checks architecture claims without becoming primary executor. | review findings resolved or recorded | Planned |
-| SBT123 | 12 | I108 | Closeout | Architecture-sensitive Talos-primary session classified for REL-002. | governance validation; REL-002 update | Planned |
-| SBT130 | 13 | I109 | Final session | Complete a third non-trivial Talos-primary session or record why it could not qualify. | targeted tests; runtime evidence | Planned |
-| SBT131 | 14 | I109 | Evidence audit | Audit all self-bootstrap sessions against every REL-002 acceptance criterion. | evidence matrix | Planned |
-| SBT132 | 15 | I109 | Readiness report | Produce v1.0 go/no-go report with residuals, rollback, and next owners. | docs review; governance validation | Planned |
-| SBT133 | 16 | I109 | Final gate | Close the four-month plan with no release overclaim. | workspace validation; maintainer review | Planned |
+| SBT100 | 1 | I106 | Start gate | Talos-primary execution contract, inventory, and disqualification rules recorded. | governance validation; clean worktree evidence | Complete — non-qualifying |
+| SBT101 | 1 | I106 | Evidence schema | Checkpoint template classifies qualifying, partial, and non-qualifying sessions. | owner-doc review; sample record | Complete — non-qualifying |
+| SBT102 | 2 | I106 | Runtime smoke | Repeatable Talos binary smoke harness covers version, validation, governance preview/write dry run, provider failure, and session resume evidence. | real `talos` commands or Talos-owned tests | Complete — non-qualifying |
+| SBT103 | 3 | I106 | Governance rehearsal | Talos performs a bounded owner-doc update through the accepted governance path and records rollback evidence. | governance validation; diff review | Complete — non-qualifying |
+| SBT104 | 4 | I106 | Closeout | Month-1 harness result classified for REL-002 without overclaiming. | workspace validation as needed; REL-002 update | Complete — non-qualifying |
+| SBT110 | 5 | I107 | Selection | Select from the issue-audit corrective queue first: #18 request-dispatch timeout, #39 dashboard transient notification, #24/#31 visual evidence, then TOOL-020/I085 only if higher-priority residuals are closed. | owner-doc activation note | Complete — non-qualifying |
+| SBT111 | 6 | I107 | Implementation | Talos implements the selected corrective change using existing patterns and permission-gated tools. | targeted tests; real binary evidence | Complete — non-qualifying |
+| SBT112 | 7 | I107 | Docs sync | Talos updates user docs, backlog, iteration, and board in owner-first order. | governance validation; docs diff review | Complete — non-qualifying |
+| SBT113 | 8 | I107 | Closeout | First non-trivial Talos-primary feature/polish session classified for REL-002. | workspace tests or recorded fallback | Complete — non-qualifying |
+| SBT120 | 9 | I108 | Risk routing | Activate ARCH-032 or another bounded architecture-sensitive item with explicit risk classification. | owner-doc activation note | Complete — non-qualifying |
+| SBT121 | 10 | I108 | Architecture work | Talos performs the audit or bounded diagnostic/change without crossing permission/storage/dependency gates. | architecture evidence; targeted tests if code changes | Complete — non-qualifying |
+| SBT122 | 11 | I108 | Review gate | External review checks architecture claims without becoming primary executor. | review findings resolved or recorded | Complete — non-qualifying |
+| SBT123 | 12 | I108 | Closeout | Architecture-sensitive Talos-primary session classified for REL-002. | governance validation; REL-002 update | Complete — non-qualifying |
+| SBT130 | 13 | I109 | Final session | Complete a third non-trivial Talos-primary session or record why it could not qualify. | targeted tests; runtime evidence | Complete — non-qualifying |
+| SBT131 | 14 | I109 | Evidence audit | Audit all self-bootstrap sessions against every REL-002 acceptance criterion. | evidence matrix | Complete — non-qualifying |
+| SBT132 | 15 | I109 | Readiness report | Produce v1.0 go/no-go report with residuals, rollback, and next owners. | docs review; governance validation | Complete — non-qualifying |
+| SBT133 | 16 | I109 | Final gate | Close the four-month plan with no release overclaim. | workspace validation; maintainer review | Complete — non-qualifying |
 
 ## Monthly Exit Gates
 
@@ -231,6 +231,7 @@ credential migration, permission policy migration, or storage default migration.
 
 - REL-002 qualification gaps: `docs/backlog/active/REL-002-v1-self-bootstrap-release-gate.md`.
 - Feature/story residuals: the selected backlog owner doc.
+- Issue/doc/code status reconciliation: `docs/reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md`.
 - Monthly execution evidence: I106-I109 iteration docs.
 - Cross-cutting ideas outside scope: `docs/proposals/`.
 
@@ -241,5 +242,6 @@ credential migration, permission policy migration, or storage default migration.
 | 2026-07-08 | Created planned Talos-primary self-bootstrap package with I106-I109 shells and REL-002 qualification boundaries. |
 | 2026-07-09 | SBT100 activated. Runtime: glm-5.2 via zai-coding-plan (external, not Talos). Baseline: 1791 tests pass, governance 0 warnings, `talos 0.3.0` binary available, clean worktree. Session classified non-qualifying for REL-002. I106 moved to Active. |
 | 2026-07-09 | SBT101-SBT104 complete. Evidence schema, smoke harness (`scripts/talos_smoke.sh`), governance rehearsal with rollback all delivered. Pre-existing `bash_tool.rs` fmt violation fixed. Full validation matrix green: fmt, check, 1791 tests, clippy, governance, diff-check. I106 moved to Review. REL-002 classification: non-qualifying (external runtime). I107 pending Review acceptance and Talos-primary runtime. |
+| 2026-07-09 | SBT110-SBT113 complete. I107 selected and fixed #18 request-dispatch timeout. Follow-up audit added agent/CLI bridge tests for dispatch-timeout terminal processing cleanup. I107 moved to Review. REL-002 classification: non-qualifying (external runtime glm-5.2). |
 | 2026-07-09 | SBT120-SBT123 complete. ARCH-032 Single Data Flow Audit performed. All 12 src/ directories audited. Zero `broadcast::channel` usages. All channels single-consumer mpsc or oneshot or watch (state cache). Hook system uses trait-method dispatch. No deviations. ARCHITECTURE.md updated. I108 moved to Review. REL-002 classification: non-qualifying (external runtime glm-5.2). |
 | 2026-07-09 | SBT130-SBT133 complete. I109 REL-002 closeout. All 8 acceptance criteria audited: 3 UNMET, 4 PARTIAL, 1 MET. Zero fully qualifying Talos-primary sessions. Readiness report: `docs/reference/REL-002-READINESS-REPORT-2026-07-09.md`. Verdict: NO-GO for v1.0.0. No tag, release, publish, or external trial authorized. Four-month plan closed. |

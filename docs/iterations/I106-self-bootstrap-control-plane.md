@@ -112,15 +112,15 @@ runtime, not Talos.
 | Worktree state | `git status --short` | Clean |
 | HEAD commit | `git log --oneline -1` | `3418962` |
 
-### Existing Work Inventory (Verified Against Owner Docs)
+### Existing Work Inventory At I106 Activation (Verified Against Owner Docs)
 
 | Area | Current State | Disposition |
 |---|---|---|
 | I106-I109 (this plan) | Planned | I106 activated 2026-07-09; I107-I109 wait monthly closeouts. |
 | I085 | Paused (MC107 walkthrough residual) | Not activated; may be used only if I107 explicitly selects it. |
 | I086-I089 | Planned (product hardening shells) | Not activated; historical baselines. |
-| RUNTIME-002 / PROVIDER-002 | Partial — #18 request-dispatch timeout open | First priority for I107 if I106 qualifies. |
-| TUI-028 | Partial — #39, #24, #31 open | Second priority for I107 after #18. |
+| RUNTIME-002 / PROVIDER-002 | Partial — #18 request-dispatch timeout open at activation | First priority for I107 if I106 qualifies; later resolved by I107. |
+| TUI-028 | Partial — #25, #39, #24, #31 open | Second priority for I107 after #18; still partial after I107. |
 | TUI-029 | Planned — decision required | Not activated; needs ADR-034 revision first. |
 | ARCH-032 | Planned | Candidate for I108 architecture-sensitive work. |
 | REL-002 | Planned — not ready | Target gate; no v1.0 claim authorized. |

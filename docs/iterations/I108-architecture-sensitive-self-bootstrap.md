@@ -1,6 +1,6 @@
 # Iteration I108: Architecture-Sensitive Self-Bootstrap
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-07-08
 > Planned objective: have Talos route and complete one bounded architecture-sensitive session as
 > the primary executor without bypassing review gates.

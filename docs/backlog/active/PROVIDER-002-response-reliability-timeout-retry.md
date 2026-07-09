@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | PROVIDER-002 |
 | Priority | P1 |
-| Status | Partial — request-dispatch timeout gap reopened by #18 |
+| Status | Resolved — request-dispatch timeout fixed in I107 SBT111 (non-qualifying REL-002 evidence) |
 | Origin | UX-001, maintainer feedback 2026-07-03 |
 | Relates To | UX-001, MODEL-003, PROVIDER-001, TUI-020 |
 
@@ -90,7 +90,7 @@ Provider runtime should support these states without requiring TUI-specific code
 - [x] OpenAI-compatible provider has first-packet timeout, idle timeout, retry classification, and
       backoff tests. (UX103/UX104)
 - [x] Anthropic provider has equivalent first-packet/idle timeout and retry coverage. (UX103/UX104)
-- [ ] OpenAI-compatible and Anthropic providers bound HTTP request dispatch / response-header wait
+- [x] OpenAI-compatible and Anthropic providers bound HTTP request dispatch / response-header wait
       so `send().await` cannot hang forever before stream parsing begins. (#18)
 - [x] Retrying is not attempted after assistant text/tool-call output has begun unless a later ADR
       explicitly introduces resumable streams. (Retry only in send_request, before streaming starts)
@@ -149,4 +149,12 @@ The #18 request-dispatch timeout gap identified in the 2026-07-08 Status Correct
 
 Stream-idle semantics are preserved: the timeout does not cover the streaming body, which remains protected by `first_packet_timeout_secs` and `stream_idle_timeout_secs`.
 
-Evidence: 4 deterministic tests (2 per provider), 1795 workspace tests, fmt/clippy/governance/smoke all green. Runtime: glm-5.2 external → non-qualifying for REL-002.
+Evidence:
+
+- Provider layer: `test_dispatch_timeout_openai`, `test_normal_request_not_dispatch_timed_out_openai`,
+  `test_dispatch_timeout_anthropic`, and `test_normal_request_not_dispatch_timed_out_anthropic`.
+- Agent/runtime bridge: `run_streaming_emits_error_event_on_provider_dispatch_timeout` proves
+  `Agent::run_streaming` converts provider dispatch failure into `AgentEvent::Error`.
+- Conversation loop: `conversation_loop_clears_processing_on_dispatch_timeout_error` proves the
+  terminal UI status has `is_processing=false` and `phase=TimedOut`.
+- Runtime: glm-5.2 external -> non-qualifying for REL-002.

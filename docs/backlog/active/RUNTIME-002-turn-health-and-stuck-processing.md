@@ -340,9 +340,14 @@ The #18 root cause — `reqwest::Client::new()` had no request-level timeout, so
 - `test_normal_request_not_dispatch_timed_out_openai` — regression guard: normal requests with fast responses are NOT timed out
 - `test_dispatch_timeout_anthropic` — same for Anthropic provider
 - `test_normal_request_not_dispatch_timed_out_anthropic` — same regression guard for Anthropic
+- `run_streaming_emits_error_event_on_provider_dispatch_timeout` — proves provider dispatch timeout
+  is emitted to the streaming event channel as `AgentEvent::Error`.
+- `conversation_loop_clears_processing_on_dispatch_timeout_error` — proves the conversation loop
+  turns the dispatch-timeout error into a terminal status with `is_processing=false` and
+  `phase=TimedOut`.
 
 ### Validation
-- 1795 workspace tests pass (was 1791; +4 new dispatch timeout tests)
+- 1797 workspace tests pass (was 1791; +4 provider dispatch timeout tests, +2 agent/CLI bridge tests)
 - cargo fmt --all -- --check: clean
 - cargo clippy --workspace -- -D warnings: no warnings
 - scripts/validate_project_governance.sh .: 0 warnings

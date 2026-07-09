@@ -55,6 +55,25 @@ impl LanguageModel for MockModel {
     }
 }
 
+struct ErroringModel {
+    message: String,
+}
+
+impl ErroringModel {
+    fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl LanguageModel for ErroringModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        Err(ProviderError::NetworkError(self.message.clone()))
+    }
+}
+
 trait VecDequeExt<T> {
     fn pop_front(&mut self) -> Option<T>;
 }
@@ -66,6 +85,34 @@ impl<T> VecDequeExt<T> for Vec<T> {
         } else {
             Some(self.remove(0))
         }
+    }
+}
+
+#[tokio::test]
+async fn run_streaming_emits_error_event_on_provider_dispatch_timeout() {
+    let provider: Arc<dyn LanguageModel> = Arc::new(ErroringModel::new(
+        "request dispatch timeout: no response headers within 1s",
+    ));
+    let agent = Agent::new(provider, ToolRegistry::new());
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+    let result = agent
+        .run_streaming("hello".to_string(), vec![], event_tx)
+        .await;
+
+    assert!(matches!(result, Err(AgentError::ProviderError(_))));
+    let event = tokio::time::timeout(std::time::Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("error event should be emitted")
+        .expect("error event should be present");
+    match event {
+        AgentEvent::Error { message } => {
+            assert!(
+                message.contains("request dispatch timeout"),
+                "error event should preserve dispatch timeout detail, got: {message}"
+            );
+        }
+        other => panic!("expected AgentEvent::Error, got {other:?}"),
     }
 }
 

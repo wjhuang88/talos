@@ -31,7 +31,7 @@ For each of the 8 REL-002 acceptance criteria:
 
 ### Criterion 3: Talos can implement code changes with permission-gated tools and passing validation
 **Status**: PARTIAL
-**Evidence**: I107 SBT111 delivered a real code change (dispatch_timeout_secs) with 1795 tests passing, fmt/clippy/governance clean. The SB100-SB130 and SSP100-SSP150 pilots also delivered code changes through Talos. However, all I106-I109 code changes were executed by glm-5.2 external, not Talos. The partial sessions had Codex remediation.
+**Evidence**: I107 SBT111 delivered a real code change (`dispatch_timeout_secs`) with provider tests, and the follow-up audit added agent/CLI bridge tests for terminal processing cleanup. The SB100-SB130 and SSP100-SSP150 pilots also delivered code changes through Talos. However, all I106-I109 code changes were executed by glm-5.2 external, not Talos. The partial sessions had Codex remediation.
 
 ### Criterion 4: Talos can perform architecture-risk classification
 **Status**: PARTIAL
@@ -70,7 +70,7 @@ For each of the 8 REL-002 acceptance criteria:
 
 Despite the NO-GO verdict, the four-month plan produced concrete value:
 
-1. **Request-dispatch timeout (#18)**: The #18 issue-audit residual is fixed. `dispatch_timeout_secs` (default 60s) bounds the `send().await` phase independently from stream timeouts. 4 deterministic tests. 1795 workspace tests pass.
+1. **Request-dispatch timeout (#18)**: The #18 issue-audit residual is fixed. `dispatch_timeout_secs` (default 60s) bounds the `send().await` phase independently from stream timeouts. 4 provider tests plus 2 agent/CLI bridge tests cover dispatch timeout propagation and terminal `is_processing=false`.
 2. **Channel topology audit (ARCH-032)**: All 12 src/ directories audited. Zero broadcast channels. All paths ADR-006 compliant. ARCHITECTURE.md updated with factual current-state diagrams.
 3. **Evidence/control plane (I106)**: Repeatable smoke harness (`scripts/talos_smoke.sh`), evidence schema with Qualifying/Partial/Non-qualifying rubric, governance mutation path with rollback.
 4. **Partial self-bootstrap evidence**: SB100-SB130 and SSP100-SSP150 proved Talos (deepseek-v4-pro) CAN act as primary executor for bounded code changes — the gap is consistency and completeness, not capability absence.
