@@ -33,6 +33,7 @@
 mod error;
 mod jsonl;
 mod compact_text;
+mod compaction_engine;
 mod compression;
 mod manager;
 mod segment_chain;
