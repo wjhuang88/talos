@@ -11,6 +11,8 @@ use std::path::Path;
 use talos_core::message::Message;
 use uuid::Uuid;
 
+pub use crate::compact_text::CompactTextSessionStore;
+
 /// Trait abstracting session entry persistence.
 ///
 /// Enables different storage formats (JSONL, compact text, segment chains)

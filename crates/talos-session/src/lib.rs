@@ -30,6 +30,7 @@
 
 mod error;
 mod jsonl;
+mod compact_text;
 mod manager;
 pub mod sqlite;
 mod store;
@@ -42,7 +43,7 @@ pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
-pub use store::{JsonlSessionStore, SessionStore};
+pub use store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
 pub use todo::{
     CreateTodo, TodoAddDependencyTool, TodoCreateBatchInput, TodoCreateBatchTool, TodoCreateInput,
     TodoCreateTool, TodoDeleteInput, TodoDeleteTool, TodoDependency, TodoDependencyInput,
