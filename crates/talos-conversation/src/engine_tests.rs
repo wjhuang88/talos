@@ -630,7 +630,7 @@ async fn slash_hooks_shows_read_only_diagnostics() {
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
     assert!(text.contains("Hooks diagnostics"));
-    assert!(text.contains("config-introduced hooks: not enabled"));
+    assert!(text.contains("config-introduced hooks: none declared"));
     assert!(text.contains("executable hook carriers: disabled"));
     assert!(text.contains("BeforeProviderCall"));
     assert!(text.contains("TurnComplete"));

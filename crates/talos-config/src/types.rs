@@ -369,7 +369,22 @@ impl LogFileConfig {
 /// Hook-system configuration placeholder for I009-S2.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct HookConfig {
-    // TODO: I009-S2 will fill this
+    #[serde(default)]
+    pub declarations: Vec<HookDeclaration>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct HookDeclaration {
+    pub event: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// MCP configuration placeholder for I009-S3.

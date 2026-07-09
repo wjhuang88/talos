@@ -163,6 +163,7 @@ pub struct ConversationEngine {
     pub(crate) provider_name: String,
     pub(crate) branch_id: Option<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
+    pub(crate) hook_declarations: Vec<(String, String, bool)>,
     pub(crate) mcp_servers: Vec<McpServerDiagnostic>,
     pub(crate) skills: Vec<SkillDiagnostic>,
     pub(crate) scrollback: ScrollbackState,
@@ -197,6 +198,7 @@ impl ConversationEngine {
             provider_name,
             branch_id: None,
             plugin_observations: Vec::new(),
+            hook_declarations: Vec::new(),
             mcp_servers: Vec::new(),
             skills: Vec::new(),
             scrollback: ScrollbackState::default(),
@@ -228,6 +230,10 @@ impl ConversationEngine {
     pub fn with_mcp_servers(mut self, servers: Vec<McpServerDiagnostic>) -> Self {
         self.mcp_servers = servers;
         self
+    }
+
+    pub fn set_hook_declarations(&mut self, hooks: Vec<(String, String, bool)>) {
+        self.hook_declarations = hooks;
     }
 
     pub fn status_snapshot(&self) -> StatusSnapshot {
@@ -790,7 +796,21 @@ impl ConversationEngine {
     fn handle_hooks_command(&self) -> Vec<UiOutput> {
         let mut text = String::new();
         text.push_str("[System] Hooks diagnostics:\n");
-        text.push_str("[System]   config-introduced hooks: not enabled\n");
+
+        if self.hook_declarations.is_empty() {
+            text.push_str("[System]   config-introduced hooks: none declared\n");
+        } else {
+            text.push_str(&format!(
+                "[System]   config-introduced hooks: {} declared\n",
+                self.hook_declarations.len()
+            ));
+            for (name, event, enabled) in &self.hook_declarations {
+                let status = if *enabled { "enabled" } else { "disabled" };
+                text.push_str(&format!(
+                    "[System]     {name} ({event}) [{status}]\n"
+                ));
+            }
+        }
         text.push_str("[System]   executable hook carriers: disabled\n");
         text.push_str("[System]   builtin hook event catalog:\n");
         for kind in talos_plugin::ALL_HOOK_EVENT_KINDS {
