@@ -42,6 +42,7 @@ mod store;
 pub mod todo;
 mod topology;
 mod transcript;
+mod tool_compression;
 mod types;
 
 pub use error::SessionError;
