@@ -369,16 +369,16 @@ impl GitBranchListTool {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GitDiffInput {
-    /// When true, show staged changes (HEAD vs index). When false (default), show
-    /// all changes (HEAD vs worktree).
     #[serde(default)]
     pub staged: bool,
-    /// Maximum diff lines to output (default 200).
     #[serde(default)]
     pub max_lines: Option<u32>,
-    /// Optional path prefix filter — only files whose path starts with this value are included.
     #[serde(default)]
     pub path: Option<String>,
+    #[serde(default)]
+    pub base_ref: Option<String>,
+    #[serde(default)]
+    pub head_ref: Option<String>,
 }
 
 pub struct GitDiffTool {
@@ -428,6 +428,41 @@ impl GitDiffTool {
             serde_json::from_value(input).map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
         let max_lines = git_input.max_lines.unwrap_or(200) as usize;
         let path_filter = git_input.path.as_deref();
+
+        if let (Some(base), Some(head)) = (&git_input.base_ref, &git_input.head_ref) {
+            let workdir = {
+                let repo = discover_repo(&self.workspace_root)?;
+                repo.workdir()
+                    .ok_or_else(|| GitToolError::Git("no workdir (bare repo?)".into()))?
+                    .to_path_buf()
+            };
+
+            let mut cmd = tokio::process::Command::new("git");
+            cmd.arg("diff")
+                .arg(format!("{base}..{head}"))
+                .current_dir(&workdir);
+            if let Some(p) = path_filter {
+                cmd.arg("--").arg(p);
+            }
+            let output = cmd
+                .output()
+                .await
+                .map_err(|e| GitToolError::Git(format!("host git not available: {e}")))?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(GitToolError::Git(format!(
+                    "git diff {base}..{head} failed: {stderr}"
+                )));
+            }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let lines: Vec<&str> = stdout.lines().collect();
+            if lines.len() > max_lines {
+                let truncated = lines[..max_lines].join("\n");
+                return Ok(format!("{truncated}\n... (truncated at {max_lines} lines)"));
+            }
+            return Ok(stdout.trim_end().to_string());
+        }
+
         let staged = git_input.staged;
 
         let repo = discover_repo(&self.workspace_root)?;
