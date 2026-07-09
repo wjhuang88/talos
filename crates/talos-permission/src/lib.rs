@@ -55,6 +55,9 @@
 
 mod resource;
 mod rule;
+mod workspace_trust;
+
+pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
 pub use resource::{ResourceExtractor, ResourceKind};
 pub use rule::{PermissionError, PermissionRule};
