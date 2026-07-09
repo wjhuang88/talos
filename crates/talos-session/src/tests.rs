@@ -874,6 +874,7 @@ fn session_metadata_serialization() {
         token_count: Some(1500),
         working_directory: Some("/home/user/project".into()),
         reasoning: None,
+        raw_content: None,
     };
 
     let json = serde_json::to_string(&metadata).unwrap();
@@ -899,6 +900,7 @@ fn session_entry_serialization() {
             token_count: None,
             working_directory: None,
             reasoning: None,
+            raw_content: None,
         },
     };
 

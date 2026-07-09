@@ -37,6 +37,7 @@ pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> Session
             .ok()
             .map(|path| path.to_string_lossy().to_string()),
         reasoning: None,
+        raw_content: None,
     }
 }
 

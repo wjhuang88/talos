@@ -13,25 +13,18 @@ use uuid::Uuid;
 /// at the time the entry was created.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionMetadata {
-    /// Provider used for this entry (e.g., `anthropic`, `openai`, `zhipu-coding-plan`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-
-    /// The model name used to generate this entry (e.g., `claude-sonnet-4-20250514`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-
-    /// Approximate token count for this entry.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_count: Option<u32>,
-
-    /// Working directory at the time of this entry.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<String>,
-
-    /// Provider-native reasoning blocks for request-history replay (ADR-034).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<talos_core::message::AssistantReasoning>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_content: Option<String>,
 }
 
 impl SessionMetadata {
@@ -42,6 +35,7 @@ impl SessionMetadata {
             && self.token_count.is_none()
             && self.working_directory.is_none()
             && self.reasoning.is_none()
+            && self.raw_content.is_none()
     }
 }
 

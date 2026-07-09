@@ -133,6 +133,7 @@ mod tests {
                 token_count: Some(42),
                 working_directory: Some("/tmp/project".into()),
                 reasoning: None,
+                raw_content: None,
             },
         }
     }

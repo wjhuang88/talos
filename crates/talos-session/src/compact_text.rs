@@ -541,6 +541,7 @@ mod tests {
             token_count: Some(42),
             working_directory: None,
             reasoning: None,
+            raw_content: None,
         };
         let entry = make_entry_with_meta("assistant", "Response with metadata", meta);
 
@@ -718,6 +719,7 @@ mod tests {
                     token_count: Some(100 + i as u32),
                     working_directory: None,
                     reasoning: None,
+                    raw_content: None,
                 },
             })
             .collect();
