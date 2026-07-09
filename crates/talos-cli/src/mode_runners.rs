@@ -11,8 +11,8 @@ use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_conversation::{
-    ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, StreamMessage, UiOutput,
-    UserInput,
+    ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, StreamMessage, TipKind,
+    UiOutput, UserInput,
 };
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
@@ -1048,22 +1048,16 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 let url = format!("http://{addr}/");
                 if config.dashboard.loopback_only {
                     eprintln!("Dashboard: {url} (loopback-only, no token)");
-                    send_stream(
-                        &ui_output_tx_for_dashboard,
-                        MessageSource::System,
-                        format!(
-                            "[System] Dashboard available at {url} (loopback-only, no token).\n"
-                        ),
-                    );
+                    let _ = ui_output_tx_for_dashboard.send(UiOutput::Tip {
+                        text: format!("Dashboard: {url} (loopback-only)"),
+                        kind: TipKind::Info,
+                    });
                 } else {
                     eprintln!("Dashboard: {url} (token: {token})");
-                    send_stream(
-                        &ui_output_tx_for_dashboard,
-                        MessageSource::System,
-                        format!(
-                            "[System] Dashboard available at {url} with bearer token {token}.\n"
-                        ),
-                    );
+                    let _ = ui_output_tx_for_dashboard.send(UiOutput::Tip {
+                        text: format!("Dashboard: {url} (token: {token})"),
+                        kind: TipKind::Info,
+                    });
                 }
             }
             Err(e) => {
@@ -2113,11 +2107,11 @@ mod dashboard_tests {
 ";
 
         assert_eq!(
-            parse_dashboard_board_section(board, "Blocked / Paused"),
+            crate::dashboard_helpers::parse_dashboard_board_section(board, "Blocked / Paused"),
             vec![("T58 Dashboard review".to_string(), "Blocked".to_string())]
         );
         assert_eq!(
-            parse_dashboard_board_section(board, "Next"),
+            crate::dashboard_helpers::parse_dashboard_board_section(board, "Next"),
             vec![("T61 Rehearsal".to_string(), "Planned".to_string())]
         );
     }
