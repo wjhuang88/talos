@@ -97,3 +97,18 @@ content is cleared on new submit, cancellation, terminal error, and turn end.
 - #31 requires runtime/visual evidence that model switching does not create visible status-bar
   layout jumps.
 - #26 (thinking content history archive) is not implemented and is now tracked by `TUI-029`.
+
+## Formal Deferral of Residuals (2026-07-09)
+
+The following TUI-028 residuals are formally deferred per AGENTS.md iteration transition rule #4 ("If an iteration exceeds its timebox, cut scope, not quality"):
+
+### Deferred: #25 (Thinking ripple animation)
+**Rationale**: The two-color three-segment center-out ripple block animation requires visual design iteration and runtime PTY testing that exceeds the current session's capacity. The existing single-color animation is functional and does not cause display corruption. Formal deferral recorded; no quality regression.
+
+### Deferred: #24 (Processing animation cadence evidence)
+**Rationale**: Runtime/visual evidence of animation cadence stability requires PTY-based recording under heavy rendering load. The animation uses a deterministic tick path (ADR-034) and does not depend on rendering workload for cadence. Evidence collection is deferred to a dedicated TUI QA session.
+
+### Deferred: #31 (Model-name layout jump evidence)
+**Rationale**: Visual evidence of model-name format consistency requires side-by-side PTY comparison across model switches. The status bar format code uses fixed-width padding. Visual evidence collection is deferred to a dedicated TUI QA session.
+
+These deferrals do NOT compromise existing functionality. They represent polish work that requires interactive visual testing unavailable in non-interactive CI/agent sessions.
