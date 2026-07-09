@@ -32,6 +32,7 @@ mod error;
 mod jsonl;
 mod manager;
 pub mod sqlite;
+mod store;
 pub mod todo;
 mod topology;
 mod types;
@@ -41,6 +42,7 @@ pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
+pub use store::{JsonlSessionStore, SessionStore};
 pub use todo::{
     CreateTodo, TodoAddDependencyTool, TodoCreateBatchInput, TodoCreateBatchTool, TodoCreateInput,
     TodoCreateTool, TodoDeleteInput, TodoDeleteTool, TodoDependency, TodoDependencyInput,

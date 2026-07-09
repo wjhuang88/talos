@@ -372,7 +372,7 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
     let project_path = sessions_dir.join(&project_dir);
     std::fs::create_dir_all(&project_path).context("failed to create project directory")?;
 
-    let new_file_path = project_path.join(format!("{new_id}.jsonl"));
+    let new_file_path = project_path.join(format!("{new_id}.{}", source.file_extension()));
 
     let mut new_session = Session::new(
         new_id,

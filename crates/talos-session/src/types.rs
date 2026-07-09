@@ -1,4 +1,5 @@
 use crate::SessionError;
+use crate::store::{JsonlSessionStore, SessionStore};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -110,7 +111,6 @@ pub struct SessionInfo {
 ///
 /// Sessions maintain a collection of branches, each identified by a unique ID.
 /// The `current_branch` field tracks which branch is active for appending new entries.
-#[derive(Debug, Clone)]
 pub struct Session {
     pub id: Uuid,
     pub project: String,
@@ -122,6 +122,42 @@ pub struct Session {
     pub persisted: bool,
     pub(crate) last_entry_id: Arc<Mutex<Option<String>>>,
     pub(crate) write_lock: Arc<Mutex<()>>,
+    pub(crate) store: Arc<dyn SessionStore>,
+}
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("id", &self.id)
+            .field("project", &self.project)
+            .field("workspace_root", &self.workspace_root)
+            .field("created_at", &self.created_at)
+            .field("file_path", &self.file_path)
+            .field("current_branch", &self.current_branch)
+            .field("branches", &self.branches)
+            .field("persisted", &self.persisted)
+            .field("last_entry_id", &self.last_entry_id)
+            .field("write_lock", &self.write_lock)
+            .finish()
+    }
+}
+
+impl Clone for Session {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            project: self.project.clone(),
+            workspace_root: self.workspace_root.clone(),
+            created_at: self.created_at,
+            file_path: self.file_path.clone(),
+            current_branch: self.current_branch.clone(),
+            branches: self.branches.clone(),
+            persisted: self.persisted,
+            last_entry_id: Arc::clone(&self.last_entry_id),
+            write_lock: Arc::clone(&self.write_lock),
+            store: Arc::clone(&self.store),
+        }
+    }
 }
 
 impl Session {
@@ -149,6 +185,7 @@ impl Session {
             persisted: true,
             last_entry_id: Arc::new(Mutex::new(None)),
             write_lock: Arc::new(Mutex::new(())),
+            store: Arc::new(JsonlSessionStore),
         }
     }
 
@@ -266,7 +303,7 @@ impl Session {
             .write_lock
             .lock()
             .map_err(|_| SessionError::LockPoisoned)?;
-        std::fs::read(&self.file_path).map_err(SessionError::IoError)
+        self.store.read_bytes(&self.file_path)
     }
 
     /// List all branch IDs in this session.
@@ -274,5 +311,10 @@ impl Session {
         let mut ids: Vec<String> = self.branches.keys().cloned().collect();
         ids.sort();
         ids
+    }
+
+    /// Returns the file extension used by this session's store.
+    pub fn file_extension(&self) -> &'static str {
+        self.store.file_extension()
     }
 }

@@ -1,5 +1,5 @@
-use crate::jsonl::scan_file;
 use crate::sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
+use crate::store::{JsonlSessionStore, SessionStore};
 use crate::todo::{TodoError, TodoRepository};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
 use crate::{Session, SessionError, SessionInfo};
@@ -51,10 +51,28 @@ pub struct SessionCleanupReport {
 }
 
 /// Manages sessions on disk.
-#[derive(Debug, Clone)]
 pub struct SessionManager {
     pub(crate) sessions_dir: PathBuf,
     index: Arc<Mutex<Option<SessionIndex>>>,
+    store: Arc<dyn SessionStore>,
+}
+
+impl std::fmt::Debug for SessionManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionManager")
+            .field("sessions_dir", &self.sessions_dir)
+            .finish()
+    }
+}
+
+impl Clone for SessionManager {
+    fn clone(&self) -> Self {
+        Self {
+            sessions_dir: self.sessions_dir.clone(),
+            index: Arc::clone(&self.index),
+            store: Arc::clone(&self.store),
+        }
+    }
 }
 
 impl SessionManager {
@@ -64,10 +82,8 @@ impl SessionManager {
         let manager = Self {
             sessions_dir: dir,
             index: Arc::new(Mutex::new(None)),
+            store: Arc::new(JsonlSessionStore),
         };
-        // Repair any drift between on-disk JSONL and the SQLite index on
-        // startup. Errors are non-fatal: a future operation that needs the
-        // index will surface a precise cause.
         let _ = manager.reconcile_index();
         Ok(manager)
     }
@@ -87,6 +103,7 @@ impl SessionManager {
         Self {
             sessions_dir,
             index: Arc::new(Mutex::new(None)),
+            store: Arc::new(JsonlSessionStore),
         }
     }
 
@@ -123,7 +140,7 @@ impl SessionManager {
         let project_dir = self.sessions_dir.join(workspace_dir_name(workspace_root));
         fs::create_dir_all(&project_dir)?;
 
-        let file_path = project_dir.join(format!("{id}.jsonl"));
+        let file_path = project_dir.join(format!("{id}.{}", self.store.file_extension()));
         fs::File::create(&file_path)?;
 
         Ok(Session::new(
@@ -146,7 +163,7 @@ impl SessionManager {
     ) -> Result<Session, SessionError> {
         let id = Uuid::new_v4();
         let project_dir = self.sessions_dir.join(workspace_dir_name(workspace_root));
-        let file_path = project_dir.join(format!("{id}.jsonl"));
+        let file_path = project_dir.join(format!("{id}.{}", self.store.file_extension()));
 
         Ok(Session::new_deferred(
             id,
@@ -177,7 +194,7 @@ impl SessionManager {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let file_path = project_dir.join(format!("{id}.jsonl"));
+            let file_path = project_dir.join(format!("{id}.{}", self.store.file_extension()));
             if file_path.exists() {
                 let metadata = fs::metadata(&file_path)?;
                 let created_at = metadata
@@ -231,7 +248,7 @@ impl SessionManager {
             for file_entry in fs::read_dir(&project_dir)? {
                 let file_entry = file_entry?;
                 let path = file_entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                if path.extension().and_then(|e| e.to_str()) != Some(self.store.file_extension()) {
                     continue;
                 }
 
@@ -248,15 +265,15 @@ impl SessionManager {
                         .map(DateTime::<Utc>::from)
                         .unwrap_or_else(Utc::now);
 
-                    let (message_count, last_preview) = scan_file(&path)?;
+                    let info = self.store.scan_file(&path)?;
 
                     sessions.push(SessionInfo {
                         id,
                         project: dir_name.clone(),
                         workspace_root: String::new(),
-                        last_message_preview: last_preview,
+                        last_message_preview: info.last_message_preview,
                         timestamp,
-                        message_count,
+                        message_count: info.message_count,
                     });
                 }
             }
@@ -275,7 +292,7 @@ impl SessionManager {
             return Ok(Vec::new());
         }
 
-        Self::scan_workspace_sessions(workspace_root, &workspace_dir)
+        Self::scan_workspace_sessions(workspace_root, &workspace_dir, self.store.as_ref())
     }
 
     /// Return the most recently modified session for one workspace directory.
@@ -290,12 +307,13 @@ impl SessionManager {
     fn scan_workspace_sessions(
         workspace_root: &str,
         workspace_dir: &Path,
+        store: &dyn SessionStore,
     ) -> Result<Vec<SessionInfo>, SessionError> {
         let mut sessions = Vec::new();
         for file_entry in fs::read_dir(workspace_dir)? {
             let file_entry = file_entry?;
             let path = file_entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            if path.extension().and_then(|e| e.to_str()) != Some(store.file_extension()) {
                 continue;
             }
 
@@ -312,15 +330,15 @@ impl SessionManager {
                     .map(DateTime::<Utc>::from)
                     .unwrap_or_else(Utc::now);
 
-                let (message_count, last_preview) = scan_file(&path)?;
+                let info = store.scan_file(&path)?;
 
                 sessions.push(SessionInfo {
                     id,
                     project: String::new(),
                     workspace_root: workspace_root.to_string(),
-                    last_message_preview: last_preview,
+                    last_message_preview: info.last_message_preview,
                     timestamp,
-                    message_count,
+                    message_count: info.message_count,
                 });
             }
         }
@@ -427,7 +445,9 @@ impl SessionManager {
                 for file_entry in fs::read_dir(&ws_dir)? {
                     let file_entry = file_entry?;
                     let path = file_entry.path();
-                    if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                    if path.extension().and_then(|e| e.to_str())
+                        != Some(self.store.file_extension())
+                    {
                         continue;
                     }
                     let stem = match path.file_stem().and_then(|s| s.to_str()) {
@@ -437,7 +457,15 @@ impl SessionManager {
                     on_disk_ids.insert(stem.clone());
 
                     let existing = index.get_session_info(&stem)?;
-                    let (msg_count, _) = scan_file(&path).unwrap_or((0, String::new()));
+                    let info = self.store.scan_file(&path).unwrap_or(SessionInfo {
+                        id: Uuid::nil(),
+                        project: String::new(),
+                        workspace_root: String::new(),
+                        last_message_preview: String::new(),
+                        timestamp: Utc::now(),
+                        message_count: 0,
+                    });
+                    let msg_count = info.message_count;
                     let needs_reindex = match &existing {
                         None => true,
                         Some(info) => info.message_count != msg_count,
@@ -596,7 +624,9 @@ impl SessionManager {
                 if !ws_entry.file_type()?.is_dir() {
                     continue;
                 }
-                let candidate = ws_entry.path().join(format!("{id}.jsonl"));
+                let candidate = ws_entry
+                    .path()
+                    .join(format!("{id}.{}", self.store.file_extension()));
                 if candidate.exists() {
                     return Ok(candidate);
                 }
@@ -619,7 +649,12 @@ impl SessionManager {
         if let Some(target) = &policy.workspace_root {
             let workspace_dir = self.sessions_dir.join(workspace_dir_name(target));
             if workspace_dir.exists() {
-                Self::collect_cleanup_workspace(target, &workspace_dir, &mut by_workspace)?;
+                Self::collect_cleanup_workspace(
+                    target,
+                    &workspace_dir,
+                    &mut by_workspace,
+                    self.store.as_ref(),
+                )?;
             }
             return Ok(by_workspace);
         }
@@ -633,7 +668,12 @@ impl SessionManager {
             let workspace_root = workspace_root_from_dir_name(
                 &ws_dir.file_name().unwrap_or_default().to_string_lossy(),
             );
-            Self::collect_cleanup_workspace(&workspace_root, &ws_dir, &mut by_workspace)?;
+            Self::collect_cleanup_workspace(
+                &workspace_root,
+                &ws_dir,
+                &mut by_workspace,
+                self.store.as_ref(),
+            )?;
         }
 
         Ok(by_workspace)
@@ -643,11 +683,12 @@ impl SessionManager {
         workspace_root: &str,
         workspace_dir: &Path,
         by_workspace: &mut std::collections::HashMap<String, Vec<CleanupSession>>,
+        store: &dyn SessionStore,
     ) -> Result<(), SessionError> {
         for file_entry in fs::read_dir(workspace_dir)? {
             let file_entry = file_entry?;
             let path = file_entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            if path.extension().and_then(|e| e.to_str()) != Some(store.file_extension()) {
                 continue;
             }
             let Some(id) = path
@@ -693,6 +734,7 @@ impl Default for SessionManager {
         Self {
             sessions_dir: PathBuf::from(home).join(".talos").join("sessions"),
             index: Arc::new(Mutex::new(None)),
+            store: Arc::new(JsonlSessionStore),
         }
     }
 }

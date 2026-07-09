@@ -1,9 +1,6 @@
 use crate::{Session, SessionEntry, SessionError, SessionMetadata};
 use chrono::Utc;
 use std::collections::HashSet;
-use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::path::Path;
 use talos_core::message::{AgentEvent, Message};
 use uuid::Uuid;
 
@@ -54,7 +51,7 @@ impl Session {
                 .expect("last_entry_id mutex poisoned");
             if guard.is_none() {
                 drop(guard);
-                let id = read_last_entry_id(&self.file_path);
+                let id = self.store.read_last_entry_id(&self.file_path);
                 *self
                     .last_entry_id
                     .lock()
@@ -77,41 +74,13 @@ impl Session {
 
     fn append_entry_locked(&self, entry: &SessionEntry) -> Result<(), SessionError> {
         let _lock = self.write_lock.lock().expect("write_lock mutex poisoned");
-        let line =
-            serde_json::to_string(entry).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
-
-        if !self.file_path.exists()
-            && let Some(parent) = self.file_path.parent()
-        {
-            fs::create_dir_all(parent)?;
-        }
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.file_path)?;
-        writeln!(file, "{line}")?;
-
-        *self
-            .last_entry_id
-            .lock()
-            .expect("last_entry_id mutex poisoned") = Some(entry.id.clone());
-        Ok(())
+        self.store.append_entry(&self.file_path, entry)
     }
 
-    /// Read all entries from the session's JSONL file.
-    ///
-    /// Entries are reconstructed from the JSONL format. Entries without `id` or
-    /// `parent_id` (backward compatibility) are assigned synthetic IDs and treated
-    /// as a single linear branch.
     pub fn read_entries(&self) -> Result<Vec<SessionEntry>, SessionError> {
-        read_entries_from_path(&self.file_path)
+        self.store.read_entries(&self.file_path)
     }
 
-    /// Read all messages from the session's JSONL file for the current branch.
-    ///
-    /// Only entries with role `"user"`, `"assistant"`, or `"system"` that contain
-    /// valid message data are returned.
     pub fn read_messages(&self) -> Result<Vec<Message>, SessionError> {
         let entries = self.read_entries()?;
         let mut messages = Vec::new();
@@ -172,7 +141,6 @@ impl Session {
         Ok(messages)
     }
 
-    /// Read all events from the session's JSONL file.
     pub fn read_events(&self) -> Result<Vec<AgentEvent>, SessionError> {
         let entries = self.read_entries()?;
         let mut events = Vec::new();
@@ -189,108 +157,7 @@ impl Session {
     }
 }
 
-fn read_last_entry_id(path: &Path) -> Option<String> {
-    let mut file = fs::File::open(path).ok()?;
-    let file_size = file.metadata().ok()?.len();
-    if file_size == 0 {
-        return None;
-    }
-    let read_size = std::cmp::min(file_size, 8192) as usize;
-    let seek_pos = file_size.saturating_sub(read_size as u64);
-    file.seek(SeekFrom::Start(seek_pos)).ok()?;
-    let mut buf = vec![0u8; read_size];
-    file.read_exact(&mut buf).ok()?;
-    let text = String::from_utf8_lossy(&buf);
-    let last_line = text.lines().rev().find(|l| !l.is_empty())?;
-    let entry: SessionEntry = serde_json::from_str(last_line).ok()?;
-    Some(entry.id)
-}
-
-pub(crate) fn scan_file(path: &Path) -> Result<(usize, String), SessionError> {
-    let file = fs::File::open(path)?;
-    let reader = BufReader::new(file);
-    let mut count = 0;
-    let mut last_preview = String::new();
-
-    for line in reader.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-
-        if let Ok(entry) = serde_json::from_str::<SessionEntry>(&line) {
-            count += 1;
-            last_preview = preview_text(&entry.content);
-            continue;
-        }
-
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line)
-            && value.get("type").and_then(|t| t.as_str()) == Some("message")
-        {
-            count += 1;
-            if let Some(data) = value.get("data")
-                && let Ok(msg) = serde_json::from_value::<Message>(data.clone())
-            {
-                let (_, content) = message_parts(&msg);
-                last_preview = preview_text(&content);
-            }
-        }
-    }
-
-    Ok((count, last_preview))
-}
-
-fn read_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, SessionError> {
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let file = fs::File::open(path)?;
-    let reader = BufReader::new(file);
-    let mut entries = Vec::new();
-    let mut synthetic_counter: u64 = 0;
-
-    for line in reader.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-
-        if let Ok(entry) = serde_json::from_str::<SessionEntry>(&line) {
-            entries.push(entry);
-            continue;
-        }
-
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line)
-            && value.get("type").and_then(|t| t.as_str()) == Some("message")
-            && let Some(data) = value.get("data")
-            && let Ok(msg) = serde_json::from_value::<Message>(data.clone())
-        {
-            let (role, content) = message_parts(&msg);
-            let id = format!("synthetic-{synthetic_counter}");
-            let parent_id = if synthetic_counter > 0 {
-                Some(format!("synthetic-{}", synthetic_counter - 1))
-            } else {
-                None
-            };
-
-            entries.push(SessionEntry {
-                id,
-                parent_id,
-                timestamp: Utc::now(),
-                role,
-                content,
-                metadata: SessionMetadata::default(),
-            });
-            synthetic_counter += 1;
-        }
-        // Invalid lines are silently skipped (crash-safety guarantee)
-    }
-
-    Ok(entries)
-}
-
-fn parse_tool_result(content: &str) -> (bool, String, String) {
+pub(crate) fn parse_tool_result(content: &str) -> (bool, String, String) {
     if let Some(rest) = content.strip_prefix("__ERROR__:")
         && let Some((id, body)) = rest.split_once("__\n")
     {
@@ -304,7 +171,7 @@ fn parse_tool_result(content: &str) -> (bool, String, String) {
     (false, "unknown".to_string(), content.to_string())
 }
 
-fn message_parts(message: &Message) -> (String, String) {
+pub(crate) fn message_parts(message: &Message) -> (String, String) {
     match message {
         Message::User { content } => ("user".to_string(), content.clone()),
         Message::Assistant {
@@ -315,7 +182,6 @@ fn message_parts(message: &Message) -> (String, String) {
             if tool_calls.is_empty() {
                 return ("assistant".to_string(), content.clone());
             }
-            // Embed tool calls as json-tool blocks so they survive JSONL round-trip.
             let mut full = content.clone();
             for tc in tool_calls {
                 let block = serde_json::json!({
@@ -340,7 +206,7 @@ fn message_parts(message: &Message) -> (String, String) {
     }
 }
 
-fn preview_text(content: &str) -> String {
+pub(crate) fn preview_text(content: &str) -> String {
     const MAX_PREVIEW_CHARS: usize = 100;
     let mut chars = content.chars();
     let preview: String = chars.by_ref().take(MAX_PREVIEW_CHARS).collect();
