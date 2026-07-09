@@ -476,3 +476,81 @@ Extensions in Talos follow a layered approach, starting simple and adding sandbo
 3. **WASM sandboxing** (future, optional): For untrusted third-party plugins. Adds sandboxing at the cost of complexity and API restrictions.
 
 The hook system is the foundation — WASM and native plugins are alternative hosting mechanisms for the same hook interface. This matches Pi's ExtensionAPI pattern: `registerTool`, `registerCommand`, `on(event)`.
+
+## Channel Topology Audit (ARCH-032, 2026-07-09)
+
+An audit of all producer/consumer channels across the workspace verified continued compliance
+with ADR-006 (no global event bus, no uncontrolled broadcast, no multi-consumer side channel).
+The audit covered all src/ files in `talos-agent`, `talos-cli`, `talos-conversation`,
+`talos-core`, `talos-evolution`, `talos-mcp`, `talos-memory`, `talos-permission`, `talos-plugin`,
+`talos-runtime`, `talos-session`, and `talos-tui`.
+
+### Channel Classification
+
+Every channel in the workspace falls into one of these categories:
+
+| Category | Pattern | ADR-006 Status | Count |
+|---|---|---|---|
+| SQ/EQ session seam | `mpsc::channel<SessionOp>` (bounded 512) + `mpsc::unbounded_channel<SessionEvent>` | Adopted (A+B) | 2 |
+| Per-turn agent event channel | `mpsc::unbounded_channel<AgentEvent>` scoped to one turn | Compliant (A) | 1 |
+| Per-turn result oneshot | `oneshot::channel<TurnRecord>` scoped to one turn | Compliant | 1 |
+| L1 UI event loop | `mpsc::unbounded_channel<AppEvent>` single consumer | Adopted (A) | 1 |
+| Conversation bridge | `mpsc::unbounded_channel<UiOutput/UserInput/AgentEvent>` | Compliant (A) | 5 |
+| Session lifecycle | `mpsc::unbounded_channel<SessionLifecycleRequest>` | Compliant (A) | 1 |
+| Watch state distribution | `watch::channel<Session/Sender<SessionOp>/ModelInfo>` | Compliant — state cache, not event broadcast | 3 |
+| MCP request/response | `oneshot::channel` for JSON-RPC correlation | Compliant — bounded request/response | 5 |
+| WASM watchdog | `std::sync::mpsc::channel<()>` scoped to one `execute_inner` call | Compliant — single-consumer, function-local | 1 |
+| Per-turn stream | `mpsc::unbounded_channel<String>` for text stream to TUI | Compliant (A) | 1 |
+| Sync crates (no channels) | `talos-session`, `talos-permission`, `talos-memory` | N/A — pure sync | 0 |
+| Dashboard (no channels) | Pre-computed `DashboardSnapshot` served via HTTP | N/A — no channels | 0 |
+
+**Zero `broadcast::channel` usages across the entire workspace.**
+
+### Watch Channel Analysis
+
+Three `watch::channel` instances exist in `run_tui_mode` (`talos-cli/src/mode_runners.rs:702-704`).
+They distribute **state snapshots** (current `Session`, current `mpsc::Sender<SessionOp>`, current
+`ModelInfo`) across session switches — not event streams. Each has exactly one sender (the session
+handler task) and typed, named receivers. This is the "deterministic fan-out from a single consumer"
+pattern that ADR-006 §73-75 explicitly endorses as the correct alternative to pub/sub.
+
+### Hook Dispatch (Not a Channel)
+
+The hook system (`HookRegistry` in `talos-plugin/src/registry.rs`) uses **sequential trait-method
+dispatch**, not channels. `HookRegistry::dispatch()` iterates `HashMap<HookEventKind,
+Vec<Arc<dyn HookHandler>>>` and calls `handler.on_event()` synchronously. `EvolutionHookHandler`
+and `LoggingHandler` are registered per-Agent — there is no global event bus and no per-path
+evolution observer channel (ADR-006 §117-129).
+
+### Channel Topology Diagram
+
+```text
+┌─────────────┐     SessionOp (SQ)     ┌──────────────────┐
+│  CLI / TUI  │ ──────────────────────► │ AppServerSession │
+│  (producer) │                         │     (actor)      │
+└─────────────┘                         └────────┬─────────┘
+       ▲                                         │
+       │                                         │ SessionEvent (EQ)
+       │                                         ▼
+       │                                  ┌──────────────┐
+       │         UiOutput                 │   Bridge     │
+       │ ◄─────────────────────────────── │ (conversation│
+       │                                  │    loop)     │
+       │         UserInput                └──────┬───────┘
+       └──────────────────────────────►          │
+                                                 │ SessionLifecycleRequest
+                                                 ▼
+                                          ┌──────────────┐
+                                          │ Mode Runner  │
+                                          │ (session mgmt)│
+                                          └──────────────┘
+```
+
+All arrows are single-consumer mpsc. Watch channels (state distribution) are not shown — they
+carry last-value state snapshots, not events.
+
+### Compliance Verdict
+
+**Fully compliant with ADR-006.** No deviations found. No remediation required. All channels
+trace to concrete single-producer/single-consumer pairs or bounded request/response patterns. The
+hook system uses trait-method dispatch (not channels), with per-Agent `HookRegistry` instances.
