@@ -144,7 +144,7 @@ docs/iterations/
 | I105 | Trial Readiness Closeout | **Complete (2026-07-08)** | Month 4 of the 2026-07-07 developer operating plan. D130-D133 closed: trial docs (README troubleshooting section), smoke checklist (6 direct binary commands plus integration coverage for interactive/failure paths), REL-002 non-qualifying classification, final go/no-go report (GO for controlled local trial, NO-GO for v1.0). 1791 workspace tests pass. See `I105-trial-readiness-closeout.md`. |
 | I106 | Self-Bootstrap Control Plane | Review | Month 1 of the 2026-07-08 Talos-primary self-bootstrap plan. SBT100-SBT104 complete: execution contract, evidence schema, smoke harness (`scripts/talos_smoke.sh`), governance rehearsal with rollback. REL-002 classification: non-qualifying (runtime was external glm-5.2). See `I106-self-bootstrap-control-plane.md`. |
 | I107 | Talos-Primary Feature Polish | Review | Month 2 of the 2026-07-08 Talos-primary self-bootstrap plan. #18 request-dispatch timeout fixed (SBT111), docs synced, classified non-qualifying. See `I107-talos-primary-feature-polish.md`. |
-| I108 | Architecture-Sensitive Self-Bootstrap | Planned | Month 3 of the 2026-07-08 Talos-primary self-bootstrap plan. Talos must route and complete one bounded architecture-sensitive session with review gates preserved. See `I108-architecture-sensitive-self-bootstrap.md`. |
+| I108 | Architecture-Sensitive Self-Bootstrap | Review | Month 3 of the 2026-07-08 Talos-primary self-bootstrap plan. ARCH-032 Single Data Flow Audit completed (SBT121): zero broadcast channels, all paths ADR-006 compliant. Non-qualifying REL-002 evidence. See `I108-architecture-sensitive-self-bootstrap.md`. |
 | I109 | REL-002 Self-Bootstrap Closeout | Planned | Month 4 of the 2026-07-08 Talos-primary self-bootstrap plan. Final session, evidence audit, and v1.0 go/no-go report without release overclaim. See `I109-rel002-self-bootstrap-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
@@ -192,7 +192,7 @@ rewrite published iteration baselines.
 | I105 | Complete | Month-4 developer operating plan closed 2026-07-08. D130-D133 closed. GO for controlled local trial, NO-GO for v1.0 (REL-002 not met). Four-month plan complete. |
 | I106 | Review | Month-1 Talos-primary self-bootstrap control plane. SBT100-SBT104 complete; REL-002 non-qualifying (external runtime). Smoke harness and evidence schema ready for Talos-primary use. |
 | I107 | Review | Month-2 Talos-primary corrective feature/polish session. #18 request-dispatch timeout fixed (SBT111); docs synced. REL-002 non-qualifying (external runtime). |
-| I108 | Planned | Month-3 architecture-sensitive self-bootstrap session. Activate after I107 closeout; prefer ARCH-032 unless maintainer selects a different bounded owner. |
+| I108 | Review | Month-3 architecture-sensitive self-bootstrap session. ARCH-032 Single Data Flow Audit complete (SBT121): zero broadcast channels, all paths ADR-006 compliant. Non-qualifying REL-002 evidence. |
 | I109 | Planned | Month-4 REL-002 closeout. Activate after I108 closeout; no v1.0 claim unless every REL-002 criterion is met. |
 | I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
 | I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
