@@ -160,6 +160,9 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-08 | I102-I105 | `docs/iterations/I105-trial-readiness-closeout.md` | Does not qualify. The four-month developer operating plan produced controlled-local-trial evidence and a NO-GO v1.0 classification, but execution was external-runtime primary rather than Talos-primary. |
 | 2026-07-08 | I106-I109 planned | `docs/tasks/2026-07-08-four-month-talos-self-bootstrap-plan.md` | Planned Talos-primary attempt. No qualification claim yet; future evidence must be recorded by I106-I109 execution. |
 | 2026-07-09 | I106 SBT100-SBT104 | `docs/iterations/I106-self-bootstrap-control-plane.md` | Does not qualify. The primary executor was glm-5.2 via zai-coding-plan (external runtime), not the `talos` binary. The session produced useful artifacts: execution contract, evidence schema with disqualification rules, repeatable smoke harness (`scripts/talos_smoke.sh`), and governance mutation rehearsal with rollback evidence. All validation gates passed (1791 tests, clippy clean, governance 0 warnings). However, Talos was used as a validation subject, not the autonomous primary executor. |
+| 2026-07-09 | I107 SBT110-SBT113 | `docs/iterations/I107-talos-primary-feature-polish.md` | Does not qualify. #18 request-dispatch timeout fix delivered (dispatch_timeout_secs, 4 tests, 1795 workspace tests). However, executor was glm-5.2 external, not Talos. |
+| 2026-07-09 | I108 SBT120-SBT123 | `docs/iterations/I108-architecture-sensitive-self-bootstrap.md` | Does not qualify. ARCH-032 Single Data Flow Audit completed (zero broadcast channels, ADR-006 compliant). However, executor was glm-5.2 external, not Talos. |
+| 2026-07-09 | I109 SBT130-SBT133 | `docs/iterations/I109-rel002-self-bootstrap-closeout.md` | Does not qualify. Final closeout report produced (NO-GO for v1.0.0). Executor was glm-5.2 external, not Talos. |
 
 ## Readiness Reports
 
@@ -169,6 +172,7 @@ Each qualifying self-bootstrap session must record:
 | 2026-07-04 | `docs/reference/REL-002-READINESS-REPORT-2026-07-04.md` | Not ready for `v1.0.0`; runtime/governance/architecture prerequisites improved, but no qualifying Talos-primary sessions exist. |
 | 2026-07-06 | `docs/reference/I098-I101-AUTONOMY-PERMISSION-RUNTIME-CLOSEOUT-2026-07-06.md` | Not ready for `v1.0.0`; autonomy/runtime prerequisites improved, but no qualifying Talos-primary development session exists. |
 | 2026-07-08 | `docs/iterations/I105-trial-readiness-closeout.md` | Not ready for `v1.0.0`; controlled local trial can proceed, but REL-002 remains unmet because I102-I105 were external-runtime primary. |
+| 2026-07-09 | `docs/reference/REL-002-READINESS-REPORT-2026-07-09.md` | Not ready for `v1.0.0`; four-month self-bootstrap plan complete but all sessions were external-runtime primary. Zero fully qualifying sessions. NO-GO. |
 
 ## Relationship To Other Work
 
