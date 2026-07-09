@@ -46,7 +46,7 @@ pub(crate) fn build_dashboard_snapshot(
     }
 }
 
-fn build_dashboard_governance_summary(workspace_root: &Path) -> String {
+pub(crate) fn build_dashboard_governance_summary(workspace_root: &Path) -> String {
     let mut lines = vec!["Talos Governance".to_string()];
 
     let manifest_path = workspace_root
@@ -126,7 +126,7 @@ fn clean_dashboard_cell(cell: &str) -> String {
         .to_string()
 }
 
-fn parse_dashboard_open_iterations(content: &str) -> Vec<(String, String, String)> {
+pub(crate) fn parse_dashboard_open_iterations(content: &str) -> Vec<(String, String, String)> {
     let mut in_current = false;
     let mut items = Vec::new();
 
@@ -168,4 +168,42 @@ fn parse_dashboard_open_iterations(content: &str) -> Vec<(String, String, String
     }
 
     items
+}
+
+#[cfg(test)]
+mod dashboard_tests {
+    use super::*;
+
+    #[test]
+    fn parse_dashboard_board_section_extracts_items() {
+        let board = "# Board
+
+## Now
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| T57 Tool sweep | Active | [x](x.md) | Tests |
+
+## Blocked / Paused
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| T58 Dashboard review | Blocked | [x](x.md) | Security |
+
+## Next
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| T61 Rehearsal | Planned | [x](x.md) | Evidence |
+";
+
+        assert_eq!(
+            crate::dashboard_helpers::parse_dashboard_board_section(board, "Blocked / Paused"),
+            vec![("T58 Dashboard review".to_string(), "Blocked".to_string())]
+        );
+        assert_eq!(
+            crate::dashboard_helpers::parse_dashboard_board_section(board, "Next"),
+            vec![("T61 Rehearsal".to_string(), "Planned".to_string())]
+        );
+    }
 }

@@ -7,6 +7,7 @@ mod export;
 pub mod formatting;
 mod highlight;
 mod inline_terminal;
+mod panel_state;
 mod scrollback;
 mod scrollback_input;
 mod scrollback_markdown;
