@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-029 |
 | Priority | P2 |
-| Status | Planned — decision required |
+| Status | Rejected — ADR-034 transient boundary preserved |
 | Source | [GitHub Issue #26](https://github.com/wjhuang88/talos/issues/26) |
 | Depends On | `MODEL-003`, `TUI-020`, ADR-034 |
 
@@ -65,3 +65,34 @@ history. That claim is false for the current codebase.
 - `crates/talos-conversation/src/engine.rs`
 - `crates/talos-tui/src/app.rs`
 - `crates/talos-session/src/jsonl.rs`
+
+## Decision: Rejected (2026-07-09)
+
+**ADR-034 v3 transient boundary is preserved.** Thinking/reasoning content will NOT be archived
+into visible history for the current direction. The request in GitHub Issue #26 is formally
+rejected with the following rationale:
+
+1. **Context window pressure**: Adding reasoning text to visible history increases token usage
+   on resume without clear user benefit. The current transient preview shows thinking during the
+   turn; archiving it would bloat session files and context.
+
+2. **Provider reasoning complexity**: ADR-034 persists structured `ReasoningBlock` data for
+   provider replay correctness. Some blocks contain signed/redacted content that must not be
+   displayed. Exposing any reasoning text risks leaking provider-internal data.
+
+3. **Design consistency**: ADR-035 (TUI history scrollback boundary) establishes that terminal
+   scrollback is the canonical renderer for finalized history. Adding thinking content to this
+   scrollback would create visual noise and complicate the clean user/assistant/tool message
+   structure.
+
+4. **No new evidence**: ADR-034 was accepted 2026-07-03 after architecture review. No new
+   technical evidence, user feedback data, or provider behavior changes have emerged that would
+   justify revising the decision.
+
+## Reversal Trigger
+
+This decision can be revisited if:
+1. A provider releases a model where reasoning text is explicitly user-facing (not chain-of-thought)
+2. Users provide clear feedback that archived reasoning improves their workflow
+3. Context window limits increase enough that reasoning archival is not a cost concern
+4. A new ADR specifically addresses displayable vs. hidden reasoning with a clear boundary
