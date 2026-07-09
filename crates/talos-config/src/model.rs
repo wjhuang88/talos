@@ -29,18 +29,10 @@ pub enum ModelError {
 }
 
 /// Load the built-in model dataset embedded at compile time.
+include!(concat!(env!("OUT_DIR"), "/models_data.rs"));
+
 pub fn builtin_models() -> Vec<ModelMetadata> {
-    let toml_str = include_str!("models.toml");
-    let dataset: TomlDataset = toml::from_str(toml_str)
-        .unwrap_or_else(|e| panic!("built-in models.toml failed to parse: {e}"));
-    dataset
-        .models
-        .into_iter()
-        .map(|mut m| {
-            m.source = ModelSource::Builtin;
-            m
-        })
-        .collect()
+    generated_models()
 }
 
 /// Provider metadata from the built-in `models.toml` `[[providers]]` section.
@@ -62,11 +54,7 @@ pub struct BuiltinProvider {
 
 /// Load the built-in provider metadata embedded at compile time.
 pub fn builtin_providers() -> Vec<BuiltinProvider> {
-    let toml_str = include_str!("models.toml");
-    let dataset: TomlDataset = toml::from_str(toml_str)
-        .unwrap_or_else(|e| panic!("built-in models.toml failed to parse: {e}"));
-    dataset
-        .providers
+    generated_providers()
         .into_iter()
         .map(|p| BuiltinProvider {
             id: p.id,
