@@ -194,9 +194,10 @@ fn test_permission_profile_denies_save_url_when_write_facet_is_denied() {
     }));
 
     let mut engine = PermissionEngine {
-        rules: Vec::new(),
-        workspace_root: None,
-    };
+                rules: Vec::new(),
+                workspace_root: None,
+                trusted_workspace: false,
+            };
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Network,
         None,

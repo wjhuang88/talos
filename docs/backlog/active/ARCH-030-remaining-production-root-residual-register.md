@@ -25,11 +25,11 @@ speculative rewrites without concrete acceptance criteria.
 
 ## Residual Roots
 
-Updated 2026-07-09 after four-month architecture cleanup plan execution.
+Updated 2026-07-10 after four-month architecture cleanup plan completion.
 
 | Root | Current Lines | Previous | Status | Notes |
 |---|---|---|---|---|
-| `crates/talos-cli/src/mode_runners.rs` | **2118** (1797 prod + 321 test) | 2290 | Partially decomposed | Dashboard helpers extracted; session/provider handlers remain |
+| `crates/talos-cli/src/mode_runners.rs` | **672** ✅ | 2290 | Decomposed | Session handlers → session_handlers.rs (958), interactive mode → mode_interactive.rs (184), tests → mode_runners_tests.rs (315) |
 | `crates/talos-tui/src/app.rs` | 1005 | 1005 | Unchanged | Frame/input/cursor flows are visual-risk sensitive |
 | `crates/talos-session/src/sqlite.rs` | 986 | 983 | Unchanged | SQLite schema + FTS search + fork metadata |
 | `crates/talos-exploration/src/lib.rs` | 958 | 958 | Unchanged | Store SQL and citation validation |
@@ -49,12 +49,12 @@ Updated 2026-07-09 after four-month architecture cleanup plan execution.
 | `state.rs` (tui) | 450 | panel_state.rs (537), state_tests.rs (500) |
 | `lib.rs` (permission) | 451 | rule.rs (162), resource.rs (76), workspace_trust.rs (206), permission_tests.rs (970) |
 | `git.rs` (tools) | 660 | git_write.rs (454), git_tests.rs (227) |
+| `mode_runners.rs` (cli) | 672 | session_handlers.rs (958), mode_interactive.rs (184), mode_runners_tests.rs (315) |
 
 ### Remaining Over-Threshold Roots
 
 | Root | Lines | Gap | Recommended Next Slice |
 |---|---|---|---|
-| `mode_runners.rs` | 1797 prod | 997 over | Extract session handlers (handle_session_new/resume/fork/model) + provider setup functions |
 | `app.rs` (tui) | 1005 | 205 over | Extract frame/cursor/output queue helpers with visual-risk tests |
 | `sqlite.rs` | 986 | 186 over | Split schema/migration SQL from fork/query helpers |
 | `lib.rs` (exploration) | 958 | 158 over | Split schema/migration SQL from citation validation |

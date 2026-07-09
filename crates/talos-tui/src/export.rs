@@ -70,9 +70,10 @@ mod tests {
 
     fn engine_allowing_write() -> PermissionEngine {
         let mut engine = PermissionEngine {
-            rules: Vec::new(),
-            workspace_root: None,
-        };
+                    rules: Vec::new(),
+                    workspace_root: None,
+                    trusted_workspace: false,
+                };
         engine.add_rule(PermissionRule::new(
             "write",
             None,
@@ -83,9 +84,10 @@ mod tests {
 
     fn engine_with_rule(rule: PermissionRule) -> PermissionEngine {
         let mut engine = PermissionEngine {
-            rules: Vec::new(),
-            workspace_root: None,
-        };
+                    rules: Vec::new(),
+                    workspace_root: None,
+                    trusted_workspace: false,
+                };
         engine.add_rule(rule);
         engine
     }
@@ -123,9 +125,10 @@ mod tests {
     fn export_refuses_ask_decision_without_creating_file() {
         // Empty engine has no write rule, so the default decision is Ask.
         let engine = PermissionEngine {
-            rules: Vec::new(),
-            workspace_root: None,
-        };
+                    rules: Vec::new(),
+                    workspace_root: None,
+                    trusted_workspace: false,
+                };
         let (_dir, path) = temp_path("transcript.md");
 
         let result = export_transcript(&engine, &path, "content");
