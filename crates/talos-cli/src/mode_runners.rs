@@ -15,7 +15,6 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
-use talos_plugin::HookRegistry;
 use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
@@ -25,7 +24,7 @@ use talos_tools::{
     TreeTool, WriteTool,
 };
 use talos_tui::Tui;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::mpsc;
 
 use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
@@ -35,16 +34,17 @@ use crate::mode_runtime::{
     session_metadata_for_model, set_todo_prompt_provider,
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
-use crate::model_lifecycle::{
-    RebuildSessionParams, build_model_picker_data, provider_setup_target_model,
-    rebuild_session_for_model,
-};
+use crate::provider_handlers::{handle_connect, handle_connect_with_credential, handle_provider_setup};
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
     build_tui_tool_registry, register_permission_aware_tools, register_tui_permission_aware_tools,
 };
 use crate::runtime_adapter;
+use crate::session_handlers::{
+    handle_session_delete, handle_session_fork, handle_session_model,
+    handle_session_model_with_credential, handle_session_new, handle_session_resume, send_stream,
+};
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name, workspace_path_display,
