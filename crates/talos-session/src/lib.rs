@@ -1,8 +1,10 @@
-//! Talos session management — JSONL-based session logging with tree-branching support.
+//! Talos session management — append-only session logging with tree-branching support.
 //!
-//! Sessions are stored as append-only JSONL files, organized by working directory.
-//! Each line in a JSONL file is a JSON object representing a [`SessionEntry`] with
-//! fields for `id`, `parent_id`, `timestamp`, `role`, `content`, and optional `metadata`.
+//! Sessions are stored as append-only files, organized by working directory.
+//! New sessions use the compact text `.tlog` format by default; existing `.jsonl`
+//! files are read transparently for backward compatibility. Each line in a session
+//! file represents a [`SessionEntry`] with fields for `id`, `parent_id`,
+//! `timestamp`, `role`, `content`, and optional `metadata`.
 //!
 //! # Directory Layout
 //!
@@ -32,6 +34,7 @@ mod error;
 mod jsonl;
 mod compact_text;
 mod manager;
+mod segment_chain;
 pub mod sqlite;
 mod store;
 pub mod todo;

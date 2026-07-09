@@ -200,7 +200,24 @@ fn parse_tlog_bytes(data: &[u8]) -> Result<Vec<SessionEntry>, SessionError> {
                 pos += consumed;
             }
             Err(DecodeError::Skip) => {
-                pos += newline_pos + 1;
+                let mut search_pos = pos + newline_pos + 1;
+                while search_pos < text.len() {
+                    let search_remaining = &text[search_pos..];
+                    if let Some(nl) = search_remaining.find('\n') {
+                        let candidate = &search_remaining[..nl];
+                        if candidate.starts_with("E\t") || candidate.is_empty() || candidate.starts_with(TLOG_MAGIC) {
+                            pos = search_pos;
+                            break;
+                        }
+                        search_pos += nl + 1;
+                    } else {
+                        pos = text.len();
+                        break;
+                    }
+                }
+                if search_pos >= text.len() {
+                    pos = text.len();
+                }
             }
             Err(DecodeError::Fatal(e)) => return Err(e),
         }

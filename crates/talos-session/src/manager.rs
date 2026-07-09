@@ -148,7 +148,7 @@ impl SessionManager {
 
     /// Create a new session for the given project and workspace.
     ///
-    /// The session file is created at `~/.talos/sessions/<workspace_dir>/<uuid>.jsonl`,
+    /// The session file is created at `~/.talos/sessions/<workspace_dir>/<uuid>.tlog`,
     /// where `workspace_dir` is a hash of the workspace root path.
     pub fn create_session(
         &self,

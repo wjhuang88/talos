@@ -433,7 +433,8 @@ impl EventLoop {
                 std::fs::create_dir_all(&project_dir)?;
 
                 let new_id = uuid::Uuid::new_v4();
-                let new_file_path = project_dir.join(format!("{new_id}.jsonl"));
+                let ext = session.file_extension();
+                let new_file_path = project_dir.join(format!("{new_id}.{ext}"));
 
                 let entries_to_copy = if let Some(branch) = forked.get_branch(&branch_id) {
                     branch.entries.clone()
@@ -441,16 +442,23 @@ impl EventLoop {
                     entries
                 };
 
-                let mut file = std::fs::OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(&new_file_path)?;
-
-                for entry in &entries_to_copy {
-                    let line = serde_json::to_string(entry)?;
-                    std::io::Write::write_all(&mut file, line.as_bytes())?;
-                    std::io::Write::write_all(&mut file, b"\n")?;
+                if ext == "tlog" {
+                    let store = talos_session::CompactTextSessionStore;
+                    use talos_session::SessionStore;
+                    for entry in &entries_to_copy {
+                        store.append_entry(&new_file_path, entry)?;
+                    }
+                } else {
+                    let mut file = std::fs::OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .truncate(true)
+                        .open(&new_file_path)?;
+                    for entry in &entries_to_copy {
+                        let line = serde_json::to_string(entry)?;
+                        std::io::Write::write_all(&mut file, line.as_bytes())?;
+                        std::io::Write::write_all(&mut file, b"\n")?;
+                    }
                 }
 
                 if let Ok(mut index) = SessionIndex::new(&sessions_dir.join("index.db")) {
