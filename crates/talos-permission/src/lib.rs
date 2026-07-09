@@ -118,40 +118,34 @@ impl<'de> Deserialize<'de> for PermissionDecision {
 /// match wins. If no rule matches, a default decision is applied based on
 /// the tool name.
 pub struct PermissionEngine {
-    /// Ordered list of permission rules.
     pub rules: Vec<PermissionRule>,
-    /// Optional workspace root. When set, file operations (read/write/edit)
-    /// targeting paths within this directory are auto-allowed.
     pub workspace_root: Option<PathBuf>,
+    pub trusted_workspace: bool,
 }
 
 impl PermissionEngine {
-    /// Creates a new permission engine with the default ruleset.
-    ///
-    /// Default rules:
-    /// - Read tools (name contains "read" or "list") → [`PermissionDecision::Allow`]
-    /// - Write tools (name contains "write" or "edit") → [`PermissionDecision::Ask`]
-    /// - Bash tool → [`PermissionDecision::Ask`]
     pub fn new() -> Self {
         let mut engine = Self {
             rules: Vec::new(),
             workspace_root: None,
+            trusted_workspace: false,
         };
         engine.add_default_rules();
         engine
     }
 
-    /// Creates a new permission engine that auto-allows file operations
-    /// within the given workspace root directory.
     pub fn with_workspace_root(root: PathBuf) -> Self {
         let mut engine = Self::new();
         engine.workspace_root = Some(root);
         engine
     }
 
-    /// Sets the workspace root for auto-approval of workspace-relative paths.
     pub fn set_workspace_root(&mut self, root: PathBuf) {
         self.workspace_root = Some(root);
+    }
+
+    pub fn set_trusted_workspace(&mut self, trusted: bool) {
+        self.trusted_workspace = trusted;
     }
 
     /// Adds the default ruleset to the engine.
@@ -296,6 +290,14 @@ impl PermissionEngine {
         let nature = facet.nature;
         if let Some(ref root) = self.workspace_root
             && nature == talos_core::tool::ToolNature::Read
+            && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
+        {
+            return PermissionDecision::Allow;
+        }
+
+        if self.trusted_workspace
+            && let Some(ref root) = self.workspace_root
+            && nature == talos_core::tool::ToolNature::Write
             && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
         {
             return PermissionDecision::Allow;

@@ -308,6 +308,7 @@ fn build_permission_engine(root: PathBuf, rules: &[PermissionRule]) -> Permissio
     PermissionEngine {
         rules: rules.to_vec(),
         workspace_root: Some(root),
+        trusted_workspace: false,
     }
 }
 

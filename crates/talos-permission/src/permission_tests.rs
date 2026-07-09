@@ -142,7 +142,7 @@
         // We need to test with a new engine where we control rule order
         let mut engine2 = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine2.add_rule(PermissionRule {
             tool_name: "bash".to_owned(),
@@ -161,7 +161,7 @@
     fn test_custom_rule_deny_write_to_sensitive_path() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
@@ -185,7 +185,7 @@
     fn test_path_pattern_src_glob_matches() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
@@ -204,7 +204,7 @@
     fn test_path_pattern_src_glob_nested() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
@@ -224,7 +224,7 @@
     fn test_path_pattern_src_glob_no_match() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
@@ -244,7 +244,7 @@
     fn test_path_pattern_deny_outside_src() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
@@ -279,7 +279,7 @@
     fn test_first_match_wins() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "bash".to_owned(),
@@ -306,7 +306,7 @@
     fn test_specific_rule_before_general() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "write".to_owned(),
@@ -396,7 +396,7 @@
     fn test_nature_match_without_resource_matches_all() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Write,
@@ -419,7 +419,7 @@
     fn test_nature_path_resource_match() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Write,
@@ -451,7 +451,7 @@
     fn test_nature_domain_resource_match() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Network,
@@ -483,7 +483,7 @@
     fn test_profile_denies_when_any_facet_is_denied() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Network,
@@ -522,7 +522,7 @@
     fn test_profile_asks_when_any_facet_requires_approval() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Network,
@@ -565,7 +565,7 @@
     fn test_legacy_tool_name_rule_still_works() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new(
             "write",
@@ -592,7 +592,7 @@
     fn test_first_match_wins_nature_rules() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule::new_nature(
             ToolNature::Write,
@@ -756,7 +756,7 @@
     fn test_load_old_config_format_tool_name_only() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         let config = serde_json::json!({
             "rules": [
@@ -788,7 +788,7 @@
     fn test_load_new_config_format_nature_form() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         let config = serde_json::json!({
             "rules": [
@@ -848,7 +848,7 @@
     fn test_config_with_both_tool_name_and_nature_prefers_nature() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         // Rule has both tool_name AND nature set — nature should take precedence
         let config = serde_json::json!({
@@ -893,7 +893,7 @@
     fn test_tool_name_exact_match_in_rules() {
         let mut engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         engine.add_rule(PermissionRule {
             tool_name: "read".to_owned(),
@@ -914,7 +914,7 @@
     fn test_empty_rules_falls_to_default() {
         let engine = PermissionEngine {
             rules: Vec::new(),
-            workspace_root: None,
+            workspace_root: None, trusted_workspace: false,
         };
         let decision = engine.evaluate("read", &serde_json::json!({}));
         assert_eq!(decision, PermissionDecision::Allow);
