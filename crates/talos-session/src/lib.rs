@@ -33,6 +33,7 @@
 mod error;
 mod jsonl;
 mod compact_text;
+mod compression;
 mod manager;
 mod segment_chain;
 pub mod sqlite;
