@@ -1,6 +1,6 @@
 # Iteration I114: TUI Runtime Visual Stability
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-10
 > Planned objective: Close the verified TUI-028 visual reliability gaps without changing session or provider semantics.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -12,10 +12,10 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| #24 | TUI-028 | Open | Existing TUI render loop | Processing and ellipsis frames advance only on a fixed timer, not on redraws caused by input or stream traffic. |
-| #25 | TUI-028 | Open | #24 timer | The transient `thinking` label uses exactly two colors in three contiguous segments whose center segment expands and contracts. |
+| #24 | TUI-028 | Complete (2026-07-10) | Existing TUI render loop | Processing and ellipsis frames advance only on a fixed timer, not on redraws caused by input or stream traffic. |
+| #25 | TUI-028 | Complete (2026-07-10) | #24 timer | The transient `thinking` label uses exactly two colors in three contiguous segments whose center segment expands and contracts. |
 | #31 | TUI-028 | Complete (2026-07-10) | Existing status renderer | Model switching uses display-width-aware truncation and a single-line redraw without a large padding gap. |
-| #39 | TUI-028 | Open | Commit `2b0600e` | A focused regression and runtime check prove dashboard availability stays a transient tip and never enters scrollback. |
+| #39 | TUI-028 | Complete (2026-07-10) | Commit `2b0600e` | A focused regression and runtime check prove dashboard availability stays a transient tip and never enters scrollback. |
 
 ### Scope
 
@@ -87,6 +87,9 @@
 - Native visual confirmation: after the padding correction, the maintainer confirmed in Alacritty
   that model and provider names are compact and adjacent, with no visible layout fault. #31 is
   accepted.
+- Native visual confirmation: the maintainer confirmed #24's processing cadence and corrected
+  #39 dashboard notification in Alacritty. The animation remains stable under runtime activity,
+  and the Dashboard Tip leaves no stale line or startup blank row.
 
 ## Variance And Residuals
 
@@ -95,11 +98,13 @@
   diagnostics were drawn into the inline viewport, leaving a stale line or a blank startup row.
   The next corrective commit routes those diagnostics to the terminal-UI log sink; the Tip remains
   the sole TUI notification surface.
-- #24 still needs an observable processing-animation cadence capture. #39 still needs a native
-  capture after its `stderr`-to-log-sink correction.
+- None for TUI-028. TUI-029 remains a separately ready implementation item under ADR-034 v4.
 
 ## Retrospective
 
-- Outcome: active.
-- Documentation: activation records updated before code changes.
-- Lessons: pending.
+- Outcome: met. #24, #25, #31, and #39 were implemented and accepted in native Alacritty PTY
+  checks; #27 was already verified.
+- Documentation: TUI-028 owner, iteration index, product backlog, board, and GitHub issues
+  synchronized.
+- Lessons: direct terminal writes after inline-TUI initialization corrupt the viewport; route
+  diagnostics through the terminal-UI log sink and UI notices through `UiOutput::Tip`.

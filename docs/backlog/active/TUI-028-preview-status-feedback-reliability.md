@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-028 |
 | Priority | P1 |
-| Status | In Progress — I114 closes #24, #25, #31, and #39 verification |
+| Status | Complete — I114 (2026-07-10) |
 | Source | [GitHub Issue #24](https://github.com/wjhuang88/talos/issues/24), [GitHub Issue #25](https://github.com/wjhuang88/talos/issues/25), [GitHub Issue #27](https://github.com/wjhuang88/talos/issues/27), [GitHub Issue #28](https://github.com/wjhuang88/talos/issues/28), [GitHub Issue #31](https://github.com/wjhuang88/talos/issues/31), [GitHub Issue #39](https://github.com/wjhuang88/talos/issues/39) |
 | Depends On | `TUI-027`, `TUI-020`, `TUI-024`, `RUNTIME-002` |
 
@@ -134,6 +134,14 @@ visual review showed that short model names created an unacceptable large gap be
 I114 removes that padding: the model and provider remain adjacent, while display-width-safe
 truncation and bounded single-line rendering prevent overflow or stale fragments. The maintainer
 confirmed the corrected Alacritty rendering; #31 is complete. #24 and #39 remain open under I114.
+
+## I114 Closeout (2026-07-10)
+
+The maintainer confirmed the remaining native Alacritty evidence: #24's processing cadence remains
+stable during runtime activity, and corrected #39 Dashboard availability is a transient Tip with no
+stale output or blank startup row. #25 and #31 were already accepted in the same native-terminal
+review; #27 was previously verified. TUI-028 is Complete. TUI-029 / #26 remains a separate,
+implementation-ready requirement under ADR-034 v4.
 
 ## TUI-029 Policy Update (2026-07-10)
 
