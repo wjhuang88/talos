@@ -1139,7 +1139,7 @@ mod tests {
     }
 
     #[test]
-    fn test_status_model_slot_is_fixed_and_display_width_aware() {
+    fn test_status_model_names_are_display_width_aware_without_padding_gap() {
         let base = StatusSnapshot {
             model_name: "short".to_string(),
             provider: "provider".to_string(),
@@ -1158,13 +1158,14 @@ mod tests {
 
         let short = build_status_text(&base, 120);
         let wide = build_status_text(&unicode, 120);
-        let short_model_slot = short.lines[0].spans[1].content.as_ref();
-        let wide_model_slot = wide.lines[0].spans[1].content.as_ref();
+        let short_model = short.lines[0].spans[1].content.as_ref();
+        let wide_model = wide.lines[0].spans[1].content.as_ref();
 
-        assert_eq!(
-            UnicodeWidthStr::width(short_model_slot),
-            UnicodeWidthStr::width(wide_model_slot),
-            "model changes must not move following status fields"
+        assert!(short_model.starts_with("⬡ short (provider)"));
+        assert!(wide_model.starts_with("⬡ 非常长的模型名称-2026 (provider)"));
+        assert!(
+            !short_model.contains("short                         (provider)"),
+            "model and provider must remain visually adjacent"
         );
         assert!(UnicodeWidthStr::width(short.lines[0].to_string().as_str()) <= 120);
         assert!(UnicodeWidthStr::width(wide.lines[0].to_string().as_str()) <= 120);

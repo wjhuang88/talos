@@ -4,7 +4,7 @@
 > Published plan date: 2026-07-10
 > Planned objective: Close the verified TUI-028 visual reliability gaps without changing session or provider semantics.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
-> MVP deliverable: A real `talos` TUI run has stable time-based processing animation, a two-color three-segment thinking ripple, and fixed-width model status slots.
+> MVP deliverable: A real `talos` TUI run has stable time-based processing animation, a two-color three-segment thinking ripple, and compact display-width-safe model status rendering.
 
 ## Published Baseline
 
@@ -14,14 +14,14 @@
 |---|---|---|---|---|
 | #24 | TUI-028 | Open | Existing TUI render loop | Processing and ellipsis frames advance only on a fixed timer, not on redraws caused by input or stream traffic. |
 | #25 | TUI-028 | Open | #24 timer | The transient `thinking` label uses exactly two colors in three contiguous segments whose center segment expands and contracts. |
-| #31 | TUI-028 | Open | Existing status renderer | Model switching uses a display-width-aware fixed model slot so adjacent status fields do not move when model names differ. |
+| #31 | TUI-028 | Complete (2026-07-10) | Existing status renderer | Model switching uses display-width-aware truncation and a single-line redraw without a large padding gap. |
 | #39 | TUI-028 | Open | Commit `2b0600e` | A focused regression and runtime check prove dashboard availability stays a transient tip and never enters scrollback. |
 
 ### Scope
 
 - Decouple processing animation state advancement from `draw_frame` redraw frequency.
 - Render the existing transient thinking preview with the requested two-color, three-segment center-out ripple.
-- Make model-name truncation and slot padding terminal-display-width-aware.
+- Make model-name truncation terminal-display-width-aware without padding the provider away from it.
 - Add focused tests and PTY evidence through the real `talos` binary.
 
 ### Non-Goals
@@ -34,7 +34,7 @@
 
 - Given repeated input, stream, or tool-output redraws while processing, when no animation timer tick occurs, then the processing frame and ellipsis frame remain unchanged; each 150ms timer tick advances exactly one frame.
 - Given a live thinking preview, when it renders across successive animation frames, then `thinking` is represented by three contiguous segments using only the two designated colors, with the primary center segment expanding from the center and contracting cyclically.
-- Given two model names with different ASCII or Unicode display widths at the same terminal width, when the active model changes, then the model slot and the following status-field start positions remain identical and the line does not exceed its width budget.
+- Given two model names with different ASCII or Unicode display widths at the same terminal width, when the active model changes, then the status row redraws as one bounded line, the provider remains adjacent to the model label, and the line does not exceed its width budget.
 - Given the dashboard starts in TUI mode, when availability is reported, then the real binary displays a transient tip and no dashboard text is written to scrollback.
 
 ### Planned Validation
@@ -78,12 +78,25 @@
   available PTY reached splash output and emitted the cursor-position query, but the host PTY did
   not respond to `ESC[6n`; Talos exited with `failed to initialize TUI` rather than producing a
   false visual result. Real visual evidence remains required before completion.
+- Native runtime evidence: `/Users/GHuang/Downloads/录屏2026-07-10 10.35.37.mov` (57.5 seconds,
+  Alacritty) shows the real TUI processing a request and handling cancellation. It also exposed the
+  direct-`stderr` #39 viewport corruption documented below; it does not yet prove #24 or #31.
+- Native visual confirmation: the maintainer confirmed in Alacritty that the live `thinking`
+  preview uses the requested two-color, three-segment center-out ripple. #25 is accepted; no
+  persistence or history behavior changed.
+- Native visual confirmation: after the padding correction, the maintainer confirmed in Alacritty
+  that model and provider names are compact and adjacent, with no visible layout fault. #31 is
+  accepted.
 
 ## Variance And Residuals
 
 - The prior claim that the animation path was independent of redraw workload was incorrect: `draw_frame` advanced `processing_tick` on every redraw. I114 corrects both the behavior and the missing evidence.
-- Host PTY automation currently cannot satisfy Talos's cursor-position handshake. This is an
-  evidence-environment limitation, not evidence that the visual acceptance criteria passed.
+- Visual evidence recorded on 2026-07-10 exposed a #39 follow-up: direct `stderr` dashboard
+  diagnostics were drawn into the inline viewport, leaving a stale line or a blank startup row.
+  The next corrective commit routes those diagnostics to the terminal-UI log sink; the Tip remains
+  the sole TUI notification surface.
+- #24 still needs an observable processing-animation cadence capture. #39 still needs a native
+  capture after its `stderr`-to-log-sink correction.
 
 ## Retrospective
 

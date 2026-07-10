@@ -614,15 +614,15 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             Ok((addr, _)) => {
                 let url = format!("http://{addr}/");
                 if config.dashboard.loopback_only {
-                    eprintln!("Dashboard: {url} (loopback-only, no token)");
+                    tracing::info!(dashboard_url = %url, "dashboard started (loopback-only)");
                     let _ = ui_output_tx_for_dashboard.send(dashboard_available_tip(&url, true));
                 } else {
-                    eprintln!("Dashboard: {url} (token: {token})");
+                    tracing::info!(dashboard_url = %url, dashboard_token = %token, "dashboard started");
                     let _ = ui_output_tx_for_dashboard.send(dashboard_available_tip(&url, false));
                 }
             }
             Err(e) => {
-                eprintln!("Dashboard: failed to start: {e}");
+                tracing::warn!(error = %e, "dashboard failed to start");
                 let _ = ui_output_tx_for_dashboard.send(dashboard_failure_tip(&e.to_string()));
             }
         }

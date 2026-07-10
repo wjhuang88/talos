@@ -145,7 +145,7 @@ fn build_compact_status(
         .saturating_sub(display_width(provider).min(14))
         .clamp(8, 16);
 
-    let model_part = format_model_slot(model_name, model_limit);
+    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
     let ctx_part = if context_label.is_empty() {
         String::new()
     } else {
@@ -226,7 +226,7 @@ fn build_expanded_status(
         .saturating_sub(provider_budget)
         .clamp(12, 48);
 
-    let model_part = format_model_slot(model_name, model_limit);
+    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
     let ctx_part = if context_label.is_empty() {
         String::new()
     } else {
@@ -283,12 +283,6 @@ pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {
     }
     truncated.push('…');
     truncated
-}
-
-fn format_model_slot(model_name: &str, width: usize) -> String {
-    let model = truncate_str(model_name, width);
-    let padding = width.saturating_sub(display_width(&model));
-    format!("⬡ {model}{}", " ".repeat(padding))
 }
 
 fn display_width(value: &str) -> usize {

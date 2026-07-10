@@ -113,6 +113,28 @@ The maintainer explicitly selected these residuals for direct implementation. I1
 record of that session's capacity; it is no longer the execution disposition. I114 must produce
 real Talos-binary PTY evidence before this story can be marked Complete.
 
+### #39 Runtime Follow-Up (2026-07-10)
+
+Native Alacritty PTY evidence showed that the Tip itself is transient, but the direct `stderr`
+dashboard diagnostic was emitted after inline TUI initialization and drew into the viewport. That
+created either a stale old-format line or a blank startup row. I114 routes diagnostics to the
+terminal-UI log sink and leaves `UiOutput::Tip` as the only TUI-facing notification path; it needs
+a second native-PTY capture before #39 can be closed.
+
+### #25 Native PTY Acceptance (2026-07-10)
+
+The maintainer visually confirmed in Alacritty that the live `thinking` preview has the requested
+two-color, three-segment center-out ripple. This is visual-only and preserves TUI-020's transient
+reasoning semantics. #25 is complete; #24, #31, and #39 remain open under I114.
+
+### #31 Visual Correction (2026-07-10)
+
+The first I114 implementation padded a fixed-width model slot to avoid field movement. Native
+visual review showed that short model names created an unacceptable large gap before the provider.
+I114 removes that padding: the model and provider remain adjacent, while display-width-safe
+truncation and bounded single-line rendering prevent overflow or stale fragments. The maintainer
+confirmed the corrected Alacritty rendering; #31 is complete. #24 and #39 remain open under I114.
+
 ## TUI-029 Policy Update (2026-07-10)
 
 The maintainer approved #26 after reviewing its rejection. ADR-034 v4 now permits a separate typed
