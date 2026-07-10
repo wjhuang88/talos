@@ -6,6 +6,7 @@
 //! - Emits [`SessionEvent`] on the unbounded EQ
 
 use std::panic::AssertUnwindSafe;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures_util::FutureExt;
@@ -35,9 +36,11 @@ use turn::{TurnForwarding, TurnRecord, run_turn_with_forwarding};
 pub struct AppServerSession {
     agent: Arc<Agent>,
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
-    eq_tx: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
+    eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
     compactor: Compactor,
+    session_file: Option<PathBuf>,
+    session_dir: Option<PathBuf>,
 }
 
 impl AppServerSession {
@@ -49,7 +52,7 @@ impl AppServerSession {
     /// The SQ channel has a bounded capacity of 512; the EQ is unbounded.
     pub fn new(agent: Agent, config: SessionConfig) -> (SessionHandle, Self) {
         let (sq_tx, sq_rx) = tokio::sync::mpsc::channel(512);
-        let (eq_tx, eq_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
         let handle = SessionHandle { sq_tx, eq_rx };
 
@@ -61,9 +64,16 @@ impl AppServerSession {
             eq_tx,
             history: config.initial_history,
             compactor,
+            session_file: None,
+            session_dir: None,
         };
 
         (handle, actor)
+    }
+
+    pub fn set_session_paths(&mut self, file: PathBuf, dir: PathBuf) {
+        self.session_file = Some(file);
+        self.session_dir = Some(dir);
     }
 
     /// Runs the session actor loop until shutdown or SQ disconnect.
@@ -110,6 +120,26 @@ impl AppServerSession {
                         let compacted = self.compactor.apply_budget(self.history.clone());
                         let compacted = self.compactor.apply_trim(compacted);
                         let compacted = self.compactor.apply_microcompact(compacted);
+
+                        let compacted = match self
+                            .compactor
+                            .compact(compacted, self.agent.provider())
+                            .await
+                        {
+                            Ok(c) => c,
+                            Err(_) => {
+                                let (c, _) =
+                                    self.compactor.compact_deterministic(self.history.clone());
+                                c
+                            }
+                        };
+
+                        if let (Some(file), Some(dir)) =
+                            (&self.session_file, &self.session_dir)
+                        {
+                            let _ = self.try_archive_session(file, dir, &compacted);
+                        }
+
                         self.history = compacted;
                     }
 
@@ -251,5 +281,36 @@ impl AppServerSession {
         for msg in record.new_messages {
             self.history.push(msg);
         }
+    }
+
+    fn try_archive_session(
+        &self,
+        file: &Path,
+        dir: &Path,
+        _compacted: &[Message],
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if !file.exists() {
+            return Ok(());
+        }
+
+        let segment_id = format!("s{:03}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() % 1000);
+        let archive_raw = dir.join(format!("{segment_id}.tlog"));
+
+        let raw = std::fs::read(file)?;
+        let line_count = String::from_utf8_lossy(&raw).lines().count();
+        std::fs::write(&archive_raw, &raw)?;
+
+        let _ = self.eq_tx.send(SessionEvent::AgentEvent {
+            event: AgentEvent::Error {
+                message: format!(
+                    "Session archived: {line_count} entries frozen to {segment_id}"
+                ),
+            },
+        });
+
+        Ok(())
     }
 }

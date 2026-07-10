@@ -146,9 +146,7 @@ type TodoSectionProviderCallback = dyn Fn() -> Option<String> + Send + Sync;
 /// # }
 /// ```
 pub struct Agent {
-    /// The language model provider used for this agent.
     provider: Arc<dyn LanguageModel>,
-    /// Registry of tools available to the agent.
     tools: ToolRegistry,
     /// Optional permission engine for gating tool execution.
     permission_engine: Option<Arc<PermissionEngine>>,
@@ -188,19 +186,16 @@ pub struct Agent {
     bash_compression_enabled: bool,
     tool_output_threshold: usize,
 }
-
 impl Agent {
+    pub fn provider(&self) -> &dyn LanguageModel {
+        self.provider.as_ref()
+    }
+
     /// Runs a single turn with the given user message and returns the complete
     /// assistant response.
     ///
     /// If the model emits tool calls during the turn, they are executed and
     /// results are fed back until the model produces a final text response.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AgentError::ProviderError`] if the provider fails,
-    /// [`AgentError::Cancelled`] if the cancellation token is triggered,
-    /// [`AgentError::UnexpectedEvent`] if an error event is received,
     /// [`AgentError::TurnBudgetExceeded`] if the tool call budget is exceeded,
     /// or [`AgentError::DoomLoopDetected`] if a doom loop is detected.
     pub async fn run(&self, user_message: String) -> AgentResult<String> {
