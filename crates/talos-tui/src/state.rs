@@ -6,13 +6,13 @@
 use std::time::{Duration, Instant};
 
 use talos_conversation::{
-    CommandExecutionMode, CredentialResponseData, ModelPickerData, ModelPickerItem,
+    CommandExecutionMode, CredentialResponseData, ModelPickerData,
     SessionPickerItem, StatusSnapshot, TipKind,
 };
 use talos_core::ApprovalChoice;
 
 pub(crate) use crate::panel_state::{
-    BottomPanelState, PanelAction, PanelAcceptMode, PanelItem, PanelItemAction,
+    BottomPanelState, PanelAction, PanelAcceptMode, PanelItemAction,
     PanelKind, CredentialField, SLASH_MENU_MAX_VISIBLE,
 };
 

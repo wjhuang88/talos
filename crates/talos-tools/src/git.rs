@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use talos_core::tool::{
-    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+    AgentTool, ToolFamily, ToolResult,
 };
 use talos_core::tool_parameters;
 use thiserror::Error;

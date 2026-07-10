@@ -1,6 +1,6 @@
 //! Git write tools — host-git-backed operations (add, commit, push, pull, checkout).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use schemars::JsonSchema;

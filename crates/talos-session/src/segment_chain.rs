@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Segment chain metadata for session archival (ADR-037).
 //!
 //! When session compaction triggers (Slice D), the current segment is frozen and
@@ -8,7 +9,6 @@
 //! In the current state (pre-Slice-D), there is always exactly one segment (the
 //! head). The chain.tlog exists only as infrastructure for future archival.
 
-#![allow(dead_code)]
 
 use std::fs;
 use std::io::Write;

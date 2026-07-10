@@ -80,9 +80,7 @@ impl TuiApprovalHandler {
             });
         } else if is_git && !is_trusted {
             let _ = ui_output_tx.send(UiOutput::Tip {
-                text: format!(
-                    "Git workspace detected. Run 'talos --trust' to enable auto-approval for repo-scoped writes"
-                ),
+                text: "Git workspace detected. Run 'talos --trust' to enable auto-approval for repo-scoped writes".to_string(),
                 kind: TipKind::Info,
             });
         }

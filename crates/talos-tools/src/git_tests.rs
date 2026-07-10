@@ -1,4 +1,5 @@
     use super::*;
+    use talos_core::tool::{ToolNature, ToolResourceKind};
 
     #[test]
     fn git_push_permission_profile_has_execute_and_remote_network() {

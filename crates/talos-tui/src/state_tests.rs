@@ -222,8 +222,8 @@
 
     // ── MC106: Group-aware search filtering ─────────────────────────────
 
-    fn model_item(id: &str, provider: &str, is_current: bool) -> ModelPickerItem {
-        ModelPickerItem {
+    fn model_item(id: &str, provider: &str, is_current: bool) -> talos_conversation::ModelPickerItem {
+        talos_conversation::ModelPickerItem {
             command: "/model".to_string(),
             model_id: id.to_string(),
             provider: provider.to_string(),

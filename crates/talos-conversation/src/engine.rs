@@ -321,10 +321,10 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::TextDelta { delta } => {
-                if !self.current_thinking_text.is_empty() {
-                    if let Some(thinking_outputs) = self.finalize_thinking() {
-                        outputs.extend(thinking_outputs);
-                    }
+                if !self.current_thinking_text.is_empty()
+                    && let Some(thinking_outputs) = self.finalize_thinking()
+                {
+                    outputs.extend(thinking_outputs);
                 }
                 self.current_phase = Some(TurnPhase::Generating);
                 self.current_turn_text.push_str(delta);
@@ -342,10 +342,10 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolCallStarted { name } => {
-                if !self.current_thinking_text.is_empty() {
-                    if let Some(thinking_outputs) = self.finalize_thinking() {
-                        outputs.extend(thinking_outputs);
-                    }
+                if !self.current_thinking_text.is_empty()
+                    && let Some(thinking_outputs) = self.finalize_thinking()
+                {
+                    outputs.extend(thinking_outputs);
                 }
                 self.current_phase = Some(TurnPhase::RunningTool { name: name.clone() });
                 self.close_stream();

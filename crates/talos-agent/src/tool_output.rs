@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Tool output compression (ADR-037 Mechanism A).
 //!
 //! When a tool produces output exceeding a threshold, the content is split into

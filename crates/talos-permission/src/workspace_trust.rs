@@ -20,7 +20,7 @@ pub struct WorkspaceTrustStore {
 impl WorkspaceTrustStore {
     pub fn new(talos_root: &Path) -> Self {
         let config_path = talos_root.join("trusted_workspaces.toml");
-        let mut store = Self {
+        let store = Self {
             trusted: Mutex::new(HashSet::new()),
             config_path,
         };

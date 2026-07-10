@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Segment compression trait for session archival (ADR-036/037).
 //!
 //! When session compaction triggers (Slice D), frozen segments are compressed

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Session compaction engine — freezes segments, applies rules, archives (ADR-037 Mechanism B).
 
 use crate::compression::{NoCompressor, SegmentCompressor};
@@ -85,7 +86,7 @@ impl CompactionEngine {
             self.store.append_entry(head_path, entry)?;
         }
 
-        let record_count = entries.len();
+        let _record_count = entries.len();
         let archived_bytes = std::fs::metadata(&archived_path)
             .map(|m| m.len())
             .unwrap_or(0);
@@ -93,14 +94,14 @@ impl CompactionEngine {
         self.update_chain(
             session_dir,
             &segment_id,
-            record_count,
+            _record_count,
             original_bytes,
             archived_bytes,
         )?;
 
         Ok(CompactionResult::Compacted {
             segment_id,
-            original_count: record_count,
+            original_count: _record_count,
             compacted_count: compacted.len(),
             original_bytes,
             archived_bytes,
@@ -155,8 +156,8 @@ impl CompactionEngine {
         &self,
         session_dir: &Path,
         segment_id: &str,
-        record_count: usize,
-        orig_bytes: u64,
+        _record_count: usize,
+        _orig_bytes: u64,
         archived_bytes: u64,
     ) -> Result<(), SessionError> {
         let chain_file = chain_path(session_dir);

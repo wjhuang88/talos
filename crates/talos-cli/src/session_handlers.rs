@@ -2,6 +2,7 @@
 
 use super::*;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_delete(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     workspace_root: &std::path::Path,
@@ -444,6 +445,7 @@ pub(crate) async fn handle_session_model_with_credential(
 }
 
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_new(
     transition: &Arc<Mutex<SessionTransition>>,
     ui_tx: &mpsc::UnboundedSender<UiOutput>,

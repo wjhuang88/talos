@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Talos model metadata — static model knowledge with pricing, capabilities, and source provenance.
 //!
 //! Provides a built-in dataset of mainstream models and supports importing
@@ -28,7 +29,6 @@ pub enum ModelError {
     ImportError(String),
 }
 
-/// Load the built-in model dataset embedded at compile time.
 include!(concat!(env!("OUT_DIR"), "/models_data.rs"));
 
 pub fn builtin_models() -> Vec<ModelMetadata> {
@@ -69,14 +69,14 @@ pub fn builtin_providers() -> Vec<BuiltinProvider> {
 
 /// Internal TOML dataset wrapper.
 #[derive(Debug, Deserialize)]
-struct TomlDataset {
+#[allow(dead_code)] struct TomlDataset {
     #[serde(default)]
     providers: Vec<TomlProviderEntry>,
     models: Vec<ModelMetadata>,
 }
 
 #[derive(Debug, Deserialize)]
-struct TomlProviderEntry {
+#[allow(dead_code)] pub(crate) struct TomlProviderEntry {
     id: String,
     #[serde(default)]
     name: String,

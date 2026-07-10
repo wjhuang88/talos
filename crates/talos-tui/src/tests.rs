@@ -17,7 +17,8 @@ mod tests {
         truncate_str,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
-    use crate::state::{ApprovalState, BottomPanelState, CtrlCState, PanelItem, Tip, TuiState};
+    use crate::state::{ApprovalState, BottomPanelState, CtrlCState, Tip, TuiState};
+    use crate::panel_state::PanelItem;
     use crate::{contrast_ratio, rgb_components};
 
     // ── TuiState (pure UI) ─────────────────────────────────────────────

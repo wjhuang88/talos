@@ -7,7 +7,7 @@ pub(crate) use session_handlers::*;
 mod mode_interactive;
 pub(crate) use mode_interactive::run_interactive_mode;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
