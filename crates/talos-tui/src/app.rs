@@ -156,13 +156,7 @@ impl Tui {
                     if let Some(ar) = reasoning
                         && let Some(text) = talos_core::message::project_displayable_reasoning(ar)
                     {
-                        let display_text = format!(
-                            "Thinking:\n{}\n",
-                            text.lines()
-                                .map(|line| format!("| {line}"))
-                                .collect::<Vec<_>>()
-                                .join("\n")
-                        );
+                        let display_text = format!("Thinking: {text}\n");
                         let stream = futures::stream::iter(vec![display_text]);
                         let msg = talos_conversation::StreamMessage {
                             source: talos_conversation::MessageSource::Reasoning,

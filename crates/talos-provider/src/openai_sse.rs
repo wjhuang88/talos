@@ -35,6 +35,10 @@ struct OpenAIDelta {
     #[serde(default)]
     reasoning_content: Option<String>,
     #[serde(default)]
+    reasoning: Option<String>,
+    #[serde(default)]
+    thinking: Option<String>,
+    #[serde(default)]
     tool_calls: Option<Vec<OpenAIDeltaToolCall>>,
 }
 
@@ -227,7 +231,12 @@ pub(crate) async fn parse_sse_stream(
                     .await;
             }
 
-            if let Some(ref reasoning_content) = choice.delta.reasoning_content
+            if let Some(reasoning_content) = choice
+                .delta
+                .reasoning_content
+                .as_ref()
+                .or(choice.delta.reasoning.as_ref())
+                .or(choice.delta.thinking.as_ref())
                 && !reasoning_content.is_empty()
             {
                 reasoning_text.push_str(reasoning_content);
@@ -876,6 +885,25 @@ mod tests {
         assert_eq!(
             chunk.choices[0].delta.reasoning_content,
             Some("thinking chunk".into())
+        );
+    }
+
+    #[test]
+    fn openai_stream_chunk_deserializes_reasoning_aliases() {
+        let reasoning: OpenAIStreamChunk =
+            serde_json::from_str(r#"{"choices":[{"delta":{"reasoning":"MiniMax reasoning"}}]}"#)
+                .expect("reasoning alias must deserialize");
+        assert_eq!(
+            reasoning.choices[0].delta.reasoning.as_deref(),
+            Some("MiniMax reasoning")
+        );
+
+        let thinking: OpenAIStreamChunk =
+            serde_json::from_str(r#"{"choices":[{"delta":{"thinking":"MiniMax thinking"}}]}"#)
+                .expect("thinking alias must deserialize");
+        assert_eq!(
+            thinking.choices[0].delta.thinking.as_deref(),
+            Some("MiniMax thinking")
         );
     }
 

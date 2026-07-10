@@ -1053,13 +1053,7 @@ impl ConversationEngine {
         }
         let text = std::mem::take(&mut self.current_thinking_text);
         let (tx, rx) = mpsc::unbounded_channel::<String>();
-        let display_text = format!(
-            "Thinking:\n{}\n",
-            text.lines()
-                .map(|line| format!("| {line}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
+        let display_text = format!("Thinking: {text}\n");
         let _ = tx.send(display_text);
         drop(tx);
 
