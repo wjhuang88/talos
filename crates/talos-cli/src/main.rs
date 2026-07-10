@@ -240,6 +240,12 @@ pub(crate) struct Cli {
 
     #[arg(
         long,
+        help = "Grant workspace trust for this Git repository (auto-approve repo-scoped writes)."
+    )]
+    trust: bool,
+
+    #[arg(
+        long,
         conflicts_with_all = ["config_get", "config_set"],
         help = "List all configuration values."
     )]

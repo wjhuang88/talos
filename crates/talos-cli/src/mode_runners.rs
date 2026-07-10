@@ -200,9 +200,24 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     };
 
     let (ui_output_tx, ui_output_rx) = mpsc::unbounded_channel::<UiOutput>();
-    let approval_handler = Arc::new(TuiApprovalHandler::new(
+    let talos_root = crate::storage::resolve_talos_root();
+
+    if cli.trust {
+        let trust_store = talos_permission::WorkspaceTrustStore::new(&talos_root);
+        if talos_permission::is_git_workspace(&workspace_root) {
+            trust_store
+                .grant_trust(&workspace_root)
+                .context("failed to write trust file")?;
+            eprintln!("Workspace trusted: {}", workspace_root.display());
+        } else {
+            eprintln!("--trust requires a Git workspace");
+        }
+    }
+
+    let approval_handler = Arc::new(TuiApprovalHandler::new_with_trust(
         ui_output_tx.clone(),
         workspace_root.to_path_buf(),
+        &talos_root,
     ));
 
     let hooks = build_hook_registry(true);

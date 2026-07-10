@@ -288,6 +288,15 @@ impl PermissionEngine {
         input: &Value,
     ) -> PermissionDecision {
         let nature = facet.nature;
+
+        for rule in &self.rules {
+            match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
+                Ok(true) => return rule.decision.clone(),
+                Ok(false) => continue,
+                Err(_) => continue,
+            }
+        }
+
         if let Some(ref root) = self.workspace_root
             && nature == talos_core::tool::ToolNature::Read
             && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
@@ -301,14 +310,6 @@ impl PermissionEngine {
             && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
         {
             return PermissionDecision::Allow;
-        }
-
-        for rule in &self.rules {
-            match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
-                Ok(true) => return rule.decision.clone(),
-                Ok(false) => continue,
-                Err(_) => continue,
-            }
         }
 
         match nature {

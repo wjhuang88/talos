@@ -13,6 +13,7 @@ use talos_core::ApprovalChoice;
 use talos_core::tool::{
     AgentTool, ToolBackend, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
 };
+use talos_conversation::{TipKind, UiOutput};
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_session::{
     SessionManager, TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool,
@@ -34,7 +35,7 @@ use uuid::Uuid;
 
 use crate::approval::{ApprovalPrompt, add_always_allow_rules, always_allow_rule_descriptions};
 use crate::colors;
-use talos_conversation::UiOutput;
+
 
 /// Non-blocking approval handler for TUI mode.
 ///
@@ -54,6 +55,41 @@ impl TuiApprovalHandler {
         Self {
             ui_output_tx,
             engine: Mutex::new(PermissionEngine::with_workspace_root(workspace_root)),
+        }
+    }
+
+    pub(crate) fn new_with_trust(
+        ui_output_tx: mpsc::UnboundedSender<UiOutput>,
+        workspace_root: PathBuf,
+        talos_root: &Path,
+    ) -> Self {
+        let mut engine = PermissionEngine::with_workspace_root(workspace_root.clone());
+
+        let trust_store = talos_permission::WorkspaceTrustStore::new(talos_root);
+        let is_git = talos_permission::is_git_workspace(&workspace_root);
+        let is_trusted = trust_store.is_trusted(&workspace_root);
+
+        if is_git && is_trusted {
+            engine.set_trusted_workspace(true);
+            let _ = ui_output_tx.send(UiOutput::Tip {
+                text: format!(
+                    "Workspace trusted: write operations within {} will be auto-approved",
+                    workspace_root.display()
+                ),
+                kind: TipKind::Info,
+            });
+        } else if is_git && !is_trusted {
+            let _ = ui_output_tx.send(UiOutput::Tip {
+                text: format!(
+                    "Git workspace detected. Run 'talos --trust' to enable auto-approval for repo-scoped writes"
+                ),
+                kind: TipKind::Info,
+            });
+        }
+
+        Self {
+            ui_output_tx,
+            engine: Mutex::new(engine),
         }
     }
 
