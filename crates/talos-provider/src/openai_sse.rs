@@ -136,6 +136,7 @@ pub(crate) async fn parse_sse_stream(
             // OpenAI sends `data: [DONE]` at the end
             if data.as_str().map(|s| s.trim()) == Some("[DONE]") {
                 let text_calls = parse_text_tool_calls(&text_accumulator);
+                let has_text_tool_calls = !text_calls.is_empty();
                 for call in text_calls {
                     let _ = tx
                         .send(AgentEvent::ToolCall {
@@ -181,7 +182,7 @@ pub(crate) async fn parse_sse_stream(
                 }
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
-                        stop_reason: if has_native_tool_calls {
+                        stop_reason: if has_native_tool_calls || has_text_tool_calls {
                             StopReason::ToolUse
                         } else {
                             StopReason::EndTurn
@@ -279,7 +280,7 @@ pub(crate) async fn parse_sse_stream(
             }
 
             if let Some(ref finish_reason) = choice.finish_reason {
-                let stop_reason = match finish_reason.as_str() {
+                let requested_stop_reason = match finish_reason.as_str() {
                     "stop" => StopReason::EndTurn,
                     "tool_calls" => StopReason::ToolUse,
                     "length" => StopReason::MaxTokens,
@@ -289,6 +290,7 @@ pub(crate) async fn parse_sse_stream(
                 // Emit accumulated tool calls. Some OpenAI-compatible providers stream
                 // function name/arguments but omit the tool call id; synthesize a stable
                 // per-response id so the following tool result can still be paired.
+                let has_native_tool_calls = tool_call_names.iter().any(|name| !name.is_empty());
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
@@ -309,6 +311,7 @@ pub(crate) async fn parse_sse_stream(
                 }
 
                 let text_calls = parse_text_tool_calls(&text_accumulator);
+                let has_text_tool_calls = !text_calls.is_empty();
                 for call in text_calls {
                     let _ = tx
                         .send(AgentEvent::ToolCall {
@@ -331,7 +334,13 @@ pub(crate) async fn parse_sse_stream(
 
                 let _ = tx
                     .send(AgentEvent::TurnEnd {
-                        stop_reason,
+                        stop_reason: if matches!(requested_stop_reason, StopReason::ToolUse)
+                            && !(has_native_tool_calls || has_text_tool_calls)
+                        {
+                            StopReason::EndTurn
+                        } else {
+                            requested_stop_reason
+                        },
                         usage: Usage {
                             input_tokens,
                             output_tokens,
