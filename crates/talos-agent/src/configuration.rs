@@ -57,6 +57,7 @@ impl Agent {
             model_id: None,
             replay_reasoning: true,
             bash_compression_enabled: false,
+            tool_output_threshold: 4000,
         }
     }
 
@@ -128,6 +129,7 @@ impl Agent {
             model_id: None,
             replay_reasoning: true,
             bash_compression_enabled: false,
+            tool_output_threshold: 4000,
         }
     }
 

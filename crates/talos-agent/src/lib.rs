@@ -18,6 +18,7 @@
 pub mod compaction;
 pub mod compression;
 pub mod token;
+mod tool_output;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -185,6 +186,7 @@ pub struct Agent {
     /// When true, bash tool output exceeding the line threshold is compressed
     /// before entering model context. Default: false.
     bash_compression_enabled: bool,
+    tool_output_threshold: usize,
 }
 
 impl Agent {
@@ -785,6 +787,15 @@ impl Agent {
                             BashOutputCompressor::new().compress(&observed.result.content);
                         MessageToolResult {
                             content: compressed.content,
+                            ..ui_result.clone()
+                        }
+                    } else if observed.result.content.len() > self.tool_output_threshold {
+                        let compressed = crate::tool_output::compress_tool_output(
+                            &observed.result.content,
+                            self.tool_output_threshold,
+                        );
+                        MessageToolResult {
+                            content: compressed.model_content,
                             ..ui_result.clone()
                         }
                     } else {

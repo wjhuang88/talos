@@ -43,6 +43,7 @@ pub mod todo;
 mod topology;
 mod transcript;
 mod tool_compression;
+pub use tool_compression::{compress_tool_output, ToolOutputCompression};
 mod types;
 
 pub use error::SessionError;
