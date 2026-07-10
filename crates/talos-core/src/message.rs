@@ -383,3 +383,19 @@ pub fn strip_tool_syntax(text: &str) -> String {
     }
     result.trim().to_string()
 }
+
+pub fn project_displayable_reasoning(ar: &AssistantReasoning) -> Option<String> {
+    let mut parts = Vec::new();
+    for block in &ar.blocks {
+        match block {
+            ReasoningBlock::Thinking { text, .. } if !text.is_empty() => parts.push(text.clone()),
+            ReasoningBlock::Plain { text } if !text.is_empty() => parts.push(text.clone()),
+            _ => {}
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n"))
+    }
+}

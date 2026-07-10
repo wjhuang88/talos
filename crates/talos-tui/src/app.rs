@@ -150,8 +150,21 @@ impl Tui {
                 Message::Assistant {
                     content,
                     tool_calls,
+                    reasoning,
                     ..
                 } => {
+                    if let Some(ar) = reasoning
+                        && let Some(text) = talos_core::message::project_displayable_reasoning(ar) {
+                            let stream = futures::stream::iter(vec![text]);
+                            let msg = talos_conversation::StreamMessage {
+                                source: talos_conversation::MessageSource::Reasoning,
+                                stream: Box::pin(stream),
+                            };
+                            self.handle_ui_output(UiOutput::Stream(msg));
+                            self.consume_stream_completely();
+                            self.finalize_active_stream();
+                        }
+
                     let tool_calls_in_text =
                         talos_core::message::extract_tool_calls_from_text(content);
                     let cleaned = talos_core::message::strip_tool_syntax(content);
