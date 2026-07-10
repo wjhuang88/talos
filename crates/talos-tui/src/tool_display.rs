@@ -428,7 +428,7 @@ fn secondary_result_attrs() -> HistoryAttrs {
     HistoryAttrs::default()
 }
 
-fn secondary_result_color() -> Option<CColor> {
+pub(crate) fn secondary_result_color() -> Option<CColor> {
     Some(CColor::Rgb {
         r: 0x9A,
         g: 0xA4,

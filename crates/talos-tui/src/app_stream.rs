@@ -231,13 +231,37 @@ impl StreamRenderState {
     }
 
     fn render_next_line(&mut self, line: &str) -> ScrollbackLine {
-        let rendered = if self.markdown_enabled() {
+        let rendered = if matches!(self.source(), Some(MessageSource::Reasoning)) {
+            self.render_reasoning_line(self.line_count, line)
+        } else if self.markdown_enabled() {
             self.render_line(self.line_count, line, None)
         } else {
             self.render_plain_line(self.line_count, line)
         };
         self.line_count += 1;
         rendered
+    }
+
+    fn render_reasoning_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
+        let padding = crate::scrollback::stream_padding_for(self.source(), line_index);
+        ScrollbackLine::styled(
+            vec![
+                HistorySegment::styled(
+                    padding,
+                    crate::scrollback::prefix_color_for(self.source(), line_index),
+                    HistoryAttrs {
+                        bold: line_index == 0,
+                        ..HistoryAttrs::default()
+                    },
+                ),
+                HistorySegment::styled(
+                    line,
+                    crate::tool_display::secondary_result_color(),
+                    HistoryAttrs::default(),
+                ),
+            ],
+            self.bg(),
+        )
     }
 
     fn render_block_lines(
