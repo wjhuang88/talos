@@ -722,14 +722,21 @@ impl ConversationEngine {
         let path = path_arg.trim();
         if path.is_empty() {
             let hint =
-                "[Error] Usage: /export <path>\nExample: /export transcript.md\n".to_string();
+                "[Error] Usage: /export <path> [--include-thinking]\nExample: /export transcript.md\n".to_string();
             return vec![UiOutput::Stream(StreamMessage {
                 source: MessageSource::Error,
                 stream: Box::pin(stream::once(async move { hint })),
             })];
         }
 
-        let content = self.transcript_plain_text();
+        let include_thinking = path.contains("--include-thinking");
+        let clean_path = path.replace("--include-thinking", "").trim().to_string();
+
+        let content = if include_thinking {
+            self.transcript_plain_text_with_thinking()
+        } else {
+            self.transcript_plain_text()
+        };
         if content.is_empty() {
             let msg = "[System] Transcript is empty — nothing to export.\n".to_string();
             return vec![UiOutput::Stream(StreamMessage {
@@ -738,13 +745,13 @@ impl ConversationEngine {
             })];
         }
 
-        let confirm = format!("[System] Exporting transcript to {path}…\n");
+        let confirm = format!("[System] Exporting transcript to {clean_path}…\n");
         let mut outputs = vec![UiOutput::Stream(StreamMessage {
             source: MessageSource::System,
             stream: Box::pin(stream::once(async move { confirm })),
         })];
         outputs.push(UiOutput::ExportToFile {
-            path: PathBuf::from(path),
+            path: PathBuf::from(clean_path),
             content,
         });
         outputs
@@ -947,6 +954,22 @@ impl ConversationEngine {
     pub fn transcript_plain_text(&self) -> String {
         let mut out = String::new();
         for msg in &self.messages {
+            Self::append_message_plain(&mut out, msg);
+        }
+        out
+    }
+
+    pub fn transcript_plain_text_with_thinking(&self) -> String {
+        let mut out = String::new();
+        for msg in &self.messages {
+            if msg.role == MessageRole::Reasoning {
+                out.push_str("Thinking:\n");
+                for line in msg.content.lines() {
+                    out.push_str(&format!("| {line}\n"));
+                }
+                out.push('\n');
+                continue;
+            }
             Self::append_message_plain(&mut out, msg);
         }
         out

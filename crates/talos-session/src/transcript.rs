@@ -67,6 +67,14 @@ pub fn export_json(entries: &[SessionEntry]) -> Result<String, serde_json::Error
 /// [content]
 /// ```
 pub fn export_markdown(entries: &[SessionEntry]) -> String {
+    export_markdown_filtered(entries, false)
+}
+
+#[allow(dead_code)] pub fn export_markdown_with_thinking(entries: &[SessionEntry]) -> String {
+    export_markdown_filtered(entries, true)
+}
+
+fn export_markdown_filtered(entries: &[SessionEntry], include_thinking: bool) -> String {
     if entries.is_empty() {
         return String::new();
     }
@@ -76,7 +84,18 @@ pub fn export_markdown(entries: &[SessionEntry]) -> String {
         if i > 0 {
             output.push_str("\n\n");
         }
-        // Capitalize the role for the header.
+
+        if include_thinking
+            && let Some(ref reasoning) = entry.metadata.reasoning
+            && let Some(text) = talos_core::message::project_displayable_reasoning(reasoning)
+        {
+            output.push_str("## Thinking\n");
+            for line in text.lines() {
+                output.push_str(&format!("| {line}\n"));
+            }
+            output.push_str("\n\n");
+        }
+
         let role_header = match entry.role.as_str() {
             "user" => "User",
             "assistant" => "Assistant",
