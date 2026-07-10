@@ -436,13 +436,6 @@ impl EventLoop {
                 let ext = session.file_extension();
                 let new_file_path = project_dir.join(format!("{new_id}.{ext}"));
 
-                let parent_ref_path = project_dir.join(format!("{new_id}.parent_ref"));
-                let parent_ref_content = format!(
-                    "parent:{}:{}:{}\n",
-                    session.id, ext, fork_from_id
-                );
-                std::fs::write(&parent_ref_path, parent_ref_content)?;
-
                 let entries_to_copy = if let Some(branch) = forked.get_branch(&branch_id) {
                     branch.entries.clone()
                 } else {
