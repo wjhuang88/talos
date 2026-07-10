@@ -218,6 +218,32 @@ pub(crate) async fn parse_sse_stream(
                         reasoning_tokens = usage.reasoning_tokens;
                     }
                     if let Some(stop_reason) = extract_stop_reason(&data) {
+                        // Some Anthropic-compatible providers (including MiniMax)
+                        // omit `content_block_stop` before the final tool_use
+                        // message delta. Flush any started blocks so the agent
+                        // never observes ToolUse without a corresponding call.
+                        for (_, block) in std::mem::take(&mut tool_use_blocks) {
+                            if block.name.is_empty() {
+                                continue;
+                            }
+                            let input = serde_json::from_str(&block.input_json)
+                                .unwrap_or_else(|_| serde_json::json!({}));
+                            let _ = tx
+                                .send(AgentEvent::ToolCall {
+                                    call: ToolCall {
+                                        id: if block.id.is_empty() {
+                                            format!("call_{}", Uuid::new_v4())
+                                        } else {
+                                            block.id
+                                        },
+                                        name: block.name,
+                                        input,
+                                    },
+                                    provenance: ToolProvenance::Native,
+                                    summary_fields: vec![],
+                                })
+                                .await;
+                        }
                         if !reasoning_blocks.is_empty() {
                             let _ = tx
                                 .send(AgentEvent::ReasoningComplete {
