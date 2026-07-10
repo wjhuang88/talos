@@ -545,6 +545,56 @@ impl SessionManager {
 
     #[allow(clippy::collapsible_if)]
     pub fn delete_session(&self, id: &Uuid) -> Result<(), SessionError> {
+        if let Ok(guard) = self.get_or_create_index() {
+            if let Some(index) = guard.as_ref() {
+                if let Ok(forks) = index.get_forks(&id.to_string()) {
+                    if !forks.is_empty() {
+                        let fork_ids: Vec<&str> = forks.iter().map(|f| f.forked_session_id.as_str()).collect();
+                        return Err(SessionError::ParseError(format!(
+                            "session {} has {} active fork(s): {} — use --force-orphan to copy referenced data before deletion",
+                            id,
+                            forks.len(),
+                            fork_ids.join(", ")
+                        )));
+                    }
+                }
+            }
+        }
+
+        let file_path = self.find_session_file(id)?;
+        if file_path.exists() {
+            fs::remove_file(&file_path)?;
+        }
+        if let Ok(mut guard) = self.get_or_create_index() {
+            if let Some(index) = guard.as_mut() {
+                let _ = index.delete_session(&id.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_session_force(&self, id: &Uuid) -> Result<(), SessionError> {
+        if let Ok(guard) = self.get_or_create_index() {
+            if let Some(index) = guard.as_ref() {
+                if let Ok(forks) = index.get_forks(&id.to_string()) {
+                    for fork in &forks {
+                        let fork_file = self.find_session_file(
+                            &Uuid::parse_str(&fork.forked_session_id)
+                                .unwrap_or_else(|_| Uuid::nil())
+                        );
+                        if let Ok(ref fork_path) = fork_file {
+                            if fork_path.exists() {
+                                let src = self.find_session_file(id)?;
+                                if let Ok(src_data) = fs::read(&src) {
+                                    let _ = fs::write(fork_path, src_data);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let file_path = self.find_session_file(id)?;
         if file_path.exists() {
             fs::remove_file(&file_path)?;
