@@ -100,16 +100,7 @@ pub(crate) fn preview_line_spans<'a>(
     if let Some(frame) = thinking_label_frame
         && let Some(rest) = text_part.strip_prefix("thinking")
     {
-        let ramp = semantic::THINKING_LABEL_GRADIENT;
-        let offset = (frame / 2) % ramp.len();
-        for (idx, ch) in "thinking".chars().enumerate() {
-            spans.push(Span::styled(
-                ch.to_string(),
-                Style::default()
-                    .fg(ramp[(idx + offset) % ramp.len()])
-                    .add_modifier(Modifier::BOLD),
-            ));
-        }
+        spans.extend(thinking_ripple_spans(frame));
         if !rest.is_empty() {
             spans.push(Span::styled(
                 rest.to_string(),
@@ -150,13 +141,31 @@ pub(crate) fn hold_preview_color(frame: usize) -> Color {
     semantic::HOLD_PREVIEW[(frame / 2) % semantic::HOLD_PREVIEW.len()]
 }
 
-pub(crate) fn preview_spinner_padding(
-    processing_frame: usize,
-    _processing_tick: usize,
-) -> (String, usize) {
+pub(crate) fn preview_spinner_padding(processing_frame: usize) -> (String, usize) {
     let n = SPINNER_FRAMES.len();
     let frame_idx = processing_frame % n;
     (format!(" {} ", SPINNER_FRAMES[frame_idx]), frame_idx)
+}
+
+fn thinking_ripple_spans(frame: usize) -> [Span<'static>; 3] {
+    const LABEL: &str = "thinking";
+    const ACTIVE_WIDTHS: [usize; 4] = [2, 4, 6, 4];
+
+    let active_width = ACTIVE_WIDTHS[frame % ACTIVE_WIDTHS.len()];
+    let left_width = (LABEL.len() - active_width) / 2;
+    let right_start = left_width + active_width;
+    let secondary = Style::default()
+        .fg(semantic::THINKING_RIPPLE_SECONDARY)
+        .add_modifier(Modifier::BOLD);
+    let primary = Style::default()
+        .fg(semantic::THINKING_RIPPLE_PRIMARY)
+        .add_modifier(Modifier::BOLD);
+
+    [
+        Span::styled(LABEL[..left_width].to_string(), secondary),
+        Span::styled(LABEL[left_width..right_start].to_string(), primary),
+        Span::styled(LABEL[right_start..].to_string(), secondary),
+    ]
 }
 
 pub(crate) struct QueuePreviewComponent {

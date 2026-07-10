@@ -11,7 +11,7 @@ use talos_conversation::{CopyScope, TipKind, TodoPanelData, TurnPhase, UiOutput,
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::MissedTickBehavior};
 
 use crate::evolution::{self, EvolutionPanel};
 use crate::inline_terminal::{
@@ -22,6 +22,8 @@ use crate::state::{ApprovalState, CtrlCState, PanelAction, Tip, TuiState};
 use crate::theme::{semantic, to_crossterm_color};
 
 pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState};
+
+const PROCESSING_FRAME_INTERVAL: Duration = Duration::from_millis(150);
 
 pub struct Tui {
     state: TuiState,
@@ -38,7 +40,6 @@ pub struct Tui {
     pending_stream_opening: Vec<ScrollbackLine>,
     text_filter: ToolSyntaxFilter,
     processing_frame: usize,
-    processing_tick: usize,
     stream_count: usize,
     session_id: Option<String>,
     last_total_height: u16,
@@ -77,7 +78,6 @@ impl Tui {
             pending_stream_opening: Vec::new(),
             text_filter: ToolSyntaxFilter::new(),
             processing_frame: 0,
-            processing_tick: 0,
             stream_count: 0,
             session_id: None,
             last_total_height: 0,
@@ -382,7 +382,8 @@ impl Tui {
     pub async fn run(&mut self) -> io::Result<()> {
         let session_start = Instant::now();
         let mut event_stream = EventStream::new();
-        let mut render_interval = tokio::time::interval(Duration::from_millis(50));
+        let mut render_interval = tokio::time::interval(PROCESSING_FRAME_INTERVAL);
+        render_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
 
         self.draw_frame()?;
@@ -393,7 +394,7 @@ impl Tui {
             self.draw_frame()?;
 
             tokio::select! {
-                _ = render_interval.tick() => {}
+                _ = render_interval.tick() => self.advance_processing_frame(),
                 Some(Ok(event)) = event_stream.next() => {
                     if self.handle_input_event(&event) {
                         break;
@@ -568,9 +569,9 @@ impl Tui {
             }
             UiOutput::Tip { text, kind } => {
                 self.state.tip = Some(Tip {
+                    ttl: tip_ttl(&kind),
                     kind,
                     text,
-                    ttl: Duration::from_secs(2),
                     created_at: Instant::now(),
                 });
             }
@@ -698,23 +699,23 @@ impl Tui {
         Ok(())
     }
 
+    fn advance_processing_frame(&mut self) {
+        self.processing_frame = next_processing_frame(
+            self.state.status.is_processing,
+            self.processing_frame,
+        );
+    }
+
     fn draw_frame(&mut self) -> io::Result<()> {
         let state = &self.state;
         let status = &state.status;
 
         let (preview_padding, spinner_color) = if status.is_processing {
-            self.processing_tick += 1;
-            if self.processing_tick.is_multiple_of(3) {
-                self.processing_frame = self.processing_frame.wrapping_add(1);
-            }
-            let (padding, color_idx) = crate::scrollback::preview_spinner_padding(
-                self.processing_frame,
-                self.processing_tick,
-            );
+            let (padding, color_idx) =
+                crate::scrollback::preview_spinner_padding(self.processing_frame);
             (padding, Some(semantic::PROCESSING_SPINNER[color_idx]))
         } else {
             self.processing_frame = 0;
-            self.processing_tick = 0;
             ("   ".to_string(), None)
         };
         let hold_status = self.stream_render.hold_status().cloned();
@@ -1193,6 +1194,22 @@ pub(crate) fn build_todo_panel_lines(data: &TodoPanelData) -> Vec<ScrollbackLine
     }
 
     lines
+}
+
+pub(crate) fn next_processing_frame(is_processing: bool, processing_frame: usize) -> usize {
+    if is_processing {
+        processing_frame.wrapping_add(1)
+    } else {
+        0
+    }
+}
+
+pub(crate) fn tip_ttl(kind: &TipKind) -> Duration {
+    match kind {
+        TipKind::Info => Duration::from_secs(8),
+        TipKind::Error => Duration::from_secs(5),
+        _ => Duration::from_secs(3),
+    }
 }
 
 impl Drop for Tui {

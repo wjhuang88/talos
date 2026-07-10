@@ -6,13 +6,13 @@ use talos_core::message::Message;
 use tokio::sync::mpsc;
 
 use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
-use crate::app::{preview_text_for_state, submit_input_message};
+use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
 use crate::scrollback;
 use crate::state::TuiState;
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
-use talos_conversation::TurnPhase;
+use talos_conversation::{TipKind, TurnPhase};
 
 fn state_line(text: &str) -> ScrollbackLine {
     ScrollbackLine::plain(text, None)
@@ -312,8 +312,8 @@ fn idle_processing_preview_animates_ellipsis() {
 fn preview_spinner_uses_single_block() {
     let n = SPINNER_FRAMES.len();
 
-    let (p0, c0) = scrollback::preview_spinner_padding(0, 0);
-    let (p1, c1) = scrollback::preview_spinner_padding(1, 0);
+    let (p0, c0) = scrollback::preview_spinner_padding(0);
+    let (p1, c1) = scrollback::preview_spinner_padding(1);
 
     assert_eq!(p0, format!(" {} ", SPINNER_FRAMES[0]));
     assert_eq!(c0, 0);
@@ -327,29 +327,45 @@ fn preview_spinner_uses_single_block() {
 }
 
 #[test]
-fn thinking_preview_styles_only_label_with_blue_gradient() {
+fn thinking_preview_uses_two_color_three_segment_ripple() {
     let spans =
         scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(0));
 
-    assert_eq!(spans.len(), 9);
-    let label: String = spans[..8]
+    assert_eq!(spans.len(), 4);
+    let label: String = spans[..3]
         .iter()
         .map(|span| span.content.as_ref())
         .collect();
     assert_eq!(label, "thinking");
-    for (idx, span) in spans[..8].iter().enumerate() {
-        assert_eq!(
-            span.style.fg,
-            Some(semantic::THINKING_LABEL_GRADIENT[idx % 4])
-        );
-    }
-    assert_eq!(spans[8].content.as_ref(), ": draft");
-    assert_eq!(spans[8].style.fg, Some(semantic::PREVIEW_FG));
+    assert_eq!(spans[0].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
+    assert_eq!(spans[1].style.fg, Some(semantic::THINKING_RIPPLE_PRIMARY));
+    assert_eq!(spans[2].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
+    assert_eq!(spans[1].content.as_ref(), "nk");
+    assert_eq!(spans[3].content.as_ref(), ": draft");
+    assert_eq!(spans[3].style.fg, Some(semantic::PREVIEW_FG));
 
-    let shifted =
+    let expanded =
         scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(2));
-    assert_ne!(spans[0].style.fg, shifted[0].style.fg);
-    assert_eq!(shifted[8].style.fg, Some(semantic::PREVIEW_FG));
+    assert_eq!(expanded.len(), 4);
+    assert_eq!(expanded[1].content.as_ref(), "hinkin");
+    assert_eq!(expanded[0].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
+    assert_eq!(expanded[1].style.fg, Some(semantic::THINKING_RIPPLE_PRIMARY));
+    assert_eq!(expanded[2].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
+}
+
+#[test]
+fn processing_frames_advance_only_on_timer_ticks() {
+    let frame = 7;
+    assert_eq!(frame, 7, "redraw-only work must not mutate animation state");
+    assert_eq!(next_processing_frame(true, frame), 8);
+    assert_eq!(next_processing_frame(false, frame), 0);
+}
+
+#[test]
+fn dashboard_tip_ttls_are_visible_but_bounded() {
+    assert_eq!(tip_ttl(&TipKind::Info).as_secs(), 8);
+    assert_eq!(tip_ttl(&TipKind::Error).as_secs(), 5);
+    assert_eq!(tip_ttl(&TipKind::ApprovalResult).as_secs(), 3);
 }
 
 #[test]

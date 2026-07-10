@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-028 |
 | Priority | P1 |
-| Status | Partial — #25/#24/#31 open; #39 implementation awaits focused verification/issue sync |
+| Status | In Progress — I114 closes #24, #25, #31, and #39 verification |
 | Source | [GitHub Issue #24](https://github.com/wjhuang88/talos/issues/24), [GitHub Issue #25](https://github.com/wjhuang88/talos/issues/25), [GitHub Issue #27](https://github.com/wjhuang88/talos/issues/27), [GitHub Issue #28](https://github.com/wjhuang88/talos/issues/28), [GitHub Issue #31](https://github.com/wjhuang88/talos/issues/31), [GitHub Issue #39](https://github.com/wjhuang88/talos/issues/39) |
 | Depends On | `TUI-027`, `TUI-020`, `TUI-024`, `RUNTIME-002` |
 
@@ -106,6 +106,13 @@ code. TUI-028 remains Partial because the commit recorded the broad CLI suite bu
 focused regression proving the notification never enters scrollback/history; GitHub #39 should stay
 open until that focused evidence and issue sync are complete.
 
+## I114 Reactivation (2026-07-10)
+
+The maintainer explicitly selected these residuals for direct implementation. I114 owns #24,
+#25, #31, and the focused #39 regression. The 2026-07-09 deferral remains an accurate historical
+record of that session's capacity; it is no longer the execution disposition. I114 must produce
+real Talos-binary PTY evidence before this story can be marked Complete.
+
 ## TUI-029 Policy Update (2026-07-10)
 
 The maintainer approved #26 after reviewing its rejection. ADR-034 v4 now permits a separate typed
@@ -121,9 +128,9 @@ The following TUI-028 residuals are formally deferred per AGENTS.md iteration tr
 **Rationale**: The two-color three-segment center-out ripple block animation requires visual design iteration and runtime PTY testing that exceeds the current session's capacity. The existing single-color animation is functional and does not cause display corruption. Formal deferral recorded; no quality regression.
 
 ### Deferred: #24 (Processing animation cadence evidence)
-**Rationale**: Runtime/visual evidence of animation cadence stability requires PTY-based recording under heavy rendering load. The animation uses a deterministic tick path (ADR-034) and does not depend on rendering workload for cadence. Evidence collection is deferred to a dedicated TUI QA session.
+**Historical rationale**: Runtime/visual evidence of animation cadence stability requires PTY-based recording under heavy rendering load. The previous assertion that the implementation did not depend on rendering workload was later found incorrect: `draw_frame` advanced the animation. I114 supersedes this deferral for execution.
 
 ### Deferred: #31 (Model-name layout jump evidence)
-**Rationale**: Visual evidence of model-name format consistency requires side-by-side PTY comparison across model switches. The status bar format code uses fixed-width padding. Visual evidence collection is deferred to a dedicated TUI QA session.
+**Historical rationale**: Visual evidence of model-name format consistency requires side-by-side PTY comparison across model switches. The prior renderer did not pad a fixed display-width model slot. I114 supersedes this deferral for implementation and evidence.
 
-These deferrals do NOT compromise existing functionality. They represent polish work that requires interactive visual testing unavailable in non-interactive CI/agent sessions.
+These deferrals recorded the prior session's capacity. They do not establish that the remaining behavior was correct; I114 now provides the implementation and PTY verification path.

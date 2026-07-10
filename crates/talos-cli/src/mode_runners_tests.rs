@@ -313,3 +313,32 @@
             vec![("T61 Rehearsal".to_string(), "Planned".to_string())]
         );
     }
+
+    #[test]
+    fn dashboard_notifications_are_transient_and_never_include_tokens() {
+        let loopback = dashboard_available_tip("http://127.0.0.1:61205/", true);
+        assert!(matches!(
+            loopback,
+            UiOutput::Tip {
+                kind: TipKind::Info,
+                ref text
+            } if text == "Dashboard ready: http://127.0.0.1:61205/ (loopback-only)"
+        ));
+
+        let restricted = dashboard_available_tip("http://127.0.0.1:61205/", false);
+        assert!(matches!(
+            restricted,
+            UiOutput::Tip {
+                kind: TipKind::Info,
+                ref text
+            } if text.contains("token required, see terminal output") && !text.contains("secret-token")
+        ));
+
+        assert!(matches!(
+            dashboard_failure_tip("address in use"),
+            UiOutput::Tip {
+                kind: TipKind::Error,
+                ref text
+            } if text == "Dashboard failed to start: address in use"
+        ));
+    }

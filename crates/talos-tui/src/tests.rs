@@ -8,6 +8,7 @@ mod tests {
     };
     use talos_core::ApprovalChoice;
     use talos_core::message::Usage;
+    use unicode_width::UnicodeWidthStr;
 
     use crate::inline_terminal::ViewportComponent;
     use crate::scrollback::{
@@ -1135,6 +1136,45 @@ mod tests {
     #[test]
     fn test_truncate_str_empty_string() {
         assert_eq!(truncate_str("", 10), "");
+    }
+
+    #[test]
+    fn test_status_model_slot_is_fixed_and_display_width_aware() {
+        let base = StatusSnapshot {
+            model_name: "short".to_string(),
+            provider: "provider".to_string(),
+            workspace_path: "workspace".to_string(),
+            usage: Usage::default(),
+            branch_id: None,
+            steering_count: 0,
+            followup_count: 0,
+            is_processing: false,
+            ..Default::default()
+        };
+        let unicode = StatusSnapshot {
+            model_name: "非常长的模型名称-2026".to_string(),
+            ..base.clone()
+        };
+
+        let short = build_status_text(&base, 120);
+        let wide = build_status_text(&unicode, 120);
+        let short_model_slot = short.lines[0].spans[1].content.as_ref();
+        let wide_model_slot = wide.lines[0].spans[1].content.as_ref();
+
+        assert_eq!(
+            UnicodeWidthStr::width(short_model_slot),
+            UnicodeWidthStr::width(wide_model_slot),
+            "model changes must not move following status fields"
+        );
+        assert!(UnicodeWidthStr::width(short.lines[0].to_string().as_str()) <= 120);
+        assert!(UnicodeWidthStr::width(wide.lines[0].to_string().as_str()) <= 120);
+    }
+
+    #[test]
+    fn test_truncate_str_respects_unicode_display_width() {
+        let result = truncate_str("模型名称", 5);
+        assert_eq!(result, "模型…");
+        assert_eq!(UnicodeWidthStr::width(result.as_str()), 5);
     }
 
     #[test]

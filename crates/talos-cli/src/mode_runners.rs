@@ -615,31 +615,40 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 let url = format!("http://{addr}/");
                 if config.dashboard.loopback_only {
                     eprintln!("Dashboard: {url} (loopback-only, no token)");
-                    let _ = ui_output_tx_for_dashboard.send(UiOutput::Tip {
-                        text: format!("Dashboard: {url} (loopback-only)"),
-                        kind: TipKind::Info,
-                    });
+                    let _ = ui_output_tx_for_dashboard.send(dashboard_available_tip(&url, true));
                 } else {
                     eprintln!("Dashboard: {url} (token: {token})");
-                    let _ = ui_output_tx_for_dashboard.send(UiOutput::Tip {
-                        text: format!("Dashboard: {url} (token: {token})"),
-                        kind: TipKind::Info,
-                    });
+                    let _ = ui_output_tx_for_dashboard.send(dashboard_available_tip(&url, false));
                 }
             }
             Err(e) => {
                 eprintln!("Dashboard: failed to start: {e}");
-                send_stream(
-                    &ui_output_tx_for_dashboard,
-                    MessageSource::Error,
-                    format!("[Error] Dashboard failed to start: {e}\n"),
-                );
+                let _ = ui_output_tx_for_dashboard.send(dashboard_failure_tip(&e.to_string()));
             }
         }
     }
 
     tui.run().await?;
     Ok(())
+}
+
+pub(crate) fn dashboard_available_tip(url: &str, loopback_only: bool) -> UiOutput {
+    let detail = if loopback_only {
+        "loopback-only"
+    } else {
+        "token required, see terminal output"
+    };
+    UiOutput::Tip {
+        text: format!("Dashboard ready: {url} ({detail})"),
+        kind: TipKind::Info,
+    }
+}
+
+pub(crate) fn dashboard_failure_tip(message: &str) -> UiOutput {
+    UiOutput::Tip {
+        text: format!("Dashboard failed to start: {message}"),
+        kind: TipKind::Error,
+    }
 }
 
 pub(crate) async fn run_mcp_server() -> Result<()> {

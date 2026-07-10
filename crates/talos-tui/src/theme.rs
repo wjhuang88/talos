@@ -287,12 +287,8 @@ pub(crate) mod semantic {
     pub(crate) const TIP_ERROR: Color = THEME.tip_error;
     pub(crate) const TIP_INFO: Color = THEME.tip_info;
     pub(crate) const HOLD_PREVIEW: [Color; 2] = THEME.hold_preview;
-    pub(crate) const THINKING_LABEL_GRADIENT: [Color; 4] = [
-        THEME.text_accent,
-        THEME.text_secondary_accent,
-        THEME.status_value,
-        THEME.text_secondary_accent,
-    ];
+    pub(crate) const THINKING_RIPPLE_PRIMARY: Color = THEME.text_accent;
+    pub(crate) const THINKING_RIPPLE_SECONDARY: Color = THEME.text_secondary_accent;
     pub(crate) const PROCESSING_SPINNER: [Color; 10] = THEME.processing_spinner;
     pub(crate) const MARKDOWN_CODE: Color = THEME.markdown_code;
     pub(crate) const MARKDOWN_TEXT_STRONG: Color = THEME.markdown_text_strong;

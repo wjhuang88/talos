@@ -146,6 +146,7 @@ docs/iterations/
 | I107 | Talos-Primary Feature Polish | Review | Month 2 of the 2026-07-08 Talos-primary self-bootstrap plan. #18 request-dispatch timeout fixed (SBT111), docs synced, classified non-qualifying. See `I107-talos-primary-feature-polish.md`. |
 | I108 | Architecture-Sensitive Self-Bootstrap | Review | Month 3 of the 2026-07-08 Talos-primary self-bootstrap plan. ARCH-032 Single Data Flow Audit completed (SBT121): zero broadcast channels, all paths ADR-006 compliant. Non-qualifying REL-002 evidence. See `I108-architecture-sensitive-self-bootstrap.md`. |
 | I109 | REL-002 Self-Bootstrap Closeout | Review | Month 4 of the 2026-07-08 Talos-primary self-bootstrap plan. REL-002 closeout: acceptance criteria audited, NO-GO v1.0 verdict, readiness report produced. Non-qualifying evidence (external runtime). See `I109-rel002-self-bootstrap-closeout.md`. |
+| I114 | TUI Runtime Visual Stability | Active | Closes TUI-028 #24 timer cadence, #25 thinking ripple, #31 model-slot stability, and #39 focused transient-tip verification through real PTY evidence. See `I114-tui-runtime-visual-stability.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -194,6 +195,7 @@ rewrite published iteration baselines.
 | I107 | Review | Month-2 Talos-primary corrective feature/polish session. #18 request-dispatch timeout fixed (SBT111); docs synced. REL-002 non-qualifying (external runtime). |
 | I108 | Review | Month-3 architecture-sensitive self-bootstrap session. ARCH-032 Single Data Flow Audit complete (SBT121): zero broadcast channels, all paths ADR-006 compliant. Non-qualifying REL-002 evidence. |
 | I109 | Review | Month-4 REL-002 closeout. SBT130-SBT133 complete: acceptance criteria audited (3 UNMET, 4 PARTIAL, 1 MET), NO-GO v1.0 verdict, readiness report produced. Non-qualifying evidence (external runtime glm-5.2). Four-month plan closed. |
+| I114 | Active | Explicit maintainer-priority activation for TUI-028 #24/#25/#31 and #39 focused verification. I018-I020, I028, I086-I089, and other planned work remain deferred or blocked as individually recorded. |
 | I087 | Planned | Site install distribution entrypoints under `talos.hwj.zone`, gated by validation. |
 | I088 | Planned | Extension and ingestion risk-bounded work, with no remote plugin/browser/PDF scope. |
 | I089 | Planned | Ecosystem/shared Skills decision, REL-002 rehearsal, docs sweep, and four-month closeout. |

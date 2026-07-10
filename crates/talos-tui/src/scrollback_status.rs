@@ -2,6 +2,7 @@ use ratatui::{
     style::Style,
     text::{Line, Span, Text},
 };
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::scrollback::truncate_end_to_width;
 use crate::theme::semantic;
@@ -126,11 +127,11 @@ fn build_compact_status(
     let ctx_len = if context_label.is_empty() {
         0
     } else {
-        context_label.chars().count() + 2
+        display_width(context_label) + 2
     };
-    let reserved = tokens_part.chars().count()
-        + queue_part.chars().count()
-        + phase_part.chars().count()
+    let reserved = display_width(&tokens_part)
+        + display_width(&queue_part)
+        + display_width(&phase_part)
         + ctx_len
         + 1;
     let available = (width as usize).saturating_sub(reserved);
@@ -141,10 +142,10 @@ fn build_compact_status(
     };
     let workspace_limit = available
         .saturating_sub(model_limit)
-        .saturating_sub(provider.chars().count().min(14))
+        .saturating_sub(display_width(provider).min(14))
         .clamp(8, 16);
 
-    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
+    let model_part = format_model_slot(model_name, model_limit);
     let ctx_part = if context_label.is_empty() {
         String::new()
     } else {
@@ -203,15 +204,15 @@ fn build_expanded_status(
     let ctx_len = if context_label.is_empty() {
         0
     } else {
-        context_label.chars().count() + 2
+        display_width(context_label) + 2
     };
     let right_part = format!("{tokens_part}{queue_part}{phase_part}");
-    let reserved = 1 + right_part.chars().count() + 5 + ctx_len;
+    let reserved = 1 + display_width(&right_part) + 5 + ctx_len;
     let available = (width as usize).saturating_sub(reserved);
     let provider_budget = if provider.is_empty() {
         0
     } else {
-        provider.chars().count().min(18) + 3
+        display_width(provider).min(18) + 3
     };
     let model_limit = if workspace.is_empty() {
         available.saturating_sub(provider_budget).clamp(10, 40)
@@ -225,7 +226,7 @@ fn build_expanded_status(
         .saturating_sub(provider_budget)
         .clamp(12, 48);
 
-    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
+    let model_part = format_model_slot(model_name, model_limit);
     let ctx_part = if context_label.is_empty() {
         String::new()
     } else {
@@ -264,15 +265,34 @@ fn status_provider_for_display<'a>(model_name: &str, provider: &'a str) -> &'a s
 }
 
 pub(crate) fn truncate_str(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
+    if max_len == 0 {
+        return String::new();
+    }
+    if display_width(s) <= max_len {
         return s.to_string();
     }
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() <= max_len {
-        return s.to_string();
+    let mut width = 0;
+    let mut truncated = String::new();
+    for ch in s.chars() {
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + char_width + 1 > max_len {
+            break;
+        }
+        truncated.push(ch);
+        width += char_width;
     }
-    let truncated: String = chars[..max_len - 1].iter().collect();
-    format!("{truncated}…")
+    truncated.push('…');
+    truncated
+}
+
+fn format_model_slot(model_name: &str, width: usize) -> String {
+    let model = truncate_str(model_name, width);
+    let padding = width.saturating_sub(display_width(&model));
+    format!("⬡ {model}{}", " ".repeat(padding))
+}
+
+fn display_width(value: &str) -> usize {
+    UnicodeWidthStr::width(value)
 }
 
 fn phase_status_label(status: &talos_conversation::StatusSnapshot) -> Option<String> {
