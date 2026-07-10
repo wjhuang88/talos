@@ -6,18 +6,17 @@
 use std::time::{Duration, Instant};
 
 use talos_conversation::{
-    CommandExecutionMode, CredentialResponseData, ModelPickerData,
-    SessionPickerItem, StatusSnapshot, TipKind,
+    CommandExecutionMode, CredentialResponseData, ModelPickerData, SessionPickerItem,
+    StatusSnapshot, TipKind,
 };
 use talos_core::ApprovalChoice;
 
 pub(crate) use crate::panel_state::{
-    BottomPanelState, PanelAction, PanelAcceptMode, PanelItemAction,
-    PanelKind, CredentialField, SLASH_MENU_MAX_VISIBLE,
+    BottomPanelState, CredentialField, PanelAcceptMode, PanelAction, PanelItemAction, PanelKind,
+    SLASH_MENU_MAX_VISIBLE,
 };
 
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
-
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum ApprovalState {
@@ -442,8 +441,6 @@ impl TuiState {
         }
     }
 }
-
-
 
 #[cfg(test)]
 #[path = "state_tests.rs"]

@@ -816,9 +816,7 @@ impl ConversationEngine {
             ));
             for (name, event, enabled) in &self.hook_declarations {
                 let status = if *enabled { "enabled" } else { "disabled" };
-                text.push_str(&format!(
-                    "[System]     {name} ({event}) [{status}]\n"
-                ));
+                text.push_str(&format!("[System]     {name} ({event}) [{status}]\n"));
             }
         }
         text.push_str("[System]   executable hook carriers: disabled\n");
@@ -1055,7 +1053,14 @@ impl ConversationEngine {
         }
         let text = std::mem::take(&mut self.current_thinking_text);
         let (tx, rx) = mpsc::unbounded_channel::<String>();
-        let _ = tx.send(text.clone());
+        let display_text = format!(
+            "Thinking:\n{}\n",
+            text.lines()
+                .map(|line| format!("| {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let _ = tx.send(display_text);
         drop(tx);
 
         self.messages.push(ChatMessage {

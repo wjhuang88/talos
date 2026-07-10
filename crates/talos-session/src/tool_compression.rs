@@ -33,9 +33,15 @@ pub fn compress_tool_output(content: &str, threshold: usize) -> ToolOutputCompre
     }
 
     let total = content.len();
+    let prefix_end = content
+        .char_indices()
+        .map(|(index, _)| index)
+        .take_while(|index| *index <= threshold)
+        .last()
+        .unwrap_or(0);
     let summary = format!(
         "{}\n... [truncated, {total} bytes total]",
-        &content[..threshold]
+        &content[..prefix_end]
     );
 
     ToolOutputCompression {
@@ -85,5 +91,12 @@ mod tests {
         assert_eq!(result.model_content, content);
         assert_eq!(result.raw_content, None);
         assert_eq!(result.raw_flag, 0);
+    }
+
+    #[test]
+    fn truncation_preserves_utf8_boundaries() {
+        let result = compress_tool_output("你好世界", 5);
+        assert_eq!(result.model_content, "你\n... [truncated, 12 bytes total]");
+        assert_eq!(result.raw_content.as_deref(), Some("你好世界"));
     }
 }

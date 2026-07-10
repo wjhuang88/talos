@@ -92,7 +92,6 @@ pub(crate) async fn handle_session_delete(
     }
 }
 
-
 pub(crate) async fn handle_provider_setup(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,
@@ -114,7 +113,11 @@ pub(crate) async fn handle_provider_setup(
     ));
 }
 
-pub(crate) async fn handle_connect(ui_tx: &mpsc::UnboundedSender<UiOutput>, config: &Config, provider: &str) {
+pub(crate) async fn handle_connect(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    provider: &str,
+) {
     if provider.is_empty() {
         let data = build_connect_picker_data(config);
         let _ = ui_tx.send(UiOutput::ConnectPicker(data));
@@ -443,7 +446,6 @@ pub(crate) async fn handle_session_model_with_credential(
         None
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_new(
@@ -958,5 +960,3 @@ pub(crate) async fn handle_session_fork(
         }
     }
 }
-
-

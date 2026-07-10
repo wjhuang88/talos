@@ -23,6 +23,7 @@ hex = "0.4"
 zstd = { version = "0.13", optional = true }
 
 [features]
+default = ["archive-compress-zstd"]
 archive-compress-zstd = ["dep:zstd"]
 
 [dev-dependencies]

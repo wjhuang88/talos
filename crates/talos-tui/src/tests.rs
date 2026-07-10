@@ -11,6 +11,7 @@ mod tests {
     use unicode_width::UnicodeWidthStr;
 
     use crate::inline_terminal::ViewportComponent;
+    use crate::panel_state::PanelItem;
     use crate::scrollback::{
         BottomPanelComponent, BottomPanelPlacement, bottom_panel_placement, bottom_panel_rows,
         build_input_text, build_status_text, cursor_line_col, input_line_count, stream_padding_for,
@@ -18,7 +19,6 @@ mod tests {
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, BottomPanelState, CtrlCState, Tip, TuiState};
-    use crate::panel_state::PanelItem;
     use crate::{contrast_ratio, rgb_components};
 
     // ── TuiState (pure UI) ─────────────────────────────────────────────

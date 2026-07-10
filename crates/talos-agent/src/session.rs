@@ -134,9 +134,7 @@ impl AppServerSession {
                             }
                         };
 
-                        if let (Some(file), Some(dir)) =
-                            (&self.session_file, &self.session_dir)
-                        {
+                        if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
                             let _ = self.try_archive_session(file, dir, &compacted);
                         }
 
@@ -289,8 +287,8 @@ impl AppServerSession {
         dir: &Path,
         _compacted: &[Message],
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        use talos_session::compaction_engine::CompactionEngine;
         use talos_session::CompactTextSessionStore;
+        use talos_session::compaction_engine::CompactionEngine;
 
         let store = std::sync::Arc::new(CompactTextSessionStore);
         let engine = CompactionEngine::new(store);

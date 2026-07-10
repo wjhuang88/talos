@@ -164,7 +164,10 @@ mod tests {
 
         {
             let store = WorkspaceTrustStore::new(&dir);
-            assert!(store.is_trusted(&ws), "trust should persist across instances");
+            assert!(
+                store.is_trusted(&ws),
+                "trust should persist across instances"
+            );
         }
 
         std::fs::remove_dir_all(&dir).ok();

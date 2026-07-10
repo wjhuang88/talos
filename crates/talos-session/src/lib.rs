@@ -30,20 +30,20 @@
 //! Entries without `id` or `parent_id` fields (from older JSONL files) are treated
 //! as part of a single linear branch. They are assigned synthetic IDs on load.
 
-mod error;
-mod jsonl;
 mod compact_text;
 pub mod compaction_engine;
 mod compression;
+mod error;
+mod jsonl;
 mod manager;
 mod segment_chain;
 pub mod sqlite;
 mod store;
 pub mod todo;
+mod tool_compression;
 mod topology;
 mod transcript;
-mod tool_compression;
-pub use tool_compression::{compress_tool_output, ToolOutputCompression};
+pub use tool_compression::{ToolOutputCompression, compress_tool_output};
 mod types;
 
 pub use error::SessionError;
@@ -60,8 +60,8 @@ pub use todo::{
     TodoUpdateBatchTool, TodoUpdateInput, TodoUpdateStatusInput, TodoUpdateStatusTool,
     TodoUpdateTool, status_icon,
 };
-pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 pub use transcript::{TranscriptEntry, export_json, export_markdown, read_transcript};
+pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetadata};
 
 #[cfg(test)]
 #[allow(warnings)]

@@ -183,4 +183,3 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);
     event_loop.run().await
 }
-

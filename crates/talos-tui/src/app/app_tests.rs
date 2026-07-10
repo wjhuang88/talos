@@ -348,9 +348,18 @@ fn thinking_preview_uses_two_color_three_segment_ripple() {
         scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(2));
     assert_eq!(expanded.len(), 4);
     assert_eq!(expanded[1].content.as_ref(), "hinkin");
-    assert_eq!(expanded[0].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
-    assert_eq!(expanded[1].style.fg, Some(semantic::THINKING_RIPPLE_PRIMARY));
-    assert_eq!(expanded[2].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
+    assert_eq!(
+        expanded[0].style.fg,
+        Some(semantic::THINKING_RIPPLE_SECONDARY)
+    );
+    assert_eq!(
+        expanded[1].style.fg,
+        Some(semantic::THINKING_RIPPLE_PRIMARY)
+    );
+    assert_eq!(
+        expanded[2].style.fg,
+        Some(semantic::THINKING_RIPPLE_SECONDARY)
+    );
 }
 
 #[test]

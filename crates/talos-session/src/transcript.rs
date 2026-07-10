@@ -70,7 +70,8 @@ pub fn export_markdown(entries: &[SessionEntry]) -> String {
     export_markdown_filtered(entries, false)
 }
 
-#[allow(dead_code)] pub fn export_markdown_with_thinking(entries: &[SessionEntry]) -> String {
+#[allow(dead_code)]
+pub fn export_markdown_with_thinking(entries: &[SessionEntry]) -> String {
     export_markdown_filtered(entries, true)
 }
 
@@ -123,8 +124,8 @@ pub fn read_transcript(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::{CompactTextSessionStore, JsonlSessionStore};
     use crate::SessionEntry;
+    use crate::store::{CompactTextSessionStore, JsonlSessionStore};
     use chrono::Utc;
     use uuid::Uuid;
 

@@ -289,24 +289,39 @@ impl PermissionEngine {
     ) -> PermissionDecision {
         let nature = facet.nature;
 
+        let mut matched_rule = None;
         for rule in &self.rules {
             match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
-                Ok(true) => return rule.decision.clone(),
+                Ok(true) => {
+                    matched_rule = Some(rule.decision.clone());
+                    break;
+                }
                 Ok(false) => continue,
                 Err(_) => continue,
             }
         }
 
-        if let Some(ref root) = self.workspace_root
-            && nature == talos_core::tool::ToolNature::Read
-            && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
-        {
-            return PermissionDecision::Allow;
+        // A persisted workspace trust decision is deliberately narrower than a
+        // general permission Allow: it applies only to repo-contained writes.
+        // Explicit Deny rules remain authoritative.
+        if let Some(PermissionDecision::Deny(reason)) = &matched_rule {
+            return PermissionDecision::Deny(reason.clone());
         }
 
         if self.trusted_workspace
             && let Some(ref root) = self.workspace_root
             && nature == talos_core::tool::ToolNature::Write
+            && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
+        {
+            return PermissionDecision::Allow;
+        }
+
+        if let Some(decision) = matched_rule {
+            return decision;
+        }
+
+        if let Some(ref root) = self.workspace_root
+            && nature == talos_core::tool::ToolNature::Read
             && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
         {
             return PermissionDecision::Allow;
@@ -432,14 +447,38 @@ fn is_workspace_path_allowed_with_resource(
 
 /// Checks whether `path` is within (or relative to) the workspace `root`.
 ///
-/// Relative paths are assumed to be workspace-relative. Absolute paths are
-/// checked with `starts_with`.
+/// Relative paths are resolved against the workspace root. Existing paths are
+/// canonicalized so symlink escapes are rejected; missing write targets use a
+/// lexical normalization that still rejects `..` escapes.
 fn is_path_in_workspace(path_str: &str, root: &Path) -> bool {
     let path = Path::new(path_str);
-    if path.is_relative() {
-        return true;
+    let root = match std::fs::canonicalize(root) {
+        Ok(root) => root,
+        Err(_) => return false,
+    };
+    let candidate = if path.is_relative() {
+        root.join(path)
+    } else {
+        path.to_path_buf()
+    };
+
+    if let Ok(canonical) = std::fs::canonicalize(&candidate) {
+        return canonical.starts_with(&root);
     }
-    path.starts_with(root)
+
+    let mut normalized = PathBuf::new();
+    for component in candidate.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    return false;
+                }
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    normalized.starts_with(root)
 }
 
 impl Default for PermissionEngine {
@@ -447,7 +486,6 @@ impl Default for PermissionEngine {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 #[path = "permission_tests.rs"]

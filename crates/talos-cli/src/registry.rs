@@ -9,11 +9,11 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
+use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
     AgentTool, ToolBackend, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
 };
-use talos_conversation::{TipKind, UiOutput};
 use talos_permission::{PermissionDecision, PermissionEngine};
 use talos_session::{
     SessionManager, TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool,
@@ -35,7 +35,6 @@ use uuid::Uuid;
 
 use crate::approval::{ApprovalPrompt, add_always_allow_rules, always_allow_rule_descriptions};
 use crate::colors;
-
 
 /// Non-blocking approval handler for TUI mode.
 ///

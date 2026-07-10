@@ -5,14 +5,13 @@
 //! orchestration remains under evaluation.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{
-    AgentTool, ToolFamily, ToolResult,
-};
+use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 use thiserror::Error;
 
@@ -30,8 +29,8 @@ pub enum GitToolError {
 #[path = "git_write.rs"]
 mod git_write;
 pub use git_write::{
-    GitAddInput, GitAddTool, GitCheckoutInput, GitCheckoutTool, GitCommitInput,
-    GitCommitTool, GitPullInput, GitPullTool, GitPushInput, GitPushTool,
+    GitAddInput, GitAddTool, GitCheckoutInput, GitCheckoutTool, GitCommitInput, GitCommitTool,
+    GitPullInput, GitPullTool, GitPushInput, GitPushTool,
 };
 
 fn discover_repo(workspace_root: &std::path::Path) -> Result<gix::Repository, GitToolError> {
@@ -447,14 +446,20 @@ impl GitDiffTool {
 
             let mut cmd = tokio::process::Command::new("git");
             cmd.arg("diff")
+                .arg("--no-ext-diff")
                 .arg(format!("{base}..{head}"))
-                .current_dir(&workdir);
+                .current_dir(&workdir)
+                .kill_on_drop(true);
             if let Some(p) = path_filter {
                 cmd.arg("--").arg(p);
             }
-            let output = cmd
-                .output()
+            let output = tokio::time::timeout(Duration::from_secs(10), cmd.output())
                 .await
+                .map_err(|_| {
+                    GitToolError::Git(format!(
+                        "git diff {base}..{head} timed out after 10 seconds"
+                    ))
+                })?
                 .map_err(|e| GitToolError::Git(format!("host git not available: {e}")))?;
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
@@ -653,7 +658,6 @@ impl GitShowTool {
         Ok(output.trim_end().to_string())
     }
 }
-
 
 #[cfg(test)]
 #[path = "git_tests.rs"]

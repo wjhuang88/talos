@@ -1,7 +1,11 @@
 #![allow(dead_code)]
 //! Session compaction engine — freezes segments, applies rules, archives (ADR-037 Mechanism B).
 
-use crate::compression::{NoCompressor, SegmentCompressor};
+#[cfg(not(feature = "archive-compress-zstd"))]
+use crate::compression::NoCompressor;
+use crate::compression::SegmentCompressor;
+#[cfg(feature = "archive-compress-zstd")]
+use crate::compression::ZstdCompressor;
 use crate::segment_chain::{ChainMetadata, SegmentMeta, SegmentStatus, chain_path};
 use crate::store::SessionStore;
 use crate::{SessionEntry, SessionError};
@@ -35,6 +39,9 @@ impl CompactionEngine {
     pub fn new(store: Arc<dyn SessionStore>) -> Self {
         Self {
             store,
+            #[cfg(feature = "archive-compress-zstd")]
+            compressor: Box::new(ZstdCompressor::default()),
+            #[cfg(not(feature = "archive-compress-zstd"))]
             compressor: Box::new(NoCompressor),
             rules: CompactionRules::default(),
         }
@@ -69,13 +76,11 @@ impl CompactionEngine {
             return Ok(CompactionResult::Skipped);
         }
 
-        let segment_id = format!("s{:03}", chrono::Utc::now().timestamp() % 1000);
+        let segment_id = format!("s-{}", uuid::Uuid::new_v4());
         let archive_path = session_dir.join(format!("{segment_id}.tlog"));
         let compressed_path = session_dir.join(format!("{segment_id}.tlog.zst"));
 
-        let original_bytes = std::fs::metadata(head_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let original_bytes = std::fs::metadata(head_path).map(|m| m.len()).unwrap_or(0);
 
         let archived_path = self.archive_head(head_path, &archive_path, &compressed_path)?;
 
@@ -119,9 +124,13 @@ impl CompactionEngine {
             .compressor
             .compress(&raw)
             .map_err(|e| SessionError::ParseError(e.to_string()))?;
-        std::fs::write(compressed_path, &compressed)?;
-        std::fs::write(archive_path, &raw)?;
-        Ok(compressed_path.to_path_buf())
+        if self.compressor.format_tag() == "none" {
+            std::fs::write(archive_path, &raw)?;
+            Ok(archive_path.to_path_buf())
+        } else {
+            std::fs::write(compressed_path, &compressed)?;
+            Ok(compressed_path.to_path_buf())
+        }
     }
 
     fn apply_rules(&self, entries: &[SessionEntry], keep_recent: usize) -> Vec<SessionEntry> {
@@ -139,8 +148,7 @@ impl CompactionEngine {
             role: "system".into(),
             content: format!(
                 "[Compaction summary: {} earlier entries summarized, {} recent entries preserved]",
-                split,
-                keep_recent
+                split, keep_recent
             ),
             metadata: crate::SessionMetadata::default(),
         });
@@ -164,16 +172,27 @@ impl CompactionEngine {
         let mut chain = ChainMetadata::read(&chain_file)
             .map_err(|e| SessionError::ParseError(e.to_string()))?;
 
-        if let Some(head) = chain.segments.iter_mut().find(|s| s.status == SegmentStatus::Active) {
-            head.status = SegmentStatus::Compressed;
-            head.archived_bytes = Some(archived_bytes);
-            head.archived_ts = Some(chrono::Utc::now().timestamp_millis());
-            head.archive_format = Some(self.compressor.format_tag().to_string());
-        }
-
+        let previous_archive = chain
+            .head_segment()
+            .and_then(|head| head.prev_segment_id.clone());
         let now = chrono::Utc::now().timestamp_millis();
+        chain
+            .segments
+            .retain(|segment| segment.status != SegmentStatus::Active);
         chain.segments.push(SegmentMeta {
             segment_id: segment_id.to_string(),
+            status: SegmentStatus::Compressed,
+            prev_segment_id: previous_archive,
+            record_count: _record_count,
+            orig_bytes: _orig_bytes,
+            archived_bytes: Some(archived_bytes),
+            created_ts: now,
+            archived_ts: Some(now),
+            archive_format: Some(self.compressor.format_tag().to_string()),
+            ref_count: 0,
+        });
+        chain.segments.push(SegmentMeta {
+            segment_id: "head".to_string(),
             status: SegmentStatus::Active,
             prev_segment_id: Some(segment_id.to_string()),
             record_count: 0,
@@ -185,7 +204,8 @@ impl CompactionEngine {
             ref_count: 0,
         });
 
-        chain.write(&chain_file)
+        chain
+            .write(&chain_file)
             .map_err(|e| SessionError::ParseError(e.to_string()))?;
         Ok(())
     }

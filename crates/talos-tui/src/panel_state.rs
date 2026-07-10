@@ -1,8 +1,7 @@
 //! Bottom panel state — slash command menu, pickers, approval overlay, credential input.
 
 use talos_conversation::{
-    CommandExecutionMode, ModelPickerData, ModelPickerItem,
-    SessionPickerItem,
+    CommandExecutionMode, ModelPickerData, ModelPickerItem, SessionPickerItem,
 };
 
 pub(crate) const SLASH_MENU_MAX_VISIBLE: usize = 8;

@@ -155,6 +155,21 @@ impl Clone for Session {
 }
 
 impl Session {
+    /// Archives the current log while holding the session write lock.
+    pub fn compact_archived(
+        &self,
+        max_entries: usize,
+    ) -> Result<crate::compaction_engine::CompactionResult, SessionError> {
+        let _lock = self
+            .write_lock
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        let engine = crate::compaction_engine::CompactionEngine::new(Arc::clone(&self.store));
+        let dir = self.file_path.parent().ok_or_else(|| {
+            SessionError::ParseError("session file has no parent directory".into())
+        })?;
+        engine.compact_segment(&self.file_path, dir, max_entries)
+    }
     /// Create a new session with a single empty root branch.
     /// The file path MUST already exist on disk.
     pub fn new(id: Uuid, project: String, workspace_root: String, file_path: PathBuf) -> Self {

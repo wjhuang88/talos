@@ -6,8 +6,8 @@ use serde_json::Value;
 use talos_core::tool::ToolNature;
 use thiserror::Error;
 
-use crate::resource::{ResourceExtractor, ResourceKind};
 use crate::PermissionDecision;
+use crate::resource::{ResourceExtractor, ResourceKind};
 
 /// Errors that can occur during permission evaluation.
 #[derive(Debug, Error)]

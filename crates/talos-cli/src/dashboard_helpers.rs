@@ -172,7 +172,6 @@ pub(crate) fn parse_dashboard_open_iterations(content: &str) -> Vec<(String, Str
 
 #[cfg(test)]
 mod dashboard_tests {
-    use super::*;
 
     #[test]
     fn parse_dashboard_board_section_extracts_items() {
@@ -207,4 +206,3 @@ mod dashboard_tests {
         );
     }
 }
-

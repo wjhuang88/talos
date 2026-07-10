@@ -69,14 +69,16 @@ pub fn builtin_providers() -> Vec<BuiltinProvider> {
 
 /// Internal TOML dataset wrapper.
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)] struct TomlDataset {
+#[allow(dead_code)]
+struct TomlDataset {
     #[serde(default)]
     providers: Vec<TomlProviderEntry>,
     models: Vec<ModelMetadata>,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)] pub(crate) struct TomlProviderEntry {
+#[allow(dead_code)]
+pub(crate) struct TomlProviderEntry {
     id: String,
     #[serde(default)]
     name: String,

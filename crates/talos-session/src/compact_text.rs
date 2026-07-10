@@ -44,11 +44,7 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         read_tlog_entries(file_path)
     }
 
-    fn append_entry(
-        &self,
-        file_path: &Path,
-        entry: &SessionEntry,
-    ) -> Result<(), SessionError> {
+    fn append_entry(&self, file_path: &Path, entry: &SessionEntry) -> Result<(), SessionError> {
         if !file_path.exists() {
             // Write file header on first append.
             if let Some(parent) = file_path.parent() {
@@ -59,14 +55,16 @@ impl crate::store::SessionStore for CompactTextSessionStore {
                 .write(true)
                 .truncate(true)
                 .open(file_path)?;
-            writeln!(file, "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}", Utc::now().timestamp_millis())?;
+            writeln!(
+                file,
+                "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
+                Utc::now().timestamp_millis()
+            )?;
             file.flush()?;
         }
 
         let line = encode_entry(entry);
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open(file_path)?;
+        let mut file = OpenOptions::new().append(true).open(file_path)?;
         file.write_all(line.as_bytes())?;
         file.flush()?;
         Ok(())
@@ -157,7 +155,8 @@ fn read_tlog_entries(path: &Path) -> Result<Vec<SessionEntry>, SessionError> {
 }
 
 fn parse_tlog_bytes(data: &[u8]) -> Result<Vec<SessionEntry>, SessionError> {
-    let text = std::str::from_utf8(data).map_err(|_| SessionError::ParseError("invalid UTF-8".into()))?;
+    let text =
+        std::str::from_utf8(data).map_err(|_| SessionError::ParseError("invalid UTF-8".into()))?;
     let mut entries = Vec::new();
     let mut pos = 0;
     let mut first_line = true;
@@ -205,7 +204,10 @@ fn parse_tlog_bytes(data: &[u8]) -> Result<Vec<SessionEntry>, SessionError> {
                     let search_remaining = &text[search_pos..];
                     if let Some(nl) = search_remaining.find('\n') {
                         let candidate = &search_remaining[..nl];
-                        if candidate.starts_with("E\t") || candidate.is_empty() || candidate.starts_with(TLOG_MAGIC) {
+                        if candidate.starts_with("E\t")
+                            || candidate.is_empty()
+                            || candidate.starts_with(TLOG_MAGIC)
+                        {
                             pos = search_pos;
                             break;
                         }
@@ -267,9 +269,7 @@ fn try_parse_record(text: &str) -> Result<(SessionEntry, usize), DecodeError> {
     let rest = &text[rest_start..];
 
     let colon_pos = rest.find(':').ok_or(DecodeError::Skip)?;
-    let content_len: usize = rest[..colon_pos]
-        .parse()
-        .map_err(|_| DecodeError::Skip)?;
+    let content_len: usize = rest[..colon_pos].parse().map_err(|_| DecodeError::Skip)?;
 
     let content_start = colon_pos + 1;
     let content_end = content_start + content_len;
@@ -304,8 +304,7 @@ fn try_parse_record(text: &str) -> Result<(SessionEntry, usize), DecodeError> {
         serde_json::from_str(meta_str).map_err(|_| DecodeError::Skip)?
     };
 
-    let timestamp =
-        chrono::DateTime::from_timestamp_millis(ts_ms).unwrap_or_else(Utc::now);
+    let timestamp = chrono::DateTime::from_timestamp_millis(ts_ms).unwrap_or_else(Utc::now);
 
     let entry = SessionEntry {
         id,
@@ -430,8 +429,8 @@ fn scan_tlog_file(path: &Path) -> Result<SessionInfo, SessionError> {
 #[allow(warnings)]
 mod tests {
     use super::*;
-    use crate::store::SessionStore;
     use crate::JsonlSessionStore;
+    use crate::store::SessionStore;
     use chrono::TimeZone;
     use std::io::Read;
 
@@ -711,8 +710,14 @@ mod tests {
                     None
                 },
                 timestamp: Utc::now(),
-                role: if i % 2 == 0 { "user".to_string() } else { "assistant".to_string() },
-                content: format!("This is message number {i} with some content to simulate a real conversation."),
+                role: if i % 2 == 0 {
+                    "user".to_string()
+                } else {
+                    "assistant".to_string()
+                },
+                content: format!(
+                    "This is message number {i} with some content to simulate a real conversation."
+                ),
                 metadata: SessionMetadata {
                     provider: Some("anthropic".into()),
                     model: Some("claude-sonnet-4-20250514".into()),
@@ -741,8 +746,14 @@ mod tests {
 
         println!("JSONL: {jsonl_size} bytes");
         println!("TLOG:  {tlog_size} bytes");
-        println!("Ratio: {:.1}%", (tlog_size as f64 / jsonl_size as f64) * 100.0);
-        println!("Saving: {:.1}%", (1.0 - tlog_size as f64 / jsonl_size as f64) * 100.0);
+        println!(
+            "Ratio: {:.1}%",
+            (tlog_size as f64 / jsonl_size as f64) * 100.0
+        );
+        println!(
+            "Saving: {:.1}%",
+            (1.0 - tlog_size as f64 / jsonl_size as f64) * 100.0
+        );
 
         // .tlog should be smaller than JSONL.
         assert!(

@@ -789,10 +789,7 @@ fn list_sessions_old_format_preview_handles_utf8_char_boundary() {
 
     let content = "你好！我是 Talos，一个 AI 编程助手。".repeat(8);
 
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(&file_path)
-        .unwrap();
+    let mut file = OpenOptions::new().append(true).open(&file_path).unwrap();
     let old_entry = serde_json::json!({
         "type": "message",
         "data": {
@@ -823,10 +820,7 @@ fn backward_compatibility_with_old_jsonl_format() {
     let file_path = project_dir.join(format!("{id}.jsonl"));
     std::fs::File::create(&file_path).unwrap();
 
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(&file_path)
-        .unwrap();
+    let mut file = OpenOptions::new().append(true).open(&file_path).unwrap();
 
     let old_entry1 = serde_json::json!({
         "type": "message",

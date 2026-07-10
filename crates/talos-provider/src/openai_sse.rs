@@ -457,18 +457,18 @@ fn extract_openai_stream_error(data: &Value) -> Option<String> {
 #[allow(warnings)]
 mod tests {
     use super::*;
-    use talos_config::ProviderTimeoutConfig;
-    use talos_core::message::Message;
-    use talos_core::provider::{LanguageModel, ProviderError};
-    use crate::openai_request::{
-        build_request_body, EMPTY_ASSISTANT_MESSAGE, EMPTY_ASSISTANT_TOOL_CALL_MESSAGE,
-        EMPTY_TOOL_RESULT_MESSAGE, EMPTY_USER_MESSAGE, OpenAIFunction, OpenAIMessage, OpenAIToolCall,
-    };
     use crate::openai::OpenAIProvider;
-    use crate::openai::{OPENAI_API_URL, CHAT_COMPLETIONS_PATH};
+    use crate::openai::{CHAT_COMPLETIONS_PATH, OPENAI_API_URL};
+    use crate::openai_request::{
+        EMPTY_ASSISTANT_MESSAGE, EMPTY_ASSISTANT_TOOL_CALL_MESSAGE, EMPTY_TOOL_RESULT_MESSAGE,
+        EMPTY_USER_MESSAGE, OpenAIFunction, OpenAIMessage, OpenAIToolCall, build_request_body,
+    };
     use serde_json::json;
+    use talos_config::ProviderTimeoutConfig;
     use talos_config::{ReasoningEffort, ReasoningOptions};
+    use talos_core::message::Message;
     use talos_core::message::{AssistantReasoning, ReasoningBlock};
+    use talos_core::provider::{LanguageModel, ProviderError};
 
     async fn spawn_chunked_sse_server(
         chunks: Vec<(Duration, String)>,

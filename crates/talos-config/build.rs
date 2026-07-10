@@ -309,11 +309,8 @@ fn generate_toml(providers: Vec<TomlProvider>, models: Vec<TomlModel>) -> String
 }
 
 fn generate_compiled_models() {
-    let toml_str = std::fs::read_to_string("src/models.toml")
-        .expect("models.toml must exist");
-    let root: toml::Table = toml_str
-        .parse()
-        .expect("models.toml must be valid TOML");
+    let toml_str = std::fs::read_to_string("src/models.toml").expect("models.toml must exist");
+    let root: toml::Table = toml_str.parse().expect("models.toml must be valid TOML");
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR must be set");
     let dest = std::path::Path::new(&out_dir).join("models_data.rs");
@@ -366,16 +363,33 @@ fn generate_models_rust(root: &toml::Table) -> String {
                 let output_limit = opt_num_field(t, "output_limit");
                 let release_date = opt_str_field(t, "release_date");
                 let caps = t.get("capabilities").and_then(|v| v.as_table());
-                let tools = caps.and_then(|c| c.get("tools")).and_then(|v| v.as_bool()).unwrap_or(false);
-                let so = caps.and_then(|c| c.get("structured_output")).and_then(|v| v.as_bool()).unwrap_or(false);
-                let reasoning = caps.and_then(|c| c.get("reasoning")).and_then(|v| v.as_bool()).unwrap_or(false);
-                let image = caps.and_then(|c| c.get("image_input")).and_then(|v| v.as_bool()).unwrap_or(false);
+                let tools = caps
+                    .and_then(|c| c.get("tools"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let so = caps
+                    .and_then(|c| c.get("structured_output"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let reasoning = caps
+                    .and_then(|c| c.get("reasoning"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let image = caps
+                    .and_then(|c| c.get("image_input"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 let pricing = if let Some(p) = t.get("pricing").and_then(|v| v.as_table()) {
                     let inp = p.get("input_per_1m").and_then(|v| v.as_float());
                     let outp = p.get("output_per_1m").and_then(|v| v.as_float());
                     let cache = p.get("cache_read_per_1m").and_then(|v| v.as_float());
                     if inp.is_some() || outp.is_some() || cache.is_some() {
-                        format!("Some(talos_core::model::ModelPricing {{ input_per_1m: {}, output_per_1m: {}, cache_read_per_1m: {} }})", opt_f64(inp), opt_f64(outp), opt_f64(cache))
+                        format!(
+                            "Some(talos_core::model::ModelPricing {{ input_per_1m: {}, output_per_1m: {}, cache_read_per_1m: {} }})",
+                            opt_f64(inp),
+                            opt_f64(outp),
+                            opt_f64(cache)
+                        )
                     } else {
                         "None".to_string()
                     }

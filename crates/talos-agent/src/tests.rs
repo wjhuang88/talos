@@ -1930,10 +1930,10 @@ impl SandboxProvider for MockSandbox {
 #[tokio::test]
 async fn test_permission_check_blocks_denied_tool() {
     let mut engine = PermissionEngine {
-                rules: Vec::new(),
-                workspace_root: None,
-                trusted_workspace: false,
-            };
+        rules: Vec::new(),
+        workspace_root: None,
+        trusted_workspace: false,
+    };
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "echo".into(),
         path_pattern: None,
@@ -1997,10 +1997,10 @@ async fn test_permission_check_blocks_denied_tool() {
 #[tokio::test]
 async fn test_permission_check_allows_permitted_tool() {
     let mut engine = PermissionEngine {
-                rules: Vec::new(),
-                workspace_root: None,
-                trusted_workspace: false,
-            };
+        rules: Vec::new(),
+        workspace_root: None,
+        trusted_workspace: false,
+    };
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "echo".into(),
         path_pattern: None,
@@ -2064,10 +2064,10 @@ async fn test_permission_check_allows_permitted_tool() {
 #[tokio::test]
 async fn test_permission_ask_defaults_to_deny() {
     let mut engine = PermissionEngine {
-                rules: Vec::new(),
-                workspace_root: None,
-                trusted_workspace: false,
-            };
+        rules: Vec::new(),
+        workspace_root: None,
+        trusted_workspace: false,
+    };
     engine.add_rule(talos_permission::PermissionRule {
         tool_name: "echo".into(),
         path_pattern: None,
@@ -2761,10 +2761,10 @@ async fn test_disclosed_browser_backend_still_requires_permission_allow() {
     }));
 
     let mut engine = PermissionEngine {
-                rules: Vec::new(),
-                workspace_root: None,
-                trusted_workspace: false,
-            };
+        rules: Vec::new(),
+        workspace_root: None,
+        trusted_workspace: false,
+    };
     engine.add_rule(talos_permission::PermissionRule::new_nature(
         ToolNature::Network,
         None,

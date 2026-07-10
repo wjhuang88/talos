@@ -9,7 +9,6 @@
 //! In the current state (pre-Slice-D), there is always exactly one segment (the
 //! head). The chain.tlog exists only as infrastructure for future archival.
 
-
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -67,11 +66,15 @@ pub struct ChainMetadata {
 
 impl ChainMetadata {
     pub fn head_segment(&self) -> Option<&SegmentMeta> {
-        self.segments.iter().find(|s| s.status == SegmentStatus::Active)
+        self.segments
+            .iter()
+            .find(|s| s.status == SegmentStatus::Active)
     }
 
     pub fn archived_segments(&self) -> impl Iterator<Item = &SegmentMeta> {
-        self.segments.iter().filter(|s| s.status != SegmentStatus::Active)
+        self.segments
+            .iter()
+            .filter(|s| s.status != SegmentStatus::Active)
     }
 
     pub fn total_ref_count(&self, segment_id: &str) -> u32 {
@@ -159,10 +162,7 @@ impl ChainMetadata {
                 .archived_ts
                 .map(|t| t.to_string())
                 .unwrap_or_else(|| "-".into());
-            let archive_format = seg
-                .archive_format
-                .as_deref()
-                .unwrap_or("-");
+            let archive_format = seg.archive_format.as_deref().unwrap_or("-");
             writeln!(
                 file,
                 "S\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",

@@ -5,9 +5,6 @@
 //! to reduce storage. The `SegmentCompressor` trait abstracts compression
 //! behind a swappable interface per ADR-036.
 
-#[cfg(test)]
-use std::sync::OnceLock;
-
 pub trait SegmentCompressor: Send + Sync {
     fn compress(&self, input: &[u8]) -> Result<Vec<u8>, CompressionError>;
     fn decompress(&self, input: &[u8]) -> Result<Vec<u8>, CompressionError>;

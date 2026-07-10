@@ -154,16 +154,24 @@ impl Tui {
                     ..
                 } => {
                     if let Some(ar) = reasoning
-                        && let Some(text) = talos_core::message::project_displayable_reasoning(ar) {
-                            let stream = futures::stream::iter(vec![text]);
-                            let msg = talos_conversation::StreamMessage {
-                                source: talos_conversation::MessageSource::Reasoning,
-                                stream: Box::pin(stream),
-                            };
-                            self.handle_ui_output(UiOutput::Stream(msg));
-                            self.consume_stream_completely();
-                            self.finalize_active_stream();
-                        }
+                        && let Some(text) = talos_core::message::project_displayable_reasoning(ar)
+                    {
+                        let display_text = format!(
+                            "Thinking:\n{}\n",
+                            text.lines()
+                                .map(|line| format!("| {line}"))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        );
+                        let stream = futures::stream::iter(vec![display_text]);
+                        let msg = talos_conversation::StreamMessage {
+                            source: talos_conversation::MessageSource::Reasoning,
+                            stream: Box::pin(stream),
+                        };
+                        self.handle_ui_output(UiOutput::Stream(msg));
+                        self.consume_stream_completely();
+                        self.finalize_active_stream();
+                    }
 
                     let tool_calls_in_text =
                         talos_core::message::extract_tool_calls_from_text(content);
@@ -713,10 +721,8 @@ impl Tui {
     }
 
     fn advance_processing_frame(&mut self) {
-        self.processing_frame = next_processing_frame(
-            self.state.status.is_processing,
-            self.processing_frame,
-        );
+        self.processing_frame =
+            next_processing_frame(self.state.status.is_processing, self.processing_frame);
     }
 
     fn draw_frame(&mut self) -> io::Result<()> {

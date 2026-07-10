@@ -489,12 +489,12 @@ fn extract_error_message(data: &Value) -> Option<String> {
 #[allow(warnings)]
 mod tests {
     use super::*;
+    use crate::AnthropicProvider;
     use serde_json::json;
     use talos_config::ProviderTimeoutConfig;
     use talos_core::message::Message;
-    use talos_core::provider::ProviderError;
-    use crate::AnthropicProvider;
     use talos_core::provider::LanguageModel;
+    use talos_core::provider::ProviderError;
 
     async fn spawn_chunked_sse_server(
         chunks: Vec<(Duration, String)>,

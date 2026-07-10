@@ -7,6 +7,7 @@ pub(crate) use session_handlers::*;
 mod mode_interactive;
 pub(crate) use mode_interactive::run_interactive_mode;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -471,10 +472,15 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     // the old actor's session.
     let mut owning_session: talos_session::Session = session.clone();
     tokio::spawn(async move {
+        let mut raw_tool_outputs = HashMap::<String, String>::new();
         loop {
             while let Some(session_event) = bridge_forwarder.recv().await {
                 match session_event {
                     SessionEvent::AgentEvent { event } => {
+                        if let AgentEvent::ToolResult { result } = &event {
+                            raw_tool_outputs
+                                .insert(result.tool_use_id.clone(), result.content.clone());
+                        }
                         if !matches!(event, AgentEvent::ThinkingDelta { .. }) {
                             let _ = owning_session.append_event(&event);
                         }
@@ -493,14 +499,30 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                                 continue;
                             }
                             let info = model_info_rx_for_bridge.borrow().clone();
-                            let metadata =
+                            let mut metadata =
                                 session_metadata_for_model(&info.model_name, &info.provider);
+                            if let Message::Tool { result } = msg
+                                && let Some(raw) = raw_tool_outputs.remove(&result.tool_use_id)
+                                && raw != result.content
+                            {
+                                metadata.raw_content = Some(raw);
+                            }
                             if let Err(e) = owning_session.append_with_metadata(msg, metadata) {
                                 eprintln!("Warning: failed to persist message: {e}");
                             }
                         }
                         if let Err(e) = session_manager_for_persist.update_index(&owning_session) {
                             eprintln!("Warning: failed to update session index: {e}");
+                        }
+                        // Keep on-disk session logs bounded after persistence. The session owns
+                        // the write lock, so archival cannot race an append from this bridge.
+                        if owning_session
+                            .read_entries()
+                            .map(|entries| entries.len() > 200)
+                            .unwrap_or(false)
+                            && let Err(e) = owning_session.compact_archived(50)
+                        {
+                            eprintln!("Warning: failed to archive session: {e}");
                         }
                     }
                     SessionEvent::TurnCompleted {
@@ -619,7 +641,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     if config.dashboard.enabled {
-        let snapshot = crate::dashboard_helpers::build_dashboard_snapshot(&config, &session_manager, &workspace_root_str);
+        let snapshot = crate::dashboard_helpers::build_dashboard_snapshot(
+            &config,
+            &session_manager,
+            &workspace_root_str,
+        );
         let server = talos_dashboard::DashboardServer::with_loopback_only(
             snapshot,
             config.dashboard.loopback_only,
@@ -690,7 +716,6 @@ pub(crate) async fn run_mcp_server() -> Result<()> {
 
 /// Handle `/new` — create a fresh session and transition to it.
 #[allow(clippy::too_many_arguments)]
-
 #[cfg(test)]
 #[path = "mode_runners_tests.rs"]
 mod tests;

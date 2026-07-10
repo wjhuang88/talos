@@ -14,10 +14,10 @@
 
 mod approval;
 mod colors;
+mod dashboard_helpers;
 mod event_loop;
 mod exploration_cli;
 mod governance;
-mod dashboard_helpers;
 mod governance_mutation;
 mod init_wizard;
 mod logging;

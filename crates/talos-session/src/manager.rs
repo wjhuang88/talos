@@ -508,11 +508,12 @@ impl SessionManager {
                                 .and_then(|n| n.to_str())
                                 .unwrap_or("unknown")
                                 .to_string();
-                            let session_store = if path.extension().and_then(|e| e.to_str()) == Some("tlog") {
-                                Arc::clone(&self.store)
-                            } else {
-                                Arc::clone(&self.jsonl_store)
-                            };
+                            let session_store =
+                                if path.extension().and_then(|e| e.to_str()) == Some("tlog") {
+                                    Arc::clone(&self.store)
+                                } else {
+                                    Arc::clone(&self.jsonl_store)
+                                };
                             let mut session = Session::with_store(
                                 id,
                                 project,
@@ -699,11 +700,7 @@ impl SessionManager {
         if let Some(target) = &policy.workspace_root {
             let workspace_dir = self.sessions_dir.join(workspace_dir_name(target));
             if workspace_dir.exists() {
-                self.collect_cleanup_workspace(
-                    target,
-                    &workspace_dir,
-                    &mut by_workspace,
-                )?;
+                self.collect_cleanup_workspace(target, &workspace_dir, &mut by_workspace)?;
             }
             return Ok(by_workspace);
         }
@@ -717,11 +714,7 @@ impl SessionManager {
             let workspace_root = workspace_root_from_dir_name(
                 &ws_dir.file_name().unwrap_or_default().to_string_lossy(),
             );
-            self.collect_cleanup_workspace(
-                &workspace_root,
-                &ws_dir,
-                &mut by_workspace,
-            )?;
+            self.collect_cleanup_workspace(&workspace_root, &ws_dir, &mut by_workspace)?;
         }
 
         Ok(by_workspace)
