@@ -1052,10 +1052,7 @@ impl ConversationEngine {
             return None;
         }
         let text = std::mem::take(&mut self.current_thinking_text);
-        let (tx, rx) = mpsc::unbounded_channel::<String>();
         let display_text = format!("Thinking: {text}\n");
-        let _ = tx.send(display_text);
-        drop(tx);
 
         self.messages.push(ChatMessage {
             role: MessageRole::Reasoning,
@@ -1067,10 +1064,7 @@ impl ConversationEngine {
 
         Some(vec![
             UiOutput::ThinkingPreview { text: None },
-            UiOutput::Stream(StreamMessage {
-                source: MessageSource::Reasoning,
-                stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
-            }),
+            UiOutput::Reasoning(display_text),
         ])
     }
 

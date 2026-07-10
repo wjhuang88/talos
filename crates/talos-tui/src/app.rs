@@ -157,14 +157,7 @@ impl Tui {
                         && let Some(text) = talos_core::message::project_displayable_reasoning(ar)
                     {
                         let display_text = format!("Thinking: {text}\n");
-                        let stream = futures::stream::iter(vec![display_text]);
-                        let msg = talos_conversation::StreamMessage {
-                            source: talos_conversation::MessageSource::Reasoning,
-                            stream: Box::pin(stream),
-                        };
-                        self.handle_ui_output(UiOutput::Stream(msg));
-                        self.consume_stream_completely();
-                        self.finalize_active_stream();
+                        self.handle_ui_output(UiOutput::Reasoning(display_text));
                     }
 
                     let tool_calls_in_text =
@@ -528,6 +521,14 @@ impl Tui {
                 self.pending_stream_opening = self.stream_render.start(msg.source.clone());
                 self.stream_opening_pending = true;
                 self.active_stream = Some(msg.stream);
+            }
+            UiOutput::Reasoning(text) => {
+                self.pending_scrollback
+                    .extend(crate::scrollback::render_history_message(
+                        &mut self.stream_count,
+                        talos_conversation::MessageSource::Reasoning,
+                        &text,
+                    ));
             }
             UiOutput::ToolCallStarted { .. } => {
                 if self.active_stream.is_some() {

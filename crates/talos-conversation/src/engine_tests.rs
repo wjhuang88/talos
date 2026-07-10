@@ -1523,6 +1523,12 @@ fn thinking_delta_updates_preview_without_history() {
             .iter()
             .any(|output| matches!(output, UiOutput::ThinkingPreview { text: None }))
     );
+    assert!(
+        outputs.iter().any(
+            |output| matches!(output, UiOutput::Reasoning(text) if text == "Thinking: checking constraints\n")
+        ),
+        "finalized thinking must use the non-streaming output path"
+    );
     assert_eq!(engine.messages.len(), 1);
     assert_eq!(engine.messages[0].role, MessageRole::Reasoning);
     assert_eq!(engine.messages[0].content, "checking constraints");

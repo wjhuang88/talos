@@ -181,6 +181,8 @@ pub struct StreamMessage {
 
 pub enum UiOutput {
     Stream(StreamMessage),
+    /// A finalized reasoning block that must not replace the active assistant stream.
+    Reasoning(String),
     Status(StatusSnapshot),
     /// Current durable session identity for UI summary surfaces.
     SessionIdentity {
