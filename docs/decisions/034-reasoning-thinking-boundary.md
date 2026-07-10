@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (revised 2026-07-03 after architecture review)
+Accepted (v4 revised 2026-07-10 for bounded visible-history projection)
 
 Revision history:
 
@@ -21,6 +21,11 @@ Revision history:
   deliver JSONL compatibility), and official OpenAI Chat Completions never streams
   `reasoning_content`. This revision redesigns persistence around structured `ReasoningBlock`s
   with origin-gated replay.
+- **v4 (2026-07-10)**: Maintainer change control for TUI-029 supersedes v3's transient-only
+  display clauses. Reasoning text already exposed through `ThinkingDelta` may be archived as a
+  separate static TUI history block and reconstructed on resume from displayable text fields.
+  Signatures and `ReasoningBlock::Redacted` remain opaque and non-displayable; provider replay,
+  origin gating, and durable storage remain unchanged.
 
 ## Context
 
@@ -118,7 +123,8 @@ boundary violation the dedicated-variant design exists to prevent.
 
 ```rust
 /// Emitted once per provider response, before `TurnEnd`, when the response
-/// carried reasoning blocks. Durable replay payload; never display content.
+/// carried reasoning blocks. Durable replay payload; never render this event
+/// directly. TUI-029 display projection uses the filtered text helper only.
 ReasoningComplete { blocks: Vec<ReasoningBlock> },
 ```
 
@@ -161,7 +167,8 @@ pub enum ReasoningBlock {
 }
 
 /// Reasoning payload for one assistant message, stamped with the identity
-/// that produced it. Request-history metadata only — never display content.
+/// that produced it. Request-history metadata; display consumers may access
+/// only the filtered text projection defined by ADR-034 v4 / TUI-029.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AssistantReasoning {
     /// Config provider key that produced the blocks (e.g. `anthropic`, `my-gateway`).
@@ -335,12 +342,16 @@ are deferred until evidence demands them; conditions 1-2 already prevent the kno
   provider will return an error if the model does not support reasoning.
 - Reasoning is never auto-enabled. The user must explicitly set `reasoning = { ... }` per model.
 
-### Persistence: two layers, symmetric round-trip inside talos-session
+### Persistence: three layers, one durable payload
 
-Thinking content serves two purposes with different persistence requirements:
+Thinking content serves three purposes with different persistence requirements:
 
-1. **Display persistence** (scrollback, transcript, export): transient. Unchanged from today.
-2. **Request-history persistence** (JSONL → resume → replay): durable, structured, origin-stamped.
+1. **Live display** (preview): transient `ThinkingDelta` text while the provider is reasoning.
+2. **Visible-history projection** (TUI-029): finalized displayable text may enter static terminal
+   scrollback and may be reconstructed on resume. This projection is not provider context and is
+   not duplicated into session message content.
+3. **Request-history persistence** (session store → resume → replay): durable, structured,
+   origin-stamped `AssistantReasoning` metadata.
 
 The critical corrected fact (review verdict Q4): session JSONL does **not** serialize `Message`
 values. `message_parts()` flattens to role/content strings; `read_messages()` reconstructs
@@ -370,6 +381,9 @@ End-to-end data flow (no step is optional):
 
 ```
 provider stream ──ThinkingDelta──────────────► conversation preview (display, transient)
+       │                                              │
+       │                                              └─► bounded static history projection
+       │                                                   at answer/tool transition
        │
        └─ReasoningComplete{blocks}─► agent stamps AssistantReasoning{provider,model,blocks}
                                      and attaches to the assembled assistant Message
@@ -401,15 +415,22 @@ The existing JSONL exclusion of `AgentEvent::ThinkingDelta` stays, and
 bridge filter at `mode_runners.rs:724`): its payload persists via `SessionMetadata`, and
 persisting it as an event row would duplicate signatures into event history.
 
-### Security boundary: reasoning never reaches display or export surfaces
+### Security boundary: only displayable reasoning text reaches visible history
 
-Reasoning is request-history metadata, not conversation content (review verdict Q5). Explicitly:
+Provider-native reasoning remains request-history metadata, not ordinary assistant content. TUI-029
+adds a deliberately narrower display projection:
 
-- `reasoning` is never rendered into scrollback, `ChatMessage.content`, or the TUI beyond the
-  existing transient preview.
-- `/copy` and `/export` build from the visible transcript
-  (`ConversationEngine::transcript_plain_text()` / markdown) and MUST NOT be extended to include
-  durable `reasoning` — this is now an intentional boundary, not an implementation accident.
+- Live archival is sourced from `ThinkingDelta`, which is already displayable preview text. It is
+  finalized before the first answer/tool event for that provider response.
+- Resume archival may project only `ReasoningBlock::Thinking.text` and
+  `ReasoningBlock::Plain.text` through one centralized helper. Empty text is skipped.
+- `ReasoningBlock::Thinking.signature` and `ReasoningBlock::Redacted.data` are never inspected,
+  rendered, copied, exported, logged, truncated, or reformatted.
+- The archive is a separate reasoning history role. It must never be concatenated into
+  `Message::Assistant.content`, a tool result, a system message, or provider request context.
+- `/copy` and `/export` exclude reasoning by default. `/export <path> --include-thinking` may
+  include only the filtered text projection with an explicit `Thinking` heading. Raw metadata is
+  never exported through this flag.
 - Any future raw-session export feature must redact `SessionMetadata.reasoning` by default or
   require explicit opt-in.
 - JSONL on disk gains encrypted (`signature`, `redacted_thinking.data`) and plaintext reasoning
@@ -431,11 +452,18 @@ This ADR fixes only the correctness-critical boundary:
 - Age-based reasoning trimming (e.g., strip reasoning from turns older than N) is **deferred to
   MEM-007** (active context compression), where token budgeting already lives.
 
-### TUI rendering: existing preview behavior
+### TUI rendering: live preview plus static finalized archive
 
-The TUI already renders `"thinking: {text}"` in the one-line `PreviewComponent` during the
-processing phase. Sufficient for this slice: no collapsible section, no scrollable thinking
-panel. Richer thinking UX requires its own design decision.
+The live one-line `PreviewComponent` remains unchanged while processing. When displayable reasoning
+transitions to answer text or tool use, TUI-029 finalizes the accumulated text into a separate,
+static reasoning history block before the answer/tool entry. The block uses a `Thinking` label and
+indented `| ` body lines with a subdued style. It is a one-shot terminal scrollback print and does
+not add an interactive widget, retained render buffer, or alternate history surface, so ADR-035
+remains intact.
+
+Cancellation and provider failure clear an unfinished preview without archiving it in the first
+implementation slice. `MaxTokens` may archive text already delivered as displayable reasoning, but
+must not fabricate missing content.
 
 ### Cost model: surface reasoning tokens as informational subset of output
 
@@ -495,18 +523,22 @@ reconstruct hidden chain-of-thought.
 6. **Capability gating**: warn-and-skip if catalog says `reasoning = false`; trust config for
    user-configured models. Never auto-enable.
 
-7. **Persistence**: two layers. Display transient (unchanged). Durable reasoning rides
-   `SessionMetadata.reasoning` with encode/decode implemented symmetrically inside
-   talos-session (`append_with_metadata` lifts; `read_messages` re-attaches).
+7. **Persistence**: three layers. Live preview is transient; visible history is a filtered
+   projection; durable provider replay rides `SessionMetadata.reasoning` with encode/decode
+   implemented symmetrically inside talos-session (`append_with_metadata` lifts;
+   `read_messages` re-attaches). The visible projection creates no duplicate session payload.
    `ReasoningComplete` joins `ThinkingDelta` in the event-persistence exclusion.
 
-8. **Security boundary**: reasoning excluded from scrollback, transcript, `/copy`, `/export`;
-   future raw exports redact by default.
+8. **Security boundary**: only displayable `Thinking.text` / `Plain.text` may reach reasoning
+   scrollback. Signatures and redacted payloads remain non-displayable. `/copy` and `/export`
+   exclude reasoning by default; explicit `--include-thinking` exports filtered text only; future
+   raw exports redact metadata by default.
 
 9. **Compaction**: reasoning never survives its message through compaction; age-based trimming
    deferred to MEM-007.
 
-10. **TUI rendering**: existing one-line preview. No new widget.
+10. **TUI rendering**: keep the one-line live preview and add a distinct static reasoning history
+    block at answer/tool transition. No interactive widget or managed history surface.
 
 11. **Cost model**: `reasoning_tokens: u32` on `Usage` as informational subset of
     `output_tokens`, priced at output rate, shown in status bar and exit summary.
@@ -584,9 +616,11 @@ Exact touchpoints, in dependency order. Each carries its own test obligation (se
    assembled per-response assistant message **before** the tool-continuation request is built;
    replay gate on request copies (never mutate stored history).
 
-6. **talos-conversation / talos-tui**: handle `ReasoningComplete` as a no-op in the engine match
-   (explicitly, not via wildcard); no display changes. Status bar / exit summary gain the
-   reasoning-token breakdown.
+6. **talos-conversation / talos-tui (v3 implementation)**: handle `ReasoningComplete` as a no-op
+   in the engine match (explicitly, not via wildcard); status bar / exit summary gain the
+   reasoning-token breakdown. ADR-034 v4 supersedes only the no-display conclusion through the
+   separate filtered projection contract below; `ReasoningComplete` still must not be rendered
+   directly.
 
 7. **talos-cli**: no changes on the main persistence path (`TurnCompleted.new_messages` flows
    automatically); `event_loop.rs:287` constructor gains `reasoning: None` (legacy path,
@@ -624,7 +658,8 @@ In scope for UX101-UX102 (order matters — data model first):
 Explicitly deferred:
 
 - Age-based reasoning compaction → MEM-007.
-- Richer thinking TUI → separate design decision.
+- Interactive/collapsible thinking TUI → separate future decision. TUI-029 v4 now owns the bounded
+  static-history projection only.
 - Per-gateway compatibility overrides / nested `options.thinking` request shapes → follow-up
   slice on evidence.
 - Gemini native adapter (`thoughtSignature`) → only with a future Gemini protocol decision.
@@ -634,6 +669,46 @@ If the slice must shrink further, cut the **entire Anthropic replay path** (ship
 UX101 + request mapping UX102 without persistence) rather than shipping unsigned persistence.
 Do not resurrect the v2 hybrid.
 
+## v4 Implementation Contract (TUI-029)
+
+The v4 display amendment is implementable as a presentation projection over existing structured
+reasoning. It does not change provider adapters or the session wire format.
+
+1. **Conversation state**: accumulate the existing `ThinkingDelta` text. Finalize it exactly once
+   before the first `TextDelta`, `ToolCallStarted`, or `ToolCall` that follows that reasoning
+   segment, or at a successful/`MaxTokens` `TurnEnd`. A tool loop may therefore produce more than
+   one reasoning archive block. Error and cancellation discard unfinished text in the first slice.
+2. **Typed history**: add `Reasoning` to the conversation-layer `MessageRole` and
+   `MessageSource`; never encode the distinction in a string prefix or reuse `System`/`Assistant`.
+   These public enums are semver-bound. The implementation change must be called out in release
+   notes; downstream exhaustive matches must add the new variant. No `talos-core::Message` variant
+   is added and provider protocol compatibility is unchanged.
+3. **Static format**: render a one-shot scrollback block with a `Thinking` label followed by
+   indented `| ` body lines in a subdued semantic color. Full displayable text is retained; no
+   collapsible widget, alternate screen, or viewport history is introduced.
+4. **Resume**: `talos-tui::hydrate_history` reconstructs the reasoning block immediately before
+   its assistant answer/tool call by using a centralized projection helper over
+   `AssistantReasoning`. The helper returns only non-empty `Thinking.text` and `Plain.text` in block
+   order and ignores signatures and `Redacted` blocks.
+5. **Copy/export**: reasoning-role messages are excluded from existing transcript and `/copy`
+   output by default. `/export <path> --include-thinking` includes the same filtered projection in
+   Markdown/plain text; no raw signature or redacted payload can enter the export path.
+6. **No duplicate persistence**: do not add another session field or copy reasoning into message
+   content. Existing `SessionMetadata.reasoning` is the sole durable source.
+
+Minimum implementation evidence:
+
+| Area | Required evidence |
+| --- | --- |
+| Conversation transition | Thinking -> answer and thinking -> tool each emit one reasoning archive before the next entry; repeated terminal events do not duplicate it |
+| Failure boundary | Cancellation/error clear preview without archiving partial text |
+| Security projection | Thinking/Plain text is returned in order; signature and Redacted payload sentinel values never appear |
+| TUI rendering | Static `Thinking` heading and indented body render in terminal scrollback with no viewport widget |
+| Resume | Persisted assistant reasoning rehydrates before the associated answer/tool entry |
+| Export | Default export excludes reasoning; `--include-thinking` includes filtered text only |
+| Runtime | Real TUI/provider fixture demonstrates live preview -> static history -> answer/tool ordering and resume behavior |
+| Regression | Provider replay fixtures remain byte-identical; workspace test/clippy/governance gates pass |
+
 ## Reversal Trigger
 
 Revisit if:
@@ -641,7 +716,8 @@ Revisit if:
 - A Gemini-native or OpenAI Responses adapter is added (both need new block variants/mappings).
 - Evidence shows gateways need per-provider replay compatibility flags
   (`requires_reasoning_replay` / `forbids_reasoning_replay`).
-- The TUI one-line preview proves insufficient and a richer thinking UX is designed.
+- A committed requirement needs interactive/collapsible reasoning history beyond TUI-029's static
+  projection (which would trigger ADR-035 redesign).
 - Provider APIs change their reasoning field shapes in ways that break the current mapping.
 - MEM-007 lands and reasoning-aware compaction changes replay behavior.
 

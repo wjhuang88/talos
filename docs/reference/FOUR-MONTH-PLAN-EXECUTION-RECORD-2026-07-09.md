@@ -38,7 +38,7 @@
 | T130 | Tool compression engine + raw_content field | c74f421, a0cd945 |
 | T131 | PERF-001 build-time models.toml | f65db0c |
 | T132 | Dashboard notification as transient Tip; #24/#25/#31 deferred | 2b0600e, cf70e11 |
-| T133 | TUI-029 thinking history archive — formally rejected | 3801da7 |
+| T133 | TUI-029 decision delivered as rejection in `3801da7`; superseded by 2026-07-10 maintainer change control and ADR-034 v4 | 3801da7 + follow-up decision commit |
 | T134 | HOOK-001 config-introduced hook declarations | ccefe1f |
 | T135 | Final closeout + ARCH-030 update | a231a6f, 42b99bd |
 
@@ -56,3 +56,14 @@
 - cargo check --workspace: exit 0
 - cargo test --workspace: 1843 tests, 0 failures (61 test suites)
 - All commits pushed to main
+
+## Post-Closeout Change Control (2026-07-10)
+
+The maintainer rejected T133's product conclusion and explicitly requested implementation of GitHub
+#26. The original T133 decision artifact remains delivered and traceable, so the four-month
+execution record stays Complete; its rejection outcome is superseded, not erased.
+
+ADR-034 v4 now allows a typed static history projection of displayable reasoning text while keeping
+signatures/redacted payloads and provider replay metadata protected. TUI-029 is Ready for
+Implementation and must be activated in a new iteration. No TUI-029 production implementation is
+claimed by this record.

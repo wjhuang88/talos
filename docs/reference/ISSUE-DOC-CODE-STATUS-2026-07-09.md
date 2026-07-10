@@ -24,7 +24,7 @@ in the owner docs listed below.
 | #23 bash exit code classification | Closed | `TOOL-019` | Expected non-zero exit codes classified without false tool error. | No action. |
 | #24 processing animation cadence | Open | `TUI-028` | Code has a 50ms render interval, but no runtime/visual proof under heavy rendering or long-output load. | Reopened; add evidence or implementation. |
 | #25 thinking ripple animation | Open | `TUI-028` | Current code animates the `"thinking"` label gradient; it does not implement the requested two-color three-segment center-out ripple block animation. | Keep open; implement or revise requirement. |
-| #26 thinking content history | Open | `TUI-029` | Not implemented by design; requires ADR-034/TUI-020 policy change before visible history/archive behavior. | Keep open. |
+| #26 thinking content history | Open | `TUI-029` | ADR-034 v4 approved the bounded display projection on 2026-07-10. Implementation has not started; TUI-029 is Ready for Implementation in a new iteration. | Keep open until code, runtime evidence, and owner-doc acceptance are complete. |
 | #27 stale preview clear | Closed | `TUI-028` | Engine clears preview on cancel/error/turn lifecycle; conversation-loop tests cover terminal cleanup paths. | No action. |
 | #28 dashboard message format | Closed, superseded by #39 | `TUI-028` | Original issue remains unimplemented as transient notification; #39 is the active reopened issue. | Track through #39. |
 | #31 model switch status-bar jump | Open | `TUI-028` | Code truncates labels, but no runtime/visual evidence proves transition stability. | Reopened; add evidence or implementation. |
@@ -61,4 +61,5 @@ in the owner docs listed below.
 ## Residual Rule
 
 Do not close #24, #25, #31, or #39 until the owner doc records direct runtime/visual evidence or a
-reviewed requirement change. Do not implement #26 without an ADR-034/TUI-020 policy revision.
+reviewed requirement change. #26 may now be implemented only within ADR-034 v4 and TUI-029's
+activation/test gates; the issue remains open until runtime evidence closes acceptance.

@@ -57,7 +57,7 @@ Detailed matrix: `docs/reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md`.
 | #18 | Closed | `RUNTIME-002`, `PROVIDER-002` | Fixed by I107 plus follow-up bridge tests. |
 | #24 | Reopened | `TUI-028` | Still needs runtime/visual cadence evidence under heavy rendering/load. |
 | #25 | Open | `TUI-028` | Still not implemented: current code animates a gradient label, not the requested two-color three-segment ripple. |
-| #26 | Open | `TUI-029` | Planned; requires ADR-034/TUI-020 policy decision before implementation. |
+| #26 | Open | `TUI-029` | ADR-034 v4 approved 2026-07-10; Ready for Implementation in a new iteration. |
 | #28/#39 | #28 closed, #39 open | `TUI-028` | Still open through #39: dashboard availability must be transient `UiOutput::Tip`, not persistent scrollback. |
 | #31 | Reopened | `TUI-028` | Still needs runtime/visual evidence for model-switch layout stability. |
 | #35 | Closed | `ARCH-032` | Audit complete; no ADR-006 deviations found. |
@@ -70,7 +70,7 @@ Detailed matrix: `docs/reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md`.
    - #24 runtime/visual animation cadence evidence.
    - #31 runtime/visual model-switch layout evidence.
 2. TUI-029:
-   - #26 thinking history archive policy decision before implementation.
+   - #26 implement the approved bounded thinking history archive with security/runtime evidence.
 3. REL-002:
    - Start a new Talos-primary attempt only when the `talos` binary is the actual primary executor.
    - Do not claim v1.0 readiness until REL-002 criteria have fully qualifying evidence.
@@ -84,3 +84,9 @@ Detailed matrix: `docs/reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md`.
 - Classify any external-runtime implementation as non-qualifying for REL-002.
 - No tag, release, publish, permission/sandbox relaxation, dependency addition, credential change,
   storage-default migration, or external trial invitation without a separate gate.
+
+## Post-Handoff Change Control (2026-07-10)
+
+The maintainer explicitly requested #26 implementation after reviewing the prior rejection. ADR-034
+v4 and TUI-029 now define an implementation-ready display projection. This does not retroactively
+qualify I106-I109 for REL-002 and does not rewrite their historical execution classification.

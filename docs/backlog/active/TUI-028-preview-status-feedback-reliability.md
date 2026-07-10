@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-028 |
 | Priority | P1 |
-| Status | Partial — #25, #28/#39, #24, and #31 remain open |
+| Status | Partial — #25/#24/#31 open; #39 implementation awaits focused verification/issue sync |
 | Source | [GitHub Issue #24](https://github.com/wjhuang88/talos/issues/24), [GitHub Issue #25](https://github.com/wjhuang88/talos/issues/25), [GitHub Issue #27](https://github.com/wjhuang88/talos/issues/27), [GitHub Issue #28](https://github.com/wjhuang88/talos/issues/28), [GitHub Issue #31](https://github.com/wjhuang88/talos/issues/31), [GitHub Issue #39](https://github.com/wjhuang88/talos/issues/39) |
 | Depends On | `TUI-027`, `TUI-020`, `TUI-024`, `RUNTIME-002` |
 
@@ -24,7 +24,7 @@ looks like an error, model-name layout jumps, and thinking display follow-ups.
 - Status bar model-name changes do not visibly jump because of inconsistent formatting.
 - Thinking animation redesign is a visual-only slice and must not change persistence semantics.
 - Thinking-content persistence/history archive is not part of TUI-028. It is tracked by `TUI-029`
-  / GitHub Issue #26 and requires an ADR-034/TUI-020 policy revision before implementation.
+  / GitHub Issue #26 and is implementation-ready under ADR-034 v4.
 
 ## Non-Goals
 
@@ -97,6 +97,21 @@ content is cleared on new submit, cancellation, terminal error, and turn end.
 - #31 requires runtime/visual evidence that model switching does not create visible status-bar
   layout jumps.
 - #26 (thinking content history archive) is not implemented and is now tracked by `TUI-029`.
+
+## Post-Deferral Implementation Note: #39 (2026-07-10)
+
+Commit `2b0600e` changed dashboard availability from persistent `MessageSource::System` output to
+transient `UiOutput::Tip { kind: TipKind::Info }`. The requested behavior is present in production
+code. TUI-028 remains Partial because the commit recorded the broad CLI suite but did not add a
+focused regression proving the notification never enters scrollback/history; GitHub #39 should stay
+open until that focused evidence and issue sync are complete.
+
+## TUI-029 Policy Update (2026-07-10)
+
+The maintainer approved #26 after reviewing its rejection. ADR-034 v4 now permits a separate typed
+visible-history projection of displayable reasoning text. TUI-029 is Ready for Implementation in a
+new iteration; signatures/redacted payloads remain non-displayable and no normal assistant/session
+content mutation is authorized.
 
 ## Formal Deferral of Residuals (2026-07-09)
 

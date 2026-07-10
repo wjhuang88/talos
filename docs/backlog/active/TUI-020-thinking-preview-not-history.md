@@ -65,3 +65,14 @@ Implemented the smallest explicit transient-message boundary:
 - `crates/talos-conversation/src/`
 - `crates/talos-tui/src/`
 - `crates/talos-session/src/`
+
+## Change-Control Note (2026-07-10)
+
+TUI-020 remains Complete for its published I078 objective: live thinking stays separate from the
+assistant answer and is not persisted as normal conversation content. A later maintainer request
+approved TUI-029 under ADR-034 v4 to add a separate, typed, static visible-history projection.
+
+TUI-029 does not invalidate this implementation or permit thinking to be concatenated into normal
+assistant history. It supersedes only the broader product rule that all finalized thinking must
+disappear from visible scrollback. Future implementation belongs to a new iteration and must retain
+TUI-020's preview separation, provider-context separation, and failure clearing behavior.

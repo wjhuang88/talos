@@ -158,3 +158,14 @@ Most tracks are independent and can be parallelized across agents within each mo
 - `docs/backlog/active/TUI-029-thinking-history-archive.md` — thinking history decision
 - `docs/backlog/active/HOOK-001-config-introduced-hooks.md` — config hooks
 - `docs/backlog/active/TOOL-020-git-diff-ref-comparisons.md` — git diff ref-to-ref
+
+## Post-Closeout Change Control (2026-07-10)
+
+T133 originally selected the allowed rejection branch and was recorded complete in the separate
+execution record. The maintainer subsequently supplied explicit user evidence and directed that
+TUI-029 be implemented. Per `CHANGE-CONTROL.md`, the T133 decision remains historical execution
+evidence while its product outcome is superseded by ADR-034 v4.
+
+TUI-029 is now Ready for Implementation. Because implementation is a materially broader acceptance
+target than T133's decision-only deliverable, it requires a new iteration ID rather than reopening
+I113 or rewriting this published matrix.

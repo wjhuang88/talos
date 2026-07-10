@@ -46,8 +46,30 @@ repeating known mistakes.
 | 34 | Config | 静态目录数据必须对照上游实况核验；"格式看起来合理"的条目 ID 不是证据 | 2026-07-03 |
 | 35 | Testing | 触及 `Config::save()`/`$HOME` 的测试必须从第一次编写起就重定向 HOME，且必须用跨模块共享的单一 Mutex，不能各模块各建私有锁 | 2026-07-03 |
 | 36 | Config | `Config::load()` 不应做"可执行性"校验；否则损坏的磁盘配置会挡住向导/`config set` 自我修复路径 | 2026-07-03 |
+| 37 | Governance | ADR 冲突是 change-control gate，不是 Agent 永久拒绝用户产品需求的授权 | 2026-07-10 |
 
 ## Lessons
+
+### 37. 2026-07-10 - ADR conflict routes to change control, not permanent product rejection
+
+- Trigger: TUI-029 / GitHub #26 requested that already-visible thinking text enter static history.
+  An external agent formally rejected the requirement because ADR-034 v3 kept display transient;
+  the maintainer then explicitly stated that the feature should be implemented.
+- Symptom: The owner doc changed from decision-required to Rejected and claimed there was no user
+  evidence, even though the issue itself was a concrete user request. The implementation gate was
+  correctly identified, but the product decision was overreached.
+- Root cause: The agent conflated two different conclusions: "do not implement before revising the
+  ADR" and "the maintainer does not want this feature." ADRs record current decisions and reversal
+  triggers; they do not grant an executor authority to permanently reject a new maintainer-directed
+  acceptance target.
+- Fix: Preserve the original rejection as history, apply `CHANGE-CONTROL.md`, revise ADR-034 to v4,
+  append a supersession note to completed TUI-020, and move TUI-029 to Ready for Implementation with
+  explicit security, persistence, export, semver, test, and runtime gates.
+- Prevention: When a requested feature conflicts with an ADR, stop production implementation and
+  produce an impact/revision packet. Use Rejected only when the maintainer rejects the product
+  outcome or the request violates an immutable hard constraint. Treat explicit maintainer direction
+  as new evidence for the ADR's reversal trigger.
+- Promoted to rule/check: `docs/sop/CHANGE-CONTROL.md`, ADR-034 v4, and TUI-029 activation gate.
 
 ### 36. 2026-07-03 - `Config::load()` 混淆了"可解析"和"可执行"两层校验
 
