@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TUI-029 |
 | Priority | P2 |
-| Status | Ready for Implementation — ADR-034 v4 accepted |
+| Status | Complete — ADR-034 v4 implemented (2026-07-10) |
 | Source | [GitHub Issue #26](https://github.com/wjhuang88/talos/issues/26) |
 | Depends On | `MODEL-003`, `TUI-020`, ADR-034 |
 
@@ -173,3 +173,40 @@ This decision can be revisited if:
 2. Users provide clear feedback that archived reasoning improves their workflow
 3. Context window limits increase enough that reasoning archival is not a cost concern
 4. A new ADR specifically addresses displayable vs. hidden reasoning with a clear boundary
+
+## Implementation Record (2026-07-10)
+
+### Slice A: Conversation typed reasoning role + transition finalization
+- `MessageRole::Reasoning` and `MessageSource::Reasoning` added
+- `finalize_thinking()`: called at TextDelta/ToolCallStarted/TurnEnd transitions
+- ThinkingDelta text archived as `ChatMessage { role: Reasoning, content }` 
+- Error/cancel discards unfinished thinking (ADR-034 v4 non-goal)
+- Commit: 6970af9
+
+### Slice B: Resume hydration + display projection
+- `project_displayable_reasoning()`: centralized helper in talos-core
+  - Extracts only `Thinking.text` and `Plain.text` (never signatures/Redacted)
+  - Returns `Option<String>`, None if no displayable text
+- `hydrate_history()`: on resume, reasoning block emitted as Reasoning-sourced
+  stream BEFORE the associated assistant answer/tool entry
+- Commit: 4ebf73e
+
+### Slice C: --include-thinking export
+- `/export <path> --include-thinking`: exports reasoning with `Thinking:` heading
+  and indented `| ` body lines
+- Default `/export` and `/copy` exclude reasoning (unchanged)
+- `transcript_plain_text_with_thinking()`: iterates Reasoning-role messages
+- Commit: 26211d3
+
+### Slice D: Docs sync
+- TUI-029 status updated to Complete
+- ADR-034 v4 accepted and implemented
+- Acceptance criteria verified: all checkboxes in Acceptance section met
+
+### Validation Evidence
+- `cargo check --workspace`: exit 0
+- `cargo clippy --workspace -- -D warnings`: clean
+- `cargo test --workspace`: 61 test suites, 0 failures
+- Thinking transition tests: finalize at answer/tool boundary, discard on error
+- Resume tests: hydrate_history reconstructs reasoning before assistant entry
+- Export tests: default excludes reasoning, --include-thinking includes filtered text
