@@ -19,6 +19,7 @@ pub enum MessageRole {
     Assistant,
     System,
     Error,
+    Reasoning,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,6 +171,7 @@ pub enum MessageSource {
     Tool { name: String },
     System,
     Error,
+    Reasoning,
 }
 
 pub struct StreamMessage {

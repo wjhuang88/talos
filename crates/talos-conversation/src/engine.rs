@@ -321,6 +321,11 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::TextDelta { delta } => {
+                if !self.current_thinking_text.is_empty() {
+                    if let Some(thinking_outputs) = self.finalize_thinking() {
+                        outputs.extend(thinking_outputs);
+                    }
+                }
                 self.current_phase = Some(TurnPhase::Generating);
                 self.current_turn_text.push_str(delta);
                 if let Some(ref tx) = self.stream_tx {
@@ -337,6 +342,11 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolCallStarted { name } => {
+                if !self.current_thinking_text.is_empty() {
+                    if let Some(thinking_outputs) = self.finalize_thinking() {
+                        outputs.extend(thinking_outputs);
+                    }
+                }
                 self.current_phase = Some(TurnPhase::RunningTool { name: name.clone() });
                 self.close_stream();
                 outputs.push(UiOutput::ToolCallStarted {
@@ -388,22 +398,16 @@ impl ConversationEngine {
             }
             AgentEvent::TurnEnd { usage, stop_reason } => {
                 self.close_stream();
-                // A `ToolUse` stop reason signals the turn continues with a tool call; any other
-                // stop reason (`EndTurn`, `MaxTokens`) is terminal for this turn and must clear
-                // `is_processing` so the UI does not remain stuck on a spinner with no phase label.
                 if !matches!(stop_reason, StopReason::ToolUse) {
                     self.is_processing = false;
                 }
                 self.current_phase = None;
+                if let Some(thinking_outputs) = self.finalize_thinking() {
+                    outputs.extend(thinking_outputs);
+                }
                 self.finalize_turn();
                 self.usage = usage.clone();
                 self.last_flushed_message = self.messages.len();
-                let had_thinking = !self.current_thinking_text.is_empty();
-                self.current_thinking_text.clear();
-
-                if had_thinking {
-                    outputs.push(UiOutput::ThinkingPreview { text: None });
-                }
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::Error { message } => {
@@ -417,7 +421,6 @@ impl ConversationEngine {
                 self.current_turn_text.clear();
                 let had_thinking = !self.current_thinking_text.is_empty();
                 self.current_thinking_text.clear();
-
                 if had_thinking {
                     outputs.push(UiOutput::ThinkingPreview { text: None });
                 }
@@ -1008,6 +1011,7 @@ impl ConversationEngine {
     }
 
     fn finalize_turn(&mut self) {
+        self.current_thinking_text.clear();
         self.scrollback.scrolled_line_count = 0;
         if self.current_turn_text.is_empty() {
             return;
@@ -1020,6 +1024,32 @@ impl ConversationEngine {
             tool_call: None,
             created_at: Instant::now(),
         });
+    }
+
+    fn finalize_thinking(&mut self) -> Option<Vec<UiOutput>> {
+        if self.current_thinking_text.is_empty() {
+            return None;
+        }
+        let text = std::mem::take(&mut self.current_thinking_text);
+        let (tx, rx) = mpsc::unbounded_channel::<String>();
+        let _ = tx.send(text.clone());
+        drop(tx);
+
+        self.messages.push(ChatMessage {
+            role: MessageRole::Reasoning,
+            status: MessageStatus::Completed,
+            content: text,
+            tool_call: None,
+            created_at: Instant::now(),
+        });
+
+        Some(vec![
+            UiOutput::ThinkingPreview { text: None },
+            UiOutput::Stream(StreamMessage {
+                source: MessageSource::Reasoning,
+                stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
+            }),
+        ])
     }
 
     fn set_tool_result(&mut self, result: &MessageToolResult) -> Option<String> {

@@ -732,6 +732,7 @@ pub(crate) fn stream_padding_for(
         Some(MessageSource::Assistant) => " ● ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
+        Some(MessageSource::Reasoning) => " ~ ",
         Some(MessageSource::Tool { .. }) => " ● ",
         None => "   ",
     }
@@ -759,6 +760,7 @@ pub(crate) fn prefix_color_for(
         }
         Some(MessageSource::System) => to_crossterm_color(semantic::PREFIX_SYSTEM),
         Some(MessageSource::Error) => to_crossterm_color(semantic::PREFIX_ERROR),
+        Some(MessageSource::Reasoning) => to_crossterm_color(semantic::PREFIX_SYSTEM),
         None => None,
     }
 }
