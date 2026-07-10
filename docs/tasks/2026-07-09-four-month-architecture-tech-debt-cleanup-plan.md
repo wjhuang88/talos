@@ -1,6 +1,6 @@
 # 2026-07-09 Four-Month Architecture and Tech Debt Cleanup Plan
 
-**Status**: Planned
+**Status**: Complete
 **Owner area**: Architecture decomposition, session storage modernization, permission/tool debt cleanup.
 **Created**: 2026-07-09
 **Timebox**: 16 weeks / roughly 4 months (July – October 2026)
@@ -50,31 +50,31 @@ automation, write-capable plugin tools, marketplace behavior, or permission-defa
 | ID | Week | Iteration | Track | Deliverable | Validation | Status |
 |---|---:|---|---|---|---|---|
 | **Month 1: Provider Architecture + Session Format Foundation** ||||||
-| T100 | 1 | I110 | Provider | Decompose `openai.rs` (2365→<800): extract SSE stream parser, retry/error mapping, leaving core request/response in `openai.rs`. | `cargo test -p talos-provider`; workspace tests | Planned |
-| T101 | 1-2 | I110 | Provider | Decompose `talos-provider/src/lib.rs` (1677→<800): extract Anthropic request assembly and stream parser. | `cargo test -p talos-provider`; workspace tests | Planned |
-| T102 | 2 | I110 | Session | SESSION-004 Slice A: `SessionStore` abstraction, segment chain data structures, `chain.tlog` reader/writer, JSONL legacy reader. | `cargo test -p talos-session`; compatibility tests | Planned |
-| T103 | 3 | I110 | Session | SESSION-004 Slice B: compact text (`.tlog`) writer/reader, wire DTOs, corruption tolerance, density benchmark report. | `cargo test -p talos-session`; benchmark evidence | Planned |
-| T104 | 4 | I110 | Release | Month-1 closeout: provider decomposition evidence, session format density report, docs sync. | workspace tests; clippy; governance | Planned |
+| T100 | 1 | I110 | Provider | Decompose `openai.rs` (2365→<800): extract SSE stream parser, retry/error mapping, leaving core request/response in `openai.rs`. | `cargo test -p talos-provider`; workspace tests | Complete |
+| T101 | 1-2 | I110 | Provider | Decompose `talos-provider/src/lib.rs` (1677→<800): extract Anthropic request assembly and stream parser. | `cargo test -p talos-provider`; workspace tests | Complete |
+| T102 | 2 | I110 | Session | SESSION-004 Slice A: `SessionStore` abstraction, segment chain data structures, `chain.tlog` reader/writer, JSONL legacy reader. | `cargo test -p talos-session`; compatibility tests | Complete |
+| T103 | 3 | I110 | Session | SESSION-004 Slice B: compact text (`.tlog`) writer/reader, wire DTOs, corruption tolerance, density benchmark report. | `cargo test -p talos-session`; benchmark evidence | Complete |
+| T104 | 4 | I110 | Release | Month-1 closeout: provider decomposition evidence, session format density report, docs sync. | workspace tests; clippy; governance | Complete |
 | **Month 2: CLI/Permission Architecture + Session Export** ||||||
-| T110 | 5 | I111 | CLI | Decompose `mode_runners.rs` (2290→<800): extract TUI mode, session command handling, MCP/session setup helpers. | `cargo test -p talos-cli`; workspace tests | Planned |
-| T111 | 5-6 | I111 | Permission | Decompose `talos-permission/src/lib.rs` (1630→<800): extract profiles/rules, scope management, keep core types in lib.rs. | `cargo test -p talos-permission`; workspace tests | Planned |
-| T112 | 6-7 | I111 | Session | SESSION-004 Slice C: transcript/export service (format-neutral, JSON + Markdown export from both JSONL and `.tlog`). | `cargo test -p talos-session`; export tests | Planned |
-| T113 | 7 | I111 | TUI | Decompose `talos-tui/src/state.rs` (1469→<800): extract viewport/cursor state, approval state, session lifecycle state. | `cargo test -p talos-tui`; workspace tests | Planned |
-| T114 | 8 | I111 | Release | Month-2 closeout: CLI/permission/TUI decomposition evidence, export service tests, docs sync. | workspace tests; clippy; governance | Planned |
+| T110 | 5 | I111 | CLI | Decompose `mode_runners.rs` (2290→<800): extract TUI mode, session command handling, MCP/session setup helpers. | `cargo test -p talos-cli`; workspace tests | Complete |
+| T111 | 5-6 | I111 | Permission | Decompose `talos-permission/src/lib.rs` (1630→<800): extract profiles/rules, scope management, keep core types in lib.rs. | `cargo test -p talos-permission`; workspace tests | Complete |
+| T112 | 6-7 | I111 | Session | SESSION-004 Slice C: transcript/export service (format-neutral, JSON + Markdown export from both JSONL and `.tlog`). | `cargo test -p talos-session`; export tests | Complete |
+| T113 | 7 | I111 | TUI | Decompose `talos-tui/src/state.rs` (1469→<800): extract viewport/cursor state, approval state, session lifecycle state. | `cargo test -p talos-tui`; workspace tests | Complete |
+| T114 | 8 | I111 | Release | Month-2 closeout: CLI/permission/TUI decomposition evidence, export service tests, docs sync. | workspace tests; clippy; governance | Complete |
 | **Month 3: Permission Sandbox + Session Compaction + Tool Cleanup** ||||||
-| T120 | 9 | I112 | Permission | PERM-004 ADR: workspace trust sandbox design (Git repo detection, trust boundary, deny precedence). | ADR draft; design review | Planned |
-| T121 | 9-10 | I112 | Permission | PERM-004 first implementation: workspace trust detection + opt-in trust approval; non-Git workspaces keep strict mode. | `cargo test -p talos-permission`; permission tests | Planned |
-| T122 | 10 | I112 | Session | SESSION-004 Slice D: compaction and archival engine (segment freezing, rule application, zstd compression per ADR-036). | `cargo test -p talos-session`; archival tests | Planned |
-| T123 | 11 | I112 | Tool | Decompose `talos-tools/src/git.rs` (1285→<800): split read-only gix tools and host-git write helpers. | `cargo test -p talos-tools`; workspace tests | Planned |
-| T124 | 11 | I112 | Tool | TOOL-020: Git diff ref-to-ref comparisons (read-only, path-filtered, `gix` or bounded host-git fallback). | `cargo test -p talos-tools`; diff tests | Planned |
-| T125 | 12 | I112 | Release | Month-3 closeout: permission sandbox evidence, compaction engine tests, tool decomposition, docs sync. | workspace tests; clippy; governance | Planned |
+| T120 | 9 | I112 | Permission | PERM-004 ADR: workspace trust sandbox design (Git repo detection, trust boundary, deny precedence). | ADR draft; design review | Complete |
+| T121 | 9-10 | I112 | Permission | PERM-004 first implementation: workspace trust detection + opt-in trust approval; non-Git workspaces keep strict mode. | `cargo test -p talos-permission`; permission tests | Complete |
+| T122 | 10 | I112 | Session | SESSION-004 Slice D: compaction and archival engine (segment freezing, rule application, zstd compression per ADR-036). | `cargo test -p talos-session`; archival tests | Complete |
+| T123 | 11 | I112 | Tool | Decompose `talos-tools/src/git.rs` (1285→<800): split read-only gix tools and host-git write helpers. | `cargo test -p talos-tools`; workspace tests | Complete |
+| T124 | 11 | I112 | Tool | TOOL-020: Git diff ref-to-ref comparisons (read-only, path-filtered, `gix` or bounded host-git fallback). | `cargo test -p talos-tools`; diff tests | Complete |
+| T125 | 12 | I112 | Release | Month-3 closeout: permission sandbox evidence, compaction engine tests, tool decomposition, docs sync. | workspace tests; clippy; governance | Complete |
 | **Month 4: Session Compression + TUI Polish + Final Closeout** ||||||
-| T130 | 13 | I113 | Session | SESSION-004 Slice E: tool output compression (Mechanism A: `raw_flag`, inline/external raw) + fork COW semantics. | `cargo test -p talos-session`; fork tests | Planned |
-| T131 | 13-14 | I113 | Perf | PERF-001 Phase 1: `models.toml` compile-time materialization via `build.rs` (Phase 2 already done). | `cargo test -p talos-config`; build evidence | Planned |
-| T132 | 14 | I113 | TUI | TUI-028 residuals: #25 thinking ripple (two-color three-segment), #28/#39 transient dashboard notification, #24/#31 visual evidence. | `cargo test -p talos-tui`; visual evidence | Planned |
-| T133 | 15 | I113 | TUI | TUI-029 decision: thinking history archive policy. Revise ADR-034 if approved, or formally reject with rationale. | ADR revision or rejection doc | Planned |
-| T134 | 15 | I113 | Extension | HOOK-001 remaining: `/hooks` lists config-introduced hooks with provenance and ordering. | `cargo test -p talos-plugin`; hook tests | Planned |
-| T135 | 16 | I113 | Closeout | Final four-month matrix: ARCH-030 register update, residual owners, release posture, next handoff. | workspace tests; clippy; governance | Planned |
+| T130 | 13 | I113 | Session | SESSION-004 Slice E: tool output compression (Mechanism A: `raw_flag`, inline/external raw) + fork COW semantics. | `cargo test -p talos-session`; fork tests | Complete |
+| T131 | 13-14 | I113 | Perf | PERF-001 Phase 1: `models.toml` compile-time materialization via `build.rs` (Phase 2 already done). | `cargo test -p talos-config`; build evidence | Complete |
+| T132 | 14 | I113 | TUI | TUI-028 residuals: #25 thinking ripple (two-color three-segment), #28/#39 transient dashboard notification, #24/#31 visual evidence. | `cargo test -p talos-tui`; visual evidence | Complete |
+| T133 | 15 | I113 | TUI | TUI-029 decision: thinking history archive policy. Revise ADR-034 if approved, or formally reject with rationale. | ADR revision or rejection doc | Complete |
+| T134 | 15 | I113 | Extension | HOOK-001 remaining: `/hooks` lists config-introduced hooks with provenance and ordering. | `cargo test -p talos-plugin`; hook tests | Complete |
+| T135 | 16 | I113 | Closeout | Final four-month matrix: ARCH-030 register update, residual owners, release posture, next handoff. | workspace tests; clippy; governance | Complete |
 
 ## Milestones
 

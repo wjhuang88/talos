@@ -289,27 +289,32 @@ impl AppServerSession {
         dir: &Path,
         _compacted: &[Message],
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if !file.exists() {
+        use talos_session::compaction_engine::CompactionEngine;
+        use talos_session::CompactTextSessionStore;
+
+        let store = std::sync::Arc::new(CompactTextSessionStore);
+        let engine = CompactionEngine::new(store);
+
+        if !engine.should_compact(file, 0) {
             return Ok(());
         }
 
-        let segment_id = format!("s{:03}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() % 1000);
-        let archive_raw = dir.join(format!("{segment_id}.tlog"));
-
-        let raw = std::fs::read(file)?;
-        let line_count = String::from_utf8_lossy(&raw).lines().count();
-        std::fs::write(&archive_raw, &raw)?;
-
-        let _ = self.eq_tx.send(SessionEvent::AgentEvent {
-            event: AgentEvent::Error {
-                message: format!(
-                    "Session archived: {line_count} entries frozen to {segment_id}"
-                ),
-            },
-        });
+        match engine.compact_segment(file, dir, 0)? {
+            talos_session::compaction_engine::CompactionResult::Compacted {
+                segment_id,
+                original_count,
+                ..
+            } => {
+                let _ = self.eq_tx.send(SessionEvent::AgentEvent {
+                    event: AgentEvent::Error {
+                        message: format!(
+                            "Session compacted: {original_count} entries archived to {segment_id}"
+                        ),
+                    },
+                });
+            }
+            talos_session::compaction_engine::CompactionResult::Skipped => {}
+        }
 
         Ok(())
     }

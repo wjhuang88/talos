@@ -160,21 +160,12 @@ Legacy single-file JSONL sessions are read as a single "legacy segment" with `pr
 - Updates `chain.tlog`.
 - Archived segments are immutable and non-deletable while `ref_count > 0`.
 
-### 6. Fork Snapshot Reference
+### 6. Fork
 
-```text
-# Forked session head.tlog header
-TALOS\tv1\t<fork_uuid>\t<head_seg>\t<parent_ref>\t<forked_ts>\n
-
-# parent_ref format:
-parent:<parent_session_uuid>:<parent_segment_id>:<fork_record_offset>
-```
-
-Parent deletion policy:
-- Default: reject deletion if any fork references the session (check `ref_count` in chain.tlog).
-- `--force-orphan`: copy referenced segments to fork directory, break COW.
-- `--force-dangling`: accept dangling reference; fork's new conversation works but history is
-  truncated at the fork point.
+Fork copies head.tlog entries to a new session file. Since compaction bounds
+head.tlog size, this is a simple and sufficient operation. No COW snapshot
+references, parent_ref, or ref_count tracking is needed — the forked session
+is fully independent from the parent.
 
 ### 7. Compression (per ADR-036)
 
