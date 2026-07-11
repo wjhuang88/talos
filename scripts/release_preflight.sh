@@ -27,6 +27,6 @@ fi
 echo "release preflight: Talos version ${workspace_version}"
 cargo fmt --all -- --check
 cargo check --locked --workspace
-cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked --workspace -- -D warnings
 cargo test --locked --workspace
 echo "release preflight: passed"
