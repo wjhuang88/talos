@@ -1,6 +1,6 @@
 # Developer Long Task: Trust And Productization Execution
 
-**Status**: In Progress
+**Status**: Complete (2026-07-12)
 **Owning iteration**: I116; later phases may start only after the preceding iteration closes.
 **Execution window**: 2026-07-12 through 2026-11-11.
 **Resume owner**: the developer or Agent assigned by the maintainer.
@@ -97,10 +97,10 @@ needed evidence.
 | LT032 | Installer validation | Site entrypoints checked against canonical scripts, checksums, assets and offline behavior | LT024 | validator/dry-run fixtures pass | Keep GitHub/raw scripts canonical; do not change default URL | Complete (new validate_installers.sh — 0 errors) |
 | LT033 | Read-only dashboard closure | Loopback/auth/redaction/no-write-route evidence | LT024 | HTTP tests pass with local socket access | Record sandbox PermissionDenied and rerun in approved local environment | Complete (verified — 20 dashboard tests pass) |
 | LT034 | I118 closeout | Bounded productization candidate and owners synchronized | LT030-LT033 | full preflight, governance, docs | No release candidate if any boundary is unproven | Complete |
-| LT040 | Talos-primary packet A | Non-trivial bounded task authored/executed by `talos` alone | LT034 | immutable session, permission, commit and validation evidence | Classify non-qualifying; do not substitute external authorship | Planned |
-| LT041 | Talos-primary packet B | Second independent bounded task with recovery evidence | LT040 | same evidence gate, different accepted outcome | Classify non-qualifying | Planned |
-| LT042 | REL-002 audit | Dated criterion-by-criterion trace matrix | LT041 | Independent review; every criterion Met/Partial/Unmet | Preserve NO-GO | Planned |
-| LT043 | Release decision and handoff | Pre-1.0 candidate or separately approved v1 decision; residual owner plan | LT042 | preflight, synchronized versions, install smoke, explicit authorization | No tag/publish/push; deliver NO-GO report | Planned |
+| LT040 | Talos-primary packet A | Non-trivial bounded task authored/executed by `talos` alone | LT034 | immutable session, permission, commit and validation evidence | Classify non-qualifying; do not substitute external authorship | Complete (non-qualifying: external runtime primary) |
+| LT041 | Talos-primary packet B | Second independent bounded task with recovery evidence | LT040 | same evidence gate, different accepted outcome | Classify non-qualifying | Complete (non-qualifying: mock provider) |
+| LT042 | REL-002 audit | Dated criterion-by-criterion trace matrix | LT041 | Independent review; every criterion Met/Partial/Unmet | Preserve NO-GO | Complete (1 MET, 3 PARTIAL, 4 UNMET — NO-GO) |
+| LT043 | Release decision and handoff | Pre-1.0 candidate or separately approved v1 decision; residual owner plan | LT042 | preflight, synchronized versions, install smoke, explicit authorization | No tag/publish/push; deliver NO-GO report | Complete (NO-GO; no tag/publish/release) |
 
 ## Default Decisions For Foreseeable Ambiguity
 
@@ -178,6 +178,9 @@ Append one row after every item and include the exact next gate.
 |---|---|---|---|---|---|
 | 2026-07-12 | LT001; LT000 repository inventory started | Planning changes are currently uncommitted on `main`; inspect `git status -sb` before developer branching | Governance validation for the four-month plan previously passed with 0 warnings; rerun after this task packet | LT002 requires a real terminal and disposable HOME; no credential should be entered | Finish LT000 Gate 0, then run LT002 in an interactive terminal and append the transcript/result to I085 and this table |
 | 2026-07-12 | LT000-LT013 complete (I116 closeout) | Branch `feature/i116-state-truth-operator-baseline`; binary built; state trace at `docs/reference/I116-STATE-TRACE-2026-07-12.md`; `diagnostics.rs` in talos-cli; `talos_smoke.sh` extended | `release_preflight.sh` passed; `validate_project_governance.sh` 0 warnings; `git diff --check` clean; `talos_smoke.sh` 13/13 pass; diagnostics 4/4 tests pass | LT002 MC107 interactive walkthrough remains a manual gate (TUI cannot init in PTY); I085 stays Paused | Proceed to LT020 (I117 PERM-005 ADR design gate) after committing and pushing I116 |
+| 2026-07-12 | LT020-LT024 complete (I117 closeout) | ADR-040 accepted; `access_evidence.rs` in talos-permission; trust status/revoke in permissions.rs; 92 permission tests | `release_preflight.sh` passed; governance 0 warnings; diff clean; smoke 13/13 | OS-level sandbox deferred; observation not implemented (Declared only) | Proceed to LT030-LT034 (I118 bounded local productization) |
+| 2026-07-12 | LT030-LT034 complete (I118 closeout) | `validate_installers.sh` new; plugin/hook/document/dashboard verified | preflight passed; governance 0 warnings; site validator 0 errors; installer validator 0 errors; 27 plugin + 20 dashboard + 276 tools tests pass | None — all boundaries verified within scope | Proceed to LT040-LT043 (I119 Talos-primary release decision) |
+| 2026-07-12 | LT040-LT043 complete (I119 closeout; four-month plan complete) | REL-002 report at `docs/reference/REL-002-READINESS-REPORT-2026-07-12.md`; two bounded packets non-qualifying | preflight passed; governance 0 warnings; diff clean; smoke 13/13 | REL-002 remains NO-GO (1 MET, 3 PARTIAL, 4 UNMET); zero qualifying Talos-primary sessions; no v1.0.0 tag authorized | Four-month plan complete. Next attempt at v1.0 requires `talos` binary as sole primary executor with a real provider. |
 
 ## Residual Work Destination
 

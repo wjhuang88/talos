@@ -151,7 +151,7 @@ docs/iterations/
 | I116 | State Truth And Operator Baseline | **Complete (2026-07-12)** | State trace matrix reconciled 3 drifts (SESSION-004/PERF-001/TOOL-020); operator smoke 13/13; `talos diagnostics status` shipped. See `I116-state-truth-operator-baseline.md`. |
 | I117 | Command Sandbox Evidence | **Complete (2026-07-12)** | ADR-040 accepted; typed access evidence + evidence-based enforcement + trust status/revoke shipped. Unknown/out-of-repo never inherits trust. See `I117-command-sandbox-evidence.md`. |
 | I118 | Bounded Local Productization | **Complete (2026-07-12)** | Local plugin/hook/document/dashboard/installer verified and bounded. New `validate_installers.sh`. No remote/write/browser expansion. See `I118-bounded-local-productization.md`. |
-| I119 | Talos-Primary Release Decision | **Planned (2026-07-12)** | Month 4: sole-primary Talos task evidence, REL-002 re-audit, conditional release, and handoff. See `I119-talos-primary-release-decision.md`. |
+| I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -207,7 +207,7 @@ rewrite published iteration baselines.
 | I116 | Complete (2026-07-12) | State truth, operator smoke, and diagnostics status delivered. Removed from non-terminal inventory. I117 is the next to activate. |
 | I117 | Complete (2026-07-12) | ADR-040 + evidence enforcement + trust status/revoke delivered. Removed from non-terminal inventory. I118 is the next to activate. |
 | I118 | Complete (2026-07-12) | Bounded local productization verified: plugin/hook/document/dashboard/installer all pass. Removed from non-terminal inventory. I119 is the next to activate. |
-| I119 | Planned | Ready for activation after I118 Complete. Talos-primary evidence and release decision. |
+| I119 | Complete (2026-07-12) | REL-002 re-audit NO-GO; two bounded packets non-qualifying; four-month plan complete. Removed from non-terminal inventory. |
 | I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
 | I092 | Complete | Closed 2026-07-04 with bash-only cache-stability/export evidence and autonomy permission matrix. |
 | I093 | Complete | Closed 2026-07-04 with readiness/reporting only, non-qualifying REL-002 evidence, and no v1.0 claim, tag, publish, or release action. |

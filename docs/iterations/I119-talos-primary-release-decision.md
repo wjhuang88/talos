@@ -1,6 +1,6 @@
 # Iteration I119: Talos-Primary Release Decision
 
-> Document status: Planned
+> Document status: Complete (2026-07-12)
 > Published plan date: 2026-07-12
 > Planned objective: Produce reproducible Talos-primary development evidence and make an honest
 > evidence-based pre-1.0 or v1.0 release decision.
@@ -61,3 +61,8 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-12 | Planning | Published as Month 4 shell; activation waits for I118 Complete and explicit task selection. |
+| 2026-07-12 | I119 activated + closed | I118 Complete; I119 activated and closed. Two bounded task packets attempted using the `talos` binary (validation plan + mock provider turn). Both classified as non-qualifying because the external agent (glm-5.2) was the primary executor. REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. Verdict: NO-GO for v1.0.0. No tag, publish, or release authorized. |
+| 2026-07-12 | LT040 complete (non-qualifying) | Packet A: `talos validate plan/run` executed successfully (exit 0, governance 0 warnings). Non-qualifying: external agent selected and interpreted the task. Evidence in `docs/reference/REL-002-READINESS-REPORT-2026-07-12.md`. |
+| 2026-07-12 | LT041 complete (non-qualifying) | Packet B: `talos -p --mock` bounded turn executed (exit 0). Non-qualifying: mock provider cannot produce real development work. Evidence in same report. |
+| 2026-07-12 | LT042 complete | REL-002 criterion-by-criterion audit: 1 MET (release checklist), 3 PARTIAL (governance/tools/docs), 4 UNMET (primary executor, risk classification, qualifying sessions, non-Codex requirement). Dated report at `docs/reference/REL-002-READINESS-REPORT-2026-07-12.md`. |
+| 2026-07-12 | LT043 complete | Release decision: **NO-GO for v1.0.0**. Pre-1.0 patch/minor releases may continue with explicit maintainer authorization. No tag, publish, push, or release action taken. Four-month plan handoff complete. |
