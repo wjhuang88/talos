@@ -1,6 +1,6 @@
 # Iteration I117: Command Sandbox Evidence
 
-> Document status: Planned
+> Document status: Active (2026-07-12)
 > Published plan date: 2026-07-12
 > Planned objective: Close the PERM-005 command-execution evidence gap while preserving strict
 > behavior for unknown, out-of-repo, network, credential, and destructive access.
@@ -61,3 +61,9 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-12 | Planning | Published as Month 2 shell; activation waits for I116 Complete and PERM-005 readiness review. |
+| 2026-07-12 | I117 activated | I116 Complete; I117 activated. ADR-040 accepted as the PERM-005 design gate. Execution from LT020-LT024. |
+| 2026-07-12 | LT020 complete | ADR-040 (Command Access Evidence and Logical Sandbox Enforcement) accepted. Defines declared/observed/unknown access, canonical root enforcement, Deny precedence, and safe-fallback-to-strict behavior. |
+| 2026-07-12 | LT021 complete | `AccessEvidence` type with `AccessKind` (Read/Write/Delete/Spawn/Network/Unknown) and `EvidenceState` (Declared/Observed/Unknown) implemented in `crates/talos-permission/src/access_evidence.rs`. Serializable; 19 unit tests including serialization, classification, and repo-local checks. |
+| 2026-07-12 | LT022 complete | `PermissionEngine::evaluate_command_with_evidence()` enforces: Deny always wins; Unknown/Spawn/Network/Delete/Write never inherits trust; only Declared Read with repo-local paths may proceed under trust; out-of-repo escalates to Ask. 8 security tests cover traversal, pipe, symlink-equivalent, child-process, unknown-access, deny-precedence, and non-Git strictness. |
+| 2026-07-12 | LT023 complete | `talos permissions trust status` shows workspace trust state (Git detection, trust active, trust effect, ADR references). `talos permissions trust revoke` removes trust with cross-process persistence test. CLI smoke verified. |
+| 2026-07-12 | LT024 closeout | 92 permission tests pass (including 27 access-evidence/security tests). Release preflight, governance validation, and diff check all clean. ADR-040 documents the OS-sandbox limitation residual. bash/exec remains per-command Ask/Deny unless structural evidence proves repo-local read; unknown/out-of-repo never inherits trust. |

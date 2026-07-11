@@ -53,10 +53,12 @@
 //! assert!(matches!(decision, PermissionDecision::Allow));
 //! ```
 
+mod access_evidence;
 mod resource;
 mod rule;
 mod workspace_trust;
 
+pub use access_evidence::{AccessEvidence, AccessKind, EvidenceState, classify_command_access};
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
 pub use resource::{ResourceExtractor, ResourceKind};
@@ -335,6 +337,56 @@ impl PermissionEngine {
             | talos_core::tool::ToolNature::Execute
             | talos_core::tool::ToolNature::Network => PermissionDecision::Ask,
         }
+    }
+
+    /// Evaluates a command execution request with access evidence (ADR-040).
+    ///
+    /// Security properties:
+    /// - Deny rules always win.
+    /// - Unknown/Spawn/Network/Delete/Write evidence never inherits workspace trust.
+    /// - Only Declared Read evidence with all paths repo-local may proceed
+    ///   under workspace trust.
+    /// - Out-of-repo paths escalate to Ask.
+    pub fn evaluate_command_with_evidence(
+        &self,
+        tool_name: &str,
+        command: &str,
+        evidence: &crate::access_evidence::AccessEvidence,
+        input: &Value,
+    ) -> PermissionDecision {
+        let nature = talos_core::tool::ToolNature::Execute;
+
+        let mut matched_rule = None;
+        for rule in &self.rules {
+            match rule.matches(tool_name, nature, input, None) {
+                Ok(true) => {
+                    matched_rule = Some(rule.decision.clone());
+                    break;
+                }
+                Ok(false) => continue,
+                Err(_) => continue,
+            }
+        }
+
+        if let Some(PermissionDecision::Deny(reason)) = &matched_rule {
+            return PermissionDecision::Deny(reason.clone());
+        }
+
+        if let Some(decision) = matched_rule {
+            return decision;
+        }
+
+        if self.trusted_workspace
+            && let Some(ref root) = self.workspace_root
+            && evidence.kind == crate::access_evidence::AccessKind::Read
+            && evidence.state == crate::access_evidence::EvidenceState::Declared
+            && evidence.is_repo_local(root)
+        {
+            return PermissionDecision::Allow;
+        }
+
+        let _ = command;
+        PermissionDecision::Ask
     }
 
     /// Loads rules from a JSON configuration value.

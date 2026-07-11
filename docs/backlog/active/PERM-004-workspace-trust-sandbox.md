@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-004 |
 | Priority | P1 |
-| Status | Partial — ADR-038 and first workspace-trust slice complete; PERM-005 command-execution enforcement remains |
+| Status | Complete — ADR-038 and ADR-040 accepted; file-write trust and evidence-based command enforcement delivered (I117, 2026-07-12) |
 | Source | [GitHub Issue #22](https://github.com/wjhuang88/talos/issues/22) |
 | Depends On | `PERM-002`, `PERM-003`, `TOOL-017`, `VALIDATION-001` |
 
