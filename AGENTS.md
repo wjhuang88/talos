@@ -36,7 +36,6 @@ These are immutable facts that every change must respect:
     tests, and release builds. Before creating or pushing a release tag, run
     `./scripts/release_preflight.sh vX.Y.Z`; do not substitute an ad-hoc command set. A failed tag
     is immutable: fix the source and publish a new patch tag instead of moving or force-pushing it.
-
 ## Coding Behavior
 
 ### Accuracy Over Approval
