@@ -6,7 +6,7 @@ Set up and maintain a local development environment for Talos.
 
 ## Prerequisites
 
-- Rust toolchain: `rustup` with stable channel, edition 2024
+- Rust toolchain: repository-pinned `rust-toolchain.toml`, edition 2024
 - OS: macOS, Linux, or WSL2
 
 ## Setup
@@ -29,9 +29,9 @@ cargo build --workspace
 ### 3. Verify
 
 ```bash
-cargo check --workspace
-cargo test --workspace
-cargo clippy --workspace
+cargo check --locked --workspace
+cargo test --locked --workspace
+cargo clippy --locked --workspace -- -D warnings
 ```
 
 All three must exit 0 before starting work.
@@ -41,9 +41,10 @@ All three must exit 0 before starting work.
 | Command | Purpose |
 | --- | --- |
 | `cargo build --workspace` | Build all crates |
-| `cargo check --workspace` | Fast type-check all crates |
-| `cargo test --workspace` | Run all tests |
-| `cargo clippy --workspace` | Lint all crates |
+| `cargo check --locked --workspace` | Fast type-check all crates with the committed lockfile |
+| `cargo test --locked --workspace` | Run all tests with the committed lockfile |
+| `cargo clippy --locked --workspace -- -D warnings` | Lint shipped workspace targets with CI's warning policy |
+| `./scripts/release_preflight.sh vX.Y.Z` | Validate a release candidate using the exact CI flow |
 | `cargo doc --workspace --no-deps` | Generate documentation |
 | `cargo run -p talos-cli` | Run the CLI |
 | `cargo test -p talos-{crate}` | Test a specific crate |

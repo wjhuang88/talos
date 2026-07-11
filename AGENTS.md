@@ -31,6 +31,11 @@ These are immutable facts that every change must respect:
 7. **No speculative features.** Only implement what the current iteration scope defines. Record ideas in `docs/proposals/`.
 8. **Tests must pass before merge.** `cargo test --workspace` must exit 0. No `#[ignore]` without a tracking issue.
 9. **External dependencies must not crash the process.** Any call into a dependency that involves native/C code (tree-sitter, SQLite, `libc`, process spawning) or that may panic must be wrapped so failures degrade gracefully to a safe fallback, never a silent process exit. `catch_unwind`, timeout guards, and error propagation are mandatory at the integration boundary.
+10. **Build and release validation is standardized.** Agents must use the repository-pinned toolchain
+    from `rust-toolchain.toml`, keep `Cargo.lock` tracked, and use `--locked` for workspace checks,
+    tests, and release builds. Before creating or pushing a release tag, run
+    `./scripts/release_preflight.sh vX.Y.Z`; do not substitute an ad-hoc command set. A failed tag
+    is immutable: fix the source and publish a new patch tag instead of moving or force-pushing it.
 
 ## Coding Behavior
 
@@ -117,6 +122,20 @@ These are immutable facts that every change must respect:
 5. **Never force-push to main.**
 6. **Commit messages reference iteration/story IDs** when applicable: `feat(agent): implement turn loop (#I1-S3)`
 
+### Standard Build And Release Flow
+
+All agents follow this sequence for compile, merge, and release work:
+
+1. Read `rust-toolchain.toml` and use the pinned Rust/Clippy toolchain.
+2. Run `./scripts/release_preflight.sh` for workspace-level validation.
+3. Use `--locked` for workspace checks, Clippy, tests, and release builds; do not delete
+   `Cargo.lock` to bypass a failure.
+4. For a release, synchronize the workspace version and all internal path dependency versions,
+   run `./scripts/release_preflight.sh vX.Y.Z`, review `git diff --cached`, commit, then create and
+   push an annotated tag. Never reuse a tag whose workflow failed.
+5. Record the commit, tag, validation evidence, and any blocked external workflow in the owner
+   release task and Board.
+
 ## Task Router
 
 | Task Type | Route To |
@@ -128,6 +147,7 @@ These are immutable facts that every change must respect:
 | "How do I set up local dev?" | `docs/sop/LOCAL-DEV.md` |
 | "What's the testing strategy?" | `docs/sop/TESTING.md` |
 | "How do I commit my work?" | `docs/sop/GIT-WORKFLOW.md` |
+| "How do I compile or publish a release?" | `docs/sop/RELEASE-WORKFLOW.md` |
 | "Run an unattended / overnight / long-running task" | `docs/sop/LONG-RUNNING-TASK.md` |
 | "Where is the architecture documented?" | `docs/reference/ARCHITECTURE.md` |
 | "What are the reference projects?" | `docs/reference/REFERENCE-PROJECTS.md` |

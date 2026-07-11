@@ -11,7 +11,10 @@ Define commit, branching, and PR conventions for the Talos project.
 1. **Review the staged diff**: `git diff --cached`
 2. **Verify**: No secrets, no unintended changes, no debug code
 3. **Check**: Does every changed line trace to a requirement?
-4. **Run**: `cargo check --workspace && cargo clippy --workspace && cargo test --workspace`
+4. **Run**: `cargo check --locked --workspace && cargo clippy --locked --workspace -- -D warnings && cargo test --locked --workspace`
+
+For workspace or release validation, prefer `./scripts/release_preflight.sh` so local and CI
+checks cannot drift. The pinned toolchain is defined in `rust-toolchain.toml`.
 
 ### Commit Messages
 
@@ -50,6 +53,8 @@ chore(workspace): set up CI pipeline (#E1-S5)
 - One logical change per commit. No mixed concerns.
 - Never commit secrets. Check for API keys, tokens, passwords.
 - Never force-push to `main`.
+- Never move or force-push a release tag. If a tag workflow fails, correct the source and use a new
+  patch version/tag.
 - Keep commits atomic and reorderable.
 
 ## Branching
