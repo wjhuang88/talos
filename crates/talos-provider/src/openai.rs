@@ -132,7 +132,7 @@ impl OpenAIProvider {
             let request_fut = self
                 .client
                 .post(self.endpoint_url())
-                .header("Authorization", format!("Bearer {}", &self.api_key))
+                .header("Authorization", format!("Bearer {}", self.api_key))
                 .header("Content-Type", "application/json")
                 .json(&body)
                 .send();

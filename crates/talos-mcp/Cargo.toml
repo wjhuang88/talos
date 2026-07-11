@@ -9,10 +9,10 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { version = "0.3.3", path = "../talos-core" }
-talos-plugin = { version = "0.3.3", path = "../talos-plugin" }
+talos-core = { version = "0.3.4", path = "../talos-core" }
+talos-plugin = { version = "0.3.4", path = "../talos-plugin" }
 # I009-S4 begin
-talos-permission = { version = "0.3.3", path = "../talos-permission" }
+talos-permission = { version = "0.3.4", path = "../talos-permission" }
 rmcp = { version = "1.7.0", default-features = false, features = ["server", "client", "transport-io", "transport-child-process", "transport-async-rw"] }
 # I009-S4 end
 tokio = { version = "1", features = ["full"] }
@@ -29,7 +29,7 @@ reqwest = { version = "0.13.4", default-features = false, features = ["rustls", 
 [dev-dependencies]
 tempfile = "3"
 # I009-S4 begin
-talos-tools = { version = "0.3.3", path = "../talos-tools" }
+talos-tools = { version = "0.3.4", path = "../talos-tools" }
 # I009-S4 end
 
 [lints]
