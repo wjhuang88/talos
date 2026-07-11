@@ -473,4 +473,49 @@ mod tests {
         let p = normalize_path(std::path::Path::new("/.."));
         assert_eq!(p, PathBuf::from("/"));
     }
+
+    #[test]
+    fn test_traversal_relative_starting_with_parent_dir() {
+        let ev = AccessEvidence {
+            kind: AccessKind::Read,
+            state: EvidenceState::Declared,
+            paths: vec![PathBuf::from("../etc/passwd")],
+            detail: String::new(),
+        };
+        let root = std::env::current_dir().expect("cwd");
+        assert!(
+            !ev.is_repo_local(&root),
+            "../etc/passwd must NOT be repo-local"
+        );
+    }
+
+    #[test]
+    fn test_traversal_mixed_existing_and_parent_dir() {
+        let ev = AccessEvidence {
+            kind: AccessKind::Read,
+            state: EvidenceState::Declared,
+            paths: vec![PathBuf::from("src/../../../etc/passwd")],
+            detail: String::new(),
+        };
+        let root = std::env::current_dir().expect("cwd");
+        assert!(
+            !ev.is_repo_local(&root),
+            "src/../../../etc/passwd must NOT be repo-local"
+        );
+    }
+
+    #[test]
+    fn test_traversal_that_stays_in_repo_is_repo_local() {
+        let ev = AccessEvidence {
+            kind: AccessKind::Read,
+            state: EvidenceState::Declared,
+            paths: vec![PathBuf::from("src/../Cargo.toml")],
+            detail: String::new(),
+        };
+        let root = std::env::current_dir().expect("cwd");
+        assert!(
+            ev.is_repo_local(&root),
+            "src/../Cargo.toml stays in repo and should be repo-local"
+        );
+    }
 }
