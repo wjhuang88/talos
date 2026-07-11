@@ -471,6 +471,14 @@ GitHub Release 工作流由 tag 触发：
 - 稳定版本：`v0.1.0`
 - 预发布版本：`v0.1.0-alpha.1`、`v0.1.0-beta.1`、`v0.1.0-rc.1`、`v0.1.0-pre.1`、`v0.1.0-dev.1`
 
+创建 tag 前，请运行与 CI 和 Release workflow 相同的预检：
+
+```bash
+./scripts/release_preflight.sh v0.3.4
+```
+
+仓库通过 `rust-toolchain.toml` 固定 Rust/Clippy 工具链；不要使用其他工具链直接发布。
+
 Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
 
 post-v0.2.0 加固素材集中在

@@ -622,6 +622,15 @@ Release tags drive the GitHub release workflow:
 - Stable release: `v0.1.0`
 - Pre-release: `v0.1.0-alpha.1`, `v0.1.0-beta.1`, `v0.1.0-rc.1`, `v0.1.0-pre.1`, `v0.1.0-dev.1`
 
+Before creating a tag, run the same preflight used by CI and the release workflow:
+
+```bash
+./scripts/release_preflight.sh v0.3.4
+```
+
+The repository pins the Rust/Clippy toolchain in `rust-toolchain.toml`; do not tag a release from
+a different toolchain.
+
 The release workflow builds Linux, macOS, and Windows artifacts from a macOS runner.
 
 The post-v0.2.0 hardening notes that fed the pre-0.3 release line are collected in
