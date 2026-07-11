@@ -18,7 +18,6 @@ acceptance criteria, verification evidence, or iteration state.
 |---|---|---|---|
 | R27 High-Risk Governance Gate | In Progress (standing gate) | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | Standing governance gate, not an active work item. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
 | Four-Month Product Hardening Plan | Active (I085 paused; I086-I089 planned) | [hardening plan](tasks/2026-07-03-four-month-product-hardening-plan.md) | `v0.2.2` tag pushed 2026-07-03 and I085 activated 2026-07-03. I085 Stage 1/2 code and README acceptance are closed; I085 is paused with only MC107 real terminal walkthrough residual. I086-I089 remain planned shells. No branch push, crate publish, remote dashboard, browser automation, remote plugin install, write-capable plugin tools, or permission-default change without a separate gate. |
-| Release 0.3.3 Closeout | In Progress | [v0.3.3 closeout](tasks/2026-07-11-release-0.3.3-closeout.md) | Synchronize workspace/component versions, pass release validation, then push `main` and annotated tag `v0.3.3`; tag-driven GitHub Release workflow owns artifacts. |
 
 ## Review
 
@@ -86,6 +85,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | Release 0.3.0 Closeout | Complete (v0.3.0 tag pushed 2026-07-07) | [v0.3.0 closeout](tasks/2026-07-07-release-0.3.0-closeout.md) | Workspace version bumped to `0.3.0`, release validation passed, `main` and annotated tag `v0.3.0` pushed. Crate publish and manual GitHub Release stayed out of scope. |
+| Release 0.3.3 Closeout | Complete (v0.3.3 tag pushed 2026-07-11) | [v0.3.3 closeout](tasks/2026-07-11-release-0.3.3-closeout.md) | Workspace/component versions synchronized to `0.3.3`, release validation passed, `main` and annotated tag `v0.3.3` pushed; tag-driven workflow owns artifacts. |
 | Talos Self-Bootstrap Stability Pilot | Complete (SSP150) | [stability pilot](tasks/2026-07-06-self-bootstrap-stability-pilot.md) | SSP100-SSP150 complete: 5 commits (TOOL-019, TODO-002, TUI-028, RUNTIME-002, closeout). Second qualifying REL-002 evidence session. |
 | Open Requirement Implementation Audit | Complete | [audit task](tasks/2026-07-05-open-requirement-implementation-audit.md) / [PERM-003 study](reference/PERMISSION-EXPERIENCE-REFERENCE-STUDY-2026-07-05.md) | A1-A6 complete and residuals returned to owner docs. Resume permission, validation, model-browser, and Git residuals from their owner stories with a new iteration ID when acceptance changes. |
 | PERM-003 Permission Experience Reference Study | Complete | [PERM-003](backlog/active/PERM-003-permission-experience-reference-study.md) / [trace](reference/PERMISSION-LONG-TASK-TRACE-2026-07-05.md) | Reference study, taxonomy, approval copy, repeated-approval trace, and deny-precedence tests closed. Future permission implementation must use the recorded taxonomy and keep deny precedence. |
