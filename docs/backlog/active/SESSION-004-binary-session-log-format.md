@@ -5,7 +5,7 @@
 | ID | SESSION-004 |
 | Type | Product Story |
 | Priority | P1 |
-| Status | Ready for Implementation — revised 2026-07-09 |
+| Status | Complete — implemented via ADR-037; reconciled 2026-07-12 (I116/LT010) |
 | Source | Maintainer request 2026-07-06 (original); design revision 2026-07-09 (compact text + archival) |
 | Depends on | SESSION-002, MEM-002, ADR-034, ADR-036 (zstd), ADR-037 (format decision) |
 | Blocks | Durable long-session storage density, faster resume scans, compaction archival, future session export/archive format |

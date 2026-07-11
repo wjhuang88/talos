@@ -148,7 +148,7 @@ docs/iterations/
 | I109 | REL-002 Self-Bootstrap Closeout | **Complete (2026-07-12)** | Evidence audit and NO-GO report complete; REL-002 remains unmet/partial as recorded. See `I109-rel002-self-bootstrap-closeout.md`. |
 | I114 | TUI Runtime Visual Stability | Complete (2026-07-10) | TUI-028 #24 cadence, #25 thinking ripple, #31 compact status rendering, and #39 transient dashboard notification accepted in native Alacritty PTY evidence. See `I114-tui-runtime-visual-stability.md`. |
 | I115 | Runtime Event Semantic Convergence | **Complete (2026-07-11)** | ARCH-033 corrected the semantic gap after ARCH-032: one ordered live queue, authoritative session lifecycle, actor-owned persistence, replay equivalence, and shared runtime-surface semantics. Full workspace and binary E2E validation passed. See `I115-runtime-event-semantic-convergence.md`. |
-| I116 | State Truth And Operator Baseline | **Active (2026-07-12)** | Developer execution begins at LT000-LT002 in `../tasks/2026-07-12-developer-trust-productization-long-task.md`; deliver state truth plus real-binary operator smoke/status evidence. See `I116-state-truth-operator-baseline.md`. |
+| I116 | State Truth And Operator Baseline | **Complete (2026-07-12)** | State trace matrix reconciled 3 drifts (SESSION-004/PERF-001/TOOL-020); operator smoke 13/13; `talos diagnostics status` shipped. See `I116-state-truth-operator-baseline.md`. |
 | I117 | Command Sandbox Evidence | **Planned (2026-07-12)** | Month 2: PERM-005 ADR/evidence enforcement and explicit workspace-trust status/revoke, with strict unknown/out-of-repo fallback. See `I117-command-sandbox-evidence.md`. |
 | I118 | Bounded Local Productization | **Planned (2026-07-12)** | Month 3: local read-only plugin/hook/document/dashboard and installer productization without remote/write/browser expansion. See `I118-bounded-local-productization.md`. |
 | I119 | Talos-Primary Release Decision | **Planned (2026-07-12)** | Month 4: sole-primary Talos task evidence, REL-002 re-audit, conditional release, and handoff. See `I119-talos-primary-release-decision.md`. |
@@ -204,8 +204,8 @@ rewrite published iteration baselines.
 | I087 | Superseded before activation | Revised site-install acceptance moves to I118. |
 | I088 | Superseded before activation | Revised extension/ingestion acceptance moves to I118. |
 | I089 | Superseded before activation | Revised Talos-primary evidence/release decision moves to I119. |
-| I116 | Active (2026-07-12) | Sole active iteration. I085 remains explicitly Paused; I106-I109 closed Complete without evidence reclassification. Execute from the developer long-task owner. |
-| I117 | Planned | Blocked from activation until I116 Complete and PERM-005 readiness/ADR review. |
+| I116 | Complete (2026-07-12) | State truth, operator smoke, and diagnostics status delivered. Removed from non-terminal inventory. I117 is the next to activate. |
+| I117 | Planned | Ready for activation after I116 Complete. PERM-005 ADR/security review is the first gate. |
 | I118 | Planned | Blocked from activation until I117 Complete. |
 | I119 | Planned | Blocked from activation until I118 Complete and explicit sole-primary task selection. |
 | I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |

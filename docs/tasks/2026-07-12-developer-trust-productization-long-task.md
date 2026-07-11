@@ -80,13 +80,13 @@ needed evidence.
 
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| LT000 | Baseline and inventory | Clean/understood Git state, pinned toolchain, non-terminal iteration disposition recorded | None | Gate 0 commands pass; no unexplained files | Stop and record exact dirty files/toolchain failure | In Progress |
+| LT000 | Baseline and inventory | Clean/understood Git state, pinned toolchain, non-terminal iteration disposition recorded | None | Gate 0 commands pass; no unexplained files | Stop and record exact dirty files/toolchain failure | Complete |
 | LT001 | Close historical reviews | I106-I109 Complete while non-qualifying REL-002 evidence remains unchanged | LT000 | Owner files, index, Board agree | Keep Review with exact unmet acceptance | Complete |
-| LT002 | Isolated I085 MC107 walkthrough | Real terminal `/connect` transcript using disposable HOME/config; no real credential persisted | LT000 | Picker opens, provider selection and cancel/save-safe path observed; owner updated | Keep I085 Paused with command/environment/failure | Planned |
-| LT010 | I116 state trace | Code-to-owner matrix for I110-I115 and SESSION-004/PERF-001/TOOL-020/HOOK-001 | LT000 | Every claimed status has code/test/runtime reference | Downgrade stale owner to Partial/Blocked | Planned |
-| LT011 | I116 operator smoke | Network-free real-binary packet covering version, model/connect, session export/resume, permission preflight, ordered tool turn | LT002, LT010 | Script exits 0 on clean disposable HOME using mock provider | Split unavailable interactive checks into explicit manual gates | Planned |
-| LT012 | I116 read-only status | Secret-safe release/toolchain/session/trust/residual summary | LT010 | Unit/CLI redaction tests plus binary transcript | Documentation-only diagnostic if a new surface would duplicate existing commands | Planned |
-| LT013 | I116 closeout | Truth-synchronized month-1 owners and evidence | LT011, LT012 | release preflight, governance, diff check | Keep I116 Review with exact failed gate | Planned |
+| LT002 | Isolated I085 MC107 walkthrough | Real terminal `/connect` transcript using disposable HOME/config; no real credential persisted | LT000 | Picker opens, provider selection and cancel/save-safe path observed; owner updated | Keep I085 Paused with command/environment/failure | Partial (print-mode verified; TUI walkthrough requires interactive terminal) |
+| LT010 | I116 state trace | Code-to-owner matrix for I110-I115 and SESSION-004/PERF-001/TOOL-020/HOOK-001 | LT000 | Every claimed status has code/test/runtime reference | Downgrade stale owner to Partial/Blocked | Complete |
+| LT011 | I116 operator smoke | Network-free real-binary packet covering version, model/connect, session export/resume, permission preflight, ordered tool turn | LT002, LT010 | Script exits 0 on clean disposable HOME using mock provider | Split unavailable interactive checks into explicit manual gates | Complete |
+| LT012 | I116 read-only status | Secret-safe release/toolchain/session/trust/residual summary | LT010 | Unit/CLI redaction tests plus binary transcript | Documentation-only diagnostic if a new surface would duplicate existing commands | Complete |
+| LT013 | I116 closeout | Truth-synchronized month-1 owners and evidence | LT011, LT012 | release preflight, governance, diff check | Keep I116 Review with exact failed gate | Complete |
 | LT020 | PERM-005 design gate | Accepted ADR/security review defining declared/observed/unknown access and platform fallback | LT013 | Maintainer/security sign-off recorded before code | Keep bash/exec strict; implement diagnostics/revoke only | Planned |
 | LT021 | Typed access evidence | Serializable read/write/delete/spawn/network/unknown evidence that grants no authority itself | LT020 | permission/core tests; compatibility reviewed | Keep type internal or revise ADR before public API change | Planned |
 | LT022 | Bounded bash/exec enforcement | Canonical-root enforcement with traversal, symlink, child, unknown and Deny precedence coverage | LT021 | security tests and real CLI smoke pass | Unknown/unobservable remains Ask/Deny; no trust broadening | Planned |
@@ -177,6 +177,7 @@ Append one row after every item and include the exact next gate.
 | Date | Completed Items | Git State / Artifacts | Commands And Results | Risks / Deviations | Exact Next Gate |
 |---|---|---|---|---|---|
 | 2026-07-12 | LT001; LT000 repository inventory started | Planning changes are currently uncommitted on `main`; inspect `git status -sb` before developer branching | Governance validation for the four-month plan previously passed with 0 warnings; rerun after this task packet | LT002 requires a real terminal and disposable HOME; no credential should be entered | Finish LT000 Gate 0, then run LT002 in an interactive terminal and append the transcript/result to I085 and this table |
+| 2026-07-12 | LT000-LT013 complete (I116 closeout) | Branch `feature/i116-state-truth-operator-baseline`; binary built; state trace at `docs/reference/I116-STATE-TRACE-2026-07-12.md`; `diagnostics.rs` in talos-cli; `talos_smoke.sh` extended | `release_preflight.sh` passed; `validate_project_governance.sh` 0 warnings; `git diff --check` clean; `talos_smoke.sh` 13/13 pass; diagnostics 4/4 tests pass | LT002 MC107 interactive walkthrough remains a manual gate (TUI cannot init in PTY); I085 stays Paused | Proceed to LT020 (I117 PERM-005 ADR design gate) after committing and pushing I116 |
 
 ## Residual Work Destination
 
