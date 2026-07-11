@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-004 |
 | Priority | P1 |
-| Status | Planned — ADR required |
+| Status | Partial — ADR-038 and first workspace-trust slice complete; PERM-005 command-execution enforcement remains |
 | Source | [GitHub Issue #22](https://github.com/wjhuang88/talos/issues/22) |
 | Depends On | `PERM-002`, `PERM-003`, `TOOL-017`, `VALIDATION-001` |
 
@@ -29,6 +29,22 @@ Git repository. PERM-004 should use that signal when selecting the workspace tru
 
 The repo-sandbox mode is a policy design target, not an implementation authorization. It requires
 the ADR, tests, and `PERM-005` sandbox-observability follow-up before broad bash/exec relaxation.
+
+## Implementation Status (2026-07-11 Reconciliation)
+
+ADR-038 is accepted and I112/T121 delivered the first bounded slice:
+
+- `WorkspaceTrustStore` persists explicit trust decisions by canonical workspace path.
+- CLI `--trust` grants trust only when a Git workspace is detected.
+- `PermissionEngine` applies trust only to repo-contained `Write` facets.
+- Explicit Deny rules remain authoritative; non-Git and out-of-repo operations keep strict policy.
+- Boundary, traversal, persistence, and Deny-precedence tests cover the delivered slice.
+
+This does not complete the broader sandbox objective. Git detection currently uses the bounded
+workspace `.git` check rather than claiming arbitrary repository discovery, and bash/exec remains
+per-command because Talos cannot yet prove touched paths, child-process access, or unknown access.
+Those security requirements belong to PERM-005. No future agent may interpret this first slice as
+repo-wide `bash`/`exec` permission.
 
 ## Acceptance
 
