@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Four-Month Trust And Productization Plan | In Progress (I116-I117 Complete; I118 next) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [I116 trace](reference/I116-STATE-TRACE-2026-07-12.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) | I116 closed: state truth + smoke + diagnostics. I117 closed: ADR-040 + access evidence + trust status/revoke. Unknown/out-of-repo bash/exec never inherits trust. I118 bounded local productization is the next gate. |
+| Four-Month Trust And Productization Plan | In Progress (I116-I118 Complete; I119 next) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [I116 trace](reference/I116-STATE-TRACE-2026-07-12.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) | I116 closed: state truth + smoke + diagnostics. I117 closed: ADR-040 + evidence enforcement + trust status/revoke. I118 closed: bounded local plugin/hook/document/dashboard/installer verified. I119 Talos-primary evidence and release decision is the final gate. |
 
 ## Review
 
