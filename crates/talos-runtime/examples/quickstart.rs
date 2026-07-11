@@ -39,7 +39,10 @@ async fn main() {
     // Step 4: Collect events until the turn completes.
     while let Some(event) = runtime.next_event().await {
         match &event {
-            SessionEvent::AgentEvent { event } => match event {
+            SessionEvent::TurnEvent {
+                payload: talos_core::session::TurnEventPayload::Progress { event },
+                ..
+            } => match event {
                 AgentEvent::TurnStart => println!("  ▶ Turn started"),
                 AgentEvent::TextDelta { delta } => print!("  {delta}"),
                 AgentEvent::TurnEnd { stop_reason, .. } => {
@@ -47,10 +50,18 @@ async fn main() {
                 }
                 _ => {}
             },
-            SessionEvent::TurnStarted { turn_id } => {
+            SessionEvent::TurnEvent {
+                turn_id,
+                payload: talos_core::session::TurnEventPayload::Started,
+                ..
+            } => {
                 println!("  [turn] {turn_id} started");
             }
-            SessionEvent::TurnCompleted { turn_id, status } => {
+            SessionEvent::TurnEvent {
+                turn_id,
+                payload: talos_core::session::TurnEventPayload::Completed { status },
+                ..
+            } => {
                 println!("  [turn] {turn_id} completed: {status:?}");
                 break;
             }

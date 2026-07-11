@@ -1,13 +1,22 @@
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use talos_core::message::{AgentEvent, Message};
-use talos_core::session::{SessionEvent, TurnCompletionStatus};
+use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 
 use crate::Agent;
+
+#[derive(Clone)]
+pub(super) struct TurnPersistence {
+    pub(super) session: talos_session::Session,
+    pub(super) metadata: talos_session::SessionMetadata,
+}
 
 pub(super) struct TurnRecord {
     pub(super) new_messages: Vec<Message>,
@@ -22,6 +31,9 @@ pub(super) struct TurnForwarding {
     pub(super) eq_tx: mpsc::UnboundedSender<SessionEvent>,
     pub(super) cancel_token: CancellationToken,
     pub(super) turn_id: String,
+    pub(super) session_id: String,
+    pub(super) sequence: Arc<AtomicU64>,
+    pub(super) persistence: Option<TurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
 }
 
@@ -35,11 +47,19 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         eq_tx,
         cancel_token,
         turn_id,
+        session_id,
+        sequence,
+        persistence,
         result_tx,
     } = turn;
 
     let eq_tx_clone = eq_tx.clone();
     let cancel_clone = cancel_token.clone();
+    let progress_sequence = sequence.clone();
+    let progress_turn_id = turn_id.clone();
+    let progress_session_id = session_id.clone();
+    let raw_tool_outputs = Arc::new(Mutex::new(HashMap::<String, String>::new()));
+    let progress_raw_tool_outputs = raw_tool_outputs.clone();
 
     let forwarder = tokio::spawn(async move {
         loop {
@@ -48,7 +68,21 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 event = event_rx.recv() => {
                     match event {
                         Some(event) => {
-                            let _ = eq_tx.send(SessionEvent::AgentEvent { event });
+                            if let AgentEvent::ToolResult { result } = &event
+                                && let Ok(mut outputs) = progress_raw_tool_outputs.lock()
+                            {
+                                outputs.insert(
+                                    result.tool_use_id.clone(),
+                                    result.content.clone(),
+                                );
+                            }
+                            let sequence = progress_sequence.fetch_add(1, Ordering::Relaxed);
+                            let _ = eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: progress_session_id.clone(),
+                                turn_id: progress_turn_id.clone(),
+                                sequence,
+                                payload: TurnEventPayload::Progress { event },
+                            });
                         }
                         None => break,
                     }
@@ -65,9 +99,14 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         _ = cancel_token.cancelled() => {
             agent_task.abort();
             let _ = forwarder.await;
-            let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
+            let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+            let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                session_id,
                 turn_id,
-                status: TurnCompletionStatus::Cancelled,
+                sequence,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Cancelled,
+                },
             });
             return;
         }
@@ -78,31 +117,84 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     match agent_result {
         Ok(Ok((final_text, new_messages))) => {
             let cloned_messages = new_messages.clone();
-            let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
+            if let Some(persistence) = persistence
+                && let Err(message) =
+                    persist_turn_messages(&persistence, &new_messages, &raw_tool_outputs)
+            {
+                let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+                let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                    session_id,
+                    turn_id,
+                    sequence,
+                    payload: TurnEventPayload::Completed {
+                        status: TurnCompletionStatus::Error { message },
+                    },
+                });
+                let _ = result_tx.send(TurnRecord { new_messages });
+                return;
+            }
+            let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+            let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                session_id,
                 turn_id,
-                status: TurnCompletionStatus::Success {
-                    final_text: final_text.clone(),
-                    new_messages: cloned_messages,
+                sequence,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: final_text.clone(),
+                        new_messages: cloned_messages,
+                    },
                 },
             });
             let _ = result_tx.send(TurnRecord { new_messages });
         }
         Ok(Err(e)) => {
-            let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
+            let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+            let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                session_id,
                 turn_id,
-                status: TurnCompletionStatus::Error {
-                    message: e.to_string(),
+                sequence,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Error {
+                        message: e.to_string(),
+                    },
                 },
             });
         }
         Err(_join_error) => {
             error!("agent panicked during turn");
-            let _ = eq_tx_clone.send(SessionEvent::TurnCompleted {
+            let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+            let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                session_id,
                 turn_id,
-                status: TurnCompletionStatus::Error {
-                    message: "agent panicked".into(),
+                sequence,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Error {
+                        message: "agent panicked".into(),
+                    },
                 },
             });
         }
     }
+}
+
+fn persist_turn_messages(
+    persistence: &TurnPersistence,
+    messages: &[Message],
+    raw_tool_outputs: &Arc<Mutex<HashMap<String, String>>>,
+) -> Result<(), String> {
+    for message in messages {
+        let mut metadata = persistence.metadata.clone();
+        if let Message::Tool { result } = message
+            && let Ok(outputs) = raw_tool_outputs.lock()
+            && let Some(raw) = outputs.get(&result.tool_use_id)
+            && raw != &result.content
+        {
+            metadata.raw_content = Some(raw.clone());
+        }
+        persistence
+            .session
+            .append_with_metadata(message, metadata)
+            .map_err(|error| format!("failed to persist completed turn: {error}"))?;
+    }
+    Ok(())
 }

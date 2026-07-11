@@ -179,7 +179,27 @@ pub struct StreamMessage {
     pub stream: Pin<Box<dyn futures::Stream<Item = String> + Send>>,
 }
 
+/// One FIFO-ordered content operation for the canonical UI output queue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContentOutput {
+    /// Start a streamed logical message block.
+    Start { source: MessageSource },
+    /// Append text to the currently open logical message block.
+    Delta { text: String },
+    /// Finish the currently open logical message block.
+    End,
+    /// Render a complete non-streaming logical message atomically.
+    Block { source: MessageSource, text: String },
+}
+
 pub enum UiOutput {
+    /// Canonical FIFO content path. All in-tree live runtime output uses this
+    /// variant so text cannot race lifecycle/tool outputs on a nested channel.
+    Content(ContentOutput),
+    /// Legacy compatibility input for external callers.
+    ///
+    /// New code must use [`UiOutput::Content`]. This variant remains during
+    /// the ADR-039 semver migration window.
     Stream(StreamMessage),
     /// A finalized reasoning block that must not replace the active assistant stream.
     Reasoning(String),

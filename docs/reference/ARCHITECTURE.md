@@ -184,26 +184,29 @@ library crates, while reusable crates must not depend on CLI/TUI/product assumpt
 readiness is tracked in `docs/reference/CRATE-PUBLICATION-MATRIX.md`. Real crates.io publication or
 placeholder name reservation remains a separate maintainer-approved release action.
 
-## TUI Event-Driven Architecture (I023)
+## TUI Event-Driven Architecture (I023, corrected by I115)
 
-The TUI follows a single-directional information flow: Agent → ConversationEngine → UI.
+The TUI follows a single-directional information flow:
+`AppServerSession → ConversationEngine → UI`.
 
 ### ConversationEngine (`talos-conversation`)
 
-Owns all business state (messages, turn lifecycle, model info). The TUI does not hold business state — only pure UI state (input buffer, cursor, tips, approval).
+Projects ordered session events into conversation-visible messages, status, and model information.
+The session actor owns authoritative user-turn lifecycle, Agent history, and successful turn-message
+persistence. The TUI holds only rendering/input state.
 
 ```text
 ┌─────────────────────┐     UiOutput (mpsc)     ┌──────────────┐
 │  ConversationEngine │ ──────────────────────> │     Tui      │
-│  (business state)   │                         │  (UI state)  │
+│  (ordered projection)│                        │  (UI state)  │
 │                     │ <────────────────────── │              │
 └─────────────────────┘     UserInput (mpsc)    └──────────────┘
 ```
 
-State-critical session events must be delivered to `ConversationEngine` through
-a non-lossy queue. The TUI bridge may use bounded/lossy fan-out only for passive
-observers; it must not drop turn lifecycle events that drive `is_processing`,
-stream closure, queue draining, or error display.
+State-critical events arrive as `SessionEvent::TurnEvent { session_id, turn_id, sequence, payload }` through a
+non-lossy queue. `TurnEventPayload::Started` and `Completed` are the only authoritative user-turn
+lifecycle. Provider `AgentEvent::TurnStart`/`TurnEnd` delimit provider responses inside a turn and
+must not complete a user turn or drain steering.
 
 Cancellation is part of the same contract. When TUI input produces
 `UserInput::Cancel`, the integration layer must send `SessionOp::Interrupt` to
@@ -215,7 +218,8 @@ valid backend interrupt.
 
 | Variant | Purpose |
 |---------|---------|
-| `Stream { stream, source }` | New content stream (user message or AI response). UI consumes via `Stream::next()` in `select!` loop. |
+| `Content(ContentOutput)` | Canonical FIFO content path: `Start`, `Delta`, `End`, or atomic `Block`. |
+| `Stream { stream, source }` | Legacy public compatibility input only; in-tree runtime producers do not use it. |
 | `Status { snapshot }` | Status update (model name, token usage, processing state). |
 | `Tip { text, kind }` | Transient tip message with TTL auto-expiry. |
 | `ToolCallStarted { name }` | Lightweight tool-start marker for paths that do not yet have full display metadata. |
@@ -224,14 +228,20 @@ valid backend interrupt.
 | `ToolApprovalRequest` | Inline approval request flowing through the same `UiOutput` channel; TUI returns the user's decision through a oneshot response. |
 | `Exit` | Signal to terminate the UI loop. |
 
-### Stream Consumption
+### Ordered Content Consumption
 
-Content flows as character/chunk streams, not pre-split lines:
+Live content shares the same FIFO `UiOutput` queue as tool, reasoning, status, and lifecycle
+projections:
 
-1. `select!` loop has a `next_stream_chunk` branch that reads the active stream directly — no spawn task.
-2. `consume_stream_chunk` splits on `\n`, pushes complete lines to `pending_scrollback`, updates `streaming_preview` from `stream_buffer`.
-3. `flush_pending_scrollback` calls `insert_history` (one line at a time, Codex-style terminal ops) to write to scrollback above the viewport.
-4. `handle_ui_output(Stream)` finalizes active stream, pushes non-empty preview to scrollback, then sets new active stream.
+1. `Content::Start` opens one logical message block.
+2. `Content::Delta` passes text to `consume_stream_chunk`, which splits complete lines and updates
+   the preview.
+3. `Content::End` finalizes the same block before any later FIFO tool/status output is handled.
+4. `Content::Block` renders a complete user/system/reasoning message atomically.
+5. `flush_pending_scrollback` writes styled lines to terminal scrollback.
+
+There is no nested live-text receiver competing with `UiOutput` in `select!`; this prevents a later
+tool boundary from closing a receiver that still contains earlier text.
 
 ### Line Padding System
 
@@ -262,7 +272,7 @@ to the input buffer, including newlines; Enter submits the whole buffer. When th
 user block is flushed to scrollback, only the first line receives the ` > `
 prompt marker. Continuation lines retain the three-column alignment with spaces.
 
-The same prefix rule applies to every `StreamMessage` source. Streams are
+The same prefix rule applies to every `ContentOutput` source. Content blocks are
 logical message blocks, but the TUI writes complete lines to terminal history as
 soon as they arrive. The source prefix is rendered only for stream-local line 0;
 all later lines use the blank three-column prefix. Incomplete trailing text stays
@@ -554,3 +564,20 @@ carry last-value state snapshots, not events.
 **Fully compliant with ADR-006.** No deviations found. No remediation required. All channels
 trace to concrete single-producer/single-consumer pairs or bounded request/response patterns. The
 hook system uses trait-method dispatch (not channels), with per-Agent `HookRegistry` instances.
+
+### Semantic Follow-Up (ARCH-033 / I115, 2026-07-11)
+
+The topology verdict above remains historically accurate for ADR-006's narrow question: there was
+no global broadcast bus and every channel had an explicit consumer. Its final “no remediation” claim
+did not cover semantic ordering or state ownership. A follow-up audit found that nested
+`StreamMessage` receivers created a second ordering domain, provider-response `TurnEnd` competed
+with session `TurnCompleted`, CLI modes persisted/reconstructed turns differently, and RPC bypassed
+the session seam.
+
+I115 corrects those findings under ADR-039:
+
+- canonical EQ events are `TurnEvent { session_id, turn_id, sequence, payload }`;
+- one FIFO `UiOutput::Content` path carries live text with tool/reasoning/status projections;
+- steering drains only on authoritative session completion;
+- `AppServerSession` owns successful turn-message persistence;
+- TUI, interactive, inline, print, embedded runtime, and RPC use the session protocol.

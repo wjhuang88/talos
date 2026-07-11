@@ -27,6 +27,7 @@ acceptance criteria, verification evidence, or iteration state.
 | I108 Architecture-Sensitive Self-Bootstrap | Review | [I108](iterations/I108-architecture-sensitive-self-bootstrap.md) | ARCH-032 Single Data Flow Audit complete (SBT121): zero broadcast channels, all paths ADR-006 compliant. Non-qualifying REL-002 evidence (external runtime glm-5.2). |
 | I109 REL-002 Self-Bootstrap Closeout | Review | [I109](iterations/I109-rel002-self-bootstrap-closeout.md) / [readiness report](reference/REL-002-READINESS-REPORT-2026-07-09.md) | SBT130-SBT133 complete: acceptance criteria audited (3 UNMET, 4 PARTIAL, 1 MET), NO-GO v1.0 verdict, readiness report produced. Non-qualifying REL-002 evidence (external runtime glm-5.2). Four-month plan closed. No v1.0.0 tag, release, publish, or external trial authorized. |
 | Issue / Doc / Code Status Audit | Review | [status matrix](reference/ISSUE-DOC-CODE-STATUS-2026-07-09.md) | #18/#35 closed, #24/#31 reopened, #25/#26/#39 kept open, and local owner docs synced with code evidence. |
+| I115 Runtime Event Semantic Convergence | Complete | [I115](iterations/I115-runtime-event-semantic-convergence.md) / [ARCH-033](backlog/active/ARCH-033-runtime-event-semantic-convergence.md) | Closed after FIFO content, authoritative lifecycle, actor persistence, cross-surface runtime evidence, full tests, clippy, and governance validation passed. |
 
 ## Blocked / Paused
 

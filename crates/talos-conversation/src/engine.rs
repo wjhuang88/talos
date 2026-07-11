@@ -1,23 +1,26 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use futures::stream;
-use talos_core::message::{AgentEvent, MessageToolResult, StopReason, Usage};
+use talos_core::message::{AgentEvent, MessageToolResult, Usage};
+use talos_core::session::TurnCompletionStatus;
 use talos_core::tool::ToolProvenance;
-use tokio::sync::mpsc;
 
 use crate::command_registry::{MOCK_REQUEST_COMMAND, command_registry};
 use crate::types::{
-    ChatMessage, CopyScope, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
+    ChatMessage, ContentOutput, CopyScope, McpServerDiagnostic, MessageRole, MessageSource,
+    MessageStatus, ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
+    SkillDiagnostic, StatusSnapshot, TipKind, TodoCommandAction, TodoCommandRequest,
     TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput,
 };
 
 fn is_timeout_error(message: &str) -> bool {
     let lower = message.to_ascii_lowercase();
     lower.contains("timeout") || lower.contains("timed out")
+}
+
+fn content_block(source: MessageSource, text: String) -> UiOutput {
+    UiOutput::Content(ContentOutput::Block { source, text })
 }
 
 fn plugin_observation_key(provenance: &ToolProvenance) -> String {
@@ -174,7 +177,7 @@ pub struct ConversationEngine {
     pub(crate) output_price_per_million: Option<f64>,
     pub(crate) workspace_root: Option<PathBuf>,
     last_flushed_message: usize,
-    stream_tx: Option<mpsc::UnboundedSender<String>>,
+    content_open: bool,
 }
 
 impl ConversationEngine {
@@ -209,7 +212,7 @@ impl ConversationEngine {
             output_price_per_million: None,
             workspace_root: None,
             last_flushed_message: 0,
-            stream_tx: None,
+            content_open: false,
         }
     }
 
@@ -265,6 +268,48 @@ impl ConversationEngine {
         self.is_processing
     }
 
+    /// Applies the authoritative session-level start of a user turn.
+    pub fn handle_turn_started(&mut self) -> Vec<UiOutput> {
+        self.is_processing = true;
+        self.current_phase = Some(TurnPhase::Connecting);
+        vec![UiOutput::Status(self.status_snapshot())]
+    }
+
+    /// Applies the authoritative terminal status of the whole user turn.
+    pub fn handle_turn_completed(&mut self, status: &TurnCompletionStatus) -> Vec<UiOutput> {
+        match status {
+            TurnCompletionStatus::Success { .. } => {
+                let mut outputs = Vec::new();
+                self.close_content(&mut outputs);
+                if let Some(thinking_outputs) = self.finalize_thinking() {
+                    outputs.extend(thinking_outputs);
+                }
+                self.finalize_turn();
+                self.last_flushed_message = self.messages.len();
+                self.is_processing = false;
+                self.current_phase = None;
+                outputs.push(UiOutput::Status(self.status_snapshot()));
+                outputs
+            }
+            TurnCompletionStatus::Cancelled => {
+                let mut outputs = Vec::new();
+                self.close_content(&mut outputs);
+                self.current_turn_text.clear();
+                self.current_thinking_text.clear();
+                self.is_processing = false;
+                self.current_phase = Some(TurnPhase::Cancelled);
+                outputs.push(UiOutput::ThinkingPreview { text: None });
+                outputs.push(UiOutput::Status(self.status_snapshot()));
+                outputs
+            }
+            TurnCompletionStatus::Error { message } => {
+                self.handle_agent_event(&AgentEvent::Error {
+                    message: message.clone(),
+                })
+            }
+        }
+    }
+
     pub fn start_user_message(&mut self, msg: &str) -> Vec<UiOutput> {
         self.is_processing = true;
         self.handle_user_message(msg)
@@ -282,13 +327,13 @@ impl ConversationEngine {
     }
 
     pub fn cancel_turn(&mut self) -> Vec<UiOutput> {
-        self.close_stream();
+        let mut outputs = Vec::new();
+        self.close_content(&mut outputs);
         self.is_processing = false;
         self.current_phase = Some(TurnPhase::Cancelled);
         self.current_turn_text.clear();
         let had_thinking = !self.current_thinking_text.is_empty();
         self.current_thinking_text.clear();
-        let mut outputs = Vec::new();
         if had_thinking {
             outputs.push(UiOutput::ThinkingPreview { text: None });
         }
@@ -311,13 +356,6 @@ impl ConversationEngine {
                 self.current_phase = Some(TurnPhase::Connecting);
                 self.current_turn_text.clear();
                 self.current_thinking_text.clear();
-
-                let (tx, rx) = mpsc::unbounded_channel::<String>();
-                self.stream_tx = Some(tx);
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Assistant,
-                    stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
-                }));
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::TextDelta { delta } => {
@@ -328,8 +366,16 @@ impl ConversationEngine {
                 }
                 self.current_phase = Some(TurnPhase::Generating);
                 self.current_turn_text.push_str(delta);
-                if let Some(ref tx) = self.stream_tx {
-                    let _ = tx.send(delta.clone());
+                if !delta.is_empty() {
+                    if !self.content_open {
+                        self.content_open = true;
+                        outputs.push(UiOutput::Content(ContentOutput::Start {
+                            source: MessageSource::Assistant,
+                        }));
+                    }
+                    outputs.push(UiOutput::Content(ContentOutput::Delta {
+                        text: delta.clone(),
+                    }));
                 }
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
@@ -348,7 +394,7 @@ impl ConversationEngine {
                     outputs.extend(thinking_outputs);
                 }
                 self.current_phase = Some(TurnPhase::RunningTool { name: name.clone() });
-                self.close_stream();
+                self.close_content(&mut outputs);
                 outputs.push(UiOutput::ToolCallStarted {
                     name: name.to_string(),
                 });
@@ -362,7 +408,7 @@ impl ConversationEngine {
                 self.current_phase = Some(TurnPhase::RunningTool {
                     name: call.name.clone(),
                 });
-                self.close_stream();
+                self.close_content(&mut outputs);
                 self.record_provenance(provenance);
                 self.messages.push(ChatMessage {
                     role: MessageRole::Assistant,
@@ -386,7 +432,7 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ToolResult { result } => {
-                self.close_stream();
+                self.close_content(&mut outputs);
                 let tool_name = self.set_tool_result(result);
                 outputs.push(UiOutput::ToolResult(ToolResultDisplay {
                     tool_name,
@@ -396,11 +442,8 @@ impl ConversationEngine {
                 self.current_phase = Some(TurnPhase::Generating);
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
-            AgentEvent::TurnEnd { usage, stop_reason } => {
-                self.close_stream();
-                if !matches!(stop_reason, StopReason::ToolUse) {
-                    self.is_processing = false;
-                }
+            AgentEvent::TurnEnd { usage, .. } => {
+                self.close_content(&mut outputs);
                 self.current_phase = None;
                 if let Some(thinking_outputs) = self.finalize_thinking() {
                     outputs.extend(thinking_outputs);
@@ -411,7 +454,7 @@ impl ConversationEngine {
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::Error { message } => {
-                self.close_stream();
+                self.close_content(&mut outputs);
                 self.is_processing = false;
                 self.current_phase = Some(if is_timeout_error(message) {
                     TurnPhase::TimedOut
@@ -429,13 +472,10 @@ impl ConversationEngine {
                     kind: TipKind::Error,
                 });
 
-                let (tx, rx) = mpsc::unbounded_channel::<String>();
                 let text = format!("[Error] {message}");
-                let _ = tx.send(text);
-                drop(tx);
-                outputs.push(UiOutput::Stream(StreamMessage {
+                outputs.push(UiOutput::Content(ContentOutput::Block {
                     source: MessageSource::Error,
-                    stream: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
+                    text,
                 }));
 
                 self.messages.push(ChatMessage {
@@ -467,9 +507,9 @@ impl ConversationEngine {
         });
         self.last_flushed_message = self.messages.len();
 
-        vec![UiOutput::Stream(StreamMessage {
+        vec![UiOutput::Content(ContentOutput::Block {
             source: MessageSource::User,
-            stream: Box::pin(stream::once(async move { msg_owned })),
+            text: msg_owned,
         })]
     }
 
@@ -488,10 +528,7 @@ impl ConversationEngine {
                         command.usage, command.description
                     ));
                 }
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(stream::once(async move { text })),
-                }));
+                outputs.push(content_block(MessageSource::System, text));
             }
             "/quit" | "/exit" => {
                 outputs.push(UiOutput::Exit);
@@ -501,17 +538,11 @@ impl ConversationEngine {
                     "[System] Model: {} | Input: {} | Output: {} tokens\n",
                     self.model_name, self.usage.input_tokens, self.usage.output_tokens,
                 );
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(stream::once(async move { text })),
-                }));
+                outputs.push(content_block(MessageSource::System, text));
             }
             "/plugins" => {
                 let text = "[System] /plugins is reserved for future plugin packages.\n[System] Use /mcp to inspect MCP server status and tool provenance.\n".to_string();
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::System,
-                    stream: Box::pin(stream::once(async move { text })),
-                }));
+                outputs.push(content_block(MessageSource::System, text));
             }
             "/mcp" => {
                 outputs.extend(self.handle_mcp_command());
@@ -531,10 +562,7 @@ impl ConversationEngine {
             "/new" => {
                 if self.is_processing {
                     let text = "[System] Cannot start a new session while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    outputs.push(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    }));
+                    outputs.push(content_block(MessageSource::System, text));
                 } else {
                     outputs.push(UiOutput::SessionNew(SessionNewRequest));
                 }
@@ -542,10 +570,7 @@ impl ConversationEngine {
             "/resume" => {
                 if self.is_processing {
                     let text = "[System] Cannot resume a session while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    outputs.push(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    }));
+                    outputs.push(content_block(MessageSource::System, text));
                 } else {
                     let session_id = if arg.is_empty() {
                         None
@@ -558,10 +583,7 @@ impl ConversationEngine {
             "/fork" => {
                 if self.is_processing {
                     let text = "[System] Cannot fork a session while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    outputs.push(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    }));
+                    outputs.push(content_block(MessageSource::System, text));
                 } else {
                     outputs.push(UiOutput::SessionFork(SessionForkRequest));
                 }
@@ -569,10 +591,7 @@ impl ConversationEngine {
             "/delete" => {
                 if self.is_processing {
                     let text = "[System] Cannot delete a session while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    outputs.push(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    }));
+                    outputs.push(content_block(MessageSource::System, text));
                 } else if arg.is_empty() {
                     outputs.push(UiOutput::SessionDelete(SessionDeleteRequest {
                         selection: None,
@@ -586,10 +605,7 @@ impl ConversationEngine {
             "/model" => {
                 if self.is_processing {
                     let text = "[System] Cannot switch models while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    outputs.push(UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    }));
+                    outputs.push(content_block(MessageSource::System, text));
                 } else {
                     outputs.push(UiOutput::ModelSwitchRequest(ModelSwitchRequest {
                         model_id: arg.to_string(),
@@ -614,10 +630,7 @@ impl ConversationEngine {
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");
-                outputs.push(UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Error,
-                    stream: Box::pin(stream::once(async move { text })),
-                }));
+                outputs.push(content_block(MessageSource::Error, text));
             }
         }
 
@@ -627,27 +640,22 @@ impl ConversationEngine {
     fn handle_todo_command(&self, arg: &str) -> Vec<UiOutput> {
         match parse_todo_command(arg) {
             Ok(request) => vec![UiOutput::TodoCommand(request)],
-            Err(message) => vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(stream::once(async move { format!("[Error] {message}\n") })),
-            })],
+            Err(message) => vec![content_block(
+                MessageSource::Error,
+                format!("[Error] {message}\n"),
+            )],
         }
     }
 
     fn handle_agile_command(&self, _arg: &str) -> Vec<UiOutput> {
         let Some(ref ws) = self.workspace_root else {
-            return vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(stream::once(async move {
-                    "[System] /agile is unavailable — no workspace path set.\n".to_string()
-                })),
-            })];
+            return vec![content_block(
+                MessageSource::System,
+                "[System] /agile is unavailable — no workspace path set.\n".to_string(),
+            )];
         };
         let text = crate::governance_summary::format_governance_summary(ws);
-        vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { text })),
-        })]
+        vec![content_block(MessageSource::System, text)]
     }
 
     fn handle_validate_command(&self, arg: &str) -> Vec<UiOutput> {
@@ -657,28 +665,20 @@ impl ConversationEngine {
                 let text = format!(
                     "[Error] Unsupported internal validation profile: {other}. Usage: /validate [governance]\n"
                 );
-                return vec![UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Error,
-                    stream: Box::pin(stream::once(async move { text })),
-                })];
+                return vec![content_block(MessageSource::Error, text)];
             }
         };
         let Some(ref ws) = self.workspace_root else {
-            return vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(stream::once(async move {
-                    "[System] /validate is unavailable — no workspace path set.\n".to_string()
-                })),
-            })];
+            return vec![content_block(
+                MessageSource::System,
+                "[System] /validate is unavailable — no workspace path set.\n".to_string(),
+            )];
         };
 
         let plan = crate::collect_validation_plan(ws, profile);
         let evidence = crate::run_validation_plan(ws, plan);
         let text = crate::render_text_evidence(&evidence);
-        vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { text })),
-        })]
+        vec![content_block(MessageSource::System, text)]
     }
 
     fn handle_copy_command(&self, scope: &str) -> Vec<UiOutput> {
@@ -699,18 +699,12 @@ impl ConversationEngine {
             }
             _ => {
                 let hint = "[Error] Usage: /copy last | /copy all\n".to_string();
-                return vec![UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Error,
-                    stream: Box::pin(stream::once(async move { hint })),
-                })];
+                return vec![content_block(MessageSource::Error, hint)];
             }
         };
 
         let confirm = format!("[System] Copying {label} to clipboard…\n");
-        let mut outputs = vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { confirm })),
-        })];
+        let mut outputs = vec![content_block(MessageSource::System, confirm)];
         outputs.push(UiOutput::CopyToClipboard {
             text,
             scope: scope_enum,
@@ -723,10 +717,7 @@ impl ConversationEngine {
         if path.is_empty() {
             let hint =
                 "[Error] Usage: /export <path> [--include-thinking]\nExample: /export transcript.md\n".to_string();
-            return vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::Error,
-                stream: Box::pin(stream::once(async move { hint })),
-            })];
+            return vec![content_block(MessageSource::Error, hint)];
         }
 
         let include_thinking = path.contains("--include-thinking");
@@ -739,17 +730,11 @@ impl ConversationEngine {
         };
         if content.is_empty() {
             let msg = "[System] Transcript is empty — nothing to export.\n".to_string();
-            return vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(stream::once(async move { msg })),
-            })];
+            return vec![content_block(MessageSource::System, msg)];
         }
 
         let confirm = format!("[System] Exporting transcript to {clean_path}…\n");
-        let mut outputs = vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { confirm })),
-        })];
+        let mut outputs = vec![content_block(MessageSource::System, confirm)];
         outputs.push(UiOutput::ExportToFile {
             path: PathBuf::from(clean_path),
             content,
@@ -761,10 +746,7 @@ impl ConversationEngine {
         if self.mcp_servers.is_empty() && self.plugin_observations.is_empty() {
             let text = "[System] No MCP servers configured and no tool provenance observed yet.\n"
                 .to_string();
-            return vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(stream::once(async move { text })),
-            })];
+            return vec![content_block(MessageSource::System, text)];
         }
         let mut text = String::new();
         if !self.mcp_servers.is_empty() {
@@ -797,10 +779,7 @@ impl ConversationEngine {
                 ));
             }
         }
-        vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { text })),
-        })]
+        vec![content_block(MessageSource::System, text)]
     }
 
     fn handle_hooks_command(&self) -> Vec<UiOutput> {
@@ -824,10 +803,7 @@ impl ConversationEngine {
         for kind in talos_plugin::ALL_HOOK_EVENT_KINDS {
             text.push_str(&format!("[System]     {kind}\n"));
         }
-        vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { text })),
-        })]
+        vec![content_block(MessageSource::System, text)]
     }
 
     fn handle_skills_command(&mut self, arg: &str) -> Vec<UiOutput> {
@@ -836,18 +812,12 @@ impl ConversationEngine {
             Some("activate") => {
                 if self.is_processing {
                     let text = "[System] Cannot activate a skill while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    return vec![UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    })];
+                    return vec![content_block(MessageSource::System, text)];
                 }
                 let name = parts.collect::<Vec<_>>().join(" ");
                 if name.trim().is_empty() {
                     let text = "[Error] Usage: /skills activate <name>\n".to_string();
-                    return vec![UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(stream::once(async move { text })),
-                    })];
+                    return vec![content_block(MessageSource::Error, text)];
                 }
                 return vec![UiOutput::SkillCommand(SkillCommandRequest::Activate {
                     name,
@@ -856,18 +826,12 @@ impl ConversationEngine {
             Some("reference") => {
                 if self.is_processing {
                     let text = "[System] Cannot load a skill reference while a turn is active. Wait for the current turn to finish.\n".to_string();
-                    return vec![UiOutput::Stream(StreamMessage {
-                        source: MessageSource::System,
-                        stream: Box::pin(stream::once(async move { text })),
-                    })];
+                    return vec![content_block(MessageSource::System, text)];
                 }
                 let path = parts.collect::<Vec<_>>().join(" ");
                 if path.trim().is_empty() {
                     let text = "[Error] Usage: /skills reference <relative-path>\n".to_string();
-                    return vec![UiOutput::Stream(StreamMessage {
-                        source: MessageSource::Error,
-                        stream: Box::pin(stream::once(async move { text })),
-                    })];
+                    return vec![content_block(MessageSource::Error, text)];
                 }
                 return vec![UiOutput::SkillCommand(SkillCommandRequest::Reference {
                     path,
@@ -877,20 +841,14 @@ impl ConversationEngine {
                 let text = format!(
                     "[Error] Unknown /skills action: {other}. Usage: /skills [activate <name> | reference <path>]\n"
                 );
-                return vec![UiOutput::Stream(StreamMessage {
-                    source: MessageSource::Error,
-                    stream: Box::pin(stream::once(async move { text })),
-                })];
+                return vec![content_block(MessageSource::Error, text)];
             }
             None => {}
         }
 
         if self.skills.is_empty() {
             let text = "[System] No skills available.\n".to_string();
-            return vec![UiOutput::Stream(StreamMessage {
-                source: MessageSource::System,
-                stream: Box::pin(stream::once(async move { text })),
-            })];
+            return vec![content_block(MessageSource::System, text)];
         }
 
         let mut text = String::from("[System] Available skills (Level 0 metadata):\n");
@@ -906,10 +864,7 @@ impl ConversationEngine {
         text.push_str(
             "[System] Use /skills activate <name> to load one Skill body, then /skills reference <relative-path> for bounded references.\n",
         );
-        vec![UiOutput::Stream(StreamMessage {
-            source: MessageSource::System,
-            stream: Box::pin(stream::once(async move { text })),
-        })]
+        vec![content_block(MessageSource::System, text)]
     }
 
     pub fn drain_steering_queue(&mut self) -> Option<String> {
@@ -1027,8 +982,11 @@ impl ConversationEngine {
         }
     }
 
-    fn close_stream(&mut self) {
-        drop(self.stream_tx.take());
+    fn close_content(&mut self, outputs: &mut Vec<UiOutput>) {
+        if self.content_open {
+            self.content_open = false;
+            outputs.push(UiOutput::Content(ContentOutput::End));
+        }
     }
 
     fn finalize_turn(&mut self) {
@@ -1064,7 +1022,10 @@ impl ConversationEngine {
 
         Some(vec![
             UiOutput::ThinkingPreview { text: None },
-            UiOutput::Reasoning(display_text),
+            UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Reasoning,
+                text: display_text,
+            }),
         ])
     }
 

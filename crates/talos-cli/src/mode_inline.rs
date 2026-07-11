@@ -10,14 +10,16 @@ use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_core::message::AgentEvent;
-use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{
+    RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
+};
 use tokio::sync::mpsc;
 
 use crate::approval::ApprovalPrompt;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
-    set_todo_prompt_provider,
+    session_metadata_for_model, set_todo_prompt_provider,
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
@@ -118,6 +120,10 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        session.clone(),
+        session_metadata_for_model(&config.model, &config.provider),
+    );
     tokio::spawn(async move { actor.run().await });
 
     let sq_tx = handle.sq_tx.clone();
@@ -168,47 +174,26 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
             })
             .await;
 
-        let user_msg = talos_core::message::Message::User {
-            content: input.to_string(),
-        };
-        if let Err(e) = session.append(&user_msg) {
-            eprintln!("Warning: failed to persist user message: {e}");
-        }
-
         let mut turn_done = false;
         while let Some(event) = eq_rx.recv().await {
             match event {
-                SessionEvent::AgentEvent { event } => match event {
-                    AgentEvent::TextDelta { delta } => {
-                        print!("{delta}");
-                        let _ = io::stdout().flush();
-                    }
-                    AgentEvent::TurnEnd { .. } => {
-                        println!();
-                        turn_done = true;
-                        break;
-                    }
-                    AgentEvent::Error { message } => {
-                        eprintln!("\nError: {message}");
-                        turn_done = true;
-                        break;
-                    }
-                    _ => {}
-                },
-                SessionEvent::TurnCompleted { status, .. } => {
+                SessionEvent::TurnEvent {
+                    payload:
+                        TurnEventPayload::Progress {
+                            event: AgentEvent::TextDelta { delta },
+                        },
+                    ..
+                } => {
+                    print!("{delta}");
+                    let _ = io::stdout().flush();
+                }
+                SessionEvent::TurnEvent {
+                    payload: TurnEventPayload::Completed { status },
+                    ..
+                } => {
                     match status {
-                        talos_core::session::TurnCompletionStatus::Success {
-                            final_text: _,
-                            new_messages,
-                        } => {
-                            for msg in &new_messages {
-                                if matches!(msg, talos_core::message::Message::User { .. }) {
-                                    continue;
-                                }
-                                if let Err(e) = session.append(msg) {
-                                    eprintln!("Warning: failed to persist message: {e}");
-                                }
-                            }
+                        talos_core::session::TurnCompletionStatus::Success { .. } => {
+                            println!();
                             if let Err(e) = session_manager.update_index(&session) {
                                 eprintln!("Warning: failed to update session index: {e}");
                             }

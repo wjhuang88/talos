@@ -24,6 +24,12 @@ fn mcp_client_e2e_routes_tool_call_through_fixture_server() {
         String::from_utf8_lossy(&output.stderr)
     );
 
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("fixture tool call complete"),
+        "print mode returned at a provider tool boundary before final text: {stdout}"
+    );
+
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("event")

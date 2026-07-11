@@ -8,6 +8,7 @@
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use futures_util::FutureExt;
 use tokio::sync::mpsc;
@@ -15,7 +16,9 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use talos_core::message::{AgentEvent, Message};
-use talos_core::session::{SessionConfig, SessionEvent, SessionHandle, SessionOp};
+use talos_core::session::{
+    SessionConfig, SessionEvent, SessionHandle, SessionOp, TurnEventPayload,
+};
 
 use crate::compaction::Compactor;
 use crate::token::TokenEstimator;
@@ -27,7 +30,9 @@ mod turn;
 #[allow(warnings)]
 mod tests;
 
-use turn::{TurnForwarding, TurnRecord, run_turn_with_forwarding};
+use turn::{TurnForwarding, TurnPersistence, TurnRecord, run_turn_with_forwarding};
+
+static NEXT_RUNTIME_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Session actor that owns an [`Agent`] and processes commands from the SQ.
 ///
@@ -41,6 +46,8 @@ pub struct AppServerSession {
     compactor: Compactor,
     session_file: Option<PathBuf>,
     session_dir: Option<PathBuf>,
+    persistence: Option<TurnPersistence>,
+    session_id: String,
 }
 
 impl AppServerSession {
@@ -66,6 +73,12 @@ impl AppServerSession {
             compactor,
             session_file: None,
             session_dir: None,
+            persistence: None,
+            session_id: format!(
+                "runtime_{}_{}",
+                std::process::id(),
+                NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed)
+            ),
         };
 
         (handle, actor)
@@ -76,13 +89,23 @@ impl AppServerSession {
         self.session_dir = Some(dir);
     }
 
+    /// Assigns the durable session that owns all successful turn-message writes.
+    pub fn set_persistence(
+        &mut self,
+        session: talos_session::Session,
+        metadata: talos_session::SessionMetadata,
+    ) {
+        self.session_id = session.id.to_string();
+        self.persistence = Some(TurnPersistence { session, metadata });
+    }
+
     /// Runs the session actor loop until shutdown or SQ disconnect.
     ///
     /// For each [`SessionOp::Submit`], spawns a turn task that:
-    /// 1. Emits [`SessionEvent::TurnStarted`]
+    /// 1. Emits [`TurnEventPayload::Started`]
     /// 2. Calls `agent.run_streaming()` with an internal mpsc channel
-    /// 3. Forwards `AgentEvent`s as `SessionEvent::AgentEvent` on the EQ
-    /// 4. Emits [`SessionEvent::TurnCompleted`] on finish
+    /// 3. Forwards `AgentEvent`s as ordered [`TurnEventPayload::Progress`] on the EQ
+    /// 4. Emits [`TurnEventPayload::Completed`] on finish
     ///
     /// [`SessionOp::Interrupt`] cancels the current turn.
     /// [`SessionOp::Shutdown`] exits the loop.
@@ -104,9 +127,13 @@ impl AppServerSession {
                     turn_counter += 1;
                     let turn_id = format!("turn_{turn_counter}");
 
-                    let _ = self.eq_tx.send(SessionEvent::TurnStarted {
+                    let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                        session_id: self.session_id.clone(),
                         turn_id: turn_id.clone(),
+                        sequence: 0,
+                        payload: TurnEventPayload::Started,
                     });
+                    let sequence = Arc::new(AtomicU64::new(1));
 
                     let token = CancellationToken::new();
                     cancel_token = Some(token.clone());
@@ -146,6 +173,8 @@ impl AppServerSession {
                     let turn_id_clone = turn_id.clone();
                     let token_clone = token.clone();
                     let history = self.history.clone();
+                    let persistence = self.persistence.clone();
+                    let session_id = self.session_id.clone();
 
                     let handle = tokio::spawn(async move {
                         let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
@@ -160,6 +189,9 @@ impl AppServerSession {
                             eq_tx,
                             cancel_token: token_clone,
                             turn_id: turn_id_clone,
+                            session_id,
+                            sequence,
+                            persistence,
                             result_tx,
                         }))
                         .catch_unwind()
@@ -181,9 +213,13 @@ impl AppServerSession {
                     turn_counter += 1;
                     let turn_id = format!("turn_{turn_counter}");
 
-                    let _ = self.eq_tx.send(SessionEvent::TurnStarted {
+                    let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                        session_id: self.session_id.clone(),
                         turn_id: turn_id.clone(),
+                        sequence: 0,
+                        payload: TurnEventPayload::Started,
                     });
+                    let mut sequence = 1;
 
                     match self
                         .agent
@@ -191,42 +227,72 @@ impl AppServerSession {
                         .await
                     {
                         Ok(Some(preview)) => {
-                            let _ = self.eq_tx.send(SessionEvent::AgentEvent {
-                                event: AgentEvent::TurnStart,
-                            });
-                            let _ = self.eq_tx.send(SessionEvent::AgentEvent {
-                                event: AgentEvent::TextDelta {
-                                    delta: preview.clone(),
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(),
+                                turn_id: turn_id.clone(),
+                                sequence,
+                                payload: TurnEventPayload::Progress {
+                                    event: AgentEvent::TurnStart,
                                 },
                             });
-                            let _ = self.eq_tx.send(SessionEvent::AgentEvent {
-                                event: AgentEvent::TurnEnd {
-                                    stop_reason: talos_core::message::StopReason::EndTurn,
-                                    usage: talos_core::message::Usage::default(),
+                            sequence += 1;
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(),
+                                turn_id: turn_id.clone(),
+                                sequence,
+                                payload: TurnEventPayload::Progress {
+                                    event: AgentEvent::TextDelta {
+                                        delta: preview.clone(),
+                                    },
                                 },
                             });
-                            let _ = self.eq_tx.send(SessionEvent::TurnCompleted {
+                            sequence += 1;
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(),
+                                turn_id: turn_id.clone(),
+                                sequence,
+                                payload: TurnEventPayload::Progress {
+                                    event: AgentEvent::TurnEnd {
+                                        stop_reason: talos_core::message::StopReason::EndTurn,
+                                        usage: talos_core::message::Usage::default(),
+                                    },
+                                },
+                            });
+                            sequence += 1;
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(),
                                 turn_id,
-                                status: talos_core::session::TurnCompletionStatus::Success {
-                                    final_text: preview,
-                                    new_messages: vec![],
+                                sequence,
+                                payload: TurnEventPayload::Completed {
+                                    status: talos_core::session::TurnCompletionStatus::Success {
+                                        final_text: preview,
+                                        new_messages: vec![],
+                                    },
                                 },
                             });
                         }
                         Ok(None) => {
-                            let _ = self.eq_tx.send(SessionEvent::TurnCompleted {
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(),
                                 turn_id,
-                                status: talos_core::session::TurnCompletionStatus::Error {
-                                    message: "request preview is unavailable for this provider"
-                                        .into(),
+                                sequence,
+                                payload: TurnEventPayload::Completed {
+                                    status: talos_core::session::TurnCompletionStatus::Error {
+                                        message: "request preview is unavailable for this provider"
+                                            .into(),
+                                    },
                                 },
                             });
                         }
                         Err(error) => {
-                            let _ = self.eq_tx.send(SessionEvent::TurnCompleted {
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(),
                                 turn_id,
-                                status: talos_core::session::TurnCompletionStatus::Error {
-                                    message: error.to_string(),
+                                sequence,
+                                payload: TurnEventPayload::Completed {
+                                    status: talos_core::session::TurnCompletionStatus::Error {
+                                        message: error.to_string(),
+                                    },
                                 },
                             });
                         }
@@ -303,12 +369,10 @@ impl AppServerSession {
                 original_count,
                 ..
             } => {
-                let _ = self.eq_tx.send(SessionEvent::AgentEvent {
-                    event: AgentEvent::Error {
-                        message: format!(
-                            "Session compacted: {original_count} entries archived to {segment_id}"
-                        ),
-                    },
+                let _ = self.eq_tx.send(SessionEvent::Error {
+                    message: format!(
+                        "Session compacted: {original_count} entries archived to {segment_id}"
+                    ),
                 });
             }
             talos_session::compaction_engine::CompactionResult::Skipped => {}

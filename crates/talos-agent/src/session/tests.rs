@@ -5,11 +5,41 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use talos_core::message::{Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderResult};
-use talos_core::session::{RuntimePolicy, SessionEvent, TurnCompletionStatus};
+use talos_core::session::{RuntimePolicy, SessionEvent, TurnCompletionStatus, TurnEventPayload};
 use talos_core::tool::ToolRegistry;
 use tokio::sync::mpsc;
 
 type Receiver<T> = mpsc::Receiver<T>;
+
+fn is_turn_started(event: &SessionEvent) -> bool {
+    matches!(
+        event,
+        SessionEvent::TurnEvent {
+            payload: TurnEventPayload::Started,
+            ..
+        }
+    )
+}
+
+fn progress_event(event: &SessionEvent) -> Option<&AgentEvent> {
+    match event {
+        SessionEvent::TurnEvent {
+            payload: TurnEventPayload::Progress { event },
+            ..
+        } => Some(event),
+        _ => None,
+    }
+}
+
+fn completed_status(event: &SessionEvent) -> Option<&TurnCompletionStatus> {
+    match event {
+        SessionEvent::TurnEvent {
+            payload: TurnEventPayload::Completed { status },
+            ..
+        } => Some(status),
+        _ => None,
+    }
+}
 
 struct MockModel {
     responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
@@ -148,22 +178,17 @@ async fn test_submit_and_receive() {
     let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
+        events.iter().any(is_turn_started),
         "Should have TurnStarted"
     );
     assert!(
-            events.iter().any(|e| matches!(e, SessionEvent::AgentEvent { event: AgentEvent::TextDelta { delta } } if delta == "hello")),
+            events.iter().any(|e| matches!(progress_event(e), Some(AgentEvent::TextDelta { delta }) if delta == "hello")),
             "Should have TextDelta with 'hello'"
         );
     assert!(
         events.iter().any(|e| matches!(
-            e,
-            SessionEvent::TurnCompleted {
-                status: TurnCompletionStatus::Success { .. },
-                ..
-            }
+            completed_status(e),
+            Some(TurnCompletionStatus::Success { .. })
         )),
         "Should have TurnCompleted(Success)"
     );
@@ -203,10 +228,8 @@ async fn set_skill_context_reaches_request_preview() {
     let events = collect_events(eq_rx, Duration::from_secs(2)).await;
     let preview_text = events
         .iter()
-        .find_map(|event| match event {
-            SessionEvent::AgentEvent {
-                event: AgentEvent::TextDelta { delta },
-            } => Some(delta.as_str()),
+        .find_map(|event| match progress_event(event) {
+            Some(AgentEvent::TextDelta { delta }) => Some(delta.as_str()),
             _ => None,
         })
         .expect("request preview text");
@@ -253,21 +276,15 @@ async fn test_multi_turn() {
 
     let events = collect_events(eq_rx, Duration::from_secs(2)).await;
 
-    let turn_started_count = events
-        .iter()
-        .filter(|e| matches!(e, SessionEvent::TurnStarted { .. }))
-        .count();
+    let turn_started_count = events.iter().filter(|e| is_turn_started(e)).count();
     assert_eq!(turn_started_count, 2, "Should have 2 TurnStarted events");
 
     let success_count = events
         .iter()
         .filter(|e| {
             matches!(
-                e,
-                SessionEvent::TurnCompleted {
-                    status: TurnCompletionStatus::Success { .. },
-                    ..
-                }
+                completed_status(e),
+                Some(TurnCompletionStatus::Success { .. })
             )
         })
         .count();
@@ -321,19 +338,13 @@ async fn test_interrupt() {
     let events = collect_events(eq_rx, Duration::from_secs(3)).await;
 
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
+        events.iter().any(is_turn_started),
         "Should have TurnStarted"
     );
     assert!(
-        events.iter().any(|e| matches!(
-            e,
-            SessionEvent::TurnCompleted {
-                status: TurnCompletionStatus::Cancelled,
-                ..
-            }
-        )),
+        events
+            .iter()
+            .any(|e| matches!(completed_status(e), Some(TurnCompletionStatus::Cancelled))),
         "Should have TurnCompleted(Cancelled)"
     );
 }
@@ -467,21 +478,15 @@ async fn test_panic_recovery() {
 
     let events = collect_events(eq_rx, Duration::from_secs(3)).await;
 
-    let turn_started_count = events
-        .iter()
-        .filter(|e| matches!(e, SessionEvent::TurnStarted { .. }))
-        .count();
+    let turn_started_count = events.iter().filter(|e| is_turn_started(e)).count();
     assert_eq!(turn_started_count, 2, "Should have 2 TurnStarted events");
 
     let error_count = events
         .iter()
         .filter(|e| {
             matches!(
-                e,
-                SessionEvent::TurnCompleted {
-                    status: TurnCompletionStatus::Error { .. },
-                    ..
-                }
+                completed_status(e),
+                Some(TurnCompletionStatus::Error { .. })
             )
         })
         .count();
@@ -541,20 +546,14 @@ async fn test_concurrent_submit_and_interrupt() {
     let events = collect_events(eq_rx, Duration::from_secs(3)).await;
 
     assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, SessionEvent::TurnStarted { .. })),
+        events.iter().any(is_turn_started),
         "Should have TurnStarted"
     );
 
     assert!(
-        events.iter().any(|e| matches!(
-            e,
-            SessionEvent::TurnCompleted {
-                status: TurnCompletionStatus::Cancelled,
-                ..
-            }
-        )),
+        events
+            .iter()
+            .any(|e| matches!(completed_status(e), Some(TurnCompletionStatus::Cancelled))),
         "First turn should be Cancelled"
     );
 }
@@ -644,11 +643,8 @@ async fn test_multi_turn_with_history() {
         .iter()
         .filter(|e| {
             matches!(
-                e,
-                SessionEvent::TurnCompleted {
-                    status: TurnCompletionStatus::Success { .. },
-                    ..
-                }
+                completed_status(e),
+                Some(TurnCompletionStatus::Success { .. })
             )
         })
         .count();
@@ -730,11 +726,8 @@ async fn test_interrupt_after_success_preserves_history() {
     tokio::time::timeout(Duration::from_secs(1), async {
         while let Some(event) = eq_rx.recv().await {
             if matches!(
-                event,
-                SessionEvent::TurnCompleted {
-                    status: TurnCompletionStatus::Success { .. },
-                    ..
-                }
+                completed_status(&event),
+                Some(TurnCompletionStatus::Success { .. })
             ) {
                 break;
             }
@@ -754,11 +747,8 @@ async fn test_interrupt_after_success_preserves_history() {
     tokio::time::timeout(Duration::from_secs(1), async {
         while let Some(event) = eq_rx.recv().await {
             if matches!(
-                event,
-                SessionEvent::TurnCompleted {
-                    status: TurnCompletionStatus::Success { .. },
-                    ..
-                }
+                completed_status(&event),
+                Some(TurnCompletionStatus::Success { .. })
             ) {
                 break;
             }
@@ -886,5 +876,90 @@ async fn test_initial_history_from_jsonl_resume() {
             .iter()
             .any(|m| matches!(m, Message::User { content } if content.contains("new question"))),
         "Resumed session should include new user message"
+    );
+}
+
+#[tokio::test]
+async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_messages() {
+    use talos_session::{SessionManager, SessionMetadata};
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
+    let session = manager.create_session("single-flow", "").unwrap();
+    let agent = make_agent(MockModel::new(vec![success_events("persisted answer")]));
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp_dir.path().to_path_buf(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("mock-model".into()),
+            ..SessionMetadata::default()
+        },
+    );
+    let sq_tx = handle.sq_tx;
+    let mut eq_rx = handle.eq_rx;
+    let actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::Submit {
+            message: "persist this question".into(),
+        })
+        .await
+        .unwrap();
+
+    let mut sequences = Vec::new();
+    let mut session_ids = Vec::new();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while let Some(event) = eq_rx.recv().await {
+            if let SessionEvent::TurnEvent {
+                session_id,
+                sequence,
+                payload,
+                ..
+            } = event
+            {
+                session_ids.push(session_id);
+                sequences.push(sequence);
+                if matches!(payload, TurnEventPayload::Completed { .. }) {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .expect("canonical turn completion");
+
+    sq_tx.send(SessionOp::Shutdown).await.unwrap();
+    actor_task.await.unwrap();
+
+    assert_eq!(sequences, (0..sequences.len() as u64).collect::<Vec<_>>());
+    assert!(
+        session_ids
+            .iter()
+            .all(|event_session_id| event_session_id == &session.id.to_string()),
+        "every canonical event must carry the durable session identity"
+    );
+    assert_eq!(
+        session.read_messages().unwrap(),
+        vec![
+            Message::User {
+                content: "persist this question".into(),
+            },
+            Message::Assistant {
+                content: "persisted answer".into(),
+                tool_calls: vec![],
+                reasoning: None,
+            },
+        ]
+    );
+    assert!(
+        session.read_events().unwrap().is_empty(),
+        "canonical persistence must not duplicate transient AgentEvents"
     );
 }

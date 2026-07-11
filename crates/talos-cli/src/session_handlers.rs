@@ -523,7 +523,11 @@ pub(crate) async fn handle_session_new(
     maybe_set_memory_provider(&mut agent, config);
     set_todo_prompt_provider(&mut agent, &session_manager, &new_session);
 
-    let (handle, actor) = AppServerSession::new(agent, session_config);
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        new_session.clone(),
+        crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
+    );
 
     // Clone for watch channel update after commit (new_session is moved into prepare).
     let new_session_for_watch = new_session.clone();
@@ -759,7 +763,14 @@ pub(crate) async fn handle_session_resume(
         }
     }
 
-    let (handle, actor) = AppServerSession::new(agent, session_config);
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        target_session.clone(),
+        crate::mode_runtime::session_metadata_for_model(
+            &resume_config.model,
+            &resume_config.provider,
+        ),
+    );
 
     // Clone for watch channel update after commit (target_session is moved into prepare).
     let target_session_for_watch = target_session.clone();
@@ -920,7 +931,11 @@ pub(crate) async fn handle_session_fork(
     maybe_set_memory_provider(&mut agent, config);
     set_todo_prompt_provider(&mut agent, session_manager, &child_session);
 
-    let (handle, actor) = AppServerSession::new(agent, session_config);
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        child_session.clone(),
+        crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
+    );
 
     // Clone for watch channel update after commit (child_session is moved into prepare).
     let child_session_for_watch = child_session.clone();

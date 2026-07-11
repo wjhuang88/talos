@@ -6,7 +6,9 @@ use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_core::message::AgentEvent;
-use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
+use talos_core::session::{
+    RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
+};
 
 use crate::approval::ApprovalPrompt;
 use crate::mcp_runtime::McpSessionRuntime;
@@ -122,25 +124,20 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut stdout = io::stdout().lock();
     while let Some(event) = handle.eq_rx.recv().await {
         match event {
-            SessionEvent::AgentEvent {
-                event: AgentEvent::TextDelta { delta },
+            SessionEvent::TurnEvent {
+                payload:
+                    TurnEventPayload::Progress {
+                        event: AgentEvent::TextDelta { delta },
+                    },
+                ..
             } => {
                 print!("{delta}");
                 stdout.flush().context("failed to flush stdout")?;
             }
-            SessionEvent::AgentEvent {
-                event: AgentEvent::TurnEnd { .. },
-            } => {
-                println!();
-                return Ok(());
-            }
-            SessionEvent::AgentEvent {
-                event: AgentEvent::Error { message },
-            } => {
-                eprintln!("Error: {message}");
-                std::process::exit(1);
-            }
-            SessionEvent::TurnCompleted { status, .. } => match status {
+            SessionEvent::TurnEvent {
+                payload: TurnEventPayload::Completed { status },
+                ..
+            } => match status {
                 talos_core::session::TurnCompletionStatus::Success { .. } => {
                     println!();
                     return Ok(());
@@ -157,7 +154,6 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
                 eprintln!("Error: {message}");
                 std::process::exit(1);
             }
-            SessionEvent::AgentEvent { .. } => {}
             _ => {}
         }
     }

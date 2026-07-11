@@ -7,7 +7,9 @@ use crossterm::{
     terminal::enable_raw_mode,
 };
 use futures::{Stream, StreamExt};
-use talos_conversation::{CopyScope, TipKind, TodoPanelData, TurnPhase, UiOutput, UserInput};
+use talos_conversation::{
+    ContentOutput, CopyScope, TipKind, TodoPanelData, TurnPhase, UiOutput, UserInput,
+};
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
@@ -35,6 +37,7 @@ pub struct Tui {
     pending_scrollback: Vec<ScrollbackLine>,
     queued_outputs: Vec<UiOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
+    ordered_content_open: bool,
     stream_render: StreamRenderState,
     stream_opening_pending: bool,
     pending_stream_opening: Vec<ScrollbackLine>,
@@ -73,6 +76,7 @@ impl Tui {
             pending_scrollback: Vec::new(),
             queued_outputs: Vec::new(),
             active_stream: None,
+            ordered_content_open: false,
             stream_render: StreamRenderState::default(),
             stream_opening_pending: false,
             pending_stream_opening: Vec::new(),
@@ -157,7 +161,10 @@ impl Tui {
                         && let Some(text) = talos_core::message::project_displayable_reasoning(ar)
                     {
                         let display_text = format!("Thinking: {text}\n");
-                        self.handle_ui_output(UiOutput::Reasoning(display_text));
+                        self.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+                            source: talos_conversation::MessageSource::Reasoning,
+                            text: display_text,
+                        }));
                     }
 
                     let tool_calls_in_text =
@@ -171,14 +178,10 @@ impl Tui {
                     }
 
                     if !has_tool_calls && !cleaned.is_empty() {
-                        let stream = futures::stream::iter(vec![cleaned]);
-                        let msg = talos_conversation::StreamMessage {
+                        self.handle_ui_output(UiOutput::Content(ContentOutput::Block {
                             source: talos_conversation::MessageSource::Assistant,
-                            stream: Box::pin(stream),
-                        };
-                        self.handle_ui_output(UiOutput::Stream(msg));
-                        self.consume_stream_completely();
-                        self.finalize_active_stream();
+                            text: cleaned,
+                        }));
                     }
 
                     let calls: Vec<ToolCallDisplay> = if !tool_calls.is_empty() {
@@ -213,55 +216,24 @@ impl Tui {
                     }
                 }
                 Message::User { content } => {
-                    let stream = futures::stream::iter(vec![content.clone()]);
-                    let msg = talos_conversation::StreamMessage {
+                    self.handle_ui_output(UiOutput::Content(ContentOutput::Block {
                         source: talos_conversation::MessageSource::User,
-                        stream: Box::pin(stream),
-                    };
-                    self.handle_ui_output(UiOutput::Stream(msg));
-                    self.consume_stream_completely();
-                    self.finalize_active_stream();
+                        text: content.clone(),
+                    }));
                 }
                 Message::System { content, .. } if !content.is_empty() => {
-                    let stream = futures::stream::iter(vec![content.clone()]);
-                    let msg = talos_conversation::StreamMessage {
+                    self.handle_ui_output(UiOutput::Content(ContentOutput::Block {
                         source: talos_conversation::MessageSource::System,
-                        stream: Box::pin(stream),
-                    };
-                    self.handle_ui_output(UiOutput::Stream(msg));
-                    self.consume_stream_completely();
-                    self.finalize_active_stream();
+                        text: content.clone(),
+                    }));
                 }
                 Message::Context { content } if !content.is_empty() => {
-                    let stream = futures::stream::iter(vec![content.clone()]);
-                    let msg = talos_conversation::StreamMessage {
+                    self.handle_ui_output(UiOutput::Content(ContentOutput::Block {
                         source: talos_conversation::MessageSource::System,
-                        stream: Box::pin(stream),
-                    };
-                    self.handle_ui_output(UiOutput::Stream(msg));
-                    self.consume_stream_completely();
-                    self.finalize_active_stream();
+                        text: content.clone(),
+                    }));
                 }
                 _ => {}
-            }
-        }
-    }
-
-    fn consume_stream_completely(&mut self) {
-        while let Some(ref mut stream) = self.active_stream {
-            match stream
-                .as_mut()
-                .poll_next(&mut std::task::Context::from_waker(
-                    futures::task::noop_waker_ref(),
-                )) {
-                std::task::Poll::Ready(Some(chunk)) => {
-                    self.consume_stream_chunk(&chunk);
-                }
-                std::task::Poll::Ready(None) => {
-                    self.active_stream = None;
-                    break;
-                }
-                std::task::Poll::Pending => break,
             }
         }
     }
@@ -490,6 +462,20 @@ impl Tui {
         self.active_stream = None;
     }
 
+    fn finalize_ordered_content(&mut self) {
+        if !self.ordered_content_open {
+            return;
+        }
+        let lines = self.stream_render.finish();
+        if self.stream_opening_pending {
+            self.stream_opening_pending = false;
+            self.pending_stream_opening.clear();
+        } else {
+            self.pending_scrollback.extend(lines);
+        }
+        self.ordered_content_open = false;
+    }
+
     fn consume_stream_chunk(&mut self, chunk: &str) {
         let filter_out = self.text_filter.push_chunk(chunk);
 
@@ -514,7 +500,37 @@ impl Tui {
 
     fn handle_ui_output(&mut self, output: UiOutput) -> bool {
         match output {
+            UiOutput::Content(content) => match content {
+                ContentOutput::Start { source } => {
+                    if self.active_stream.is_some() {
+                        self.finalize_active_stream();
+                    }
+                    self.finalize_ordered_content();
+                    self.pending_stream_opening = self.stream_render.start(source);
+                    self.stream_opening_pending = true;
+                    self.ordered_content_open = true;
+                }
+                ContentOutput::Delta { text } => {
+                    if self.ordered_content_open {
+                        self.consume_stream_chunk(&text);
+                    }
+                }
+                ContentOutput::End => self.finalize_ordered_content(),
+                ContentOutput::Block { source, text } => {
+                    if self.active_stream.is_some() {
+                        self.finalize_active_stream();
+                    }
+                    self.finalize_ordered_content();
+                    self.pending_scrollback
+                        .extend(crate::scrollback::render_history_message(
+                            &mut self.stream_count,
+                            source,
+                            &text,
+                        ));
+                }
+            },
             UiOutput::Stream(msg) => {
+                self.finalize_ordered_content();
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
@@ -531,6 +547,7 @@ impl Tui {
                     ));
             }
             UiOutput::ToolCallStarted { .. } => {
+                self.finalize_ordered_content();
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
@@ -678,6 +695,7 @@ impl Tui {
                 );
             }
             UiOutput::HydrateHistory(messages) => {
+                self.finalize_ordered_content();
                 self.finalize_active_stream();
                 self.flush_pending_scrollback().ok();
                 self.hydrate_history(&messages);

@@ -47,8 +47,29 @@ repeating known mistakes.
 | 35 | Testing | 触及 `Config::save()`/`$HOME` 的测试必须从第一次编写起就重定向 HOME，且必须用跨模块共享的单一 Mutex，不能各模块各建私有锁 | 2026-07-03 |
 | 36 | Config | `Config::load()` 不应做"可执行性"校验；否则损坏的磁盘配置会挡住向导/`config set` 自我修复路径 | 2026-07-03 |
 | 37 | Governance | ADR 冲突是 change-control gate，不是 Agent 永久拒绝用户产品需求的授权 | 2026-07-10 |
+| 38 | Architecture | 单消费者 channel 拓扑不等于单数据流；必须审计排序域、生命周期权威和持久化写者 | I115 |
 
 ## Lessons
+
+### 38. 2026-07-11 - Single-consumer topology does not prove semantic single flow
+
+- Trigger: ARCH-032 reported zero broadcast channels and no deviations, but the user later observed
+  dropped content/turns around thinking and tool output.
+- Symptom: Text deltas lived in a nested `StreamMessage` receiver while tool/status/reasoning used
+  `UiOutput`; provider `TurnEnd` and session `TurnCompleted` both drove terminal behavior; CLI modes
+  also persisted or reconstructed the same turn differently.
+- Root cause: The audit counted producers/consumers but did not identify independent ordering
+  domains, authoritative lifecycle ownership, or durable write ownership. A later FIFO event could
+  close a receiver that still held earlier text even though every individual channel had one
+  consumer.
+- Fix: ADR-039/ARCH-033/I115 introduced ordered `TurnEvent` envelopes, flattened live content onto
+  one `UiOutput` FIFO, made session completion authoritative, moved successful turn persistence to
+  the actor, and converged CLI/RPC surfaces on the session protocol.
+- Prevention: Architecture audits must prove (1) one ordering domain per causal stream, (2) one
+  lifecycle authority, (3) one durable writer, and (4) replay/surface parity; channel counts alone
+  are insufficient.
+- Promoted to rule/check: ADR-039, ARCH-033 acceptance tests, and the semantic follow-up in
+  `docs/reference/ARCHITECTURE.md`.
 
 ### 37. 2026-07-10 - ADR conflict routes to change control, not permanent product rejection
 

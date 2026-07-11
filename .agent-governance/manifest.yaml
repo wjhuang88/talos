@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-09"
-status_note: "I106 Review (2026-07-09): Self-bootstrap control plane SBT100-SBT104 complete. Execution contract, evidence schema, smoke harness, and governance rehearsal delivered. REL-002 non-qualifying (external runtime glm-5.2). Full validation matrix green: 1791 tests, clippy clean, 0 governance warnings."
+last_audited_at: "2026-07-11"
+status_note: "I115 (2026-07-11): ARCH-033 semantic single-flow correction established ordered turn envelopes, one FIFO live-content path, actor-owned successful-turn persistence, and shared CLI/RPC session semantics. Workspace tests and clippy are green; governance validation recorded in I115."
 
 governance:
   skill_name: "agent-project-governance"

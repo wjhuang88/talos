@@ -241,7 +241,14 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
     }
 
-    let (handle, actor) = AppServerSession::new(agent, session_config);
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        current_session.clone(),
+        crate::mode_runtime::session_metadata_for_model(
+            &model_config.model,
+            &model_config.provider,
+        ),
+    );
     let session_for_prepare = current_session.clone();
     if let Err(e) = transition.lock().await.prepare(handle, session_for_prepare) {
         let text = format!("[Error] Failed to prepare model switch: {e}\n");
@@ -324,13 +331,9 @@ fn send_stream(
     source: talos_conversation::MessageSource,
     text: String,
 ) {
-    use futures::stream;
-    use talos_conversation::{StreamMessage, UiOutput};
+    use talos_conversation::{ContentOutput, UiOutput};
 
-    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-        source,
-        stream: Box::pin(stream::once(async move { text })),
-    }));
+    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block { source, text }));
 }
 
 #[cfg(test)]

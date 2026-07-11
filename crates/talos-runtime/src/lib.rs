@@ -447,7 +447,11 @@ pub async fn collect_until_turn_completed(
     runtime: &mut RuntimeHandle,
 ) -> Option<TurnCompletionStatus> {
     while let Some(event) = runtime.next_event().await {
-        if let SessionEvent::TurnCompleted { status, .. } = event {
+        if let SessionEvent::TurnEvent {
+            payload: talos_core::session::TurnEventPayload::Completed { status },
+            ..
+        } = event
+        {
             return Some(status);
         }
     }

@@ -26,6 +26,7 @@ dashboard, dotagents shared Skills, WASM plugins, and advanced document ingestio
 - **Rust-native core**: workspace-oriented crates with minimal runtime assumptions and no Node/Python runtime dependency.
 - **Embeddable Rust runtime**: an initial `talos-runtime` facade lets Rust projects construct a safe in-process agent runtime without depending on Talos CLI/TUI crates.
 - **Auditable internals**: oversized memory, config, CLI/TUI, and agent compaction modules are split into focused Rust modules with behavior-preserving gates.
+- **One ordered runtime flow**: TUI, inline, print, embedded, and RPC modes share the session actor's sequenced turn lifecycle; live text, thinking, and tool output preserve FIFO order.
 - **Built-in coding tools**: file, search, edit, shell, symbol, directory tree, diff/stat, Git, HTTP request, and web search operations.
 - **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.

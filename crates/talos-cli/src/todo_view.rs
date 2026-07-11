@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow, bail};
 use talos_conversation::{
-    MessageSource, StreamMessage, TodoCommandAction, TodoCommandRequest, TodoExportFormat,
+    ContentOutput, MessageSource, TodoCommandAction, TodoCommandRequest, TodoExportFormat,
     TodoPanelData, TodoPanelRow, UiOutput,
 };
 use tokio::sync::{mpsc, watch};
@@ -57,10 +57,7 @@ pub(crate) fn handle_todo_command(
 }
 
 fn send_stream(ui_tx: &mpsc::UnboundedSender<UiOutput>, source: MessageSource, text: String) {
-    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-        source,
-        stream: Box::pin(futures::stream::once(async move { text })),
-    }));
+    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block { source, text }));
 }
 
 struct RenderedTodoView {

@@ -7,7 +7,6 @@ pub(crate) use session_handlers::*;
 mod mode_interactive;
 pub(crate) use mode_interactive::run_interactive_mode;
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -19,11 +18,13 @@ use talos_agent::prompt::ContextFile;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_conversation::{
-    ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, StreamMessage, TipKind,
+    ContentOutput, ConversationEngine, MessageSource, ModelInfo, SessionPickerItem, TipKind,
     UiOutput, UserInput,
 };
-use talos_core::message::{AgentEvent, Message};
-use talos_core::session::{RuntimePolicy, SessionConfig, SessionEvent, SessionOp};
+use talos_core::message::Message;
+use talos_core::session::{
+    RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
+};
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_plugin::HookRegistry;
@@ -42,8 +43,8 @@ use crate::approval::ApprovalPrompt;
 use crate::logging::init_logger;
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
-    apply_mcp_fixture_config, maybe_set_memory_provider, request_preview_payload,
-    session_metadata_for_model, set_todo_prompt_provider,
+    apply_mcp_fixture_config, maybe_set_memory_provider, session_metadata_for_model,
+    set_todo_prompt_provider,
 };
 pub(crate) use crate::mode_runtime::{apply_session_model_to_config, context_files_for_agent};
 use crate::model_lifecycle::{
@@ -107,23 +108,29 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         registry,
         Some(Arc::new(talos_permission::PermissionEngine::new())),
         None,
-        workspace_root,
+        workspace_root.clone(),
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
 
-    let server = talos_rpc::RpcServer::new(Arc::new(runtime_adapter::AgentRuntime(agent)));
+    let (model_context_limit, _) = config.resolve_model_limits();
+    let session_config = SessionConfig {
+        runtime_policy: RuntimePolicy::headless_deny(),
+        workspace_root,
+        initial_history: vec![],
+        model_context_limit,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    tokio::spawn(async move { actor.run().await });
+    let server = talos_rpc::RpcServer::new(Arc::new(runtime_adapter::AgentRuntime::new(handle)));
     server.run_stdio().await
     // I009-S5 end
 }
 
 fn send_stream(ui_tx: &mpsc::UnboundedSender<UiOutput>, source: MessageSource, text: String) {
-    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-        source,
-        stream: Box::pin(futures::stream::once(async move { text })),
-    }));
+    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block { source, text }));
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -265,6 +272,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        session.clone(),
+        session_metadata_for_model(&config.model, &config.provider),
+    );
     let sq_tx_signal = handle.sq_tx.clone();
     tokio::spawn(async move { actor.run().await });
 
@@ -460,10 +471,9 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         }
     });
 
-    let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<AgentEvent>();
+    let (bridge_tx, bridge_rx) = mpsc::unbounded_channel::<SessionEvent>();
     let session_manager_for_persist = session_manager.clone();
     let mut bridge_forwarder = handle.eq_rx;
-    let model_info_rx_for_bridge = model_info_rx.clone();
     // Cached snapshot of the session that owns the *current* eq_rx stream.
     // Until the inner `while let` exhausts, every event arriving on
     // `bridge_forwarder` belongs to this session, even if the watch channel
@@ -472,70 +482,35 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     // the old actor's session.
     let mut owning_session: talos_session::Session = session.clone();
     tokio::spawn(async move {
-        let mut raw_tool_outputs = HashMap::<String, String>::new();
         loop {
             while let Some(session_event) = bridge_forwarder.recv().await {
-                match session_event {
-                    SessionEvent::AgentEvent { event } => {
-                        if let AgentEvent::ToolResult { result } = &event {
-                            raw_tool_outputs
-                                .insert(result.tool_use_id.clone(), result.content.clone());
-                        }
-                        if !matches!(event, AgentEvent::ThinkingDelta { .. }) {
-                            let _ = owning_session.append_event(&event);
-                        }
-                        let _ = bridge_tx.send(event);
+                if let SessionEvent::TurnEvent {
+                    payload:
+                        TurnEventPayload::Completed {
+                            status:
+                                talos_core::session::TurnCompletionStatus::Success {
+                                    final_text: _,
+                                    new_messages: _,
+                                },
+                        },
+                    ..
+                } = &session_event
+                {
+                    if let Err(e) = session_manager_for_persist.update_index(&owning_session) {
+                        eprintln!("Warning: failed to update session index: {e}");
                     }
-                    SessionEvent::TurnCompleted {
-                        status:
-                            talos_core::session::TurnCompletionStatus::Success {
-                                final_text: _,
-                                new_messages,
-                            },
-                        ..
-                    } => {
-                        for msg in &new_messages {
-                            if matches!(msg, Message::User { .. }) {
-                                continue;
-                            }
-                            let info = model_info_rx_for_bridge.borrow().clone();
-                            let mut metadata =
-                                session_metadata_for_model(&info.model_name, &info.provider);
-                            if let Message::Tool { result } = msg
-                                && let Some(raw) = raw_tool_outputs.remove(&result.tool_use_id)
-                                && raw != result.content
-                            {
-                                metadata.raw_content = Some(raw);
-                            }
-                            if let Err(e) = owning_session.append_with_metadata(msg, metadata) {
-                                eprintln!("Warning: failed to persist message: {e}");
-                            }
-                        }
-                        if let Err(e) = session_manager_for_persist.update_index(&owning_session) {
-                            eprintln!("Warning: failed to update session index: {e}");
-                        }
-                        // Keep on-disk session logs bounded after persistence. The session owns
-                        // the write lock, so archival cannot race an append from this bridge.
-                        if owning_session
-                            .read_entries()
-                            .map(|entries| entries.len() > 200)
-                            .unwrap_or(false)
-                            && let Err(e) = owning_session.compact_archived(50)
-                        {
-                            eprintln!("Warning: failed to archive session: {e}");
-                        }
+                    // Keep on-disk session logs bounded after persistence. The session owns
+                    // the write lock, so archival cannot race an append from this bridge.
+                    if owning_session
+                        .read_entries()
+                        .map(|entries| entries.len() > 200)
+                        .unwrap_or(false)
+                        && let Err(e) = owning_session.compact_archived(50)
+                    {
+                        eprintln!("Warning: failed to archive session: {e}");
                     }
-                    SessionEvent::TurnCompleted {
-                        status: talos_core::session::TurnCompletionStatus::Error { message },
-                        ..
-                    } => {
-                        let _ = bridge_tx.send(AgentEvent::Error { message });
-                    }
-                    SessionEvent::Error { message } => {
-                        let _ = bridge_tx.send(AgentEvent::Error { message });
-                    }
-                    _ => {}
                 }
+                let _ = bridge_tx.send(session_event);
             }
             // Old actor's event stream exhausted — switch persistence to the new session.
             match bridge_rx_update_rx.recv().await {
@@ -545,35 +520,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 }
                 None => break,
             }
-        }
-    });
-
-    let session_manager_for_user_persist = session_manager.clone();
-    let (user_msg_tx, mut user_msg_rx) = mpsc::unbounded_channel::<String>();
-    let session_watch_rx_for_user = session_watch_rx.clone();
-    let sq_tx_watch_rx_for_user = sq_tx_watch_rx.clone();
-    let model_info_rx_for_user = model_info_rx.clone();
-    tokio::spawn(async move {
-        while let Some(msg) = user_msg_rx.recv().await {
-            let user_msg = Message::User {
-                content: msg.clone(),
-            };
-            let session = session_watch_rx_for_user.borrow().clone();
-            let info = model_info_rx_for_user.borrow().clone();
-            let metadata = session_metadata_for_model(&info.model_name, &info.provider);
-            if let Err(e) = session.append_with_metadata(&user_msg, metadata) {
-                eprintln!("Warning: failed to persist user message: {e}");
-            }
-            if let Err(e) = session_manager_for_user_persist.update_index(&session) {
-                eprintln!("Warning: failed to update session index: {e}");
-            }
-            let sq_tx = sq_tx_watch_rx_for_user.borrow().clone();
-            let _ = sq_tx
-                .send(match request_preview_payload(&msg) {
-                    Some(message) => SessionOp::PreviewRequest { message },
-                    None => SessionOp::Submit { message: msg },
-                })
-                .await;
         }
     });
 
@@ -611,7 +557,6 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 agent_rx: bridge_rx,
                 user_rx: user_input_rx,
                 ui_tx: ui_output_tx,
-                submit_tx: user_msg_tx,
                 sq_tx_watch: sq_tx_watch_for_loop,
                 model_info_watch: model_info_rx,
                 session_tx,

@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use talos_core::message::Message;
-use talos_core::session::{SessionEvent, SessionOp, TurnCompletionStatus};
+use talos_core::session::{SessionEvent, SessionOp, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{Session, SessionManager};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -57,12 +56,6 @@ pub struct EventLoop {
     session_manager: SessionManager,
     /// Clone-able sender for submitting turns to the session actor.
     sq_tx: mpsc::Sender<SessionOp>,
-    /// Accumulates assistant text deltas per turn for session logging.
-    assistant_text: String,
-    /// Tracks whether the current turn's assistant message has already been
-    /// persisted to JSONL. Prevents double-writes when both `AgentEvent::TurnEnd`
-    /// and `SessionEvent::TurnCompleted::Success` arrive for the same turn.
-    assistant_persisted: bool,
 }
 
 impl EventLoop {
@@ -82,32 +75,37 @@ impl EventLoop {
         tokio::spawn(async move {
             while let Some(session_event) = eq_rx.recv().await {
                 match session_event {
-                    SessionEvent::AgentEvent {
-                        event: talos_core::message::AgentEvent::TextDelta { delta },
+                    SessionEvent::TurnEvent {
+                        payload:
+                            TurnEventPayload::Progress {
+                                event: talos_core::message::AgentEvent::TextDelta { delta },
+                            },
+                        ..
                     } => {
                         let _ = event_tx_forward.send(AgentTextDelta(delta));
                     }
-                    SessionEvent::AgentEvent {
-                        event: talos_core::message::AgentEvent::ToolCall { call, .. },
+                    SessionEvent::TurnEvent {
+                        payload:
+                            TurnEventPayload::Progress {
+                                event: talos_core::message::AgentEvent::ToolCall { call, .. },
+                            },
+                        ..
                     } => {
                         let _ = event_tx_forward.send(AgentToolCall(call.name.clone()));
                     }
-                    SessionEvent::AgentEvent {
-                        event: talos_core::message::AgentEvent::ToolResult { result },
+                    SessionEvent::TurnEvent {
+                        payload:
+                            TurnEventPayload::Progress {
+                                event: talos_core::message::AgentEvent::ToolResult { result },
+                            },
+                        ..
                     } => {
                         let _ = event_tx_forward.send(AgentToolResult(result.is_error));
                     }
-                    SessionEvent::AgentEvent {
-                        event: talos_core::message::AgentEvent::TurnEnd { .. },
-                    } => {
-                        let _ = event_tx_forward.send(AgentCompleted);
-                    }
-                    SessionEvent::AgentEvent {
-                        event: talos_core::message::AgentEvent::Error { message },
-                    } => {
-                        let _ = event_tx_forward.send(AgentError(message));
-                    }
-                    SessionEvent::TurnCompleted { status, .. } => match status {
+                    SessionEvent::TurnEvent {
+                        payload: TurnEventPayload::Completed { status },
+                        ..
+                    } => match status {
                         TurnCompletionStatus::Success { .. } => {
                             let _ = event_tx_forward.send(AgentCompleted);
                         }
@@ -137,8 +135,6 @@ impl EventLoop {
             branch_id: None,
             session_manager,
             sq_tx,
-            assistant_text: String::new(),
-            assistant_persisted: false,
         }
     }
 
@@ -265,8 +261,6 @@ impl EventLoop {
             (AppState::AgentRunning { .. }, AgentTextDelta(delta)) => {
                 print!("{delta}");
                 io::stdout().flush().ok();
-                // Accumulate for session logging.
-                self.assistant_text.push_str(&delta);
             }
 
             (AppState::AgentRunning { .. }, AgentToolCall(name)) => {
@@ -282,21 +276,8 @@ impl EventLoop {
 
             (AppState::AgentRunning { .. }, AgentCompleted) => {
                 println!();
-                if !self.assistant_persisted {
-                    if !self.assistant_text.is_empty() {
-                        let assistant_msg = Message::Assistant {
-                            content: std::mem::take(&mut self.assistant_text),
-                            tool_calls: vec![],
-                            reasoning: None,
-                        };
-                        if let Err(e) = self.session.append(&assistant_msg) {
-                            eprintln!("Warning: failed to log assistant message: {e}");
-                        }
-                    }
-                    if let Err(e) = self.session_manager.update_index(&self.session) {
-                        eprintln!("Warning: failed to refresh session index: {e}");
-                    }
-                    self.assistant_persisted = true;
+                if let Err(e) = self.session_manager.update_index(&self.session) {
+                    eprintln!("Warning: failed to refresh session index: {e}");
                 }
                 self.state = AppState::WaitingForInput;
             }
@@ -351,17 +332,6 @@ impl EventLoop {
 
     fn start_agent_turn(&mut self, input: String) {
         let cancel_token = CancellationToken::new();
-        self.assistant_text.clear();
-        self.assistant_persisted = false;
-
-        // Log user message to session.
-        let user_msg = Message::User {
-            content: input.clone(),
-        };
-        if let Err(e) = self.session.append(&user_msg) {
-            eprintln!("Warning: failed to log user message: {e}");
-        }
-
         // Submit through session.
         let sq_tx = self.sq_tx.clone();
         let task_handle = tokio::spawn(async move {

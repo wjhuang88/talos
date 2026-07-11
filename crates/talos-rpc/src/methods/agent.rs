@@ -118,8 +118,11 @@ pub async fn run(ctx: &MethodContext, params: Option<Value>) -> Result<MethodRes
                             };
                             notifications.push(notification);
                         }
-                        Some(AgentEvent::TurnEnd { .. }) => break,
-                        Some(AgentEvent::Error { message }) => return Err(RpcError::Internal(message)),
+                        // Provider response boundaries are progress details. A
+                        // single RPC turn may contain several around tool use;
+                        // the Runtime future is the authoritative completion.
+                        Some(AgentEvent::TurnEnd { .. }) => {}
+                        Some(AgentEvent::Error { .. }) => break,
                         Some(AgentEvent::TurnStart | AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }) => {}
                         Some(_) => {}
                         None => break,

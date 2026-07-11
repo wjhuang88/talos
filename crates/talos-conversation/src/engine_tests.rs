@@ -5,9 +5,9 @@ use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
 use crate::types::{
-    ChatMessage, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus, ModelPickerItem,
-    PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind, TodoCommandAction,
-    TodoExportFormat, ToolCallDisplay, ToolResultDisplay, TurnPhase, UiOutput,
+    ChatMessage, ContentOutput, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
+    ModelPickerItem, PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind,
+    TodoCommandAction, TodoExportFormat, ToolCallDisplay, ToolResultDisplay, TurnPhase, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -30,16 +30,31 @@ fn make_tool_result(content: &str, is_error: bool) -> MessageToolResult {
     }
 }
 
-/// Extract the first `UiOutput::Stream` from outputs and collect its content.
+/// Extract the first logical content block from ordered or legacy outputs.
 async fn collect_stream(outputs: Vec<UiOutput>) -> Option<(MessageSource, String)> {
+    let mut ordered_source = None;
+    let mut ordered_text = String::new();
     for output in outputs {
-        if let UiOutput::Stream(msg) = output {
-            let source = msg.source.clone();
-            let chunks: Vec<String> = msg.stream.collect().await;
-            return Some((source, chunks.join("")));
+        match output {
+            UiOutput::Content(ContentOutput::Block { source, text }) => {
+                return Some((source, text));
+            }
+            UiOutput::Content(ContentOutput::Start { source }) => {
+                ordered_source = Some(source);
+            }
+            UiOutput::Content(ContentOutput::Delta { text }) => ordered_text.push_str(&text),
+            UiOutput::Content(ContentOutput::End) if ordered_source.is_some() => {
+                return ordered_source.map(|source| (source, ordered_text));
+            }
+            UiOutput::Stream(msg) => {
+                let source = msg.source.clone();
+                let chunks: Vec<String> = msg.stream.collect().await;
+                return Some((source, chunks.join("")));
+            }
+            _ => {}
         }
     }
-    None
+    ordered_source.map(|source| (source, ordered_text))
 }
 
 fn find_tool_call(outputs: &[UiOutput]) -> Option<&ToolCallDisplay> {
@@ -69,16 +84,15 @@ fn find_status(outputs: &[UiOutput]) -> Option<&crate::types::StatusSnapshot> {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn turn_start_creates_stream_and_status() {
+fn turn_start_creates_status_and_defers_content_until_delta() {
     let mut engine = new_engine();
     engine.current_turn_text = "leftover".to_string();
     engine.is_processing = false;
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
 
-    assert_eq!(outputs.len(), 2);
-    assert!(matches!(&outputs[0], UiOutput::Stream(msg) if msg.source == MessageSource::Assistant));
-    assert!(matches!(&outputs[1], UiOutput::Status(_)));
+    assert_eq!(outputs.len(), 1);
+    assert!(matches!(&outputs[0], UiOutput::Status(_)));
 
     assert!(engine.current_turn_text.is_empty());
     assert!(engine.is_processing);
@@ -91,49 +105,40 @@ fn turn_start_creates_stream_and_status() {
 #[tokio::test]
 async fn text_delta_sends_chunks_to_stream() {
     let mut engine = new_engine();
-    let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-
-    let stream_msg = outputs.into_iter().find_map(|o| match o {
-        UiOutput::Stream(m) => Some(m),
-        _ => None,
-    });
-    assert!(stream_msg.is_some());
-    let stream_msg = stream_msg.unwrap();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
 
     let outputs = engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "Hello".to_string(),
     });
-    assert_eq!(outputs.len(), 1);
+    assert!(matches!(
+        outputs[0],
+        UiOutput::Content(ContentOutput::Start { .. })
+    ));
+    assert!(
+        matches!(&outputs[1], UiOutput::Content(ContentOutput::Delta { text }) if text == "Hello")
+    );
     assert!(find_status(&outputs).is_some());
     assert_eq!(engine.current_turn_text, "Hello");
 
     let outputs = engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: " World".to_string(),
     });
-    assert_eq!(outputs.len(), 1);
+    assert!(
+        matches!(&outputs[0], UiOutput::Content(ContentOutput::Delta { text }) if text == " World")
+    );
     assert_eq!(engine.current_turn_text, "Hello World");
 
-    engine.handle_agent_event(&AgentEvent::TurnEnd {
+    let outputs = engine.handle_agent_event(&AgentEvent::TurnEnd {
         stop_reason: StopReason::EndTurn,
         usage: Usage::default(),
     });
-
-    let chunks: Vec<String> = stream_msg.stream.collect().await;
-    let text: String = chunks.join("");
-    assert_eq!(text, "Hello World");
+    assert!(matches!(outputs[0], UiOutput::Content(ContentOutput::End)));
 }
 
 #[tokio::test]
 async fn text_delta_accumulates_multiline() {
     let mut engine = new_engine();
-    let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-    let stream_msg = outputs
-        .into_iter()
-        .find_map(|o| match o {
-            UiOutput::Stream(m) => Some(m),
-            _ => None,
-        })
-        .unwrap();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
 
     engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "line1\nline2\n".to_string(),
@@ -149,10 +154,6 @@ async fn text_delta_accumulates_multiline() {
         stop_reason: StopReason::EndTurn,
         usage: Usage::default(),
     });
-
-    let chunks: Vec<String> = stream_msg.stream.collect().await;
-    let text: String = chunks.join("");
-    assert_eq!(text, "line1\nline2\nline3");
 }
 
 #[tokio::test]
@@ -209,14 +210,7 @@ async fn tool_call_produces_stream_and_message() {
 async fn tool_call_closes_previous_stream() {
     let mut engine = new_engine();
 
-    let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-    let stream_msg = outputs
-        .into_iter()
-        .find_map(|o| match o {
-            UiOutput::Stream(m) => Some(m),
-            _ => None,
-        })
-        .unwrap();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
 
     engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "partial".to_string(),
@@ -228,11 +222,8 @@ async fn tool_call_closes_previous_stream() {
         summary_fields: vec![],
     });
 
-    let chunks: Vec<String> = stream_msg.stream.collect().await;
-    let text: String = chunks.join("");
-    assert_eq!(text, "partial");
-
-    assert_eq!(outputs.len(), 2);
+    assert!(matches!(outputs[0], UiOutput::Content(ContentOutput::End)));
+    assert_eq!(outputs.len(), 3);
     let display = find_tool_call(&outputs).unwrap();
     assert!(matches!(display.provenance, ToolProvenance::Native));
 }
@@ -314,6 +305,11 @@ async fn turn_end_finalizes_and_produces_status() {
         stop_reason: StopReason::EndTurn,
         usage: usage.clone(),
     });
+    let completed =
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Success {
+            final_text: "Done.\n".to_string(),
+            new_messages: vec![],
+        });
 
     assert!(!engine.is_processing);
     assert_eq!(engine.messages.len(), 1);
@@ -321,12 +317,12 @@ async fn turn_end_finalizes_and_produces_status() {
     assert_eq!(engine.messages[0].content, "Done.\n");
     assert_eq!(engine.usage, usage);
 
-    assert_eq!(outputs.len(), 1);
-    let snapshot = find_status(&outputs).unwrap();
+    let snapshot = find_status(&completed).unwrap();
     assert_eq!(snapshot.model_name, "claude-sonnet-4");
     assert_eq!(snapshot.usage.input_tokens, 100);
     assert_eq!(snapshot.usage.output_tokens, 50);
     assert!(!snapshot.is_processing);
+    assert!(find_status(&outputs).is_some());
 }
 
 #[tokio::test]
@@ -340,16 +336,23 @@ async fn turn_end_with_empty_text_still_produces_status() {
         usage: usage.clone(),
     });
 
-    assert!(!engine.is_processing);
+    assert!(engine.is_processing);
     assert_eq!(engine.messages.len(), 0);
     assert_eq!(engine.usage, usage);
 
     assert_eq!(outputs.len(), 1);
     assert!(find_status(&outputs).is_some());
+
+    let completed =
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Success {
+            final_text: String::new(),
+            new_messages: vec![],
+        });
+    assert!(!find_status(&completed).unwrap().is_processing);
 }
 
 #[test]
-fn turn_end_max_tokens_clears_processing() {
+fn turn_end_max_tokens_waits_for_session_completion() {
     let mut engine = new_engine();
     engine.handle_agent_event(&AgentEvent::TurnStart);
     engine.handle_agent_event(&AgentEvent::TextDelta {
@@ -362,16 +365,23 @@ fn turn_end_max_tokens_clears_processing() {
         usage: Usage::default(),
     });
 
-    assert!(!engine.is_processing);
+    assert!(engine.is_processing);
     assert_eq!(engine.current_phase, None);
     let status = find_status(&outputs).expect("max-tokens turn end must emit status");
-    assert!(!status.is_processing);
+    assert!(status.is_processing);
     assert!(
         engine
             .messages
             .iter()
             .any(|m| m.role == MessageRole::Assistant && m.content == "partial response cut off")
     );
+
+    let completed =
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Success {
+            final_text: "partial response cut off".to_string(),
+            new_messages: vec![],
+        });
+    assert!(!find_status(&completed).unwrap().is_processing);
 }
 
 #[test]
@@ -1524,9 +1534,13 @@ fn thinking_delta_updates_preview_without_history() {
             .any(|output| matches!(output, UiOutput::ThinkingPreview { text: None }))
     );
     assert!(
-        outputs.iter().any(
-            |output| matches!(output, UiOutput::Reasoning(text) if text == "Thinking: checking constraints\n")
-        ),
+        outputs.iter().any(|output| matches!(
+            output,
+            UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Reasoning,
+                text,
+            }) if text == "Thinking: checking constraints\n"
+        )),
         "finalized thinking must use the non-streaming output path"
     );
     assert_eq!(engine.messages.len(), 1);
@@ -1652,18 +1666,15 @@ async fn full_turn_lifecycle() {
     let (_, text) = collect_stream(outputs).await.unwrap();
     assert_eq!(text, "What is 2+2?");
 
-    let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
-    let assistant_stream = outputs
-        .into_iter()
-        .find_map(|o| match o {
-            UiOutput::Stream(m) => Some(m),
-            _ => None,
-        })
-        .unwrap();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
 
-    engine.handle_agent_event(&AgentEvent::TextDelta {
+    let text_outputs = engine.handle_agent_event(&AgentEvent::TextDelta {
         delta: "2+2 equals 4.\n".to_string(),
     });
+    assert!(matches!(
+        &text_outputs[1],
+        UiOutput::Content(ContentOutput::Delta { text }) if text == "2+2 equals 4.\n"
+    ));
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolCall {
         call: make_tool_call("calculator", ToolProvenance::Native),
@@ -1687,6 +1698,11 @@ async fn full_turn_lifecycle() {
             ..Default::default()
         },
     });
+    let completed =
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Success {
+            final_text: "2+2 equals 4.\n".to_string(),
+            new_messages: vec![],
+        });
 
     assert!(!engine.is_processing);
     assert_eq!(engine.messages.len(), 3);
@@ -1696,10 +1712,73 @@ async fn full_turn_lifecycle() {
     assert_eq!(last.content, "2+2 equals 4.\n");
 
     assert!(outputs.iter().any(|o| matches!(o, UiOutput::Status(_))));
+    assert!(!find_status(&completed).unwrap().is_processing);
+}
 
-    let chunks: Vec<String> = assistant_stream.stream.collect().await;
-    let text: String = chunks.join("");
-    assert_eq!(text, "2+2 equals 4.\n");
+#[test]
+fn canonical_tool_loop_uses_one_fifo_content_protocol_without_legacy_streams() {
+    let mut engine = new_engine();
+    let mut outputs = engine.handle_turn_started();
+    outputs.extend(engine.handle_agent_event(&AgentEvent::TurnStart));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::ThinkingDelta {
+        delta: "inspect first".into(),
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: "before tool\n".into(),
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::ToolCallStarted {
+        name: "read".into(),
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::ToolCall {
+        call: make_tool_call("read", ToolProvenance::Native),
+        provenance: ToolProvenance::Native,
+        summary_fields: vec![],
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::ToolUse,
+        usage: Usage::default(),
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::ToolResult {
+        result: make_tool_result("tool output", false),
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::TurnStart));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: "after tool\n".into(),
+    }));
+    outputs.extend(engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::EndTurn,
+        usage: Usage::default(),
+    }));
+    outputs.extend(engine.handle_turn_completed(
+        &talos_core::session::TurnCompletionStatus::Success {
+            final_text: "after tool\n".into(),
+            new_messages: vec![],
+        },
+    ));
+
+    assert!(
+        outputs
+            .iter()
+            .all(|output| !matches!(output, UiOutput::Stream(_))),
+        "canonical runtime path must not create nested stream receivers"
+    );
+    let content = outputs
+        .iter()
+        .filter_map(|output| match output {
+            UiOutput::Content(ContentOutput::Block { source, text })
+                if *source == MessageSource::Reasoning =>
+            {
+                Some(text.as_str())
+            }
+            UiOutput::Content(ContentOutput::Delta { text }) => Some(text.as_str()),
+            _ => None,
+        })
+        .collect::<String>();
+    assert_eq!(
+        content,
+        "Thinking: inspect first\nbefore tool\nafter tool\n"
+    );
+    assert!(!engine.is_processing());
 }
 
 // ---------------------------------------------------------------------------
@@ -2061,9 +2140,15 @@ fn error_message_becomes_tip_and_error_stream() {
         matches!(o, UiOutput::Tip { text, kind: TipKind::Error } if text == "connection reset by peer")
     });
     assert!(has_tip, "error must emit a Tip with the error message");
-    // Must include a Stream with MessageSource::Error
-    let has_error_stream = outputs
-        .iter()
-        .any(|o| matches!(o, UiOutput::Stream(msg) if msg.source == MessageSource::Error));
+    // Must include an ordered error content block.
+    let has_error_stream = outputs.iter().any(|o| {
+        matches!(
+            o,
+            UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                ..
+            })
+        )
+    });
     assert!(has_error_stream, "error must emit an Error stream");
 }

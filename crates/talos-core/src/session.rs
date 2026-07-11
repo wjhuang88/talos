@@ -41,6 +41,21 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// Canonical ordered event for one user turn.
+    ///
+    /// In-tree runtime consumers must use this envelope instead of inferring
+    /// user-turn lifecycle from provider-level [`AgentEvent::TurnStart`] or
+    /// [`AgentEvent::TurnEnd`](crate::message::AgentEvent::TurnEnd).
+    TurnEvent {
+        /// Stable durable session UUID or process-local runtime identity.
+        session_id: String,
+        /// Stable actor-local identifier for the user turn.
+        turn_id: String,
+        /// Monotonic sequence within `turn_id`, starting at zero.
+        sequence: u64,
+        /// Ordered turn payload.
+        payload: TurnEventPayload,
+    },
     /// An agent event (text delta, tool call, etc.) from the current turn.
     AgentEvent {
         /// The inner streaming agent event.
@@ -61,6 +76,26 @@ pub enum SessionEvent {
     },
     /// A session-level error.
     Error { message: String },
+}
+
+/// Ordered payload carried by [`SessionEvent::TurnEvent`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum TurnEventPayload {
+    /// The session actor accepted and started the user turn.
+    Started,
+    /// Streaming progress produced while executing the turn.
+    Progress {
+        /// Provider/agent progress event. Its `TurnStart`/`TurnEnd` variants
+        /// delimit provider responses, not the enclosing user turn.
+        event: AgentEvent,
+    },
+    /// The whole user turn completed.
+    Completed {
+        /// Authoritative terminal status and message sequence.
+        status: TurnCompletionStatus,
+    },
 }
 
 /// Status of a completed turn.
@@ -195,6 +230,33 @@ mod tests {
     #[test]
     fn session_event_serde_roundtrip() {
         let events = vec![
+            SessionEvent::TurnEvent {
+                session_id: "session_1".into(),
+                turn_id: "turn_1".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            },
+            SessionEvent::TurnEvent {
+                session_id: "session_1".into(),
+                turn_id: "turn_1".into(),
+                sequence: 1,
+                payload: TurnEventPayload::Progress {
+                    event: AgentEvent::TextDelta {
+                        delta: "hello".into(),
+                    },
+                },
+            },
+            SessionEvent::TurnEvent {
+                session_id: "session_1".into(),
+                turn_id: "turn_1".into(),
+                sequence: 2,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: "hello".into(),
+                        new_messages: vec![],
+                    },
+                },
+            },
             SessionEvent::AgentEvent {
                 event: AgentEvent::TextDelta {
                     delta: "hello".into(),

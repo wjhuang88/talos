@@ -178,6 +178,10 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    actor.set_persistence(
+        session.clone(),
+        session_metadata_for_model(&config.model, &config.provider),
+    );
     tokio::spawn(async move { actor.run().await });
 
     let event_loop = event_loop::EventLoop::new(workspace_root, session, session_manager, handle);

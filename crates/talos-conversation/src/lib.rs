@@ -30,14 +30,14 @@ pub use command_registry::{
 pub use engine::ConversationEngine;
 pub use governance_summary::{GovernanceValidationReport, collect_governance_validation};
 pub use types::{
-    ChatMessage, ConnectPickerData, ConnectPickerItem, CopyScope, CredentialRequestData,
-    CredentialResponseData, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    ModelInfo, ModelPickerData, ModelPickerItem, ModelSwitchRequest, PluginObservation,
-    ProviderSetupItem, ScrollbackState, SessionDeleteRequest, SessionForkRequest,
-    SessionNewRequest, SessionPickerItem, SessionResumeRequest, SkillCommandRequest,
-    SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
-    TodoExportFormat, TodoPanelData, TodoPanelRow, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, TurnPhase, UiOutput, UserInput,
+    ChatMessage, ConnectPickerData, ConnectPickerItem, ContentOutput, CopyScope,
+    CredentialRequestData, CredentialResponseData, McpServerDiagnostic, MessageRole, MessageSource,
+    MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem, ModelSwitchRequest,
+    PluginObservation, ProviderSetupItem, ScrollbackState, SessionDeleteRequest,
+    SessionForkRequest, SessionNewRequest, SessionPickerItem, SessionResumeRequest,
+    SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind,
+    TodoCommandAction, TodoCommandRequest, TodoExportFormat, TodoPanelData, TodoPanelRow,
+    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput, UserInput,
 };
 pub use validation::{
     EvidenceStatus, FindingSeverity, ProjectType, ProjectTypeDetectorDescriptor, ValidationCheck,

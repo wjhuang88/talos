@@ -147,6 +147,7 @@ docs/iterations/
 | I108 | Architecture-Sensitive Self-Bootstrap | Review | Month 3 of the 2026-07-08 Talos-primary self-bootstrap plan. ARCH-032 Single Data Flow Audit completed (SBT121): zero broadcast channels, all paths ADR-006 compliant. Non-qualifying REL-002 evidence. See `I108-architecture-sensitive-self-bootstrap.md`. |
 | I109 | REL-002 Self-Bootstrap Closeout | Review | Month 4 of the 2026-07-08 Talos-primary self-bootstrap plan. REL-002 closeout: acceptance criteria audited, NO-GO v1.0 verdict, readiness report produced. Non-qualifying evidence (external runtime). See `I109-rel002-self-bootstrap-closeout.md`. |
 | I114 | TUI Runtime Visual Stability | Complete (2026-07-10) | TUI-028 #24 cadence, #25 thinking ripple, #31 compact status rendering, and #39 transient dashboard notification accepted in native Alacritty PTY evidence. See `I114-tui-runtime-visual-stability.md`. |
+| I115 | Runtime Event Semantic Convergence | **Complete (2026-07-11)** | ARCH-033 corrected the semantic gap after ARCH-032: one ordered live queue, authoritative session lifecycle, actor-owned persistence, replay equivalence, and shared runtime-surface semantics. Full workspace and binary E2E validation passed. See `I115-runtime-event-semantic-convergence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.

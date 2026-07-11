@@ -73,6 +73,14 @@ The workspace is **fully compliant with ADR-006**. No deviations found.
 
 No deviations. No remediation required. `docs/reference/ARCHITECTURE.md` updated with the "Channel Topology Audit (ARCH-032)" section.
 
+## Post-Completion Correction (2026-07-11)
+
+The result above is retained as the published channel-topology audit. It proved ADR-006's absence of
+a global broadcast bus, but “No deviations” was too broad for semantic single-data-flow behavior.
+ARCH-033 subsequently found independent UI ordering domains, split provider/session lifecycle
+authority, multiple persistence writers, and cross-mode divergence. Remediation is owned by
+`docs/backlog/active/ARCH-033-runtime-event-semantic-convergence.md`, I115, and ADR-039; this note
+does not rewrite the completed ARCH-032 baseline.
+
 ### REL-002 Classification
 Runtime: glm-5.2 via zai-coding-plan (external, NOT Talos). Per REL-002 criterion 7, this is NON-QUALIFYING evidence. The audit is useful for future Talos-primary sessions, but this session does not prove self-bootstrap capability.
-

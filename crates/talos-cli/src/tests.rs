@@ -13,6 +13,64 @@ mod tests {
     };
     use talos_conversation::{ConversationEngine, ModelInfo, UiOutput, UserInput};
     use talos_core::message::AgentEvent;
+    use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
+
+    #[derive(Clone)]
+    struct TestTurnSender {
+        tx: tokio::sync::mpsc::UnboundedSender<SessionEvent>,
+        sequence: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    }
+
+    impl TestTurnSender {
+        fn new(tx: tokio::sync::mpsc::UnboundedSender<SessionEvent>) -> Self {
+            Self {
+                tx,
+                sequence: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            }
+        }
+
+        fn send(
+            &self,
+            event: AgentEvent,
+        ) -> Result<(), tokio::sync::mpsc::error::SendError<SessionEvent>> {
+            use std::sync::atomic::Ordering;
+
+            if matches!(event, AgentEvent::TurnStart) {
+                self.tx.send(SessionEvent::TurnEvent {
+                    session_id: "session_test".to_string(),
+                    turn_id: "turn_test".to_string(),
+                    sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
+                    payload: TurnEventPayload::Started,
+                })?;
+            }
+
+            let terminal = match &event {
+                AgentEvent::TurnEnd { .. } => Some(TurnCompletionStatus::Success {
+                    final_text: String::new(),
+                    new_messages: vec![],
+                }),
+                AgentEvent::Error { message } => Some(TurnCompletionStatus::Error {
+                    message: message.clone(),
+                }),
+                _ => None,
+            };
+            self.tx.send(SessionEvent::TurnEvent {
+                session_id: "session_test".to_string(),
+                turn_id: "turn_test".to_string(),
+                sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
+                payload: TurnEventPayload::Progress { event },
+            })?;
+            if let Some(status) = terminal {
+                self.tx.send(SessionEvent::TurnEvent {
+                    session_id: "session_test".to_string(),
+                    turn_id: "turn_test".to_string(),
+                    sequence: self.sequence.fetch_add(1, Ordering::Relaxed),
+                    payload: TurnEventPayload::Completed { status },
+                })?;
+            }
+            Ok(())
+        }
+    }
 
     fn empty_runtime_skills()
     -> std::sync::Arc<tokio::sync::Mutex<crate::skill_runtime::RuntimeSkills>> {
@@ -124,10 +182,10 @@ mod tests {
     async fn conversation_loop_displays_drained_queued_input() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let agent_tx = TestTurnSender::new(agent_tx);
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (submit_tx, mut submit_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
+        let (interrupt_tx, mut interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
             model_name: "test-model".to_string(),
@@ -143,7 +201,6 @@ mod tests {
                 agent_rx,
                 user_rx,
                 ui_tx,
-                submit_tx,
                 sq_tx_watch: sq_rx,
                 model_info_watch: model_rx,
                 session_tx,
@@ -169,7 +226,10 @@ mod tests {
                 break;
             };
             match output {
-                UiOutput::Stream(msg) if msg.source == talos_conversation::MessageSource::User => {
+                UiOutput::Content(talos_conversation::ContentOutput::Block {
+                    source: talos_conversation::MessageSource::User,
+                    ..
+                }) => {
                     saw_queued_user_stream = true;
                 }
                 UiOutput::Status(status) if status.is_processing && status.steering_count == 0 => {
@@ -185,8 +245,8 @@ mod tests {
         assert!(saw_queued_user_stream);
         assert!(saw_queue_drained_status);
         assert!(matches!(
-            submit_rx.try_recv(),
-            Ok(message) if message == "queued follow-up"
+            interrupt_rx.try_recv(),
+            Ok(talos_core::session::SessionOp::Submit { message }) if message == "queued follow-up"
         ));
 
         drop(agent_tx);
@@ -200,7 +260,6 @@ mod tests {
         let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
         let (_user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
@@ -217,7 +276,6 @@ mod tests {
                 agent_rx,
                 user_rx,
                 ui_tx,
-                submit_tx,
                 sq_tx_watch: sq_rx,
                 model_info_watch: model_rx,
                 session_tx,
@@ -249,6 +307,110 @@ mod tests {
         loop_handle.abort();
     }
 
+    #[tokio::test]
+    async fn conversation_loop_keeps_steering_queued_across_provider_tool_end() {
+        let engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx: event_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_watch_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+            },
+        ));
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 0,
+                payload: TurnEventPayload::Started,
+            })
+            .unwrap();
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 1,
+                payload: TurnEventPayload::Progress {
+                    event: AgentEvent::TurnStart,
+                },
+            })
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(output) = ui_rx.recv().await {
+                if matches!(output, UiOutput::Status(status) if status.is_processing) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("turn start reaches conversation state");
+        user_tx
+            .send(UserInput::Message("after tool".into()))
+            .unwrap();
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 2,
+                payload: TurnEventPayload::Progress {
+                    event: AgentEvent::TurnEnd {
+                        stop_reason: talos_core::message::StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                },
+            })
+            .unwrap();
+
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), sq_rx.recv())
+                .await
+                .is_err(),
+            "provider response end must not drain steering"
+        );
+
+        event_tx
+            .send(SessionEvent::TurnEvent {
+                session_id: "session_test".into(),
+                turn_id: "turn_1".into(),
+                sequence: 3,
+                payload: TurnEventPayload::Completed {
+                    status: TurnCompletionStatus::Success {
+                        final_text: String::new(),
+                        new_messages: vec![],
+                    },
+                },
+            })
+            .unwrap();
+
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), sq_rx.recv())
+                .await
+                .unwrap()
+                .and_then(|op| match op {
+                    talos_core::session::SessionOp::Submit { message } => Some(message),
+                    _ => None,
+                })
+                .as_deref(),
+            Some("after tool")
+        );
+        loop_handle.abort();
+    }
+
     // FS02 / RUNTIME-002: runtime-level integration coverage proving the conversation loop
     // forwards a terminal `UiOutput::Status { is_processing: false }` after provider/tool errors,
     // timeouts, and MaxTokens turn ends. These tests drive the full bridge path
@@ -258,13 +420,12 @@ mod tests {
         engine: ConversationEngine,
     ) -> (
         tokio::task::JoinHandle<()>,
-        tokio::sync::mpsc::UnboundedSender<AgentEvent>,
+        TestTurnSender,
         tokio::sync::mpsc::UnboundedReceiver<UiOutput>,
     ) {
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
         let (_user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
@@ -281,14 +442,13 @@ mod tests {
                 agent_rx,
                 user_rx,
                 ui_tx,
-                submit_tx,
                 sq_tx_watch: sq_rx,
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills: empty_runtime_skills(),
             },
         ));
-        (handle, agent_tx, ui_rx)
+        (handle, TestTurnSender::new(agent_tx), ui_rx)
     }
 
     async fn collect_terminal_status(
@@ -457,7 +617,10 @@ mod tests {
                 {
                     saw_error_tip = true;
                 }
-                UiOutput::Stream(msg) if msg.source == talos_conversation::MessageSource::Error => {
+                UiOutput::Content(talos_conversation::ContentOutput::Block {
+                    source: talos_conversation::MessageSource::Error,
+                    ..
+                }) => {
                     saw_error_stream = true;
                 }
                 UiOutput::Status(status) if !status.is_processing => {
@@ -525,9 +688,9 @@ mod tests {
     async fn conversation_loop_cancel_emits_terminal_cancelled_status() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let agent_tx = TestTurnSender::new(agent_tx);
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (interrupt_tx, _interrupt_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_tx, sq_rx) = tokio::sync::watch::channel(interrupt_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
@@ -544,7 +707,6 @@ mod tests {
                 agent_rx,
                 user_rx,
                 ui_tx,
-                submit_tx,
                 sq_tx_watch: sq_rx,
                 model_info_watch: model_rx,
                 session_tx,
@@ -606,7 +768,6 @@ mod tests {
         let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
         let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (submit_tx, _submit_rx) = tokio::sync::mpsc::unbounded_channel();
         let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
         let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(sq_tx);
         let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
@@ -623,7 +784,6 @@ mod tests {
                 agent_rx,
                 user_rx,
                 ui_tx,
-                submit_tx,
                 sq_tx_watch: sq_watch_rx,
                 model_info_watch: model_rx,
                 session_tx,
@@ -649,11 +809,13 @@ mod tests {
 
         let mut saw_confirmation = false;
         for _ in 0..3 {
-            if let Some(UiOutput::Stream(msg)) = ui_rx.recv().await {
-                if msg.source == talos_conversation::MessageSource::System {
-                    saw_confirmation = true;
-                    break;
-                }
+            if let Some(UiOutput::Content(talos_conversation::ContentOutput::Block {
+                source: talos_conversation::MessageSource::System,
+                ..
+            })) = ui_rx.recv().await
+            {
+                saw_confirmation = true;
+                break;
             }
         }
         assert!(saw_confirmation);

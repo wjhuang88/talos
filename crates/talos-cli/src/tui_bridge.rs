@@ -7,20 +7,21 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+use crate::mode_runtime::request_preview_payload;
 use crate::skill_runtime::RuntimeSkills;
 use talos_conversation::MessageSource;
 use talos_conversation::{
-    ConversationEngine, CredentialResponseData, ModelInfo, ModelSwitchRequest,
+    ContentOutput, ConversationEngine, CredentialResponseData, ModelInfo, ModelSwitchRequest,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionResumeRequest,
-    SkillCommandRequest, StreamMessage, TodoCommandRequest, UiOutput, UserInput,
+    SkillCommandRequest, TodoCommandRequest, UiOutput, UserInput,
 };
 use talos_core::message::AgentEvent;
+use talos_core::session::{SessionEvent, TurnEventPayload};
 
 pub(crate) struct ConversationLoopIo {
-    pub agent_rx: tokio::sync::mpsc::UnboundedReceiver<AgentEvent>,
+    pub agent_rx: tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     pub user_rx: tokio::sync::mpsc::UnboundedReceiver<UserInput>,
     pub ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
-    pub submit_tx: tokio::sync::mpsc::UnboundedSender<String>,
     pub sq_tx_watch:
         tokio::sync::watch::Receiver<tokio::sync::mpsc::Sender<talos_core::session::SessionOp>>,
     pub model_info_watch: tokio::sync::watch::Receiver<ModelInfo>,
@@ -33,7 +34,6 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
         mut agent_rx,
         mut user_rx,
         ui_tx,
-        submit_tx,
         sq_tx_watch,
         mut model_info_watch,
         session_tx,
@@ -51,13 +51,24 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
             }
             event = agent_rx.recv() => {
                 match event {
-                    Some(agent_event) => {
-                        let is_turn_end = matches!(agent_event, AgentEvent::TurnEnd { .. });
-                        let outputs = engine.handle_agent_event(&agent_event);
+                    Some(SessionEvent::TurnEvent { payload, .. }) => {
+                        let turn_completed = matches!(payload, TurnEventPayload::Completed { .. });
+                        let outputs = match payload {
+                            TurnEventPayload::Started => engine.handle_turn_started(),
+                            TurnEventPayload::Progress { event: AgentEvent::Error { .. } } => {
+                                // The authoritative terminal error follows as Completed.
+                                Vec::new()
+                            }
+                            TurnEventPayload::Progress { event } => engine.handle_agent_event(&event),
+                            TurnEventPayload::Completed { status } => {
+                                engine.handle_turn_completed(&status)
+                            }
+                            _ => Vec::new(),
+                        };
                         for output in outputs {
                             let _ = ui_tx.send(output);
                         }
-                        if is_turn_end
+                        if turn_completed
                             && let Some(msg) = engine.drain_steering_queue()
                         {
                             let outputs = engine.start_user_message(&msg);
@@ -65,9 +76,25 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 let _ = ui_tx.send(output);
                             }
                             let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            let _ = submit_tx.send(msg);
+                            if submit_session_message(&sq_tx_watch, msg).await.is_err() {
+                                for output in engine.handle_turn_completed(
+                                    &talos_core::session::TurnCompletionStatus::Error {
+                                        message: "session command channel closed".into(),
+                                    },
+                                ) {
+                                    let _ = ui_tx.send(output);
+                                }
+                            }
                         }
                     }
+                    Some(SessionEvent::Error { message }) => {
+                        for output in engine.handle_turn_completed(
+                            &talos_core::session::TurnCompletionStatus::Error { message },
+                        ) {
+                            let _ = ui_tx.send(output);
+                        }
+                    }
+                    Some(_) => {}
                     None => break,
                 }
             }
@@ -127,7 +154,15 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 let _ = ui_tx.send(output);
                             }
                             let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            let _ = submit_tx.send(msg);
+                            if submit_session_message(&sq_tx_watch, msg).await.is_err() {
+                                for output in engine.handle_turn_completed(
+                                    &talos_core::session::TurnCompletionStatus::Error {
+                                        message: "session command channel closed".into(),
+                                    },
+                                ) {
+                                    let _ = ui_tx.send(output);
+                                }
+                            }
                         }
                     }
                     UserInput::Credential(resp) => {
@@ -155,6 +190,20 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
             }
         }
     }
+}
+
+async fn submit_session_message(
+    sq_tx_watch: &tokio::sync::watch::Receiver<
+        tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    >,
+    message: String,
+) -> Result<(), ()> {
+    let sq_tx = sq_tx_watch.borrow().clone();
+    let op = match request_preview_payload(&message) {
+        Some(message) => talos_core::session::SessionOp::PreviewRequest { message },
+        None => talos_core::session::SessionOp::Submit { message },
+    };
+    sq_tx.send(op).await.map_err(|_| ())
 }
 
 async fn handle_skill_command(
@@ -212,10 +261,7 @@ fn send_bridge_stream(
     source: MessageSource,
     text: String,
 ) {
-    let _ = ui_tx.send(UiOutput::Stream(StreamMessage {
-        source,
-        stream: Box::pin(futures::stream::once(async move { text })),
-    }));
+    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block { source, text }));
 }
 
 /// Session lifecycle request forwarded from the conversation loop to the mode runner.

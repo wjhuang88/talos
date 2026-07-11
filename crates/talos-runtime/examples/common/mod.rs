@@ -35,7 +35,11 @@ pub async fn run_turn(runtime: &mut RuntimeHandle, message: &str) -> RuntimeTurn
 
     while let Some(event) = runtime.next_event().await {
         print_event(&event);
-        if let SessionEvent::TurnCompleted { status, .. } = event {
+        if let SessionEvent::TurnEvent {
+            payload: talos_core::session::TurnEventPayload::Completed { status },
+            ..
+        } = event
+        {
             final_status = status;
             break;
         }
@@ -46,7 +50,12 @@ pub async fn run_turn(runtime: &mut RuntimeHandle, message: &str) -> RuntimeTurn
 
 pub fn print_event(event: &SessionEvent) {
     match event {
-        SessionEvent::AgentEvent { event } => match event {
+        SessionEvent::TurnEvent {
+            turn_id: _,
+            sequence: _,
+            payload: talos_core::session::TurnEventPayload::Progress { event },
+            ..
+        } => match event {
             AgentEvent::TurnStart => println!("  [TurnStart]"),
             AgentEvent::TextDelta { delta } => println!("  [TextDelta] {delta}"),
             AgentEvent::ToolCallStarted { name } => println!("  [ToolCallStarted] {name}"),
@@ -66,9 +75,19 @@ pub fn print_event(event: &SessionEvent) {
             AgentEvent::Error { message } => println!("  [Error] {message}"),
             _ => println!("  [AgentEvent] (other)"),
         },
-        SessionEvent::TurnStarted { turn_id } => println!("  [TurnStarted] id={turn_id}"),
-        SessionEvent::TurnCompleted { turn_id, status } => {
-            println!("  [TurnCompleted] id={turn_id} status={status:?}")
+        SessionEvent::TurnEvent {
+            turn_id,
+            sequence,
+            payload: talos_core::session::TurnEventPayload::Started,
+            ..
+        } => println!("  [TurnStarted] id={turn_id} seq={sequence}"),
+        SessionEvent::TurnEvent {
+            turn_id,
+            sequence,
+            payload: talos_core::session::TurnEventPayload::Completed { status },
+            ..
+        } => {
+            println!("  [TurnCompleted] id={turn_id} seq={sequence} status={status:?}")
         }
         SessionEvent::ApprovalRequired {
             tool_name,
