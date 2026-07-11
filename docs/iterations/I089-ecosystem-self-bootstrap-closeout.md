@@ -1,6 +1,6 @@
 # Iteration I089: Ecosystem, Self-Bootstrap, And Closeout
 
-> Document status: Planned
+> Document status: Superseded before activation (2026-07-12)
 > Published plan date: 2026-07-03
 > Planned objective: Execute weeks 13-16 of the 2026-07-03 four-month hardening plan: decide opt-in
 > shared Skills compatibility, record REL-002 rehearsal evidence, sweep docs, and hand off the next
@@ -8,6 +8,8 @@
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: the cycle closes with ecosystem decisions, REL-002 evidence, release posture, and
 > residual owners.
+> Supersession: I106-I109 produced non-qualifying evidence and the next sole-primary evidence target
+> is materially different; it is replanned under I119.
 
 ## Published Baseline
 

@@ -1,6 +1,6 @@
 # Iteration I087: Site Install Distribution Entrypoints
 
-> Document status: Planned
+> Document status: Superseded before activation (2026-07-12)
 > Published plan date: 2026-07-03
 > Planned objective: Execute weeks 5-8 of the 2026-07-03 four-month hardening plan: decide and
 > implement verified install script entrypoints under `talos.hwj.zone` if they pass release
@@ -8,6 +8,8 @@
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: installer entrypoints are either safely hosted on the product site with validation
 > or explicitly deferred with a documented blocker.
+> Supersession: the materially revised distribution/productization target is replanned under I118;
+> this baseline remains historical.
 
 ## Published Baseline
 

@@ -1,12 +1,14 @@
 # Iteration I086: Experience Polish And Retry Visibility
 
-> Document status: Planned
+> Document status: Superseded before activation (2026-07-12)
 > Published plan date: 2026-07-03
 > Planned objective: Execute weeks 3-4 of the 2026-07-03 four-month hardening plan: close the
 > most visible I084 follow-ups without expanding model/provider scope.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: retry attempts and transient thinking behavior are visible, bounded, documented,
 > and covered by tests.
+> Supersession: later I107/I114/I115 work delivered or changed this target; remaining work is
+> replanned under I116-I119 without rewriting this baseline.
 
 ## Published Baseline
 

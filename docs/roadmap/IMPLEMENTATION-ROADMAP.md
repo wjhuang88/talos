@@ -6,6 +6,25 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
+## Current Four-Month Productization Sequence (2026-07-12)
+
+The current planning owner is
+[`2026-07-12-four-month-trust-productization-plan`](../tasks/2026-07-12-four-month-trust-productization-plan.md).
+It preserves earlier iteration history while replacing the unactivated I086-I089 path with:
+
+| Month | Iteration | Runnable Exit |
+|---|---|---|
+| 1 | I116 State Truth And Operator Baseline | Truth-synchronized governance plus repeatable operator smoke/status evidence |
+| 2 | I117 Command Sandbox Evidence | PERM-005 evidence boundary with strict unknown/out-of-repo fallback and trust revoke |
+| 3 | I118 Bounded Local Productization | Local/read-only extension, ingestion, dashboard, and installer release-candidate smoke |
+| 4 | I119 Talos-Primary Release Decision | Two replayable Talos-primary task packets, REL-002 re-audit, and conditional release decision |
+
+I116 is Active after I085 received an explicit continued-Paused disposition and I106-I109 closed
+Complete without changing their non-qualifying REL-002 evidence. Execute from
+[`2026-07-12-developer-trust-productization-long-task`](../tasks/2026-07-12-developer-trust-productization-long-task.md).
+Later months activate sequentially. The task does not authorize v1.0, permission broadening,
+remote/browser control, marketplace behavior, push, or release actions.
+
 ```
 I001 "Project Scaffold"  cargo check --workspace               能编译 ✅
 I002 "Hello Agent"       talos "What is 2+2?" -p               能对话 ✅

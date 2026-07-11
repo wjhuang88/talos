@@ -1,6 +1,6 @@
 # Iteration I088: Extension And Ingestion Risk Bounding
 
-> Document status: Planned
+> Document status: Superseded before activation (2026-07-12)
 > Published plan date: 2026-07-03
 > Planned objective: Execute weeks 9-12 of the 2026-07-03 four-month hardening plan: improve local
 > plugin/hook diagnostics and bounded document/HTML ingestion without expanding permission or browser
@@ -8,6 +8,8 @@
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
 > MVP deliverable: extension and ingestion surfaces are more useful while remaining local, explicit,
 > read-only where applicable, and test-backed.
+> Supersession: later I090/I091 and plugin/document deliveries changed the starting state; remaining
+> bounded productization is replanned under I118.
 
 ## Published Baseline
 

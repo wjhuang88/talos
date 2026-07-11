@@ -1,8 +1,8 @@
 # TUI-024: Thinking Title In Preview Area
 
 Type: Product Story
-Parent Epic: UX-001 follow-up; candidate for I086 "thinking preview policy" scope
-Status: Planned — candidate for I086
+Parent Epic: UX-001 follow-up
+Status: Planned — unselected after I086 supersession
 
 ## Identity / Goal / Value
 
@@ -49,7 +49,8 @@ Goal: when the accumulated thinking text carries a parseable section title, the 
 
 ## Dependencies
 
-- None hard. Aligns with I086 planned scope "thinking preview policy".
+- None hard. I086 was superseded before activation; select this story only through a future
+  explicit product/UX iteration rather than silently adding it to I116-I119.
 
 ## Required Reads
 

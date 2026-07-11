@@ -1,6 +1,6 @@
 # 2026-07-03 Four-Month Product Hardening Plan
 
-**Status**: Planned
+**Status**: Superseded for unexecuted remainder (2026-07-12)
 **Owner area**: Post-`v0.2.2` product hardening, distribution, and self-bootstrap readiness.
 **Created**: 2026-07-03
 **Timebox**: 16 weeks / roughly 4 months
@@ -98,6 +98,14 @@ of a raw GitHub URL. The safer design is:
 5. Run `scripts/validate_project_governance.sh .` after governance changes.
 
 ## Execution Log
+
+### 2026-07-12 Supersession
+
+The post-`v0.3.4` state materially differs from this plan: I110-I115 and several H-task outcomes
+landed through later execution plans, R27 closed, and PERM-004/PERM-005 now define a stricter
+command-sandbox dependency. The unexecuted I086-I089 path is therefore superseded by the
+2026-07-12 trust/productization plan and I116-I119. This published baseline remains unchanged as
+historical intent; no unfinished H-task is implicitly Complete because of supersession.
 
 ### I085 Delegation Prep (2026-07-03)
 
