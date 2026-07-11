@@ -9,7 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { version = "0.3.0", path = "../talos-core" }
+talos-core = { version = "0.3.3", path = "../talos-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1.2"

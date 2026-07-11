@@ -18,6 +18,7 @@ acceptance criteria, verification evidence, or iteration state.
 |---|---|---|---|
 | R27 High-Risk Governance Gate | In Progress (standing gate) | [R27 task](tasks/2026-06-27-personal-oversight-high-risk-roadmap.md) | Standing governance gate, not an active work item. Continue next high-risk packet only through the task gates. This gate does not grant any current executor personal approval authority. No tag, push, destructive cleanup, network spend, new runtime dependency, or permission-boundary change without the task's explicit gate. |
 | Four-Month Product Hardening Plan | Active (I085 paused; I086-I089 planned) | [hardening plan](tasks/2026-07-03-four-month-product-hardening-plan.md) | `v0.2.2` tag pushed 2026-07-03 and I085 activated 2026-07-03. I085 Stage 1/2 code and README acceptance are closed; I085 is paused with only MC107 real terminal walkthrough residual. I086-I089 remain planned shells. No branch push, crate publish, remote dashboard, browser automation, remote plugin install, write-capable plugin tools, or permission-default change without a separate gate. |
+| Release 0.3.3 Closeout | In Progress | [v0.3.3 closeout](tasks/2026-07-11-release-0.3.3-closeout.md) | Synchronize workspace/component versions, pass release validation, then push `main` and annotated tag `v0.3.3`; tag-driven GitHub Release workflow owns artifacts. |
 
 ## Review
 
