@@ -96,16 +96,50 @@ impl AccessEvidence {
         let repo_canonical =
             std::fs::canonicalize(repo_root).unwrap_or_else(|_| repo_root.to_path_buf());
         self.paths.iter().all(|p| {
-            let canonical = std::fs::canonicalize(p).unwrap_or_else(|_| {
-                if p.is_absolute() {
-                    p.clone()
-                } else {
-                    repo_canonical.join(p)
+            let canonical = match std::fs::canonicalize(p) {
+                Ok(c) => c,
+                Err(_) => {
+                    let base = if p.is_absolute() {
+                        p.clone()
+                    } else {
+                        repo_canonical.join(p)
+                    };
+                    normalize_path(&base)
                 }
-            });
+            };
             canonical.starts_with(&repo_canonical)
         })
     }
+}
+
+fn normalize_path(path: &std::path::Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        use std::path::Component;
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if normalized.components().next().is_none() {
+                    normalized.push("..");
+                } else {
+                    let last = normalized.components().next_back();
+                    match last {
+                        Some(Component::Normal(_)) => {
+                            normalized.pop();
+                        }
+                        Some(Component::RootDir) => {}
+                        _ => {
+                            normalized.push("..");
+                        }
+                    }
+                }
+            }
+            other => {
+                normalized.push(other.as_os_str());
+            }
+        }
+    }
+    normalized
 }
 
 /// Classify a simple bash command string into access evidence.
@@ -393,5 +427,50 @@ mod tests {
         let ev = AccessEvidence::network();
         let root = std::env::current_dir().expect("cwd");
         assert!(!ev.is_repo_local(&root));
+    }
+
+    #[test]
+    fn test_traversal_nonexistent_path_not_repo_local() {
+        let ev = AccessEvidence {
+            kind: AccessKind::Read,
+            state: EvidenceState::Declared,
+            paths: vec![PathBuf::from("../../etc/passwd")],
+            detail: String::new(),
+        };
+        let root = std::env::current_dir().expect("cwd");
+        assert!(
+            !ev.is_repo_local(&root),
+            "traversal path ../../etc/passwd must NOT be repo-local"
+        );
+    }
+
+    #[test]
+    fn test_traversal_absolute_nonexistent_not_repo_local() {
+        let ev = AccessEvidence {
+            kind: AccessKind::Read,
+            state: EvidenceState::Declared,
+            paths: vec![PathBuf::from("/etc/nonexistent/../../../passwd")],
+            detail: String::new(),
+        };
+        let root = std::env::current_dir().expect("cwd");
+        assert!(!ev.is_repo_local(&root));
+    }
+
+    #[test]
+    fn test_normalize_path_resolves_parent_dir() {
+        let p = normalize_path(std::path::Path::new("/a/b/../c"));
+        assert_eq!(p, PathBuf::from("/a/c"));
+    }
+
+    #[test]
+    fn test_normalize_path_resolves_multiple_parent_dir() {
+        let p = normalize_path(std::path::Path::new("/a/b/../../c"));
+        assert_eq!(p, PathBuf::from("/c"));
+    }
+
+    #[test]
+    fn test_normalize_path_parent_at_root_stays_at_root() {
+        let p = normalize_path(std::path::Path::new("/.."));
+        assert_eq!(p, PathBuf::from("/"));
     }
 }
