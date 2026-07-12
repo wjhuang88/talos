@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | MC-001 (Epic) |
 | Priority | P1 |
-| Status | In Progress |
+| Status | Complete (2026-07-12; I085 MC107 terminal walkthrough passed) |
 | Origin | Maintainer feedback 2026-07-03 — model catalog pipeline broken: import format mismatch, write-only cache, auth-gated picker hides most providers, only 12 hardcoded providers visible |
 | Owns | MODEL-001 (catalog data layer), MODEL-005 (interactive selection), CONF-002 (onboarding) |
 | Parent Epic | None (this IS the epic) |
@@ -107,9 +107,9 @@ The command split must not begin until the resolver precedence path is tested.
 - [x] `cargo test --workspace` passes. (1605 passed; 3 pre-existing e2e failures unrelated to MC-001 —
       confirmed identical on unmodified `main` via `git stash`, caused by this dev machine's local
       `~/.talos/config.toml` having an empty `model` field, not by any code in this epic)
-- [ ] End-to-end: `/model` and `/connect` reachable from real TUI binary.
-      (Not yet performed in this session — unit/integration tests cover the logic paths, but a live
-      interactive terminal walkthrough of `/connect` has not been recorded. MC107 residual.)
+- [x] End-to-end: `/model` and `/connect` reachable from real TUI binary.
+      (2026-07-12 disposable-HOME `screen` terminal walkthrough: provider groups/filtering,
+      credential-view cancellation without save, and model picker rendering passed.)
 
 ## Required Reads
 

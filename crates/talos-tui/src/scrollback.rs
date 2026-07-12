@@ -732,7 +732,7 @@ pub(crate) fn stream_padding_for(
         Some(MessageSource::Assistant) => " ● ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
-        Some(MessageSource::Reasoning) => "",
+        Some(MessageSource::Reasoning) => " ◇ ",
         Some(MessageSource::Tool { .. }) => " ● ",
         None => "   ",
     }

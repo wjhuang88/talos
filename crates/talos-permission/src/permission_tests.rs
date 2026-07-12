@@ -1017,3 +1017,208 @@ fn workspace_path_rejects_relative_escape() {
     assert!(!is_path_in_workspace("../../outside", &root));
     std::fs::remove_dir_all(root).ok();
 }
+
+// --- ADR-040 Evidence-based command enforcement tests ---
+
+#[test]
+fn evidence_unknown_command_escalates_under_trust() {
+    let root = std::env::temp_dir().join(format!("talos-ev-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence::unknown();
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "some-command --flag",
+        &evidence,
+        &serde_json::json!({"command": "some-command --flag"}),
+    );
+    assert_eq!(decision, PermissionDecision::Ask);
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn evidence_network_command_escalates_under_trust() {
+    let root = std::env::temp_dir().join(format!("talos-ev-net-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence::network();
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "curl https://example.com",
+        &evidence,
+        &serde_json::json!({"command": "curl https://example.com"}),
+    );
+    assert_eq!(decision, PermissionDecision::Ask);
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn evidence_deny_rule_overrides_trust() {
+    let root = std::env::temp_dir().join(format!("talos-ev-deny-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+    engine
+        .load_from_config(&serde_json::json!({"rules": [{
+            "nature": "Execute",
+            "decision": {"Deny": "all execute blocked by policy"}
+        }]}))
+        .expect("load deny rule");
+
+    let evidence = crate::access_evidence::AccessEvidence::declared_read(vec![]);
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "cat Cargo.toml",
+        &evidence,
+        &serde_json::json!({"command": "cat Cargo.toml"}),
+    );
+    assert_eq!(
+        decision,
+        PermissionDecision::Deny("all execute blocked by policy".to_string())
+    );
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn evidence_pipe_command_is_unknown_and_escalates() {
+    let root = std::env::temp_dir().join(format!("talos-ev-pipe-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::classify_command_access("cat foo | grep bar");
+    assert!(evidence.is_unknown());
+
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "cat foo | grep bar",
+        &evidence,
+        &serde_json::json!({"command": "cat foo | grep bar"}),
+    );
+    assert_eq!(decision, PermissionDecision::Ask);
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn evidence_traversal_command_escalates() {
+    let root = std::env::temp_dir().join(format!("talos-ev-trav-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence {
+        kind: crate::access_evidence::AccessKind::Read,
+        state: crate::access_evidence::EvidenceState::Declared,
+        paths: vec![std::path::PathBuf::from("/etc/passwd")],
+        detail: String::new(),
+    };
+
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "cat /etc/passwd",
+        &evidence,
+        &serde_json::json!({"command": "cat /etc/passwd"}),
+    );
+    assert_eq!(decision, PermissionDecision::Ask);
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn evidence_spawn_command_escalates_under_trust() {
+    let root = std::env::temp_dir().join(format!("talos-ev-spawn-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence::spawn();
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "sh -c 'something'",
+        &evidence,
+        &serde_json::json!({"command": "sh -c 'something'"}),
+    );
+    assert_eq!(decision, PermissionDecision::Ask);
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn trust_revoke_clears_persisted_trust() {
+    let root = std::env::temp_dir().join(format!("talos-revoke-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let workspace = std::env::temp_dir().join(format!("talos-revoke-ws-{}", std::process::id()));
+    std::fs::create_dir_all(&workspace).expect("ws");
+
+    let store = crate::WorkspaceTrustStore::new(&root);
+    assert!(!store.is_trusted(&workspace));
+
+    store.grant_trust(&workspace).expect("grant");
+    assert!(store.is_trusted(&workspace));
+
+    store.revoke_trust(&workspace).expect("revoke");
+    assert!(!store.is_trusted(&workspace));
+
+    let store2 = crate::WorkspaceTrustStore::new(&root);
+    assert!(
+        !store2.is_trusted(&workspace),
+        "revocation must persist across instances"
+    );
+
+    std::fs::remove_dir_all(root).ok();
+    std::fs::remove_dir_all(workspace).ok();
+}
+
+#[test]
+fn non_git_workspace_commands_always_ask() {
+    let root = std::env::temp_dir().join(format!("talos-nongit-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence::declared_read(vec![root.clone()]);
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "cat file.txt",
+        &evidence,
+        &serde_json::json!({"command": "cat file.txt"}),
+    );
+    assert_eq!(
+        decision,
+        PermissionDecision::Ask,
+        "non-Git workspace should not get command trust even if evidence is clean"
+    );
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn evidence_never_produces_allow_by_itself() {
+    let root = std::env::temp_dir().join(format!("talos-noallow-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence {
+        kind: crate::access_evidence::AccessKind::Read,
+        state: crate::access_evidence::EvidenceState::Declared,
+        paths: vec![root.join("Cargo.toml")],
+        detail: "cat".to_string(),
+    };
+
+    std::fs::write(root.join("Cargo.toml"), "[package]\n").ok();
+
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "cat Cargo.toml",
+        &evidence,
+        &serde_json::json!({"command": "cat Cargo.toml"}),
+    );
+    assert_eq!(
+        decision,
+        PermissionDecision::Ask,
+        "evidence must NEVER produce Allow by itself — it is observation, not authority"
+    );
+    std::fs::remove_dir_all(root).ok();
+}

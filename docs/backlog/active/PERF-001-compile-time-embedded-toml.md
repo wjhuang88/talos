@@ -5,7 +5,7 @@
 | ID | PERF-001 |
 | Type | Product/Performance Story |
 | Priority | P1 |
-| Status | Partial — Phase 2 (bash_permission_policy.toml) complete (SB121, 2026-07-06); Phase 1 (models.toml) remains Planned |
+| Status | Complete — Phase 1 (models.toml via `generate_compiled_models()` in build.rs) and Phase 2 (bash_permission_policy.toml via build.rs) both delivered; reconciled 2026-07-12 (I116/LT010) |
 | Source | Maintainer request 2026-07-06 — embedded TOML should be parsed at build time instead of consuming runtime startup/workflow cost |
 | Depends on | MC-001, PERM-003 |
 | Blocks | Large model catalog startup/interaction polish; lower-noise permission runtime follow-up |

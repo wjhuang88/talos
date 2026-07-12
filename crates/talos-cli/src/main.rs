@@ -15,6 +15,7 @@
 mod approval;
 mod colors;
 mod dashboard_helpers;
+mod diagnostics;
 mod event_loop;
 mod exploration_cli;
 mod governance;
@@ -114,6 +115,11 @@ pub(crate) enum TalosCommand {
     Permissions {
         #[command(subcommand)]
         command: permissions::PermissionsCommand,
+    },
+    /// Read-only diagnostics: release, toolchain, session, trust, and residual gates.
+    Diagnostics {
+        #[command(subcommand)]
+        command: diagnostics::DiagnosticsCommand,
     },
     /// Configuration operations.
     Config {
@@ -379,6 +385,10 @@ async fn main() -> Result<()> {
 
     if let Some(TalosCommand::Permissions { command }) = &cli.command {
         return crate::permissions::run_permissions_command(command.clone());
+    }
+
+    if let Some(TalosCommand::Diagnostics { command }) = &cli.command {
+        return crate::diagnostics::run_diagnostics_command(command.clone());
     }
 
     if let Some(TalosCommand::Config { command }) = &cli.command {

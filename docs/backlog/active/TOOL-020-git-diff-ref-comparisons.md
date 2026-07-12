@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | TOOL-020 |
 | Priority | P2 |
-| Status | Planned |
+| Status | Complete — `base_ref`/`head_ref` ref-to-ref comparison implemented in `talos-tools/src/git.rs`; reconciled 2026-07-12 (I116/LT010) |
 | Source | `TOOL-018` Acceptance Change / FS16 review closure |
 | Depends On | `TOOL-018`, `GIT-001` |
 

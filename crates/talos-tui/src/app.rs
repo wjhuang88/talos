@@ -26,6 +26,7 @@ use crate::theme::{semantic, to_crossterm_color};
 pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState};
 
 const PROCESSING_FRAME_INTERVAL: Duration = Duration::from_millis(150);
+const IME_ENTER_WINDOW: Duration = Duration::from_millis(50);
 
 pub struct Tui {
     state: TuiState,
@@ -46,6 +47,7 @@ pub struct Tui {
     stream_count: usize,
     session_id: Option<String>,
     last_total_height: u16,
+    last_char_time: Option<Instant>,
 }
 
 impl Tui {
@@ -85,6 +87,7 @@ impl Tui {
             stream_count: 0,
             session_id: None,
             last_total_height: 0,
+            last_char_time: None,
         })
     }
 
@@ -931,6 +934,11 @@ impl Tui {
                 if self.state.slash_menu.is_credential_input() {
                     match key.code {
                         KeyCode::Enter => {
+                            if let Some(t) = self.last_char_time
+                                && t.elapsed() < IME_ENTER_WINDOW
+                            {
+                                return false;
+                            }
                             if let Some(resp) = self.state.credential_submit()
                                 && let Some(ref tx) = self.user_input_tx
                             {
@@ -946,6 +954,7 @@ impl Tui {
                             self.state.credential_backspace();
                         }
                         KeyCode::Char(c) => {
+                            self.last_char_time = Some(Instant::now());
                             self.state.credential_append_char(c);
                         }
                         _ => {}
@@ -1001,6 +1010,11 @@ impl Tui {
                         self.dispatch_panel_action(action);
                     }
                     KeyCode::Enter if self.state.slash_menu.is_open => {
+                        if let Some(t) = self.last_char_time
+                            && t.elapsed() < IME_ENTER_WINDOW
+                        {
+                            return false;
+                        }
                         let action = self.state.accept_selected_panel_item();
                         self.dispatch_panel_action(action);
                     }
@@ -1014,6 +1028,7 @@ impl Tui {
                     }
                     KeyCode::Char(c) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.last_char_time = Some(Instant::now());
                         if self.state.slash_menu.is_open {
                             self.state.append_slash_query_char(c);
                         } else {

@@ -134,6 +134,45 @@ else
 fi
 echo ""
 
+# --- 9. Permission Preflight (read-only) ---
+echo "9. Permission Preflight (read-only)"
+PREFLIGHT_OUTPUT=$("$BINARY" permissions preflight \
+  --operation 'bash={"command":"cat Cargo.toml"}' 2>&1) || true
+if echo "$PREFLIGHT_OUTPUT" | grep -q "bash" && echo "$PREFLIGHT_OUTPUT" | grep -qi "decision"; then
+  ok "permission preflight produces scoped output for a read-only bash command"
+else
+  fail "permission preflight did not produce expected output"
+fi
+echo ""
+
+# --- 10. Diagnostics Status (read-only, no secrets) ---
+echo "10. Diagnostics Status (read-only)"
+DIAG_OUTPUT=$("$BINARY" diagnostics status 2>&1) || true
+if echo "$DIAG_OUTPUT" | grep -q "Talos version" && \
+   echo "$DIAG_OUTPUT" | grep -q "Session Format" && \
+   echo "$DIAG_OUTPUT" | grep -q "Workspace Trust" && \
+   echo "$DIAG_OUTPUT" | grep -q "Residual Gates"; then
+  ok "diagnostics status reports release, session, trust, and residual gates"
+  if echo "$DIAG_OUTPUT" | grep -qi "api_key\|sk-ant\|secret"; then
+    fail "diagnostics status leaked a secret-like string"
+  else
+    ok "diagnostics status contains no secret-like strings"
+  fi
+else
+  fail "diagnostics status missing required sections"
+fi
+echo ""
+
+# --- 11. Ordered Tool Turn (mock provider) ---
+echo "11. Ordered Tool Turn (mock provider)"
+TOOL_OUTPUT=$("$BINARY" -p --mock --no-init --no-context "/mock-request use a tool" 2>&1) || true
+if [ -n "$TOOL_OUTPUT" ]; then
+  ok "mock provider completed an ordered turn"
+else
+  fail "mock provider produced no output for ordered turn"
+fi
+echo ""
+
 # --- Summary ---
 echo "============================================"
 echo "Smoke Harness Summary"

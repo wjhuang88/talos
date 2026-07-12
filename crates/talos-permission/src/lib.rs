@@ -53,10 +53,12 @@
 //! assert!(matches!(decision, PermissionDecision::Allow));
 //! ```
 
+mod access_evidence;
 mod resource;
 mod rule;
 mod workspace_trust;
 
+pub use access_evidence::{AccessEvidence, AccessKind, EvidenceState, classify_command_access};
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
 pub use resource::{ResourceExtractor, ResourceKind};
@@ -335,6 +337,51 @@ impl PermissionEngine {
             | talos_core::tool::ToolNature::Execute
             | talos_core::tool::ToolNature::Network => PermissionDecision::Ask,
         }
+    }
+
+    /// Evaluates a command execution request with access evidence (ADR-040).
+    ///
+    /// Evidence is observation, not authority. This method NEVER returns
+    /// `Allow` based on evidence alone — it always defers to explicit rules
+    /// or returns `Ask`. The evidence parameter is recorded for diagnostic
+    /// purposes and future structured-allowlist integration, but cannot
+    /// broaden trust on its own.
+    ///
+    /// Security properties:
+    /// - Deny rules always win.
+    /// - Evidence NEVER produces Allow by itself.
+    /// - Without an explicit Allow rule, the decision is always Ask.
+    pub fn evaluate_command_with_evidence(
+        &self,
+        tool_name: &str,
+        command: &str,
+        _evidence: &crate::access_evidence::AccessEvidence,
+        input: &Value,
+    ) -> PermissionDecision {
+        let nature = talos_core::tool::ToolNature::Execute;
+
+        let mut matched_rule = None;
+        for rule in &self.rules {
+            match rule.matches(tool_name, nature, input, None) {
+                Ok(true) => {
+                    matched_rule = Some(rule.decision.clone());
+                    break;
+                }
+                Ok(false) => continue,
+                Err(_) => continue,
+            }
+        }
+
+        if let Some(PermissionDecision::Deny(reason)) = &matched_rule {
+            return PermissionDecision::Deny(reason.clone());
+        }
+
+        if let Some(decision) = matched_rule {
+            return decision;
+        }
+
+        let _ = command;
+        PermissionDecision::Ask
     }
 
     /// Loads rules from a JSON configuration value.

@@ -299,6 +299,24 @@ impl Agent {
 
             let profile = tool.permission_profile(&call.input);
             let decision = engine.evaluate_profile(&call.name, &profile, &call.input);
+
+            let evidence_diagnostics = collect_access_evidence_diagnostics(call)
+                .into_iter()
+                .map(|(command, evidence)| {
+                    let _ = engine.evaluate_command_with_evidence(
+                        &call.name,
+                        &command,
+                        &evidence,
+                        &call.input,
+                    );
+                    format!(
+                        "{} => {}",
+                        command,
+                        format_access_evidence_diagnostic(&evidence)
+                    )
+                })
+                .collect::<Vec<_>>();
+
             self.run_hook(
                 hook_ctx,
                 HookEvent::AfterPermissionCheck {
@@ -316,6 +334,10 @@ impl Agent {
                     )));
                 }
                 PermissionDecision::Ask => {}
+            }
+
+            for diag in evidence_diagnostics {
+                tracing::debug!("access evidence for {}: {}", call.name, diag);
             }
         }
 
@@ -479,6 +501,187 @@ impl Agent {
             content,
             is_error: result.exit_code != 0,
             continuations: Vec::new(),
+        }
+    }
+}
+
+fn format_access_evidence_diagnostic(ev: &talos_permission::AccessEvidence) -> String {
+    use talos_permission::{AccessKind, EvidenceState};
+    let kind_str = match ev.kind {
+        AccessKind::Read => "read",
+        AccessKind::Write => "write",
+        AccessKind::Delete => "delete",
+        AccessKind::Spawn => "spawn",
+        AccessKind::Network => "network",
+        AccessKind::Unknown => "unknown",
+    };
+    let state_str = match ev.state {
+        EvidenceState::Declared => "declared",
+        EvidenceState::Observed => "observed",
+        EvidenceState::Unknown => "unknown",
+    };
+    let paths_str = if ev.paths.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " paths=[{}]",
+            ev.paths
+                .iter()
+                .map(|p| p.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    };
+    format!("{kind_str}:{state_str}{paths_str}")
+}
+
+fn collect_access_evidence_diagnostics(
+    call: &ToolCall,
+) -> Vec<(String, talos_permission::AccessEvidence)> {
+    if call.name == "bash" {
+        return call
+            .input
+            .get("command")
+            .and_then(serde_json::Value::as_str)
+            .map(|command| {
+                vec![(
+                    command.to_string(),
+                    talos_permission::classify_command_access(command),
+                )]
+            })
+            .unwrap_or_default();
+    }
+    if call.name != "exec" {
+        return Vec::new();
+    }
+
+    let mut commands = Vec::new();
+    if let Some(command) = call
+        .input
+        .get("command")
+        .and_then(serde_json::Value::as_str)
+    {
+        commands.push(classify_exec_argv(command, call.input.get("args")));
+    }
+    if let Some(steps) = call
+        .input
+        .get("steps")
+        .and_then(serde_json::Value::as_array)
+    {
+        commands.extend(steps.iter().filter_map(classify_exec_step));
+    }
+    if let Some(pipes) = call
+        .input
+        .get("pipes")
+        .and_then(serde_json::Value::as_array)
+    {
+        for pipe in pipes {
+            if let Some(steps) = pipe.get("steps").and_then(serde_json::Value::as_array) {
+                commands.extend(steps.iter().filter_map(classify_exec_step));
+            }
+        }
+    }
+    commands
+}
+
+fn classify_exec_step(
+    step: &serde_json::Value,
+) -> Option<(String, talos_permission::AccessEvidence)> {
+    let command = step.get("command")?.as_str()?;
+    Some(classify_exec_argv(command, step.get("args")))
+}
+
+fn classify_exec_argv(
+    command: &str,
+    args: Option<&serde_json::Value>,
+) -> (String, talos_permission::AccessEvidence) {
+    let args = args
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let display = std::iter::once(command)
+        .chain(args.iter().copied())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let structurally_simple = std::iter::once(command)
+        .chain(args.iter().copied())
+        .all(|part| {
+            !part.is_empty()
+                && !part.chars().any(char::is_whitespace)
+                && !part.contains(['|', ';', '&', '>', '<', '`', '$', '\\', '\'', '"'])
+        });
+    let evidence = if structurally_simple {
+        talos_permission::classify_command_access(&display)
+    } else {
+        talos_permission::AccessEvidence::unknown()
+    };
+    (display, evidence)
+}
+
+#[cfg(test)]
+mod access_evidence_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn call(name: &str, input: serde_json::Value) -> ToolCall {
+        ToolCall {
+            id: "test".to_string(),
+            name: name.to_string(),
+            input,
+        }
+    }
+
+    #[test]
+    fn bash_production_input_produces_one_diagnostic() {
+        let evidence = collect_access_evidence_diagnostics(&call(
+            "bash",
+            json!({"command": "find . -delete"}),
+        ));
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].1.is_unknown());
+    }
+
+    #[test]
+    fn exec_single_steps_and_pipes_all_produce_diagnostics() {
+        let single = collect_access_evidence_diagnostics(&call(
+            "exec",
+            json!({"command": "cat", "args": ["Cargo.toml"]}),
+        ));
+        assert_eq!(single.len(), 1);
+
+        let steps = collect_access_evidence_diagnostics(&call(
+            "exec",
+            json!({"steps": [
+                {"command": "cat", "args": ["Cargo.toml"]},
+                {"command": "find", "args": [".", "-delete"]}
+            ]}),
+        ));
+        assert_eq!(steps.len(), 2);
+        assert!(steps[1].1.is_unknown());
+
+        let pipes = collect_access_evidence_diagnostics(&call(
+            "exec",
+            json!({"pipes": [{"steps": [
+                {"command": "cat", "args": ["Cargo.toml"]},
+                {"command": "wc", "args": ["-l"]}
+            ]}]}),
+        ));
+        assert_eq!(pipes.len(), 2);
+    }
+
+    #[test]
+    fn exec_argv_with_shell_like_or_spaced_argument_is_unknown() {
+        for args in [json!(["a b"]), json!(["$(touch", "x)"]), json!(["a;b"])] {
+            let evidence = collect_access_evidence_diagnostics(&call(
+                "exec",
+                json!({"command": "printf", "args": args}),
+            ));
+            assert!(evidence[0].1.is_unknown());
         }
     }
 }

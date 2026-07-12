@@ -1,6 +1,6 @@
 # Iteration I106: Self-Bootstrap Control Plane
 
-> Document status: Review
+> Document status: Complete (2026-07-12; REL-002 evidence remains non-qualifying)
 > Published plan date: 2026-07-08
 > Planned objective: establish the Talos-primary execution contract, runtime smoke harness, and
 > evidence classification needed before another REL-002 self-bootstrap attempt.
@@ -523,6 +523,13 @@ I107 will also be non-qualifying.
 - A pre-existing `cargo fmt` violation was discovered during closeout validation. This suggests the
   previous session's closeout validation may not have included `cargo fmt --check`, or the violation
   was introduced after the last fmt pass.
+
+## Final Disposition
+
+- 2026-07-12: Closed as Complete because SBT100-SBT104, the smoke harness, governance rehearsal,
+  validation, and honest REL-002 classification all satisfy this iteration's published acceptance.
+- This status change does not upgrade the executor evidence: the session remains non-qualifying
+  for REL-002 because the primary runtime was external.
 
 **Lessons for future sessions**:
 - Always run `cargo fmt --all -- --check` as the first validation step, not just at closeout.

@@ -20,6 +20,20 @@ pub(crate) enum PermissionsCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Inspect or manage workspace trust (ADR-038/040).
+    Trust {
+        #[command(subcommand)]
+        command: TrustCommand,
+    },
+}
+
+/// Subcommands for `talos permissions trust`.
+#[derive(Subcommand, Clone)]
+pub(crate) enum TrustCommand {
+    /// Show workspace trust status for the current directory.
+    Status,
+    /// Revoke workspace trust for the current directory.
+    Revoke,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,7 +83,57 @@ pub(crate) fn run_permissions_command(command: PermissionsCommand) -> Result<()>
             }
             Ok(())
         }
+        PermissionsCommand::Trust { command } => run_trust_command(command),
     }
+}
+
+fn run_trust_command(command: TrustCommand) -> Result<()> {
+    let talos_root = crate::storage::resolve_talos_root();
+    let trust_store = talos_permission::WorkspaceTrustStore::new(&talos_root);
+    let workspace = std::env::current_dir().context("failed to get current directory")?;
+
+    match command {
+        TrustCommand::Status => {
+            let is_git = talos_permission::is_git_workspace(&workspace);
+            let trusted = trust_store.is_trusted(&workspace);
+            let trusted_count = trust_store.trusted_count();
+
+            println!("=== Workspace Trust Status (ADR-038/040) ===");
+            println!();
+            println!("  Workspace:      {}", workspace.display());
+            println!("  Git repository: {}", if is_git { "yes" } else { "no" });
+            println!("  Trusted:        {}", if trusted { "yes" } else { "no" });
+            println!("  Trusted total:  {} workspace(s)", trusted_count);
+            println!();
+            if !is_git {
+                println!("  Note: non-Git workspaces cannot be trusted (ADR-038).");
+            } else if trusted {
+                println!(
+                    "  Trust effect: repo-contained file writes auto-allow (Deny rules still win)."
+                );
+                println!(
+                    "  Bash/exec: still per-command unless access evidence proves repo-local read (ADR-040)."
+                );
+            } else {
+                println!("  Trust is not active. Use --trust during session start to grant it.");
+            }
+            println!();
+            println!("  Use 'talos permissions trust revoke' to remove trust.");
+        }
+        TrustCommand::Revoke => {
+            let was_trusted = trust_store.is_trusted(&workspace);
+            trust_store.revoke_trust(&workspace)?;
+            if was_trusted {
+                println!("Revoked workspace trust for: {}", workspace.display());
+                println!(
+                    "Subsequent writes and commands in this workspace will use strict permission behavior."
+                );
+            } else {
+                println!("Workspace was not trusted: {}", workspace.display());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn parse_operation(raw: &str) -> Result<ParsedOperation> {

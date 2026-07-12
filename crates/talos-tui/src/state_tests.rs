@@ -173,7 +173,7 @@ fn paste_is_ignored_while_approval_is_visible() {
 }
 
 #[test]
-fn paste_is_ignored_while_picker_is_visible() {
+fn paste_updates_filter_when_picker_is_visible() {
     let mut state = TuiState::new();
     let data = ModelPickerData {
         ready_models: vec![],
@@ -181,9 +181,9 @@ fn paste_is_ignored_while_picker_is_visible() {
     };
 
     state.open_model_picker(&data);
-    state.input_paste("secret");
+    state.input_paste("filter_text");
 
-    assert_eq!(state.input_buffer, "");
+    assert_eq!(state.input_buffer, "filter_text");
 }
 
 #[test]

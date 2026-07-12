@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-005 |
 | Priority | P1 |
-| Status | Planned — ADR and security review required |
+| Status | Complete — ADR-040 conservative diagnostic slice passed independent security review; typed access evidence covers bash and exec single/steps/pipes without changing permission decisions; trust status/revoke shipped; OS-level sandbox deferred. |
 | Source | Maintainer request 2026-07-08 — strengthen repo-sandbox permissions beyond policy-only checks |
 | Depends On | `PERM-004`, `TOOL-016`, `TOOL-017`, `VALIDATION-001` |
 
