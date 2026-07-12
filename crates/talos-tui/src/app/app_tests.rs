@@ -34,7 +34,7 @@ fn truncate_to_width_short_enough() {
 }
 
 #[test]
-fn reasoning_uses_thinking_label_without_stream_prefix_and_tool_result_color() {
+fn reasoning_uses_own_marker_and_tool_result_color() {
     let mut stream_count = 0;
     let lines = scrollback::render_history_message(
         &mut stream_count,
@@ -43,12 +43,26 @@ fn reasoning_uses_thinking_label_without_stream_prefix_and_tool_result_color() {
     );
 
     assert_eq!(lines.len(), 1);
-    assert_eq!(lines[0].text, "Thinking: checking the turn");
-    assert_eq!(lines[0].segments[0].text, "");
+    assert_eq!(lines[0].text, " ◇ Thinking: checking the turn");
+    assert_eq!(lines[0].segments[0].text, " ◇ ");
     assert_eq!(
         lines[0].segments[1].fg,
         tool_display::secondary_result_color()
     );
+}
+
+#[test]
+fn multiline_reasoning_marks_first_line_and_aligns_continuations() {
+    let mut stream_count = 0;
+    let lines = scrollback::render_history_message(
+        &mut stream_count,
+        MessageSource::Reasoning,
+        "Thinking: first line\nsecond line\n",
+    );
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].text, " ◇ Thinking: first line");
+    assert_eq!(lines[1].text, "   second line");
 }
 
 #[test]
