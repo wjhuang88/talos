@@ -1,6 +1,6 @@
 # Iteration I117: Command Sandbox Evidence
 
-> Document status: Active (2026-07-12)
+> Document status: Partial (2026-07-12) — evidence API and classifier delivered as diagnostic-only; not yet wired into bash/exec execution pipeline; formal security sign-off remains
 > Published plan date: 2026-07-12
 > Planned objective: Close the PERM-005 command-execution evidence gap while preserving strict
 > behavior for unknown, out-of-repo, network, credential, and destructive access.

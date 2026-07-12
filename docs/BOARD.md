@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Four-Month Trust And Productization Plan | Complete (I116-I119 all closed 2026-07-12) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [I116 trace](reference/I116-STATE-TRACE-2026-07-12.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116: state truth + smoke + diagnostics. I117: ADR-040 + evidence enforcement + trust status/revoke. I118: bounded local productization verified. I119: REL-002 NO-GO (1 MET, 3 PARTIAL, 4 UNMET); zero qualifying Talos-primary sessions. No v1.0.0 tag authorized. |
+| Four-Month Trust And Productization Plan | Partial (I116/I118/I119 Complete; I117 Partial) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [I116 trace](reference/I116-STATE-TRACE-2026-07-12.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116: state truth + diagnostics. I117 Partial: evidence API diagnostic-only (auto-Allow removed); not wired into bash/exec pipeline; formal security sign-off remains. I118: bounded productization verified. I119: REL-002 NO-GO. Next: wire evidence into execution pipeline + security review. |
 
 ## Review
 
@@ -77,7 +77,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I116 State Truth And Operator Baseline | Complete (2026-07-12) | [I116](iterations/I116-state-truth-operator-baseline.md) / [trace](reference/I116-STATE-TRACE-2026-07-12.md) | State truth reconciled (3 drifts fixed), operator smoke 13/13, `talos diagnostics status` shipped. |
-| I117 Command Sandbox Evidence | Complete (2026-07-12) | [I117](iterations/I117-command-sandbox-evidence.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) | ADR-040 + typed access evidence + evidence-based enforcement + trust status/revoke. Unknown/out-of-repo never inherits trust. |
+| I117 Command Sandbox Evidence | Partial (2026-07-12) | [I117](iterations/I117-command-sandbox-evidence.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) | Evidence API + classifier + trust status/revoke delivered as diagnostic-only. Auto-Allow removed (evidence ≠ authority). Not wired into bash/exec pipeline. Next: structured allowlist + execution integration + security review. |
 | I118 Bounded Local Productization | Complete (2026-07-12) | [I118](iterations/I118-bounded-local-productization.md) | Local plugin/hook/document/dashboard/installer verified and bounded. New `validate_installers.sh`. |
 | I119 Talos-Primary Release Decision | Complete (2026-07-12) | [I119](iterations/I119-talos-primary-release-decision.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | REL-002 NO-GO (1 MET, 3 PARTIAL, 4 UNMET). Zero qualifying Talos-primary sessions. No v1.0.0 tag. |
 | Release 0.3.0 Closeout | Complete (v0.3.0 tag pushed 2026-07-07) | [v0.3.0 closeout](tasks/2026-07-07-release-0.3.0-closeout.md) | Workspace version bumped to `0.3.0`, release validation passed, `main` and annotated tag `v0.3.0` pushed. Crate publish and manual GitHub Release stayed out of scope. |

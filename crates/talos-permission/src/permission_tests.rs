@@ -1192,3 +1192,33 @@ fn non_git_workspace_commands_always_ask() {
     );
     std::fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn evidence_never_produces_allow_by_itself() {
+    let root = std::env::temp_dir().join(format!("talos-noallow-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let mut engine = PermissionEngine::with_workspace_root(root.clone());
+    engine.set_trusted_workspace(true);
+
+    let evidence = crate::access_evidence::AccessEvidence {
+        kind: crate::access_evidence::AccessKind::Read,
+        state: crate::access_evidence::EvidenceState::Declared,
+        paths: vec![root.join("Cargo.toml")],
+        detail: "cat".to_string(),
+    };
+
+    std::fs::write(root.join("Cargo.toml"), "[package]\n").ok();
+
+    let decision = engine.evaluate_command_with_evidence(
+        "bash",
+        "cat Cargo.toml",
+        &evidence,
+        &serde_json::json!({"command": "cat Cargo.toml"}),
+    );
+    assert_eq!(
+        decision,
+        PermissionDecision::Ask,
+        "evidence must NEVER produce Allow by itself — it is observation, not authority"
+    );
+    std::fs::remove_dir_all(root).ok();
+}

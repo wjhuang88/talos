@@ -96,22 +96,18 @@ fn session_formats() -> Vec<String> {
 }
 
 fn known_active_iterations() -> Vec<String> {
-    // Hardcoded from the current governance state (I116 Active, I117-I119 Planned).
-    // This is a diagnostics summary, not a live governance parser.
     vec![
-        "I116 State Truth And Operator Baseline (Active)".to_string(),
-        "I117 Command Sandbox Evidence (Planned)".to_string(),
-        "I118 Bounded Local Productization (Planned)".to_string(),
-        "I119 Talos-Primary Release Decision (Planned)".to_string(),
+        "I116-I119 Trust/Productization Plan — Complete (2026-07-12)".to_string(),
+        "See docs/iterations/README.md for current state".to_string(),
     ]
 }
 
 fn known_residual_gates() -> Vec<String> {
     vec![
-        "REL-002 v1.0 Self-Bootstrap — NO-GO (zero fully qualifying Talos-primary sessions)"
+        "REL-002 v1.0 Self-Bootstrap — NO-GO (zero qualifying Talos-primary sessions)".to_string(),
+        "PERM-005 — bash/exec remains per-command Ask/Deny (evidence is diagnostic-only)"
             .to_string(),
-        "PERM-005 Logical Tool Sandbox — bash/exec remains per-command Ask/Deny".to_string(),
-        "PERM-004 Workspace Trust — file-write trust only; bash/exec not trusted".to_string(),
+        "PERM-004 — file-write trust within Git repo; command trust not broadened".to_string(),
         "I085 MC107 — real-terminal /connect walkthrough Paused".to_string(),
     ]
 }

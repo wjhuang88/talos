@@ -168,9 +168,26 @@ pub fn classify_command_access(command: &str) -> AccessEvidence {
         return AccessEvidence::unknown();
     }
 
+    if has_dangerous_read_tool_flags(program, &args) {
+        return AccessEvidence::unknown();
+    }
+
     match program {
-        "ls" | "pwd" | "cat" | "head" | "tail" | "wc" | "grep" | "rg" | "find" | "stat"
-        | "file" | "diff" | "sed" | "awk" | "tree" | "which" | "type" => {
+        "ls" | "pwd" | "cat" | "head" | "tail" | "wc" | "grep" | "rg" | "stat" | "file"
+        | "diff" | "tree" | "which" | "type" => {
+            let paths: Vec<PathBuf> = args
+                .iter()
+                .filter(|a| !a.starts_with('-'))
+                .map(PathBuf::from)
+                .collect();
+            AccessEvidence {
+                kind: AccessKind::Read,
+                state: EvidenceState::Declared,
+                paths,
+                detail: program.to_string(),
+            }
+        }
+        "sed" | "awk" | "find" => {
             let paths: Vec<PathBuf> = args
                 .iter()
                 .filter(|a| !a.starts_with('-'))
@@ -260,6 +277,31 @@ fn has_shell_control_syntax(command: &str) -> bool {
         || command.contains('>')
         || command.contains('<')
         || command.ends_with('&')
+}
+
+fn has_dangerous_read_tool_flags(program: &str, args: &[&str]) -> bool {
+    match program {
+        "sed" => args.iter().any(|a| {
+            *a == "-i" || *a == "--in-place" || a.starts_with("-i") || a.starts_with("--in-place")
+        }),
+        "find" => args.iter().any(|a| {
+            *a == "-delete"
+                || *a == "-exec"
+                || *a == "-execdir"
+                || *a == "-ok"
+                || *a == "-fls"
+                || *a == "-fprint"
+                || *a == "-fprintf"
+                || *a == "-print0"
+        }),
+        "awk" => args
+            .iter()
+            .any(|a| a.contains("system(") || a.contains("getline")),
+        "rg" => args
+            .iter()
+            .any(|a| *a == "--pre" || a.starts_with("--pre=")),
+        _ => false,
+    }
 }
 
 fn is_env_assignment(token: &str) -> bool {
@@ -516,6 +558,62 @@ mod tests {
         assert!(
             ev.is_repo_local(&root),
             "src/../Cargo.toml stays in repo and should be repo-local"
+        );
+    }
+
+    #[test]
+    fn test_sed_in_place_is_unknown() {
+        let ev = classify_command_access("sed -i 's/foo/bar/' Cargo.toml");
+        assert!(
+            ev.is_unknown(),
+            "sed -i modifies files in place and must NOT be classified as Read"
+        );
+    }
+
+    #[test]
+    fn test_find_delete_is_unknown() {
+        let ev = classify_command_access("find . -delete");
+        assert!(
+            ev.is_unknown(),
+            "find -delete removes files and must NOT be classified as Read"
+        );
+    }
+
+    #[test]
+    fn test_find_exec_is_unknown() {
+        let ev = classify_command_access("find . -exec rm {} \\;");
+        assert!(
+            ev.is_unknown(),
+            "find -exec spawns processes and must NOT be classified as Read"
+        );
+    }
+
+    #[test]
+    fn test_rg_pre_is_unknown() {
+        let ev = classify_command_access("rg --pre=cat foo");
+        assert!(
+            ev.is_unknown(),
+            "rg --pre can execute arbitrary commands and must NOT be classified as Read"
+        );
+    }
+
+    #[test]
+    fn test_sed_without_in_place_is_read() {
+        let ev = classify_command_access("sed -n 1,5p Cargo.toml");
+        assert_eq!(
+            ev.kind,
+            AccessKind::Read,
+            "sed -n (print only, no quotes) should still be Read"
+        );
+    }
+
+    #[test]
+    fn test_find_without_dangerous_flags_is_read() {
+        let ev = classify_command_access("find . -name test.rs");
+        assert_eq!(
+            ev.kind,
+            AccessKind::Read,
+            "find without dangerous flags should be Read"
         );
     }
 }

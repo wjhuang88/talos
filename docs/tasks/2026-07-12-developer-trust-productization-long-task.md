@@ -1,6 +1,6 @@
 # Developer Long Task: Trust And Productization Execution
 
-**Status**: Complete (2026-07-12)
+**Status**: Partial (2026-07-12) — I116/I118/I119 Complete; I117 Partial (evidence API diagnostic-only, not wired into execution pipeline)
 **Owning iteration**: I116; later phases may start only after the preceding iteration closes.
 **Execution window**: 2026-07-12 through 2026-11-11.
 **Resume owner**: the developer or Agent assigned by the maintainer.
@@ -87,11 +87,11 @@ needed evidence.
 | LT011 | I116 operator smoke | Network-free real-binary packet covering version, model/connect, session export/resume, permission preflight, ordered tool turn | LT002, LT010 | Script exits 0 on clean disposable HOME using mock provider | Split unavailable interactive checks into explicit manual gates | Complete |
 | LT012 | I116 read-only status | Secret-safe release/toolchain/session/trust/residual summary | LT010 | Unit/CLI redaction tests plus binary transcript | Documentation-only diagnostic if a new surface would duplicate existing commands | Complete |
 | LT013 | I116 closeout | Truth-synchronized month-1 owners and evidence | LT011, LT012 | release preflight, governance, diff check | Keep I116 Review with exact failed gate | Complete |
-| LT020 | PERM-005 design gate | Accepted ADR/security review defining declared/observed/unknown access and platform fallback | LT013 | Maintainer/security sign-off recorded before code | Keep bash/exec strict; implement diagnostics/revoke only | Complete (ADR-040 written; implementation follows conservative fallback — no bash/exec broadening, diagnostics/revoke only, evidence-based read-only enforcement; formal production security sign-off remains a separate gate) |
+| LT020 | PERM-005 design gate | Accepted ADR/security review defining declared/observed/unknown access and platform fallback | LT013 | Maintainer/security sign-off recorded before code | Keep bash/exec strict; implement diagnostics/revoke only | Partial (ADR-040 written; formal security sign-off not yet recorded) |
 | LT021 | Typed access evidence | Serializable read/write/delete/spawn/network/unknown evidence that grants no authority itself | LT020 | permission/core tests; compatibility reviewed | Keep type internal or revise ADR before public API change | Complete |
-| LT022 | Bounded bash/exec enforcement | Canonical-root enforcement with traversal, symlink, child, unknown and Deny precedence coverage | LT021 | security tests and real CLI smoke pass | Unknown/unobservable remains Ask/Deny; no trust broadening | Complete |
+| LT022 | Bounded bash/exec enforcement | Canonical-root enforcement with traversal, symlink, child, unknown and Deny precedence coverage | LT021 | security tests and real CLI smoke pass | Unknown/unobservable remains Ask/Deny; no trust broadening | Partial (evidence API exists but auto-Allow removed; not wired into bash/exec execution pipeline) |
 | LT023 | Trust status and revoke | Explicit read-only status and revocation UX for Git workspace trust | LT021 | persistence, redaction, non-Git strictness tests | Ship diagnostics/revoke without command trust | Complete |
-| LT024 | I117 closeout | Security-reviewed limitation and residual report | LT022, LT023 | full preflight and permission security review | I117 remains Partial; PERM-005 owns residual | Complete |
+| LT024 | I117 closeout | Security-reviewed limitation and residual report | LT022, LT023 | full preflight and permission security review | I117 remains Partial; PERM-005 owns residual | Partial (I117 marked Partial; evidence not wired into execution pipeline; formal security review not done) |
 | LT030 | Local extension diagnostics | Explicit local read-only plugin/command/hook discovery with provenance/collision diagnostics | LT024 | fixtures and CLI smoke; no executable carrier | Diagnostics only | Complete (verified — shipped by prior iterations) |
 | LT031 | Bounded document extraction | Text/HTML/JSON/CSV/Markdown extraction with size/type/permission guards | LT024 | failure and handoff tests through binary | Preserve existing formats; defer heavy/native parser | Complete (verified — 25+ unit + 12 boundary tests pass) |
 | LT032 | Installer validation | Site entrypoints checked against canonical scripts, checksums, assets and offline behavior | LT024 | validator/dry-run fixtures pass | Keep GitHub/raw scripts canonical; do not change default URL | Complete (new validate_installers.sh — 0 errors) |
