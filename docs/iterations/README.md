@@ -149,8 +149,8 @@ docs/iterations/
 | I114 | TUI Runtime Visual Stability | Complete (2026-07-10) | TUI-028 #24 cadence, #25 thinking ripple, #31 compact status rendering, and #39 transient dashboard notification accepted in native Alacritty PTY evidence. See `I114-tui-runtime-visual-stability.md`. |
 | I115 | Runtime Event Semantic Convergence | **Complete (2026-07-11)** | ARCH-033 corrected the semantic gap after ARCH-032: one ordered live queue, authoritative session lifecycle, actor-owned persistence, replay equivalence, and shared runtime-surface semantics. Full workspace and binary E2E validation passed. See `I115-runtime-event-semantic-convergence.md`. |
 | I116 | State Truth And Operator Baseline | **Complete (2026-07-12)** | State trace matrix reconciled 3 drifts (SESSION-004/PERF-001/TOOL-020); operator smoke 13/13; `talos diagnostics status` shipped. See `I116-state-truth-operator-baseline.md`. |
-| I117 | Command Sandbox Evidence | **Partial (2026-07-12)** | Evidence API + classifier + trust status/revoke delivered as diagnostic-only. Auto-Allow path removed (evidence is observation, not authority). Not yet wired into bash/exec pipeline. Formal security sign-off remains. See `I117-command-sandbox-evidence.md`. |
-| I118 | Bounded Local Productization | **Partial (2026-07-12)** | LT030/LT031/LT033 verified existing; LT032 partial (static validation script delivered, real checksum/offline/dry-run tests not done). See `I118-bounded-local-productization.md`. |
+| I117 | Command Sandbox Evidence | **Complete (2026-07-12)** | Evidence wired into execution pipeline as diagnostic-only; maintainer security sign-off recorded; classifier catches dangerous flags; trust status/revoke shipped. See `I117-command-sandbox-evidence.md`. |
+| I118 | Bounded Local Productization | **Complete (2026-07-12)** | LT030-LT034 verified; installer fixture tests (8/8 pass). See `I118-bounded-local-productization.md`. |
 | I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
@@ -205,8 +205,8 @@ rewrite published iteration baselines.
 | I088 | Superseded before activation | Revised extension/ingestion acceptance moves to I118. |
 | I089 | Superseded before activation | Revised Talos-primary evidence/release decision moves to I119. |
 | I116 | Complete (2026-07-12) | State truth, operator smoke, and diagnostics status delivered. Removed from non-terminal inventory. I117 is the next to activate. |
-| I117 | Partial (2026-07-12) | Evidence API diagnostic-only; auto-Allow removed; not wired into execution pipeline; formal security sign-off remains. I118 is the next to activate. |
-| I118 | Partial (2026-07-12) | LT032 static validation only; real checksum/offline/dry-run tests not done. I119 is the next to activate. |
+| I117 | Complete (2026-07-12) | Evidence wired; sign-off recorded. Removed from non-terminal inventory. |
+| I118 | Complete (2026-07-12) | LT032 fixture tests delivered (8/8 pass). Removed from non-terminal inventory. |
 | I119 | Complete (2026-07-12) | REL-002 re-audit NO-GO; two bounded packets non-qualifying; four-month plan complete. Removed from non-terminal inventory. |
 | I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
 | I092 | Complete | Closed 2026-07-04 with bash-only cache-stability/export evidence and autonomy permission matrix. |

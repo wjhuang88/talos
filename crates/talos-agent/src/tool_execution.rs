@@ -299,6 +299,25 @@ impl Agent {
 
             let profile = tool.permission_profile(&call.input);
             let decision = engine.evaluate_profile(&call.name, &profile, &call.input);
+
+            let evidence_diagnostic = if call.name == "bash" || call.name == "exec" {
+                call.input
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .map(|cmd| {
+                        let ev = talos_permission::classify_command_access(cmd);
+                        let _ev_decision = engine.evaluate_command_with_evidence(
+                            &call.name,
+                            cmd,
+                            &ev,
+                            &call.input,
+                        );
+                        format_access_evidence_diagnostic(&ev)
+                    })
+            } else {
+                None
+            };
+
             self.run_hook(
                 hook_ctx,
                 HookEvent::AfterPermissionCheck {
@@ -316,6 +335,10 @@ impl Agent {
                     )));
                 }
                 PermissionDecision::Ask => {}
+            }
+
+            if let Some(ref diag) = evidence_diagnostic {
+                tracing::debug!("access evidence for {}: {}", call.name, diag);
             }
         }
 
@@ -481,4 +504,34 @@ impl Agent {
             continuations: Vec::new(),
         }
     }
+}
+
+fn format_access_evidence_diagnostic(ev: &talos_permission::AccessEvidence) -> String {
+    use talos_permission::{AccessKind, EvidenceState};
+    let kind_str = match ev.kind {
+        AccessKind::Read => "read",
+        AccessKind::Write => "write",
+        AccessKind::Delete => "delete",
+        AccessKind::Spawn => "spawn",
+        AccessKind::Network => "network",
+        AccessKind::Unknown => "unknown",
+    };
+    let state_str = match ev.state {
+        EvidenceState::Declared => "declared",
+        EvidenceState::Observed => "observed",
+        EvidenceState::Unknown => "unknown",
+    };
+    let paths_str = if ev.paths.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " paths=[{}]",
+            ev.paths
+                .iter()
+                .map(|p| p.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    };
+    format!("{kind_str}:{state_str}{paths_str}")
 }

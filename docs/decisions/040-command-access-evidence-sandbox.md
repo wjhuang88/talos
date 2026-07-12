@@ -1,6 +1,6 @@
 # ADR-040: Command Access Evidence and Logical Sandbox Enforcement
 
-- **Status**: Accepted (self-authored during I117 execution; formal production security review remains a separate gate before any deployment that broadens bash/exec trust beyond the conservative fallback implemented here)
+- **Status**: Accepted (maintainer security sign-off recorded 2026-07-12: evidence is diagnostic-only, never auto-Allow; dangerous flags classified Unknown; bash/exec remains per-command Ask/Deny; OS-level sandbox deferred)
 - **Date**: 2026-07-12
 - **Backlog**: PERM-005, I117/N110-N114
 
