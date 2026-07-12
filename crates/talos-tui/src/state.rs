@@ -87,11 +87,11 @@ impl TuiState {
         }
         if self.slash_menu.is_credential_input() {
             self.credential_append_str(text);
-        } else if self.slash_menu.is_slash() {
+        } else if self.slash_menu.is_open {
             self.input_append_str(text);
             let query = self.panel_query().to_string();
             self.slash_menu.reset_selection_for_query(&query);
-        } else if !self.slash_menu.is_open {
+        } else {
             self.input_append_str(text);
         }
     }
