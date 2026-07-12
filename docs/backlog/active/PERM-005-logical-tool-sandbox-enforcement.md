@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-005 |
 | Priority | P1 |
-| Status | Complete — ADR-040 accepted; typed access evidence, evidence-based enforcement, and trust status/revoke delivered (I117, 2026-07-12). OS-level sandbox remains deferred. |
+| Status | Partial — ADR-040 accepted; typed access evidence, classifier, and trust status/revoke delivered as diagnostic-only (I117, 2026-07-12). Evidence auto-Allow removed (observation ≠ authority). Not yet wired into bash/exec execution pipeline. Formal security sign-off remains. OS-level sandbox deferred. |
 | Source | Maintainer request 2026-07-08 — strengthen repo-sandbox permissions beyond policy-only checks |
 | Depends On | `PERM-004`, `TOOL-016`, `TOOL-017`, `VALIDATION-001` |
 

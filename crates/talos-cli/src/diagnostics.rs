@@ -96,10 +96,7 @@ fn session_formats() -> Vec<String> {
 }
 
 fn known_active_iterations() -> Vec<String> {
-    vec![
-        "I116-I119 Trust/Productization Plan — Complete (2026-07-12)".to_string(),
-        "See docs/iterations/README.md for current state".to_string(),
-    ]
+    vec!["See docs/iterations/README.md for current iteration state".to_string()]
 }
 
 fn known_residual_gates() -> Vec<String> {

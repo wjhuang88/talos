@@ -150,7 +150,7 @@ docs/iterations/
 | I115 | Runtime Event Semantic Convergence | **Complete (2026-07-11)** | ARCH-033 corrected the semantic gap after ARCH-032: one ordered live queue, authoritative session lifecycle, actor-owned persistence, replay equivalence, and shared runtime-surface semantics. Full workspace and binary E2E validation passed. See `I115-runtime-event-semantic-convergence.md`. |
 | I116 | State Truth And Operator Baseline | **Complete (2026-07-12)** | State trace matrix reconciled 3 drifts (SESSION-004/PERF-001/TOOL-020); operator smoke 13/13; `talos diagnostics status` shipped. See `I116-state-truth-operator-baseline.md`. |
 | I117 | Command Sandbox Evidence | **Partial (2026-07-12)** | Evidence API + classifier + trust status/revoke delivered as diagnostic-only. Auto-Allow path removed (evidence is observation, not authority). Not yet wired into bash/exec pipeline. Formal security sign-off remains. See `I117-command-sandbox-evidence.md`. |
-| I118 | Bounded Local Productization | **Complete (2026-07-12)** | Local plugin/hook/document/dashboard/installer verified and bounded. New `validate_installers.sh`. No remote/write/browser expansion. See `I118-bounded-local-productization.md`. |
+| I118 | Bounded Local Productization | **Partial (2026-07-12)** | LT030/LT031/LT033 verified existing; LT032 partial (static validation script delivered, real checksum/offline/dry-run tests not done). See `I118-bounded-local-productization.md`. |
 | I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
@@ -205,8 +205,8 @@ rewrite published iteration baselines.
 | I088 | Superseded before activation | Revised extension/ingestion acceptance moves to I118. |
 | I089 | Superseded before activation | Revised Talos-primary evidence/release decision moves to I119. |
 | I116 | Complete (2026-07-12) | State truth, operator smoke, and diagnostics status delivered. Removed from non-terminal inventory. I117 is the next to activate. |
-| I117 | Complete (2026-07-12) | ADR-040 + evidence enforcement + trust status/revoke delivered. Removed from non-terminal inventory. I118 is the next to activate. |
-| I118 | Complete (2026-07-12) | Bounded local productization verified: plugin/hook/document/dashboard/installer all pass. Removed from non-terminal inventory. I119 is the next to activate. |
+| I117 | Partial (2026-07-12) | Evidence API diagnostic-only; auto-Allow removed; not wired into execution pipeline; formal security sign-off remains. I118 is the next to activate. |
+| I118 | Partial (2026-07-12) | LT032 static validation only; real checksum/offline/dry-run tests not done. I119 is the next to activate. |
 | I119 | Complete (2026-07-12) | REL-002 re-audit NO-GO; two bounded packets non-qualifying; four-month plan complete. Removed from non-terminal inventory. |
 | I091 | Complete | Closed 2026-07-04 with audit-first plugin/hook diagnostics and optional runtime asset distribution policy. |
 | I092 | Complete | Closed 2026-07-04 with bash-only cache-stability/export evidence and autonomy permission matrix. |

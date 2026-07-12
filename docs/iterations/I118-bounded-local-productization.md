@@ -1,6 +1,6 @@
 # Iteration I118: Bounded Local Productization
 
-> Document status: Complete (2026-07-12)
+> Document status: Partial (2026-07-12) — LT030/LT031/LT033 verified; LT032 partial (static validation only, real checksum/offline tests not done)
 > Published plan date: 2026-07-12
 > Planned objective: Finish useful local/read-only extension, ingestion, dashboard, and installer
 > surfaces without expanding remote, browser, marketplace, or write-capable boundaries.
