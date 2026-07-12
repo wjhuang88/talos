@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-005 |
 | Priority | P1 |
-| Status | Complete — ADR-040 accepted with maintainer security sign-off; typed access evidence wired into bash/exec execution pipeline as diagnostic-only; classifier catches dangerous flags (sed -i, find -delete); trust status/revoke shipped; evidence never auto-allows (I117, 2026-07-12). OS-level sandbox deferred. |
+| Status | Complete — ADR-040 conservative diagnostic slice passed independent security review; typed access evidence covers bash and exec single/steps/pipes without changing permission decisions; trust status/revoke shipped; OS-level sandbox deferred. |
 | Source | Maintainer request 2026-07-08 — strengthen repo-sandbox permissions beyond policy-only checks |
 | Depends On | `PERM-004`, `TOOL-016`, `TOOL-017`, `VALIDATION-001` |
 

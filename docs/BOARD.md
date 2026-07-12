@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Four-Month Trust And Productization Plan | Complete except LT002 (I116-I119 Complete; LT002 terminal walkthrough pending user) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [I116 trace](reference/I116-STATE-TRACE-2026-07-12.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116 Complete: state truth + diagnostics. I117 Complete: evidence wired into execution pipeline (diagnostic-only), maintainer sign-off recorded. I118 Complete: installer fixture tests (8/8). I119 Complete: REL-002 NO-GO. Residual: LT002 terminal walkthrough (user to run). |
+| Four-Month Trust And Productization Plan | Complete (2026-07-12) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [security review](reference/I117-PERMISSION-SECURITY-REVIEW-2026-07-12.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116-I119 and LT002 complete. Permission evidence remains diagnostic-only; installer local fixture and socket-capable preflight pass; I085 terminal walkthrough passed. REL-002 remains NO-GO and no release is authorized. |
 
 ## Review
 
@@ -30,7 +30,6 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | Architect-Owned High-Risk Work Group | Reference baseline | [High-risk group](tasks/2026-06-28-architect-owned-high-risk-work-group.md) | Explicit maintainer direction on 2026-07-04 resumed direct senior-agent planning through the new four-month high-risk execution task. This group remains the selection baseline; execution state lives in the 2026-07-04 task. |
-| I085 Model Catalog Modernization | Paused (MC107 manual TUI residual) | [I085](iterations/I085-model-catalog-modernization.md) / [MC-001](backlog/active/MC-001-model-catalog-modernization.md) | Code/docs acceptance closed except real terminal `/connect` walkthrough. Resume only to perform and record that walkthrough, then move I085 to Review/Complete. |
 | I011 S2 Provider Plugin Architecture | Paused | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Resume as I015 schema-only work under ADR-013 |
 
 ## Next
@@ -77,7 +76,7 @@ acceptance criteria, verification evidence, or iteration state.
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | I116 State Truth And Operator Baseline | Complete (2026-07-12) | [I116](iterations/I116-state-truth-operator-baseline.md) / [trace](reference/I116-STATE-TRACE-2026-07-12.md) | State truth reconciled (3 drifts fixed), operator smoke 13/13, `talos diagnostics status` shipped. |
-| I117 Command Sandbox Evidence | Complete (2026-07-12) | [I117](iterations/I117-command-sandbox-evidence.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) | Evidence wired into execution pipeline as diagnostic-only. Maintainer security sign-off recorded. Classifier catches sed -i, find -delete, rg --pre. Trust status/revoke shipped. |
+| I117 Command Sandbox Evidence | Complete (2026-07-12) | [I117](iterations/I117-command-sandbox-evidence.md) / [security review](reference/I117-PERMISSION-SECURITY-REVIEW-2026-07-12.md) / [ADR-040](decisions/040-command-access-evidence-sandbox.md) | Independent review accepted the diagnostic-only slice. Bash and exec single/steps/pipes emit evidence without changing permission decisions; auto-Allow remains forbidden. |
 | I118 Bounded Local Productization | Complete (2026-07-12) | [I118](iterations/I118-bounded-local-productization.md) | LT030-LT034 verified; installer fixture tests (8/8 pass: checksum, offline, extraction, error handling). |
 | I119 Talos-Primary Release Decision | Complete (2026-07-12) | [I119](iterations/I119-talos-primary-release-decision.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | REL-002 NO-GO (1 MET, 3 PARTIAL, 4 UNMET). Zero qualifying Talos-primary sessions. No v1.0.0 tag. |
 | Release 0.3.0 Closeout | Complete (v0.3.0 tag pushed 2026-07-07) | [v0.3.0 closeout](tasks/2026-07-07-release-0.3.0-closeout.md) | Workspace version bumped to `0.3.0`, release validation passed, `main` and annotated tag `v0.3.0` pushed. Crate publish and manual GitHub Release stayed out of scope. |

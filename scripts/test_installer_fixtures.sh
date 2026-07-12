@@ -1,138 +1,88 @@
 #!/usr/bin/env bash
-# Installer behavior fixture tests.
-#
-# Tests install.sh error handling and checksum logic using local fixtures.
-# No network access required.
-#
-# Usage:
-#   scripts/test_installer_fixtures.sh
-#
-# Origin: I118 LT032 — installer validation behavior tests.
-
+# Drives the real POSIX installer with a local, PATH-injected curl fixture.
+# No network access is performed.
 set -euo pipefail
 
-PASS=0
-FAIL=0
+root="$(cd "$(dirname "$0")/.." && pwd)"
+installer="$root/install/install.sh"
+fixture="$(mktemp -d)"
+trap 'rm -rf "$fixture"' EXIT INT TERM
 
-ok()   { echo "  PASS: $1"; PASS=$((PASS + 1)); }
-fail() { echo "  FAIL: $1"; FAIL=$((FAIL + 1)); }
+mkdir -p "$fixture/bin" "$fixture/release" "$fixture/staging"
+printf '#!/bin/sh\nprintf "talos fixture 0.0.0\\n"\n' > "$fixture/staging/talos"
+chmod +x "$fixture/staging/talos"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-INSTALL_SH="$PROJECT_ROOT/install/install.sh"
-
-echo "============================================"
-echo "Installer Fixture Tests"
-echo "============================================"
-echo ""
-
-# --- 1. Unsupported OS exits 1 ---
-echo "1. Unsupported OS rejection"
-OUTPUT=$(uname_out="FrobOS" sh -c '
-  # Override uname to return unsupported OS
-  uname() { echo "FrobOS"; }
-  export -f uname
-  sh "'"$INSTALL_SH"'" 2>&1
-' 2>&1) || true
-# We cannot easily override uname in sh, so test arch rejection instead
-# Skip this test if uname override doesn't work in this shell
-ok "OS detection code exists in install.sh (validated by static check)"
-
-# --- 2. Checksum logic: correct hash accepted ---
-echo "2. Checksum verification (correct hash)"
-TMPDIR1=$(mktemp -d)
-echo "test archive content" > "$TMPDIR1/test.tar.gz"
-EXPECTED_HASH=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$TMPDIR1/test.tar.gz" | awk '{print $1}'; else shasum -a 256 "$TMPDIR1/test.tar.gz" | awk '{print $1}'; fi)
-ACTUAL_HASH=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$TMPDIR1/test.tar.gz" | awk '{print $1}'; else shasum -a 256 "$TMPDIR1/test.tar.gz" | awk '{print $1}'; fi)
-if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
-  ok "checksum computation matches for known file"
+os="$(uname -s)"
+arch="$(uname -m)"
+case "$os" in Darwin) os_part=darwin ;; Linux) os_part=linux ;; *) echo "unsupported test OS: $os" >&2; exit 1 ;; esac
+case "$arch" in x86_64|amd64) arch_part=x86_64 ;; arm64|aarch64) arch_part=aarch64 ;; *) echo "unsupported test arch: $arch" >&2; exit 1 ;; esac
+archive="talos-${arch_part}-${os_part}.tar.gz"
+tar -czf "$fixture/release/$archive" -C "$fixture/staging" talos
+if command -v sha256sum >/dev/null 2>&1; then
+  hash="$(sha256sum "$fixture/release/$archive" | awk '{print $1}')"
 else
-  fail "checksum computation mismatch"
+  hash="$(shasum -a 256 "$fixture/release/$archive" | awk '{print $1}')"
 fi
-rm -rf "$TMPDIR1"
+printf '%s  %s\n' "$hash" "$archive" > "$fixture/release/checksum.sha256"
 
-# --- 3. Checksum logic: mismatch detected ---
-echo "3. Checksum mismatch detection"
-TMPDIR2=$(mktemp -d)
-echo "correct content" > "$TMPDIR2/archive.tar.gz"
-WRONG_HASH="0000000000000000000000000000000000000000000000000000000000000000"
-ACTUAL=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$TMPDIR2/archive.tar.gz" | awk '{print $1}'; else shasum -a 256 "$TMPDIR2/archive.tar.gz" | awk '{print $1}'; fi)
-if [ "$WRONG_HASH" != "$ACTUAL" ]; then
-  ok "checksum mismatch correctly detected (hashes differ)"
+cat > "$fixture/bin/curl" <<'EOF'
+#!/bin/sh
+set -eu
+out=""
+url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    -*) shift ;;
+    *) url="$1"; shift ;;
+  esac
+done
+[ -n "$url" ] || exit 2
+if [ "${FIXTURE_OFFLINE:-0}" = 1 ]; then exit 7; fi
+case "$url" in
+  *api.github.com*) payload='[{"tag_name":"v0.0.0"}]' ;;
+  */checksum.sha256) payload_file="$FIXTURE_RELEASE/checksum.sha256" ;;
+  *.tar.gz) payload_file="$FIXTURE_RELEASE/${url##*/}" ;;
+  *) exit 22 ;;
+esac
+if [ -n "$out" ]; then
+  if [ -n "${payload_file:-}" ]; then cp "$payload_file" "$out"; else printf '%s\n' "$payload" > "$out"; fi
 else
-  fail "checksum mismatch not detected"
+  if [ -n "${payload_file:-}" ]; then cat "$payload_file"; else printf '%s\n' "$payload"; fi
 fi
-rm -rf "$TMPDIR2"
+EOF
+chmod +x "$fixture/bin/curl"
 
-# --- 4. Archive extraction: valid tar.gz extracts correctly ---
-echo "4. Archive extraction"
-TMPDIR3=$(mktemp -d)
-# Create a fake talos binary
-mkdir -p "$TMPDIR3/staging"
-echo '#!/bin/sh' > "$TMPDIR3/staging/talos"
-echo 'echo "talos 0.3.4"' >> "$TMPDIR3/staging/talos"
-chmod +x "$TMPDIR3/staging/talos"
-# Create tar.gz
-tar -czf "$TMPDIR3/talos-test.tar.gz" -C "$TMPDIR3/staging" talos
-# Extract to another dir
-mkdir -p "$TMPDIR3/extract"
-tar -xzf "$TMPDIR3/talos-test.tar.gz" -C "$TMPDIR3/extract"
-if [ -x "$TMPDIR3/extract/talos" ] && "$TMPDIR3/extract/talos" 2>&1 | grep -q "talos 0.3.4"; then
-  ok "valid tar.gz archive extracts and binary runs"
-else
-  fail "archive extraction failed"
-fi
-rm -rf "$TMPDIR3"
-
-# --- 5. Offline failure: unreachable GitHub API exits 1 ---
-echo "5. Offline failure handling"
-# Simulate offline by pointing to a non-existent repo
-OFFLINE_OUTPUT=$(TALOS_REPO="nonexistent/nonexistent-repo-12345" TALOS_VERSION="latest" sh "$INSTALL_SH" 2>&1) && {
-  fail "installer should exit non-zero when GitHub API is unreachable"
-} || {
-  EXIT_CODE=$?
-  if [ "$EXIT_CODE" -ne 0 ]; then
-    ok "installer exits non-zero ($EXIT_CODE) when release cannot be resolved"
-  else
-    fail "installer exited 0 despite unreachable repo"
-  fi
+run_installer() {
+  env PATH="$fixture/bin:$PATH" FIXTURE_RELEASE="$fixture/release" \
+    HOME="$fixture/home" TALOS_INSTALL_DIR="$fixture/install" "$@" sh "$installer"
 }
 
-# --- 6. Specific version skips API resolution ---
-echo "6. Specific version bypasses API"
-# When TALOS_VERSION is set to a specific tag, install.sh should skip the API call
-# Verify by checking that the base URL uses the version directly
-if grep -q 'base="https://github.com/${owner_repo}/releases/download/${version}"' "$INSTALL_SH"; then
-  ok "install.sh constructs download URL from version without API when version is specified"
-else
-  fail "install.sh does not construct version-based URL correctly"
-fi
+echo "1. real installer installs and runs a fixture archive"
+output="$(run_installer TALOS_VERSION=v0.0.0 2>&1)"
+test -x "$fixture/install/talos"
+"$fixture/install/talos" --version | grep -q 'talos fixture 0.0.0'
+printf '%s\n' "$output" | grep -q 'checksum verified'
 
-# --- 7. Install dir override ---
-echo "7. Install directory override"
-if grep -q 'TALOS_INSTALL_DIR' "$INSTALL_SH"; then
-  ok "install.sh supports TALOS_INSTALL_DIR override"
-else
-  fail "install.sh missing TALOS_INSTALL_DIR override"
-fi
+echo "2. latest version is resolved through the fixture API"
+rm -rf "$fixture/install"
+run_installer TALOS_VERSION=latest >/dev/null
+test -x "$fixture/install/talos"
 
-# --- 8. Temp directory cleanup ---
-echo "8. Temp directory cleanup"
-if grep -q "trap.*rm -rf.*tmpdir" "$INSTALL_SH"; then
-  ok "install.sh has cleanup trap for temp directory"
-else
-  fail "install.sh missing cleanup trap"
-fi
-
-# --- Summary ---
-echo ""
-echo "============================================"
-echo "Fixture Test Summary"
-echo "  Passed: $PASS"
-echo "  Failed: $FAIL"
-echo "============================================"
-
-if [ "$FAIL" -gt 0 ]; then
+echo "3. checksum mismatch makes the real installer fail"
+printf '%064d  %s\n' 0 "$archive" > "$fixture/release/checksum.sha256"
+if run_installer TALOS_VERSION=v0.0.0 >"$fixture/mismatch.log" 2>&1; then
+  echo "installer accepted a bad checksum" >&2
   exit 1
 fi
-exit 0
+grep -q 'checksum mismatch' "$fixture/mismatch.log"
+printf '%s  %s\n' "$hash" "$archive" > "$fixture/release/checksum.sha256"
+
+echo "4. offline fixture makes the real installer fail without network"
+if run_installer TALOS_VERSION=latest FIXTURE_OFFLINE=1 >"$fixture/offline.log" 2>&1; then
+  echo "installer succeeded while fixture transport was offline" >&2
+  exit 1
+fi
+grep -q 'unable to resolve latest release tag' "$fixture/offline.log"
+
+echo "installer fixture tests: 4/4 passed"

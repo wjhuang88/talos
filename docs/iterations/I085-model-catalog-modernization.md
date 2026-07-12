@@ -1,6 +1,6 @@
 # Iteration I085: Model Catalog Modernization — talos-models, /model, /connect
 
-> Document status: Paused (MC107 manual TUI walkthrough residual)
+> Document status: Complete (2026-07-12)
 > Published plan date: 2026-07-03
 > Planned objective: Replace the ad-hoc model catalog pipeline (hand-maintained TOML + broken
 > models.dev import + auth-gated picker) with a proper `talos-models` crate backed by SQLite,
@@ -359,6 +359,8 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 | 2026-07-03 | Incident + Fix | Root-caused the 3 "pre-existing" e2e failures noted above: they were not actually pre-existing drift — this session's new `handle_connect_with_credential_*` tests called `Config::save()` (via the production function under test) before HOME-isolation was added, writing test-fixture data over the developer's real `~/.talos/config.toml`. Confirmed via file mtime + literal fixture strings found in the corrupted file. A stale `~/.talos/config.toml.bak-20260606` backup exists but is a month old and pre-dates the current provider-nested config schema, so the exact state between 2026-06-06 and this incident cannot be recovered; user opted to hand-edit their config rather than have it reconstructed. Separately, investigating the resulting "invalid configuration: 'model' is required" crash surfaced a real, independent, pre-existing design bug: `Config::load()` called `self.validate()` internally, so *any* on-disk config with an empty `model` (from an interrupted wizard save, manual edit, or this incident) hard-fails `Config::load()` before the three mode runners' own `needs_model_setup`/`needs_api_key` first-run-wizard logic ever gets a chance to run — and before `talos config set` (which itself calls `Config::load()` first) can be used to repair it. Fixed: `Config::load()` no longer calls `validate()`; mode runners already re-check `config.model.is_empty()` post-load (unchanged), and `run_config_set` still calls `.validate()` explicitly after applying an edit, before saving. Added regression tests `test_load_existing_file_with_empty_model_succeeds` and `test_load_then_set_model_recovers_from_empty_model_on_disk` (`talos-config/src/tests.rs`). While fixing this, discovered and fixed a second, related bug: two independent test-local `HOME`-mutation mutexes (`init_wizard.rs`'s pre-existing `ENV_MUTEX` and this session's new `mode_runners.rs` mutex) do not serialize against each other despite both mutating the same process-wide `HOME` env var, since `cargo test` runs tests in parallel threads within one process — causing flaky cross-module corruption of each other's temp-dir redirection. Consolidated into one shared `crate::test_support::HOME_ENV_MUTEX` used by both modules. 1610 workspace tests pass (up from 1605), 0 failures — the 3 previously-"pre-existing" e2e failures are now fixed and passing. |
 | 2026-07-04 | Post-review Fix | User acceptance found four UX/robustness gaps. Fixed: `/model` now omits unauthenticated provider rows entirely (provider setup belongs in `/connect`); slash-menu filtering prioritizes command-name prefix matches so typing `/mo` then Enter completes `/model` instead of executing `/help`; `/connect` fallback now uses packaged `models.toml` plus built-in provider endpoint metadata; group headers render with a higher-contrast warning accent instead of dim text. Then-current follow-up required implicit `catalog.db` seeding on first missing-file access; that runtime DB path was superseded by the 2026-07-05 maintainer decision recorded below. Added regression coverage for the 2026-07-04 behavior. |
 | 2026-07-04 | Pause | MC107 README/onboarding residual closed and catalog lifecycle verified by automated tests. I085 is paused before I090 activation because the only remaining item is a real terminal `/connect` walkthrough, which cannot be honestly claimed from the unattended/headless validation run. |
+| 2026-07-12 | LT002 retry | Built `talos 0.3.4` and launched the real binary with disposable HOME under two allocated PTYs (`TERM=xterm-256color` and `TERM=dumb`). Both reached the terminal cursor-position query (`ESC[6n`) but the execution PTY is not a terminal emulator and could not return a valid cursor report before timeout. No real/fake credential was entered and no user config was touched. MC107 remains Paused; resume in Alacritty/iTerm/Terminal using the LT002 steps in the developer long-task record. |
+| 2026-07-12 | MC107/LT002 complete | Re-ran the same disposable-HOME binary inside a detached `screen` terminal emulator. `/connect` rendered Connected/Available groups and 151 providers; filtering `openai`, navigating to OpenAI, and entering the credential view worked. Escape cancelled without entering or saving a credential. `/model` then rendered the configured DeepSeek model group. Talos exited normally with zero turns. I085 acceptance is complete. |
 
 ## Verification Evidence
 
@@ -446,11 +448,9 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 - Stage 2 is unblocked and its current accepted runtime path is closed: `/connect` reads
   packaged `models.toml` provider data, supports an optional custom `base_url` without losing
   unrelated provider fields, and both `/model` and `/connect` support group-aware "type to filter"
-  search. The earlier `catalog.db` runtime path is superseded. I085 is paused with the single MC107
-  residual below.
-- MC107 residual: manual TUI runtime verification of `/connect` end-to-end
-  (real terminal session, not just unit tests) has not been performed in this
-  session.
+  search. The earlier `catalog.db` runtime path is superseded.
+- MC107 terminal residual closed 2026-07-12 with a disposable-HOME `screen` walkthrough of
+  `/connect`, safe credential cancellation, and `/model`.
 - MC107 README residual closed: README now documents `/connect` in its own onboarding paragraph.
 - Runtime `catalog.db` creation is no longer the accepted behavior. The active contract is
   no runtime model-metadata DB, no startup network fetch, and no explicit user initialization step:
@@ -459,4 +459,7 @@ so `selected_index` continues to refer to the original item list. Do not introdu
 
 ## Retrospective
 
-- Pending.
+- Unit coverage was not sufficient for the terminal picker acceptance; a terminal emulator was
+  required because a bare PTY cannot answer cursor-position queries.
+- The final walkthrough preserved the user's real config and exercised the cancel path without a
+  credential.

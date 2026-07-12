@@ -1,6 +1,7 @@
 # ADR-040: Command Access Evidence and Logical Sandbox Enforcement
 
-- **Status**: Accepted (maintainer security sign-off recorded 2026-07-12: evidence is diagnostic-only, never auto-Allow; dangerous flags classified Unknown; bash/exec remains per-command Ask/Deny; OS-level sandbox deferred)
+- **Status**: Accepted after independent conservative-slice security review (2026-07-12;
+  `docs/reference/I117-PERMISSION-SECURITY-REVIEW-2026-07-12.md`)
 - **Date**: 2026-07-12
 - **Backlog**: PERM-005, I117/N110-N114
 
@@ -89,9 +90,10 @@ require platform-specific binaries and may not be available in all environments.
    `AccessEvidence` for commands with provably bounded structure. Commands with shell
    metacharacters, variable expansion, or unclassifiable structure produce `Unknown` evidence.
 
-3. **Repo-Boundary Enforcement**: When workspace trust is active and a command's declared access is
-   fully within the canonical repo root, the command may use a coarser approval path. Any path
-   outside the repo root, any `Unknown` access, any `Spawn` or `Network` intent escalates to Ask.
+3. **Repo-Boundary Diagnostics**: The conservative slice records declared repo-local versus
+   unknown/out-of-repo access but never changes the permission decision. Bash and every direct-exec
+   command/step/pipe remain governed by the existing per-command permission profile. A future
+   coarser approval path requires a new security review and ADR amendment.
 
 4. **Deny Precedence**: Deny rules always override trust-based allow. No exceptions.
 
