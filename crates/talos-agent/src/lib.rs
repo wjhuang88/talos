@@ -30,6 +30,7 @@ mod configuration;
 pub mod context;
 mod helpers;
 pub mod prompt;
+pub mod scheduler;
 pub mod session;
 mod tool_execution;
 
