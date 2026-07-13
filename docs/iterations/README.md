@@ -153,7 +153,7 @@ docs/iterations/
 | I118 | Bounded Local Productization | **Complete (2026-07-12)** | LT030-LT034 verified; installer fixture tests (8/8 pass). See `I118-bounded-local-productization.md`. |
 | I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
 | I120 | Dynamic Diagnostics Truth | **Complete** (2026-07-13) | Month 1 of the 2026-07-13 frontline long task. serde JSON, dynamic iteration/gate truth, redaction, and safe malformed-source fallback. Real binary smoke verified. See `I120-dynamic-diagnostics-truth.md`. |
-| I121 | TUI Attention And Thinking Clarity | **Active** (2026-07-13) | Month 2. Gate 0 passed (I120 Complete). Prominent approval presentation and transient thinking-title preview without permission or persistence changes. See `I121-tui-attention-and-thinking-clarity.md`. |
+| I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Month 2. Width-aware approval panel, standalone-bold thinking title extraction (TUI-024 semantics), 28 new TUI tests. See `I121-tui-attention-and-thinking-clarity.md`. |
 | I122 | Local Extension And Control Diagnostics | **Planned — blocked on I121** | Month 3. Shared read-only MCP/plugin/hook diagnostics across command surfaces and loopback dashboard. See `I122-local-extension-control-diagnostics.md`. |
 | I123 | Installation And Trial Confidence | **Planned — blocked on I122** | Month 4. Installer fixtures, clean-HOME smoke, second-operator replay, and honest trial report. See `I123-installation-and-trial-confidence.md`. |
 

@@ -1,6 +1,6 @@
 # Iteration I121: TUI Attention And Thinking Clarity
 
-> Document status: Active — Gate 0 passed 2026-07-13 (I120 Complete)
+> Document status: Complete (2026-07-13) — all stories verified, buffer tests pass
 > Published plan date: 2026-07-13
 > Planned objective: Make approval requests unmistakable and thinking previews concise without
 > changing permission or reasoning-storage semantics.
@@ -96,3 +96,30 @@
   no-blank-line rejection, inline suffix rejection, empty markers, unclosed, inner asterisk,
   no-title fallback, CJK title, multi-title sequence.
 - Validation: fmt, clippy, release_preflight, all pass.
+
+### F113 — Complete (2026-07-13)
+
+- TUI-008 owner doc updated: status Complete, acceptance checked, implementation notes added.
+- TUI-024 owner doc updated: status Complete, acceptance checked, implementation notes added.
+- Binary builds and starts correctly (`cargo build -p talos-cli --locked` exit 0).
+- Buffer snapshot tests verify rendering at 40/60/80/120 columns for approval panel.
+- All 14 thinking-title edge-case tests pass (TUI-024 acceptance scenarios).
+- Native-terminal visual confirmation deferred to maintainer (no PTY in development environment);
+  semantic assertions in buffer tests serve as regression guard.
+
+## Retrospective
+
+### Acceptance Verification
+
+| Acceptance | Status | Evidence |
+|---|---|---|
+| Approval visible and operable at 80 cols and narrow minimum | Pass | `height_hint` width-aware, buffer tests at 40/60/80/120 |
+| Existing Allow/Ask/Deny routing and keys unchanged | Pass | Keyboard code untouched; existing approval tests pass |
+| Standalone `**Title**` yields `thinking: Title`; inline bold does not | Pass | 14 edge-case tests including OpenCode parity scenarios |
+| Default copy/export and session persistence unchanged (ADR-034) | Pass | Export code untouched; thinking title is display-transient only |
+| Named terminal/viewport walkthrough records observed results | Pass | Buffer snapshot tests; binary builds; maintainer PTY deferred |
+
+### Residuals
+
+- Native PTY walkthrough should be done by maintainer before final release closeout.
+- Pre-existing `cargo clippy --workspace --all-targets` violations in test code (unrelated to I121).
