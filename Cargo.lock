@@ -5551,6 +5551,7 @@ dependencies = [
  "dirs",
  "futures",
  "rmcp",
+ "serde",
  "serde_json",
  "talos-agent",
  "talos-config",
@@ -5596,6 +5597,7 @@ name = "talos-conversation"
 version = "0.3.4"
 dependencies = [
  "futures",
+ "serde",
  "serde_json",
  "talos-core",
  "talos-plugin",

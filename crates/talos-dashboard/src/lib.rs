@@ -33,6 +33,7 @@ pub struct DashboardSnapshot {
     pub status: Value,
     pub history: Value,
     pub governance: String,
+    pub extensions: Value,
 }
 
 #[derive(Clone)]
@@ -87,6 +88,7 @@ impl DashboardServer {
             .route("/history", get(history_handler))
             .route("/governance", get(governance_handler))
             .route("/config", get(config_handler))
+            .route("/extensions", get(extensions_handler))
             .route("/", get(root_handler))
             .fallback(not_found_handler);
         if state.loopback_only {
@@ -153,6 +155,7 @@ async fn root_handler() -> Response {
   <a href="/history">History</a>
   <a href="/governance">Governance</a>
   <a href="/config">Config</a>
+  <a href="/extensions">Extensions</a>
 </body>
 </html>"#;
     let mut resp = body.into_response();
@@ -184,6 +187,12 @@ async fn config_handler(State(state): State<AppState>) -> Response {
     resp
 }
 
+async fn extensions_handler(State(state): State<AppState>) -> Response {
+    let mut resp = state.snapshot.extensions.to_string().into_response();
+    apply_security_headers(&mut resp, "application/json");
+    resp
+}
+
 async fn not_found_handler() -> StatusCode {
     StatusCode::NOT_FOUND
 }
@@ -194,6 +203,7 @@ fn redact_snapshot(snapshot: DashboardSnapshot) -> DashboardSnapshot {
         status: redact_value(snapshot.status),
         history: redact_value(snapshot.history),
         governance: redact_text(&snapshot.governance),
+        extensions: redact_value(snapshot.extensions),
     }
 }
 
@@ -319,6 +329,10 @@ mod tests {
             status: serde_json::json!({"model": "test-model", "sessions": 3}),
             history: serde_json::json!([{"id": "abc", "preview": "hello"}]),
             governance: "Now: test item".to_string(),
+            extensions: serde_json::json!({
+                "mcp_servers": [{"name": "test-server", "connected": true, "tool_count": 2}],
+                "collisions": []
+            }),
         }
     }
 
@@ -467,12 +481,21 @@ mod tests {
                 }
             ]),
             governance: "refresh_token=abc status=ok".to_string(),
+            extensions: serde_json::json!({
+                "mcp_servers": [{"name": "server", "error": "api_key=sk-live"}],
+            }),
         };
         let server = DashboardServer::with_loopback_only(snapshot, false);
         let token = server.token().to_string();
         let app = server.build_router();
 
-        for path in ["/status", "/history", "/governance", "/config"] {
+        for path in [
+            "/status",
+            "/history",
+            "/governance",
+            "/config",
+            "/extensions",
+        ] {
             let (status, body) = request(&app, Method::GET, path, Some(&token)).await;
             assert_eq!(status, StatusCode::OK);
             assert!(!body.contains("sk-live"), "{path} leaked api key: {body}");
@@ -561,5 +584,47 @@ mod tests {
         let (status, body) = request(&app, Method::GET, "/status", None).await;
         assert_eq!(status, StatusCode::OK);
         assert!(body.contains("test-model"));
+    }
+
+    #[tokio::test]
+    async fn extensions_route_returns_json() {
+        let (app, token) = build_test_app();
+        let (status, body) = request(&app, Method::GET, "/extensions", Some(&token)).await;
+        assert_eq!(status, StatusCode::OK);
+        let value: serde_json::Value = serde_json::from_str(&body).expect("valid JSON");
+        assert!(value["mcp_servers"].is_array());
+        assert!(
+            value["mcp_servers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|s| { s["name"] == "test-server" && s["connected"] == true }),
+            "extensions should include test-server: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn extensions_route_redacts_sensitive_data() {
+        let (app, token) = build_test_app();
+        let (status, body) = request(&app, Method::GET, "/extensions", Some(&token)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            !body.contains("sk-live"),
+            "extensions leaked api key: {body}"
+        );
+        assert!(!body.contains("secret"), "extensions leaked secret: {body}");
+    }
+
+    #[tokio::test]
+    async fn extensions_route_is_get_only() {
+        let (app, token) = build_test_app();
+        for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
+            let (status, _) = request(&app, method, "/extensions", Some(&token)).await;
+            assert_eq!(
+                status,
+                StatusCode::METHOD_NOT_ALLOWED,
+                "extensions route must be GET-only"
+            );
+        }
     }
 }

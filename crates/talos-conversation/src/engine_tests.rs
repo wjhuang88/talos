@@ -562,8 +562,9 @@ async fn slash_plugins_shows_transition_notice() {
 
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert!(text.contains("reserved for future plugin packages"));
-    assert!(text.contains("Use /mcp"));
+    assert!(text.contains("WASM plugin packages: not yet available"));
+    assert!(text.contains("Use /mcp for MCP detail"));
+    assert!(text.contains("Provenance observations: 1"));
     assert!(!text.contains("Observed tool provenance"));
 }
 
@@ -580,7 +581,10 @@ async fn slash_plugins_notice_does_not_leak_mcp_status() {
 
     let (_, text) = collect_stream(outputs).await.unwrap();
     assert!(!text.contains("MCP servers (startup snapshot)"));
-    assert!(!text.contains("github"));
+    assert!(
+        !text.contains("github"),
+        "individual server names must not appear in /plugins: {text}"
+    );
 }
 
 #[tokio::test]
@@ -2151,4 +2155,382 @@ fn error_message_becomes_tip_and_error_stream() {
         )
     });
     assert!(has_error_stream, "error must emit an Error stream");
+}
+
+#[test]
+fn extension_snapshot_empty() {
+    let engine = new_engine();
+    let snap = engine.extension_snapshot();
+    assert!(snap.mcp_servers.is_empty());
+    assert!(snap.hooks.declarations.is_empty());
+    assert!(!snap.hooks.executable_carriers_enabled);
+    assert!(snap.provenance.is_empty());
+    assert!(snap.collisions.is_empty());
+}
+
+#[test]
+fn extension_snapshot_with_mcp_servers() {
+    let engine = new_engine().with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "filesystem".to_string(),
+            connected: true,
+            tool_count: 3,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "remote".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("timeout".to_string()),
+        },
+    ]);
+    let snap = engine.extension_snapshot();
+    assert_eq!(snap.mcp_servers.len(), 2);
+    assert!(
+        snap.mcp_servers
+            .iter()
+            .any(|s| s.name == "filesystem" && s.connected)
+    );
+    assert!(
+        snap.mcp_servers
+            .iter()
+            .any(|s| s.name == "remote" && !s.connected)
+    );
+}
+
+#[test]
+fn extension_snapshot_with_hooks() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![
+        ("pre-turn".to_string(), "TurnStart".to_string(), true),
+        ("post-tool".to_string(), "AfterToolCall".to_string(), false),
+    ]);
+    let snap = engine.extension_snapshot();
+    assert_eq!(snap.hooks.declarations.len(), 2);
+    assert!(
+        snap.hooks
+            .declarations
+            .iter()
+            .any(|d| d.name == "pre-turn" && d.enabled)
+    );
+    assert!(
+        snap.hooks
+            .declarations
+            .iter()
+            .any(|d| d.name == "post-tool" && !d.enabled)
+    );
+    assert!(!snap.hooks.event_catalog.is_empty());
+}
+
+#[test]
+fn extension_snapshot_detects_mcp_name_collision() {
+    let engine = new_engine().with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: true,
+            tool_count: 1,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("conflict".to_string()),
+        },
+    ]);
+    let snap = engine.extension_snapshot();
+    assert!(
+        snap.collisions.iter().any(|c| c == "mcp:dup"),
+        "collisions: {:?}",
+        snap.collisions
+    );
+}
+
+#[test]
+fn extension_snapshot_detects_hook_name_collision() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![
+        ("my-hook".to_string(), "TurnStart".to_string(), true),
+        ("my-hook".to_string(), "AfterToolCall".to_string(), true),
+    ]);
+    let snap = engine.extension_snapshot();
+    assert!(
+        snap.collisions.iter().any(|c| c == "hook:my-hook"),
+        "collisions: {:?}",
+        snap.collisions
+    );
+}
+
+#[test]
+fn extension_snapshot_serializes_to_valid_json() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![("h".to_string(), "TurnStart".to_string(), true)]);
+    let engine = engine.with_mcp_servers(vec![McpServerDiagnostic {
+        name: "s".to_string(),
+        connected: true,
+        tool_count: 2,
+        error: None,
+    }]);
+    let snap = engine.extension_snapshot();
+    let json = serde_json::to_string(&snap).expect("serialize");
+    let value: serde_json::Value = serde_json::from_str(&json).expect("parse");
+    assert!(value["mcp_servers"].is_array());
+    assert!(value["hooks"].is_object());
+    assert!(value["provenance"].is_array());
+    assert!(value["collisions"].is_array());
+}
+
+#[test]
+fn extension_snapshot_no_secrets() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "server".to_string(),
+        connected: true,
+        tool_count: 1,
+        error: None,
+    }]);
+    let snap = engine.extension_snapshot();
+    let json = serde_json::to_string(&snap).expect("serialize");
+    assert!(!json.to_lowercase().contains("api_key"));
+    assert!(!json.to_lowercase().contains("secret"));
+    assert!(!json.to_lowercase().contains("token"));
+    assert!(!json.to_lowercase().contains("password"));
+}
+
+#[tokio::test]
+async fn slash_mcp_shows_unavailable_server_error() {
+    let mut engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "broken-server".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("connection refused".to_string()),
+    }]);
+    let outputs = engine.handle_slash_command("/mcp");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("broken-server"), "server name must appear");
+    assert!(
+        text.contains("unavailable"),
+        "unavailable status must appear"
+    );
+    assert!(
+        text.contains("connection_failed"),
+        "bounded error category must appear instead of raw text: {text}"
+    );
+}
+
+#[tokio::test]
+async fn slash_hooks_shows_disabled_hook() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![(
+        "my-hook".to_string(),
+        "TurnStart".to_string(),
+        false,
+    )]);
+    let outputs = engine.handle_slash_command("/hooks");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("my-hook"), "hook name must appear");
+    assert!(text.contains("disabled"), "disabled status must appear");
+}
+
+#[tokio::test]
+async fn slash_plugins_shows_summary_counts() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![("h".to_string(), "TurnStart".to_string(), true)]);
+    let mut engine = engine.with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "s1".to_string(),
+            connected: true,
+            tool_count: 2,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "s2".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("timeout".to_string()),
+        },
+    ]);
+    let outputs = engine.handle_slash_command("/plugins");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("MCP servers: 2"), "total count: {text}");
+    assert!(text.contains("1 connected"), "connected count: {text}");
+    assert!(text.contains("Hook declarations: 1"), "hook count: {text}");
+}
+
+#[tokio::test]
+async fn slash_mcp_shows_collision_warning() {
+    let mut engine = new_engine().with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: true,
+            tool_count: 1,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("conflict".to_string()),
+        },
+    ]);
+    let outputs = engine.handle_slash_command("/mcp");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(
+        text.contains("collision"),
+        "collision must be visible: {text}"
+    );
+    assert!(
+        text.contains("mcp:dup"),
+        "collision identifier must appear: {text}"
+    );
+}
+
+#[test]
+fn extension_snapshot_no_crash_on_empty_state() {
+    let engine = new_engine();
+    let snap = engine.extension_snapshot();
+    assert!(snap.mcp_servers.is_empty());
+    assert!(snap.collisions.is_empty());
+    assert!(
+        snap.hooks.event_catalog.len() > 0,
+        "event catalog should always be populated"
+    );
+}
+
+#[test]
+fn extension_snapshot_categorizes_api_key_error() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "leaky".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some(
+            "failed to connect to https://api.example.com/v1?api_key=sk-secret-key".to_string(),
+        ),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert!(
+        !error.contains("sk-secret-key") && !error.contains("api_key"),
+        "no raw substring of error text may appear: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_categorizes_bearer_token_error() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "auth".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("Authorization: Bearer abc123token failed".to_string()),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert!(
+        !error.contains("abc123token") && !error.contains("Bearer"),
+        "no raw substring of error text may appear: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_categorizes_url_query_secret() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "url".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("request to https://mcp.example.com/sse?token=hidden&ok=1 failed".to_string()),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert!(
+        !error.contains("hidden")
+            && !error.contains("token=")
+            && !error.contains("mcp.example.com"),
+        "no raw substring of error text may appear: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_categorizes_multiple_secrets_in_one_error() {
+    let raw = "MCP failed: token=first token=second api_key=third secret=fourth";
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "multi".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some(raw.to_string()),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert!(
+        !error.contains("first")
+            && !error.contains("second")
+            && !error.contains("third")
+            && !error.contains("fourth"),
+        "no secret value may appear: {error}"
+    );
+    assert!(
+        !error.contains("token=") && !error.contains("api_key=") && !error.contains("secret="),
+        "no pattern name may appear: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_error_is_bounded_category() {
+    let cases = [
+        ("MCP server 'x' timed out after 30s", "timeout"),
+        (
+            "invalid MCP config: missing transport",
+            "invalid_configuration",
+        ),
+        ("failed to spawn MCP server 'x': not found", "spawn_failed"),
+        ("MCP server 'x' disconnected", "disconnected"),
+        ("connection refused by host", "connection_failed"),
+        ("MCP RPC error from 'x': boom", "protocol_error"),
+        ("initialization failed at step 1", "initialization_failed"),
+        ("MCP HTTP error: status 500", "network_error"),
+        ("something completely unknown", "unavailable"),
+    ];
+    for (raw, expected) in cases {
+        let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+            name: "t".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some(raw.to_string()),
+        }]);
+        let snap = engine.extension_snapshot();
+        let error = snap.mcp_servers[0].error.as_ref().unwrap();
+        assert_eq!(
+            error, expected,
+            "raw {raw:?} should categorize as {expected:?}, got {error:?}"
+        );
+    }
+}
+
+#[test]
+fn build_extension_snapshot_matches_engine_snapshot() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![("h".to_string(), "TurnStart".to_string(), true)]);
+    let engine = engine.with_mcp_servers(vec![McpServerDiagnostic {
+        name: "s".to_string(),
+        connected: true,
+        tool_count: 1,
+        error: None,
+    }]);
+
+    let from_engine = engine.extension_snapshot();
+    let from_builder = crate::build_extension_snapshot(
+        &[McpServerDiagnostic {
+            name: "s".to_string(),
+            connected: true,
+            tool_count: 1,
+            error: None,
+        }],
+        &[("h".to_string(), "TurnStart".to_string(), true)],
+        &[],
+    );
+
+    assert_eq!(from_engine.mcp_servers, from_builder.mcp_servers);
+    assert_eq!(
+        from_engine.hooks.declarations,
+        from_builder.hooks.declarations
+    );
+    assert_eq!(from_engine.collisions, from_builder.collisions);
 }

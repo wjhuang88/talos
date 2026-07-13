@@ -1,6 +1,6 @@
 # Iteration I058: Explicit Runtime Skill Activation
 
-> Document status: Review
+> Document status: Complete (2026-06-29; header reconciled 2026-07-13)
 > Published plan date: 2026-06-27
 > Planned objective: Implement explicit Level 1 Skill body and bounded Level 2 reference activation
 >   without leaking skill content into history or destabilizing prompt-cache behavior.
@@ -184,5 +184,6 @@ The implementation owner is split deliberately:
 
 ## Retrospective
 
-- Review state reached after adding real-binary evidence. Keep Complete gated on the normal review
-  decision and any release packaging policy outside I058.
+- Complete after the real-binary evidence and normal review decision recorded in the iteration
+  index. Release packaging remains outside I058. The 2026-07-13 edit reconciles the stale header
+  without changing the published scope.

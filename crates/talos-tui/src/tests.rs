@@ -10,12 +10,13 @@ mod tests {
     use talos_core::message::Usage;
     use unicode_width::UnicodeWidthStr;
 
-    use crate::inline_terminal::ViewportComponent;
+    use crate::inline_terminal::{InlineFrame, ViewportComponent};
     use crate::panel_state::PanelItem;
     use crate::scrollback::{
-        BottomPanelComponent, BottomPanelPlacement, bottom_panel_placement, bottom_panel_rows,
-        build_input_text, build_status_text, cursor_line_col, input_line_count, stream_padding_for,
-        truncate_str,
+        BottomPanelComponent, BottomPanelPlacement, approval_natural_height,
+        bottom_panel_placement, bottom_panel_rows, build_input_text, build_status_text,
+        cursor_line_col, extract_thinking_title, input_line_count, stream_padding_for,
+        truncate_str, wrap_text_to_lines,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, BottomPanelState, CtrlCState, Tip, TuiState};
@@ -842,6 +843,436 @@ mod tests {
         assert_eq!(bottom_panel_rows(5, 3), (1, true, true));
         assert_eq!(bottom_panel_rows(5, 6), (5, true, false));
         assert_eq!(bottom_panel_rows(10, 10), (8, true, true));
+    }
+
+    // ── Approval panel height_hint (F110) ──────────────────────────────
+
+    #[test]
+    fn test_approval_height_wide_returns_6() {
+        let menu = BottomPanelState::open_approval("bash", "command: echo hello world");
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        assert_eq!(comp.height_hint(80), 6);
+        assert_eq!(comp.height_hint(120), 6);
+        assert_eq!(comp.height_hint(60), 6);
+    }
+
+    #[test]
+    fn test_approval_height_narrow_returns_more_than_6() {
+        let long_args = "command: cargo test --workspace --locked --all-features";
+        let menu = BottomPanelState::open_approval("bash", long_args);
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let h = comp.height_hint(40);
+        assert!(
+            h > 6,
+            "narrow width with long args should need >6 rows, got {h}"
+        );
+    }
+
+    #[test]
+    fn test_approval_height_empty_args_returns_6() {
+        let menu = BottomPanelState::open_approval("read", "");
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        assert_eq!(comp.height_hint(40), 6);
+        assert_eq!(comp.height_hint(80), 6);
+    }
+
+    #[test]
+    fn test_approval_height_capped_by_max_height() {
+        let menu = BottomPanelState::open_approval("bash", "command: echo hello");
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: 3,
+        };
+        assert_eq!(comp.height_hint(80), 3);
+        assert_eq!(comp.height_hint(40), 3);
+    }
+
+    // ── wrap_text_to_lines helper (F110) ───────────────────────────────
+
+    #[test]
+    fn test_wrap_text_fits_in_one_line() {
+        let lines = wrap_text_to_lines("hello world", 20, 2);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "hello world");
+    }
+
+    #[test]
+    fn test_wrap_text_truncates_with_ellipsis() {
+        let lines = wrap_text_to_lines("abcdefghij", 4, 2);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "abcd");
+        assert!(
+            lines[1].ends_with('…'),
+            "last line should end with ellipsis: {}",
+            lines[1]
+        );
+    }
+
+    #[test]
+    fn test_wrap_text_no_truncation_when_exact_fit() {
+        let lines = wrap_text_to_lines("abcdefgh", 4, 2);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "abcd");
+        assert_eq!(lines[1], "efgh");
+    }
+
+    #[test]
+    fn test_wrap_text_empty_input() {
+        assert!(wrap_text_to_lines("", 10, 2).is_empty());
+        assert!(wrap_text_to_lines("hello", 0, 2).is_empty());
+        assert!(wrap_text_to_lines("hello", 10, 0).is_empty());
+    }
+
+    #[test]
+    fn test_wrap_text_replaces_newlines() {
+        let lines = wrap_text_to_lines("hello\nworld", 20, 2);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "hello world");
+    }
+
+    // ── approval_natural_height (F110) ─────────────────────────────────
+
+    #[test]
+    fn test_approval_natural_height_wide() {
+        assert_eq!(approval_natural_height(80, "some args"), 6);
+        assert_eq!(approval_natural_height(60, "some args"), 6);
+    }
+
+    #[test]
+    fn test_approval_natural_height_narrow_empty_args() {
+        assert_eq!(approval_natural_height(40, ""), 6);
+        assert_eq!(approval_natural_height(40, "   "), 6);
+    }
+
+    #[test]
+    fn test_approval_natural_height_narrow_with_args() {
+        let h = approval_natural_height(40, "command: echo hello world test");
+        assert!(h > 6, "narrow with args should need >6 rows, got {h}");
+    }
+
+    // ── Approval panel buffer rendering (F110) ────────────────────────
+
+    fn render_approval_to_buffer(
+        tool_name: &str,
+        arguments: &str,
+        width: u16,
+        selected: usize,
+    ) -> (ratatui::buffer::Buffer, u16) {
+        let menu = BottomPanelState::open_approval(tool_name, arguments);
+        let mut menu = menu;
+        menu.selected_index = selected;
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let h = comp.height_hint(width);
+        let area = ratatui::layout::Rect::new(0, 0, width, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
+        (buf, h)
+    }
+
+    fn buffer_line_content(buf: &ratatui::buffer::Buffer, y: u16, width: u16) -> String {
+        (0..width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect::<String>()
+            .trim_end()
+            .to_string()
+    }
+
+    fn buffer_contains(
+        buf: &ratatui::buffer::Buffer,
+        width: u16,
+        height: u16,
+        needle: &str,
+    ) -> bool {
+        (0..height).any(|y| buffer_line_content(buf, y, width).contains(needle))
+    }
+
+    #[test]
+    fn test_approval_render_80_cols_shows_tool_name_and_options() {
+        let (buf, h) = render_approval_to_buffer("bash", "command: echo hello", 80, 0);
+        assert!(h >= 5);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 80))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(all.contains("bash"), "tool name must be visible");
+        assert!(
+            all.contains("[y] approve"),
+            "approve option must be visible"
+        );
+        assert!(
+            all.contains("[a] always approve"),
+            "always option must be visible"
+        );
+        assert!(all.contains("[n] deny"), "deny option must be visible");
+    }
+
+    #[test]
+    fn test_approval_render_40_cols_shows_tool_name_and_options() {
+        let (buf, h) = render_approval_to_buffer("bash", "command: echo hello world test", 40, 0);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 40))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(all.contains("bash"), "tool name must be visible at 40 cols");
+        assert!(
+            all.contains("[y] approve"),
+            "approve option must be visible at 40 cols"
+        );
+        assert!(
+            all.contains("[n] deny"),
+            "deny option must be visible at 40 cols"
+        );
+    }
+
+    #[test]
+    fn test_approval_render_120_cols_shows_all() {
+        let (buf, h) =
+            render_approval_to_buffer("write", "path: /some/long/path/to/file.rs", 120, 0);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 120))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(all.contains("write"));
+        assert!(all.contains("[y] approve"));
+        assert!(all.contains("[n] deny"));
+    }
+
+    #[test]
+    fn test_approval_render_selected_style_differs() {
+        let (buf, _) = render_approval_to_buffer("bash", "echo hi", 80, 0);
+        let selected_line = buffer_line_content(&buf, 2, 80);
+        let unselected_line = buffer_line_content(&buf, 3, 80);
+        assert!(
+            selected_line.contains("[y] approve"),
+            "first option should be selected: {selected_line}"
+        );
+        assert!(
+            unselected_line.contains("[a] always approve"),
+            "second option should be unselected: {unselected_line}"
+        );
+        let selected_cell = &buf[(2, 2)];
+        let unselected_cell = &buf[(2, 3)];
+        assert_ne!(
+            selected_cell.bg, unselected_cell.bg,
+            "selected and unselected must have different background"
+        );
+    }
+
+    #[test]
+    fn test_approval_render_40_cols_args_max_2_lines() {
+        let long_args = "a".repeat(200);
+        let (buf, h) = render_approval_to_buffer("bash", &long_args, 40, 0);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 40))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(all.contains("bash"), "tool name must be visible");
+        assert!(all.contains("[y] approve"), "options must be visible");
+        assert!(all.contains("[n] deny"));
+    }
+
+    #[test]
+    fn test_approval_render_insufficient_height_keeps_options() {
+        let menu = BottomPanelState::open_approval("bash", "command: echo hello world");
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: 5,
+        };
+        let h = comp.height_hint(40);
+        assert_eq!(h, 5, "should be capped at 5");
+        let area = ratatui::layout::Rect::new(0, 0, 40, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 40))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(all.contains("bash"), "tool name must survive clipping");
+        assert!(all.contains("[y] approve"), "options must survive clipping");
+        assert!(
+            all.contains("[n] deny"),
+            "all 3 options should fit at height 5"
+        );
+    }
+
+    #[test]
+    fn test_approval_render_no_overflow_at_various_widths() {
+        for width in [40u16, 60, 80, 120] {
+            let (buf, h) = render_approval_to_buffer(
+                "bash",
+                "command: echo test args here with some length",
+                width,
+                0,
+            );
+            for y in 0..h {
+                let line = buffer_line_content(&buf, y, width);
+                let display_w = unicode_width::UnicodeWidthStr::width(line.as_str());
+                assert!(
+                    display_w <= width as usize,
+                    "line {y} at width {width} has display width {display_w}: {line:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_approval_render_cjk_display_width_no_overflow() {
+        let cjk_args = "路径: /测试目录/文件名.txt 参数: 执行命令";
+        let lines = wrap_text_to_lines(cjk_args, 36, 2);
+        for line in &lines {
+            let dw = unicode_width::UnicodeWidthStr::width(line.as_str());
+            assert!(
+                dw <= 36,
+                "CJK wrap line display width {dw} exceeds 36: {line:?}"
+            );
+        }
+        let menu = BottomPanelState::open_approval("文件操作", cjk_args);
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let h = comp.height_hint(40);
+        let area = ratatui::layout::Rect::new(0, 0, 40, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
+    }
+
+    #[test]
+    fn test_approval_render_cjk_tool_name() {
+        let menu = BottomPanelState::open_approval("文件操作", "路径: /测试/文件.txt");
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let h = comp.height_hint(80);
+        assert!(h >= 6, "CJK tool name should produce valid height");
+        let area = ratatui::layout::Rect::new(0, 0, 80, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
+        let all = (0..h)
+            .map(|y| buffer_line_content(&buf, y, 80))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            all.contains("[y] approve"),
+            "options must be visible with CJK tool name"
+        );
+        assert!(all.contains("[n] deny"));
+    }
+
+    // ── extract_thinking_title (F112) ──────────────────────────────────
+
+    #[test]
+    fn test_thinking_title_standalone_bold() {
+        assert_eq!(
+            extract_thinking_title("**Analyzing the problem**\n\nLet me think about..."),
+            Some("Analyzing the problem")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_eof_after_title() {
+        assert_eq!(extract_thinking_title("**Title**"), Some("Title"));
+    }
+
+    #[test]
+    fn test_thinking_title_trailing_newline() {
+        assert_eq!(extract_thinking_title("**Title**\n"), Some("Title"));
+    }
+
+    #[test]
+    fn test_thinking_title_most_recent_wins() {
+        assert_eq!(
+            extract_thinking_title("prefix\n\n**First**\n\nbody\n\n**Second**\n\nmore"),
+            Some("Second")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_crlf_input() {
+        assert_eq!(
+            extract_thinking_title("**Title**\r\n\r\nbody"),
+            Some("Title")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_inline_bold_does_not_match() {
+        assert_eq!(
+            extract_thinking_title("Here is **bold** text in a line"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_no_blank_line_after_does_not_match() {
+        assert_eq!(extract_thinking_title("**Title**\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_inline_suffix_does_not_match() {
+        assert_eq!(extract_thinking_title("**Important:** inline text"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_empty_markers_do_not_match() {
+        assert_eq!(extract_thinking_title("****\n\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_unclosed_does_not_match() {
+        assert_eq!(extract_thinking_title("**未闭合\n\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_inner_asterisk_does_not_match() {
+        assert_eq!(extract_thinking_title("**含*星号*的标题**\n\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_no_title_returns_none() {
+        assert_eq!(extract_thinking_title("just regular thinking text"), None);
+        assert_eq!(extract_thinking_title(""), None);
+    }
+
+    #[test]
+    fn test_thinking_title_cjk_title() {
+        assert_eq!(
+            extract_thinking_title("**分析问题**\n\n接下来..."),
+            Some("分析问题")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_title_without_body_section() {
+        assert_eq!(
+            extract_thinking_title("intro\n\n**Step 1**\n\ndetails\n\n**Step 2**\n"),
+            Some("Step 2")
+        );
     }
 
     // ── Status bar redesign ────────────────────────────────────────────

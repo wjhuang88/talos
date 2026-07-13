@@ -33,6 +33,7 @@ talos-evolution = { version = "0.3.4", path = "../talos-evolution" }
 talos-skill = { version = "0.3.4", path = "../talos-skill" }
 talos-exploration = { version = "0.3.4", path = "../talos-exploration" }
 talos-dashboard = { version = "0.3.4", path = "../talos-dashboard" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1.2"
 async-trait = "0.1"

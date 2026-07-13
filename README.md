@@ -567,11 +567,15 @@ Include the following diagnostic information in your bug report:
 talos --version                    # version and build info
 talos config list                  # redacted config (secrets masked as ***)
 talos storage status               # local data directory sizes and session counts
+talos diagnostics status --json    # JSON diagnostics (iterations, gates, trust, redacted)
 talos --governance-status          # governance manifest and board disposition
 ```
 
 All diagnostic commands mask secrets. `config list` replaces `api_key` values with `***` while
-preserving `api_key_env` variable names so you can share output safely.
+preserving `api_key_env` variable names so you can share output safely. `diagnostics status --json`
+emits valid JSON via `serde_json` with dynamic iteration state from `docs/iterations/README.md`,
+typed residual gates, and bounded `unavailable` diagnostics when governance sources are missing or
+malformed.
 
 ### Debug Logging
 

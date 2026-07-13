@@ -543,9 +543,16 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     tui.set_session_id(session.id.to_string());
 
     let skill_diagnostics = runtime_skills.lock().await.diagnostics();
+    let hook_decls: Vec<(String, String, bool)> = config
+        .hooks
+        .declarations
+        .iter()
+        .map(|d| (d.name.clone(), d.event.clone(), d.enabled))
+        .collect();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(skill_diagnostics)
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec())
+        .with_hook_declarations(hook_decls.clone())
         .with_workspace_root(workspace_root.clone());
     let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
@@ -586,10 +593,17 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     if config.dashboard.enabled {
+        let ext_snapshot = talos_conversation::build_extension_snapshot(
+            mcp_runtime.diagnostics(),
+            &hook_decls,
+            &[],
+        );
+        let extensions = serde_json::to_value(&ext_snapshot).unwrap_or(serde_json::Value::Null);
         let snapshot = crate::dashboard_helpers::build_dashboard_snapshot(
             &config,
             &session_manager,
             &workspace_root_str,
+            extensions,
         );
         let server = talos_dashboard::DashboardServer::with_loopback_only(
             snapshot,

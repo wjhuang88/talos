@@ -6,24 +6,25 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
-## Current Four-Month Productization Sequence (2026-07-12)
+## Current Four-Month Frontline Reliability Sequence (2026-07-13)
 
 The current planning owner is
-[`2026-07-12-four-month-trust-productization-plan`](../tasks/2026-07-12-four-month-trust-productization-plan.md).
-It preserves earlier iteration history while replacing the unactivated I086-I089 path with:
+[`2026-07-13-four-month-frontline-reliability-plan`](../tasks/2026-07-13-four-month-frontline-reliability-plan.md).
+The single resumable long-task owner is
+[`2026-07-13-frontline-developer-execution-package`](../tasks/2026-07-13-frontline-developer-execution-package.md).
+It preserves the completed I116-I119 history and defines four new sequential iterations:
 
 | Month | Iteration | Runnable Exit |
 |---|---|---|
-| 1 | I116 State Truth And Operator Baseline | Truth-synchronized governance plus repeatable operator smoke/status evidence |
-| 2 | I117 Command Sandbox Evidence | PERM-005 evidence boundary with strict unknown/out-of-repo fallback and trust revoke |
-| 3 | I118 Bounded Local Productization | Local/read-only extension, ingestion, dashboard, and installer release-candidate smoke |
-| 4 | I119 Talos-Primary Release Decision | Two replayable Talos-primary task packets, REL-002 re-audit, and conditional release decision |
+| 1 | I120 Dynamic Diagnostics Truth | Valid, redacted, dynamically derived diagnostics in text and JSON |
+| 2 | I121 TUI Attention And Thinking Clarity | Prominent approval UX and concise transient thinking titles |
+| 3 | I122 Local Extension And Control Diagnostics | Consistent read-only extension state across CLI/TUI/dashboard |
+| 4 | I123 Installation And Trial Confidence | Installer fixtures and replayable clean-HOME local trial |
 
-I116 is Active after I085 received an explicit continued-Paused disposition and I106-I109 closed
-Complete without changing their non-qualifying REL-002 evidence. Execute from
-[`2026-07-12-developer-trust-productization-long-task`](../tasks/2026-07-12-developer-trust-productization-long-task.md).
-Later months activate sequentially. The task does not authorize v1.0, permission broadening,
-remote/browser control, marketplace behavior, push, or release actions.
+No iteration is Active at publication. The assignee activates I120 only after the long-task Gate 0;
+later iterations activate sequentially after their predecessor closes. F100-F133 are stories inside
+those iterations, not iterations or independent long tasks. The long task does not authorize v1.0,
+permission changes, remote/write control, plugin host calls, push, tag, publish, or release actions.
 
 ```
 I001 "Project Scaffold"  cargo check --workspace               能编译 ✅

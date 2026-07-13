@@ -353,12 +353,15 @@ pub(crate) fn bottom_panel_rows(total: usize, area_height: u16) -> (usize, bool,
 }
 
 impl ViewportComponent for BottomPanelComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 {
+    fn height_hint(&self, w: u16) -> u16 {
         if !self.menu.is_open {
             return 0;
         }
         if self.menu.is_approval() {
-            return 5u16.min(self.max_height);
+            let Some(crate::state::PanelKind::Approval { arguments, .. }) = &self.menu.kind else {
+                return 0;
+            };
+            return approval_natural_height(w, arguments).min(self.max_height);
         }
         if self.menu.is_credential_input() {
             let (is_connect, has_default_endpoint) = match &self.menu.kind {
@@ -637,31 +640,57 @@ impl BottomPanelComponent<'_> {
         let warn = semantic::TEXT_WARNING;
         let accent = semantic::TEXT_ACCENT;
         let dim = semantic::DIM_TEXT;
-        let bg = semantic::NORD2;
+        let nord2 = semantic::NORD2;
         let input_bg = semantic::INPUT_BG;
-        let selected_style = Style::default().fg(accent).bg(bg);
+        let selected_style = Style::default().fg(accent).bg(nord2);
         let unselected_style = Style::default().fg(dim).bg(input_bg);
 
-        let mut lines: Vec<Line<'static>> = Vec::with_capacity(5);
+        let width = area.width;
+        let height = area.height as usize;
+        let wide = width >= 60;
 
-        let separator = format!(" {}", "─".repeat(area.width.saturating_sub(1) as usize));
-        lines.push(Line::from(Span::styled(
-            separator,
-            Style::default().fg(dim),
-        )));
+        let mut lines: Vec<Line<'static>> = Vec::new();
 
-        let prefix = format!("  \u{26a0} {tool_name}: ");
-        let arg_width = area
-            .width
-            .saturating_sub(prefix.chars().count() as u16)
-            .max(1) as usize;
-        let arguments = truncate_one_line(arguments, arg_width);
-        lines.push(Line::from(Span::styled(
-            format!("{prefix}{arguments}"),
-            Style::default().fg(warn).bg(bg).bold(),
-        )));
+        let sep = format!(" {}", "─".repeat(width.saturating_sub(1) as usize));
+        lines.push(Line::from(Span::styled(sep, Style::default().fg(dim))));
+
+        if wide {
+            let prefix = format!("  \u{26a0} {tool_name}: ");
+            let arg_w = width
+                .saturating_sub(unicode_width::UnicodeWidthStr::width(prefix.as_str()) as u16)
+                .max(1) as usize;
+            let args_disp = truncate_one_line(arguments, arg_w);
+            lines.push(Line::from(Span::styled(
+                format!("{prefix}{args_disp}"),
+                Style::default().fg(warn).bg(nord2).bold(),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                format!("  \u{26a0} {tool_name}"),
+                Style::default().fg(warn).bg(nord2).bold(),
+            )));
+        }
+
+        let options_count = self.menu.items.len();
+        let mandatory = 1 + 1 + options_count;
+        let budget = height.saturating_sub(mandatory);
+
+        if !wide && !arguments.trim().is_empty() && budget > 0 {
+            let arg_w = (width as usize).saturating_sub(4).max(1);
+            let arg_max = budget.min(2);
+            let wrapped = wrap_text_to_lines(arguments, arg_w, arg_max);
+            for wl in &wrapped {
+                lines.push(Line::from(Span::styled(
+                    format!("  {wl}"),
+                    Style::default().fg(warn).bg(input_bg),
+                )));
+            }
+        }
 
         for (i, item) in self.menu.items.iter().enumerate() {
+            if lines.len() >= height {
+                break;
+            }
             let is_selected = i == self.menu.selected_index;
             let style = if is_selected {
                 selected_style
@@ -671,10 +700,12 @@ impl BottomPanelComponent<'_> {
             lines.push(Line::from(Span::styled(format!("  {}", item.label), style)));
         }
 
-        lines.push(Line::from(Span::styled(
-            "  Up/Down to navigate, Enter to confirm",
-            Style::default().fg(dim).bg(input_bg),
-        )));
+        if lines.len() < height {
+            lines.push(Line::from(Span::styled(
+                "  Up/Down to navigate, Enter to confirm",
+                Style::default().fg(dim).bg(input_bg),
+            )));
+        }
 
         frame.render_widget(
             Paragraph::new(Text::from(lines)).style(Style::default().bg(input_bg)),
@@ -683,21 +714,109 @@ impl BottomPanelComponent<'_> {
     }
 }
 
-fn truncate_one_line(value: &str, max_chars: usize) -> String {
+fn truncate_one_line(value: &str, max_width: usize) -> String {
     let single = value.replace('\n', " ");
-    let chars: Vec<char> = single.chars().collect();
-    if chars.len() <= max_chars {
-        single
-    } else if max_chars == 0 {
-        String::new()
-    } else {
-        format!(
-            "{}…",
-            chars[..max_chars.saturating_sub(1)]
-                .iter()
-                .collect::<String>()
-        )
+    if unicode_width::UnicodeWidthStr::width(single.as_str()) <= max_width {
+        return single;
     }
+    if max_width == 0 {
+        return String::new();
+    }
+    let mut width = 0usize;
+    let mut result = String::new();
+    for ch in single.chars() {
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + cw > max_width.saturating_sub(1) {
+            break;
+        }
+        result.push(ch);
+        width += cw;
+    }
+    result + "…"
+}
+
+pub(crate) fn approval_natural_height(width: u16, arguments: &str) -> u16 {
+    const BASE: u16 = 6;
+    if width >= 60 || arguments.trim().is_empty() {
+        BASE
+    } else {
+        let arg_w = (width as usize).saturating_sub(4).max(1);
+        let wrapped = wrap_text_to_lines(arguments, arg_w, 2);
+        BASE + wrapped.len() as u16
+    }
+}
+
+pub(crate) fn wrap_text_to_lines(text: &str, max_width: usize, max_lines: usize) -> Vec<String> {
+    if max_width == 0 || max_lines == 0 {
+        return Vec::new();
+    }
+    let flat: String = text
+        .chars()
+        .map(|c| if c == '\n' { ' ' } else { c })
+        .collect();
+
+    let mut all_lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut current_w = 0usize;
+
+    for ch in flat.chars() {
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if current_w + cw > max_width && !current.is_empty() {
+            all_lines.push(std::mem::take(&mut current));
+            current_w = 0;
+        }
+        current.push(ch);
+        current_w += cw;
+    }
+    if !current.is_empty() {
+        all_lines.push(current);
+    }
+
+    if all_lines.is_empty() {
+        return Vec::new();
+    }
+
+    if all_lines.len() <= max_lines {
+        return all_lines;
+    }
+
+    let mut result: Vec<String> = all_lines[..max_lines].to_vec();
+    if let Some(last) = result.last_mut() {
+        while unicode_width::UnicodeWidthStr::width(last.as_str()) >= max_width && !last.is_empty()
+        {
+            last.pop();
+        }
+        last.push('…');
+    }
+    result
+}
+
+pub(crate) fn extract_thinking_title(text: &str) -> Option<&str> {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let mut last_title: Option<&str> = None;
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        let Some(title) = parse_standalone_bold(trimmed) else {
+            continue;
+        };
+        let followed_by_empty_or_eof = match lines.get(i + 1) {
+            None => true,
+            Some(next) => next.trim().is_empty(),
+        };
+        if followed_by_empty_or_eof {
+            last_title = Some(title);
+        }
+    }
+    last_title
+}
+
+fn parse_standalone_bold(line: &str) -> Option<&str> {
+    let after_open = line.strip_prefix("**")?;
+    let title = after_open.strip_suffix("**")?;
+    if title.is_empty() || title.contains('*') {
+        return None;
+    }
+    Some(title)
 }
 
 pub(crate) fn truncate_end_to_width(s: &str, max_width: u16) -> String {

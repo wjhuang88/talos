@@ -7,8 +7,9 @@ use talos_core::tool::ToolProvenance;
 
 use crate::command_registry::{MOCK_REQUEST_COMMAND, command_registry};
 use crate::types::{
-    ChatMessage, ContentOutput, CopyScope, McpServerDiagnostic, MessageRole, MessageSource,
-    MessageStatus, ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
+    ChatMessage, ContentOutput, CopyScope, ExtensionSnapshot, HookDeclarationDiagnostic,
+    HookSnapshot, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
+    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
     SkillDiagnostic, StatusSnapshot, TipKind, TodoCommandAction, TodoCommandRequest,
     TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput,
@@ -232,6 +233,11 @@ impl ConversationEngine {
 
     pub fn with_mcp_servers(mut self, servers: Vec<McpServerDiagnostic>) -> Self {
         self.mcp_servers = servers;
+        self
+    }
+
+    pub fn with_hook_declarations(mut self, hooks: Vec<(String, String, bool)>) -> Self {
+        self.hook_declarations = hooks;
         self
     }
 
@@ -541,8 +547,7 @@ impl ConversationEngine {
                 outputs.push(content_block(MessageSource::System, text));
             }
             "/plugins" => {
-                let text = "[System] /plugins is reserved for future plugin packages.\n[System] Use /mcp to inspect MCP server status and tool provenance.\n".to_string();
-                outputs.push(content_block(MessageSource::System, text));
+                outputs.extend(self.handle_plugins_command());
             }
             "/mcp" => {
                 outputs.extend(self.handle_mcp_command());
@@ -743,15 +748,16 @@ impl ConversationEngine {
     }
 
     fn handle_mcp_command(&mut self) -> Vec<UiOutput> {
-        if self.mcp_servers.is_empty() && self.plugin_observations.is_empty() {
+        let snap = self.extension_snapshot();
+        if snap.mcp_servers.is_empty() && snap.provenance.is_empty() {
             let text = "[System] No MCP servers configured and no tool provenance observed yet.\n"
                 .to_string();
             return vec![content_block(MessageSource::System, text)];
         }
         let mut text = String::new();
-        if !self.mcp_servers.is_empty() {
+        if !snap.mcp_servers.is_empty() {
             text.push_str("[System] MCP servers (startup snapshot):\n");
-            for server in &self.mcp_servers {
+            for server in &snap.mcp_servers {
                 if server.connected {
                     text.push_str(&format!(
                         "[System]   {} (connected, {} tool{})\n",
@@ -768,9 +774,9 @@ impl ConversationEngine {
                 }
             }
         }
-        if !self.plugin_observations.is_empty() {
+        if !snap.provenance.is_empty() {
             text.push_str("[System] Observed tool provenance (this session):\n");
-            for entry in &self.plugin_observations {
+            for entry in &snap.provenance {
                 text.push_str(&format!(
                     "[System]   {} ({} call{})\n",
                     entry.key,
@@ -779,29 +785,98 @@ impl ConversationEngine {
                 ));
             }
         }
+        let mcp_collisions: Vec<_> = snap
+            .collisions
+            .iter()
+            .filter(|c| c.starts_with("mcp:"))
+            .collect();
+        if !mcp_collisions.is_empty() {
+            text.push_str(&format!(
+                "[System]   collisions: {}\n",
+                mcp_collisions
+                    .iter()
+                    .map(|c| c.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
         vec![content_block(MessageSource::System, text)]
     }
 
     fn handle_hooks_command(&self) -> Vec<UiOutput> {
+        let snap = self.extension_snapshot();
         let mut text = String::new();
         text.push_str("[System] Hooks diagnostics:\n");
 
-        if self.hook_declarations.is_empty() {
+        if snap.hooks.declarations.is_empty() {
             text.push_str("[System]   config-introduced hooks: none declared\n");
         } else {
             text.push_str(&format!(
                 "[System]   config-introduced hooks: {} declared\n",
-                self.hook_declarations.len()
+                snap.hooks.declarations.len()
             ));
-            for (name, event, enabled) in &self.hook_declarations {
-                let status = if *enabled { "enabled" } else { "disabled" };
-                text.push_str(&format!("[System]     {name} ({event}) [{status}]\n"));
+            for d in &snap.hooks.declarations {
+                let status = if d.enabled { "enabled" } else { "disabled" };
+                text.push_str(&format!(
+                    "[System]     {} ({}) [{status}]\n",
+                    d.name, d.event
+                ));
             }
         }
-        text.push_str("[System]   executable hook carriers: disabled\n");
+        text.push_str(&format!(
+            "[System]   executable hook carriers: {}\n",
+            if snap.hooks.executable_carriers_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        ));
         text.push_str("[System]   builtin hook event catalog:\n");
-        for kind in talos_plugin::ALL_HOOK_EVENT_KINDS {
+        for kind in &snap.hooks.event_catalog {
             text.push_str(&format!("[System]     {kind}\n"));
+        }
+        let hook_collisions: Vec<_> = snap
+            .collisions
+            .iter()
+            .filter(|c| c.starts_with("hook:"))
+            .collect();
+        if !hook_collisions.is_empty() {
+            text.push_str(&format!(
+                "[System]   collisions: {}\n",
+                hook_collisions
+                    .iter()
+                    .map(|c| c.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        vec![content_block(MessageSource::System, text)]
+    }
+
+    fn handle_plugins_command(&self) -> Vec<UiOutput> {
+        let snap = self.extension_snapshot();
+        let mut text = String::new();
+        text.push_str("[System] Extension diagnostics:\n");
+        text.push_str(&format!(
+            "[System]   MCP servers: {} ({} connected)\n",
+            snap.mcp_servers.len(),
+            snap.mcp_servers.iter().filter(|s| s.connected).count()
+        ));
+        text.push_str(&format!(
+            "[System]   Hook declarations: {}\n",
+            snap.hooks.declarations.len()
+        ));
+        text.push_str(&format!(
+            "[System]   Provenance observations: {}\n",
+            snap.provenance.len()
+        ));
+        text.push_str("[System]   WASM plugin packages: not yet available\n");
+        text.push_str("[System] Use /mcp for MCP detail, /hooks for hook detail.\n");
+        if !snap.collisions.is_empty() {
+            text.push_str(&format!(
+                "[System]   collisions: {}\n",
+                snap.collisions.join(", ")
+            ));
         }
         vec![content_block(MessageSource::System, text)]
     }
@@ -1051,4 +1126,101 @@ impl ConversationEngine {
                 .push(PluginObservation { key, count: 1 });
         }
     }
+
+    pub fn extension_snapshot(&self) -> ExtensionSnapshot {
+        build_extension_snapshot(
+            &self.mcp_servers,
+            &self.hook_declarations,
+            &self.plugin_observations,
+        )
+    }
+}
+
+pub fn build_extension_snapshot(
+    mcp_servers: &[McpServerDiagnostic],
+    hook_declarations: &[(String, String, bool)],
+    provenance: &[PluginObservation],
+) -> ExtensionSnapshot {
+    let sanitized_mcp: Vec<McpServerDiagnostic> = mcp_servers
+        .iter()
+        .map(|s| McpServerDiagnostic {
+            name: s.name.clone(),
+            connected: s.connected,
+            tool_count: s.tool_count,
+            error: s.error.as_deref().map(categorize_mcp_error),
+        })
+        .collect();
+
+    let mut seen_mcp = std::collections::HashSet::new();
+    let mut collisions = Vec::new();
+    for server in &sanitized_mcp {
+        if !seen_mcp.insert(&server.name) {
+            collisions.push(format!("mcp:{}", server.name));
+        }
+    }
+    let mut seen_hooks = std::collections::HashSet::new();
+    for (name, _, _) in hook_declarations {
+        if !seen_hooks.insert(name.as_str()) {
+            collisions.push(format!("hook:{name}"));
+        }
+    }
+
+    let declarations = hook_declarations
+        .iter()
+        .map(|(name, event, enabled)| HookDeclarationDiagnostic {
+            name: name.clone(),
+            event: event.clone(),
+            enabled: *enabled,
+        })
+        .collect();
+
+    let event_catalog = talos_plugin::ALL_HOOK_EVENT_KINDS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    ExtensionSnapshot {
+        mcp_servers: sanitized_mcp,
+        hooks: HookSnapshot {
+            declarations,
+            executable_carriers_enabled: false,
+            event_catalog,
+        },
+        provenance: provenance.to_vec(),
+        collisions,
+    }
+}
+
+/// Maps a raw MCP error string to a bounded, fixed category label.
+///
+/// Never returns any substring of the input. This guarantees no credential,
+/// token, or query parameter can leak through diagnostics output regardless
+/// of how many times it appears in the raw error text — the raw text is
+/// discarded entirely, not scanned-and-patched.
+fn categorize_mcp_error(raw: &str) -> String {
+    let lower = raw.to_lowercase();
+    let category = if lower.contains("timeout") || lower.contains("timed out") {
+        "timeout"
+    } else if lower.contains("invalid") && lower.contains("config") {
+        "invalid_configuration"
+    } else if lower.contains("spawn") {
+        "spawn_failed"
+    } else if lower.contains("disconnect") {
+        "disconnected"
+    } else if lower.contains("refused")
+        || lower.contains("connect")
+        || lower.contains("unreachable")
+        || lower.contains("dns")
+    {
+        "connection_failed"
+    } else if lower.contains("rpc") || lower.contains("protocol") || lower.contains("json") {
+        "protocol_error"
+    } else if lower.contains("initializ") {
+        "initialization_failed"
+    } else if lower.contains("http") {
+        "network_error"
+    } else {
+        "unavailable"
+    };
+    category.to_string()
 }

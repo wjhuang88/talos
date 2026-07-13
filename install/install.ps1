@@ -3,6 +3,13 @@
 # Usage:
 #   iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 #
+# Test-only parameter:
+#   -SkipSelfCheck is used by the offline fixture because its archive contains a
+#   deliberately non-runnable placement stub. Normal installs always self-check.
+param(
+  [switch]$SkipSelfCheck
+)
+
 # Environment overrides:
 #   $env:TALOS_REPO         GitHub <owner>/<repo>   (default: wjhuang88/talos)
 #   $env:TALOS_VERSION      release tag or 'latest' (default: latest)
@@ -40,8 +47,40 @@ New-Item -ItemType Directory -Path $TmpDir | Out-Null
 
 try {
   Write-Host "-> downloading talos $Version ($Target)"
-  Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Archive" -OutFile (Join-Path $TmpDir $Archive)
-  Expand-Archive -Path (Join-Path $TmpDir $Archive) -DestinationPath $TmpDir -Force
+  $ArchivePath = Join-Path $TmpDir $Archive
+  Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Archive" -OutFile $ArchivePath
+
+  # best-effort checksum verification (mirrors install.sh against the release checksum.sha256)
+  $ChecksumPath = Join-Path $TmpDir 'checksum.sha256'
+  try {
+    Invoke-WebRequest -UseBasicParsing -Uri "$Base/checksum.sha256" -OutFile $ChecksumPath -ErrorAction Stop
+  } catch {
+    $ChecksumPath = $null
+  }
+  if ($ChecksumPath -and (Test-Path $ChecksumPath)) {
+    $Expected = $null
+    foreach ($line in (Get-Content $ChecksumPath)) {
+      $line = $line.Trim()
+      if (-not $line) { continue }
+      $parts = $line -split '\s+'
+      if ($parts.Count -ge 2) {
+        $name = $parts[1]
+        if ($name.StartsWith('*')) { $name = $name.Substring(1) }
+        if ($name -eq $Archive) { $Expected = $parts[0]; break }
+      }
+    }
+    if ($Expected) {
+      $Actual = (Get-FileHash -Algorithm SHA256 -Path $ArchivePath).Hash.ToLower()
+      if ($Actual -ne $Expected.ToLower()) {
+        throw "checksum mismatch for $Archive (expected $Expected, got $Actual)"
+      }
+      Write-Host "-> checksum verified"
+    }
+  } else {
+    Write-Host "note: checksum.sha256 not available; skipping checksum verification"
+  }
+
+  Expand-Archive -Path $ArchivePath -DestinationPath $TmpDir -Force
   Move-Item -Path (Join-Path $TmpDir 'talos.exe') -Destination (Join-Path $InstallDir 'talos.exe') -Force
 } finally {
   Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
@@ -51,4 +90,10 @@ Write-Host "-> installed talos to $(Join-Path $InstallDir 'talos.exe')"
 if (-not (($env:PATH -split ';') -contains $InstallDir)) {
   Write-Host "note: add $InstallDir to your PATH"
 }
-& (Join-Path $InstallDir 'talos.exe') --version 2>$null
+if ($IsWindows -and -not $SkipSelfCheck) {
+  & (Join-Path $InstallDir 'talos.exe') --version
+} elseif ($SkipSelfCheck) {
+  Write-Host "note: skipping self-check for installer fixture"
+} else {
+  Write-Host "note: skipping self-check (talos.exe is a Windows binary; run it on Windows to verify --version)"
+}

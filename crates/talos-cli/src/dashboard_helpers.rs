@@ -7,6 +7,7 @@ pub(crate) fn build_dashboard_snapshot(
     config: &Config,
     session_manager: &talos_session::SessionManager,
     workspace_root: &str,
+    extensions: serde_json::Value,
 ) -> talos_dashboard::DashboardSnapshot {
     let config_toml = toml::to_string_pretty(config).unwrap_or_default();
     let config_masked = crate::mask_secrets(&config_toml, config);
@@ -43,6 +44,7 @@ pub(crate) fn build_dashboard_snapshot(
         status,
         history,
         governance,
+        extensions,
     }
 }
 

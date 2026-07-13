@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | HOOK-001 |
-| Status | **Planned — architecture unblocked 2026-06-30**. ADR-029 accepted. First slice is schema and diagnostics for config-introduced hooks; executable hook carriers remain governed by ADR-027. |
+| Status | **Partial — schema and diagnostics delivered in I091; I122 selects read-only consistency closeout**. Executable hook carriers remain governed by ADR-027 and are not selected. |
 | Priority | P3 |
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | PLUGIN-001, CMD-002, `talos-plugin`, I009 |

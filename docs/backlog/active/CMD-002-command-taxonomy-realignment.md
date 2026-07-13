@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | CMD-002 |
-| Status | **Planned — architecture unblocked 2026-06-30**. ADR-030 accepted. First slice can move MCP status to `/mcp` and make `/plugins` a transition notice before plugin packages ship. |
+| Status | **Partial — taxonomy and first diagnostics slices delivered; I122 selects read-only consistency closeout**. `/mcp`, `/plugins`, and `/hooks` exist; broader plugin packages and executable hook behavior remain excluded. |
 | Priority | P2 |
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | CMD-001, PLUGIN-001, EXT-001, HOOK-001, ADR-009 |

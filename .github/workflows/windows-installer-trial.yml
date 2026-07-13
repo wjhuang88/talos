@@ -1,0 +1,40 @@
+name: Windows Installer Trial
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub Release tag whose Windows x86_64 asset will be installed
+        required: true
+        default: v0.3.4
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  real-install:
+    name: Real Windows x86_64 install
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install published artifact and verify version
+        shell: pwsh
+        env:
+          TALOS_REPO: ${{ github.repository }}
+          TALOS_VERSION: ${{ inputs.release_tag }}
+          TALOS_INSTALL_DIR: ${{ runner.temp }}\\talos-install
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & ./install/install.ps1
+          $binary = Join-Path $env:TALOS_INSTALL_DIR 'talos.exe'
+          if (-not (Test-Path $binary)) {
+            throw "installer did not create $binary"
+          }
+          $version = & $binary --version 2>&1
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^talos ') {
+            throw "installed talos.exe --version failed: $version"
+          }
+          Write-Host "verified: $version"

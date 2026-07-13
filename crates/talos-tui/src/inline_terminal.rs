@@ -26,6 +26,11 @@ impl<'a> InlineFrame<'a> {
         self.area
     }
 
+    #[cfg(test)]
+    pub(crate) fn new(area: Rect, buffer: &'a mut Buffer) -> Self {
+        Self { area, buffer }
+    }
+
     pub fn render_widget<W: Widget>(&mut self, widget: W, area: Rect) {
         widget.render(area, self.buffer);
     }

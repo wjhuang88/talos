@@ -2,7 +2,7 @@
 
 Type: Product Story
 Parent Epic: UX-001 follow-up
-Status: Planned — unselected after I086 supersession
+Status: Complete (I121 F112, 2026-07-13)
 
 ## Identity / Goal / Value
 
@@ -62,15 +62,26 @@ Goal: when the accumulated thinking text carries a parseable section title, the 
 
 ## Acceptance for behavior
 
-- Given thinking text beginning with a standalone `**Section Title**` block
+- [x] Given thinking text beginning with a standalone `**Section Title**` block
   When the preview renders during processing
   Then it shows `thinking: Section Title` (not the raw stream), updating if a later section
   title appears.
-- Given thinking text without any leading bold block
+- [x] Given thinking text without any leading bold block
   When the preview renders
   Then behavior is unchanged from today.
-- Given `**Important:** inline bold that is not a standalone title line`
+- [x] Given `**Important:** inline bold that is not a standalone title line`
   When parsed
   Then no title is extracted (parity with the OpenCode test suite).
-- Given `/export` after a turn with titles shown
+- [x] Given `/export` after a turn with titles shown
   Then no thinking text or title appears in the export (ADR-034 boundary regression test).
+
+## I121 F112 Implementation (2026-07-13)
+
+- `extract_thinking_title(text) -> Option<&str>` in `scrollback.rs`: scans ALL lines, returns the
+  LAST valid standalone-bold title followed by a blank line or EOF.
+- Dedicated `parse_standalone_bold` helper — no regex, no reuse of `parse_inline_delimiters`.
+- `preview_text_for_state()` in `app.rs` uses extracted title when available, falls back to full text.
+- Ripple animation on `"thinking"` prefix unchanged.
+- 14 edge-case tests: standalone bold, EOF, trailing newline, most-recent-wins, CRLF, inline bold
+  rejection, no-blank-line rejection, inline suffix rejection, empty markers, unclosed, inner
+  asterisk, no-title fallback, CJK title, multi-title sequence.

@@ -1,6 +1,6 @@
 # Iteration I047: v0.1.2 Release Readiness And Runtime Polish
 
-> Document status: Review
+> Document status: Complete (2026-06-29; header reconciled 2026-07-13)
 > Published plan date: 2026-06-25
 > Planned objective: Produce a release-ready Talos month slice that stabilizes installation,
 >   first-run model setup, clears all known prerequisites for I019, opens the memory-system
@@ -396,8 +396,9 @@ slice; the long-running task is the recovery/checkpoint owner.
 
 ## Retrospective
 
-- Outcome: All selected I047 slices delivered and verified. The `v0.1.2` tag has been pushed; the
-  iteration remains in Review until release workflow evidence is recorded.
+- Outcome: Complete. All selected I047 slices delivered and verified, and the `v0.1.2` release
+  workflow evidence was subsequently accepted. The 2026-07-13 reconciliation changes only the
+  stale header; it does not alter the published baseline or execution evidence.
 - Documentation: Backlog, Board, iteration evidence, release readiness notes, README files, and
   long-running task checkpoints were synchronized for the `v0.1.2` handoff.
 - Lessons: No new reusable project lesson was recorded; known residuals are tracked as deferred

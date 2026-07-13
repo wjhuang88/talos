@@ -129,13 +129,13 @@ fn print_iteration_summary(workspace: &Path) {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct IterationItem {
-    id: String,
-    codename: String,
-    state: String,
+pub(crate) struct IterationItem {
+    pub(crate) id: String,
+    pub(crate) codename: String,
+    pub(crate) state: String,
 }
 
-fn parse_open_iterations(content: &str) -> Vec<IterationItem> {
+pub(crate) fn parse_open_iterations(content: &str) -> Vec<IterationItem> {
     let mut in_current_iterations = false;
     let mut found = false;
     let mut items = Vec::new();
