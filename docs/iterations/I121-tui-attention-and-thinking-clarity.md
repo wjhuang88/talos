@@ -76,3 +76,23 @@
   natural_height wide/narrow, buffer rendering at 40/60/80/120, selected style distinction,
   insufficient-height option preservation, CJK tool name, no-overflow check.
 - Validation: fmt, clippy, release_preflight, all pass.
+
+### F112 — Complete (2026-07-13)
+
+- `extract_thinking_title(text: &str) -> Option<&str>` scans ALL lines and returns the LAST valid
+  standalone-bold title.
+- Title block rules (TUI-024/OpenCode semantics):
+  - Line trimmed must fully match `**Title**`
+  - Title must not be empty or contain extra `*`
+  - Title must be followed by empty line or EOF (double newline or end of text)
+  - Supports `\n` and `\r\n`
+  - Inline bold does not match
+- Dedicated `parse_standalone_bold` helper — no regex, no reuse of `parse_inline_delimiters`.
+- `preview_text_for_state()` in `app.rs` now uses `extract_thinking_title` to display
+  `thinking: Title` when a valid title exists, falling back to full thinking text otherwise.
+- Ripple animation (`thinking_ripple_spans`) unchanged — operates on the `"thinking"` prefix.
+- Export/session persistence unchanged (ADR-034).
+- 14 tests: standalone bold, EOF, trailing newline, most-recent-wins, CRLF, inline bold rejection,
+  no-blank-line rejection, inline suffix rejection, empty markers, unclosed, inner asterisk,
+  no-title fallback, CJK title, multi-title sequence.
+- Validation: fmt, clippy, release_preflight, all pass.

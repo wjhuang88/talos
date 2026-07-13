@@ -15,7 +15,8 @@ mod tests {
     use crate::scrollback::{
         BottomPanelComponent, BottomPanelPlacement, approval_natural_height,
         bottom_panel_placement, bottom_panel_rows, build_input_text, build_status_text,
-        cursor_line_col, input_line_count, stream_padding_for, truncate_str, wrap_text_to_lines,
+        cursor_line_col, extract_thinking_title, input_line_count, stream_padding_for,
+        truncate_str, wrap_text_to_lines,
     };
     use crate::sidebar::{SkillInfo, SkillSidebar};
     use crate::state::{ApprovalState, BottomPanelState, CtrlCState, Tip, TuiState};
@@ -1150,6 +1151,97 @@ mod tests {
             "options must be visible with CJK tool name"
         );
         assert!(all.contains("[n] deny"));
+    }
+
+    // ── extract_thinking_title (F112) ──────────────────────────────────
+
+    #[test]
+    fn test_thinking_title_standalone_bold() {
+        assert_eq!(
+            extract_thinking_title("**Analyzing the problem**\n\nLet me think about..."),
+            Some("Analyzing the problem")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_eof_after_title() {
+        assert_eq!(extract_thinking_title("**Title**"), Some("Title"));
+    }
+
+    #[test]
+    fn test_thinking_title_trailing_newline() {
+        assert_eq!(extract_thinking_title("**Title**\n"), Some("Title"));
+    }
+
+    #[test]
+    fn test_thinking_title_most_recent_wins() {
+        assert_eq!(
+            extract_thinking_title("prefix\n\n**First**\n\nbody\n\n**Second**\n\nmore"),
+            Some("Second")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_crlf_input() {
+        assert_eq!(
+            extract_thinking_title("**Title**\r\n\r\nbody"),
+            Some("Title")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_inline_bold_does_not_match() {
+        assert_eq!(
+            extract_thinking_title("Here is **bold** text in a line"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_no_blank_line_after_does_not_match() {
+        assert_eq!(extract_thinking_title("**Title**\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_inline_suffix_does_not_match() {
+        assert_eq!(extract_thinking_title("**Important:** inline text"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_empty_markers_do_not_match() {
+        assert_eq!(extract_thinking_title("****\n\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_unclosed_does_not_match() {
+        assert_eq!(extract_thinking_title("**未闭合\n\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_inner_asterisk_does_not_match() {
+        assert_eq!(extract_thinking_title("**含*星号*的标题**\n\nbody"), None);
+    }
+
+    #[test]
+    fn test_thinking_title_no_title_returns_none() {
+        assert_eq!(extract_thinking_title("just regular thinking text"), None);
+        assert_eq!(extract_thinking_title(""), None);
+    }
+
+    #[test]
+    fn test_thinking_title_cjk_title() {
+        assert_eq!(
+            extract_thinking_title("**分析问题**\n\n接下来..."),
+            Some("分析问题")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_title_without_body_section() {
+        assert_eq!(
+            extract_thinking_title("intro\n\n**Step 1**\n\ndetails\n\n**Step 2**\n"),
+            Some("Step 2")
+        );
     }
 
     // ── Status bar redesign ────────────────────────────────────────────

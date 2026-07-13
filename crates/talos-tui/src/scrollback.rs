@@ -773,6 +773,34 @@ pub(crate) fn wrap_text_to_lines(text: &str, width: usize, max_lines: usize) -> 
     result
 }
 
+pub(crate) fn extract_thinking_title(text: &str) -> Option<&str> {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let mut last_title: Option<&str> = None;
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        let Some(title) = parse_standalone_bold(trimmed) else {
+            continue;
+        };
+        let followed_by_empty_or_eof = match lines.get(i + 1) {
+            None => true,
+            Some(next) => next.trim().is_empty(),
+        };
+        if followed_by_empty_or_eof {
+            last_title = Some(title);
+        }
+    }
+    last_title
+}
+
+fn parse_standalone_bold(line: &str) -> Option<&str> {
+    let after_open = line.strip_prefix("**")?;
+    let title = after_open.strip_suffix("**")?;
+    if title.is_empty() || title.contains('*') {
+        return None;
+    }
+    Some(title)
+}
+
 pub(crate) fn truncate_end_to_width(s: &str, max_width: u16) -> String {
     let max = max_width as usize;
     if unicode_width::UnicodeWidthStr::width(s) <= max {
