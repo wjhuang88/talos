@@ -1,6 +1,6 @@
 # Iteration I123: Installation And Trial Confidence
 
-> Document status: Active (2026-07-13) — Gate 0 passed; F130 in progress
+> Document status: Complete (2026-07-13) — F130-F133 verified; REL-002 NO-GO unchanged
 > Published plan date: 2026-07-13
 > Planned objective: Make installation failure modes and a clean-HOME local trial repeatable by a
 > second operator without real credentials or release actions.
@@ -119,4 +119,37 @@ Evidence tiers (honest):
 - **Untested**: live GitHub download (no network fixtures); Windows ARM64 installer (not
   published); PowerShell checksum verification (installer gap, see F130 residual).
 
-### F133 — Honest trial-readiness report and residual owners (Next)
+### F133 — Honest trial-readiness report and residual owners (Complete 2026-07-13)
+
+**Trial-readiness verdict: GO for a controlled local trial; NO-GO for v1.0 / REL-002.**
+
+I123 makes installation failure modes and a clean-HOME local trial repeatable by a second operator
+without real credentials or any release action. What is now repeatable:
+
+- Installer fixture matrix (F130): POSIX `install.sh` 9/9 (install, latest, checksum mismatch,
+  offline, unsupported OS/arch, install-dir override, temp cleanup, corrupted archive); PowerShell
+  `install.ps1` 4/4 (install + placement, latest, offline terminating error, ARM64 explicit
+  unsupported). Both run with zero network access.
+- Clean-HOME trial smoke (F131): 18 pass / 0 fail / 2 honest SKIP (export = TUI-only; graceful
+  interruption = mock turns finish too fast to signal). Runs from a disposable HOME, proves config
+  masking, session resume evidence, and permission preflight Ask/Deny.
+- Second-operator replay (F132): `bash scripts/replay_trial.sh` emits a JSON record
+  (`target/trial-replay/trial-replay-<ts>.json`) a second operator can `diff` for variance.
+
+REL-002 posture is **unchanged**: this iteration adds no self-bootstrap evidence, no v1.0 claim,
+and **requests no release action** (no tag, publish, deploy, or push to main). It improves
+install/trial confidence only.
+
+Residual owners (gaps found, none blocking a controlled local trial):
+
+| Residual | Owner area | Required action |
+|---|---|---|
+| `install.ps1` performs no checksum verification (unlike `install.sh`) | Installer hardening (maintainer decision) | Add checksum step to `install.ps1`; until then, PowerShell install integrity is unverified |
+| `/export` has no non-interactive path (TUI-only slash command) | TUI export surface | Provide a CLI/print export if non-interactive export is needed |
+| Graceful interruption not exercisable via mock (turns too fast; TTY-dependent) | Signal-handling test harness | Add a long-running mock request type or a TTY-based interrupt test |
+| Windows ARM64 installer not published (`install.ps1` throws) | Release artifacts | Publish ARM64 Windows binaries or keep the explicit throw |
+| Live GitHub download untested (no network fixtures) | Release pipeline | Run fixtures against real release assets in CI (separate from offline fixtures) |
+| PowerShell fixture runs only where `pwsh` is installed | CI | Run `test_installer_fixtures_ps1.sh` on Windows CI |
+
+No secret, raw plugin/hook body, or real credential appears in any fixture or smoke output. The
+PowerShell checksum gap is documented, not faked.
