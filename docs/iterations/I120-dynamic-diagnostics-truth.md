@@ -81,3 +81,18 @@
 - Pre-existing note: `cargo clippy --workspace --all-targets` has pre-existing `unwrap()` violations
   in test code across multiple crates unrelated to this change; `release_preflight.sh` (the
   authoritative workspace gate) does not use `--all-targets` and passes.
+
+### F101 — Complete (2026-07-13)
+
+- `print_json()` replaced with `serde_json::to_string_pretty(&summary)` — all JSON escaping now
+  handled by serde, not hand-rolled string formatting.
+- 47 lines of manual JSON construction code removed.
+- CLI integration test `tests/diagnostics_e2e.rs` created with 7 tests:
+  - JSON parses as `serde_json::Value` with all expected fields
+  - No secrets in JSON output
+  - No stale I085 Paused claim in JSON output
+  - Clean iteration source populates `active_iterations`
+  - Missing iteration index produces `unavailable` diagnostic
+  - Text mode works alongside JSON mode
+  - `workspace_root` is a valid JSON string
+- Validation: fmt, check, release_preflight, governance 0 warnings, `git diff --check` — all pass.

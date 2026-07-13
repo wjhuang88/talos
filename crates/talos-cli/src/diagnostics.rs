@@ -30,7 +30,8 @@ pub(crate) fn run_diagnostics_command(command: DiagnosticsCommand) -> Result<()>
 fn run_diagnostics_status(json: bool) -> Result<()> {
     let summary = collect_diagnostics_summary();
     if json {
-        print_json(&summary);
+        let json_str = serde_json::to_string_pretty(&summary)?;
+        println!("{json_str}");
     } else {
         print_text(&summary);
     }
@@ -156,54 +157,6 @@ fn print_text(s: &DiagnosticsSummary) {
     }
     println("");
     println("All values are read-only. Credential values are not displayed.");
-}
-
-fn print_json(s: &DiagnosticsSummary) {
-    println("{");
-    println(&format!("  \"talos_version\": \"{}\",", s.talos_version));
-    println(&format!("  \"rust_toolchain\": \"{}\",", s.rust_toolchain));
-    println("  \"session_formats\": [");
-    for (i, fmt) in s.session_formats.iter().enumerate() {
-        let comma = if i + 1 < s.session_formats.len() {
-            ","
-        } else {
-            ""
-        };
-        println(&format!("    \"{fmt}\"{comma}"));
-    }
-    println("  ],");
-    println(&format!("  \"workspace_root\": \"{}\",", s.workspace_root));
-    println(&format!("  \"is_git_workspace\": {},", s.is_git_workspace));
-    println(&format!(
-        "  \"workspace_trusted\": {},",
-        s.workspace_trusted
-    ));
-    println(&format!(
-        "  \"trusted_workspace_count\": {},",
-        s.trusted_workspace_count
-    ));
-    println(&format!("  \"config_exists\": {},", s.config_exists));
-    println("  \"active_iterations\": [");
-    for (i, it) in s.active_iterations.iter().enumerate() {
-        let comma = if i + 1 < s.active_iterations.len() {
-            ","
-        } else {
-            ""
-        };
-        println(&format!("    \"{it}\"{comma}"));
-    }
-    println("  ],");
-    println("  \"residual_gates\": [");
-    for (i, g) in s.residual_gates.iter().enumerate() {
-        let comma = if i + 1 < s.residual_gates.len() {
-            ","
-        } else {
-            ""
-        };
-        println(&format!("    \"{g}\"{comma}"));
-    }
-    println("  ]");
-    println("}");
 }
 
 fn println(s: &str) {
