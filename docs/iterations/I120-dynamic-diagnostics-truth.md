@@ -1,6 +1,6 @@
 # Iteration I120: Dynamic Diagnostics Truth
 
-> Document status: Active — Gate 0 passed 2026-07-13
+> Document status: Complete (2026-07-13) — all stories verified, real binary smoke passed
 > Published plan date: 2026-07-13
 > Planned objective: Replace hardcoded/stale diagnostics with valid, bounded, dynamically derived
 > operator truth.
@@ -110,3 +110,37 @@
   - Unicode workspace path properly serialized through serde
 - Total: 18 unit tests + 7 CLI integration tests, all pass.
 - Validation: fmt, check, release_preflight, governance 0 warnings, `git diff --check` — all pass.
+
+### F103 — Complete (2026-07-13)
+
+- Real binary smoke: `talos diagnostics status --json` and `talos diagnostics status` verified in the
+  Talos workspace. JSON parses via `serde_json`, shows I120 as active, lists I121-I123 as blocked,
+  and contains no stale I085 claim or credential values.
+- README diagnostics section updated with `talos diagnostics status --json` command and description.
+- Full validation ladder: fmt, `cargo check --workspace --locked`, release_preflight, governance
+  0 warnings, `git diff --check` — all pass.
+
+## Retrospective
+
+### Acceptance Verification
+
+| Acceptance | Status | Evidence |
+|---|---|---|
+| JSON output parses and round-trips through `serde_json::Value` | Pass | `serde_json::to_string_pretty` replaces hand-rolled JSON; 18 unit + 7 CLI integration tests |
+| No stale I085 Paused claim or manually escaped user/path data | Pass | Stale claim removed; serde handles all escaping; dedicated test `test_no_stale_i085_paused_claim` |
+| Missing/malformed governance sources yield bounded `unavailable` diagnostics | Pass | `collect_active_iterations_at` returns bounded fallback for missing/malformed; 4 fixture tests |
+| Text and JSON views represent the same typed summary, no credential values | Pass | Both use `DiagnosticsSummary`; `test_text_and_json_views_share_same_summary`; no-secrets tests |
+
+### What Went Well
+
+- Reusing `governance::parse_open_iterations()` avoided duplicate mutable state.
+- serde derive on `DiagnosticsSummary` eliminated the entire class of JSON escaping bugs.
+- Workspace-aware `collect_diagnostics_summary_at()` enabled comprehensive fixture tests without
+  touching the real workspace.
+
+### Residuals
+
+- Pre-existing `cargo clippy --workspace --all-targets` violations exist in test code across
+  multiple crates (unrelated to I120). `release_preflight.sh` does not use `--all-targets`.
+- The `collect_residual_gates_at` function currently delegates to the typed registry. Future
+  iterations could derive gates from Board/ADR sources if needed.
