@@ -2295,3 +2295,103 @@ fn extension_snapshot_no_secrets() {
     assert!(!json.to_lowercase().contains("token"));
     assert!(!json.to_lowercase().contains("password"));
 }
+
+#[tokio::test]
+async fn slash_mcp_shows_unavailable_server_error() {
+    let mut engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "broken-server".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("connection refused".to_string()),
+    }]);
+    let outputs = engine.handle_slash_command("/mcp");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("broken-server"), "server name must appear");
+    assert!(
+        text.contains("unavailable"),
+        "unavailable status must appear"
+    );
+    assert!(
+        text.contains("connection refused"),
+        "error message must appear"
+    );
+}
+
+#[tokio::test]
+async fn slash_hooks_shows_disabled_hook() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![(
+        "my-hook".to_string(),
+        "TurnStart".to_string(),
+        false,
+    )]);
+    let outputs = engine.handle_slash_command("/hooks");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("my-hook"), "hook name must appear");
+    assert!(text.contains("disabled"), "disabled status must appear");
+}
+
+#[tokio::test]
+async fn slash_plugins_shows_summary_counts() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![("h".to_string(), "TurnStart".to_string(), true)]);
+    let mut engine = engine.with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "s1".to_string(),
+            connected: true,
+            tool_count: 2,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "s2".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("timeout".to_string()),
+        },
+    ]);
+    let outputs = engine.handle_slash_command("/plugins");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(text.contains("MCP servers: 2"), "total count: {text}");
+    assert!(text.contains("1 connected"), "connected count: {text}");
+    assert!(text.contains("Hook declarations: 1"), "hook count: {text}");
+}
+
+#[tokio::test]
+async fn slash_mcp_shows_collision_warning() {
+    let mut engine = new_engine().with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: true,
+            tool_count: 1,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("conflict".to_string()),
+        },
+    ]);
+    let outputs = engine.handle_slash_command("/mcp");
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(
+        text.contains("collision"),
+        "collision must be visible: {text}"
+    );
+    assert!(
+        text.contains("mcp:dup"),
+        "collision identifier must appear: {text}"
+    );
+}
+
+#[test]
+fn extension_snapshot_no_crash_on_empty_state() {
+    let engine = new_engine();
+    let snap = engine.extension_snapshot();
+    assert!(snap.mcp_servers.is_empty());
+    assert!(snap.collisions.is_empty());
+    assert!(
+        snap.hooks.event_catalog.len() > 0,
+        "event catalog should always be populated"
+    );
+}
