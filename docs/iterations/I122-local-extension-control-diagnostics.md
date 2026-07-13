@@ -137,7 +137,7 @@ maps any raw error string to one of 9 fixed category labels (`timeout`, `invalid
 No substring of the raw error ever appears in diagnostics output — regardless of how many
 secrets, tokens, or URL parameters it contains.
 
-6 new tests replace the old 4 sanitization tests:
+5 new tests replaced the old 4 sanitization tests (net +1 test count; 138→139):
 - `extension_snapshot_categorizes_api_key_error` — URL with `api_key=` → no raw substring
 - `extension_snapshot_categorizes_bearer_token_error` — `Authorization: Bearer` → no raw substring
 - `extension_snapshot_categorizes_url_query_secret` — `?token=hidden` → no raw substring
