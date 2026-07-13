@@ -23,7 +23,9 @@ use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use async_trait::async_trait;
 use talos_core::session::SessionOp;
+use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -427,6 +429,167 @@ pub(crate) fn spawn_scheduler_actor(
     let actor = SchedulerActor::new(cmd_rx, sq_tx, cancel_token);
     let join = tokio::spawn(async move { actor.run().await });
     (handle, join)
+}
+
+// ── Two-phase composition infrastructure ─────────────────────────────────
+
+/// Creates a scheduler handle and a pending actor for two-phase composition.
+///
+/// Composition roots must create the scheduler BEFORE the session (to register
+/// the delay tool) but can only spawn the actor AFTER the session provides
+/// `sq_tx`. This function splits those two steps.
+///
+/// Typical usage:
+/// ```
+/// # use talos_agent::scheduler::create_scheduler;
+/// # let mut registry = talos_core::tool::ToolRegistry::new();
+/// let (handle, pending) = create_scheduler();
+/// registry.register(std::sync::Arc::new(
+///     talos_agent::scheduler::DelayTool::new(handle),
+/// ));
+/// // ... create agent + session ...
+/// // pending.spawn(session_handle.sq_tx.clone(), cancel_token);
+/// ```
+pub fn create_scheduler() -> (SchedulerHandle, PendingSchedulerActor) {
+    let (cmd_tx, cmd_rx) = mpsc::channel(64);
+    let handle = SchedulerHandle::new(cmd_tx);
+    let pending = PendingSchedulerActor { cmd_rx };
+    (handle, pending)
+}
+
+/// Holds the scheduler command receiver until `sq_tx` is available.
+///
+/// After the session is created, call [`spawn`](Self::spawn) to start the
+/// actor. The actor will abort all tasks when the `CancellationToken` fires.
+pub struct PendingSchedulerActor {
+    cmd_rx: mpsc::Receiver<ScheduleCommand>,
+}
+
+impl PendingSchedulerActor {
+    /// Spawns the scheduler actor, linking it to the session queue and
+    /// shutdown token.
+    ///
+    /// The returned `JoinHandle` completes when the actor shuts down (via
+    /// `Shutdown` command, `CancellationToken`, or command channel closure).
+    pub fn spawn(
+        self,
+        sq_tx: mpsc::Sender<SessionOp>,
+        cancel_token: CancellationToken,
+    ) -> JoinHandle<()> {
+        let actor = SchedulerActor::new(self.cmd_rx, sq_tx, cancel_token);
+        tokio::spawn(async move { actor.run().await })
+    }
+}
+
+impl fmt::Debug for PendingSchedulerActor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PendingSchedulerActor")
+            .field("cmd_rx", &"mpsc::Receiver<ScheduleCommand>")
+            .finish()
+    }
+}
+
+// ── Delay tool (SF102) ───────────────────────────────────────────────────
+
+/// Built-in tool for scheduling a one-shot delayed follow-up message.
+///
+/// Permission: `ToolNature::Execute` (default `Ask`). The registration
+/// approval authorizes only this scheduling operation — any tool call in the
+/// follow-up turn receives its own fresh permission decision.
+///
+/// Session-scoped: the scheduled task dies when the process exits and is
+/// never persisted.
+pub struct DelayTool {
+    handle: SchedulerHandle,
+}
+
+impl DelayTool {
+    /// Creates a new delay tool linked to the scheduler actor.
+    pub fn new(handle: SchedulerHandle) -> Self {
+        Self { handle }
+    }
+}
+
+#[async_trait]
+impl AgentTool for DelayTool {
+    fn name(&self) -> &str {
+        "delay"
+    }
+
+    fn description(&self) -> &str {
+        "Schedule a one-shot delayed follow-up message that will be injected \
+         into the session after the specified delay. The task is \
+         session-scoped: it dies when the process exits and is never \
+         persisted. Minimum delay: 1 second. Maximum delay: 86400 seconds \
+         (24 hours)."
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The follow-up message to inject after the delay."
+                },
+                "delay_secs": {
+                    "type": "integer",
+                    "description": "Delay in seconds before the message is injected.",
+                    "minimum": MIN_DELAY_SECS,
+                    "maximum": MAX_DELAY_SECS
+                }
+            },
+            "required": ["message", "delay_secs"]
+        })
+    }
+
+    async fn execute(&self, input: serde_json::Value) -> ToolResult {
+        let message = match input.get("message").and_then(|v| v.as_str()) {
+            Some(msg) if !msg.is_empty() => msg.to_string(),
+            _ => return ToolResult::error("missing or empty 'message' field"),
+        };
+
+        let delay_secs = match input.get("delay_secs").and_then(|v| v.as_u64()) {
+            Some(secs) => secs,
+            None => {
+                return ToolResult::error(
+                    "missing or invalid 'delay_secs' field (expected a positive integer)",
+                );
+            }
+        };
+
+        if let Err(reason) = validate_delay_secs(delay_secs) {
+            return ToolResult::error(reason);
+        }
+
+        let (response_tx, response_rx) = oneshot::channel();
+        let command = ScheduleCommand::RegisterOneShot {
+            id: None,
+            message,
+            delay: Duration::from_secs(delay_secs),
+            response_tx,
+        };
+
+        if self.handle.send(command).await.is_err() {
+            return ToolResult::error("scheduler is not available (session may be shutting down)");
+        }
+
+        match response_rx.await {
+            Ok(ScheduleRegistrationResult::Registered { task_id }) => ToolResult::success(format!(
+                "Scheduled follow-up registered.\nTask ID: {task_id}\nDelay: {delay_secs} second(s)\n\nThe message will be injected into the session after the delay as a visibly labeled scheduled follow-up."
+            )),
+            Ok(ScheduleRegistrationResult::InvalidDuration { reason }) => ToolResult::error(reason),
+            Err(_) => ToolResult::error("scheduler dropped the request"),
+        }
+    }
+
+    fn nature(&self) -> ToolNature {
+        ToolNature::Execute
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────

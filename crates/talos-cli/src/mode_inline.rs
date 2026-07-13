@@ -22,7 +22,9 @@ use crate::mode_runtime::{
     session_metadata_for_model, set_todo_prompt_provider,
 };
 use crate::provider_setup::{build_provider, parse_provider};
-use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
+use crate::registry::{
+    build_print_tool_registry, create_scheduler_and_tool, register_permission_aware_tools,
+};
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name,
@@ -57,6 +59,8 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     let mut registry = build_print_tool_registry();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    registry.register(delay_tool);
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
@@ -120,6 +124,10 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),

@@ -43,7 +43,9 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         talos_permission::PermissionEngine::new(),
     )));
 
+    let (delay_tool, sched_pending) = crate::registry::create_scheduler_and_tool();
     let mut registry = ToolRegistry::new();
+    registry.register(delay_tool);
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(BashTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),
@@ -178,6 +180,10 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),

@@ -54,7 +54,8 @@ use crate::model_lifecycle::{
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
-    build_tui_tool_registry, register_permission_aware_tools, register_tui_permission_aware_tools,
+    build_tui_tool_registry, create_scheduler_and_tool, register_permission_aware_tools,
+    register_tui_permission_aware_tools,
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
@@ -98,6 +99,8 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     let mut registry = build_print_tool_registry();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    registry.register(delay_tool);
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
@@ -123,6 +126,10 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     tokio::spawn(async move { actor.run().await });
     let server = talos_rpc::RpcServer::new(Arc::new(runtime_adapter::AgentRuntime::new(handle)));
     server.run_stdio().await
@@ -233,11 +240,13 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         session.id,
     );
+    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -272,6 +281,10 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         session.clone(),
         session_metadata_for_model(&config.model, &config.provider),

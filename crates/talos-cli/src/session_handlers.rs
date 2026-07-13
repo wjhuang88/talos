@@ -501,11 +501,13 @@ pub(crate) async fn handle_session_new(
         }
     };
     mcp_runtime.report_startup_failures();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         new_session.id,
     );
+    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -524,6 +526,10 @@ pub(crate) async fn handle_session_new(
     set_todo_prompt_provider(&mut agent, &session_manager, &new_session);
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         new_session.clone(),
         crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),
@@ -731,11 +737,13 @@ pub(crate) async fn handle_session_resume(
         }
     };
     mcp_runtime.report_startup_failures();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         target_session.id,
     );
+    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -764,6 +772,10 @@ pub(crate) async fn handle_session_resume(
     }
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         target_session.clone(),
         crate::mode_runtime::session_metadata_for_model(
@@ -909,11 +921,13 @@ pub(crate) async fn handle_session_fork(
         }
     };
     mcp_runtime.report_startup_failures();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         child_session.id,
     );
+    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -932,6 +946,10 @@ pub(crate) async fn handle_session_fork(
     set_todo_prompt_provider(&mut agent, session_manager, &child_session);
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         child_session.clone(),
         crate::mode_runtime::session_metadata_for_model(&config.model, &config.provider),

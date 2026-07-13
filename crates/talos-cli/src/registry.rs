@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
+use talos_agent::scheduler::{DelayTool, PendingSchedulerActor, create_scheduler};
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
@@ -35,6 +36,15 @@ use uuid::Uuid;
 
 use crate::approval::{ApprovalPrompt, add_always_allow_rules, always_allow_rule_descriptions};
 use crate::colors;
+
+/// Creates a scheduler handle and wraps the delay tool for registry registration.
+///
+/// Returns the delay tool (ready to register) and a pending scheduler actor
+/// that must be spawned after the session is created (once `sq_tx` is available).
+pub(crate) fn create_scheduler_and_tool() -> (Arc<dyn AgentTool>, PendingSchedulerActor) {
+    let (handle, pending) = create_scheduler();
+    (Arc::new(DelayTool::new(handle)), pending)
+}
 
 /// Non-blocking approval handler for TUI mode.
 ///

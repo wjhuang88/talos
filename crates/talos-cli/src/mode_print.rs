@@ -17,7 +17,9 @@ use crate::mode_runtime::{
     request_preview_payload,
 };
 use crate::provider_setup::{build_provider, parse_provider};
-use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
+use crate::registry::{
+    build_print_tool_registry, create_scheduler_and_tool, register_permission_aware_tools,
+};
 use crate::session_setup::{resolve_prompt, resolve_workspace_root};
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::{Cli, build_hook_registry};
@@ -48,6 +50,8 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let hooks = build_hook_registry(true);
     let mut registry = build_print_tool_registry();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    registry.register(delay_tool);
 
     #[cfg(debug_assertions)]
     let fixture_mode = cli.mcp_server_fixture.is_some();
@@ -110,6 +114,10 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         model_context_limit,
     };
     let (mut handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     tokio::spawn(async move { actor.run().await });
 
     handle

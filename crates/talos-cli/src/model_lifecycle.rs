@@ -17,7 +17,8 @@ use tokio::sync::{Mutex, mpsc, watch};
 
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::registry::{
-    TuiApprovalHandler, build_tui_tool_registry, register_tui_permission_aware_tools,
+    TuiApprovalHandler, build_tui_tool_registry, create_scheduler_and_tool,
+    register_tui_permission_aware_tools,
 };
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
@@ -210,11 +211,13 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
     };
     mcp_runtime.report_startup_failures();
+    let (delay_tool, sched_pending) = create_scheduler_and_tool();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         current_session.id,
     );
+    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -242,6 +245,10 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
     }
 
     let (handle, mut actor) = AppServerSession::new(agent, session_config);
+    let _sched_join = sched_pending.spawn(
+        handle.sq_tx.clone(),
+        tokio_util::sync::CancellationToken::new(),
+    );
     actor.set_persistence(
         current_session.clone(),
         crate::mode_runtime::session_metadata_for_model(
