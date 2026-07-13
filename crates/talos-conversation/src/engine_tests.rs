@@ -2312,8 +2312,8 @@ async fn slash_mcp_shows_unavailable_server_error() {
         "unavailable status must appear"
     );
     assert!(
-        text.contains("connection refused"),
-        "error message must appear"
+        text.contains("connection_failed"),
+        "bounded error category must appear instead of raw text: {text}"
     );
 }
 
@@ -2397,7 +2397,7 @@ fn extension_snapshot_no_crash_on_empty_state() {
 }
 
 #[test]
-fn extension_snapshot_sanitizes_mcp_error_with_api_key() {
+fn extension_snapshot_categorizes_api_key_error() {
     let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
         name: "leaky".to_string(),
         connected: false,
@@ -2407,20 +2407,15 @@ fn extension_snapshot_sanitizes_mcp_error_with_api_key() {
         ),
     }]);
     let snap = engine.extension_snapshot();
-    let server = &snap.mcp_servers[0];
-    let error = server.error.as_ref().unwrap();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
     assert!(
-        !error.contains("sk-secret-key"),
-        "api key must be redacted: {error}"
-    );
-    assert!(
-        error.contains("***"),
-        "redacted value should contain ***: {error}"
+        !error.contains("sk-secret-key") && !error.contains("api_key"),
+        "no raw substring of error text may appear: {error}"
     );
 }
 
 #[test]
-fn extension_snapshot_sanitizes_mcp_error_with_bearer_token() {
+fn extension_snapshot_categorizes_bearer_token_error() {
     let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
         name: "auth".to_string(),
         connected: false,
@@ -2430,13 +2425,13 @@ fn extension_snapshot_sanitizes_mcp_error_with_bearer_token() {
     let snap = engine.extension_snapshot();
     let error = snap.mcp_servers[0].error.as_ref().unwrap();
     assert!(
-        !error.contains("abc123token"),
-        "bearer token must be redacted: {error}"
+        !error.contains("abc123token") && !error.contains("Bearer"),
+        "no raw substring of error text may appear: {error}"
     );
 }
 
 #[test]
-fn extension_snapshot_sanitizes_mcp_error_with_url_query_secret() {
+fn extension_snapshot_categorizes_url_query_secret() {
     let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
         name: "url".to_string(),
         connected: false,
@@ -2446,25 +2441,67 @@ fn extension_snapshot_sanitizes_mcp_error_with_url_query_secret() {
     let snap = engine.extension_snapshot();
     let error = snap.mcp_servers[0].error.as_ref().unwrap();
     assert!(
-        !error.contains("hidden"),
-        "URL query secret must be redacted: {error}"
+        !error.contains("hidden")
+            && !error.contains("token=")
+            && !error.contains("mcp.example.com"),
+        "no raw substring of error text may appear: {error}"
     );
 }
 
 #[test]
-fn extension_snapshot_preserves_clean_error() {
+fn extension_snapshot_categorizes_multiple_secrets_in_one_error() {
+    let raw = "MCP failed: token=first token=second api_key=third secret=fourth";
     let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
-        name: "clean".to_string(),
+        name: "multi".to_string(),
         connected: false,
         tool_count: 0,
-        error: Some("connection refused by host".to_string()),
+        error: Some(raw.to_string()),
     }]);
     let snap = engine.extension_snapshot();
     let error = snap.mcp_servers[0].error.as_ref().unwrap();
-    assert_eq!(
-        error, "connection refused by host",
-        "clean error should be preserved"
+    assert!(
+        !error.contains("first")
+            && !error.contains("second")
+            && !error.contains("third")
+            && !error.contains("fourth"),
+        "no secret value may appear: {error}"
     );
+    assert!(
+        !error.contains("token=") && !error.contains("api_key=") && !error.contains("secret="),
+        "no pattern name may appear: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_error_is_bounded_category() {
+    let cases = [
+        ("MCP server 'x' timed out after 30s", "timeout"),
+        (
+            "invalid MCP config: missing transport",
+            "invalid_configuration",
+        ),
+        ("failed to spawn MCP server 'x': not found", "spawn_failed"),
+        ("MCP server 'x' disconnected", "disconnected"),
+        ("connection refused by host", "connection_failed"),
+        ("MCP RPC error from 'x': boom", "protocol_error"),
+        ("initialization failed at step 1", "initialization_failed"),
+        ("MCP HTTP error: status 500", "network_error"),
+        ("something completely unknown", "unavailable"),
+    ];
+    for (raw, expected) in cases {
+        let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+            name: "t".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some(raw.to_string()),
+        }]);
+        let snap = engine.extension_snapshot();
+        let error = snap.mcp_servers[0].error.as_ref().unwrap();
+        assert_eq!(
+            error, expected,
+            "raw {raw:?} should categorize as {expected:?}, got {error:?}"
+        );
+    }
 }
 
 #[test]

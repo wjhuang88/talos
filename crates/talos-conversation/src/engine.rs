@@ -1147,7 +1147,7 @@ pub fn build_extension_snapshot(
             name: s.name.clone(),
             connected: s.connected,
             tool_count: s.tool_count,
-            error: s.error.as_ref().map(|e| sanitize_diagnostic_text(e)),
+            error: s.error.as_deref().map(categorize_mcp_error),
         })
         .collect();
 
@@ -1191,41 +1191,36 @@ pub fn build_extension_snapshot(
     }
 }
 
-fn sanitize_diagnostic_text(text: &str) -> String {
-    let mut result = text.to_string();
-    for pattern in [
-        "api_key=",
-        "token=",
-        "secret=",
-        "password=",
-        "apikey=",
-        "Authorization: Bearer ",
-        "auth_token=",
-    ] {
-        if result.to_lowercase().contains(&pattern.to_lowercase()) {
-            let lower = result.to_lowercase();
-            if let Some(start) = lower.find(&pattern.to_lowercase()) {
-                let val_start = start + pattern.len();
-                let val_end = result[val_start..]
-                    .find(|c: char| c.is_whitespace() || c == '&' || c == '"')
-                    .map(|e| val_start + e)
-                    .unwrap_or(result.len());
-                result.replace_range(val_start..val_end, "***");
-            }
-        }
-    }
-    if result.contains("://")
-        && let Some(q_start) = result.find('?')
+/// Maps a raw MCP error string to a bounded, fixed category label.
+///
+/// Never returns any substring of the input. This guarantees no credential,
+/// token, or query parameter can leak through diagnostics output regardless
+/// of how many times it appears in the raw error text — the raw text is
+/// discarded entirely, not scanned-and-patched.
+fn categorize_mcp_error(raw: &str) -> String {
+    let lower = raw.to_lowercase();
+    let category = if lower.contains("timeout") || lower.contains("timed out") {
+        "timeout"
+    } else if lower.contains("invalid") && lower.contains("config") {
+        "invalid_configuration"
+    } else if lower.contains("spawn") {
+        "spawn_failed"
+    } else if lower.contains("disconnect") {
+        "disconnected"
+    } else if lower.contains("refused")
+        || lower.contains("connect")
+        || lower.contains("unreachable")
+        || lower.contains("dns")
     {
-        let query = &result[q_start..];
-        if query.to_lowercase().contains("token")
-            || query.to_lowercase().contains("key")
-            || query.to_lowercase().contains("secret")
-            || query.to_lowercase().contains("auth")
-        {
-            result.truncate(q_start);
-            result.push_str("?***");
-        }
-    }
-    result
+        "connection_failed"
+    } else if lower.contains("rpc") || lower.contains("protocol") || lower.contains("json") {
+        "protocol_error"
+    } else if lower.contains("initializ") {
+        "initialization_failed"
+    } else if lower.contains("http") {
+        "network_error"
+    } else {
+        "unavailable"
+    };
+    category.to_string()
 }

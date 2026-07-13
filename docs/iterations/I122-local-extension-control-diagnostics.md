@@ -1,6 +1,6 @@
 # Iteration I122: Local Extension And Control Diagnostics
 
-> Document status: Complete (2026-07-13) — all stories verified, binary smoke passed
+> Document status: Review (2026-07-13) — P0 fix applied: error categorization replaces pattern-blacklist sanitization
 > Published plan date: 2026-07-13
 > Planned objective: Give CLI, TUI, and loopback dashboard one truthful read-only view of installed
 > local extension state and bounded failures.
@@ -119,14 +119,40 @@ Fixed 1 clippy `collapsible_if` regression introduced during the sanitizer imple
 |---|---|---|
 | All three command surfaces and dashboard agree | Pass (after fix) | `build_extension_snapshot()` shared by engine and `mode_runners.rs`; `build_extension_snapshot_matches_engine_snapshot` proves parity |
 | Collisions and invalid entries visible, cannot crash | Pass | Collision detection in `build_extension_snapshot()`; 4 collision tests |
-| Secret fields and raw bodies never appear | Pass (after fix) | `sanitize_diagnostic_text()` strips api_key/token/secret/password/bearer/URL-query patterns; 4 sanitization regression tests with realistic sensitive payloads |
+| Secret fields and raw bodies never appear | Pass (after P0 fix) | `categorize_mcp_error()` discards ALL raw error text, returns one of 9 fixed category labels; 6 regression tests including multi-secret-per-message case that broke the prior approach |
 | No new mutation endpoint; auth tests green | Pass | 3 GET-only tests for `/extensions`; existing auth tests pass |
+
+### P0 Fix — Bounded Error Categorization (2026-07-13)
+
+Independent re-review found that `sanitize_diagnostic_text()` only handled the first occurrence of
+each secret pattern in an error string — subsequent patterns leaked through. Example:
+
+  Raw: `MCP failed: token=first token=second`
+  Old: `MCP failed: token=*** token=second`  ← second `token=second` still in output
+
+Replaced the entire pattern-blacklist approach with `categorize_mcp_error()` — a function that
+maps any raw error string to one of 9 fixed category labels (`timeout`, `invalid_configuration`,
+`spawn_failed`, `disconnected`, `connection_failed`, `protocol_error`,
+`initialization_failed`, `network_error`, `unavailable`) and **discards all original text**.
+No substring of the raw error ever appears in diagnostics output — regardless of how many
+secrets, tokens, or URL parameters it contains.
+
+6 new tests replace the old 4 sanitization tests:
+- `extension_snapshot_categorizes_api_key_error` — URL with `api_key=` → no raw substring
+- `extension_snapshot_categorizes_bearer_token_error` — `Authorization: Bearer` → no raw substring
+- `extension_snapshot_categorizes_url_query_secret` — `?token=hidden` → no raw substring
+- `extension_snapshot_categorizes_multiple_secrets_in_one_error` — **the regression that broke the old approach**: two `token=`, one `api_key=`, one `secret=` in one string — none leak
+- `extension_snapshot_error_is_bounded_category` — 9 test cases verifying each category mapping
+- Updated `slash_mcp_shows_unavailable_server_error` to assert `connection_failed` category (not raw text)
+
+Total: 139 conversation tests + 23 dashboard tests — all pass. `cargo fmt`, clippy,
+`release_preflight.sh`, governance validation all pass.
 
 ### Residuals
 
 - Dashboard extensions show startup-time MCP/hook diagnostics only; provenance is empty at dashboard
   build time (no tool calls have occurred yet) — this is inherent to when the dashboard snapshot is
   built, not a data-consistency gap.
-- Sanitization uses pattern matching (not a full URL/credential parser); may not catch every possible
-  secret encoding. Documented as best-effort defense-in-depth, not a complete guarantee.
+- Error categorization maps to 9 fixed labels; novel error shapes may map to `unavailable`. The raw
+  error text is intentionally discarded entirely — debugging requires checking MCP server logs directly.
 - `--all-targets` clippy gate has pre-existing violations in unrelated test code (same as I120/I121).
