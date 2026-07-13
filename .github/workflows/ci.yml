@@ -32,3 +32,14 @@ jobs:
 
       - name: Release preflight
         run: ./scripts/release_preflight.sh
+
+  windows-installer-fixture:
+    name: Windows installer fixture
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PowerShell installer fixture (offline)
+        shell: pwsh
+        run: ./scripts/install_fixtures.ps1
