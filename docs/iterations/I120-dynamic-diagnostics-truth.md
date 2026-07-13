@@ -96,3 +96,17 @@
   - Text mode works alongside JSON mode
   - `workspace_root` is a valid JSON string
 - Validation: fmt, check, release_preflight, governance 0 warnings, `git diff --check` — all pass.
+
+### F102 — Complete (2026-07-13)
+
+- `collect_diagnostics_summary_at(workspace, root)` added for workspace-aware fixture testing.
+- `collect_residual_gates_at(workspace)` wraps the typed registry with workspace awareness.
+- 6 new fixture tests:
+  - Full summary from clean workspace (iteration README present → I120 found)
+  - Full summary from empty workspace (no docs → bounded `unavailable` + typed registry fallback)
+  - Full summary from malformed workspace (garbage README → no panic, bounded output)
+  - Text and JSON views share the same typed summary (consistent field counts)
+  - Residual gates always bounded (non-empty, non-empty strings)
+  - Unicode workspace path properly serialized through serde
+- Total: 18 unit tests + 7 CLI integration tests, all pass.
+- Validation: fmt, check, release_preflight, governance 0 warnings, `git diff --check` — all pass.

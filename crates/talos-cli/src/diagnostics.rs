@@ -57,15 +57,19 @@ fn collect_diagnostics_summary() -> DiagnosticsSummary {
     let workspace_root = std::env::current_dir()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| "<unknown>".to_string());
+    let ws_path = workspace_root.clone();
+    collect_diagnostics_summary_at(Path::new(&ws_path), workspace_root)
+}
 
+fn collect_diagnostics_summary_at(workspace: &Path, workspace_root: String) -> DiagnosticsSummary {
     let talos_root = crate::storage::resolve_talos_root();
     let trust_store = talos_permission::WorkspaceTrustStore::new(&talos_root);
-    let ws_path = Path::new(&workspace_root);
-    let is_git = talos_permission::is_git_workspace(ws_path);
-    let trusted = trust_store.is_trusted(ws_path);
+    let is_git = talos_permission::is_git_workspace(workspace);
+    let trusted = trust_store.is_trusted(workspace);
 
     let config_path = talos_root.join("config.toml");
-    let active_iterations = collect_active_iterations_at(ws_path);
+    let active_iterations = collect_active_iterations_at(workspace);
+    let residual_gates = collect_residual_gates_at(workspace);
 
     DiagnosticsSummary {
         talos_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -77,7 +81,7 @@ fn collect_diagnostics_summary() -> DiagnosticsSummary {
         trusted_workspace_count: trust_store.trusted_count(),
         config_exists: config_path.exists(),
         active_iterations,
-        residual_gates: current_residual_gates(),
+        residual_gates,
     }
 }
 
@@ -110,6 +114,10 @@ fn collect_active_iterations_at(workspace: &Path) -> Vec<String> {
         .iter()
         .map(|it| format!("{} {} — {}", it.id, it.codename, it.state))
         .collect()
+}
+
+fn collect_residual_gates_at(_workspace: &Path) -> Vec<String> {
+    current_residual_gates()
 }
 
 fn current_residual_gates() -> Vec<String> {
@@ -357,5 +365,140 @@ mod tests {
         let json_str = serde_json::to_string(&summary).expect("serialize");
         let value: serde_json::Value = serde_json::from_str(&json_str).expect("must parse");
         assert_eq!(value["talos_version"], "test\"with\\backslash\nand\ttab");
+    }
+
+    #[test]
+    fn test_full_summary_from_clean_workspace() {
+        let dir = tempdir().expect("tempdir");
+        let iter_dir = dir.path().join("docs").join("iterations");
+        fs::create_dir_all(&iter_dir).unwrap();
+        fs::write(
+            iter_dir.join("README.md"),
+            "# Iterations\n\n## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I120 | Dynamic Diagnostics | **Active** (2026-07-13) | no |\n",
+        )
+        .unwrap();
+
+        let summary =
+            collect_diagnostics_summary_at(dir.path(), dir.path().to_string_lossy().into());
+        assert!(!summary.talos_version.is_empty());
+        assert!(
+            summary.active_iterations.iter().any(|i| i.contains("I120")),
+            "clean workspace should find I120: {:?}",
+            summary.active_iterations
+        );
+        assert!(
+            !summary.residual_gates.is_empty(),
+            "residual gates should always be present from typed registry"
+        );
+    }
+
+    #[test]
+    fn test_full_summary_from_empty_workspace() {
+        let dir = tempdir().expect("tempdir");
+        let summary =
+            collect_diagnostics_summary_at(dir.path(), dir.path().to_string_lossy().into());
+
+        assert!(
+            summary
+                .active_iterations
+                .iter()
+                .any(|i| i.contains("unavailable")),
+            "empty workspace should report unavailable iterations: {:?}",
+            summary.active_iterations
+        );
+        assert!(
+            !summary.residual_gates.is_empty(),
+            "residual gates must always be bounded even with no workspace"
+        );
+        assert!(
+            summary.residual_gates.iter().any(|g| g.contains("REL-002")),
+            "typed registry fallback should include REL-002"
+        );
+    }
+
+    #[test]
+    fn test_full_summary_from_malformed_workspace() {
+        let dir = tempdir().expect("tempdir");
+        let iter_dir = dir.path().join("docs").join("iterations");
+        fs::create_dir_all(&iter_dir).unwrap();
+        fs::write(
+            iter_dir.join("README.md"),
+            "{{{{not valid markdown{{{{\n\n```\nbinary\x00null\n```\n",
+        )
+        .unwrap_or(());
+
+        let summary =
+            collect_diagnostics_summary_at(dir.path(), dir.path().to_string_lossy().into());
+        assert!(
+            !summary.active_iterations.is_empty(),
+            "malformed workspace should not produce empty iterations"
+        );
+        assert!(
+            !summary.residual_gates.is_empty(),
+            "malformed workspace should not affect residual gates"
+        );
+    }
+
+    #[test]
+    fn test_text_and_json_views_share_same_summary() {
+        let dir = tempdir().expect("tempdir");
+        let summary =
+            collect_diagnostics_summary_at(dir.path(), dir.path().to_string_lossy().into());
+
+        let json_str = serde_json::to_string(&summary).expect("serialize");
+        let json_value: serde_json::Value = serde_json::from_str(&json_str).expect("parse");
+
+        assert_eq!(
+            json_value["active_iterations"]
+                .as_array()
+                .expect("array")
+                .len(),
+            summary.active_iterations.len(),
+            "JSON and struct should have same iteration count"
+        );
+        assert_eq!(
+            json_value["residual_gates"]
+                .as_array()
+                .expect("array")
+                .len(),
+            summary.residual_gates.len(),
+            "JSON and struct should have same gate count"
+        );
+    }
+
+    #[test]
+    fn test_residual_gates_always_bounded() {
+        let dir = tempdir().expect("tempdir");
+        let gates = collect_residual_gates_at(dir.path());
+        assert!(!gates.is_empty(), "residual gates must never be empty");
+        assert!(
+            gates.iter().all(|g| !g.is_empty()),
+            "each gate string must be non-empty"
+        );
+    }
+
+    #[test]
+    fn test_summary_with_unicode_workspace_path() {
+        let dir = tempdir().expect("tempdir");
+        let unicode_subdir = dir.path().join("テスト");
+        fs::create_dir_all(&unicode_subdir).unwrap();
+        let iter_dir = unicode_subdir.join("docs").join("iterations");
+        fs::create_dir_all(&iter_dir).unwrap();
+        fs::write(
+            iter_dir.join("README.md"),
+            "## Current Iterations\n\n| ID | Codename | State | Verified |\n|---|---|---|---|\n| I120 | Test | Active | no |\n",
+        )
+        .unwrap();
+
+        let summary = collect_diagnostics_summary_at(
+            &unicode_subdir,
+            unicode_subdir.to_string_lossy().into(),
+        );
+        let json_str = serde_json::to_string(&summary).expect("serialize");
+        let value: serde_json::Value = serde_json::from_str(&json_str).expect("parse");
+        assert!(
+            value["workspace_root"].as_str().unwrap().contains("テスト"),
+            "unicode path should be properly serialized"
+        );
     }
 }
