@@ -586,10 +586,14 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     if config.dashboard.enabled {
+        let extensions = serde_json::json!({
+            "mcp_servers": mcp_runtime.diagnostics(),
+        });
         let snapshot = crate::dashboard_helpers::build_dashboard_snapshot(
             &config,
             &session_manager,
             &workspace_root_str,
+            extensions,
         );
         let server = talos_dashboard::DashboardServer::with_loopback_only(
             snapshot,
