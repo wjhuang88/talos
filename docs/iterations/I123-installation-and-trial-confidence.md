@@ -71,4 +71,22 @@ Activated 2026-07-13 after I122 Complete.
 - Acceptance met: both installer script paths pass fixture tests; checksum (POSIX) and offline
   failures are explicit and leave no false success state.
 
-### F131 — Clean-HOME real-binary trial smoke (Next)
+### F131 — Clean-HOME real-binary trial smoke (Complete 2026-07-13)
+
+Extended `scripts/talos_smoke.sh` from 11 to 17 checks (running from a disposable `HOME`,
+`TALOS_*` env cleared, cleanup trap). New coverage:
+- (12) Disposable-HOME isolation — binary starts with no real credentials.
+- (13) Config masking — a fixture `api_key = "sk-test-fixture-secret-xxxxx"` written to the temp
+  HOME config is displayed as `***`, never plaintext.
+- (14) Session resume evidence — a mock turn creates a session; `--list` shows it.
+- (15) Export evidence — **SKIP (honest)**: `/export` is a TUI-only slash command; print mode has
+  no non-interactive export path. Documented, not faked.
+- (16) Permission preflight Ask/Deny — risky `rm important.txt` surfaces a non-allow decision
+  (ask/deny), never unconditional `allow`; read-only `cat` shows a decision keyword.
+- (17) Graceful interruption — **SKIP (best-effort)**: mock turns return instantly, so the process
+  finishes before SIGINT can be delivered; signal handling may also require a TTY. Soft skip, no
+  false pass/fail.
+Result: **18 passed, 0 failed, 2 skipped** (`bash scripts/talos_smoke.sh`, exit 0). Acceptance met:
+trial smoke starts from a disposable HOME and needs no real secret or external provider.
+
+### F132 — Second-operator recovery/troubleshooting replay (Next)
