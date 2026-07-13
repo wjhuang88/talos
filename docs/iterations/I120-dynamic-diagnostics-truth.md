@@ -1,6 +1,6 @@
 # Iteration I120: Dynamic Diagnostics Truth
 
-> Document status: Planned — ready for assignment
+> Document status: Active — Gate 0 passed 2026-07-13
 > Published plan date: 2026-07-13
 > Planned objective: Replace hardcoded/stale diagnostics with valid, bounded, dynamically derived
 > operator truth.
@@ -55,4 +55,15 @@
 
 ## Execution Record
 
-Not started. Activate only after Gate 0 in the execution package passes.
+### Gate 0 — 2026-07-13
+
+- Branch: `feature/i120-dynamic-diagnostics` (from updated `main` at `6a7a0f6`).
+- `rustc 1.97.0` (pinned by `rust-toolchain.toml`).
+- `cargo metadata --locked --no-deps --format-version 1` — exit 0.
+- `scripts/validate_project_governance.sh .` — 0 warnings.
+- `./scripts/release_preflight.sh` — passed (fmt, check, clippy `-D warnings`, workspace tests).
+- Non-terminal inventory disposition confirmed: no other iteration is Active. I018/I019/I020/I028
+  deferred; I081/I082/I083 reconciled to Superseded; I121-I123 blocked on I120; Board-level Review
+  items are not iterations.
+
+### F100 — In Progress

@@ -108,3 +108,4 @@ next iteration without activating it.
 | Date/time | Story | Branch/commit | State | Validation | Changed files | Failure/retry | Next exact action |
 |---|---|---|---|---|---|---|---|
 | 2026-07-13 | Planning handoff | `main` | Complete | `cargo check --workspace --locked`; governance 0 warnings; `git diff --check` | plan/iteration/governance docs | none | Assignee reruns full Gate 0 from updated main and activates I120 only after all checks pass. |
+| 2026-07-13 | Gate 0 / I120 activation | `feature/i120-dynamic-diagnostics` @ `ac869fc` | In Progress | rustc 1.97.0; cargo metadata exit 0; governance 0 warnings; release_preflight passed; `git diff --check` clean | `docs/iterations/I120-*.md`, `docs/iterations/README.md`, execution package | none | Begin F100: owner-state fixture and dynamic diagnostics contract. |
