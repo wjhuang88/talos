@@ -76,7 +76,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I122 Local Extension And Control Diagnostics | Complete (2026-07-13) | [I122](iterations/I122-local-extension-control-diagnostics.md) | Typed ExtensionSnapshot, unified /mcp /plugins /hooks from snapshot, dashboard /extensions route, collision detection, 133 conversation + 23 dashboard tests. |
+| I122 Local Extension And Control Diagnostics | Complete (2026-07-13, review fixes applied) | [I122](iterations/I122-local-extension-control-diagnostics.md) | Typed ExtensionSnapshot shared by engine and dashboard via `build_extension_snapshot()`; real hook config wired into engine; MCP error sanitization (api_key/token/secret/bearer/URL-query); dashboard homepage links `/extensions`. 138 conversation + 23 dashboard + 185 CLI tests. |
 | I121 TUI Attention And Thinking Clarity | Complete (2026-07-13) | [I121](iterations/I121-tui-attention-and-thinking-clarity.md) / [TUI-008](backlog/active/TUI-008-approval-dialog-ux.md) / [TUI-024](backlog/active/TUI-024-thinking-title-in-preview.md) | Code, CJK layout, 293 TUI tests, real default/opt-in export regressions, and native Alacritty approval/thinking evidence pass. |
 | I120 Dynamic Diagnostics Truth | Complete (2026-07-13) | [I120](iterations/I120-dynamic-diagnostics-truth.md) | serde JSON, malformed→unavailable, typed ResidualGate, 18 unit + 7 CLI tests, and standard repository validation pass. |
 | I116 State Truth And Operator Baseline | Complete (2026-07-12) | [I116](iterations/I116-state-truth-operator-baseline.md) / [trace](reference/I116-STATE-TRACE-2026-07-12.md) | State truth reconciled (3 drifts fixed), operator smoke 13/13, `talos diagnostics status` shipped. |

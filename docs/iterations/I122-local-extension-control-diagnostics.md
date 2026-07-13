@@ -86,18 +86,47 @@
 - Binary smoke: `talos --no-init -p --mock` builds and starts correctly.
 - 133 conversation tests + 23 dashboard tests all pass.
 
+### Review Fixes — Complete (2026-07-13)
+
+Independent review found the initial F120-F123 closeout over-claimed three acceptance items. Fixed:
+
+1. **Dashboard/command parity gap**: dashboard previously received only `mcp_servers` at startup while
+   commands used the full `extension_snapshot()` (hooks, provenance, collisions). Fixed by extracting
+   `build_extension_snapshot()` as a free function shared by both the engine method and
+   `mode_runners.rs`; dashboard now serializes the identical `ExtensionSnapshot` shape via
+   `talos_conversation::build_extension_snapshot()`.
+2. **Hook config never reached the engine**: `set_hook_declarations()` was only called in tests.
+   Fixed by mapping `config.hooks.declarations` to engine tuples and adding
+   `ConversationEngine::with_hook_declarations()`; wired into both TUI mode-runner call sites.
+3. **MCP error text could leak secrets**: raw `error.to_string()` was rendered unsanitized. Added
+   `sanitize_diagnostic_text()` inside `build_extension_snapshot()` — strips `api_key=`, `token=`,
+   `secret=`, `password=`, `Authorization: Bearer `, and URL query strings containing
+   token/key/secret/auth. Applied uniformly so both commands and dashboard get sanitized output.
+4. **Dashboard homepage missing `/extensions` link**: added.
+5. **`ExtensionSnapshot`/`HookSnapshot`/`HookDeclarationDiagnostic` not exported from crate root**:
+   added to `talos-conversation::lib.rs` public exports; `build_extension_snapshot` also exported.
+
+5 new regression tests: sanitize api_key, sanitize bearer token, sanitize URL query secret, preserve
+clean error text, `build_extension_snapshot()` output matches `engine.extension_snapshot()` output
+(parity proof). Total: 138 conversation tests, 23 dashboard tests, 185 CLI tests — all pass.
+Fixed 1 clippy `collapsible_if` regression introduced during the sanitizer implementation.
+
 ## Retrospective
 
 ### Acceptance Verification
 
 | Acceptance | Status | Evidence |
 |---|---|---|
-| All three command surfaces and dashboard agree | Pass | `/mcp`, `/plugins`, `/hooks` all call `extension_snapshot()`; dashboard `/extensions` route serves same data shape |
-| Collisions and invalid entries visible, cannot crash | Pass | Collision detection in `extension_snapshot()`; 4 collision tests |
-| Secret fields and raw bodies never appear | Pass | No-secrets test; dashboard redaction test covers `/extensions` |
+| All three command surfaces and dashboard agree | Pass (after fix) | `build_extension_snapshot()` shared by engine and `mode_runners.rs`; `build_extension_snapshot_matches_engine_snapshot` proves parity |
+| Collisions and invalid entries visible, cannot crash | Pass | Collision detection in `build_extension_snapshot()`; 4 collision tests |
+| Secret fields and raw bodies never appear | Pass (after fix) | `sanitize_diagnostic_text()` strips api_key/token/secret/password/bearer/URL-query patterns; 4 sanitization regression tests with realistic sensitive payloads |
 | No new mutation endpoint; auth tests green | Pass | 3 GET-only tests for `/extensions`; existing auth tests pass |
 
 ### Residuals
 
-- Dashboard extensions show startup-time MCP diagnostics only (provenance and hook declarations are runtime state in the engine, not accessible at dashboard snapshot time).
+- Dashboard extensions show startup-time MCP/hook diagnostics only; provenance is empty at dashboard
+  build time (no tool calls have occurred yet) — this is inherent to when the dashboard snapshot is
+  built, not a data-consistency gap.
+- Sanitization uses pattern matching (not a full URL/credential parser); may not catch every possible
+  secret encoding. Documented as best-effort defense-in-depth, not a complete guarantee.
 - `--all-targets` clippy gate has pre-existing violations in unrelated test code (same as I120/I121).

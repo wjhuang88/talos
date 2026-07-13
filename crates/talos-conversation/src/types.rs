@@ -60,7 +60,7 @@ pub struct SkillDiagnostic {
     pub source: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ExtensionSnapshot {
     pub mcp_servers: Vec<McpServerDiagnostic>,
     pub hooks: HookSnapshot,
@@ -68,14 +68,14 @@ pub struct ExtensionSnapshot {
     pub collisions: Vec<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct HookSnapshot {
     pub declarations: Vec<HookDeclarationDiagnostic>,
     pub executable_carriers_enabled: bool,
     pub event_catalog: Vec<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct HookDeclarationDiagnostic {
     pub name: String,
     pub event: String,

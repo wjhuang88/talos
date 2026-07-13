@@ -155,6 +155,7 @@ async fn root_handler() -> Response {
   <a href="/history">History</a>
   <a href="/governance">Governance</a>
   <a href="/config">Config</a>
+  <a href="/extensions">Extensions</a>
 </body>
 </html>"#;
     let mut resp = body.into_response();

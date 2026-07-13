@@ -236,6 +236,11 @@ impl ConversationEngine {
         self
     }
 
+    pub fn with_hook_declarations(mut self, hooks: Vec<(String, String, bool)>) -> Self {
+        self.hook_declarations = hooks;
+        self
+    }
+
     pub fn set_hook_declarations(&mut self, hooks: Vec<(String, String, bool)>) {
         self.hook_declarations = hooks;
     }
@@ -1123,44 +1128,104 @@ impl ConversationEngine {
     }
 
     pub fn extension_snapshot(&self) -> ExtensionSnapshot {
-        let mut seen_mcp = std::collections::HashSet::new();
-        let mut collisions = Vec::new();
-        for server in &self.mcp_servers {
-            if !seen_mcp.insert(&server.name) {
-                collisions.push(format!("mcp:{}", server.name));
-            }
-        }
-        let mut seen_hooks = std::collections::HashSet::new();
-        for (name, _, _) in &self.hook_declarations {
-            if !seen_hooks.insert(name.as_str()) {
-                collisions.push(format!("hook:{name}"));
-            }
-        }
+        build_extension_snapshot(
+            &self.mcp_servers,
+            &self.hook_declarations,
+            &self.plugin_observations,
+        )
+    }
+}
 
-        let declarations = self
-            .hook_declarations
-            .iter()
-            .map(|(name, event, enabled)| HookDeclarationDiagnostic {
-                name: name.clone(),
-                event: event.clone(),
-                enabled: *enabled,
-            })
-            .collect();
+pub fn build_extension_snapshot(
+    mcp_servers: &[McpServerDiagnostic],
+    hook_declarations: &[(String, String, bool)],
+    provenance: &[PluginObservation],
+) -> ExtensionSnapshot {
+    let sanitized_mcp: Vec<McpServerDiagnostic> = mcp_servers
+        .iter()
+        .map(|s| McpServerDiagnostic {
+            name: s.name.clone(),
+            connected: s.connected,
+            tool_count: s.tool_count,
+            error: s.error.as_ref().map(|e| sanitize_diagnostic_text(e)),
+        })
+        .collect();
 
-        let event_catalog = talos_plugin::ALL_HOOK_EVENT_KINDS
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-
-        ExtensionSnapshot {
-            mcp_servers: self.mcp_servers.clone(),
-            hooks: HookSnapshot {
-                declarations,
-                executable_carriers_enabled: false,
-                event_catalog,
-            },
-            provenance: self.plugin_observations.clone(),
-            collisions,
+    let mut seen_mcp = std::collections::HashSet::new();
+    let mut collisions = Vec::new();
+    for server in &sanitized_mcp {
+        if !seen_mcp.insert(&server.name) {
+            collisions.push(format!("mcp:{}", server.name));
         }
     }
+    let mut seen_hooks = std::collections::HashSet::new();
+    for (name, _, _) in hook_declarations {
+        if !seen_hooks.insert(name.as_str()) {
+            collisions.push(format!("hook:{name}"));
+        }
+    }
+
+    let declarations = hook_declarations
+        .iter()
+        .map(|(name, event, enabled)| HookDeclarationDiagnostic {
+            name: name.clone(),
+            event: event.clone(),
+            enabled: *enabled,
+        })
+        .collect();
+
+    let event_catalog = talos_plugin::ALL_HOOK_EVENT_KINDS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    ExtensionSnapshot {
+        mcp_servers: sanitized_mcp,
+        hooks: HookSnapshot {
+            declarations,
+            executable_carriers_enabled: false,
+            event_catalog,
+        },
+        provenance: provenance.to_vec(),
+        collisions,
+    }
+}
+
+fn sanitize_diagnostic_text(text: &str) -> String {
+    let mut result = text.to_string();
+    for pattern in [
+        "api_key=",
+        "token=",
+        "secret=",
+        "password=",
+        "apikey=",
+        "Authorization: Bearer ",
+        "auth_token=",
+    ] {
+        if result.to_lowercase().contains(&pattern.to_lowercase()) {
+            let lower = result.to_lowercase();
+            if let Some(start) = lower.find(&pattern.to_lowercase()) {
+                let val_start = start + pattern.len();
+                let val_end = result[val_start..]
+                    .find(|c: char| c.is_whitespace() || c == '&' || c == '"')
+                    .map(|e| val_start + e)
+                    .unwrap_or(result.len());
+                result.replace_range(val_start..val_end, "***");
+            }
+        }
+    }
+    if result.contains("://")
+        && let Some(q_start) = result.find('?')
+    {
+        let query = &result[q_start..];
+        if query.to_lowercase().contains("token")
+            || query.to_lowercase().contains("key")
+            || query.to_lowercase().contains("secret")
+            || query.to_lowercase().contains("auth")
+        {
+            result.truncate(q_start);
+            result.push_str("?***");
+        }
+    }
+    result
 }

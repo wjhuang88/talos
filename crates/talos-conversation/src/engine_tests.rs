@@ -2395,3 +2395,105 @@ fn extension_snapshot_no_crash_on_empty_state() {
         "event catalog should always be populated"
     );
 }
+
+#[test]
+fn extension_snapshot_sanitizes_mcp_error_with_api_key() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "leaky".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some(
+            "failed to connect to https://api.example.com/v1?api_key=sk-secret-key".to_string(),
+        ),
+    }]);
+    let snap = engine.extension_snapshot();
+    let server = &snap.mcp_servers[0];
+    let error = server.error.as_ref().unwrap();
+    assert!(
+        !error.contains("sk-secret-key"),
+        "api key must be redacted: {error}"
+    );
+    assert!(
+        error.contains("***"),
+        "redacted value should contain ***: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_sanitizes_mcp_error_with_bearer_token() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "auth".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("Authorization: Bearer abc123token failed".to_string()),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert!(
+        !error.contains("abc123token"),
+        "bearer token must be redacted: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_sanitizes_mcp_error_with_url_query_secret() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "url".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("request to https://mcp.example.com/sse?token=hidden&ok=1 failed".to_string()),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert!(
+        !error.contains("hidden"),
+        "URL query secret must be redacted: {error}"
+    );
+}
+
+#[test]
+fn extension_snapshot_preserves_clean_error() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "clean".to_string(),
+        connected: false,
+        tool_count: 0,
+        error: Some("connection refused by host".to_string()),
+    }]);
+    let snap = engine.extension_snapshot();
+    let error = snap.mcp_servers[0].error.as_ref().unwrap();
+    assert_eq!(
+        error, "connection refused by host",
+        "clean error should be preserved"
+    );
+}
+
+#[test]
+fn build_extension_snapshot_matches_engine_snapshot() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![("h".to_string(), "TurnStart".to_string(), true)]);
+    let engine = engine.with_mcp_servers(vec![McpServerDiagnostic {
+        name: "s".to_string(),
+        connected: true,
+        tool_count: 1,
+        error: None,
+    }]);
+
+    let from_engine = engine.extension_snapshot();
+    let from_builder = crate::build_extension_snapshot(
+        &[McpServerDiagnostic {
+            name: "s".to_string(),
+            connected: true,
+            tool_count: 1,
+            error: None,
+        }],
+        &[("h".to_string(), "TurnStart".to_string(), true)],
+        &[],
+    );
+
+    assert_eq!(from_engine.mcp_servers, from_builder.mcp_servers);
+    assert_eq!(
+        from_engine.hooks.declarations,
+        from_builder.hooks.declarations
+    );
+    assert_eq!(from_engine.collisions, from_builder.collisions);
+}
