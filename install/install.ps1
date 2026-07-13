@@ -40,8 +40,40 @@ New-Item -ItemType Directory -Path $TmpDir | Out-Null
 
 try {
   Write-Host "-> downloading talos $Version ($Target)"
-  Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Archive" -OutFile (Join-Path $TmpDir $Archive)
-  Expand-Archive -Path (Join-Path $TmpDir $Archive) -DestinationPath $TmpDir -Force
+  $ArchivePath = Join-Path $TmpDir $Archive
+  Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Archive" -OutFile $ArchivePath
+
+  # best-effort checksum verification (mirrors install.sh against the release checksum.sha256)
+  $ChecksumPath = Join-Path $TmpDir 'checksum.sha256'
+  try {
+    Invoke-WebRequest -UseBasicParsing -Uri "$Base/checksum.sha256" -OutFile $ChecksumPath -ErrorAction Stop
+  } catch {
+    $ChecksumPath = $null
+  }
+  if ($ChecksumPath -and (Test-Path $ChecksumPath)) {
+    $Expected = $null
+    foreach ($line in (Get-Content $ChecksumPath)) {
+      $line = $line.Trim()
+      if (-not $line) { continue }
+      $parts = $line -split '\s+'
+      if ($parts.Count -ge 2) {
+        $name = $parts[1]
+        if ($name.StartsWith('*')) { $name = $name.Substring(1) }
+        if ($name -eq $Archive) { $Expected = $parts[0]; break }
+      }
+    }
+    if ($Expected) {
+      $Actual = (Get-FileHash -Algorithm SHA256 -Path $ArchivePath).Hash.ToLower()
+      if ($Actual -ne $Expected.ToLower()) {
+        throw "checksum mismatch for $Archive (expected $Expected, got $Actual)"
+      }
+      Write-Host "-> checksum verified"
+    }
+  } else {
+    Write-Host "note: checksum.sha256 not available; skipping checksum verification"
+  }
+
+  Expand-Archive -Path $ArchivePath -DestinationPath $TmpDir -Force
   Move-Item -Path (Join-Path $TmpDir 'talos.exe') -Destination (Join-Path $InstallDir 'talos.exe') -Force
 } finally {
   Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
