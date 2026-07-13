@@ -1,6 +1,6 @@
 # Iteration I057: Acceptance Remediation And Release Gate
 
-> Document status: Review
+> Document status: Complete (2026-06-29; header reconciled 2026-07-13)
 > Published plan date: 2026-06-26
 > Planned objective: Repair the acceptance blockers found in the DATA-001 -> I019 -> I020 review before any v0.2.0 release tag.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.

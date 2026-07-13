@@ -117,9 +117,9 @@ docs/iterations/
 | I078 | Month 3 — Session Orchestration, Todo, Memory, And Thinking | **Complete (2026-07-02)** | Weeks 9-12 of the 2026-07-01 replan delivered slash auto-execute, session todo foundations, thinking separation, and self-bootstrap gap evidence. See `I078-month3-session-todo-memory-thinking.md`. |
 | I079 | Month 4 — Release Readiness And Handoff | **Complete (2026-07-02)** | Weeks 13-16 of the 2026-07-01 replan delivered reliability sweep, memory injection decision, publish gate packet, REL-002 readiness report, closeout, handoff, and maintainer feedback fixes. See `I079-month4-release-readiness-handoff.md`. |
 | I080 | Frontline Month 1 — Config And Governance Visibility | **Complete** (2026-07-02) | Config subcommands verified, Ctrl+A/Ctrl+E composer navigation, `/agile status` slash command, dashboard `loopback_only` default-on, ADR-031 amended. F103 deferred. See `I080-frontline-config-governance-visibility.md`. |
-| I081 | Frontline Month 2 — Extension And Distribution Discipline | **Planned (2026-07-02)** | Weeks 5-8 of the 2026-07-02 frontline plan: plugin diagnostics, hook listing, read-only plugin polish, local opt-in UX, asset distribution design, and closeout. See `I081-frontline-extension-distribution.md`. |
-| I082 | Frontline Month 3 — Document Ingestion And Parser Footprint | **Planned (2026-07-02)** | Weeks 9-12 of the 2026-07-02 frontline plan: document extraction, HTML/link extraction, link references, parser feature gates, and closeout. See `I082-frontline-ingestion-footprint.md`. |
-| I083 | Frontline Month 4 — Ecosystem Compatibility And Release Posture | **Planned (2026-07-02)** | Weeks 13-16 of the 2026-07-02 frontline plan: shared skills policy/implementation, REL-002 rehearsal evidence, docs sweep, release posture, closeout, and handoff. See `I083-frontline-ecosystem-release-posture.md`. |
+| I081 | Frontline Month 2 — Extension And Distribution Discipline | **Superseded before activation** | Historical baseline; replaced by later product-hardening plans. See `I081-frontline-extension-distribution.md`. |
+| I082 | Frontline Month 3 — Document Ingestion And Parser Footprint | **Superseded before activation** | Historical baseline; replaced by later product-hardening plans. See `I082-frontline-ingestion-footprint.md`. |
+| I083 | Frontline Month 4 — Ecosystem Compatibility And Release Posture | **Superseded before activation** | Historical baseline; replaced by later product-hardening plans. See `I083-frontline-ecosystem-release-posture.md`. |
 | I084 | Experience Reliability — Thinking, Timeout, Retry, And Status | **Complete (2026-07-03)** | UX100-UX106 complete: ADR-034 v3, structured reasoning persistence, Anthropic/OpenAI reasoning paths, timeout detection, retry/backoff, TUI status states. Evidence recorded: 1497 workspace tests, clippy, fmt, governance validation. See `I084-experience-reliability.md`. |
 | I085 | Model Catalog Modernization — talos-models, /model, /connect | **Complete (2026-07-12)** | Stage 1/2 and DB-free packaged-catalog behavior are closed. MC107 real-terminal walkthrough verified `/connect` grouping/filtering, safe credential cancel, and `/model` rendering in a disposable HOME. See `I085-model-catalog-modernization.md`. |
 | I086 | Experience Polish And Retry Visibility | **Superseded before activation (2026-07-12)** | Later I107/I114/I115 work delivered or changed the target; remaining work is replanned under I116-I119. See `I086-experience-polish-and-retry-visibility.md`. |
@@ -152,6 +152,10 @@ docs/iterations/
 | I117 | Command Sandbox Evidence | **Complete (2026-07-12)** | Independent security review accepted diagnostic-only evidence for bash and exec single/steps/pipes; evidence never changes permission decisions. See `I117-command-sandbox-evidence.md`. |
 | I118 | Bounded Local Productization | **Complete (2026-07-12)** | LT030-LT034 verified; installer fixture tests (8/8 pass). See `I118-bounded-local-productization.md`. |
 | I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
+| I120 | Dynamic Diagnostics Truth | **Planned — ready for assignment** | Month 1 of the 2026-07-13 frontline long task. Valid JSON, dynamic iteration/gate truth, redaction, and safe malformed-source fallback. See `I120-dynamic-diagnostics-truth.md`. |
+| I121 | TUI Attention And Thinking Clarity | **Planned — blocked on I120** | Month 2. Prominent approval presentation and transient thinking-title preview without permission or persistence changes. See `I121-tui-attention-and-thinking-clarity.md`. |
+| I122 | Local Extension And Control Diagnostics | **Planned — blocked on I121** | Month 3. Shared read-only MCP/plugin/hook diagnostics across command surfaces and loopback dashboard. See `I122-local-extension-control-diagnostics.md`. |
+| I123 | Installation And Trial Confidence | **Planned — blocked on I122** | Month 4. Installer fixtures, clean-HOME smoke, second-operator replay, and honest trial report. See `I123-installation-and-trial-confidence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -186,9 +190,9 @@ rewrite published iteration baselines.
 | I078 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I079 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
 | I080 | Complete | Closed 2026-07-02. Removed from non-terminal inventory. |
-| I081 | Planned (superseded remainder) | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
-| I082 | Planned (superseded remainder) | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
-| I083 | Planned (superseded remainder) | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
+| I081 | Superseded before activation | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
+| I082 | Superseded before activation | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
+| I083 | Superseded before activation | Historical shell from the 2026-07-02 frontline plan. The unexecuted path is replaced by the 2026-07-03 product hardening plan. |
 | I084 | Complete | UX100-UX106 complete and release-facing validation evidence recorded. Removed from non-terminal inventory after this release closeout. |
 | I085 | Complete (2026-07-12) | MC107 real-terminal walkthrough passed; removed from non-terminal inventory. |
 | I086 | Superseded before activation | Replaced by the changed post-v0.3.4 objectives in I116-I119. |

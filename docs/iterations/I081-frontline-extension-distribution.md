@@ -1,6 +1,6 @@
 # Iteration I081: Frontline Month 2 — Extension And Distribution Discipline
 
-> Document status: Planned
+> Document status: Superseded before activation (reconciled 2026-07-13)
 > Published plan date: 2026-07-02
 > Planned objective: Execute weeks 5-8 of the 2026-07-02 frontline plan: plugin diagnostics,
 > hook listing/diagnostics, read-only plugin fixture polish, explicit local plugin enablement UX,

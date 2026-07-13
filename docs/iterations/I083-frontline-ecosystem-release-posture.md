@@ -1,6 +1,6 @@
 # Iteration I083: Frontline Month 4 — Ecosystem Compatibility And Release Posture
 
-> Document status: Planned
+> Document status: Superseded before activation (reconciled 2026-07-13)
 > Published plan date: 2026-07-02
 > Planned objective: Execute weeks 13-16 of the 2026-07-02 frontline plan: opt-in shared skills
 > policy/implementation, REL-002 rehearsal evidence, command/help/docs consistency, release posture,

@@ -1,6 +1,6 @@
 # Iteration I082: Frontline Month 3 — Document Ingestion And Parser Footprint
 
-> Document status: Planned
+> Document status: Superseded before activation (reconciled 2026-07-13)
 > Published plan date: 2026-07-02
 > Planned objective: Execute weeks 9-12 of the 2026-07-02 frontline plan: bounded document capture,
 > HTML/link extraction, follow-up link references, and tree-sitter parser feature gates.
