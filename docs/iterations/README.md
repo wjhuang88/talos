@@ -155,7 +155,7 @@ docs/iterations/
 | I120 | Dynamic Diagnostics Truth | **Complete** (2026-07-13) | Month 1. serde JSON, dynamic iteration state, malformed→unavailable, and typed ResidualGate pass the maintainer-confirmed repository validation gate. See `I120-dynamic-diagnostics-truth.md`. |
 | I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
 | I122 | Local Extension And Control Diagnostics | **Complete** (2026-07-13) | Month 3. Typed extension snapshot, unified /mcp//plugins//hooks, dashboard /extensions route, 133+23 tests. See `I122-local-extension-control-diagnostics.md`. |
-| I123 | Installation And Trial Confidence | **Complete** (2026-07-13) | Month 4. Installer fixtures, clean-HOME smoke, second-operator replay, and honest trial report. See `I123-installation-and-trial-confidence.md`. |
+| I123 | Installation And Trial Confidence | **Complete** (2026-07-13) | Month 4. Installer fixtures (POSIX 9/9 + PowerShell 5/0/1, checksum verified), clean-HOME smoke (18/0/2, real session resume), second-operator replay (two byte-identical records), and honest trial report. See `I123-installation-and-trial-confidence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
