@@ -542,8 +542,7 @@ impl ConversationEngine {
                 outputs.push(content_block(MessageSource::System, text));
             }
             "/plugins" => {
-                let text = "[System] /plugins is reserved for future plugin packages.\n[System] Use /mcp to inspect MCP server status and tool provenance.\n".to_string();
-                outputs.push(content_block(MessageSource::System, text));
+                outputs.extend(self.handle_plugins_command());
             }
             "/mcp" => {
                 outputs.extend(self.handle_mcp_command());
@@ -744,15 +743,16 @@ impl ConversationEngine {
     }
 
     fn handle_mcp_command(&mut self) -> Vec<UiOutput> {
-        if self.mcp_servers.is_empty() && self.plugin_observations.is_empty() {
+        let snap = self.extension_snapshot();
+        if snap.mcp_servers.is_empty() && snap.provenance.is_empty() {
             let text = "[System] No MCP servers configured and no tool provenance observed yet.\n"
                 .to_string();
             return vec![content_block(MessageSource::System, text)];
         }
         let mut text = String::new();
-        if !self.mcp_servers.is_empty() {
+        if !snap.mcp_servers.is_empty() {
             text.push_str("[System] MCP servers (startup snapshot):\n");
-            for server in &self.mcp_servers {
+            for server in &snap.mcp_servers {
                 if server.connected {
                     text.push_str(&format!(
                         "[System]   {} (connected, {} tool{})\n",
@@ -769,9 +769,9 @@ impl ConversationEngine {
                 }
             }
         }
-        if !self.plugin_observations.is_empty() {
+        if !snap.provenance.is_empty() {
             text.push_str("[System] Observed tool provenance (this session):\n");
-            for entry in &self.plugin_observations {
+            for entry in &snap.provenance {
                 text.push_str(&format!(
                     "[System]   {} ({} call{})\n",
                     entry.key,
@@ -780,29 +780,98 @@ impl ConversationEngine {
                 ));
             }
         }
+        let mcp_collisions: Vec<_> = snap
+            .collisions
+            .iter()
+            .filter(|c| c.starts_with("mcp:"))
+            .collect();
+        if !mcp_collisions.is_empty() {
+            text.push_str(&format!(
+                "[System]   collisions: {}\n",
+                mcp_collisions
+                    .iter()
+                    .map(|c| c.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
         vec![content_block(MessageSource::System, text)]
     }
 
     fn handle_hooks_command(&self) -> Vec<UiOutput> {
+        let snap = self.extension_snapshot();
         let mut text = String::new();
         text.push_str("[System] Hooks diagnostics:\n");
 
-        if self.hook_declarations.is_empty() {
+        if snap.hooks.declarations.is_empty() {
             text.push_str("[System]   config-introduced hooks: none declared\n");
         } else {
             text.push_str(&format!(
                 "[System]   config-introduced hooks: {} declared\n",
-                self.hook_declarations.len()
+                snap.hooks.declarations.len()
             ));
-            for (name, event, enabled) in &self.hook_declarations {
-                let status = if *enabled { "enabled" } else { "disabled" };
-                text.push_str(&format!("[System]     {name} ({event}) [{status}]\n"));
+            for d in &snap.hooks.declarations {
+                let status = if d.enabled { "enabled" } else { "disabled" };
+                text.push_str(&format!(
+                    "[System]     {} ({}) [{status}]\n",
+                    d.name, d.event
+                ));
             }
         }
-        text.push_str("[System]   executable hook carriers: disabled\n");
+        text.push_str(&format!(
+            "[System]   executable hook carriers: {}\n",
+            if snap.hooks.executable_carriers_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        ));
         text.push_str("[System]   builtin hook event catalog:\n");
-        for kind in talos_plugin::ALL_HOOK_EVENT_KINDS {
+        for kind in &snap.hooks.event_catalog {
             text.push_str(&format!("[System]     {kind}\n"));
+        }
+        let hook_collisions: Vec<_> = snap
+            .collisions
+            .iter()
+            .filter(|c| c.starts_with("hook:"))
+            .collect();
+        if !hook_collisions.is_empty() {
+            text.push_str(&format!(
+                "[System]   collisions: {}\n",
+                hook_collisions
+                    .iter()
+                    .map(|c| c.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        vec![content_block(MessageSource::System, text)]
+    }
+
+    fn handle_plugins_command(&self) -> Vec<UiOutput> {
+        let snap = self.extension_snapshot();
+        let mut text = String::new();
+        text.push_str("[System] Extension diagnostics:\n");
+        text.push_str(&format!(
+            "[System]   MCP servers: {} ({} connected)\n",
+            snap.mcp_servers.len(),
+            snap.mcp_servers.iter().filter(|s| s.connected).count()
+        ));
+        text.push_str(&format!(
+            "[System]   Hook declarations: {}\n",
+            snap.hooks.declarations.len()
+        ));
+        text.push_str(&format!(
+            "[System]   Provenance observations: {}\n",
+            snap.provenance.len()
+        ));
+        text.push_str("[System]   WASM plugin packages: not yet available\n");
+        text.push_str("[System] Use /mcp for MCP detail, /hooks for hook detail.\n");
+        if !snap.collisions.is_empty() {
+            text.push_str(&format!(
+                "[System]   collisions: {}\n",
+                snap.collisions.join(", ")
+            ));
         }
         vec![content_block(MessageSource::System, text)]
     }

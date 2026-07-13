@@ -562,8 +562,9 @@ async fn slash_plugins_shows_transition_notice() {
 
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert!(text.contains("reserved for future plugin packages"));
-    assert!(text.contains("Use /mcp"));
+    assert!(text.contains("WASM plugin packages: not yet available"));
+    assert!(text.contains("Use /mcp for MCP detail"));
+    assert!(text.contains("Provenance observations: 1"));
     assert!(!text.contains("Observed tool provenance"));
 }
 
@@ -580,7 +581,10 @@ async fn slash_plugins_notice_does_not_leak_mcp_status() {
 
     let (_, text) = collect_stream(outputs).await.unwrap();
     assert!(!text.contains("MCP servers (startup snapshot)"));
-    assert!(!text.contains("github"));
+    assert!(
+        !text.contains("github"),
+        "individual server names must not appear in /plugins: {text}"
+    );
 }
 
 #[tokio::test]
