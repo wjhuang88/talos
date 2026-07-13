@@ -1,6 +1,6 @@
 # Iteration I121: TUI Attention And Thinking Clarity
 
-> Document status: Complete (2026-07-13) — all stories verified, buffer tests pass
+> Document status: Review (2026-07-13) — code complete, residuals: native-terminal walkthrough + clippy gate
 > Published plan date: 2026-07-13
 > Planned objective: Make approval requests unmistakable and thinking previews concise without
 > changing permission or reasoning-storage semantics.

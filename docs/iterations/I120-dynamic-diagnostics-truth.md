@@ -1,6 +1,6 @@
 # Iteration I120: Dynamic Diagnostics Truth
 
-> Document status: Complete (2026-07-13) — all stories verified, real binary smoke passed
+> Document status: Review (2026-07-13) — code complete, residual: --all-targets clippy gate unresolved
 > Published plan date: 2026-07-13
 > Planned objective: Replace hardcoded/stale diagnostics with valid, bounded, dynamically derived
 > operator truth.
