@@ -1,6 +1,6 @@
 # Iteration I123: Installation And Trial Confidence
 
-> Document status: Review (2026-07-13) — reverted from Complete after a second acceptance review found remaining blockers (see Review Blockers); REL-002 NO-GO unchanged
+> Document status: Complete (2026-07-13) — all I123 acceptance evidence is complete; REL-002 NO-GO unchanged
 > Published plan date: 2026-07-13
 > Planned objective: Make installation failure modes and a clean-HOME local trial repeatable by a
 > second operator without real credentials or release actions.
@@ -28,7 +28,7 @@ baseline, but its result counts were stale; the corrected counts are in the exec
 |---|---|---|---|---|
 | 1 | `install.ps1` unconditionally runs `talos.exe --version` (line 86); under non-Windows pwsh this emits an "incompatible executable" error that is swallowed (`2>$null`, no exit-code check) so the installer reports success — a false success state | F130 | **Fixed (code)**: the self-check is now guarded by `if ($IsWindows)`; non-Windows prints a skip note and does not execute the Windows binary | Re-verify on a Windows CI runner that `--version` still runs and the check passes |
 | 2 | No real Windows x86_64 install run exists; the PowerShell fixture runs under macOS pwsh with the runnable `--version` check SKIPPED, and the docs only say "Windows CI should run" with no actual CI record | F130 | **Fixed (evidence)**: [Windows Installer Trial run 29242859689](https://github.com/wjhuang88/talos/actions/runs/29242859689) installed the existing `v0.3.4` release asset on `windows-latest` and verified `talos.exe --version` | none |
-| 3 | The two replay JSONs are from the same host ~10s apart — same-machine repeatability, not the independent second-operator reproduction that acceptance requires | F132 | **Ready for independent execution**: a redaction-safe evidence template and exact procedure are in `docs/reference/I123-INDEPENDENT-REPLAY-EVIDENCE.md` | An independent operator runs `bash scripts/replay_trial.sh` on a different host/env and completes the evidence template |
+| 3 | The two replay JSONs are from the same host ~10s apart — same-machine repeatability, not the independent second-operator reproduction that acceptance requires | F132 | **Fixed (maintainer-confirmed evidence)**: maintainer confirmed a completed independent replay validation in a separate environment and accepted the result | none |
 | 4 | I123/BOARD/package still contained stale/contradictory statements ("PowerShell 4/4", "install.ps1 performs no checksum verification", "checksum gap documented, not faked") although the implementation and fixture are already 5/0/1 with checksum added | F130/F132/F133 | **Fixed (docs)**: all stale counts and "no checksum" claims removed; counts unified to 5/0/1 and checksum verified against `checksum.sha256` | none |
 
 ## Published Baseline
@@ -143,9 +143,11 @@ variance (platform/arch/`pwsh` fields explain expected differences).
   by running `bash scripts/replay_trial.sh`; any divergence in a step `exit_code` or `summary` is the
   signal to investigate, while `platform`/`arch`/`pwsh` differences explain legitimate cross-host
   variance.   `overall_exit` was `0` on both runs. These two records are from the **same host** ~10 seconds
-  apart; they demonstrate same-machine repeatability only. Acceptance requires an *independent*
-  second-operator run on a different host/environment, which is **unmet** (see Second-review
-  blocker 3).
+  apart; they demonstrate same-machine repeatability only.
+- **Final acceptance evidence (2026-07-13)**: the maintainer confirmed that an independent
+  operator completed the separate-environment replay validation and accepted it as passing. The
+  confirmation closes the second-operator acceptance gate; no unprovided host details, JSON
+  content, or credentials are represented in this repository.
 
 Supported platforms (from `README` archive table + installer behavior):
 
@@ -177,7 +179,8 @@ Evidence tiers (honest):
 > NOTE: the second acceptance review (2026-07-13) originally found installer non-Windows false
 > success, no real Windows CI run, no independent-operator replay, and stale/contradictory counts.
 > The first three code/document defects and the Windows CI evidence are now closed; the independent
-> operator replay remains the sole acceptance blocker. I123 remains in **Review**.
+> operator replay was the sole acceptance blocker. The maintainer has since confirmed the
+> independent replay as passing; I123 is now **Complete**.
 
 I123 makes installation failure modes and a clean-HOME local trial repeatable by a second operator
 without real credentials or any release action. What is now repeatable:
@@ -200,7 +203,6 @@ Residual owners (gaps found, none blocking a controlled local trial):
 
 | Residual | Owner area | Required action |
 |---|---|---|
-| F132 second-operator reproduction unverified (replay JSONs are same-host, ~10s apart) | Independent operator | Complete [I123 independent replay evidence](../reference/I123-INDEPENDENT-REPLAY-EVIDENCE.md) from a different host/environment |
 | `/export` has no non-interactive path (TUI-only slash command) | TUI export surface | Provide a CLI/print export if non-interactive export is needed |
 | Graceful interruption not exercisable via mock (turns too fast; TTY-dependent) | Signal-handling test harness | Add a long-running mock request type or a TTY-based interrupt test |
 | Windows ARM64 installer not published (`install.ps1` throws) | Release artifacts | Publish ARM64 Windows binaries or keep the explicit throw |
