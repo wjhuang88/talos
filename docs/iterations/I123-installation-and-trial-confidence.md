@@ -1,6 +1,6 @@
 # Iteration I123: Installation And Trial Confidence
 
-> Document status: Planned — blocked on I122 Complete
+> Document status: Active (2026-07-13) — Gate 0 passed; F130 in progress
 > Published plan date: 2026-07-13
 > Planned objective: Make installation failure modes and a clean-HOME local trial repeatable by a
 > second operator without real credentials or release actions.
@@ -51,4 +51,4 @@
 
 ## Execution Record
 
-Not started. Do not activate until I122 is Complete.
+Activated 2026-07-13 after I122 Complete. F130 (POSIX/PowerShell installer fixture matrix) in progress.
