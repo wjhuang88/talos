@@ -117,6 +117,7 @@ impl fmt::Display for ScheduleKind {
 /// Returned by [`ScheduleCommand::List`] for read-only inspection. Contains
 /// only bounded, non-sensitive information.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ScheduledTaskInfo {
     /// Unique task identifier (e.g., `sched_1`).
     pub id: String,
@@ -135,6 +136,7 @@ impl ScheduledTaskInfo {
     /// Returns the remaining time until the task fires.
     ///
     /// Returns `Duration::ZERO` if the fire time has already passed.
+    #[allow(dead_code)]
     pub fn remaining(&self) -> Duration {
         self.fire_at.saturating_duration_since(Instant::now())
     }
@@ -172,6 +174,7 @@ pub(crate) enum CancelResult {
 /// The actor owns the receiver; tools and the CLI hold a
 /// [`SchedulerHandle`] (the sender clone) to issue commands.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) enum ScheduleCommand {
     /// Register a one-shot delayed follow-up.
     RegisterOneShot {
@@ -420,6 +423,7 @@ impl SchedulerActor {
 /// The `sq_tx` should be the same sender used by the session actor, so
 /// scheduled fires inject into the same ordered queue as user messages.
 /// The `cancel_token` should be linked to session shutdown.
+#[allow(dead_code)]
 pub(crate) fn spawn_scheduler_actor(
     sq_tx: mpsc::Sender<SessionOp>,
     cancel_token: CancellationToken,
