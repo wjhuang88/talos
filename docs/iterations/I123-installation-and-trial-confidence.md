@@ -27,7 +27,7 @@ baseline, but its result counts were stale; the corrected counts are in the exec
 | # | Blocker (from re-test) | Mapped story | Status | Required action |
 |---|---|---|---|---|
 | 1 | `install.ps1` unconditionally runs `talos.exe --version` (line 86); under non-Windows pwsh this emits an "incompatible executable" error that is swallowed (`2>$null`, no exit-code check) so the installer reports success — a false success state | F130 | **Fixed (code)**: the self-check is now guarded by `if ($IsWindows)`; non-Windows prints a skip note and does not execute the Windows binary | Re-verify on a Windows CI runner that `--version` still runs and the check passes |
-| 2 | No real Windows x86_64 install run exists; the PowerShell fixture runs under macOS pwsh with the runnable `--version` check SKIPPED, and the docs only say "Windows CI should run" with no actual CI record | F130 | **Ready for execution**: CI is configured to run the offline PowerShell fixture on `windows-latest`; the manual `Windows Installer Trial` workflow installs a selected existing release and asserts `talos.exe --version` | Push the workflow, trigger `Windows Installer Trial` with the intended existing release tag, and attach its successful run URL/log |
+| 2 | No real Windows x86_64 install run exists; the PowerShell fixture runs under macOS pwsh with the runnable `--version` check SKIPPED, and the docs only say "Windows CI should run" with no actual CI record | F130 | **Partial evidence**: the offline fixture passed on real `windows-latest` CI in [run 29242131537](https://github.com/wjhuang88/talos/actions/runs/29242131537); the manual `Windows Installer Trial` workflow is ready to install a selected existing release and assert `talos.exe --version` | Merge/push the manual workflow to the default branch, trigger it with the intended existing release tag, and attach its successful run URL/log |
 | 3 | The two replay JSONs are from the same host ~10s apart — same-machine repeatability, not the independent second-operator reproduction that acceptance requires | F132 | **Ready for independent execution**: a redaction-safe evidence template and exact procedure are in `docs/reference/I123-INDEPENDENT-REPLAY-EVIDENCE.md` | An independent operator runs `bash scripts/replay_trial.sh` on a different host/env and completes the evidence template |
 | 4 | I123/BOARD/package still contained stale/contradictory statements ("PowerShell 4/4", "install.ps1 performs no checksum verification", "checksum gap documented, not faked") although the implementation and fixture are already 5/0/1 with checksum added | F130/F132/F133 | **Fixed (docs)**: all stale counts and "no checksum" claims removed; counts unified to 5/0/1 and checksum verified against `checksum.sha256` | none |
 
@@ -161,9 +161,10 @@ Supported platforms (from `README` archive table + installer behavior):
 Evidence tiers (honest):
 - **Local**: ran in this environment (Darwin/arm64, pwsh 7.6.2): POSIX 9/9, PowerShell 5/0/1, smoke
   18 pass / 0 fail / 2 skip.
-- **CI configuration**: the normal CI workflow is configured to run the PowerShell fixture on
-  `windows-latest`; the manual `Windows Installer Trial` workflow is configured for the separate
-  real-release install and version check. Neither is evidence until a run succeeds.
+- **CI**: the normal CI PowerShell fixture passed on real `windows-latest` in
+  [run 29242131537](https://github.com/wjhuang88/talos/actions/runs/29242131537). The manual
+  `Windows Installer Trial` workflow remains the separate real-release install and version check;
+  it cannot be manually dispatched until it is present on the default branch.
 - **Static**: `scripts/validate_installers.sh` checks canonical URLs, archive naming, explicit
   error exits, and credential safety for both installers.
 -   **Untested**: live GitHub download (no network fixtures); Windows ARM64 installer (not
@@ -199,7 +200,7 @@ Residual owners (gaps found, none blocking a controlled local trial):
 
 | Residual | Owner area | Required action |
 |---|---|---|
-| Windows x86_64 real install unverified (workflow prepared but not yet run) | CI / release artifacts | Trigger `Windows Installer Trial` for an existing release and attach the successful run evidence |
+| Windows x86_64 real install unverified (offline fixture passed; real-release workflow not yet run) | CI / release artifacts | Merge the workflow, trigger `Windows Installer Trial` for an existing release, and attach the successful run evidence |
 | F132 second-operator reproduction unverified (replay JSONs are same-host, ~10s apart) | Independent operator | Complete [I123 independent replay evidence](../reference/I123-INDEPENDENT-REPLAY-EVIDENCE.md) from a different host/environment |
 | `/export` has no non-interactive path (TUI-only slash command) | TUI export surface | Provide a CLI/print export if non-interactive export is needed |
 | Graceful interruption not exercisable via mock (turns too fast; TTY-dependent) | Signal-handling test harness | Add a long-running mock request type or a TTY-based interrupt test |
