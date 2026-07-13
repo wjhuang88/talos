@@ -89,4 +89,34 @@ Extended `scripts/talos_smoke.sh` from 11 to 17 checks (running from a disposabl
 Result: **18 passed, 0 failed, 2 skipped** (`bash scripts/talos_smoke.sh`, exit 0). Acceptance met:
 trial smoke starts from a disposable HOME and needs no real secret or external provider.
 
-### F132 — Second-operator recovery/troubleshooting replay (Next)
+### F132 — Second-operator recovery/troubleshooting replay (Complete 2026-07-13)
+
+Added `scripts/replay_trial.sh`: a one-command packet that runs the F130 installer fixtures and
+the F131 clean-HOME smoke in sequence, records platform/`rustc`/`pwsh` and each step's exit code
+and summary, and writes a machine-comparable JSON record to
+`target/trial-replay/trial-replay-<UTC>.json`. Exit code is non-zero only when a step genuinely
+FAILS; an intentional SKIP (e.g. PowerShell wrapper exiting 0 when `pwsh` is absent) does not fail.
+A second operator replays with `bash scripts/replay_trial.sh` and `diff`s two JSON records to spot
+variance (platform/arch/`pwsh` fields explain expected differences).
+
+Supported platforms (from `README` archive table + installer behavior):
+
+| Platform | Installer | Fixture evidence | Notes |
+|---|---|---|---|
+| macOS x86_64 | `install.sh` | POSIX 9/9 (local) | |
+| macOS aarch64 | `install.sh` | POSIX 9/9 (local, this env) | |
+| Linux x86_64 | `install.sh` | POSIX 9/9 (CI) | |
+| Linux aarch64 | `install.sh` | POSIX 9/9 (CI) | |
+| Windows x86_64 | `install.ps1` | PowerShell 4/4 (local, pwsh present) | checksum verification absent (gap) |
+| Windows ARM64 | `install.ps1` | **untested** | installer throws "not published yet" |
+
+Evidence tiers (honest):
+- **Local**: ran in this environment (Darwin/arm64, pwsh 7.6.2): POSIX 9/9, PowerShell 4/4, smoke
+  18 pass / 0 fail / 2 skip.
+- **CI**: POSIX fixture and smoke should run on Linux/macOS CI; PowerShell fixture on Windows CI.
+- **Static**: `scripts/validate_installers.sh` checks canonical URLs, archive naming, explicit
+  error exits, and credential safety for both installers.
+- **Untested**: live GitHub download (no network fixtures); Windows ARM64 installer (not
+  published); PowerShell checksum verification (installer gap, see F130 residual).
+
+### F133 — Honest trial-readiness report and residual owners (Next)
