@@ -1,6 +1,6 @@
 # Iteration I121: TUI Attention And Thinking Clarity
 
-> Document status: Planned — blocked on I120 Complete
+> Document status: Active — Gate 0 passed 2026-07-13 (I120 Complete)
 > Published plan date: 2026-07-13
 > Planned objective: Make approval requests unmistakable and thinking previews concise without
 > changing permission or reasoning-storage semantics.
@@ -51,4 +51,28 @@
 
 ## Execution Record
 
-Not started. Do not activate until I120 is Complete.
+### Gate 0 — 2026-07-13
+
+- Branch: `feature/i121-tui-attention-thinking-clarity` (from `feature/i120-dynamic-diagnostics` at `aaff634`).
+- I120 is Complete on the I120 branch; I121 branches from that state.
+- `rustc 1.97.0`; `Cargo.lock` present; governance 0 warnings; release_preflight passed in I120 closeout.
+- No other iteration is Active (I120 Complete, I122-I123 blocked on I121).
+
+### F110-F111 — Complete (2026-07-13)
+
+- `height_hint(w)` now returns width-aware natural height for approval panels: 6 rows at ≥60 cols,
+  6+N at <60 cols (N = wrapped argument lines, max 2).
+- `render_approval` rewritten with width-aware layout:
+  - Wide (≥60): `⚠ tool_name: args` on one line, args truncated
+  - Narrow (<60): `⚠ tool_name` on own line (always complete), args on up to 2 separate lines
+- Priority clipping: separator > warning title > 3 approval options > args > help text.
+  When height insufficient, help drops first, then args. Options never clipped before args.
+- Visual emphasis: warning title retains `TEXT_WARNING` fg + `NORD2` bg + bold; panel body
+  keeps `INPUT_BG`; selected item keeps `NORD2` bg (unchanged — preserves selection contrast).
+- No `Block::borders` added (would consume internal height and worsen clipping).
+- Keyboard handling and permission decisions unchanged.
+- `wrap_text_to_lines` and `approval_natural_height` helpers added as `pub(crate)`.
+- 14 new tests: height_hint at wide/narrow/empty/capped, wrap_text basics/truncation/empty/newlines,
+  natural_height wide/narrow, buffer rendering at 40/60/80/120, selected style distinction,
+  insufficient-height option preservation, CJK tool name, no-overflow check.
+- Validation: fmt, clippy, release_preflight, all pass.
