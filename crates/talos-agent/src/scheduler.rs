@@ -1010,4 +1010,248 @@ mod tests {
             "fired task must be cleaned up even when queue is closed"
         );
     }
+
+    // ── DelayTool unit tests (SF103) ────────────────────────────────────
+
+    #[test]
+    fn delay_tool_nature_is_execute() {
+        let (handle, _pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+        assert_eq!(tool.nature(), talos_core::tool::ToolNature::Execute);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_executes_and_returns_task_id() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+        let _join = pending.spawn(sq_tx, cancel_token);
+
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "follow up on the deploy",
+                "delay_secs": 60
+            }))
+            .await;
+
+        assert!(!result.is_error, "valid input should succeed");
+        assert!(
+            result.content.contains("Task ID:"),
+            "result should contain the task ID: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("sched_"),
+            "task ID should use sched_ prefix: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_rejects_missing_message() {
+        let (handle, _pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+
+        let result = tool
+            .execute(serde_json::json!({
+                "delay_secs": 10
+            }))
+            .await;
+
+        assert!(result.is_error, "missing message should error");
+        assert!(result.content.contains("message"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_rejects_missing_delay_secs() {
+        let (handle, _pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "test"
+            }))
+            .await;
+
+        assert!(result.is_error, "missing delay_secs should error");
+        assert!(result.content.contains("delay_secs"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_rejects_empty_message() {
+        let (handle, _pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "",
+                "delay_secs": 10
+            }))
+            .await;
+
+        assert!(result.is_error, "empty message should error");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_rejects_zero_delay() {
+        let (handle, _pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "test",
+                "delay_secs": 0
+            }))
+            .await;
+
+        assert!(result.is_error, "zero delay should error");
+        assert!(result.content.contains("at least"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_rejects_excessive_delay() {
+        let (handle, _pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "test",
+                "delay_secs": MAX_DELAY_SECS + 1
+            }))
+            .await;
+
+        assert!(result.is_error, "excessive delay should error");
+        assert!(result.content.contains("at most"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_error_when_scheduler_unavailable() {
+        let (handle, pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+
+        // Drop the pending actor without spawning — the command channel
+        // has no receiver, so send() will fail.
+        drop(pending);
+
+        // Give the runtime a turn to ensure the channel is fully closed.
+        tokio::task::yield_now().await;
+
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "test",
+                "delay_secs": 10
+            }))
+            .await;
+
+        assert!(
+            result.is_error,
+            "unavailable scheduler should return error, not panic"
+        );
+    }
+
+    // ── End-to-end integration test (SF103 fixture-provider proof) ──────
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_end_to_end_fires_and_injects_labeled_message() {
+        use talos_core::tool::AgentTool;
+
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+
+        let (handle, pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+        let _join = pending.spawn(sq_tx, cancel_token);
+
+        // Step 1: Execute the delay tool as the model would.
+        let result = tool
+            .execute(serde_json::json!({
+                "message": "check on the build status",
+                "delay_secs": 1
+            }))
+            .await;
+
+        assert!(
+            !result.is_error,
+            "delay tool should succeed with valid input"
+        );
+        assert!(result.content.contains("Task ID:"));
+
+        // Verify no message has been injected yet (before the delay).
+        yield_times(5).await;
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no message should be injected before the delay expires"
+        );
+
+        // Step 2: Advance time past the delay.
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+
+        // Step 3: Verify exactly one labeled message was injected.
+        let op = sq_rx
+            .try_recv()
+            .expect("one labeled message should be injected after the delay");
+        match op {
+            SessionOp::Submit { message } => {
+                assert!(
+                    message.starts_with(SCHEDULED_FOLLOWUP_LABEL),
+                    "injected message must carry the scheduled-followup source label"
+                );
+                assert!(
+                    message.contains("check on the build status"),
+                    "injected message must contain the original text"
+                );
+            }
+            other => panic!("expected SessionOp::Submit, got {other:?}"),
+        }
+
+        // Step 4: Verify no second injection (one-shot fires exactly once).
+        yield_times(10).await;
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "one-shot must fire exactly once — no duplicate injection"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn delay_tool_end_to_end_permission_is_fresh_per_call() {
+        // This test proves that the delay tool's registration approval
+        // does not pre-approve any subsequent tool call. The injected
+        // message is just a String — any tool call derived from it will
+        // go through the normal permission pipeline.
+        //
+        // We verify this by confirming the injected SessionOp is a plain
+        // Submit with a String message, carrying no permission grant,
+        // no tool call, and no pre-approval metadata.
+
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+
+        let (handle, pending) = create_scheduler();
+        let tool = DelayTool::new(handle);
+        let _join = pending.spawn(sq_tx, cancel_token);
+
+        tool.execute(serde_json::json!({
+            "message": "verify permissions",
+            "delay_secs": 1
+        }))
+        .await;
+
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+
+        let op = sq_rx.try_recv().expect("message should be injected");
+        match op {
+            SessionOp::Submit { message } => {
+                // The injected op is a plain String message.
+                // It carries no permission state, no tool call,
+                // and no pre-approval. The session actor will treat it
+                // identically to a user-typed message — any tool call
+                // in the resulting turn gets a fresh permission decision.
+                assert!(message.starts_with(SCHEDULED_FOLLOWUP_LABEL));
+            }
+            _ => panic!("expected SessionOp::Submit"),
+        }
+    }
 }
