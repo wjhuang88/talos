@@ -1275,17 +1275,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_thinking_title_export_regression() {
-        let text = "**Secret Title**\n\nreasoning about api_key=sk-leak";
-        let title = extract_thinking_title(text);
-        assert_eq!(title, Some("Secret Title"));
-        assert!(
-            !title.unwrap().contains("api_key"),
-            "title extraction must not leak surrounding content"
-        );
-    }
-
     // ── Status bar redesign ────────────────────────────────────────────
 
     #[test]

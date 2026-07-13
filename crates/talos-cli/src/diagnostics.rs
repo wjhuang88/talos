@@ -516,7 +516,6 @@ mod tests {
 
     #[test]
     fn test_residual_gates_always_bounded() {
-        let dir = tempdir().expect("tempdir");
         let gates = collect_residual_gates();
         assert!(!gates.is_empty(), "residual gates must never be empty");
         assert!(

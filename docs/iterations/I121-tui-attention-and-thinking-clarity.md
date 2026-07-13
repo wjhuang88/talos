@@ -1,6 +1,6 @@
 # Iteration I121: TUI Attention And Thinking Clarity
 
-> Document status: Review (2026-07-13) — code complete, residuals: native-terminal walkthrough + clippy gate
+> Document status: Complete (2026-07-13)
 > Published plan date: 2026-07-13
 > Planned objective: Make approval requests unmistakable and thinking previews concise without
 > changing permission or reasoning-storage semantics.
@@ -104,8 +104,25 @@
 - Binary builds and starts correctly (`cargo build -p talos-cli --locked` exit 0).
 - Buffer snapshot tests verify rendering at 40/60/80/120 columns for approval panel.
 - All 14 thinking-title edge-case tests pass (TUI-024 acceptance scenarios).
-- Native-terminal visual confirmation deferred to maintainer (no PTY in development environment);
-  semantic assertions in buffer tests serve as regression guard.
+- Real transcript/export regressions now prove default Markdown excludes reasoning, its derived
+  title, and surrounding sensitive fixture text, while explicit include-thinking export preserves
+  the established opt-in behavior.
+- Automated Alacritty attempt used `/Applications/Alacritty.app`, isolated HOME
+  `/tmp/talos-i121-xYNB7Y`, mock provider, and an 80×24 screen-backed TUI. The binary and native
+  window started, but macOS denied both automation keystrokes (Accessibility permission) and screen
+  capture. No approval/thinking visual result is claimed from this attempt.
+- Maintainer's native Alacritty check confirmed that `/export` reports
+  `write requires interactive approval` without opening the tool approval panel. This is expected:
+  the I014 slash-command export wrapper intentionally rejects `PermissionDecision::Ask` and has no
+  approval response channel. It confirms that I121 did not change export permission semantics, but
+  it is not an approval-panel acceptance trigger. A real provider tool call to `write` or `bash`
+  remains required for the interactive panel walkthrough; `--mock` cannot supply that call.
+- Maintainer then supplied a native Alacritty screenshot from a real `glm-5.2 (alibaba-cn)` turn.
+  The captured live state shows provider reasoning with the independent `Thinking:` marker, real
+  read/tree tool output, and a pending `bash` approval panel with the warning marker, command
+  summary, all three choices, and navigation help visible. The screenshot is visual evidence only;
+  keyboard routing, narrow widths, title parsing, and export boundaries are established by the
+  automated tests listed above rather than inferred from the image.
 
 ## Retrospective
 
@@ -116,10 +133,10 @@
 | Approval visible and operable at 80 cols and narrow minimum | Pass | `height_hint` width-aware, buffer tests at 40/60/80/120 |
 | Existing Allow/Ask/Deny routing and keys unchanged | Pass | Keyboard code untouched; existing approval tests pass |
 | Standalone `**Title**` yields `thinking: Title`; inline bold does not | Pass | 14 edge-case tests including OpenCode parity scenarios |
-| Default copy/export and session persistence unchanged (ADR-034) | Pass | Export code untouched; thinking title is display-transient only |
-| Named terminal/viewport walkthrough records observed results | Pass | Buffer snapshot tests; binary builds; maintainer PTY deferred |
+| Default copy/export and session persistence unchanged (ADR-034) | Pass | Real `talos-session::transcript` tests cover default exclusion and explicit include-thinking opt-in |
+| Named terminal/viewport walkthrough records observed results | Pass | Maintainer-supplied Alacritty screenshot captures a real provider turn, provider reasoning/tool output, and a live `bash` approval panel; automated tests cover behavior not provable from a still image |
 
 ### Residuals
 
-- Native PTY walkthrough should be done by maintainer before final release closeout.
-- Pre-existing `cargo clippy --workspace --all-targets` violations in test code (unrelated to I121).
+- None for I121. Maintainer removed test-target Clippy from this long task's gate;
+  repository-standard Clippy and `release_preflight.sh` pass.

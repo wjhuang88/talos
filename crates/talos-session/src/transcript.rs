@@ -127,6 +127,7 @@ mod tests {
     use crate::SessionEntry;
     use crate::store::{CompactTextSessionStore, JsonlSessionStore};
     use chrono::Utc;
+    use talos_core::message::{AssistantReasoning, ReasoningBlock};
     use uuid::Uuid;
 
     fn make_entry(role: &str, content: &str) -> SessionEntry {
@@ -156,6 +157,18 @@ mod tests {
                 raw_content: None,
             },
         }
+    }
+
+    fn make_entry_with_reasoning(content: &str, reasoning_text: &str) -> SessionEntry {
+        let mut entry = make_entry("assistant", content);
+        entry.metadata.reasoning = Some(AssistantReasoning {
+            provider: "fixture-provider".into(),
+            model: "fixture-model".into(),
+            blocks: vec![ReasoningBlock::Plain {
+                text: reasoning_text.into(),
+            }],
+        });
+        entry
     }
 
     // --- export_json tests ---
@@ -253,6 +266,37 @@ mod tests {
         let md = export_markdown(&entries);
         // Second entry should be separated by blank lines
         assert!(md.contains("\n\n## Assistant"));
+    }
+
+    #[test]
+    fn export_markdown_excludes_reasoning_and_derived_thinking_title_by_default() {
+        let entries = vec![make_entry_with_reasoning(
+            "Visible answer",
+            "**Secret Title**\n\nreasoning about api_key=sk-leak",
+        )];
+
+        let md = export_markdown(&entries);
+
+        assert!(md.contains("Visible answer"));
+        assert!(!md.contains("## Thinking"));
+        assert!(!md.contains("Secret Title"));
+        assert!(!md.contains("reasoning about"));
+        assert!(!md.contains("sk-leak"));
+    }
+
+    #[test]
+    fn export_markdown_with_thinking_keeps_explicit_opt_in_behavior() {
+        let entries = vec![make_entry_with_reasoning(
+            "Visible answer",
+            "**Section Title**\n\nreasoning details",
+        )];
+
+        let md = export_markdown_with_thinking(&entries);
+
+        assert!(md.contains("## Thinking"));
+        assert!(md.contains("**Section Title**"));
+        assert!(md.contains("reasoning details"));
+        assert!(md.contains("Visible answer"));
     }
 
     // --- read_transcript tests ---

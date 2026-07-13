@@ -152,9 +152,9 @@ docs/iterations/
 | I117 | Command Sandbox Evidence | **Complete (2026-07-12)** | Independent security review accepted diagnostic-only evidence for bash and exec single/steps/pipes; evidence never changes permission decisions. See `I117-command-sandbox-evidence.md`. |
 | I118 | Bounded Local Productization | **Complete (2026-07-12)** | LT030-LT034 verified; installer fixture tests (8/8 pass). See `I118-bounded-local-productization.md`. |
 | I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
-| I120 | Dynamic Diagnostics Truth | **Review** (2026-07-13) | Month 1. serde JSON, dynamic iteration state, malformed→unavailable, typed ResidualGate. Residual: --all-targets clippy gate. See `I120-dynamic-diagnostics-truth.md`. |
-| I121 | TUI Attention And Thinking Clarity | **Review** (2026-07-13) | Month 2. Width-aware approval, TUI-024 thinking title, CJK display width. Residuals: native-terminal walkthrough, --all-targets clippy gate. See `I121-tui-attention-and-thinking-clarity.md`. |
-| I122 | Local Extension And Control Diagnostics | **Planned — blocked on I121** | Month 3. Shared read-only MCP/plugin/hook diagnostics across command surfaces and loopback dashboard. See `I122-local-extension-control-diagnostics.md`. |
+| I120 | Dynamic Diagnostics Truth | **Complete** (2026-07-13) | Month 1. serde JSON, dynamic iteration state, malformed→unavailable, and typed ResidualGate pass the maintainer-confirmed repository validation gate. See `I120-dynamic-diagnostics-truth.md`. |
+| I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
+| I122 | Local Extension And Control Diagnostics | **Planned — ready after I121** | Month 3. Shared read-only MCP/plugin/hook diagnostics across command surfaces and loopback dashboard. See `I122-local-extension-control-diagnostics.md`. |
 | I123 | Installation And Trial Confidence | **Planned — blocked on I122** | Month 4. Installer fixtures, clean-HOME smoke, second-operator replay, and honest trial report. See `I123-installation-and-trial-confidence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime

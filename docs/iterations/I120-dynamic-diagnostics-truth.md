@@ -1,6 +1,6 @@
 # Iteration I120: Dynamic Diagnostics Truth
 
-> Document status: Review (2026-07-13) — code complete, residual: --all-targets clippy gate unresolved
+> Document status: Complete (2026-07-13) — standard repository validation gate accepted
 > Published plan date: 2026-07-13
 > Planned objective: Replace hardcoded/stale diagnostics with valid, bounded, dynamically derived
 > operator truth.
@@ -78,9 +78,8 @@
 - `serde = { version = "1", features = ["derive"] }` added to `talos-cli/Cargo.toml`.
 - Validation: `cargo fmt --check`, `cargo check --workspace --locked`, `release_preflight.sh`,
   governance 0 warnings, `git diff --check` — all pass.
-- Pre-existing note: `cargo clippy --workspace --all-targets` has pre-existing `unwrap()` violations
-  in test code across multiple crates unrelated to this change; `release_preflight.sh` (the
-  authoritative workspace gate) does not use `--all-targets` and passes.
+- Validation uses the maintainer-confirmed repository standard: `cargo clippy --workspace --locked
+  -- -D warnings` plus `release_preflight.sh`; test-target Clippy is not an I120 gate.
 
 ### F101 — Complete (2026-07-13)
 
@@ -140,7 +139,5 @@
 
 ### Residuals
 
-- Pre-existing `cargo clippy --workspace --all-targets` violations exist in test code across
-  multiple crates (unrelated to I120). `release_preflight.sh` does not use `--all-targets`.
-- The `collect_residual_gates_at` function currently delegates to the typed registry. Future
+- The residual-gate collector currently delegates to the typed compile-time registry. Future
   iterations could derive gates from Board/ADR sources if needed.
