@@ -66,4 +66,18 @@
   deferred; I081/I082/I083 reconciled to Superseded; I121-I123 blocked on I120; Board-level Review
   items are not iterations.
 
-### F100 — In Progress
+### F100 — Complete (2026-07-13)
+
+- `DiagnosticsSummary` now derives `serde::Serialize, serde::Deserialize`.
+- `active_iterations` dynamically derived from `docs/iterations/README.md` via reused
+  `governance::parse_open_iterations()` (no duplicate mutable state).
+- Stale `I085 MC107 Paused` claim removed from residual gates (I085 is Complete).
+- Fixture tests: clean source, missing index, malformed index, empty table, serde round-trip,
+  JSON string escaping, no-secrets invariant, no-stale-I085 assertion (12 tests, all pass).
+- `governance::IterationItem` and `parse_open_iterations()` promoted to `pub(crate)`.
+- `serde = { version = "1", features = ["derive"] }` added to `talos-cli/Cargo.toml`.
+- Validation: `cargo fmt --check`, `cargo check --workspace --locked`, `release_preflight.sh`,
+  governance 0 warnings, `git diff --check` — all pass.
+- Pre-existing note: `cargo clippy --workspace --all-targets` has pre-existing `unwrap()` violations
+  in test code across multiple crates unrelated to this change; `release_preflight.sh` (the
+  authoritative workspace gate) does not use `--all-targets` and passes.
