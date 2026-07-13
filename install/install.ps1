@@ -83,4 +83,8 @@ Write-Host "-> installed talos to $(Join-Path $InstallDir 'talos.exe')"
 if (-not (($env:PATH -split ';') -contains $InstallDir)) {
   Write-Host "note: add $InstallDir to your PATH"
 }
-& (Join-Path $InstallDir 'talos.exe') --version 2>$null
+if ($IsWindows) {
+  & (Join-Path $InstallDir 'talos.exe') --version
+} else {
+  Write-Host "note: skipping self-check (talos.exe is a Windows binary; run it on Windows to verify --version)"
+}
