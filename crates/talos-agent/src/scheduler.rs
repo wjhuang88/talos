@@ -18,11 +18,15 @@
 //! (default `Ask`). `list_scheduled_tasks` is `ToolNature::Read`. Every
 //! fire-time tool call receives a fresh independent permission decision.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use talos_core::session::SessionOp;
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 // ── Duration bounds ─────────────────────────────────────────────────────
 
@@ -248,6 +252,183 @@ impl fmt::Debug for SchedulerHandle {
     }
 }
 
+// ── Actor ───────────────────────────────────────────────────────────────
+
+/// Internal bookkeeping for a live scheduled task.
+struct ActiveTask {
+    info: ScheduledTaskInfo,
+    handle: JoinHandle<()>,
+}
+
+/// Single-owner scheduler actor for session-scoped delayed follow-ups.
+///
+/// Owns all scheduling state for the current process/session. No persistence,
+/// no cross-session visibility. The actor receives commands via `cmd_rx`,
+/// fires one-shot tasks by sending `SessionOp::Submit` through `sq_tx`, and
+/// shuts down when the `CancellationToken` fires or `Shutdown` is received.
+pub(crate) struct SchedulerActor {
+    cmd_rx: mpsc::Receiver<ScheduleCommand>,
+    sq_tx: mpsc::Sender<SessionOp>,
+    cancel_token: CancellationToken,
+    tasks: HashMap<String, ActiveTask>,
+    fired_tx: mpsc::UnboundedSender<String>,
+    fired_rx: mpsc::UnboundedReceiver<String>,
+}
+
+impl SchedulerActor {
+    pub(crate) fn new(
+        cmd_rx: mpsc::Receiver<ScheduleCommand>,
+        sq_tx: mpsc::Sender<SessionOp>,
+        cancel_token: CancellationToken,
+    ) -> Self {
+        let (fired_tx, fired_rx) = mpsc::unbounded_channel();
+        Self {
+            cmd_rx,
+            sq_tx,
+            cancel_token,
+            tasks: HashMap::new(),
+            fired_tx,
+            fired_rx,
+        }
+    }
+
+    /// Runs the actor event loop until shutdown.
+    ///
+    /// Returns when the `CancellationToken` fires, `Shutdown` is received,
+    /// or the command channel closes. All remaining tasks are aborted on
+    /// exit — no fire can occur after the actor stops.
+    pub(crate) async fn run(mut self) {
+        loop {
+            tokio::select! {
+                biased;
+
+                _ = self.cancel_token.cancelled() => break,
+
+                cmd = self.cmd_rx.recv() => {
+                    match cmd {
+                        Some(ScheduleCommand::RegisterOneShot {
+                            id,
+                            message,
+                            delay,
+                            response_tx,
+                        }) => {
+                            self.handle_register_one_shot(id, message, delay, response_tx);
+                        }
+                        Some(ScheduleCommand::Cancel { id, response_tx }) => {
+                            self.handle_cancel(id, response_tx);
+                        }
+                        Some(ScheduleCommand::List { response_tx }) => {
+                            self.handle_list(response_tx);
+                        }
+                        Some(ScheduleCommand::Shutdown) => break,
+                        None => break,
+                    }
+                }
+
+                Some(task_id) = self.fired_rx.recv() => {
+                    self.tasks.remove(&task_id);
+                }
+            }
+        }
+
+        for (_, task) in self.tasks.drain() {
+            task.handle.abort();
+        }
+    }
+
+    fn handle_register_one_shot(
+        &mut self,
+        id: Option<String>,
+        message: String,
+        delay: Duration,
+        response_tx: oneshot::Sender<ScheduleRegistrationResult>,
+    ) {
+        if let Err(reason) = validate_delay_secs(delay.as_secs()) {
+            let _ = response_tx.send(ScheduleRegistrationResult::InvalidDuration { reason });
+            return;
+        }
+
+        let task_id = id.unwrap_or_else(next_task_id);
+        let now = Instant::now();
+        let fire_at = now + delay;
+        let labeled_message = label_scheduled_message(&message);
+
+        let sq_tx = self.sq_tx.clone();
+        let fired_tx = self.fired_tx.clone();
+        let task_id_for_fire = task_id.clone();
+        let labeled_for_fire = labeled_message.clone();
+
+        let handle = tokio::spawn(async move {
+            tokio::time::sleep(delay).await;
+
+            if sq_tx
+                .send(SessionOp::Submit {
+                    message: labeled_for_fire,
+                })
+                .await
+                .is_err()
+            {
+                tracing::debug!(
+                    task_id = %task_id_for_fire,
+                    "scheduled follow-up fire: session queue closed"
+                );
+            }
+            let _ = fired_tx.send(task_id_for_fire);
+        });
+
+        self.tasks.insert(
+            task_id.clone(),
+            ActiveTask {
+                info: ScheduledTaskInfo {
+                    id: task_id.clone(),
+                    message: labeled_message,
+                    kind: ScheduleKind::OneShot,
+                    created_at: now,
+                    fire_at,
+                },
+                handle,
+            },
+        );
+
+        let _ = response_tx.send(ScheduleRegistrationResult::Registered { task_id });
+    }
+
+    fn handle_cancel(&mut self, id: String, response_tx: oneshot::Sender<CancelResult>) {
+        if let Some(task) = self.tasks.remove(&id) {
+            task.handle.abort();
+            let _ = response_tx.send(CancelResult::Cancelled);
+        } else {
+            let _ = response_tx.send(CancelResult::NotFound);
+        }
+    }
+
+    fn handle_list(&self, response_tx: oneshot::Sender<Vec<ScheduledTaskInfo>>) {
+        let snapshot: Vec<ScheduledTaskInfo> =
+            self.tasks.values().map(|t| t.info.clone()).collect();
+        let _ = response_tx.send(snapshot);
+    }
+}
+
+/// Spawns the scheduler actor and returns a handle for sending commands.
+///
+/// The actor owns all scheduling state. The returned `SchedulerHandle` can
+/// be cloned to share among tools. The `JoinHandle` completes when the actor
+/// shuts down.
+///
+/// The `sq_tx` should be the same sender used by the session actor, so
+/// scheduled fires inject into the same ordered queue as user messages.
+/// The `cancel_token` should be linked to session shutdown.
+pub(crate) fn spawn_scheduler_actor(
+    sq_tx: mpsc::Sender<SessionOp>,
+    cancel_token: CancellationToken,
+) -> (SchedulerHandle, JoinHandle<()>) {
+    let (cmd_tx, cmd_rx) = mpsc::channel(64);
+    let handle = SchedulerHandle::new(cmd_tx);
+    let actor = SchedulerActor::new(cmd_rx, sq_tx, cancel_token);
+    let join = tokio::spawn(async move { actor.run().await });
+    (handle, join)
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -345,8 +526,8 @@ mod tests {
 
     #[test]
     fn test_scheduler_handle_send_on_closed_channel() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel::<ScheduleCommand>(8);
-        drop(cmd_rx); // close the receiver
+        let (cmd_tx, cmd_rx) = mpsc::channel::<ScheduleCommand>(8);
+        drop(cmd_rx);
         let handle = SchedulerHandle::new(cmd_tx);
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_time()
@@ -354,5 +535,316 @@ mod tests {
             .unwrap();
         let result = rt.block_on(handle.send(ScheduleCommand::Shutdown));
         assert!(result.is_err(), "send on closed channel should error");
+    }
+
+    // ── Actor behavior tests (paused time) ──────────────────────────────
+
+    async fn yield_times(n: usize) {
+        for _ in 0..n {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_one_shot_fires_and_injects_labeled_message() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: None,
+                message: "check the build".to_string(),
+                delay: Duration::from_secs(1),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+
+        let task_id = match resp_rx.await.unwrap() {
+            ScheduleRegistrationResult::Registered { task_id } => task_id,
+            other => panic!("expected Registered, got {other:?}"),
+        };
+        assert!(task_id.starts_with("sched_"));
+
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+
+        let op = sq_rx
+            .try_recv()
+            .expect("message should have been injected after delay");
+        match op {
+            SessionOp::Submit { message } => {
+                assert!(
+                    message.starts_with(SCHEDULED_FOLLOWUP_LABEL),
+                    "injected message must carry the source label"
+                );
+                assert!(message.contains("check the build"));
+            }
+            other => panic!("expected Submit, got {other:?}"),
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_cancelled_one_shot_does_not_fire() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: None,
+                message: "should not fire".to_string(),
+                delay: Duration::from_secs(1),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+
+        let task_id = match resp_rx.await.unwrap() {
+            ScheduleRegistrationResult::Registered { task_id } => task_id,
+            _ => panic!("expected Registered"),
+        };
+
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::Cancel {
+                id: task_id,
+                response_tx: cancel_tx,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(cancel_rx.await.unwrap(), CancelResult::Cancelled));
+
+        tokio::time::advance(Duration::from_secs(5)).await;
+        yield_times(10).await;
+
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "cancelled task must not inject a message"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_shutdown_aborts_all_tasks() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        for msg in &["task-a", "task-b", "task-c"] {
+            let (resp_tx, resp_rx) = oneshot::channel();
+            handle
+                .send(ScheduleCommand::RegisterOneShot {
+                    id: None,
+                    message: msg.to_string(),
+                    delay: Duration::from_secs(5),
+                    response_tx: resp_tx,
+                })
+                .await
+                .unwrap();
+            assert!(matches!(
+                resp_rx.await.unwrap(),
+                ScheduleRegistrationResult::Registered { .. }
+            ));
+        }
+
+        handle.send(ScheduleCommand::Shutdown).await.unwrap();
+        yield_times(5).await;
+
+        tokio::time::advance(Duration::from_secs(10)).await;
+        yield_times(10).await;
+
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no task should fire after shutdown"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_cancel_token_aborts_all_tasks() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token.clone());
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: None,
+                message: "should not fire".to_string(),
+                delay: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp_rx.await.unwrap(),
+            ScheduleRegistrationResult::Registered { .. }
+        ));
+
+        cancel_token.cancel();
+        yield_times(5).await;
+
+        tokio::time::advance(Duration::from_secs(10)).await;
+        yield_times(10).await;
+
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no task should fire after cancellation token fires"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_rejects_invalid_duration() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: None,
+                message: "bad delay".to_string(),
+                delay: Duration::from_secs(0),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+
+        match resp_rx.await.unwrap() {
+            ScheduleRegistrationResult::InvalidDuration { reason } => {
+                assert!(reason.contains("at least"));
+            }
+            _ => panic!("expected InvalidDuration"),
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_list_returns_active_tasks() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        for _ in 0..3 {
+            let (resp_tx, resp_rx) = oneshot::channel();
+            handle
+                .send(ScheduleCommand::RegisterOneShot {
+                    id: None,
+                    message: "pending".to_string(),
+                    delay: Duration::from_secs(60),
+                    response_tx: resp_tx,
+                })
+                .await
+                .unwrap();
+            assert!(matches!(
+                resp_rx.await.unwrap(),
+                ScheduleRegistrationResult::Registered { .. }
+            ));
+        }
+
+        let (list_tx, list_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::List {
+                response_tx: list_tx,
+            })
+            .await
+            .unwrap();
+
+        let snapshot = list_rx.await.unwrap();
+        assert_eq!(snapshot.len(), 3);
+        for info in &snapshot {
+            assert!(matches!(info.kind, ScheduleKind::OneShot));
+            assert!(info.message.starts_with(SCHEDULED_FOLLOWUP_LABEL));
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_fired_task_removed_from_list() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: None,
+                message: "fires soon".to_string(),
+                delay: Duration::from_secs(1),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+
+        let (list_tx, list_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::List {
+                response_tx: list_tx,
+            })
+            .await
+            .unwrap();
+
+        let snapshot = list_rx.await.unwrap();
+        assert!(snapshot.is_empty(), "fired task must be removed from list");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_cancel_unknown_returns_not_found() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::Cancel {
+                id: "nonexistent".to_string(),
+                response_tx: cancel_tx,
+            })
+            .await
+            .unwrap();
+
+        assert!(matches!(cancel_rx.await.unwrap(), CancelResult::NotFound));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_closed_session_queue_no_panic() {
+        let (sq_tx, sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        drop(sq_rx);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: None,
+                message: "queue closed".to_string(),
+                delay: Duration::from_secs(1),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+
+        let (list_tx, list_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::List {
+                response_tx: list_tx,
+            })
+            .await
+            .unwrap();
+
+        let snapshot = list_rx.await.unwrap();
+        assert!(
+            snapshot.is_empty(),
+            "fired task must be cleaned up even when queue is closed"
+        );
     }
 }
