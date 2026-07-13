@@ -217,18 +217,32 @@ else
 fi
 echo ""
 
-# --- 14. Session resume evidence (I123 F131) ---
-echo "14. Session resume evidence"
-# Run a mock turn to create a session, then list sessions to prove it exists
-"$BINARY" -p --mock --no-init --no-context "create a session for resume test" >/dev/null 2>&1 || true
-RESUME_OUTPUT=$("$BINARY" --list --limit 3 2>&1) || true
-if echo "$RESUME_OUTPUT" | grep -qi "session"; then
-  ok "session list shows entries after a mock turn (resume evidence)"
-elif echo "$RESUME_OUTPUT" | grep -qi "unable to open database\|No indexed sessions"; then
-  # In a fresh disposable HOME the index may not exist yet; acceptable
-  ok "session list reports clean state (no index yet — acceptable for fresh HOME)"
+# --- 14. Session resume with persisted-content verification (I123 F131) ---
+echo "14. Session resume (persisted content survives)"
+# Gotcha: print mode (-p) does NOT persist sessions; only inline mode (--inline) does.
+# Create a session with a marker via inline mode, resume that exact session, and assert
+# the persisted file both contains the original content and grew after the resumed turn.
+RECALL_MARKER="RECALL-MARKER-8F3A"
+echo "$RECALL_MARKER remember this codeword" | "$BINARY" --inline --mock --no-init --no-context >/dev/null 2>&1 || true
+SESSIONS_DIR="$DISPOSABLE_HOME/.talos/sessions"
+SESSION_FILE=$(find "$SESSIONS_DIR" -name '*.tlog' -type f 2>/dev/null | head -1)
+if [ -z "$SESSION_FILE" ]; then
+  SESSION_FILE=$(find "$SESSIONS_DIR" -name '*.jsonl' -type f 2>/dev/null | head -1)
+fi
+if [ -z "$SESSION_FILE" ] || [ ! -s "$SESSION_FILE" ]; then
+  fail "no persisted session file created by inline mode (resume evidence missing)"
 else
-  fail "session list output unexpected: $(echo "$RESUME_OUTPUT" | head -3)"
+  BEFORE_SIZE=$(if command -v stat >/dev/null 2>&1; then stat -f%z "$SESSION_FILE" 2>/dev/null || stat -c%s "$SESSION_FILE" 2>/dev/null; else wc -c < "$SESSION_FILE"; fi)
+  SESSION_ID=$(basename "$SESSION_FILE"); SESSION_ID=${SESSION_ID%.tlog}; SESSION_ID=${SESSION_ID%.jsonl}
+  # Resume the EXACT session and append another turn; proves the same session was
+  # loaded and its prior content persisted (no false success from a fresh session).
+  echo "what codeword did I ask you to remember?" | "$BINARY" --session "$SESSION_ID" --inline --mock --no-init --no-context >/dev/null 2>&1 || true
+  AFTER_SIZE=$(if command -v stat >/dev/null 2>&1; then stat -f%z "$SESSION_FILE" 2>/dev/null || stat -c%s "$SESSION_FILE" 2>/dev/null; else wc -c < "$SESSION_FILE"; fi)
+  if [ "$AFTER_SIZE" -gt "$BEFORE_SIZE" ] && grep -q "$RECALL_MARKER" "$SESSION_FILE"; then
+    ok "session resumed: prior content persisted (marker found) and file grew (${BEFORE_SIZE}->${AFTER_SIZE})"
+  else
+    fail "session resume failed: grew=${AFTER_SIZE}>${BEFORE_SIZE}? marker=$(grep -q "$RECALL_MARKER" "$SESSION_FILE" >/dev/null 2>&1 && echo yes || echo no)"
+  fi
 fi
 echo ""
 
