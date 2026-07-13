@@ -1,6 +1,6 @@
 # Iteration I124: One-Shot Scheduled Follow-Up
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-13
 > Planned objective: deliver one safe, session-scoped delayed follow-up through the normal queue
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -59,6 +59,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-13 | Planning | Published as Planned; no implementation or activation claimed. |
+| 2026-07-13 | Activation | Gate 0 passed (rustc 1.97.0, governance 0 warnings, release preflight passed). Security note recorded at `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md` proving Execute/Ask for mutation tools, Read for list, Deny precedence, and fire-time re-evaluation — no `talos-permission` change needed. I124 activated; SF100-SF103 ready for implementation. |
 
 ## Verification Evidence
 

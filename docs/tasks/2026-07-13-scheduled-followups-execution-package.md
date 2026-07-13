@@ -97,3 +97,5 @@ changes, dependencies, remote surfaces, destructive Git operations, push/PR, or 
 | Time | Story | Branch/commit | State | Validation | Changed files | Blocker/retry | Next exact action |
 |---|---|---|---|---|---|---|---|
 | 2026-07-13 | Planning handoff | `main` | Ready | planning inventory completed; implementation not claimed | plan/package/I124-I127/governance docs | I124 security note and Gate 0 still required | Assignee reruns Start Gate and activates I124 only. |
+| 2026-07-13 | Gate 0 | `main` `a3f17ad` | Pass | git clean (ahead 1 = planning commit); rustc 1.97.0 == pinned; cargo metadata coherent; governance 0 warnings; release preflight passed | none | none | Proceed to security note and I124 activation. |
+| 2026-07-13 | Security note | `main` | Pass | I124 pre-activation security note recorded at `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md`; all six claims proven with code evidence; no talos-permission change needed | `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md` | none | Activate I124 and begin SF100. |

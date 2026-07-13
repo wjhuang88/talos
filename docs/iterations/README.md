@@ -156,7 +156,7 @@ docs/iterations/
 | I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
 | I122 | Local Extension And Control Diagnostics | **Complete** (2026-07-13) | Month 3. Typed extension snapshot, unified /mcp//plugins//hooks, dashboard /extensions route, 133+23 tests. See `I122-local-extension-control-diagnostics.md`. |
 | I123 | Installation And Trial Confidence | **Complete** (2026-07-13) | Month 4. Installer fixtures (POSIX 9/9 + PowerShell 5/0/1, checksum verified, offline/ARM64 error text asserted), clean-HOME smoke (18/0/2, real session resume), Windows `v0.3.4` install/version trial, and maintainer-confirmed independent replay validation passed. See `I123-installation-and-trial-confidence.md`. |
-| I124 | One-Shot Scheduled Follow-Up | **Planned** | Month 1 of the scheduled-followups plan. Ask-gated bounded delay, typed/labeled queue injection, cancellation-aware actor, and fixture-provider proof. See `I124-one-shot-scheduled-followup.md`. |
+| I124 | One-Shot Scheduled Follow-Up | **Active** (2026-07-13) | Month 1 of the scheduled-followups plan. Gate 0 and security note passed. Ask-gated bounded delay, typed/labeled queue injection, cancellation-aware actor, and fixture-provider proof. See `I124-one-shot-scheduled-followup.md` and `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md`. |
 | I125 | Recurring Scheduled Follow-Ups | **Planned; blocked on I124** | Month 2. Bounded intervals, delayed missed ticks, no permission reuse, and cadence proof. See `I125-recurring-scheduled-followups.md`. |
 | I126 | Schedule Inspection And Control | **Planned; blocked on I125** | Month 3. Read-only list, Ask-gated cancel, bounded output, and narrow-terminal rendering. See `I126-schedule-inspection-control.md`. |
 | I127 | Scheduler Reliability Closeout | **Planned; blocked on I126** | Month 4. Shutdown/backpressure hardening, deterministic stress, clean-HOME trial, and second-operator replay. See `I127-scheduler-reliability-closeout.md`. |
@@ -176,7 +176,7 @@ rewrite published iteration baselines.
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Superseded before implementation | Removed from activation inventory; I124-I127 own the changed Ask-gated acceptance target. |
-| I124 | Planned | Ready for assignment; only the execution-package Gate 0 may activate it. |
+| I124 | Active (2026-07-13) | Gate 0 passed; security note recorded. SF100-SF103 in progress. |
 | I125 | Planned | Blocked on I124 Complete. |
 | I126 | Planned | Blocked on I125 Complete. |
 | I127 | Planned | Blocked on I126 Complete. |
