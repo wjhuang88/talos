@@ -1,6 +1,6 @@
 # Iteration I122: Local Extension And Control Diagnostics
 
-> Document status: Planned — blocked on I121 Complete
+> Document status: Active — Gate 0 passed 2026-07-13 (I121 Complete)
 > Published plan date: 2026-07-13
 > Planned objective: Give CLI, TUI, and loopback dashboard one truthful read-only view of installed
 > local extension state and bounded failures.
@@ -50,4 +50,11 @@
 
 ## Execution Record
 
-Not started. Do not activate until I121 is Complete.
+### Gate 0 — 2026-07-13
+
+- Branch: `feature/i122-local-extension-control-diagnostics` (from `feature/i121-tui-attention-thinking-clarity` at `b220e41`).
+- I120/I121 Complete (accepted by architecture team).
+- `rustc 1.97.0`; `Cargo.lock` present; governance 0 warnings; release_preflight passed.
+- No other iteration is Active.
+
+### F120 — In Progress

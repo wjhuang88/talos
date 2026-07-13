@@ -38,31 +38,48 @@ pub struct ToolCallInfo {
     pub result: Option<talos_core::message::MessageToolResult>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct PluginObservation {
     pub key: String,
     pub count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct McpServerDiagnostic {
-    /// Stable configured MCP server name.
     pub name: String,
-    /// Whether startup and initial tool discovery succeeded.
     pub connected: bool,
-    /// Number of tools discovered at session startup.
     pub tool_count: usize,
-    /// Non-fatal startup error when unavailable.
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SkillDiagnostic {
     pub name: String,
     pub description: String,
     pub active: bool,
-    /// Where this skill was discovered from (e.g. "project", "user", "shared").
     pub source: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ExtensionSnapshot {
+    pub mcp_servers: Vec<McpServerDiagnostic>,
+    pub hooks: HookSnapshot,
+    pub provenance: Vec<PluginObservation>,
+    pub collisions: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HookSnapshot {
+    pub declarations: Vec<HookDeclarationDiagnostic>,
+    pub executable_carriers_enabled: bool,
+    pub event_catalog: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HookDeclarationDiagnostic {
+    pub name: String,
+    pub event: String,
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

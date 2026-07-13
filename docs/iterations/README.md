@@ -154,7 +154,7 @@ docs/iterations/
 | I119 | Talos-Primary Release Decision | **Complete (2026-07-12)** | REL-002 re-audited: 1 MET, 3 PARTIAL, 4 UNMET. NO-GO for v1.0.0. Two bounded task packets classified non-qualifying (external runtime primary). See `I119-talos-primary-release-decision.md`. |
 | I120 | Dynamic Diagnostics Truth | **Complete** (2026-07-13) | Month 1. serde JSON, dynamic iteration state, malformed→unavailable, and typed ResidualGate pass the maintainer-confirmed repository validation gate. See `I120-dynamic-diagnostics-truth.md`. |
 | I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
-| I122 | Local Extension And Control Diagnostics | **Planned — ready after I121** | Month 3. Shared read-only MCP/plugin/hook diagnostics across command surfaces and loopback dashboard. See `I122-local-extension-control-diagnostics.md`. |
+| I122 | Local Extension And Control Diagnostics | **Active** (2026-07-13) | Month 3. Gate 0 passed (I121 Complete). Unified read-only extension diagnostics across CLI/TUI/dashboard. See `I122-local-extension-control-diagnostics.md`. |
 | I123 | Installation And Trial Confidence | **Planned — blocked on I122** | Month 4. Installer fixtures, clean-HOME smoke, second-operator replay, and honest trial report. See `I123-installation-and-trial-confidence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime

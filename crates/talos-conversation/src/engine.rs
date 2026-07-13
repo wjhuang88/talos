@@ -7,8 +7,9 @@ use talos_core::tool::ToolProvenance;
 
 use crate::command_registry::{MOCK_REQUEST_COMMAND, command_registry};
 use crate::types::{
-    ChatMessage, ContentOutput, CopyScope, McpServerDiagnostic, MessageRole, MessageSource,
-    MessageStatus, ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
+    ChatMessage, ContentOutput, CopyScope, ExtensionSnapshot, HookDeclarationDiagnostic,
+    HookSnapshot, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
+    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
     SkillDiagnostic, StatusSnapshot, TipKind, TodoCommandAction, TodoCommandRequest,
     TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput,
@@ -1049,6 +1050,48 @@ impl ConversationEngine {
         } else {
             self.plugin_observations
                 .push(PluginObservation { key, count: 1 });
+        }
+    }
+
+    pub fn extension_snapshot(&self) -> ExtensionSnapshot {
+        let mut seen_mcp = std::collections::HashSet::new();
+        let mut collisions = Vec::new();
+        for server in &self.mcp_servers {
+            if !seen_mcp.insert(&server.name) {
+                collisions.push(format!("mcp:{}", server.name));
+            }
+        }
+        let mut seen_hooks = std::collections::HashSet::new();
+        for (name, _, _) in &self.hook_declarations {
+            if !seen_hooks.insert(name.as_str()) {
+                collisions.push(format!("hook:{name}"));
+            }
+        }
+
+        let declarations = self
+            .hook_declarations
+            .iter()
+            .map(|(name, event, enabled)| HookDeclarationDiagnostic {
+                name: name.clone(),
+                event: event.clone(),
+                enabled: *enabled,
+            })
+            .collect();
+
+        let event_catalog = talos_plugin::ALL_HOOK_EVENT_KINDS
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        ExtensionSnapshot {
+            mcp_servers: self.mcp_servers.clone(),
+            hooks: HookSnapshot {
+                declarations,
+                executable_carriers_enabled: false,
+                event_catalog,
+            },
+            provenance: self.plugin_observations.clone(),
+            collisions,
         }
     }
 }

@@ -2152,3 +2152,142 @@ fn error_message_becomes_tip_and_error_stream() {
     });
     assert!(has_error_stream, "error must emit an Error stream");
 }
+
+#[test]
+fn extension_snapshot_empty() {
+    let engine = new_engine();
+    let snap = engine.extension_snapshot();
+    assert!(snap.mcp_servers.is_empty());
+    assert!(snap.hooks.declarations.is_empty());
+    assert!(!snap.hooks.executable_carriers_enabled);
+    assert!(snap.provenance.is_empty());
+    assert!(snap.collisions.is_empty());
+}
+
+#[test]
+fn extension_snapshot_with_mcp_servers() {
+    let engine = new_engine().with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "filesystem".to_string(),
+            connected: true,
+            tool_count: 3,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "remote".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("timeout".to_string()),
+        },
+    ]);
+    let snap = engine.extension_snapshot();
+    assert_eq!(snap.mcp_servers.len(), 2);
+    assert!(
+        snap.mcp_servers
+            .iter()
+            .any(|s| s.name == "filesystem" && s.connected)
+    );
+    assert!(
+        snap.mcp_servers
+            .iter()
+            .any(|s| s.name == "remote" && !s.connected)
+    );
+}
+
+#[test]
+fn extension_snapshot_with_hooks() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![
+        ("pre-turn".to_string(), "TurnStart".to_string(), true),
+        ("post-tool".to_string(), "AfterToolCall".to_string(), false),
+    ]);
+    let snap = engine.extension_snapshot();
+    assert_eq!(snap.hooks.declarations.len(), 2);
+    assert!(
+        snap.hooks
+            .declarations
+            .iter()
+            .any(|d| d.name == "pre-turn" && d.enabled)
+    );
+    assert!(
+        snap.hooks
+            .declarations
+            .iter()
+            .any(|d| d.name == "post-tool" && !d.enabled)
+    );
+    assert!(!snap.hooks.event_catalog.is_empty());
+}
+
+#[test]
+fn extension_snapshot_detects_mcp_name_collision() {
+    let engine = new_engine().with_mcp_servers(vec![
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: true,
+            tool_count: 1,
+            error: None,
+        },
+        McpServerDiagnostic {
+            name: "dup".to_string(),
+            connected: false,
+            tool_count: 0,
+            error: Some("conflict".to_string()),
+        },
+    ]);
+    let snap = engine.extension_snapshot();
+    assert!(
+        snap.collisions.iter().any(|c| c == "mcp:dup"),
+        "collisions: {:?}",
+        snap.collisions
+    );
+}
+
+#[test]
+fn extension_snapshot_detects_hook_name_collision() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![
+        ("my-hook".to_string(), "TurnStart".to_string(), true),
+        ("my-hook".to_string(), "AfterToolCall".to_string(), true),
+    ]);
+    let snap = engine.extension_snapshot();
+    assert!(
+        snap.collisions.iter().any(|c| c == "hook:my-hook"),
+        "collisions: {:?}",
+        snap.collisions
+    );
+}
+
+#[test]
+fn extension_snapshot_serializes_to_valid_json() {
+    let mut engine = new_engine();
+    engine.set_hook_declarations(vec![("h".to_string(), "TurnStart".to_string(), true)]);
+    let engine = engine.with_mcp_servers(vec![McpServerDiagnostic {
+        name: "s".to_string(),
+        connected: true,
+        tool_count: 2,
+        error: None,
+    }]);
+    let snap = engine.extension_snapshot();
+    let json = serde_json::to_string(&snap).expect("serialize");
+    let value: serde_json::Value = serde_json::from_str(&json).expect("parse");
+    assert!(value["mcp_servers"].is_array());
+    assert!(value["hooks"].is_object());
+    assert!(value["provenance"].is_array());
+    assert!(value["collisions"].is_array());
+}
+
+#[test]
+fn extension_snapshot_no_secrets() {
+    let engine = new_engine().with_mcp_servers(vec![McpServerDiagnostic {
+        name: "server".to_string(),
+        connected: true,
+        tool_count: 1,
+        error: None,
+    }]);
+    let snap = engine.extension_snapshot();
+    let json = serde_json::to_string(&snap).expect("serialize");
+    assert!(!json.to_lowercase().contains("api_key"));
+    assert!(!json.to_lowercase().contains("secret"));
+    assert!(!json.to_lowercase().contains("token"));
+    assert!(!json.to_lowercase().contains("password"));
+}
