@@ -62,7 +62,7 @@ docs/iterations/
 | I025 | Tool Pipeline Completion | **Complete** (2026-06-17) | Tool protocol and display pipeline closed: schema validation/dedup, diff/stat, CommonMark fence handling, Mermaid rendering via `mermaid-text`, and ToolNature permission/display metadata. See `I025-tool-pipeline-completion.md`. |
 | I026 | Approval UX + Git Tools + Prompt Optimization | **Complete** (2026-06-18) | All 7 stories implemented: approval ordering and inline result display, read/write Git tools, dynamic prompt templates, Anthropic cache-control emission, tree tool, and active documentation validation. Closure re-verification on 2026-06-18: `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` both pass. Residual: `--all-targets` clippy scope gap registered as ARCH-007. See `I026-approval-ux-doc-validation.md`. |
 | I027 | ARCH-003 Crate Boundary Cleanup | **Complete** (2026-06-18) | Removed dead `talos-mcp -> talos-agent` dependency, renamed `message::ToolResult` → `MessageToolResult` (14 files), and introduced an RPC `Runtime` trait so `talos-rpc` no longer names concrete `Agent` (`AgentRuntime` adapter in `talos-cli`). No behavior change; workspace check/tests/clippy/fmt/governance all clean. See `I027-crate-boundary-cleanup.md`; `docs/backlog/active/ARCH-003-crate-boundary-cleanup.md`. |
-| I028 | Delayed and Scheduled Task Execution | **Planned** (2026-06-18) | 4 built-in tools (`delay`, `schedule`, `cancel_scheduled_task`, `list_scheduled_tasks`) for session-scoped delayed/recurring message injection via `SessionOp::Submit`. LLM mediates tool calls through normal permission pipeline. No external scheduling crate. See `I028-delayed-scheduled-tasks.md`; `docs/backlog/active/SCHED-001-delayed-scheduled-tasks.md`. |
+| I028 | Delayed and Scheduled Task Execution | **Superseded before implementation** (2026-07-13) | Historical baseline retained, but its read/auto-allow permission premise is invalid for mutating scheduler operations. I124-I127 own the corrected Execute/Ask sequence. See `I028-delayed-scheduled-tasks.md`; `docs/tasks/2026-07-13-four-month-scheduled-followups-plan.md`. |
 | I029 | Architecture Cleanup Completion | **Complete** (2026-06-18) | Closed ARCH-004/005/006/007: anti-corruption layers, clippy `--all-targets` cleanup, prompt cache stability, and I029 god-module decomposition slice. Post-ARCH-005 residuals are tracked separately as ARCH-008/009/010. See `I029-architecture-cleanup-completion.md`. |
 | I030 | Session Module Decomposition | **Complete** (2026-06-19) | ARCH-008 closed: `talos-session/src/lib.rs` split into error/types/jsonl/topology/manager/tests modules with no behavior change. See `I030-session-module-decomposition.md`. |
 | I031 | Skill And CLI Module Cleanup | **Complete** (2026-06-19) | ARCH-009 skill split and ARCH-010 CLI mode-runner extraction landed; `talos-cli/src/main.rs` is now 241 lines. See `I031-skill-and-cli-module-cleanup.md`. |
@@ -156,6 +156,10 @@ docs/iterations/
 | I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
 | I122 | Local Extension And Control Diagnostics | **Complete** (2026-07-13) | Month 3. Typed extension snapshot, unified /mcp//plugins//hooks, dashboard /extensions route, 133+23 tests. See `I122-local-extension-control-diagnostics.md`. |
 | I123 | Installation And Trial Confidence | **Complete** (2026-07-13) | Month 4. Installer fixtures (POSIX 9/9 + PowerShell 5/0/1, checksum verified, offline/ARM64 error text asserted), clean-HOME smoke (18/0/2, real session resume), Windows `v0.3.4` install/version trial, and maintainer-confirmed independent replay validation passed. See `I123-installation-and-trial-confidence.md`. |
+| I124 | One-Shot Scheduled Follow-Up | **Planned** | Month 1 of the scheduled-followups plan. Ask-gated bounded delay, typed/labeled queue injection, cancellation-aware actor, and fixture-provider proof. See `I124-one-shot-scheduled-followup.md`. |
+| I125 | Recurring Scheduled Follow-Ups | **Planned; blocked on I124** | Month 2. Bounded intervals, delayed missed ticks, no permission reuse, and cadence proof. See `I125-recurring-scheduled-followups.md`. |
+| I126 | Schedule Inspection And Control | **Planned; blocked on I125** | Month 3. Read-only list, Ask-gated cancel, bounded output, and narrow-terminal rendering. See `I126-schedule-inspection-control.md`. |
+| I127 | Scheduler Reliability Closeout | **Planned; blocked on I126** | Month 4. Shutdown/backpressure hardening, deterministic stress, clean-HOME trial, and second-operator replay. See `I127-scheduler-reliability-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -171,7 +175,11 @@ rewrite published iteration baselines.
 | I018 | Planned | Deferred; remains a valid future observability/prompt-assets baseline. |
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
-| I028 | Planned | Deferred; scheduling is not the current priority. |
+| I028 | Superseded before implementation | Removed from activation inventory; I124-I127 own the changed Ask-gated acceptance target. |
+| I124 | Planned | Ready for assignment; only the execution-package Gate 0 may activate it. |
+| I125 | Planned | Blocked on I124 Complete. |
+| I126 | Planned | Blocked on I125 Complete. |
+| I127 | Planned | Blocked on I126 Complete. |
 | I047 | Complete (2026-06-29) | Removed from non-terminal inventory. v0.1.2 and v0.2.0 tags pushed and published. |
 | I048 | Planned | Scope fulfilled by I049–I055; superseded by actual execution flow. |
 | I049 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I049 doc, delivered via I049–I055 sequence). |
@@ -204,7 +212,7 @@ rewrite published iteration baselines.
 | I107 | Complete (2026-07-12) | Corrective delivery acceptance met; REL-002 evidence remains non-qualifying. Removed from non-terminal inventory. |
 | I108 | Complete (2026-07-12) | Architecture audit acceptance met; REL-002 evidence remains non-qualifying. Removed from non-terminal inventory. |
 | I109 | Complete (2026-07-12) | NO-GO closeout acceptance met; REL-002 remains unmet/partial. Removed from non-terminal inventory. |
-| I114 | Complete (2026-07-10) | TUI-028 #24/#25/#31/#39 accepted in native Alacritty; removed from the active selection set. I018-I020, I028, I086-I089, and other planned work remain deferred or blocked as individually recorded. |
+| I114 | Complete (2026-07-10) | TUI-028 #24/#25/#31/#39 accepted in native Alacritty; removed from the active selection set. I018-I020, I086-I089, and other planned work remain deferred or blocked as individually recorded; I028 was later superseded by I124-I127. |
 | I087 | Superseded before activation | Revised site-install acceptance moves to I118. |
 | I088 | Superseded before activation | Revised extension/ingestion acceptance moves to I118. |
 | I089 | Superseded before activation | Revised Talos-primary evidence/release decision moves to I119. |

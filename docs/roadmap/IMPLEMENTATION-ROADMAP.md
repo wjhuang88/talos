@@ -6,25 +6,25 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
-## Current Four-Month Frontline Reliability Sequence (2026-07-13)
+## Current Four-Month Scheduled Follow-Ups Sequence (2026-07-13)
 
-The current planning owner is
-[`2026-07-13-four-month-frontline-reliability-plan`](../tasks/2026-07-13-four-month-frontline-reliability-plan.md).
+The completed I120-I123 reliability sequence is preserved in its owner docs. The current planning owner is
+[`2026-07-13-four-month-scheduled-followups-plan`](../tasks/2026-07-13-four-month-scheduled-followups-plan.md).
 The single resumable long-task owner is
-[`2026-07-13-frontline-developer-execution-package`](../tasks/2026-07-13-frontline-developer-execution-package.md).
-It preserves the completed I116-I119 history and defines four new sequential iterations:
+[`2026-07-13-scheduled-followups-execution-package`](../tasks/2026-07-13-scheduled-followups-execution-package.md).
+It preserves I028 as a superseded historical baseline and defines four corrected sequential iterations:
 
 | Month | Iteration | Runnable Exit |
 |---|---|---|
-| 1 | I120 Dynamic Diagnostics Truth | Valid, redacted, dynamically derived diagnostics in text and JSON |
-| 2 | I121 TUI Attention And Thinking Clarity | Prominent approval UX and concise transient thinking titles |
-| 3 | I122 Local Extension And Control Diagnostics | Consistent read-only extension state across CLI/TUI/dashboard |
-| 4 | I123 Installation And Trial Confidence | Installer fixtures and replayable clean-HOME local trial |
+| 1 | I124 One-Shot Scheduled Follow-Up | Ask-gated delayed follow-up fires once through the normal queue |
+| 2 | I125 Recurring Scheduled Follow-Ups | Bounded recurrence without missed-tick bursts or permission reuse |
+| 3 | I126 Schedule Inspection And Control | List/cancel plus narrow-terminal readable results |
+| 4 | I127 Scheduler Reliability Closeout | Shutdown/backpressure proof and second-operator clean-HOME replay |
 
-No iteration is Active at publication. The assignee activates I120 only after the long-task Gate 0;
-later iterations activate sequentially after their predecessor closes. F100-F133 are stories inside
-those iterations, not iterations or independent long tasks. The long task does not authorize v1.0,
-permission changes, remote/write control, plugin host calls, push, tag, publish, or release actions.
+No iteration is Active at publication. The assignee activates I124 only after the long-task Gate 0;
+later iterations activate sequentially. SF100-SF133 are stories, not iterations. The long task does
+not authorize persistent/cron scheduling, direct scheduled tool calls, permission changes, remote
+control, push, tag, publish, or release actions.
 
 ```
 I001 "Project Scaffold"  cargo check --workspace               能编译 ✅

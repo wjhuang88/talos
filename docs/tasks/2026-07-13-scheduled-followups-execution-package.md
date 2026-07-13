@@ -1,0 +1,99 @@
+# Frontline Execution Package: Session-Scoped Scheduled Follow-Ups
+
+**Status**: Ready for assignment; no iteration activated
+**Program plan**: `docs/tasks/2026-07-13-four-month-scheduled-followups-plan.md`
+**Ordered iterations**: I124, I125, I126, I127
+**Checkpoint owner**: assigned developer
+
+## Start Gate
+
+1. Read `AGENTS.md`, this file, the program plan, `docs/BOARD.md`, SCHED-001, I124, and
+   `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07-04.md`.
+2. Confirm the worktree is clean and based on updated `main`. Do not stash, reset, or overwrite
+   changes belonging to someone else.
+3. Run the repository-pinned toolchain and baseline gates:
+
+```bash
+git status -sb
+rustc --version
+cargo metadata --locked --no-deps --format-version 1
+scripts/validate_project_governance.sh .
+./scripts/release_preflight.sh
+```
+
+4. Inspect current composition roots before editing. Record every place built-in tools are
+   registered; missing one is a blocking product defect, not deferred cleanup.
+5. Produce a short security note proving `delay`/`schedule`/`cancel` resolve as Execute/Ask,
+   `list_scheduled_tasks` is Read, Deny wins, and fire-time tool calls are evaluated normally.
+6. Only then mark I124 Active. Do not activate I125-I127 early.
+
+## Implementation Map
+
+| Concern | Expected owner | Constraint |
+|---|---|---|
+| actor and task metadata | `talos-agent` | one owner; cancellation-aware; no panic on channel close |
+| tool schemas/adapters | `talos-tools` | Execute for mutation, Read for list; bounded input/output |
+| internal messages | existing core/conversation session types where possible | avoid public API expansion; escalate if unavoidable |
+| composition | `talos-cli` registries/mode roots | identical availability in supported interactive modes |
+| rendering | `talos-tui` tool display | display-only; no permission or persistence logic |
+| prompt/docs | embedded prompt assets and README | describe session-only behavior and permission boundary |
+
+Do not create a second event bus, scheduler registry, or mutable state copy. Reuse the existing
+ordered session flow and tool registry.
+
+## Required Test Matrix
+
+- one-shot: fires once; cancelled before fire; shutdown before fire; invalid durations;
+- recurring: first fire timing; delayed missed ticks; no burst; cancellation race;
+- actor: command channel closes; session queue closes/fills; task completion removes metadata;
+- permission: Ask by default for every mutation, explicit Deny, list remains read-only, later tool
+  call gets a fresh decision;
+- surface: all intended registries expose the same schemas; list/cancel results are bounded;
+- runtime: fixture provider registers/fires/lists/cancels through the real conversation path;
+- TUI: 40/60/80/120-column semantic buffer assertions for schedule output;
+- lifecycle: no scheduled fire after shutdown and no leaked Tokio tasks in the test harness.
+
+Prefer `tokio::time::pause/advance` or `#[tokio::test(start_paused = true)]`. Do not use long
+wall-clock sleeps or timing tolerances that hide races.
+
+## Work And Commit Order
+
+Use one SF story per logical commit:
+
+```text
+feat(agent): add one-shot scheduled follow-up actor (#SF101) [model:<model-name>]
+feat(tools): expose ask-gated delay tool (#SF102) [model:<model-name>]
+```
+
+Before each commit, stage only that story, run its focused tests, review `git diff --cached`, scan
+for secrets, and run `git diff --check`. At iteration close run the full validation ladder from the
+program plan and record actual counts/evidence in the active iteration.
+
+## Checkpoint Template
+
+Append a row after every story, failure, or handoff:
+
+| Time | Story | Branch/commit | State | Validation | Changed files | Blocker/retry | Next exact action |
+|---|---|---|---|---|---|---|---|
+
+Allowed states: Not Started, In Progress, Review, Complete, Blocked. Retry an unchanged failed
+command at most twice. Record the first actionable error and safe fallback.
+
+## Recovery Procedure
+
+After interruption, read the latest checkpoint, current iteration, its diff, and `git status -sb`.
+Run the last focused test before editing. If the checkpoint and code disagree, code plus test
+evidence wins temporarily; reconcile the owner doc before continuing. Never infer completion from
+checkboxes alone.
+
+## Authority Boundary
+
+The assignee may implement the active iteration, tests, fixtures, and affected docs. Stop before
+permission-policy changes, persistence, direct scheduled tool calls, public API/session format
+changes, dependencies, remote surfaces, destructive Git operations, push/PR, or release actions.
+
+## Checkpoints
+
+| Time | Story | Branch/commit | State | Validation | Changed files | Blocker/retry | Next exact action |
+|---|---|---|---|---|---|---|---|
+| 2026-07-13 | Planning handoff | `main` | Ready | planning inventory completed; implementation not claimed | plan/package/I124-I127/governance docs | I124 security note and Gate 0 still required | Assignee reruns Start Gate and activates I124 only. |

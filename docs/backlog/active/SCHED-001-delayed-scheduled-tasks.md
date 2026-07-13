@@ -1,6 +1,6 @@
 # SCHED-001: Delayed and Scheduled Task Execution
 
-**Status**: In Progress (→ I028, activated 2026-06-18)
+**Status**: Planned — I028 superseded before implementation; selected into I124-I127
 **Priority**: P2
 **Source**: User request 2026-06-18
 **Depends on**: None
@@ -13,6 +13,11 @@ I092 A11 result (2026-07-04): `docs/reference/AUTONOMY-PERMISSION-MATRIX-2026-07
 the scheduled-task boundary. Scheduled message injection does not grant permission to future tool
 calls. Scheduled direct tool execution and persistent scheduler state remain denied/deferred until a
 future ADR and fire-time permission re-evaluation tests exist.
+
+2026-07-13 selection correction: I028's proposed read/auto-allow classification is rejected for
+mutating schedule registration/cancellation. I124-I127 retain session-scoped message injection but
+classify `delay`, `schedule`, and `cancel_scheduled_task` as Execute/Ask and listing as Read. No
+permission-engine change, persistence, or direct scheduled tool execution is selected.
 
 ## Problem
 

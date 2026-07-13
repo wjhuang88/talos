@@ -1,8 +1,13 @@
 # I028: Delayed and Scheduled Task Execution
 
-**Status**: Planned
+**Status**: Superseded before implementation (2026-07-13)
 **Started**: 2026-06-18 (plan opened)
 **Depends On**: None (greenfield feature)
+
+> This published baseline is preserved for history. Its `ToolNature::Read, auto-allow` premise for
+> mutating scheduling operations conflicts with the current permission architecture. The changed,
+> Ask-gated and incrementally runnable acceptance target is owned by I124-I127 and
+> `docs/tasks/2026-07-13-four-month-scheduled-followups-plan.md`. Do not activate I028.
 
 ## Outcome
 
