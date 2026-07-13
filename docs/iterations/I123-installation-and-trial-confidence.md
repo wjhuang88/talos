@@ -51,4 +51,24 @@
 
 ## Execution Record
 
-Activated 2026-07-13 after I122 Complete. F130 (POSIX/PowerShell installer fixture matrix) in progress.
+Activated 2026-07-13 after I122 Complete.
+
+### F130 — POSIX/PowerShell installer fixture matrix (Complete 2026-07-13)
+
+- Extended `scripts/test_installer_fixtures.sh` from 4 to 9 POSIX cases: preserved
+  install / latest / checksum-mismatch / offline; added unsupported-OS, unsupported-arch,
+  install-dir override + executable placement, temp cleanup, corrupted-archive extraction.
+  Result: **9/9 passed** (no network — fake `curl` + fake `uname` via PATH injection).
+- Added `scripts/install_fixtures.ps1` (locally mocks `Invoke-RestMethod` / `Invoke-WebRequest`;
+  no network) and `scripts/test_installer_fixtures_ps1.sh` (SKIP with honest label when `pwsh`
+  is absent — never a false failure). PowerShell matrix: success + `talos.exe` placement,
+  `latest` resolution, offline terminating error, ARM64 explicit unsupported message.
+  Result: **4/4 passed** (`pwsh` 7.6.2 present in this environment).
+- **Honest residual**: `install.ps1` performs no checksum verification (unlike `install.sh`).
+  A checksum-mismatch case for PowerShell therefore cannot exist; this is documented in the
+  fixture output, not faked. Adding checksum verification to the installer is a maintainer
+  decision outside F130 scope (fixture tests only).
+- Acceptance met: both installer script paths pass fixture tests; checksum (POSIX) and offline
+  failures are explicit and leave no false success state.
+
+### F131 — Clean-HOME real-binary trial smoke (Next)
