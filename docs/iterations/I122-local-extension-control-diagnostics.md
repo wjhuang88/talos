@@ -1,6 +1,6 @@
 # Iteration I122: Local Extension And Control Diagnostics
 
-> Document status: Review (2026-07-13) — P0 fix applied: error categorization replaces pattern-blacklist sanitization
+> Document status: Complete (2026-07-13) — P0 fix: error categorization replaces pattern-blacklist sanitization; 139 conversation + 23 dashboard + 185 CLI tests pass
 > Published plan date: 2026-07-13
 > Planned objective: Give CLI, TUI, and loopback dashboard one truthful read-only view of installed
 > local extension state and bounded failures.
