@@ -69,7 +69,7 @@ fn collect_diagnostics_summary_at(workspace: &Path, workspace_root: String) -> D
 
     let config_path = talos_root.join("config.toml");
     let active_iterations = collect_active_iterations_at(workspace);
-    let residual_gates = collect_residual_gates_at(workspace);
+    let residual_gates = collect_residual_gates();
 
     DiagnosticsSummary {
         talos_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -106,6 +106,9 @@ fn collect_active_iterations_at(workspace: &Path) -> Vec<String> {
     let Ok(content) = std::fs::read_to_string(&iter_path) else {
         return vec!["unavailable: iteration index not found".to_string()];
     };
+    if !has_valid_iteration_table(&content) {
+        return vec!["unavailable: iteration index malformed".to_string()];
+    }
     let iterations = crate::governance::parse_open_iterations(&content);
     if iterations.is_empty() {
         return vec!["(no open iterations)".to_string()];
@@ -116,17 +119,55 @@ fn collect_active_iterations_at(workspace: &Path) -> Vec<String> {
         .collect()
 }
 
-fn collect_residual_gates_at(_workspace: &Path) -> Vec<String> {
-    current_residual_gates()
+fn has_valid_iteration_table(content: &str) -> bool {
+    let mut in_section = false;
+    let mut found_table_sep = false;
+    for line in content.lines() {
+        if line.starts_with("## ") {
+            if found_table_sep {
+                break;
+            }
+            in_section = line.starts_with("## Current Iterations");
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        if line.starts_with("|---") {
+            found_table_sep = true;
+        }
+    }
+    found_table_sep
 }
 
-fn current_residual_gates() -> Vec<String> {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ResidualGate {
+    id: &'static str,
+    summary: &'static str,
+}
+
+fn residual_gate_registry() -> Vec<ResidualGate> {
     vec![
-        "REL-002 v1.0 Self-Bootstrap — NO-GO (zero qualifying Talos-primary sessions)".to_string(),
-        "PERM-005 — bash/exec remains per-command Ask/Deny (evidence is diagnostic-only)"
-            .to_string(),
-        "PERM-004 — file-write trust within Git repo; command trust not broadened".to_string(),
+        ResidualGate {
+            id: "REL-002",
+            summary: "v1.0 Self-Bootstrap — NO-GO (zero qualifying Talos-primary sessions)",
+        },
+        ResidualGate {
+            id: "PERM-005",
+            summary: "bash/exec remains per-command Ask/Deny (evidence is diagnostic-only)",
+        },
+        ResidualGate {
+            id: "PERM-004",
+            summary: "file-write trust within Git repo; command trust not broadened",
+        },
     ]
+}
+
+fn collect_residual_gates() -> Vec<String> {
+    residual_gate_registry()
+        .iter()
+        .map(|g| format!("{} — {}", g.id, g.summary))
+        .collect()
 }
 
 fn print_text(s: &DiagnosticsSummary) {
@@ -244,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_no_stale_i085_paused_claim() {
-        let gates = current_residual_gates();
+        let gates = collect_residual_gates();
         assert!(
             !gates
                 .iter()
@@ -332,10 +373,9 @@ mod tests {
         .unwrap();
 
         let iterations = collect_active_iterations_at(dir.path());
-        assert_eq!(
-            iterations,
-            vec!["(no open iterations)".to_string()],
-            "malformed index without parseable table rows should produce bounded empty diagnostic"
+        assert!(
+            iterations.iter().any(|i| i.contains("unavailable")),
+            "malformed index should produce unavailable, not '(no open iterations)': {iterations:?}"
         );
     }
 
@@ -434,6 +474,14 @@ mod tests {
             "malformed workspace should not produce empty iterations"
         );
         assert!(
+            summary
+                .active_iterations
+                .iter()
+                .any(|i| i.contains("unavailable")),
+            "malformed workspace should report unavailable, not false empty: {:?}",
+            summary.active_iterations
+        );
+        assert!(
             !summary.residual_gates.is_empty(),
             "malformed workspace should not affect residual gates"
         );
@@ -469,7 +517,7 @@ mod tests {
     #[test]
     fn test_residual_gates_always_bounded() {
         let dir = tempdir().expect("tempdir");
-        let gates = collect_residual_gates_at(dir.path());
+        let gates = collect_residual_gates();
         assert!(!gates.is_empty(), "residual gates must never be empty");
         assert!(
             gates.iter().all(|g| !g.is_empty()),

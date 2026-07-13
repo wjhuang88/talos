@@ -1118,14 +1118,45 @@ mod tests {
     #[test]
     fn test_approval_render_no_overflow_at_various_widths() {
         for width in [40u16, 60, 80, 120] {
-            let (buf, h) =
-                render_approval_to_buffer("bash", "command: echo test args here", width, 0);
+            let (buf, h) = render_approval_to_buffer(
+                "bash",
+                "command: echo test args here with some length",
+                width,
+                0,
+            );
             for y in 0..h {
-                for x in 0..width {
-                    let _ = &buf[(x, y)];
-                }
+                let line = buffer_line_content(&buf, y, width);
+                let display_w = unicode_width::UnicodeWidthStr::width(line.as_str());
+                assert!(
+                    display_w <= width as usize,
+                    "line {y} at width {width} has display width {display_w}: {line:?}"
+                );
             }
         }
+    }
+
+    #[test]
+    fn test_approval_render_cjk_display_width_no_overflow() {
+        let cjk_args = "路径: /测试目录/文件名.txt 参数: 执行命令";
+        let lines = wrap_text_to_lines(cjk_args, 36, 2);
+        for line in &lines {
+            let dw = unicode_width::UnicodeWidthStr::width(line.as_str());
+            assert!(
+                dw <= 36,
+                "CJK wrap line display width {dw} exceeds 36: {line:?}"
+            );
+        }
+        let menu = BottomPanelState::open_approval("文件操作", cjk_args);
+        let comp = BottomPanelComponent {
+            menu: &menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        let h = comp.height_hint(40);
+        let area = ratatui::layout::Rect::new(0, 0, 40, h);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buf);
+        comp.render(&mut frame, area);
     }
 
     #[test]
@@ -1241,6 +1272,17 @@ mod tests {
         assert_eq!(
             extract_thinking_title("intro\n\n**Step 1**\n\ndetails\n\n**Step 2**\n"),
             Some("Step 2")
+        );
+    }
+
+    #[test]
+    fn test_thinking_title_export_regression() {
+        let text = "**Secret Title**\n\nreasoning about api_key=sk-leak";
+        let title = extract_thinking_title(text);
+        assert_eq!(title, Some("Secret Title"));
+        assert!(
+            !title.unwrap().contains("api_key"),
+            "title extraction must not leak surrounding content"
         );
     }
 

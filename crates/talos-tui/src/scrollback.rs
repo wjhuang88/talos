@@ -656,7 +656,9 @@ impl BottomPanelComponent<'_> {
 
         if wide {
             let prefix = format!("  \u{26a0} {tool_name}: ");
-            let arg_w = width.saturating_sub(prefix.chars().count() as u16).max(1) as usize;
+            let arg_w = width
+                .saturating_sub(unicode_width::UnicodeWidthStr::width(prefix.as_str()) as u16)
+                .max(1) as usize;
             let args_disp = truncate_one_line(arguments, arg_w);
             lines.push(Line::from(Span::styled(
                 format!("{prefix}{args_disp}"),
@@ -712,21 +714,25 @@ impl BottomPanelComponent<'_> {
     }
 }
 
-fn truncate_one_line(value: &str, max_chars: usize) -> String {
+fn truncate_one_line(value: &str, max_width: usize) -> String {
     let single = value.replace('\n', " ");
-    let chars: Vec<char> = single.chars().collect();
-    if chars.len() <= max_chars {
-        single
-    } else if max_chars == 0 {
-        String::new()
-    } else {
-        format!(
-            "{}…",
-            chars[..max_chars.saturating_sub(1)]
-                .iter()
-                .collect::<String>()
-        )
+    if unicode_width::UnicodeWidthStr::width(single.as_str()) <= max_width {
+        return single;
     }
+    if max_width == 0 {
+        return String::new();
+    }
+    let mut width = 0usize;
+    let mut result = String::new();
+    for ch in single.chars() {
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + cw > max_width.saturating_sub(1) {
+            break;
+        }
+        result.push(ch);
+        width += cw;
+    }
+    result + "…"
 }
 
 pub(crate) fn approval_natural_height(width: u16, arguments: &str) -> u16 {
@@ -740,35 +746,47 @@ pub(crate) fn approval_natural_height(width: u16, arguments: &str) -> u16 {
     }
 }
 
-pub(crate) fn wrap_text_to_lines(text: &str, width: usize, max_lines: usize) -> Vec<String> {
-    if width == 0 || max_lines == 0 {
+pub(crate) fn wrap_text_to_lines(text: &str, max_width: usize, max_lines: usize) -> Vec<String> {
+    if max_width == 0 || max_lines == 0 {
         return Vec::new();
     }
     let flat: String = text
         .chars()
         .map(|c| if c == '\n' { ' ' } else { c })
         .collect();
-    let chars: Vec<char> = flat.chars().collect();
-    let total = chars.len().div_ceil(width);
-    if total == 0 {
+
+    let mut all_lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut current_w = 0usize;
+
+    for ch in flat.chars() {
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if current_w + cw > max_width && !current.is_empty() {
+            all_lines.push(std::mem::take(&mut current));
+            current_w = 0;
+        }
+        current.push(ch);
+        current_w += cw;
+    }
+    if !current.is_empty() {
+        all_lines.push(current);
+    }
+
+    if all_lines.is_empty() {
         return Vec::new();
     }
-    let truncated = total > max_lines;
-    let take = total.min(max_lines);
-    let mut result = Vec::with_capacity(take);
-    for i in 0..take {
-        let start = i * width;
-        let end = (start + width).min(chars.len());
-        let mut line: String = chars[start..end].iter().collect();
-        if truncated && i == take - 1 {
-            let lc: Vec<char> = line.chars().collect();
-            line = if lc.len() > 1 {
-                lc[..lc.len() - 1].iter().collect::<String>() + "…"
-            } else {
-                "…".to_string()
-            };
+
+    if all_lines.len() <= max_lines {
+        return all_lines;
+    }
+
+    let mut result: Vec<String> = all_lines[..max_lines].to_vec();
+    if let Some(last) = result.last_mut() {
+        while unicode_width::UnicodeWidthStr::width(last.as_str()) >= max_width && !last.is_empty()
+        {
+            last.pop();
         }
-        result.push(line);
+        last.push('…');
     }
     result
 }
