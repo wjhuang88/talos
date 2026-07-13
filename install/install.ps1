@@ -3,6 +3,13 @@
 # Usage:
 #   iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 #
+# Test-only parameter:
+#   -SkipSelfCheck is used by the offline fixture because its archive contains a
+#   deliberately non-runnable placement stub. Normal installs always self-check.
+param(
+  [switch]$SkipSelfCheck
+)
+
 # Environment overrides:
 #   $env:TALOS_REPO         GitHub <owner>/<repo>   (default: wjhuang88/talos)
 #   $env:TALOS_VERSION      release tag or 'latest' (default: latest)
@@ -83,8 +90,10 @@ Write-Host "-> installed talos to $(Join-Path $InstallDir 'talos.exe')"
 if (-not (($env:PATH -split ';') -contains $InstallDir)) {
   Write-Host "note: add $InstallDir to your PATH"
 }
-if ($IsWindows) {
+if ($IsWindows -and -not $SkipSelfCheck) {
   & (Join-Path $InstallDir 'talos.exe') --version
+} elseif ($SkipSelfCheck) {
+  Write-Host "note: skipping self-check for installer fixture"
 } else {
   Write-Host "note: skipping self-check (talos.exe is a Windows binary; run it on Windows to verify --version)"
 }

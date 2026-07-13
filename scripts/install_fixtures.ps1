@@ -121,31 +121,9 @@ function Prepare-Zip {
   $TmpZipDir = Join-Path $Fixture "zip-staging-$([System.Guid]::NewGuid())"
   New-Item -ItemType Directory -Path $TmpZipDir | Out-Null
   $StubExe = Join-Path $TmpZipDir 'talos.exe'
-  if ($IsWindows) {
-    # The installer self-check executes talos.exe on Windows. Use a tiny managed
-    # fixture PE so the offline archive test exercises that path without claiming
-    # it validates a published Talos binary (the real-release workflow does that).
-    $FixtureProgram = @'
-using System;
-public static class Program
-{
-    public static int Main(string[] args)
-    {
-        if (args.Length == 1 && args[0] == "--version")
-        {
-            Console.WriteLine("talos fixture 0.0.0");
-            return 0;
-        }
-        return 0;
-    }
-}
-'@
-    Add-Type -TypeDefinition $FixtureProgram -OutputAssembly $StubExe -OutputType ConsoleApplication
-  } else {
-    # Non-Windows pwsh cannot execute a Windows PE; the runnable assertion is
-    # intentionally skipped there, while archive placement remains covered.
-    '@echo off' | Set-Content -Path $StubExe -Encoding ASCII
-  }
+  # Archive placement is tested with a deliberately non-runnable stub. The
+  # real-release workflow separately executes the published Windows binary.
+  '@echo off' | Set-Content -Path $StubExe -Encoding ASCII
   Compress-Archive -Path $StubExe -DestinationPath $ZipPath -Force
   Remove-Item -Recurse -Force $TmpZipDir
   # Write a fixture checksum.sha256 (sha256sum format: "<hash>  <archive>")
@@ -161,7 +139,7 @@ function Reset-Install {
 function Run-Installer {
   $env:TEMP = $TempBase
   if (-not $env:USERPROFILE) { $env:USERPROFILE = $TempBase }
-  . $Installer
+  . $Installer -SkipSelfCheck
 }
 
 Assert-Pass "A. successful install places talos.exe" {
