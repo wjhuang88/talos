@@ -52,12 +52,15 @@ talos-cli:     Composition root (spawns actor, wires tools with sched_tx)
 
 ## Acceptance Criteria
 
-- [ ] `delay` tool accepts `{ message: string, delay_secs: u64 }` and returns a `task_id`.
+- [x] `delay` tool accepts `{ message: string, delay_secs: u64 }` and returns a `task_id`.
 - [ ] `schedule` tool accepts `{ message: string, interval_secs: u64 }` and returns a `task_id`.
 - [ ] `cancel_scheduled_task` tool accepts `{ task_id: string }` and cancels the task.
 - [ ] `list_scheduled_tasks` tool returns all active scheduled tasks.
-- [ ] Scheduled message injection triggers a new turn via `SessionOp::Submit`.
-- [ ] Tasks are cancelled on session shutdown (CancellationToken).
-- [ ] `cargo check --workspace` passes.
-- [ ] `cargo test --workspace` passes.
-- [ ] `cargo clippy --workspace -- -D warnings` passes.
+- [x] Scheduled message injection triggers a new turn via `SessionOp::Submit`.
+- [x] Tasks are cancelled on session shutdown (CancellationToken).
+- [x] `cargo check --workspace` passes.
+- [x] `cargo test --workspace` passes.
+- [x] `cargo clippy --workspace -- -D warnings` passes.
+
+> I124 delivered the `delay` tool (one-shot). `schedule` (recurring), `cancel_scheduled_task`,
+> and `list_scheduled_tasks` are owned by I125-I126.

@@ -415,6 +415,7 @@ Talos ships with built-in tools for common coding-agent work:
 - Process execution: `exec` (argv-only single process, no shell parsing), `bash` (shell escape hatch)
 - Session planning: `todo_create`, `todo_update_status`, `todo_update`, `todo_delete`,
   `todo_add_dependency`, `todo_remove_dependency`, `todo_query` (session-scoped todo state)
+- Session scheduling: `delay` (schedule a one-shot delayed follow-up message; session-scoped, dies on process exit; Execute/Ask permission)
 
 The default prompt asks models to prefer built-in tools and use shell commands as a fallback when a
 native tool cannot cover the task. It also emphasizes accuracy over approval: do not flatter,
