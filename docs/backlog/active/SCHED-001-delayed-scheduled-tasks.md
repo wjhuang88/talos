@@ -90,3 +90,16 @@ corrections are recorded in the I125 owner doc: preserve or formally migrate the
 API, add discriminating Delay/no-burst and cancellation/shutdown-race tests, prove recurring
 fire-time permission isolation, supply the configured-provider walkthrough or approved variance,
 and correct user/governance documentation. I126 remains blocked.
+
+2026-07-14 I125 maintainer re-review (`20e782e`): validation, the discriminating Delay test,
+recurring fresh-Deny proof, and cancel-result text pass. I125 remains Review because the breaking
+ADR-041 API amendment lacks explicit maintainer authority or a compatibility entry point, the new
+cancel/shutdown tests do not exercise a competing timer boundary, and SF113 still has neither the
+published real configured-provider walkthrough nor an accepted maintainer variance. Minor
+root-count and stale-symbol documentation drift also remain. I126 stays blocked.
+
+2026-07-14 I125 closure: the I124 factory is restored as a tested compatibility entry point;
+Cancel/Shutdown tests now exercise a competing-ready timer boundary; a real `alibaba-cn` /
+`glm-5.2` binary walkthrough registered `sched_1` and persisted eight labeled recurring turns;
+all documentation and full validation gates pass. I125 is Complete. I126 is unblocked but remains
+Planned until its activation inventory and Gate 0 are recorded.

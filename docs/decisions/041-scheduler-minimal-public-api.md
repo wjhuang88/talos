@@ -71,27 +71,32 @@ variance, the maintainer directed the agent to fix the blockers and close the it
 direction satisfies the program plan's stop condition and accepts only these two composition
 exports. No other scheduler type or future I125-I127 surface is pre-approved.
 
-## I125 Amendment: Factory Rename (2026-07-14)
+## I125 Amendment: Additive Multi-Tool Factory (2026-07-14)
 
-I125 replaced `create_delay_tool_and_scheduler` with `create_scheduler_tools` returning
-`Vec<Arc<dyn AgentTool>>` to support both the `delay` and `schedule` tools. This is a **breaking**
-change to the I124-approved public API.
+**Decision authority**: maintainer direction during I125 re-review closure.
 
-**Migration plan**: the rename was applied atomically across all 9 production composition roots
-and all test call sites in a single commit (`9f2f22f`). No external consumer depends on the old
-function name — `talos-cli` is a binary-only crate and `talos-runtime` does not call the factory.
+I125 adds `create_scheduler_tools`, returning `Vec<Arc<dyn AgentTool>>`, so composition roots can
+receive both the `delay` and `schedule` tools. The I124-approved
+`create_delay_tool_and_scheduler` function remains exported with its original signature and
+behavior. The I125 change is therefore additive rather than breaking.
 
-**Justification**: returning `Vec` is the minimal expansion needed for I125's `schedule` tool and
-future I126 tools. Alternative approaches (separate factory per tool, trait-based abstraction)
-were rejected as over-engineering.
+**Compatibility plan**: existing consumers may continue calling
+`create_delay_tool_and_scheduler`; new composition roots use `create_scheduler_tools`. The
+`legacy_delay_factory_remains_compatible` regression test verifies the old entry point still
+returns the Execute-nature `delay` tool. No consumer migration is required.
+
+**Justification**: the multi-tool factory is the smallest additive public surface that lets the
+CLI register I125's `schedule` tool while preserving I124 compatibility. Separate public concrete
+tool types and scheduler command/handle types remain unnecessary and private.
 
 **Approved exports** (updated):
-1. `pub fn create_scheduler_tools() -> (Vec<Arc<dyn AgentTool>>, PendingSchedulerActor)`
-2. `pub struct PendingSchedulerActor` (unchanged)
 
-Re-export: `pub use scheduler::{create_scheduler_tools, PendingSchedulerActor}`.
+1. `pub fn create_delay_tool_and_scheduler() -> (Arc<dyn AgentTool>, PendingSchedulerActor)`
+2. `pub fn create_scheduler_tools() -> (Vec<Arc<dyn AgentTool>>, PendingSchedulerActor)`
+3. `pub struct PendingSchedulerActor` (unchanged)
 
-No other scheduler type is public. All command/event/handle types remain `pub(crate)`.
+No other scheduler type is public. All command/event/handle types remain `pub(crate)`. This
+amendment approves only the I125 multi-tool factory and does not pre-approve later scheduler API.
 
 ## Reversal Trigger
 

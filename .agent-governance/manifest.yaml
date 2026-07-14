@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-11"
-status_note: "I115 (2026-07-11): ARCH-033 semantic single-flow correction established ordered turn envelopes, one FIFO live-content path, actor-owned successful-turn persistence, and shared CLI/RPC session semantics. Workspace tests and clippy are green; governance validation recorded in I115."
+last_audited_at: "2026-07-14"
+status_note: "I125 (2026-07-14): recurring scheduled follow-ups closed with additive public-API compatibility, competing-boundary cancellation/shutdown tests, fresh permission proof, a real configured-provider walkthrough, and green workspace/preflight/governance validation. I126 is Planned and unblocked but not activated."
 
 governance:
   skill_name: "agent-project-governance"

@@ -537,6 +537,20 @@ pub(crate) fn spawn_scheduler_actor(
 
 // ── Two-phase composition infrastructure ─────────────────────────────────
 
+/// Creates the delay tool and a pending scheduler actor for compatibility with
+/// the I124 public API.
+///
+/// New composition roots should use [`create_scheduler_tools`] to receive both
+/// scheduler tools. This entry point remains available so existing consumers
+/// are not broken by the additive I125 API.
+pub fn create_delay_tool_and_scheduler() -> (Arc<dyn AgentTool>, PendingSchedulerActor) {
+    let (cmd_tx, cmd_rx) = mpsc::channel(64);
+    let handle = SchedulerHandle::new(cmd_tx);
+    let tool: Arc<dyn AgentTool> = Arc::new(DelayTool::new(handle));
+    let pending = PendingSchedulerActor { cmd_rx };
+    (tool, pending)
+}
+
 /// Creates scheduler tools (delay + schedule) and a pending scheduler actor
 /// for two-phase composition.
 ///
@@ -544,8 +558,9 @@ pub(crate) fn spawn_scheduler_actor(
 /// wrap in permission wrappers) and a [`PendingSchedulerActor`] that must be
 /// spawned after the session provides `sq_tx`.
 ///
-/// This is the **only** public entry point for the scheduler module. All
-/// internal types are `pub(crate)`. See ADR-041 for the API boundary.
+/// This is the additive I125 composition entry point. The I124-compatible
+/// [`create_delay_tool_and_scheduler`] entry point remains available. All
+/// internal scheduler types are `pub(crate)`. See ADR-041 for the API boundary.
 pub fn create_scheduler_tools() -> (Vec<Arc<dyn AgentTool>>, PendingSchedulerActor) {
     let (cmd_tx, cmd_rx) = mpsc::channel(64);
     let handle = SchedulerHandle::new(cmd_tx);
@@ -1418,11 +1433,10 @@ mod tests {
             _ => panic!("expected Registered"),
         };
 
-        // Trigger first fire
-        tokio::time::advance(Duration::from_secs(6)).await;
-        yield_times(5).await;
-
-        // Cancel immediately after first fire (race window)
+        // Make the first timer tick ready without yielding to its task, then
+        // enqueue Cancel. The timer task and actor command are now competing at
+        // the same paused-time boundary.
+        tokio::time::advance(Duration::from_secs(5)).await;
         let (cancel_tx, cancel_rx) = oneshot::channel();
         handle
             .send(ScheduleCommand::Cancel {
@@ -1432,19 +1446,24 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(cancel_rx.await.unwrap(), CancelResult::Cancelled));
+        yield_times(10).await;
 
-        // Advance well past multiple intervals
-        tokio::time::advance(Duration::from_secs(30)).await;
-        yield_times(15).await;
-
-        // At most 1 fire (the pre-cancel one); no post-cancel duplicate
-        let mut count = 0;
+        // Depending on which ready task wins, the boundary tick may have
+        // entered the queue before cancellation. It must never be duplicated.
+        let mut boundary_count = 0;
         while sq_rx.try_recv().is_ok() {
-            count += 1;
+            boundary_count += 1;
         }
         assert!(
-            count <= 1,
-            "at most 1 pre-cancel fire; no post-cancel duplicate, got {count}"
+            boundary_count <= 1,
+            "the competing boundary may enqueue at most one turn, got {boundary_count}"
+        );
+
+        tokio::time::advance(Duration::from_secs(30)).await;
+        yield_times(15).await;
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no recurring turn may be enqueued after cancellation is confirmed"
         );
     }
 
@@ -1452,7 +1471,7 @@ mod tests {
     async fn actor_recurring_shutdown_no_duplicate() {
         let (sq_tx, mut sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
-        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+        let (handle, join) = spawn_scheduler_actor(sq_tx, cancel_token);
 
         let (resp_tx, resp_rx) = oneshot::channel();
         handle
@@ -1466,25 +1485,26 @@ mod tests {
             .unwrap();
         assert!(resp_rx.await.is_ok());
 
-        // Trigger first fire
-        tokio::time::advance(Duration::from_secs(6)).await;
+        // Make the timer and Shutdown command compete at the first boundary.
+        tokio::time::advance(Duration::from_secs(5)).await;
+        handle.send(ScheduleCommand::Shutdown).await.unwrap();
+        join.await.unwrap();
         yield_times(5).await;
 
-        // Shutdown
-        handle.send(ScheduleCommand::Shutdown).await.unwrap();
-        yield_times(10).await;
-
-        // Advance well past multiple intervals
-        tokio::time::advance(Duration::from_secs(30)).await;
-        yield_times(15).await;
-
-        let mut count = 0;
+        let mut boundary_count = 0;
         while sq_rx.try_recv().is_ok() {
-            count += 1;
+            boundary_count += 1;
         }
         assert!(
-            count <= 1,
-            "at most 1 pre-shutdown fire; no post-shutdown duplicate, got {count}"
+            boundary_count <= 1,
+            "the competing shutdown boundary may enqueue at most one turn, got {boundary_count}"
+        );
+
+        tokio::time::advance(Duration::from_secs(30)).await;
+        yield_times(15).await;
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no recurring turn may be enqueued after scheduler shutdown completes"
         );
     }
 
@@ -1520,6 +1540,14 @@ mod tests {
         let (tools, _pending) = create_scheduler_tools();
         let tool = tools[0].clone();
 
+        assert_eq!(tool.nature(), talos_core::tool::ToolNature::Execute);
+    }
+
+    #[test]
+    fn legacy_delay_factory_remains_compatible() {
+        let (tool, _pending) = create_delay_tool_and_scheduler();
+
+        assert_eq!(tool.name(), "delay");
         assert_eq!(tool.nature(), talos_core::tool::ToolNature::Execute);
     }
 
