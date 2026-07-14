@@ -1900,4 +1900,110 @@ mod tests {
         let _ = sq_tx.send(SessionOp::Shutdown).await;
         let _ = actor_task.await;
     }
+
+    /// Proves a recurring follow-up fires through the real Agent/session
+    /// conversation path: the provider receives the labeled scheduled
+    /// message as a `Message::User`, confirming the full pipeline traversal.
+    #[tokio::test(start_paused = true)]
+    async fn fixture_provider_recurring_fires_through_session_pipeline() {
+        let (tools, sched_pending) = create_scheduler_tools();
+        let schedule_tool = tools[1].clone();
+
+        let mut registry = ToolRegistry::new();
+        registry.register(schedule_tool);
+
+        let model = MockLanguageModel::new(vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "call_1".into(),
+                        name: "schedule".into(),
+                        input: serde_json::json!({"message": "check status", "interval_secs": 5}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Recurring check scheduled.".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Recurring check received.".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ],
+        ]);
+        let observed_requests = model.observed_requests.clone();
+
+        let engine = PermissionEngine::new();
+        let hooks = Arc::new(HookRegistry::new());
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+            hooks,
+        );
+
+        let config = SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+        let _sched_join = sched_pending.spawn(handle.sq_tx.clone(), CancellationToken::new());
+
+        let sq_tx = handle.sq_tx.clone();
+        let actor_task = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "set up recurring check".into(),
+            })
+            .await
+            .unwrap();
+
+        yield_times(30).await;
+
+        // Advance past the first 5-second interval
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(30).await;
+
+        let recurring_fire_reached_provider =
+            observed_requests.lock().unwrap().iter().any(|request| {
+                request.iter().any(|message| {
+                    matches!(
+                        message,
+                        Message::User { content }
+                            if content.starts_with(SCHEDULED_FOLLOWUP_LABEL)
+                    )
+                })
+            });
+        assert!(
+            recurring_fire_reached_provider,
+            "recurring fire must reach the provider through the full session pipeline"
+        );
+
+        let _ = sq_tx.send(SessionOp::Shutdown).await;
+        let _ = actor_task.await;
+    }
 }

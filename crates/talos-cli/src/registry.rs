@@ -990,4 +990,65 @@ mod tests {
             result.content
         );
     }
+
+    #[tokio::test]
+    async fn schedule_denied_by_permission_does_not_execute() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": { "Deny": "schedule blocked by test" },
+                    "nature": "Execute"
+                }]
+            }))
+            .unwrap();
+
+        let (tools, _pending) = talos_agent::create_scheduler_tools();
+        let schedule_tool = tools[1].clone();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: schedule_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({
+                "message": "test",
+                "interval_secs": 10
+            }))
+            .await;
+
+        assert!(result.is_error, "Deny should prevent schedule execution");
+        assert!(result.content.contains("schedule blocked"));
+    }
+
+    #[tokio::test]
+    async fn schedule_ask_in_print_mode_auto_denies() {
+        let engine = PermissionEngine::new();
+
+        let (tools, _pending) = talos_agent::create_scheduler_tools();
+        let schedule_tool = tools[1].clone();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: schedule_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({
+                "message": "test",
+                "interval_secs": 10
+            }))
+            .await;
+
+        assert!(result.is_error, "Ask in print mode should auto-deny");
+        assert!(
+            result.content.to_lowercase().contains("unavailable")
+                || result.content.to_lowercase().contains("print mode"),
+            "error should mention print mode: {}",
+            result.content
+        );
+    }
 }

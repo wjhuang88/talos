@@ -53,7 +53,7 @@ talos-cli:     Composition root (spawns actor, wires tools with sched_tx)
 ## Acceptance Criteria
 
 - [x] `delay` tool accepts `{ message: string, delay_secs: u64 }` and returns a `task_id`.
-- [ ] `schedule` tool accepts `{ message: string, interval_secs: u64 }` and returns a `task_id`.
+- [x] `schedule` tool accepts `{ message: string, interval_secs: u64 }` and returns a `task_id`.
 - [ ] `cancel_scheduled_task` tool accepts `{ task_id: string }` and cancels the task.
 - [ ] `list_scheduled_tasks` tool returns all active scheduled tasks.
 - [x] Scheduled message injection triggers a new turn via `SessionOp::Submit`.
