@@ -843,7 +843,7 @@ impl AgentTool for ListScheduledTasksTool {
                 let mut text = format!("{} active task(s):\n", tasks.len());
                 for info in &tasks {
                     let preview: String = info.message.chars().take(60).collect();
-                    let preview = if info.message.len() > 60 {
+                    let preview = if info.message.chars().count() > 60 {
                         format!("{preview}…")
                     } else {
                         preview
