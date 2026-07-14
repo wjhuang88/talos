@@ -84,3 +84,9 @@ two public exports. I125 remains blocked.
 and separately proves the follow-up resource was denied. ADR-041 is Accepted and indexed for the
 two minimal composition exports. The full validation ladder passes; I124 is Complete. I125 is
 unblocked and remains Planned, not activated.
+
+2026-07-14 I125 maintainer review: I125 remains Review despite a green validation ladder. Required
+corrections are recorded in the I125 owner doc: preserve or formally migrate the ADR-041 public
+API, add discriminating Delay/no-burst and cancellation/shutdown-race tests, prove recurring
+fire-time permission isolation, supply the configured-provider walkthrough or approved variance,
+and correct user/governance documentation. I126 remains blocked.

@@ -767,7 +767,7 @@ impl AgentTool for ScheduleTool {
 
         match response_rx.await {
             Ok(ScheduleRegistrationResult::Registered { task_id }) => ToolResult::success(format!(
-                "Recurring follow-up registered.\nTask ID: {task_id}\nInterval: {interval_secs} second(s)\n\nThe message will be injected into the session at each interval as a visibly labeled scheduled follow-up. Use cancel_scheduled_task to stop it."
+                "Recurring follow-up registered.\nTask ID: {task_id}\nInterval: {interval_secs} second(s)\n\nThe message will be injected into the session at each interval as a visibly labeled scheduled follow-up."
             )),
             Ok(ScheduleRegistrationResult::InvalidDuration { reason }) => ToolResult::error(reason),
             Err(_) => ToolResult::error("scheduler dropped the request"),
@@ -1342,7 +1342,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn actor_recurring_no_catch_up_burst() {
+    async fn actor_recurring_missed_tick_delay_not_burst() {
         let (sq_tx, mut sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
         let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
@@ -1351,7 +1351,7 @@ mod tests {
         handle
             .send(ScheduleCommand::RegisterRecurring {
                 id: None,
-                message: "burst-test".to_string(),
+                message: "delay-test".to_string(),
                 interval: Duration::from_secs(5),
                 response_tx: resp_tx,
             })
@@ -1359,21 +1359,133 @@ mod tests {
             .unwrap();
         assert!(resp_rx.await.is_ok());
 
-        // Advance 20 seconds (4 intervals) in one jump
+        // Advance 21 seconds past 4 interval boundaries (t=5,10,15,20).
+        // With MissedTickBehavior::Delay, only ONE fire occurs — the
+        // delayed tick reschedules to now+interval rather than catching up.
+        // With Burst, all 4 missed ticks would fire.
         tokio::time::advance(Duration::from_secs(21)).await;
         yield_times(20).await;
 
-        // Count fires — should be at most 4 (one per interval),
-        // NOT a burst of many catch-up ticks
+        let mut count = 0;
+        while sq_rx.try_recv().is_ok() {
+            count += 1;
+        }
+        assert_eq!(
+            count, 1,
+            "Delay produces exactly 1 fire after missing 4 intervals; \
+             Burst would produce 4 catch-up fires"
+        );
+
+        // Next fire rescheduled to t=21+5=26. Advance to t=25 — no fire yet.
+        tokio::time::advance(Duration::from_secs(4)).await;
+        yield_times(10).await;
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no fire before the rescheduled interval boundary (t=26)"
+        );
+
+        // Advance to t=27 — fire at t=26 now available
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+        assert!(
+            sq_rx.try_recv().is_ok(),
+            "exactly one fire at the rescheduled boundary (t=26)"
+        );
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no additional fire — next at t=31"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_cancel_race_no_duplicate() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "race".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        let task_id = match resp_rx.await.unwrap() {
+            ScheduleRegistrationResult::Registered { task_id } => task_id,
+            _ => panic!("expected Registered"),
+        };
+
+        // Trigger first fire
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(5).await;
+
+        // Cancel immediately after first fire (race window)
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::Cancel {
+                id: task_id,
+                response_tx: cancel_tx,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(cancel_rx.await.unwrap(), CancelResult::Cancelled));
+
+        // Advance well past multiple intervals
+        tokio::time::advance(Duration::from_secs(30)).await;
+        yield_times(15).await;
+
+        // At most 1 fire (the pre-cancel one); no post-cancel duplicate
         let mut count = 0;
         while sq_rx.try_recv().is_ok() {
             count += 1;
         }
         assert!(
-            count <= 5,
-            "no catch-up burst: expected <= 5 fires for 4 intervals, got {count}"
+            count <= 1,
+            "at most 1 pre-cancel fire; no post-cancel duplicate, got {count}"
         );
-        assert!(count >= 1, "at least one fire expected");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_shutdown_no_duplicate() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "shutdown-test".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        // Trigger first fire
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(5).await;
+
+        // Shutdown
+        handle.send(ScheduleCommand::Shutdown).await.unwrap();
+        yield_times(10).await;
+
+        // Advance well past multiple intervals
+        tokio::time::advance(Duration::from_secs(30)).await;
+        yield_times(15).await;
+
+        let mut count = 0;
+        while sq_rx.try_recv().is_ok() {
+            count += 1;
+        }
+        assert!(
+            count <= 1,
+            "at most 1 pre-shutdown fire; no post-shutdown duplicate, got {count}"
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -1901,25 +2013,31 @@ mod tests {
         let _ = actor_task.await;
     }
 
-    /// Proves a recurring follow-up fires through the real Agent/session
-    /// conversation path: the provider receives the labeled scheduled
-    /// message as a `Message::User`, confirming the full pipeline traversal.
+    /// Proves: (1) recurring fire reaches the provider through the full
+    /// Agent/session pipeline, (2) the follow-up turn's tool call receives
+    /// an independent Deny decision — schedule approval is not reused.
     #[tokio::test(start_paused = true)]
-    async fn fixture_provider_recurring_fires_through_session_pipeline() {
+    async fn fixture_provider_recurring_fires_and_follow_up_gets_fresh_deny() {
+        let echo_executed = Arc::new(AtomicBool::new(false));
+
         let (tools, sched_pending) = create_scheduler_tools();
         let schedule_tool = tools[1].clone();
 
         let mut registry = ToolRegistry::new();
         registry.register(schedule_tool);
+        registry.register(Arc::new(TrackingTool {
+            executed: echo_executed.clone(),
+        }));
 
         let model = MockLanguageModel::new(vec![
+            // Turn 1a: schedule tool call
             vec![
                 AgentEvent::TurnStart,
                 AgentEvent::ToolCall {
                     call: talos_core::message::ToolCall {
                         id: "call_1".into(),
                         name: "schedule".into(),
-                        input: serde_json::json!({"message": "check status", "interval_secs": 5}),
+                        input: serde_json::json!({"message": "check", "interval_secs": 5}),
                     },
                     provenance: Default::default(),
                     summary_fields: vec![],
@@ -1929,6 +2047,7 @@ mod tests {
                     usage: Usage::default(),
                 },
             ],
+            // Turn 1b: text after schedule result
             vec![
                 AgentEvent::TurnStart,
                 AgentEvent::TextDelta {
@@ -1939,10 +2058,28 @@ mod tests {
                     usage: Usage::default(),
                 },
             ],
+            // Turn 2a: echo tool call (from recurring fire)
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "call_2".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            // Turn 2b: text after echo denied
             vec![
                 AgentEvent::TurnStart,
                 AgentEvent::TextDelta {
-                    delta: "Recurring check received.".into(),
+                    delta: "Echo was denied.".into(),
                 },
                 AgentEvent::TurnEnd {
                     stop_reason: StopReason::EndTurn,
@@ -1952,7 +2089,19 @@ mod tests {
         ]);
         let observed_requests = model.observed_requests.clone();
 
-        let engine = PermissionEngine::new();
+        // Deny "test:echo"; schedule has no resource so default Ask applies
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": {"Deny": "echo denied by fresh recurring permission"},
+                    "nature": "Execute",
+                    "resource": "test:echo",
+                    "resource_kind": "remote"
+                }]
+            }))
+            .unwrap();
+
         let hooks = Arc::new(HookRegistry::new());
         let agent = Agent::with_security_and_hooks(
             Arc::new(model),
@@ -1988,6 +2137,7 @@ mod tests {
         tokio::time::advance(Duration::from_secs(6)).await;
         yield_times(30).await;
 
+        // (1) Recurring fire reached the provider
         let recurring_fire_reached_provider =
             observed_requests.lock().unwrap().iter().any(|request| {
                 request.iter().any(|message| {
@@ -2001,6 +2151,14 @@ mod tests {
         assert!(
             recurring_fire_reached_provider,
             "recurring fire must reach the provider through the full session pipeline"
+        );
+
+        // (2) The follow-up echo tool must NOT execute — it received an
+        // independent Deny, proving schedule approval was not reused.
+        assert!(
+            !echo_executed.load(AtomicOrdering::SeqCst),
+            "echo must NOT execute — it received a fresh independent Deny in \
+             the recurring follow-up turn, not inherited from schedule approval"
         );
 
         let _ = sq_tx.send(SessionOp::Shutdown).await;

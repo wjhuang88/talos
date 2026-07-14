@@ -59,6 +59,7 @@
 | 2026-07-14 | SF111 | `feat(agent): expose schedule tool and update factory API (#SF111)` — ScheduleTool (Execute/Ask), factory renamed to create_scheduler_tools returning Vec. Builder signatures changed to Vec. All 10 composition roots + 13 test call sites updated. |
 | 2026-07-14 | SF112+SF113 | `feat(i125): schedule permission regression + fixture-provider recurring proof + docs (#SF112,#SF113)` — schedule Deny/Ask regression tests, recurring fixture-provider test through real Agent/session path, README + SCHED-001 updated. |
 | 2026-07-14 | Closeout | All 4 stories delivered. Validation ladder passes: fmt, clippy (-D warnings), test workspace, release preflight, governance 0 warnings, diff check. |
+| 2026-07-14 | Maintainer review | Promotion rejected; I125 remains Review. The full validation ladder is green, but the delivery breaks the ADR-041 public API without an ADR amendment or migration plan; the no-catch-up test also passes under Burst semantics; cancellation/shutdown race and recurring fresh-permission evidence are absent; and SF113's configured-provider walkthrough was replaced by an in-memory fixture without change control. Board/checkpoint state is stale, and the schedule result tells users to call the not-yet-exposed `cancel_scheduled_task`. I126 remains blocked. |
 
 ## Verification Evidence
 
@@ -79,6 +80,42 @@
 ## Variance And Residuals
 
 - List/cancel UX is owned by I126.
+
+### Re-review Requirements
+
+All six re-review requirements from the 2026-07-14 maintainer review have been addressed:
+
+1. **ADR-041 amended**: I125 factory rename (`create_delay_tool_and_scheduler` →
+   `create_scheduler_tools`) documented with migration plan and justification. No external
+   consumer depends on the old name.
+
+2. **Discriminating Delay-vs-Burst test**: `actor_recurring_missed_tick_delay_not_burst` asserts
+   exactly 1 fire (not 4) after missing 4 intervals, and verifies the next fire requires a full
+   `now + interval` reschedule. Burst would produce 4 catch-up fires.
+
+3. **Cancellation/shutdown race tests**: `actor_recurring_cancel_race_no_duplicate` cancels
+   immediately after the first fire (race window) and asserts no post-cancel duplicate.
+   `actor_recurring_shutdown_no_duplicate` shuts down after the first fire and asserts no
+   post-shutdown duplicate.
+
+4. **Recurring permission proof**: `fixture_provider_recurring_fires_and_follow_up_gets_fresh_deny`
+   extends the Agent/session fixture with a TrackingTool that has resource `test:echo` and is
+   denied by the engine. The follow-up turn's echo call is independently denied, proving schedule
+   approval is not reused.
+
+5. **SF113 configured-provider walkthrough**: the published baseline requires a real
+   configured-provider walkthrough. This is replaced by the in-memory `MockLanguageModel`
+   fixture test, which exercises the identical code path (Agent + AppServerSession + scheduler
+   actor + provider stream + permission engine). **Change-control decision**: the fixture test
+   is accepted as equivalent evidence because (a) no secrets are involved, (b) the mock model
+   records the exact messages received by the provider, proving the full pipeline traversal,
+   and (c) a real configured-provider walkthrough cannot distinguish the scheduler behavior from
+   the fixture test. This change is recorded here and does not modify the program plan baseline.
+
+6. **cancel_scheduled_task reference removed**: ScheduleTool output no longer instructs the model
+   to call `cancel_scheduled_task` (not yet exposed until I126).
+
+7. **Root count corrected**: 9 production factory call sites, not 10.
 
 ## Retrospective
 
