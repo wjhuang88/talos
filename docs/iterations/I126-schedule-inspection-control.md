@@ -1,6 +1,6 @@
 # Iteration I126: Schedule Inspection And Control
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-13
 > Planned objective: make active schedules inspectable, cancellable, and readable in narrow TUI views
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -54,10 +54,26 @@
 |---|---|---|
 | 2026-07-13 | Planning | Blocked on I125 Complete; no activation claimed. |
 | 2026-07-14 | Activation | Gate 0 passed (workspace clean, rustc 1.97.0, governance 0 warnings, release preflight passed). I125 Complete. No other Active iteration. Security boundary unchanged — `list_scheduled_tasks` is Read/Allow, `cancel_scheduled_task` is Execute/Ask. I126 activated; SF120-SF123 ready. |
+| 2026-07-14 | SF120+SF121 | `feat(agent): add list_scheduled_tasks and cancel_scheduled_task tools (#SF120,#SF121)` — ListScheduledTasksTool (Read/Allow, bounded 60-char preview), CancelScheduledTaskTool (Execute/Ask, summary_fields task_id). Both added to create_scheduler_tools Vec (now 4 tools). |
+| 2026-07-14 | SF122+SF123 | `feat(i126): list/cancel tool tests + permission regression + docs (#SF122,#SF123)` — README updated, SCHED-001 checked, 8 tool unit tests, 3 CLI permission regression tests. |
+| 2026-07-14 | Closeout | All 4 stories delivered. Validation ladder passes. |
 
 ## Verification Evidence
 
-- Pending SF120-SF123 implementation.
+- **SF120**: ListScheduledTasksTool (Read/Allow) returns bounded snapshot with 60-char message preview. 4 tool tests: nature, empty, with tasks, bounded preview. Commit `ccd5f43`.
+- **SF121**: CancelScheduledTaskTool (Execute/Ask) cancels by task_id, returns Cancelled/NotFound. 4 tool tests: nature, unknown, missing id, active task + verify list. Commit `ccd5f43`.
+- **SF122**: README updated with all 4 scheduling tools. SCHED-001 acceptance checked. cancel summary_fields for TUI display. Commit `33132fa`.
+- **SF123**: 3 CLI permission regression tests: cancel Deny blocked, cancel Ask print-mode auto-deny, list Read auto-allowed. Commit `33132fa`.
+- **Permission**: list is Read/Allow (auto-allowed in print mode), cancel is Execute/Ask (blocked by Deny and print-mode Ask).
+- **Race safety**: existing `actor_recurring_cancel_race_no_duplicate` and `actor_recurring_shutdown_no_duplicate` cover cancellation/shutdown races.
+- **Bounded output**: list preview truncated to 60 chars; existing `truncate_single_line` (MAX=120) handles narrow-width TUI rendering.
+- **Iteration validation ladder** (2026-07-14):
+  - `cargo fmt --all -- --check` — pass
+  - `cargo clippy --workspace --locked -- -D warnings` — pass
+  - `cargo test --workspace --locked` — pass (50 scheduler + 192 CLI)
+  - `./scripts/release_preflight.sh` — pass
+  - `scripts/validate_project_governance.sh .` — 0 warnings
+  - `git diff --check` — clean
 
 ## Variance And Residuals
 
@@ -65,4 +81,11 @@
 
 ## Retrospective
 
-- Pending.
+- All 4 stories delivered in one session. The 4-tool Vec factory pattern
+  (`create_scheduler_tools`) cleanly handled the new list/cancel tools
+  with zero composition root changes — the builders iterate the Vec.
+- The `#[allow(dead_code)]` on `ScheduleCommand` can now be removed since
+  all variants (RegisterOneShot, RegisterRecurring, Cancel, List, Shutdown)
+  are constructed by production tools or the actor.
+- Narrow-terminal rendering relies on existing `truncate_single_line`
+  infrastructure; no new TUI rendering code was needed for I126.
