@@ -312,3 +312,15 @@ itself an effective Ask gate.
 Post-delivery verdict: **FAIL pending correction and re-review**. I124 remains Review and I125
 remains blocked. The correction must prove that Deny and unresolved Ask cannot register or fire a
 task in every supported composition family.
+
+### Second Review Update (2026-07-14)
+
+Commit `68c24cf` corrects the production composition: the delay tool now passes through the
+appropriate CLI/TUI permission wrapper, and focused Deny plus headless-Ask tests pass. Claim 1 is
+therefore satisfied for the registered production tool.
+
+The overall post-delivery verdict remains **FAIL pending correction and re-review** because the
+new fixture-provider test configures every Execute tool as Allow. It proves traversal of the real
+Agent/session path, but it does not distinguish a fresh follow-up decision from inherited or
+bypassed authority. The re-review requires a distinct registration Allow and follow-up Deny/Ask,
+with proof that the follow-up tool does not execute.

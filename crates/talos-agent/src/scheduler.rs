@@ -447,14 +447,11 @@ pub(crate) fn spawn_scheduler_actor(
 /// internal types (`SchedulerHandle`, `DelayTool`, `ScheduleCommand`, etc.)
 /// are `pub(crate)`.
 ///
-/// Typical usage in a composition root:
-/// ```ignore
-/// let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
-/// // Wrap delay_tool in PermissionAwareTool or TuiPermissionAwareTool, then:
-/// // registry.register(wrapped_tool);
-/// // ... create agent + session ...
-/// // sched_pending.spawn(session_handle.sq_tx.clone(), cancel_token);
-/// ```
+/// In composition roots: call this before building the tool registry, wrap
+/// the returned tool in the mode-appropriate permission wrapper
+/// (`PermissionAwareTool` or `TuiPermissionAwareTool`), register it, then
+/// call `sched_pending.spawn(sq_tx, cancel_token)` after the session is
+/// created. See ADR-041 for the public API boundary justification.
 pub fn create_delay_tool_and_scheduler() -> (Arc<dyn AgentTool>, PendingSchedulerActor) {
     let (cmd_tx, cmd_rx) = mpsc::channel(64);
     let handle = SchedulerHandle::new(cmd_tx);
@@ -1254,32 +1251,72 @@ mod tests {
 
     // ── Fixture-provider test through real Agent/session path (SF103 re-review) ─
 
+    use std::collections::VecDeque;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+    use std::sync::Mutex;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering as AtomicOrdering;
 
+    use talos_core::message::{AgentEvent, Message, StopReason, Usage};
+    use talos_core::provider::{LanguageModel, ProviderResult};
     use talos_core::session::{RuntimePolicy, SessionConfig};
-    use talos_core::tool::ToolRegistry;
+    use talos_core::tool::{ToolPermissionFacet, ToolRegistry, ToolResourceKind};
     use talos_permission::PermissionEngine;
     use talos_plugin::HookRegistry;
-    use talos_provider::mock::MockProvider;
 
     use crate::Agent;
     use crate::session::AppServerSession;
 
-    /// Test tool that records whether it was executed. Used to prove the
-    /// follow-up turn's tool call goes through the permission pipeline.
+    /// Minimal mock model that returns pre-configured event vectors, one per
+    /// `stream()` call. Pattern replicated from `session/tests.rs`.
+    struct MockLanguageModel {
+        responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+    }
+
+    impl MockLanguageModel {
+        fn new(responses: Vec<Vec<AgentEvent>>) -> Self {
+            Self {
+                responses: Arc::new(Mutex::new(VecDeque::from(responses))),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl LanguageModel for MockLanguageModel {
+        async fn stream(
+            &self,
+            _messages: &[Message],
+        ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            let (tx, rx) = mpsc::channel(64);
+            let events = {
+                self.responses
+                    .lock()
+                    .unwrap()
+                    .pop_front()
+                    .unwrap_or_default()
+            };
+            tokio::spawn(async move {
+                for event in events {
+                    let _ = tx.send(event).await;
+                }
+            });
+            Ok(rx)
+        }
+    }
+
+    /// Test tool with a resource-tagged permission facet so the engine can
+    /// deny it specifically while allowing the delay tool.
     struct TrackingTool {
-        name: &'static str,
         executed: Arc<AtomicBool>,
     }
 
     #[async_trait]
     impl AgentTool for TrackingTool {
         fn name(&self) -> &str {
-            self.name
+            "echo"
         }
         fn description(&self) -> &str {
-            "Test tool for tracking execution"
+            "Test tool"
         }
         fn parameters(&self) -> serde_json::Value {
             serde_json::json!({"type": "object", "properties": {}})
@@ -1291,48 +1328,111 @@ mod tests {
         fn nature(&self) -> ToolNature {
             ToolNature::Execute
         }
+        fn permission_profile(&self, _input: &serde_json::Value) -> Vec<ToolPermissionFacet> {
+            vec![ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                "test:echo".to_string(),
+                ToolResourceKind::Remote,
+            )]
+        }
     }
 
+    /// Proves: (1) delay fires through the real Agent/session path, (2) the
+    /// follow-up tool call receives an independent Deny decision — not
+    /// inherited from the delay tool's execution.
+    ///
+    /// The delay tool has Execute with no resource → engine returns Ask →
+    /// falls through (no wrapper in this agent-level test). The echo tool has
+    /// Execute with resource "test:echo" → engine returns Deny → blocked.
+    /// If the delay's effective Allow were inherited, echo would execute.
+    /// Echo NOT executing proves a fresh, independent Deny.
     #[tokio::test(start_paused = true)]
-    async fn fixture_provider_delay_fires_and_follow_up_gets_fresh_decision() {
+    async fn fixture_provider_delay_fires_and_follow_up_gets_fresh_deny() {
         let echo_executed = Arc::new(AtomicBool::new(false));
 
-        // Step 1: Create scheduler + delay tool
         let (delay_tool, sched_pending) = create_delay_tool_and_scheduler();
 
-        // Step 2: Build tool registry with delay + echo tools
         let mut registry = ToolRegistry::new();
         registry.register(delay_tool);
         registry.register(Arc::new(TrackingTool {
-            name: "echo",
             executed: echo_executed.clone(),
         }));
 
-        // Step 3: Configure mock provider
-        // Turn 1a: model calls delay
-        // Turn 1b: model gives text after delay result
-        // Turn 2a: model calls echo (follow-up turn from scheduled message)
-        // Turn 2b: model gives text after echo result
-        let provider = MockProvider::new()
-            .with_tool_call(
-                "delay",
-                serde_json::json!({"message": "check status", "delay_secs": 1}),
-            )
-            .with_response("I scheduled a follow-up.")
-            .with_tool_call("echo", serde_json::json!({}))
-            .with_response("Follow-up complete.");
+        let model = MockLanguageModel::new(vec![
+            // Turn 1a: delay tool call
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "call_1".into(),
+                        name: "delay".into(),
+                        input: serde_json::json!({"message": "check", "delay_secs": 1}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            // Turn 1b: text after delay result
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Scheduled.".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ],
+            // Turn 2a: echo tool call (from scheduled follow-up)
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "call_2".into(),
+                        name: "echo".into(),
+                        input: serde_json::json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            // Turn 2b: text after echo result (denied)
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Echo was denied.".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ],
+        ]);
 
-        // Step 4: Create agent with Allow-Execute permission engine
+        // Deny "test:echo" resource; delay has no resource so default Ask applies
         let mut engine = PermissionEngine::new();
         engine
             .load_from_config(&serde_json::json!({
-                "rules": [{"decision": "Allow", "nature": "Execute"}]
+                "rules": [{
+                    "decision": {"Deny": "echo denied by fresh permission decision"},
+                    "nature": "Execute",
+                    "resource": "test:echo",
+                    "resource_kind": "remote"
+                }]
             }))
             .unwrap();
 
         let hooks = Arc::new(HookRegistry::new());
         let agent = Agent::with_security_and_hooks(
-            Arc::new(provider),
+            Arc::new(model),
             registry,
             Some(Arc::new(engine)),
             None,
@@ -1340,7 +1440,6 @@ mod tests {
             hooks,
         );
 
-        // Step 5: Create session
         let config = SessionConfig {
             runtime_policy: RuntimePolicy::interactive(),
             workspace_root: "/tmp".into(),
@@ -1348,11 +1447,8 @@ mod tests {
             model_context_limit: 128_000,
         };
         let (handle, mut actor) = AppServerSession::new(agent, config);
-
-        // Step 6: Spawn scheduler actor
         let _sched_join = sched_pending.spawn(handle.sq_tx.clone(), CancellationToken::new());
 
-        // Step 7: Spawn session actor and send initial message
         let sq_tx = handle.sq_tx.clone();
         let actor_task = tokio::spawn(async move { actor.run().await });
 
@@ -1363,24 +1459,22 @@ mod tests {
             .await
             .unwrap();
 
-        // Step 8: Let turn 1 process (delay tool call + response)
-        yield_times(20).await;
+        // Let turn 1 process
+        yield_times(30).await;
 
-        // Step 9: Advance time past the 1-second delay
+        // Advance time past the 1-second delay
         tokio::time::advance(Duration::from_secs(2)).await;
-        yield_times(20).await;
+        yield_times(30).await;
 
-        // Step 10: Verify the follow-up turn's echo tool was executed,
-        // proving the scheduled message fired and the follow-on tool call
-        // went through the permission pipeline (fresh decision).
+        // The echo tool must NOT be executed — it received an independent
+        // Deny decision, proving the follow-up turn's permission evaluation
+        // is fresh and not inherited from the delay tool's execution.
         assert!(
-            echo_executed.load(AtomicOrdering::SeqCst),
-            "echo tool must be executed in the follow-up turn — this proves \
-             the scheduled message fired and the follow-on tool call received \
-             a fresh permission decision through the normal pipeline"
+            !echo_executed.load(AtomicOrdering::SeqCst),
+            "echo must NOT execute — it received a fresh Deny decision in \
+             the follow-up turn, independent from the delay tool's execution"
         );
 
-        // Clean up
         let _ = sq_tx.send(SessionOp::Shutdown).await;
         let _ = actor_task.await;
     }

@@ -66,6 +66,7 @@
 | 2026-07-13 | SF103 | `test(agent): prove one-shot firing, permission isolation, and edge cases (#SF103)` — 10 DelayTool tests: nature, valid input, all rejection paths, unavailable scheduler, end-to-end fire+inject proof, one-shot-once invariant, permission isolation proof. |
 | 2026-07-13 | Closeout | All 4 stories delivered. Validation ladder passes: fmt, clippy (-D warnings), test --workspace, release preflight, governance 0 warnings, diff --check. |
 | 2026-07-14 | Maintainer review | Promotion rejected; I124 remains Review. All repository validation commands pass, but the production `delay` registrations bypass the CLI/TUI approval wrappers, the claimed fixture-provider/real-session proof is only a direct tool-to-queue test, and the implementation adds an unapproved public `talos_agent::scheduler` API. I125 remains blocked pending fixes and re-review. |
+| 2026-07-14 | Maintainer re-review | Promotion rejected again; I124 remains Review. Commit `68c24cf` fixes the production approval-wrapper bypass and adds a real Agent/session test, but the test grants Allow to every Execute tool and therefore does not prove an independent follow-up Deny/Ask decision. Two new public exports and a new `talos-provider` dev-dependency still violate the published no-public-API/no-new-dependency boundary; the queue-full limitation incorrectly equates bounded capacity with bounded wait; and one new doctest is ignored without a tracking issue. Full validation remains green. I125 remains blocked. |
 
 ## Verification Evidence
 
@@ -116,11 +117,10 @@ All four blocking variances from the 2026-07-14 maintainer review have been addr
    old scheduler actor continues running until its command channel closes, but no tools can
    interact with it. Fix deferred to I127.
 
-2. **Queue-full waiting**: The scheduler command channel has a capacity of 64. Under extreme
-   load (many rapid delay/cancel/list commands), `send().await` blocks until capacity is
-   available. This is bounded (64 commands) and safe (no infinite wait), but could cause
-   latency under stress. The session queue (`sq_tx`, cap=512) has separate capacity. Fix
-   deferred to I127.
+2. **Queue-full waiting**: The scheduler command channel has a capacity of 64. Under
+   contention (many rapid delay/cancel/list commands), `send().await` blocks without a timeout —
+   bounded capacity does not guarantee bounded wait time. A send timeout or backpressure signal
+   is deferred to I127.
 
 3. **Composition root token lifecycle coupling**: Each composition root creates a fresh
    `CancellationToken` for `sched_pending.spawn()` but does NOT retain or cancel it when the
@@ -130,8 +130,18 @@ All four blocking variances from the 2026-07-14 maintainer review have been addr
 
 ### Re-review Requirements
 
-All four re-review requirements from the 2026-07-14 maintainer review have been addressed
-(see fixes above). I124 is ready for re-review.
+The production approval-wrapper bypass is fixed, and the real Agent/session path now has a test.
+The following requirements remain before another re-review:
+
+- Make the fixture-provider scenario give `delay` an Allow decision and the follow-up tool a
+  distinct Deny or unresolved Ask decision; assert that the follow-up tool does not execute while
+  the scheduled turn completes through the normal permission path.
+- Remove the new public exports (`create_delay_tool_and_scheduler`, `PendingSchedulerActor`) or
+  obtain and record the architecture/semver approval required by the published baseline.
+- Remove the new `talos-provider` dev-dependency or obtain and record dependency approval.
+- Correct the queue-full limitation: channel capacity is bounded, but `send().await` has no time
+  bound without a timeout/cancellation branch.
+- Replace the ignored scheduler doctest with a compiling example or link it to a tracking issue.
 
 ## Retrospective
 

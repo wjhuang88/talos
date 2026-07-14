@@ -69,3 +69,8 @@ talos-cli:     Composition root (spawns actor, wires tools with sched_tx)
 `delay` registrations bypass the CLI/TUI approval wrappers, the claimed fixture-provider/session
 proof is absent, and the scheduler introduced an unapproved public API. I125 remains blocked until
 the findings in the I124 owner doc are fixed and re-reviewed.
+
+2026-07-14 second review: the approval-wrapper bypass is fixed, but I124 remains Review. The real
+Agent/session test does not prove a distinct fire-time Deny/Ask decision, public exports and a new
+dev-dependency remain outside the baseline, the queue-wait limitation is misstated, and one
+doctest is ignored without a tracking issue. I125 remains blocked.
