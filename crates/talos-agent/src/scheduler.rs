@@ -61,6 +61,23 @@ pub(crate) fn validate_delay_secs(delay_secs: u64) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) const MIN_INTERVAL_SECS: u64 = 5;
+pub(crate) const MAX_INTERVAL_SECS: u64 = 3_600;
+
+pub(crate) fn validate_interval_secs(interval_secs: u64) -> Result<(), String> {
+    if interval_secs < MIN_INTERVAL_SECS {
+        return Err(format!(
+            "interval_secs must be at least {MIN_INTERVAL_SECS}; got {interval_secs}"
+        ));
+    }
+    if interval_secs > MAX_INTERVAL_SECS {
+        return Err(format!(
+            "interval_secs must be at most {MAX_INTERVAL_SECS}; got {interval_secs}"
+        ));
+    }
+    Ok(())
+}
+
 // ── Source labeling ─────────────────────────────────────────────────────
 
 /// Visible prefix prepended to scheduled follow-up messages.
@@ -99,14 +116,17 @@ pub(crate) fn next_task_id() -> String {
 /// (`Interval`) are owned by I125.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ScheduleKind {
-    /// Fires exactly once after the specified delay.
     OneShot,
+    Recurring { interval: Duration },
 }
 
 impl fmt::Display for ScheduleKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ScheduleKind::OneShot => write!(f, "one-shot"),
+            ScheduleKind::Recurring { interval } => {
+                write!(f, "recurring ({}s)", interval.as_secs())
+            }
         }
     }
 }
@@ -187,6 +207,13 @@ pub(crate) enum ScheduleCommand {
         /// The delay duration, already validated by [`validate_delay_secs`].
         delay: Duration,
         /// One-shot response channel for the registration result.
+        response_tx: oneshot::Sender<ScheduleRegistrationResult>,
+    },
+    /// Register a recurring follow-up that fires at a bounded interval.
+    RegisterRecurring {
+        id: Option<String>,
+        message: String,
+        interval: Duration,
         response_tx: oneshot::Sender<ScheduleRegistrationResult>,
     },
     /// Cancel a scheduled task by ID.
@@ -318,6 +345,19 @@ impl SchedulerActor {
                         }) => {
                             self.handle_register_one_shot(id, message, delay, response_tx);
                         }
+                        Some(ScheduleCommand::RegisterRecurring {
+                            id,
+                            message,
+                            interval,
+                            response_tx,
+                        }) => {
+                            self.handle_register_recurring(
+                                id,
+                                message,
+                                interval,
+                                response_tx,
+                            );
+                        }
                         Some(ScheduleCommand::Cancel { id, response_tx }) => {
                             self.handle_cancel(id, response_tx);
                         }
@@ -389,6 +429,67 @@ impl SchedulerActor {
                     kind: ScheduleKind::OneShot,
                     created_at: now,
                     fire_at,
+                },
+                handle,
+            },
+        );
+
+        let _ = response_tx.send(ScheduleRegistrationResult::Registered { task_id });
+    }
+
+    fn handle_register_recurring(
+        &mut self,
+        id: Option<String>,
+        message: String,
+        interval: Duration,
+        response_tx: oneshot::Sender<ScheduleRegistrationResult>,
+    ) {
+        if let Err(reason) = validate_interval_secs(interval.as_secs()) {
+            let _ = response_tx.send(ScheduleRegistrationResult::InvalidDuration { reason });
+            return;
+        }
+
+        let task_id = id.unwrap_or_else(next_task_id);
+        let now = Instant::now();
+        let labeled_message = label_scheduled_message(&message);
+
+        let sq_tx = self.sq_tx.clone();
+        let task_id_for_fire = task_id.clone();
+        let labeled_for_fire = labeled_message.clone();
+
+        let handle = tokio::spawn(async move {
+            let mut timer =
+                tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+            loop {
+                timer.tick().await;
+
+                if sq_tx
+                    .send(SessionOp::Submit {
+                        message: labeled_for_fire.clone(),
+                    })
+                    .await
+                    .is_err()
+                {
+                    tracing::debug!(
+                        task_id = %task_id_for_fire,
+                        "recurring follow-up: session queue closed"
+                    );
+                    break;
+                }
+            }
+        });
+
+        self.tasks.insert(
+            task_id.clone(),
+            ActiveTask {
+                info: ScheduledTaskInfo {
+                    id: task_id.clone(),
+                    message: labeled_message,
+                    kind: ScheduleKind::Recurring { interval },
+                    created_at: now,
+                    fire_at: now + interval,
                 },
                 handle,
             },
@@ -1011,6 +1112,205 @@ mod tests {
             snapshot.is_empty(),
             "fired task must be cleaned up even when queue is closed"
         );
+    }
+
+    // ── Recurring behavior tests (SF110) ─────────────────────────────────
+
+    #[test]
+    fn validate_interval_secs_accepts_valid_range() {
+        assert!(validate_interval_secs(MIN_INTERVAL_SECS).is_ok());
+        assert!(validate_interval_secs(30).is_ok());
+        assert!(validate_interval_secs(MAX_INTERVAL_SECS).is_ok());
+    }
+
+    #[test]
+    fn validate_interval_secs_rejects_below_minimum() {
+        let result = validate_interval_secs(MIN_INTERVAL_SECS - 1);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("at least"));
+    }
+
+    #[test]
+    fn validate_interval_secs_rejects_above_maximum() {
+        let result = validate_interval_secs(MAX_INTERVAL_SECS + 1);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("at most"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_no_immediate_first_tick() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "tick".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp_rx.await.unwrap(),
+            ScheduleRegistrationResult::Registered { .. }
+        ));
+
+        yield_times(10).await;
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "no immediate first tick — recurring must wait one interval"
+        );
+
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(10).await;
+        assert!(
+            sq_rx.try_recv().is_ok(),
+            "first fire after one interval period"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_fires_at_cadence() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "cadence".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        // First fire at t=5
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(10).await;
+        let op = sq_rx.try_recv();
+        assert!(op.is_ok(), "first fire at ~t=5");
+        match op.unwrap() {
+            SessionOp::Submit { message } => assert!(message.starts_with(SCHEDULED_FOLLOWUP_LABEL)),
+            _ => panic!("expected Submit"),
+        }
+
+        // Second fire at t=10
+        tokio::time::advance(Duration::from_secs(5)).await;
+        yield_times(10).await;
+        assert!(sq_rx.try_recv().is_ok(), "second fire at ~t=10");
+
+        // Third fire at t=15
+        tokio::time::advance(Duration::from_secs(5)).await;
+        yield_times(10).await;
+        assert!(sq_rx.try_recv().is_ok(), "third fire at ~t=15");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_cancelled_stops_firing() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "cancel-me".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        let task_id = match resp_rx.await.unwrap() {
+            ScheduleRegistrationResult::Registered { task_id } => task_id,
+            _ => panic!("expected Registered"),
+        };
+
+        // Cancel before first fire
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::Cancel {
+                id: task_id,
+                response_tx: cancel_tx,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(cancel_rx.await.unwrap(), CancelResult::Cancelled));
+
+        // Advance well past multiple intervals
+        tokio::time::advance(Duration::from_secs(30)).await;
+        yield_times(15).await;
+
+        assert!(
+            sq_rx.try_recv().is_err(),
+            "cancelled recurring task must not fire"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_no_catch_up_burst() {
+        let (sq_tx, mut sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "burst-test".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        // Advance 20 seconds (4 intervals) in one jump
+        tokio::time::advance(Duration::from_secs(21)).await;
+        yield_times(20).await;
+
+        // Count fires — should be at most 4 (one per interval),
+        // NOT a burst of many catch-up ticks
+        let mut count = 0;
+        while sq_rx.try_recv().is_ok() {
+            count += 1;
+        }
+        assert!(
+            count <= 5,
+            "no catch-up burst: expected <= 5 fires for 4 intervals, got {count}"
+        );
+        assert!(count >= 1, "at least one fire expected");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn actor_recurring_rejects_invalid_interval() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "bad".to_string(),
+                interval: Duration::from_secs(1), // below MIN_INTERVAL_SECS=5
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+
+        match resp_rx.await.unwrap() {
+            ScheduleRegistrationResult::InvalidDuration { reason } => {
+                assert!(reason.contains("at least"));
+            }
+            _ => panic!("expected InvalidDuration"),
+        }
     }
 
     // ── DelayTool unit tests (SF103) ────────────────────────────────────
