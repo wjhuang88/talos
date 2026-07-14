@@ -1,6 +1,6 @@
 # Iteration I125: Recurring Scheduled Follow-Ups
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-13
 > Planned objective: add bounded recurring follow-ups without catch-up bursts or permission reuse
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -54,10 +54,11 @@
 |---|---|---|
 | 2026-07-13 | Planning | Blocked on I124 Complete; no activation claimed. |
 | 2026-07-14 | Dependency update | I124 reached Complete. I125 is unblocked and remains Planned; no activation or implementation is claimed. Run the required activation inventory and gates before starting work. |
+| 2026-07-14 | Activation | Gate 0 passed (workspace clean, rustc 1.97.0, cargo metadata OK, governance 0 warnings, release preflight passed). No other Active iteration exists (I124 Complete). Security boundary unchanged from I124 — `schedule` tool is `ToolNature::Execute` (default Ask), same permission architecture. I125 activated; SF110-SF113 ready for implementation. |
 
 ## Verification Evidence
 
-- Pending activation.
+- Pending SF110-SF113 implementation.
 
 ## Variance And Residuals
 
