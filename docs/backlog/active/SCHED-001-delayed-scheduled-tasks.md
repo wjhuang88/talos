@@ -74,3 +74,13 @@ the findings in the I124 owner doc are fixed and re-reviewed.
 Agent/session test does not prove a distinct fire-time Deny/Ask decision, public exports and a new
 dev-dependency remain outside the baseline, the queue-wait limitation is misstated, and one
 doctest is ignored without a tracking issue. I125 remains blocked.
+
+2026-07-14 third review: commit `7fe1d17` closes the dev-dependency, queue wording, doctest, and
+distinct-Deny setup findings, but I124 remains Review. The Deny test can still pass without the
+scheduled turn occurring, and ADR-041 has not completed accepted baseline change control for the
+two public exports. I125 remains blocked.
+
+2026-07-14 closure: the fixture-provider test now positively proves the labeled scheduled turn ran
+and separately proves the follow-up resource was denied. ADR-041 is Accepted and indexed for the
+two minimal composition exports. The full validation ladder passes; I124 is Complete. I125 is
+unblocked and remains Planned, not activated.

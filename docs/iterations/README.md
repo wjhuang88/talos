@@ -156,8 +156,8 @@ docs/iterations/
 | I121 | TUI Attention And Thinking Clarity | **Complete** (2026-07-13) | Width-aware approval, thinking-title extraction, real export regressions, and a maintainer-supplied native Alacritty walkthrough pass. See `I121-tui-attention-and-thinking-clarity.md`. |
 | I122 | Local Extension And Control Diagnostics | **Complete** (2026-07-13) | Month 3. Typed extension snapshot, unified /mcp//plugins//hooks, dashboard /extensions route, 133+23 tests. See `I122-local-extension-control-diagnostics.md`. |
 | I123 | Installation And Trial Confidence | **Complete** (2026-07-13) | Month 4. Installer fixtures (POSIX 9/9 + PowerShell 5/0/1, checksum verified, offline/ARM64 error text asserted), clean-HOME smoke (18/0/2, real session resume), Windows `v0.3.4` install/version trial, and maintainer-confirmed independent replay validation passed. See `I123-installation-and-trial-confidence.md`. |
-| I124 | One-Shot Scheduled Follow-Up | **Review — second re-review changes required** (2026-07-14) | Approval wrappers and a real Agent/session path are now present, but fresh follow-up Deny/Ask is not proven; two public exports and a new dev-dependency remain outside the baseline; queue wait is misstated as bounded; one doctest is ignored. See `I124-one-shot-scheduled-followup.md` and `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md`. |
-| I125 | Recurring Scheduled Follow-Ups | **Planned; blocked on I124** | Month 2. Bounded intervals, delayed missed ticks, no permission reuse, and cadence proof. See `I125-recurring-scheduled-followups.md`. |
+| I124 | One-Shot Scheduled Follow-Up | **Complete (2026-07-14)** | All acceptance and security evidence passes: 9 roots use permission wrappers, the real session test positively observes the scheduled turn and its independent Deny, ADR-041 records the accepted minimal API variance, and the full validation ladder is green. See `I124-one-shot-scheduled-followup.md` and `docs/reference/I124-PRE-ACTIVATION-SECURITY-NOTE-2026-07-13.md`. |
+| I125 | Recurring Scheduled Follow-Ups | **Planned; unblocked, not activated** | Month 2. Bounded intervals, delayed missed ticks, no permission reuse, and cadence proof. Run the activation gate before implementation. See `I125-recurring-scheduled-followups.md`. |
 | I126 | Schedule Inspection And Control | **Planned; blocked on I125** | Month 3. Read-only list, Ask-gated cancel, bounded output, and narrow-terminal rendering. See `I126-schedule-inspection-control.md`. |
 | I127 | Scheduler Reliability Closeout | **Planned; blocked on I126** | Month 4. Shutdown/backpressure hardening, deterministic stress, clean-HOME trial, and second-operator replay. See `I127-scheduler-reliability-closeout.md`. |
 
@@ -176,8 +176,8 @@ rewrite published iteration baselines.
 | I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
 | I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
 | I028 | Superseded before implementation | Removed from activation inventory; I124-I127 own the changed Ask-gated acceptance target. |
-| I124 | Review — second re-review changes required (2026-07-14) | Prove distinct fire-time Deny/Ask, resolve public exports and the new dev-dependency, correct queue-wait wording, and remove or track the ignored doctest. |
-| I125 | Planned | Blocked on I124 Complete. |
+| I124 | Complete (2026-07-14) | Removed from non-terminal inventory after positive scheduled-turn/Deny proof, accepted ADR-041 change control, and a green validation ladder. |
+| I125 | Planned; unblocked, not activated | Eligible for its activation gate; no implementation has started. |
 | I126 | Planned | Blocked on I125 Complete. |
 | I127 | Planned | Blocked on I126 Complete. |
 | I047 | Complete (2026-06-29) | Removed from non-terminal inventory. v0.1.2 and v0.2.0 tags pushed and published. |

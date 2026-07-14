@@ -1,6 +1,6 @@
 # Iteration I124: One-Shot Scheduled Follow-Up
 
-> Document status: Review
+> Document status: Complete (2026-07-14)
 > Published plan date: 2026-07-13
 > Planned objective: deliver one safe, session-scoped delayed follow-up through the normal queue
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -67,6 +67,9 @@
 | 2026-07-13 | Closeout | All 4 stories delivered. Validation ladder passes: fmt, clippy (-D warnings), test --workspace, release preflight, governance 0 warnings, diff --check. |
 | 2026-07-14 | Maintainer review | Promotion rejected; I124 remains Review. All repository validation commands pass, but the production `delay` registrations bypass the CLI/TUI approval wrappers, the claimed fixture-provider/real-session proof is only a direct tool-to-queue test, and the implementation adds an unapproved public `talos_agent::scheduler` API. I125 remains blocked pending fixes and re-review. |
 | 2026-07-14 | Maintainer re-review | Promotion rejected again; I124 remains Review. Commit `68c24cf` fixes the production approval-wrapper bypass and adds a real Agent/session test, but the test grants Allow to every Execute tool and therefore does not prove an independent follow-up Deny/Ask decision. Two new public exports and a new `talos-provider` dev-dependency still violate the published no-public-API/no-new-dependency boundary; the queue-full limitation incorrectly equates bounded capacity with bounded wait; and one new doctest is ignored without a tracking issue. Full validation remains green. I125 remains blocked. |
+| 2026-07-14 | Maintainer third review | Promotion rejected again; I124 remains Review. Commit `7fe1d17` removes the unapproved dev-dependency, corrects the queue-wait wording, restores all doctests, and gives the follow-up `echo` call a distinct Deny rule. However, the test only asserts that `echo` did not execute, so it also passes if the scheduled turn never fires; it does not assert provider-response consumption, a scheduled label, or a second session turn. ADR-041 also does not complete change control for the published no-new-public-API baseline: it is not indexed, has no explicit accepted status, omits the program plan's explicit non-goal and stop condition, and the owner doc has no accepted change-decision record. Full validation remains green. I125 remains blocked. |
+| 2026-07-14 | Accepted change decision | Maintainer direction accepted the narrow ADR-041 variance from the published no-new-public-API non-goal. Exactly `create_delay_tool_and_scheduler()` and `PendingSchedulerActor` may be exported for cross-crate composition; the objective and acceptance criteria are unchanged, all other scheduler internals remain crate-private, and no I125-I127 API is pre-approved. The published baseline above is retained unchanged. |
+| 2026-07-14 | Closure | Third-review blockers corrected and independently revalidated. The fixture-provider test now proves all four provider responses were consumed, observes the labeled scheduled user message, and proves the follow-up `echo` remained denied. ADR-041 is Accepted, indexed, and recorded here as an appended baseline variance. Fmt, workspace Clippy, workspace tests, release preflight, governance, and diff checks pass. I124 promoted to Complete; I125 dependency block removed but I125 was not activated. |
 
 ## Verification Evidence
 
@@ -75,6 +78,9 @@
 - **SF102**: DelayTool exposed as Execute/Ask. Wired into all 9 applicable composition roots. `cargo check --workspace --locked` passes. Commit `8b5b350`.
 - **SF103**: 10 DelayTool tests including end-to-end fire+inject proof and permission isolation proof. 29 total scheduler tests pass. Commit `eb30553`.
 - **Permission regression**: `delay_tool_nature_is_execute` and `delay_tool_end_to_end_permission_is_fresh_per_call` prove the delay tool is Execute/Ask and that injected messages carry no permission grant.
+- **Real session fresh-Deny proof**: `fixture_provider_delay_fires_and_follow_up_gets_fresh_deny`
+  asserts all four provider responses are consumed, a provider request contains the labeled
+  scheduled user message, and the resource-specific Deny prevents `echo` execution.
 - **Closed-queue/cancel/shutdown evidence**: `actor_closed_session_queue_no_panic`, `actor_cancelled_one_shot_does_not_fire`, `actor_shutdown_aborts_all_tasks`, `actor_cancel_token_aborts_all_tasks` prove safe degradation.
 - **Iteration validation ladder** (2026-07-13):
   - `cargo fmt --all -- --check` — pass
@@ -128,20 +134,11 @@ All four blocking variances from the 2026-07-14 maintainer review have been addr
    (all `SchedulerHandle` clones dropped) or the process exits. This is safe (no fire after
    channel close) but not prompt (the actor may linger). Fix deferred to I127.
 
-### Re-review Requirements
+### Re-review Closure
 
-The production approval-wrapper bypass is fixed, and the real Agent/session path now has a test.
-The following requirements remain before another re-review:
-
-- Make the fixture-provider scenario give `delay` an Allow decision and the follow-up tool a
-  distinct Deny or unresolved Ask decision; assert that the follow-up tool does not execute while
-  the scheduled turn completes through the normal permission path.
-- Remove the new public exports (`create_delay_tool_and_scheduler`, `PendingSchedulerActor`) or
-  obtain and record the architecture/semver approval required by the published baseline.
-- Remove the new `talos-provider` dev-dependency or obtain and record dependency approval.
-- Correct the queue-full limitation: channel capacity is bounded, but `send().await` has no time
-  bound without a timeout/cancellation branch.
-- Replace the ignored scheduler doctest with a compiling example or link it to a tracking issue.
+All third-review requirements are closed. The permission test contains positive scheduled-turn
+evidence, and ADR-041 completes the narrow public-API change-control record. No review blocker
+remains for I124.
 
 ## Retrospective
 

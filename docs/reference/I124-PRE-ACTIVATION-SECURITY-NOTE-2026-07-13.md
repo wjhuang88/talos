@@ -324,3 +324,24 @@ new fixture-provider test configures every Execute tool as Allow. It proves trav
 Agent/session path, but it does not distinguish a fresh follow-up decision from inherited or
 bypassed authority. The re-review requires a distinct registration Allow and follow-up Deny/Ask,
 with proof that the follow-up tool does not execute.
+
+### Third Review Update (2026-07-14)
+
+Commit `7fe1d17` gives the follow-up `echo` resource a distinct Deny rule, while the production
+wrapper regressions remain green. The test still does not prove that the scheduled follow-up turn
+occurred: its only outcome assertion is that `echo` did not execute, which is also true if the
+scheduler fails to fire or the second turn is never processed. It must additionally assert the
+second provider/turn path and scheduled-message observation.
+
+The post-delivery verdict therefore remains **FAIL pending correction and re-review**. I124 stays
+Review and I125 stays blocked.
+
+### Closure Update (2026-07-14)
+
+The third-review blocker is corrected. The real Agent/session test now proves the scheduled turn
+ran by asserting all four fixture responses were consumed and that a provider request observed the
+`[scheduled-followup]` user message; it separately proves the resource-specific Deny prevented
+`echo` execution. Production wrapper Deny and unresolved-Ask regressions remain green.
+
+Final post-delivery verdict: **PASS**. The six security claims match the delivered production and
+test evidence. I124 is Complete; I125 is unblocked but not activated.

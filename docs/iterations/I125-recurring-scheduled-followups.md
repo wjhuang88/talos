@@ -53,6 +53,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-13 | Planning | Blocked on I124 Complete; no activation claimed. |
+| 2026-07-14 | Dependency update | I124 reached Complete. I125 is unblocked and remains Planned; no activation or implementation is claimed. Run the required activation inventory and gates before starting work. |
 
 ## Verification Evidence
 

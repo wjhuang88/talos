@@ -1,5 +1,8 @@
 # 041: Scheduler Minimal Public API Boundary
 
+**Status**: Accepted (2026-07-14)
+**Decision authority**: Maintainer direction during I124 third-review closure
+
 ## Context
 
 I124 implements session-scoped scheduled follow-ups in `talos-agent`. The scheduler module owns
@@ -21,7 +24,10 @@ indeed `pub(crate)`. However, two items must be public for cross-crate compositi
 | --- | --- | --- | --- |
 | Crate public APIs are semver-bound | Hard | AGENTS.md #6 | No |
 | No speculative features | Hard | AGENTS.md #7 | No |
-| SF100 baseline: "crate-private contract" | Soft | I124 plan | Yes — ADR overrides |
+| Preserve published iteration baselines; append changes | Hard | AGENTS.md / CHANGE-CONTROL | No |
+| Program non-goal: no new public API | Soft | scheduled-followups program plan | Yes, only with explicit maintainer direction and an ADR |
+| Stop and request direction before changing public API | Hard process gate | scheduled-followups program plan | Satisfied on 2026-07-14 |
+| SF100 baseline: "crate-private contract" | Soft | I124 plan | Yes, through appended change control |
 | CLI needs cross-crate factory | Hard | Architecture | No |
 
 ## Reasoning
@@ -57,6 +63,13 @@ Module visibility: `mod scheduler` (private module), items re-exported via
 `pub use scheduler::{create_delay_tool_and_scheduler, PendingSchedulerActor}`.
 
 Semver treatment: additive for 0.x — no existing public item is changed or removed.
+
+This is a narrowly scoped change to the published I124/program non-goal, not a replacement of the
+published baseline. The objective, acceptance criteria, dependency boundary, and user-visible
+deliverable are unchanged. On 2026-07-14, after the third I124 review identified this unresolved
+variance, the maintainer directed the agent to fix the blockers and close the iteration. That
+direction satisfies the program plan's stop condition and accepts only these two composition
+exports. No other scheduler type or future I125-I127 surface is pre-approved.
 
 ## Reversal Trigger
 

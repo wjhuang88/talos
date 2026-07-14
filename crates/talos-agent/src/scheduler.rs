@@ -1271,22 +1271,25 @@ mod tests {
     /// `stream()` call. Pattern replicated from `session/tests.rs`.
     struct MockLanguageModel {
         responses: Arc<Mutex<VecDeque<Vec<AgentEvent>>>>,
+        observed_requests: Arc<Mutex<Vec<Vec<Message>>>>,
     }
 
     impl MockLanguageModel {
         fn new(responses: Vec<Vec<AgentEvent>>) -> Self {
             Self {
                 responses: Arc::new(Mutex::new(VecDeque::from(responses))),
+                observed_requests: Arc::new(Mutex::new(Vec::new())),
             }
         }
     }
 
     #[async_trait]
     impl LanguageModel for MockLanguageModel {
-        async fn stream(
-            &self,
-            _messages: &[Message],
-        ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            self.observed_requests
+                .lock()
+                .unwrap()
+                .push(messages.to_vec());
             let (tx, rx) = mpsc::channel(64);
             let events = {
                 self.responses
@@ -1416,6 +1419,8 @@ mod tests {
                 },
             ],
         ]);
+        let remaining_responses = model.responses.clone();
+        let observed_requests = model.observed_requests.clone();
 
         // Deny "test:echo" resource; delay has no resource so default Ask applies
         let mut engine = PermissionEngine::new();
@@ -1466,9 +1471,27 @@ mod tests {
         tokio::time::advance(Duration::from_secs(2)).await;
         yield_times(30).await;
 
-        // The echo tool must NOT be executed — it received an independent
-        // Deny decision, proving the follow-up turn's permission evaluation
-        // is fresh and not inherited from the delay tool's execution.
+        assert_eq!(
+            remaining_responses.lock().unwrap().len(),
+            0,
+            "all four provider responses must be consumed, proving the scheduled turn completed"
+        );
+        let scheduled_message_observed = observed_requests.lock().unwrap().iter().any(|request| {
+            request.iter().any(|message| {
+                matches!(
+                    message,
+                    Message::User { content }
+                        if content.starts_with(SCHEDULED_FOLLOWUP_LABEL)
+                )
+            })
+        });
+        assert!(
+            scheduled_message_observed,
+            "a provider request must contain the labeled scheduled follow-up message"
+        );
+
+        // The scheduled turn ran, but the echo tool must NOT be executed: it
+        // received an independent Deny decision rather than inherited approval.
         assert!(
             !echo_executed.load(AtomicOrdering::SeqCst),
             "echo must NOT execute — it received a fresh Deny decision in \
