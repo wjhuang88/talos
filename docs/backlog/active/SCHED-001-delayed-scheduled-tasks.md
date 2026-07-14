@@ -54,8 +54,8 @@ talos-cli:     Composition root (spawns actor, wires tools with sched_tx)
 
 - [x] `delay` tool accepts `{ message: string, delay_secs: u64 }` and returns a `task_id`.
 - [x] `schedule` tool accepts `{ message: string, interval_secs: u64 }` and returns a `task_id`.
-- [ ] `cancel_scheduled_task` tool accepts `{ task_id: string }` and cancels the task.
-- [ ] `list_scheduled_tasks` tool returns all active scheduled tasks.
+- [x] `cancel_scheduled_task` tool accepts `{ task_id: string }` and cancels the task.
+- [x] `list_scheduled_tasks` tool returns all active scheduled tasks.
 - [x] Scheduled message injection triggers a new turn via `SessionOp::Submit`.
 - [x] Tasks are cancelled on session shutdown (CancellationToken).
 - [x] `cargo check --workspace` passes.

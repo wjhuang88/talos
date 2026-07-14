@@ -1051,4 +1051,78 @@ mod tests {
             result.content
         );
     }
+
+    #[tokio::test]
+    async fn cancel_denied_by_permission_does_not_execute() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": { "Deny": "cancel blocked by test" },
+                    "nature": "Execute"
+                }]
+            }))
+            .unwrap();
+
+        let (tools, _pending) = talos_agent::create_scheduler_tools();
+        let cancel_tool = tools[3].clone();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: cancel_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({"task_id": "sched_1"}))
+            .await;
+
+        assert!(result.is_error, "Deny should prevent cancel execution");
+        assert!(result.content.contains("cancel blocked"));
+    }
+
+    #[tokio::test]
+    async fn cancel_ask_in_print_mode_auto_denies() {
+        let engine = PermissionEngine::new();
+
+        let (tools, _pending) = talos_agent::create_scheduler_tools();
+        let cancel_tool = tools[3].clone();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: cancel_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({"task_id": "sched_1"}))
+            .await;
+
+        assert!(result.is_error, "Ask in print mode should auto-deny cancel");
+    }
+
+    #[tokio::test]
+    async fn list_tool_is_read_and_allowed() {
+        let engine = PermissionEngine::new();
+
+        let (tools, pending) = talos_agent::create_scheduler_tools();
+        let list_tool = tools[2].clone();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: list_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, tokio_util::sync::CancellationToken::new());
+
+        let result = wrapped.execute(serde_json::json!({})).await;
+
+        assert!(
+            !result.is_error,
+            "Read tool should be auto-allowed, not blocked by print mode: {}",
+            result.content
+        );
+    }
 }

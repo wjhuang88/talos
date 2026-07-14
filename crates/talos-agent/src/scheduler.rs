@@ -1937,6 +1937,137 @@ mod tests {
         }
     }
 
+    // ── ListScheduledTasksTool / CancelScheduledTaskTool tests (SF120/SF121) ─
+
+    #[test]
+    fn list_tool_nature_is_read() {
+        let (tools, _pending) = create_scheduler_tools();
+        assert_eq!(tools[2].nature(), ToolNature::Read);
+    }
+
+    #[test]
+    fn cancel_tool_nature_is_execute() {
+        let (tools, _pending) = create_scheduler_tools();
+        assert_eq!(tools[3].nature(), ToolNature::Execute);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn list_tool_returns_empty_when_no_tasks() {
+        let (tools, pending) = create_scheduler_tools();
+        let list_tool = &tools[2];
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, CancellationToken::new());
+
+        let result = list_tool.execute(serde_json::json!({})).await;
+        assert!(!result.is_error);
+        assert!(result.content.contains("No active"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn list_tool_returns_tasks_after_registration() {
+        let (tools, pending) = create_scheduler_tools();
+        let delay_tool = tools[0].clone();
+        let list_tool = tools[2].clone();
+
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, CancellationToken::new());
+
+        delay_tool
+            .execute(serde_json::json!({"message": "test task", "delay_secs": 60}))
+            .await;
+
+        let result = list_tool.execute(serde_json::json!({})).await;
+        assert!(!result.is_error);
+        assert!(result.content.contains("1 active task"));
+        assert!(result.content.contains("sched_"));
+        assert!(result.content.contains("one-shot"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn list_tool_message_preview_is_bounded() {
+        let (tools, pending) = create_scheduler_tools();
+        let delay_tool = tools[0].clone();
+        let list_tool = tools[2].clone();
+
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, CancellationToken::new());
+
+        let long_message = "x".repeat(200);
+        delay_tool
+            .execute(serde_json::json!({"message": long_message, "delay_secs": 60}))
+            .await;
+
+        let result = list_tool.execute(serde_json::json!({})).await;
+        assert!(
+            result.content.len() < 300,
+            "list output must be bounded: {} chars",
+            result.content.len()
+        );
+        assert!(
+            result.content.contains("…"),
+            "long message should be truncated"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancel_tool_returns_not_found_for_unknown() {
+        let (tools, pending) = create_scheduler_tools();
+        let cancel_tool = &tools[3];
+
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, CancellationToken::new());
+
+        let result = cancel_tool
+            .execute(serde_json::json!({"task_id": "nonexistent"}))
+            .await;
+        assert!(!result.is_error);
+        assert!(result.content.contains("not found") || result.content.contains("already"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancel_tool_rejects_missing_task_id() {
+        let (tools, _pending) = create_scheduler_tools();
+        let cancel_tool = &tools[3];
+
+        let result = cancel_tool.execute(serde_json::json!({})).await;
+        assert!(result.is_error);
+        assert!(result.content.contains("task_id"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancel_tool_cancels_active_task() {
+        let (tools, pending) = create_scheduler_tools();
+        let delay_tool = tools[0].clone();
+        let cancel_tool = tools[3].clone();
+        let list_tool = tools[2].clone();
+
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, CancellationToken::new());
+
+        let reg_result = delay_tool
+            .execute(serde_json::json!({"message": "cancel me", "delay_secs": 60}))
+            .await;
+        let task_id = reg_result
+            .content
+            .split("Task ID: ")
+            .nth(1)
+            .and_then(|s| s.split('\n').next())
+            .unwrap()
+            .to_string();
+
+        let cancel_result = cancel_tool
+            .execute(serde_json::json!({"task_id": task_id}))
+            .await;
+        assert!(!cancel_result.is_error);
+        assert!(cancel_result.content.contains("cancelled"));
+
+        let list_result = list_tool.execute(serde_json::json!({})).await;
+        assert!(
+            list_result.content.contains("No active"),
+            "cancelled task should not appear in list"
+        );
+    }
+
     // ── Fixture-provider test through real Agent/session path (SF103 re-review) ─
 
     use std::collections::VecDeque;
