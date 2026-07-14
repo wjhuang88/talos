@@ -566,7 +566,9 @@ pub fn create_scheduler_tools() -> (Vec<Arc<dyn AgentTool>>, PendingSchedulerAct
     let handle = SchedulerHandle::new(cmd_tx);
     let tools: Vec<Arc<dyn AgentTool>> = vec![
         Arc::new(DelayTool::new(handle.clone())),
-        Arc::new(ScheduleTool::new(handle)),
+        Arc::new(ScheduleTool::new(handle.clone())),
+        Arc::new(ListScheduledTasksTool::new(handle.clone())),
+        Arc::new(CancelScheduledTaskTool::new(handle)),
     ];
     let pending = PendingSchedulerActor { cmd_rx };
     (tools, pending)
@@ -795,6 +797,154 @@ impl AgentTool for ScheduleTool {
 
     fn family(&self) -> ToolFamily {
         ToolFamily::Extension
+    }
+}
+
+pub(crate) struct ListScheduledTasksTool {
+    handle: SchedulerHandle,
+}
+
+impl ListScheduledTasksTool {
+    pub(crate) fn new(handle: SchedulerHandle) -> Self {
+        Self { handle }
+    }
+}
+
+#[async_trait]
+impl AgentTool for ListScheduledTasksTool {
+    fn name(&self) -> &str {
+        "list_scheduled_tasks"
+    }
+
+    fn description(&self) -> &str {
+        "List all active scheduled follow-up tasks. Returns task ID, kind \
+         (one-shot or recurring), and a bounded message preview. Read-only: \
+         does not modify any task."
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object", "properties": {}})
+    }
+
+    async fn execute(&self, _input: serde_json::Value) -> ToolResult {
+        let (response_tx, response_rx) = oneshot::channel();
+        if self
+            .handle
+            .send(ScheduleCommand::List { response_tx })
+            .await
+            .is_err()
+        {
+            return ToolResult::error("scheduler is not available");
+        }
+
+        match response_rx.await {
+            Ok(tasks) if tasks.is_empty() => ToolResult::success("No active scheduled tasks."),
+            Ok(tasks) => {
+                let mut text = format!("{} active task(s):\n", tasks.len());
+                for info in &tasks {
+                    let preview: String = info.message.chars().take(60).collect();
+                    let preview = if info.message.len() > 60 {
+                        format!("{preview}…")
+                    } else {
+                        preview
+                    };
+                    text.push_str(&format!(
+                        "  {} | {} | next: {}s | {}\n",
+                        info.id,
+                        info.kind,
+                        info.remaining().as_secs(),
+                        preview
+                    ));
+                }
+                ToolResult::success(text.trim_end().to_string())
+            }
+            Err(_) => ToolResult::error("scheduler dropped the request"),
+        }
+    }
+
+    fn nature(&self) -> ToolNature {
+        ToolNature::Read
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+}
+
+pub(crate) struct CancelScheduledTaskTool {
+    handle: SchedulerHandle,
+}
+
+impl CancelScheduledTaskTool {
+    pub(crate) fn new(handle: SchedulerHandle) -> Self {
+        Self { handle }
+    }
+}
+
+#[async_trait]
+impl AgentTool for CancelScheduledTaskTool {
+    fn name(&self) -> &str {
+        "cancel_scheduled_task"
+    }
+
+    fn description(&self) -> &str {
+        "Cancel an active scheduled follow-up task by its task ID. \
+         Returns Cancelled or NotFound. Execute permission required."
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "string",
+                    "description": "The task ID to cancel (e.g., sched_1)."
+                }
+            },
+            "required": ["task_id"]
+        })
+    }
+
+    async fn execute(&self, input: serde_json::Value) -> ToolResult {
+        let task_id = match input.get("task_id").and_then(|v| v.as_str()) {
+            Some(id) if !id.is_empty() => id.to_string(),
+            _ => return ToolResult::error("missing or empty 'task_id' field"),
+        };
+
+        let (response_tx, response_rx) = oneshot::channel();
+        if self
+            .handle
+            .send(ScheduleCommand::Cancel {
+                id: task_id.clone(),
+                response_tx,
+            })
+            .await
+            .is_err()
+        {
+            return ToolResult::error("scheduler is not available");
+        }
+
+        match response_rx.await {
+            Ok(CancelResult::Cancelled) => ToolResult::success(format!(
+                "Task {task_id} cancelled. No further fires will occur."
+            )),
+            Ok(CancelResult::NotFound) => {
+                ToolResult::success(format!("Task {task_id} not found or already completed."))
+            }
+            Err(_) => ToolResult::error("scheduler dropped the request"),
+        }
+    }
+
+    fn nature(&self) -> ToolNature {
+        ToolNature::Execute
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["task_id"]
     }
 }
 
