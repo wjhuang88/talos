@@ -537,28 +537,24 @@ pub(crate) fn spawn_scheduler_actor(
 
 // ── Two-phase composition infrastructure ─────────────────────────────────
 
-/// Creates the delay tool and a pending scheduler actor for two-phase
-/// composition.
+/// Creates scheduler tools (delay + schedule) and a pending scheduler actor
+/// for two-phase composition.
 ///
-/// Returns the delay tool as `Arc<dyn AgentTool>` (ready for the caller to
-/// wrap in a permission-aware wrapper) and a [`PendingSchedulerActor`] that
-/// must be spawned after the session provides `sq_tx`.
+/// Returns the tools as `Vec<Arc<dyn AgentTool>>` (ready for the caller to
+/// wrap in permission wrappers) and a [`PendingSchedulerActor`] that must be
+/// spawned after the session provides `sq_tx`.
 ///
 /// This is the **only** public entry point for the scheduler module. All
-/// internal types (`SchedulerHandle`, `DelayTool`, `ScheduleCommand`, etc.)
-/// are `pub(crate)`.
-///
-/// In composition roots: call this before building the tool registry, wrap
-/// the returned tool in the mode-appropriate permission wrapper
-/// (`PermissionAwareTool` or `TuiPermissionAwareTool`), register it, then
-/// call `sched_pending.spawn(sq_tx, cancel_token)` after the session is
-/// created. See ADR-041 for the public API boundary justification.
-pub fn create_delay_tool_and_scheduler() -> (Arc<dyn AgentTool>, PendingSchedulerActor) {
+/// internal types are `pub(crate)`. See ADR-041 for the API boundary.
+pub fn create_scheduler_tools() -> (Vec<Arc<dyn AgentTool>>, PendingSchedulerActor) {
     let (cmd_tx, cmd_rx) = mpsc::channel(64);
     let handle = SchedulerHandle::new(cmd_tx);
-    let tool: Arc<dyn AgentTool> = Arc::new(DelayTool::new(handle));
+    let tools: Vec<Arc<dyn AgentTool>> = vec![
+        Arc::new(DelayTool::new(handle.clone())),
+        Arc::new(ScheduleTool::new(handle)),
+    ];
     let pending = PendingSchedulerActor { cmd_rx };
-    (tool, pending)
+    (tools, pending)
 }
 
 /// Holds the scheduler command receiver until `sq_tx` is available.
@@ -680,6 +676,98 @@ impl AgentTool for DelayTool {
         match response_rx.await {
             Ok(ScheduleRegistrationResult::Registered { task_id }) => ToolResult::success(format!(
                 "Scheduled follow-up registered.\nTask ID: {task_id}\nDelay: {delay_secs} second(s)\n\nThe message will be injected into the session after the delay as a visibly labeled scheduled follow-up."
+            )),
+            Ok(ScheduleRegistrationResult::InvalidDuration { reason }) => ToolResult::error(reason),
+            Err(_) => ToolResult::error("scheduler dropped the request"),
+        }
+    }
+
+    fn nature(&self) -> ToolNature {
+        ToolNature::Execute
+    }
+
+    fn family(&self) -> ToolFamily {
+        ToolFamily::Extension
+    }
+}
+
+pub(crate) struct ScheduleTool {
+    handle: SchedulerHandle,
+}
+
+impl ScheduleTool {
+    pub(crate) fn new(handle: SchedulerHandle) -> Self {
+        Self { handle }
+    }
+}
+
+#[async_trait]
+impl AgentTool for ScheduleTool {
+    fn name(&self) -> &str {
+        "schedule"
+    }
+
+    fn description(&self) -> &str {
+        "Schedule a recurring follow-up message that fires at a bounded \
+         interval. The message is injected into the session at each interval \
+         until cancelled. Session-scoped: dies when the process exits. \
+         Minimum interval: 5 seconds. Maximum interval: 3600 seconds (1 hour). \
+         Missed ticks are delayed, not burst-caught-up."
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "The follow-up message to inject at each interval."
+                },
+                "interval_secs": {
+                    "type": "integer",
+                    "description": "Interval in seconds between fires.",
+                    "minimum": MIN_INTERVAL_SECS,
+                    "maximum": MAX_INTERVAL_SECS
+                }
+            },
+            "required": ["message", "interval_secs"]
+        })
+    }
+
+    async fn execute(&self, input: serde_json::Value) -> ToolResult {
+        let message = match input.get("message").and_then(|v| v.as_str()) {
+            Some(msg) if !msg.is_empty() => msg.to_string(),
+            _ => return ToolResult::error("missing or empty 'message' field"),
+        };
+
+        let interval_secs = match input.get("interval_secs").and_then(|v| v.as_u64()) {
+            Some(secs) => secs,
+            None => {
+                return ToolResult::error(
+                    "missing or invalid 'interval_secs' field (expected a positive integer)",
+                );
+            }
+        };
+
+        if let Err(reason) = validate_interval_secs(interval_secs) {
+            return ToolResult::error(reason);
+        }
+
+        let (response_tx, response_rx) = oneshot::channel();
+        let command = ScheduleCommand::RegisterRecurring {
+            id: None,
+            message,
+            interval: Duration::from_secs(interval_secs),
+            response_tx,
+        };
+
+        if self.handle.send(command).await.is_err() {
+            return ToolResult::error("scheduler is not available (session may be shutting down)");
+        }
+
+        match response_rx.await {
+            Ok(ScheduleRegistrationResult::Registered { task_id }) => ToolResult::success(format!(
+                "Recurring follow-up registered.\nTask ID: {task_id}\nInterval: {interval_secs} second(s)\n\nThe message will be injected into the session at each interval as a visibly labeled scheduled follow-up. Use cancel_scheduled_task to stop it."
             )),
             Ok(ScheduleRegistrationResult::InvalidDuration { reason }) => ToolResult::error(reason),
             Err(_) => ToolResult::error("scheduler dropped the request"),
@@ -1317,7 +1405,8 @@ mod tests {
 
     #[test]
     fn delay_tool_nature_is_execute() {
-        let (tool, _pending) = create_delay_tool_and_scheduler();
+        let (tools, _pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         assert_eq!(tool.nature(), talos_core::tool::ToolNature::Execute);
     }
@@ -1326,7 +1415,8 @@ mod tests {
     async fn delay_tool_executes_and_returns_task_id() {
         let (sq_tx, _sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
-        let (tool, pending) = create_delay_tool_and_scheduler();
+        let (tools, pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let _join = pending.spawn(sq_tx, cancel_token);
 
@@ -1352,7 +1442,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_missing_message() {
-        let (tool, _pending) = create_delay_tool_and_scheduler();
+        let (tools, _pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1366,7 +1457,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_missing_delay_secs() {
-        let (tool, _pending) = create_delay_tool_and_scheduler();
+        let (tools, _pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1380,7 +1472,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_empty_message() {
-        let (tool, _pending) = create_delay_tool_and_scheduler();
+        let (tools, _pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1394,7 +1487,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_zero_delay() {
-        let (tool, _pending) = create_delay_tool_and_scheduler();
+        let (tools, _pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1409,7 +1503,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_excessive_delay() {
-        let (tool, _pending) = create_delay_tool_and_scheduler();
+        let (tools, _pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1424,7 +1519,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_error_when_scheduler_unavailable() {
-        let (tool, pending) = create_delay_tool_and_scheduler();
+        let (tools, pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         // Drop the pending actor without spawning — the command channel
         // has no receiver, so send() will fail.
@@ -1453,7 +1549,8 @@ mod tests {
         let (sq_tx, mut sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
 
-        let (tool, pending) = create_delay_tool_and_scheduler();
+        let (tools, pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let _join = pending.spawn(sq_tx, cancel_token);
 
@@ -1522,7 +1619,8 @@ mod tests {
         let (sq_tx, mut sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
 
-        let (tool, pending) = create_delay_tool_and_scheduler();
+        let (tools, pending) = create_scheduler_tools();
+        let tool = tools[0].clone();
 
         let _join = pending.spawn(sq_tx, cancel_token);
 
@@ -1653,7 +1751,8 @@ mod tests {
     async fn fixture_provider_delay_fires_and_follow_up_gets_fresh_deny() {
         let echo_executed = Arc::new(AtomicBool::new(false));
 
-        let (delay_tool, sched_pending) = create_delay_tool_and_scheduler();
+        let (tools, sched_pending) = create_scheduler_tools();
+        let delay_tool = tools[0].clone();
 
         let mut registry = ToolRegistry::new();
         registry.register(delay_tool);

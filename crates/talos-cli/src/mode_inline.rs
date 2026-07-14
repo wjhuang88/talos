@@ -56,8 +56,8 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
-    let mut registry = build_print_tool_registry(Some(delay_tool));
+    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
+    let mut registry = build_print_tool_registry(sched_tools);
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));

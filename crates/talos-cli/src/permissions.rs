@@ -156,7 +156,7 @@ fn parse_operation(raw: &str) -> Result<ParsedOperation> {
 }
 
 fn build_preflight_packet(operations: &[ParsedOperation]) -> Result<PermissionPreflightPacket> {
-    let registry = build_print_tool_registry(None);
+    let registry = build_print_tool_registry(Vec::new());
     let engine = PermissionEngine::with_workspace_root(std::env::current_dir()?);
 
     let mut entries = Vec::new();

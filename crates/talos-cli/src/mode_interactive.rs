@@ -43,13 +43,15 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         talos_permission::PermissionEngine::new(),
     )));
 
-    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
+    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
     let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(PermissionAwareTool {
-        inner: delay_tool,
-        approval: approval.clone(),
-        print_mode: false,
-    }));
+    for tool in sched_tools {
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: tool,
+            approval: approval.clone(),
+            print_mode: false,
+        }));
+    }
     registry.register(Arc::new(PermissionAwareTool {
         inner: Arc::new(BashTool::new(workspace_root.to_path_buf())),
         approval: approval.clone(),

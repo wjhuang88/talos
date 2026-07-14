@@ -459,7 +459,7 @@ impl AgentTool for StatusTool {
 /// These modes construct a registry before any durable [`talos_session::Session`]
 /// exists, so todo tools are bound to a fresh in-process session id — scoped to
 /// this one run and discarded on exit, not persisted across invocations.
-pub(crate) fn build_print_tool_registry(delay_tool: Option<Arc<dyn AgentTool>>) -> ToolRegistry {
+pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>) -> ToolRegistry {
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
     let ephemeral_session_id = Uuid::new_v4();
 
@@ -586,7 +586,7 @@ pub(crate) fn build_print_tool_registry(delay_tool: Option<Arc<dyn AgentTool>>) 
             print_mode: true,
         }));
     }
-    if let Some(tool) = delay_tool {
+    for tool in scheduler_tools {
         registry.register(Arc::new(PermissionAwareTool {
             inner: tool,
             approval: approval.clone(),
@@ -601,7 +601,7 @@ pub(crate) fn build_tui_tool_registry(
     approval_handler: Arc<TuiApprovalHandler>,
     workspace_root: PathBuf,
     session_id: Uuid,
-    delay_tool: Option<Arc<dyn AgentTool>>,
+    delay_tool: Vec<Arc<dyn AgentTool>>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -716,7 +716,7 @@ pub(crate) fn build_tui_tool_registry(
             approval: approval_handler.clone(),
         }));
     }
-    if let Some(tool) = delay_tool {
+    for tool in delay_tool {
         registry.register(Arc::new(TuiPermissionAwareTool {
             inner: tool,
             approval: approval_handler.clone(),
@@ -935,7 +935,8 @@ mod tests {
             }))
             .unwrap();
 
-        let (delay_tool, _pending) = talos_agent::create_delay_tool_and_scheduler();
+        let (tools, _pending) = talos_agent::create_scheduler_tools();
+        let delay_tool = tools[0].clone();
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
         let wrapped = PermissionAwareTool {
             inner: delay_tool,
@@ -962,7 +963,8 @@ mod tests {
     async fn delay_ask_in_print_mode_auto_denies() {
         let engine = PermissionEngine::new();
 
-        let (delay_tool, _pending) = talos_agent::create_delay_tool_and_scheduler();
+        let (tools, _pending) = talos_agent::create_scheduler_tools();
+        let delay_tool = tools[0].clone();
         let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
         let wrapped = PermissionAwareTool {
             inner: delay_tool,

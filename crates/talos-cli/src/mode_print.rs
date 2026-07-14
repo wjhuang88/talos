@@ -47,8 +47,8 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let prompt = resolve_prompt(cli.prompt)?;
 
     let hooks = build_hook_registry(true);
-    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
-    let mut registry = build_print_tool_registry(Some(delay_tool));
+    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
+    let mut registry = build_print_tool_registry(sched_tools);
 
     #[cfg(debug_assertions)]
     let fixture_mode = cli.mcp_server_fixture.is_some();
