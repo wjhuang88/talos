@@ -1,6 +1,6 @@
 # Iteration I126: Schedule Inspection And Control
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-13
 > Planned objective: make active schedules inspectable, cancellable, and readable in narrow TUI views
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -53,10 +53,11 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-13 | Planning | Blocked on I125 Complete; no activation claimed. |
+| 2026-07-14 | Activation | Gate 0 passed (workspace clean, rustc 1.97.0, governance 0 warnings, release preflight passed). I125 Complete. No other Active iteration. Security boundary unchanged — `list_scheduled_tasks` is Read/Allow, `cancel_scheduled_task` is Execute/Ask. I126 activated; SF120-SF123 ready. |
 
 ## Verification Evidence
 
-- Pending activation.
+- Pending SF120-SF123 implementation.
 
 ## Variance And Residuals
 
