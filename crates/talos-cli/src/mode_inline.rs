@@ -22,9 +22,7 @@ use crate::mode_runtime::{
     session_metadata_for_model, set_todo_prompt_provider,
 };
 use crate::provider_setup::{build_provider, parse_provider};
-use crate::registry::{
-    build_print_tool_registry, create_scheduler_and_tool, register_permission_aware_tools,
-};
+use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name,
@@ -58,9 +56,8 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry = build_print_tool_registry();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
-    registry.register(delay_tool);
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
+    let mut registry = build_print_tool_registry(Some(delay_tool));
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));

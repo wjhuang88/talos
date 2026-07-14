@@ -17,8 +17,7 @@ use tokio::sync::{Mutex, mpsc, watch};
 
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::registry::{
-    TuiApprovalHandler, build_tui_tool_registry, create_scheduler_and_tool,
-    register_tui_permission_aware_tools,
+    TuiApprovalHandler, build_tui_tool_registry, register_tui_permission_aware_tools,
 };
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
@@ -211,13 +210,13 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
         }
     };
     mcp_runtime.report_startup_failures();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         current_session.id,
+        Some(delay_tool),
     );
-    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(

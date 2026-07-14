@@ -5529,6 +5529,7 @@ dependencies = [
  "talos-memory",
  "talos-permission",
  "talos-plugin",
+ "talos-provider",
  "talos-sandbox",
  "talos-session",
  "talos-skill",

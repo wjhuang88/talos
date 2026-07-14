@@ -501,13 +501,13 @@ pub(crate) async fn handle_session_new(
         }
     };
     mcp_runtime.report_startup_failures();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         new_session.id,
+        Some(delay_tool),
     );
-    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -737,13 +737,13 @@ pub(crate) async fn handle_session_resume(
         }
     };
     mcp_runtime.report_startup_failures();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         target_session.id,
+        Some(delay_tool),
     );
-    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(
@@ -921,13 +921,13 @@ pub(crate) async fn handle_session_fork(
         }
     };
     mcp_runtime.report_startup_failures();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         child_session.id,
+        Some(delay_tool),
     );
-    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(

@@ -30,9 +30,11 @@ mod configuration;
 pub mod context;
 mod helpers;
 pub mod prompt;
-pub mod scheduler;
+mod scheduler;
 pub mod session;
 mod tool_execution;
+
+pub use scheduler::{PendingSchedulerActor, create_delay_tool_and_scheduler};
 
 use talos_core::message::{
     AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, StopReason,

@@ -65,6 +65,7 @@
 | 2026-07-13 | SF102 | `feat(agent): expose delay tool and wire scheduler into all roots (#SF102)` — DelayTool (ToolNature::Execute), create_scheduler()/PendingSchedulerActor two-phase API, wired into all 9 composition roots (print, inline, TUI, RPC, interactive, session new/resume/fork, model switch). MCP mode excluded. |
 | 2026-07-13 | SF103 | `test(agent): prove one-shot firing, permission isolation, and edge cases (#SF103)` — 10 DelayTool tests: nature, valid input, all rejection paths, unavailable scheduler, end-to-end fire+inject proof, one-shot-once invariant, permission isolation proof. |
 | 2026-07-13 | Closeout | All 4 stories delivered. Validation ladder passes: fmt, clippy (-D warnings), test --workspace, release preflight, governance 0 warnings, diff --check. |
+| 2026-07-14 | Maintainer review | Promotion rejected; I124 remains Review. All repository validation commands pass, but the production `delay` registrations bypass the CLI/TUI approval wrappers, the claimed fixture-provider/real-session proof is only a direct tool-to-queue test, and the implementation adds an unapproved public `talos_agent::scheduler` API. I125 remains blocked pending fixes and re-review. |
 
 ## Verification Evidence
 
@@ -85,6 +86,52 @@
 ## Variance And Residuals
 
 - Recurrence and operator controls are owned by I125-I126.
+
+### Re-review Fixes (2026-07-14)
+
+All four blocking variances from the 2026-07-14 maintainer review have been addressed:
+
+1. **Permission wrapper (P0)**: `build_print_tool_registry()` and `build_tui_tool_registry()`
+   now accept `delay_tool: Option<Arc<dyn AgentTool>>` and wrap it in `PermissionAwareTool`
+   (print_mode) or `TuiPermissionAwareTool` internally. All 10 call sites updated. Regression
+   tests `delay_denied_by_permission_does_not_execute` and `delay_ask_in_print_mode_auto_denies`
+   prove Deny and unresolved Ask cannot register or fire a task.
+
+2. **Fixture-provider test**: `fixture_provider_delay_fires_and_follow_up_gets_fresh_decision`
+   uses `MockProvider` + `Agent::with_security_and_hooks` + `AppServerSession` + scheduler actor.
+   Proves: (a) delay tool call processed through real turn loop, (b) scheduled message fires
+   after paused-time advance, (c) follow-up turn's `echo` tool executes — proving the follow-on
+   tool call received a fresh permission decision through the normal pipeline.
+
+3. **Public API minimized**: `pub mod scheduler` changed to `mod scheduler`. Only
+   `create_delay_tool_and_scheduler()` and `PendingSchedulerActor` are re-exported as `pub`.
+   `SchedulerHandle`, `DelayTool`, `ScheduleCommand`, and all other types are `pub(crate)`.
+
+4. **I127 limitations documented** (three items below).
+
+### I127-Owned Non-Blocking Limitations
+
+1. **Model-switch task persistence**: `model_lifecycle.rs` rebuilds the tool registry on model
+   switch, creating a new scheduler. Scheduled tasks from the previous scheduler are lost. The
+   old scheduler actor continues running until its command channel closes, but no tools can
+   interact with it. Fix deferred to I127.
+
+2. **Queue-full waiting**: The scheduler command channel has a capacity of 64. Under extreme
+   load (many rapid delay/cancel/list commands), `send().await` blocks until capacity is
+   available. This is bounded (64 commands) and safe (no infinite wait), but could cause
+   latency under stress. The session queue (`sq_tx`, cap=512) has separate capacity. Fix
+   deferred to I127.
+
+3. **Composition root token lifecycle coupling**: Each composition root creates a fresh
+   `CancellationToken` for `sched_pending.spawn()` but does NOT retain or cancel it when the
+   mode function exits. The scheduler actor continues running until the command channel closes
+   (all `SchedulerHandle` clones dropped) or the process exits. This is safe (no fire after
+   channel close) but not prompt (the actor may linger). Fix deferred to I127.
+
+### Re-review Requirements
+
+All four re-review requirements from the 2026-07-14 maintainer review have been addressed
+(see fixes above). I124 is ready for re-review.
 
 ## Retrospective
 

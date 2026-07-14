@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::Value;
-use talos_agent::scheduler::{DelayTool, PendingSchedulerActor, create_scheduler};
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
@@ -36,15 +35,6 @@ use uuid::Uuid;
 
 use crate::approval::{ApprovalPrompt, add_always_allow_rules, always_allow_rule_descriptions};
 use crate::colors;
-
-/// Creates a scheduler handle and wraps the delay tool for registry registration.
-///
-/// Returns the delay tool (ready to register) and a pending scheduler actor
-/// that must be spawned after the session is created (once `sq_tx` is available).
-pub(crate) fn create_scheduler_and_tool() -> (Arc<dyn AgentTool>, PendingSchedulerActor) {
-    let (handle, pending) = create_scheduler();
-    (Arc::new(DelayTool::new(handle)), pending)
-}
 
 /// Non-blocking approval handler for TUI mode.
 ///
@@ -469,7 +459,7 @@ impl AgentTool for StatusTool {
 /// These modes construct a registry before any durable [`talos_session::Session`]
 /// exists, so todo tools are bound to a fresh in-process session id — scoped to
 /// this one run and discarded on exit, not persisted across invocations.
-pub(crate) fn build_print_tool_registry() -> ToolRegistry {
+pub(crate) fn build_print_tool_registry(delay_tool: Option<Arc<dyn AgentTool>>) -> ToolRegistry {
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
     let ephemeral_session_id = Uuid::new_v4();
 
@@ -596,6 +586,13 @@ pub(crate) fn build_print_tool_registry() -> ToolRegistry {
             print_mode: true,
         }));
     }
+    if let Some(tool) = delay_tool {
+        registry.register(Arc::new(PermissionAwareTool {
+            inner: tool,
+            approval: approval.clone(),
+            print_mode: true,
+        }));
+    }
 
     registry
 }
@@ -604,6 +601,7 @@ pub(crate) fn build_tui_tool_registry(
     approval_handler: Arc<TuiApprovalHandler>,
     workspace_root: PathBuf,
     session_id: Uuid,
+    delay_tool: Option<Arc<dyn AgentTool>>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -713,6 +711,12 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     for tool in default_todo_tools(session_id) {
+        registry.register(Arc::new(TuiPermissionAwareTool {
+            inner: tool,
+            approval: approval_handler.clone(),
+        }));
+    }
+    if let Some(tool) = delay_tool {
         registry.register(Arc::new(TuiPermissionAwareTool {
             inner: tool,
             approval: approval_handler.clone(),
@@ -917,5 +921,71 @@ mod tests {
             .unwrap();
         let queried = query_tool.execute(serde_json::json!({})).await;
         assert!(queried.content.contains("survive model switch"));
+    }
+
+    #[tokio::test]
+    async fn delay_denied_by_permission_does_not_execute() {
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": { "Deny": "delay blocked by test" },
+                    "nature": "Execute"
+                }]
+            }))
+            .unwrap();
+
+        let (delay_tool, _pending) = talos_agent::create_delay_tool_and_scheduler();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: delay_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({
+                "message": "test",
+                "delay_secs": 10
+            }))
+            .await;
+
+        assert!(result.is_error, "Deny should prevent delay execution");
+        assert!(
+            result.content.contains("delay blocked"),
+            "error should contain deny reason: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn delay_ask_in_print_mode_auto_denies() {
+        let engine = PermissionEngine::new();
+
+        let (delay_tool, _pending) = talos_agent::create_delay_tool_and_scheduler();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(engine)));
+        let wrapped = PermissionAwareTool {
+            inner: delay_tool,
+            approval,
+            print_mode: true,
+        };
+
+        let result = wrapped
+            .execute(serde_json::json!({
+                "message": "test",
+                "delay_secs": 10
+            }))
+            .await;
+
+        assert!(
+            result.is_error,
+            "Ask in print mode should auto-deny, not execute"
+        );
+        assert!(
+            result.content.to_lowercase().contains("unavailable")
+                || result.content.to_lowercase().contains("print mode"),
+            "error should mention print mode: {}",
+            result.content
+        );
     }
 }

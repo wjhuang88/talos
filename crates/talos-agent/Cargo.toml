@@ -28,6 +28,7 @@ tracing = "0.1"
 [dev-dependencies]
 serde_json = "1"
 tempfile = "3"
+talos-provider = { version = "0.3.4", path = "../talos-provider" }
 tokio = { version = "1", features = ["test-util", "macros", "rt"] }
 
 [lints]

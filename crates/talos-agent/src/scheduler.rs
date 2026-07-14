@@ -20,6 +20,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
@@ -215,13 +216,11 @@ pub(crate) enum ScheduleCommand {
 /// `mpsc::Sender` — when the actor shuts down, `send()` returns an error
 /// that the caller must handle gracefully (no panic).
 ///
-/// The struct is `pub` so it can appear in public function signatures (e.g.,
-/// tool factory functions), but its field is private and construction is
-/// `pub(crate)` — only `talos-agent` internal code can create one.
+/// The struct and its field are `pub(crate)` — only `talos-agent` internal
+/// code can construct or inspect a handle. External callers receive the
+/// delay tool as `Arc<dyn AgentTool>` via [`create_delay_tool_and_scheduler`].
 #[derive(Clone)]
-pub struct SchedulerHandle {
-    /// Bounded command channel sender. When the actor is shut down, this
-    /// sender returns a `SendError`, which callers must handle gracefully.
+pub(crate) struct SchedulerHandle {
     cmd_tx: mpsc::Sender<ScheduleCommand>,
 }
 
@@ -437,28 +436,31 @@ pub(crate) fn spawn_scheduler_actor(
 
 // ── Two-phase composition infrastructure ─────────────────────────────────
 
-/// Creates a scheduler handle and a pending actor for two-phase composition.
+/// Creates the delay tool and a pending scheduler actor for two-phase
+/// composition.
 ///
-/// Composition roots must create the scheduler BEFORE the session (to register
-/// the delay tool) but can only spawn the actor AFTER the session provides
-/// `sq_tx`. This function splits those two steps.
+/// Returns the delay tool as `Arc<dyn AgentTool>` (ready for the caller to
+/// wrap in a permission-aware wrapper) and a [`PendingSchedulerActor`] that
+/// must be spawned after the session provides `sq_tx`.
 ///
-/// Typical usage:
-/// ```
-/// # use talos_agent::scheduler::create_scheduler;
-/// # let mut registry = talos_core::tool::ToolRegistry::new();
-/// let (handle, pending) = create_scheduler();
-/// registry.register(std::sync::Arc::new(
-///     talos_agent::scheduler::DelayTool::new(handle),
-/// ));
+/// This is the **only** public entry point for the scheduler module. All
+/// internal types (`SchedulerHandle`, `DelayTool`, `ScheduleCommand`, etc.)
+/// are `pub(crate)`.
+///
+/// Typical usage in a composition root:
+/// ```ignore
+/// let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
+/// // Wrap delay_tool in PermissionAwareTool or TuiPermissionAwareTool, then:
+/// // registry.register(wrapped_tool);
 /// // ... create agent + session ...
-/// // pending.spawn(session_handle.sq_tx.clone(), cancel_token);
+/// // sched_pending.spawn(session_handle.sq_tx.clone(), cancel_token);
 /// ```
-pub fn create_scheduler() -> (SchedulerHandle, PendingSchedulerActor) {
+pub fn create_delay_tool_and_scheduler() -> (Arc<dyn AgentTool>, PendingSchedulerActor) {
     let (cmd_tx, cmd_rx) = mpsc::channel(64);
     let handle = SchedulerHandle::new(cmd_tx);
+    let tool: Arc<dyn AgentTool> = Arc::new(DelayTool::new(handle));
     let pending = PendingSchedulerActor { cmd_rx };
-    (handle, pending)
+    (tool, pending)
 }
 
 /// Holds the scheduler command receiver until `sq_tx` is available.
@@ -503,13 +505,12 @@ impl fmt::Debug for PendingSchedulerActor {
 ///
 /// Session-scoped: the scheduled task dies when the process exits and is
 /// never persisted.
-pub struct DelayTool {
+pub(crate) struct DelayTool {
     handle: SchedulerHandle,
 }
 
 impl DelayTool {
-    /// Creates a new delay tool linked to the scheduler actor.
-    pub fn new(handle: SchedulerHandle) -> Self {
+    pub(crate) fn new(handle: SchedulerHandle) -> Self {
         Self { handle }
     }
 }
@@ -1019,8 +1020,8 @@ mod tests {
 
     #[test]
     fn delay_tool_nature_is_execute() {
-        let (handle, _pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, _pending) = create_delay_tool_and_scheduler();
+
         assert_eq!(tool.nature(), talos_core::tool::ToolNature::Execute);
     }
 
@@ -1028,8 +1029,8 @@ mod tests {
     async fn delay_tool_executes_and_returns_task_id() {
         let (sq_tx, _sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
-        let (handle, pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, pending) = create_delay_tool_and_scheduler();
+
         let _join = pending.spawn(sq_tx, cancel_token);
 
         let result = tool
@@ -1054,8 +1055,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_missing_message() {
-        let (handle, _pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, _pending) = create_delay_tool_and_scheduler();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1069,8 +1069,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_missing_delay_secs() {
-        let (handle, _pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, _pending) = create_delay_tool_and_scheduler();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1084,8 +1083,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_empty_message() {
-        let (handle, _pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, _pending) = create_delay_tool_and_scheduler();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1099,8 +1097,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_zero_delay() {
-        let (handle, _pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, _pending) = create_delay_tool_and_scheduler();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1115,8 +1112,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_rejects_excessive_delay() {
-        let (handle, _pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, _pending) = create_delay_tool_and_scheduler();
 
         let result = tool
             .execute(serde_json::json!({
@@ -1131,8 +1127,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_error_when_scheduler_unavailable() {
-        let (handle, pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, pending) = create_delay_tool_and_scheduler();
 
         // Drop the pending actor without spawning — the command channel
         // has no receiver, so send() will fail.
@@ -1158,13 +1153,11 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn delay_tool_end_to_end_fires_and_injects_labeled_message() {
-        use talos_core::tool::AgentTool;
-
         let (sq_tx, mut sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
 
-        let (handle, pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, pending) = create_delay_tool_and_scheduler();
+
         let _join = pending.spawn(sq_tx, cancel_token);
 
         // Step 1: Execute the delay tool as the model would.
@@ -1232,8 +1225,8 @@ mod tests {
         let (sq_tx, mut sq_rx) = mpsc::channel(512);
         let cancel_token = CancellationToken::new();
 
-        let (handle, pending) = create_scheduler();
-        let tool = DelayTool::new(handle);
+        let (tool, pending) = create_delay_tool_and_scheduler();
+
         let _join = pending.spawn(sq_tx, cancel_token);
 
         tool.execute(serde_json::json!({
@@ -1257,5 +1250,138 @@ mod tests {
             }
             _ => panic!("expected SessionOp::Submit"),
         }
+    }
+
+    // ── Fixture-provider test through real Agent/session path (SF103 re-review) ─
+
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+
+    use talos_core::session::{RuntimePolicy, SessionConfig};
+    use talos_core::tool::ToolRegistry;
+    use talos_permission::PermissionEngine;
+    use talos_plugin::HookRegistry;
+    use talos_provider::mock::MockProvider;
+
+    use crate::Agent;
+    use crate::session::AppServerSession;
+
+    /// Test tool that records whether it was executed. Used to prove the
+    /// follow-up turn's tool call goes through the permission pipeline.
+    struct TrackingTool {
+        name: &'static str,
+        executed: Arc<AtomicBool>,
+    }
+
+    #[async_trait]
+    impl AgentTool for TrackingTool {
+        fn name(&self) -> &str {
+            self.name
+        }
+        fn description(&self) -> &str {
+            "Test tool for tracking execution"
+        }
+        fn parameters(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object", "properties": {}})
+        }
+        async fn execute(&self, _input: serde_json::Value) -> ToolResult {
+            self.executed.store(true, AtomicOrdering::SeqCst);
+            ToolResult::success("executed")
+        }
+        fn nature(&self) -> ToolNature {
+            ToolNature::Execute
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn fixture_provider_delay_fires_and_follow_up_gets_fresh_decision() {
+        let echo_executed = Arc::new(AtomicBool::new(false));
+
+        // Step 1: Create scheduler + delay tool
+        let (delay_tool, sched_pending) = create_delay_tool_and_scheduler();
+
+        // Step 2: Build tool registry with delay + echo tools
+        let mut registry = ToolRegistry::new();
+        registry.register(delay_tool);
+        registry.register(Arc::new(TrackingTool {
+            name: "echo",
+            executed: echo_executed.clone(),
+        }));
+
+        // Step 3: Configure mock provider
+        // Turn 1a: model calls delay
+        // Turn 1b: model gives text after delay result
+        // Turn 2a: model calls echo (follow-up turn from scheduled message)
+        // Turn 2b: model gives text after echo result
+        let provider = MockProvider::new()
+            .with_tool_call(
+                "delay",
+                serde_json::json!({"message": "check status", "delay_secs": 1}),
+            )
+            .with_response("I scheduled a follow-up.")
+            .with_tool_call("echo", serde_json::json!({}))
+            .with_response("Follow-up complete.");
+
+        // Step 4: Create agent with Allow-Execute permission engine
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{"decision": "Allow", "nature": "Execute"}]
+            }))
+            .unwrap();
+
+        let hooks = Arc::new(HookRegistry::new());
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(provider),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+            hooks,
+        );
+
+        // Step 5: Create session
+        let config = SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+
+        // Step 6: Spawn scheduler actor
+        let _sched_join = sched_pending.spawn(handle.sq_tx.clone(), CancellationToken::new());
+
+        // Step 7: Spawn session actor and send initial message
+        let sq_tx = handle.sq_tx.clone();
+        let actor_task = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "schedule a check".into(),
+            })
+            .await
+            .unwrap();
+
+        // Step 8: Let turn 1 process (delay tool call + response)
+        yield_times(20).await;
+
+        // Step 9: Advance time past the 1-second delay
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(20).await;
+
+        // Step 10: Verify the follow-up turn's echo tool was executed,
+        // proving the scheduled message fired and the follow-on tool call
+        // went through the permission pipeline (fresh decision).
+        assert!(
+            echo_executed.load(AtomicOrdering::SeqCst),
+            "echo tool must be executed in the follow-up turn — this proves \
+             the scheduled message fired and the follow-on tool call received \
+             a fresh permission decision through the normal pipeline"
+        );
+
+        // Clean up
+        let _ = sq_tx.send(SessionOp::Shutdown).await;
+        let _ = actor_task.await;
     }
 }

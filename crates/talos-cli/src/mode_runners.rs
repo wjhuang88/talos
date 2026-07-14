@@ -54,8 +54,7 @@ use crate::model_lifecycle::{
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
-    build_tui_tool_registry, create_scheduler_and_tool, register_permission_aware_tools,
-    register_tui_permission_aware_tools,
+    build_tui_tool_registry, register_permission_aware_tools, register_tui_permission_aware_tools,
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
@@ -98,9 +97,8 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry = build_print_tool_registry();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
-    registry.register(delay_tool);
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
+    let mut registry = build_print_tool_registry(Some(delay_tool));
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
@@ -240,13 +238,13 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let (delay_tool, sched_pending) = create_scheduler_and_tool();
+    let (delay_tool, sched_pending) = talos_agent::create_delay_tool_and_scheduler();
     let mut registry = build_tui_tool_registry(
         approval_handler.clone(),
         workspace_root.to_path_buf(),
         session.id,
+        Some(delay_tool),
     );
-    registry.register(delay_tool);
     register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
 
     let mut agent = Agent::with_security_and_hooks(

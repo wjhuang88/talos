@@ -299,3 +299,16 @@ derived from that string is independently permission-gated by `execute_single_to
 → `engine.evaluate_profile`.
 
 I124 is cleared for activation.
+
+## Post-Delivery Review Addendum (2026-07-14)
+
+The pre-activation claims describe the required architecture, but the delivered I124 composition
+does not satisfy Claim 1 in production. All 9 applicable roots register the raw `DelayTool`
+directly. They do not use `PermissionAwareTool` or `TuiPermissionAwareTool`, which are responsible
+for resolving `PermissionDecision::Ask` into an interactive prompt or headless denial. The central
+agent permission path continues when it sees `Ask`, so declaring `ToolNature::Execute` is not by
+itself an effective Ask gate.
+
+Post-delivery verdict: **FAIL pending correction and re-review**. I124 remains Review and I125
+remains blocked. The correction must prove that Deny and unresolved Ask cannot register or fire a
+task in every supported composition family.

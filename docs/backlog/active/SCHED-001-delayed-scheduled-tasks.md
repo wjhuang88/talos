@@ -64,3 +64,8 @@ talos-cli:     Composition root (spawns actor, wires tools with sched_tx)
 
 > I124 delivered the `delay` tool (one-shot). `schedule` (recurring), `cancel_scheduled_task`,
 > and `list_scheduled_tasks` are owned by I125-I126.
+
+2026-07-14 maintainer review: I124 remains Review. Repository validation is green, but the raw
+`delay` registrations bypass the CLI/TUI approval wrappers, the claimed fixture-provider/session
+proof is absent, and the scheduler introduced an unapproved public API. I125 remains blocked until
+the findings in the I124 owner doc are fixed and re-reviewed.
