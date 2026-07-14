@@ -655,4 +655,86 @@ mod tests {
             assert_eq!(line.segments[0].fg, secondary_result_color());
         }
     }
+
+    // ── Schedule tool narrow-terminal rendering (SF122/I126 acceptance) ──
+
+    #[test]
+    fn schedule_list_output_no_panic_at_various_widths() {
+        let list_output = "2 active task(s):\n  sched_1 | one-shot | next: 45s | [scheduled-followup] check the build status…\n  sched_2 | recurring (30s) | next: 12s | [scheduled-followup] monitor deploy";
+        let display = ToolResultDisplay {
+            tool_name: Some("list_scheduled_tasks".to_string()),
+            content: list_output.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+
+        for width in [40usize, 60, 80, 120] {
+            for line in &lines {
+                let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
+                let truncated = truncate_single_line(&text, width);
+                let dw = unicode_width::UnicodeWidthStr::width(truncated.as_str());
+                assert!(
+                    dw <= width,
+                    "width {width}: line display width {dw} exceeds buffer: {truncated:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn schedule_list_output_retains_task_id_at_60_cols() {
+        let list_output = "1 active task(s):\n  sched_42 | one-shot | next: 30s | [scheduled-followup] check build";
+        let display = ToolResultDisplay {
+            tool_name: Some("list_scheduled_tasks".to_string()),
+            content: list_output.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+
+        for line in &lines {
+            let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
+            let truncated = truncate_single_line(&text, 60);
+            assert!(
+                truncated.contains("sched_") || !text.contains("sched_"),
+                "task ID should survive 60-col truncation: {truncated:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn schedule_cancel_output_no_panic_at_40_cols() {
+        let cancel_output = "Task sched_1 cancelled. No further fires will occur.";
+        let display = ToolResultDisplay {
+            tool_name: Some("cancel_scheduled_task".to_string()),
+            content: cancel_output.to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+
+        for line in &lines {
+            let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
+            let truncated = truncate_single_line(&text, 40);
+            let dw = unicode_width::UnicodeWidthStr::width(truncated.as_str());
+            assert!(
+                dw <= 40,
+                "cancel output at 40 cols: display width {dw} exceeds 40: {truncated:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn schedule_list_empty_output_no_panic_at_40_cols() {
+        let display = ToolResultDisplay {
+            tool_name: Some("list_scheduled_tasks".to_string()),
+            content: "No active scheduled tasks.".to_string(),
+            is_error: false,
+        };
+        let lines = build_tool_result_scrollback_lines(&display, "", None);
+
+        for line in &lines {
+            let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
+            let truncated = truncate_single_line(&text, 40);
+            assert!(!truncated.is_empty() || text.is_empty());
+        }
+    }
 }
