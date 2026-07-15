@@ -1,6 +1,6 @@
 # Iteration I129: WEB-001 Rendered Read-Only Dashboard Pages
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-07-15
 > Planned objective: Turn WEB-001's loopback snapshot API into a useful read-only browser surface by rendering status, history, governance, and masked-config data as accessible HTML pages — not merely JSON or plain text.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -105,16 +105,32 @@ No Active or Review iterations exist.
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-15 | Start Gate | Gate passed after SESSION-005 fix. Baseline published. |
-| 2026-07-15 | Activation | Maintainer authorized unattended execution under `2026-07-15-product-risk-unattended-authorization.md`. I129 is Active; P110-P150 remain inactive. |
+| 2026-07-15 | Implementation | HTML rendering added to `/status`, `/history`, `/governance`, `/config` with content negotiation, navigation, empty states, and XSS escaping. `/extensions` unchanged (JSON-only). 40 dashboard tests pass (17 new). |
 
 ## Verification Evidence
 
-- {to be filled during execution}
+- `cargo fmt --all -- --check`: clean.
+- `cargo check --workspace --locked`: clean.
+- `cargo clippy --workspace --locked -- -D warnings`: clean.
+- `cargo test --workspace --locked`: all pass (40 dashboard tests incl. 17 new; 0 failures).
+- `./scripts/release_preflight.sh`: passed (baseline) — dashboard changes verified via focused crate tests.
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `git diff --check`: clean.
+- **Browser evidence** (Chromium headless at `http://127.0.0.1:63774/`):
+  - `/status` with `Accept: text/html`: rendered HTML page, title "Status — Talos Dashboard", navigation present, data in `<table>`.
+  - `/history` with `Accept: text/html`: rendered HTML, 2 history items in `<ul>`.
+  - `/governance` with `Accept: text/html`: rendered HTML, governance text in `<pre>`.
+  - `/config` with `Accept: text/html`: rendered HTML, config in `<pre>`, `api_key` masked as `***` — no secret leakage.
+  - `Accept: application/json`, `*/*`, no Accept: all return JSON (backward-compatible default preserved).
+  - `/extensions` with `Accept: text/html`: returns JSON (out of scope; unchanged).
 
 ## Variance And Residuals
 
-- {to be filled during execution}
+- No variance from baseline. All acceptance criteria met.
+- No residuals. `/extensions` HTML rendering is a potential future enhancement under a separate owner story if desired.
 
 ## Retrospective
 
-- {to be filled at closeout}
+- Outcome: met. All acceptance criteria closed with browser evidence.
+- Documentation: I129, WEB-001, README, Board, iterations README, execution package checkpoint updated.
+- Lessons: Content negotiation via `Accept` header is clean but requires the conservative default (JSON unless explicit `text/html`) to preserve API compatibility. The existing redaction pipeline required no changes — HTML rendering sits on top of pre-redacted data.

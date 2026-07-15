@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::{Request, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::get;
@@ -163,28 +163,52 @@ async fn root_handler() -> Response {
     resp
 }
 
-async fn status_handler(State(state): State<AppState>) -> Response {
-    let mut resp = Json(state.snapshot.status.clone()).into_response();
-    apply_security_headers(&mut resp, "application/json; charset=utf-8");
-    resp
+async fn status_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if accepts_html(&headers) {
+        let mut resp = render_status_html(&state.snapshot).into_response();
+        apply_security_headers(&mut resp, "text/html; charset=utf-8");
+        resp
+    } else {
+        let mut resp = Json(state.snapshot.status.clone()).into_response();
+        apply_security_headers(&mut resp, "application/json; charset=utf-8");
+        resp
+    }
 }
 
-async fn history_handler(State(state): State<AppState>) -> Response {
-    let mut resp = Json(state.snapshot.history.clone()).into_response();
-    apply_security_headers(&mut resp, "application/json; charset=utf-8");
-    resp
+async fn history_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if accepts_html(&headers) {
+        let mut resp = render_history_html(&state.snapshot).into_response();
+        apply_security_headers(&mut resp, "text/html; charset=utf-8");
+        resp
+    } else {
+        let mut resp = Json(state.snapshot.history.clone()).into_response();
+        apply_security_headers(&mut resp, "application/json; charset=utf-8");
+        resp
+    }
 }
 
-async fn governance_handler(State(state): State<AppState>) -> Response {
-    let mut resp = state.snapshot.governance.clone().into_response();
-    apply_security_headers(&mut resp, "text/plain; charset=utf-8");
-    resp
+async fn governance_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if accepts_html(&headers) {
+        let mut resp = render_governance_html(&state.snapshot).into_response();
+        apply_security_headers(&mut resp, "text/html; charset=utf-8");
+        resp
+    } else {
+        let mut resp = state.snapshot.governance.clone().into_response();
+        apply_security_headers(&mut resp, "text/plain; charset=utf-8");
+        resp
+    }
 }
 
-async fn config_handler(State(state): State<AppState>) -> Response {
-    let mut resp = state.snapshot.config_masked.clone().into_response();
-    apply_security_headers(&mut resp, "text/plain; charset=utf-8");
-    resp
+async fn config_handler(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if accepts_html(&headers) {
+        let mut resp = render_config_html(&state.snapshot).into_response();
+        apply_security_headers(&mut resp, "text/html; charset=utf-8");
+        resp
+    } else {
+        let mut resp = state.snapshot.config_masked.clone().into_response();
+        apply_security_headers(&mut resp, "text/plain; charset=utf-8");
+        resp
+    }
 }
 
 async fn extensions_handler(State(state): State<AppState>) -> Response {
@@ -318,6 +342,145 @@ fn redact_assignment_values(input: &str, key: &str) -> String {
     output
 }
 
+// ── HTML rendering helpers (I129) ──────────────────────────────────────────
+
+/// Returns true only when the request's `Accept` header explicitly names
+/// `text/html`. Requests with `*/*`, no `Accept`, or `application/json`
+/// return false — preserving the existing JSON/plain-text API.
+fn accepts_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| {
+            v.split(',')
+                .any(|part| part.trim().starts_with("text/html"))
+        })
+}
+
+/// Escape dynamic content for safe embedding in HTML text nodes and
+/// attribute values. Every value rendered into an HTML page passes through
+/// this function.
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
+/// Render a `serde_json::Value` recursively as safe HTML.
+fn render_value_html(value: &Value) -> String {
+    match value {
+        Value::Object(map) => {
+            if map.is_empty() {
+                return r#"<span class="empty">(empty)</span>"#.to_string();
+            }
+            let mut rows = String::new();
+            for (k, v) in map {
+                rows.push_str(&format!(
+                    "<tr><th>{}</th><td>{}</td></tr>",
+                    html_escape(k),
+                    render_value_html(v)
+                ));
+            }
+            format!("<table>{rows}</table>")
+        }
+        Value::Array(items) => {
+            if items.is_empty() {
+                return r#"<span class="empty">(empty)</span>"#.to_string();
+            }
+            let mut lis = String::new();
+            for item in items {
+                lis.push_str(&format!("<li>{}</li>", render_value_html(item)));
+            }
+            format!("<ul>{lis}</ul>")
+        }
+        Value::String(s) => html_escape(s),
+        Value::Null => r#"<em>null</em>"#.to_string(),
+        other => html_escape(&other.to_string()),
+    }
+}
+
+/// Shared HTML page wrapper with inline CSS and navigation.
+fn render_html_page(title: &str, content: &str) -> String {
+    let title = html_escape(title);
+    format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} — Talos Dashboard</title>
+<style>
+body {{ font-family: system-ui, sans-serif; margin: 1.5rem; line-height: 1.5; max-width: 64rem; }}
+nav {{ margin-bottom: 1.5rem; padding-bottom: .5rem; border-bottom: 1px solid #ddd; }}
+nav a {{ margin-right: 1rem; }}
+h1 {{ margin-bottom: 1rem; }}
+pre {{ background: #f4f4f4; padding: 1rem; overflow-x: auto; border-radius: .25rem; }}
+table {{ border-collapse: collapse; width: 100%; }}
+th {{ text-align: left; vertical-align: top; padding: .4rem .6rem; background: #f9f9f9; white-space: nowrap; }}
+td {{ padding: .4rem .6rem; vertical-align: top; }}
+tr {{ border-bottom: 1px solid #eee; }}
+ul {{ padding-left: 1.5rem; }}
+.empty {{ color: #999; font-style: italic; }}
+</style>
+</head>
+<body>
+<nav>
+<a href="/">Home</a>
+<a href="/status">Status</a>
+<a href="/history">History</a>
+<a href="/governance">Governance</a>
+<a href="/config">Config</a>
+</nav>
+<h1>{title}</h1>
+{content}
+</body>
+</html>"#
+    )
+}
+
+fn render_status_html(snapshot: &DashboardSnapshot) -> String {
+    let content = if snapshot.status.is_null()
+        || (snapshot.status.is_object()
+            && snapshot.status.as_object().is_some_and(|m| m.is_empty()))
+    {
+        r#"<p class="empty">No status data available.</p>"#.to_string()
+    } else {
+        render_value_html(&snapshot.status)
+    };
+    render_html_page("Status", &content)
+}
+
+fn render_history_html(snapshot: &DashboardSnapshot) -> String {
+    let content = if snapshot.history.is_array()
+        && snapshot.history.as_array().is_some_and(|a| a.is_empty())
+    {
+        r#"<p class="empty">No session history.</p>"#.to_string()
+    } else {
+        render_value_html(&snapshot.history)
+    };
+    render_html_page("History", &content)
+}
+
+fn render_governance_html(snapshot: &DashboardSnapshot) -> String {
+    let content = if snapshot.governance.trim().is_empty() {
+        r#"<p class="empty">No governance data found.</p>"#.to_string()
+    } else {
+        format!("<pre>{}</pre>", html_escape(&snapshot.governance))
+    };
+    render_html_page("Governance", &content)
+}
+
+fn render_config_html(snapshot: &DashboardSnapshot) -> String {
+    let content = if snapshot.config_masked.trim().is_empty() {
+        r#"<p class="empty">No configuration data.</p>"#.to_string()
+    } else {
+        format!("<pre>{}</pre>", html_escape(&snapshot.config_masked))
+    };
+    render_html_page("Config", &content)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,6 +521,38 @@ mod tests {
                 header::AUTHORIZATION,
                 format!("Bearer {t}").parse().expect("valid header value"),
             );
+        }
+        let response = tower::ServiceExt::oneshot(app.clone(), req)
+            .await
+            .expect("request failed");
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap_or_default();
+        (status, String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    async fn request_with_accept(
+        app: &Router,
+        method: Method,
+        path: &str,
+        token: Option<&str>,
+        accept: Option<&str>,
+    ) -> (StatusCode, String) {
+        let mut req = Request::builder()
+            .method(method)
+            .uri(path)
+            .body(axum::body::Body::empty())
+            .expect("failed to build request");
+        if let Some(t) = token {
+            req.headers_mut().insert(
+                header::AUTHORIZATION,
+                format!("Bearer {t}").parse().expect("valid header value"),
+            );
+        }
+        if let Some(a) = accept {
+            req.headers_mut()
+                .insert(header::ACCEPT, a.parse().expect("valid accept header"));
         }
         let response = tower::ServiceExt::oneshot(app.clone(), req)
             .await
@@ -626,5 +821,326 @@ mod tests {
                 "extensions route must be GET-only"
             );
         }
+    }
+
+    // ── I129 content negotiation tests ─────────────────────────────────────
+
+    #[tokio::test]
+    async fn html_accept_returns_html_status() {
+        let (app, token) = build_test_app();
+        let (status, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/status",
+            Some(&token),
+            Some("text/html"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("<!doctype html>"), "expected HTML: {body}");
+        assert!(body.contains("<title>Status"), "expected title");
+        assert!(body.contains("test-model"), "expected data in HTML");
+        assert!(body.contains("<nav>"), "expected navigation");
+    }
+
+    #[tokio::test]
+    async fn html_accept_returns_html_history() {
+        let (app, token) = build_test_app();
+        let (status, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/history",
+            Some(&token),
+            Some("text/html"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("<!doctype html>"));
+        assert!(body.contains("abc"));
+    }
+
+    #[tokio::test]
+    async fn html_accept_returns_html_governance() {
+        let (app, token) = build_test_app();
+        let (status, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/governance",
+            Some(&token),
+            Some("text/html"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("<!doctype html>"));
+        assert!(body.contains("Now: test item"));
+    }
+
+    #[tokio::test]
+    async fn html_accept_returns_html_config() {
+        let (app, token) = build_test_app();
+        let (status, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/config",
+            Some(&token),
+            Some("text/html"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("<!doctype html>"));
+        assert!(body.contains("***"));
+    }
+
+    #[tokio::test]
+    async fn no_accept_returns_json_status() {
+        let (app, token) = build_test_app();
+        let (status, body) =
+            request_with_accept(&app, Method::GET, "/status", Some(&token), None).await;
+        assert_eq!(status, StatusCode::OK);
+        let _: serde_json::Value =
+            serde_json::from_str(&body).expect("should be valid JSON, not HTML");
+    }
+
+    #[tokio::test]
+    async fn wildcard_accept_returns_json_status() {
+        let (app, token) = build_test_app();
+        let (status, body) =
+            request_with_accept(&app, Method::GET, "/status", Some(&token), Some("*/*")).await;
+        assert_eq!(status, StatusCode::OK);
+        let _: serde_json::Value =
+            serde_json::from_str(&body).expect("*/* should return JSON, not HTML");
+    }
+
+    #[tokio::test]
+    async fn json_accept_returns_json_status() {
+        let (app, token) = build_test_app();
+        let (status, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/status",
+            Some(&token),
+            Some("application/json"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let _: serde_json::Value =
+            serde_json::from_str(&body).expect("application/json should return JSON");
+    }
+
+    #[tokio::test]
+    async fn complex_accept_with_html_returns_html() {
+        let (app, token) = build_test_app();
+        let (status, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/status",
+            Some(&token),
+            Some("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            body.contains("<!doctype html>"),
+            "complex Accept with text/html should return HTML"
+        );
+    }
+
+    #[tokio::test]
+    async fn html_mode_redacts_secrets() {
+        let snapshot = DashboardSnapshot {
+            config_masked: "api_key = \"sk-live\"\ntoken=abc".to_string(),
+            status: serde_json::json!({
+                "model": "test",
+                "api_key": "sk-live",
+                "url": "https://example.com/?token=abc&ok=1",
+            }),
+            history: serde_json::json!([
+                {
+                    "tool": "http_request",
+                    "headers": {
+                        "Authorization": "Bearer secret",
+                        "Cookie": "sid=secret"
+                    },
+                    "url": "https://example.com/?api_key=sk-live&ok=1"
+                }
+            ]),
+            governance: "refresh_token=abc status=ok".to_string(),
+            extensions: serde_json::json!({}),
+        };
+        let server = DashboardServer::with_loopback_only(snapshot, false);
+        let token = server.token().to_string();
+        let app = server.build_router();
+
+        for path in ["/status", "/history", "/governance", "/config"] {
+            let (status_code, body) =
+                request_with_accept(&app, Method::GET, path, Some(&token), Some("text/html")).await;
+            assert_eq!(status_code, StatusCode::OK, "{path} should be OK");
+            assert!(
+                !body.contains("sk-live"),
+                "{path} leaked api key in HTML: {body}"
+            );
+            assert!(
+                !body.contains("Bearer secret"),
+                "{path} leaked bearer in HTML: {body}"
+            );
+            assert!(
+                !body.contains("sid=secret"),
+                "{path} leaked cookie in HTML: {body}"
+            );
+            assert!(
+                !body.contains("token=abc"),
+                "{path} leaked token query in HTML: {body}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn html_mode_escapes_xss_payloads() {
+        let snapshot = DashboardSnapshot {
+            config_masked: "<script>alert(1)</script>".to_string(),
+            status: serde_json::json!({"model": "<img onerror=alert(1)>"}),
+            history: serde_json::json!([{"id": "\"><script>alert('xss')</script>"}]),
+            governance: "<b>bold</b>&amp;".to_string(),
+            extensions: serde_json::json!({}),
+        };
+        let server = DashboardServer::with_loopback_only(snapshot, false);
+        let token = server.token().to_string();
+        let app = server.build_router();
+
+        for path in ["/status", "/history", "/governance", "/config"] {
+            let (_, body) =
+                request_with_accept(&app, Method::GET, path, Some(&token), Some("text/html")).await;
+            assert!(
+                !body.contains("<script>"),
+                "{path} HTML leaked unescaped <script>: {body}"
+            );
+            assert!(
+                !body.contains("<img "),
+                "{path} HTML leaked unescaped <img> tag: {body}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_snapshot_renders_empty_states() {
+        let snapshot = DashboardSnapshot {
+            config_masked: "".to_string(),
+            status: serde_json::json!({}),
+            history: serde_json::json!([]),
+            governance: "".to_string(),
+            extensions: serde_json::json!({}),
+        };
+        let server = DashboardServer::with_loopback_only(snapshot, true);
+        let app = server.build_router();
+
+        let (_, status_body) =
+            request_with_accept(&app, Method::GET, "/status", None, Some("text/html")).await;
+        assert!(
+            status_body.contains("No status data available."),
+            "expected empty state: {status_body}"
+        );
+
+        let (_, history_body) =
+            request_with_accept(&app, Method::GET, "/history", None, Some("text/html")).await;
+        assert!(
+            history_body.contains("No session history."),
+            "expected empty state: {history_body}"
+        );
+
+        let (_, gov_body) =
+            request_with_accept(&app, Method::GET, "/governance", None, Some("text/html")).await;
+        assert!(
+            gov_body.contains("No governance data found."),
+            "expected empty state: {gov_body}"
+        );
+
+        let (_, config_body) =
+            request_with_accept(&app, Method::GET, "/config", None, Some("text/html")).await;
+        assert!(
+            config_body.contains("No configuration data."),
+            "expected empty state: {config_body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn extensions_ignores_accept_html() {
+        let (app, token) = build_test_app();
+        let (status_code, body) = request_with_accept(
+            &app,
+            Method::GET,
+            "/extensions",
+            Some(&token),
+            Some("text/html"),
+        )
+        .await;
+        assert_eq!(status_code, StatusCode::OK);
+        let _: serde_json::Value =
+            serde_json::from_str(&body).expect("extensions must return JSON even with text/html");
+    }
+
+    #[tokio::test]
+    async fn html_mode_get_only() {
+        let (app, token) = build_test_app();
+        for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
+            let (status_code, _) = request_with_accept(
+                &app,
+                method.clone(),
+                "/status",
+                Some(&token),
+                Some("text/html"),
+            )
+            .await;
+            assert_eq!(
+                status_code,
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} /status with text/html should be 405"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn html_mode_loopback_only_no_token() {
+        let app = build_loopback_only_app();
+        let (status_code, body) =
+            request_with_accept(&app, Method::GET, "/status", None, Some("text/html")).await;
+        assert_eq!(status_code, StatusCode::OK);
+        assert!(body.contains("<!doctype html>"));
+    }
+
+    #[tokio::test]
+    async fn html_mode_token_required_in_token_mode() {
+        let (app, _token) = build_test_app();
+        let (status_code, _) =
+            request_with_accept(&app, Method::GET, "/status", None, Some("text/html")).await;
+        assert_eq!(status_code, StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn html_escape_covers_all_special_chars() {
+        assert_eq!(html_escape("<>&\"'"), "&lt;&gt;&amp;&quot;&#x27;");
+    }
+
+    #[test]
+    fn accepts_html_matching() {
+        let mut headers = HeaderMap::new();
+        assert!(!accepts_html(&headers)); // no Accept header
+
+        headers.insert(header::ACCEPT, "*/*".parse().unwrap());
+        assert!(!accepts_html(&headers));
+
+        headers.insert(header::ACCEPT, "application/json".parse().unwrap());
+        assert!(!accepts_html(&headers));
+
+        headers.insert(header::ACCEPT, "text/html".parse().unwrap());
+        assert!(accepts_html(&headers));
+
+        headers.insert(
+            header::ACCEPT,
+            "text/html,application/xhtml+xml,*/*;q=0.8".parse().unwrap(),
+        );
+        assert!(accepts_html(&headers));
+
+        headers.insert(header::ACCEPT, "text/html;charset=utf-8".parse().unwrap());
+        assert!(accepts_html(&headers));
     }
 }

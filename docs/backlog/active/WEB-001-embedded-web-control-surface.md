@@ -45,10 +45,13 @@ prior “in Review” label did not reflect their completed evidence.
 `/governance`, `/config`, and `/extensions`. `/` is an inline HTML landing page containing links to
 those representations. The routes return JSON or plain text; they do not render a dashboard UI.
 
-Not implemented: status/history/config pages, a live log/SSE view, governance tables or Kanban,
-client-side navigation/state, config editing, approvals, session actions, WebSocket control, or
-remote/LAN access. The shipped capability is therefore an API foundation, not the product web
-control surface described by this story.
+Rendered HTML pages delivered (I129): `/status`, `/history`, `/governance`, `/config` now
+return accessible HTML with navigation, empty states, and HTML escaping when `Accept: text/html`
+is sent. Conservative content negotiation preserves JSON/plain-text for all other requests.
+`/extensions` remains JSON-only.
+
+Still not implemented: a live log/SSE view, config editing, approvals, session actions, WebSocket
+control, or remote/LAN access.
 
 ## Target Model (Not Current Implementation)
 
