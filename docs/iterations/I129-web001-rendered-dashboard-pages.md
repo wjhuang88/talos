@@ -106,6 +106,7 @@ No Active or Review iterations exist.
 |---|---|---|
 | 2026-07-15 | Start Gate | Gate passed after SESSION-005 fix. Baseline published. |
 | 2026-07-15 | Implementation | HTML rendering added to `/status`, `/history`, `/governance`, `/config` with content negotiation, navigation, empty states, and XSS escaping. `/extensions` unchanged (JSON-only). 40 dashboard tests pass (17 new). |
+| 2026-07-15 | Commit | `17dbe60` — `feat(dashboard): render read-only HTML pages for loopback dashboard (#I129) [model:gpt-5]`. Pushed to `origin/main`. Working tree clean, `main` synced. |
 
 ## Verification Evidence
 
