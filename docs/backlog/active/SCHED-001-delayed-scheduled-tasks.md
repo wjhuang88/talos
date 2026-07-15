@@ -127,3 +127,15 @@ Planned until its activation gate.
 test never fills a channel and the recurring stress bound accepts a catch-up Burst. No isolated
 clean-HOME or independent second-operator replay record exists, and Board/SCHED/execution-package
 status is stale. Corrections are recorded in the I127 owner doc; no release action is authorized.
+
+2026-07-15 I127 maintainer re-review (`43662e7`): I127 remains Review. The exact Delay assertion
+and review-document sync are accepted, but a raw `try_send` test does not bound the production
+tools' `send().await` full-queue wait. The clean-HOME command only shows schemas and a successful
+exit; it does not record the lifecycle or independent operator replay required by SF132/SF133.
+
+2026-07-15 I127 closure (`b15a33c`): `SchedulerHandle::send` now returns immediate Full/Closed
+results through the real delay/schedule/list/cancel tools, with a saturated-handle regression for
+all four. `scripts/replay_i127_scheduler.sh` was independently replayed in a disposable HOME and
+proved clean-HOME composition plus fixture-provider register/fire/list/cancel/shutdown. Full locked
+validation and governance pass. I127 and the I124-I127 delivery sequence are Complete; durable
+scheduling and REL-002/release remain out of scope.
