@@ -400,10 +400,39 @@ fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
         fs::create_dir_all(parent)?;
     }
     let connection = Connection::open(path).map_err(sql_error)?;
+    // Initialize WAL mode and schema without busy_timeout so concurrent
+    // first-time opens fail fast instead of blocking for 5s each. The
+    // bounded retry loop (20 × 25 ms ≤ 500 ms total) lets the first writer
+    // complete. Only DatabaseBusy / DatabaseLocked are retried; all other
+    // SQLite errors propagate immediately. After init succeeds, apply the
+    // 5-second busy_timeout for subsequent transaction operations.
+    let init_sql = "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; \
+         CREATE TABLE IF NOT EXISTS durable_bindings \
+         (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE);";
+    const MAX_INIT_RETRIES: u32 = 20;
+    const RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
+    let mut retries = 0u32;
+    loop {
+        match connection.execute_batch(init_sql) {
+            Ok(()) => break,
+            Err(rusqlite::Error::SqliteFailure(err, _))
+                if retries < MAX_INIT_RETRIES
+                    && matches!(
+                        err.code,
+                        rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked
+                    ) =>
+            {
+                retries += 1;
+                std::thread::sleep(RETRY_INTERVAL);
+            }
+            // Non-retryable error or retries exhausted: return the
+            // structured SQLite error without panicking.
+            Err(e) => return Err(sql_error(e)),
+        }
+    }
     connection
         .busy_timeout(std::time::Duration::from_secs(5))
         .map_err(sql_error)?;
-    connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS durable_bindings (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE);").map_err(sql_error)?;
     Ok(connection)
 }
 
@@ -738,5 +767,56 @@ mod tests {
             &PersistencePolicy::default(),
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn open_bindings_non_busy_error_returns_immediately() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("durable-bindings.sqlite");
+        // Write invalid content so Connection::open succeeds but the PRAGMA
+        // fails with SQLITE_NOTADB — not BUSY/LOCKED. The retry loop must
+        // NOT engage; the error returns in well under the 500 ms retry floor.
+        std::fs::write(&db_path, b"not a database").expect("write");
+        let start = std::time::Instant::now();
+        let result = open_bindings(&db_path);
+        let elapsed = start.elapsed();
+        assert!(result.is_err(), "should fail on corrupt database");
+        assert!(
+            matches!(result, Err(SessionError::DurableTurn(_))),
+            "expected DurableTurn, got {result:?}"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_millis(400),
+            "non-BUSY error took {elapsed:?}; should return immediately"
+        );
+    }
+
+    #[test]
+    fn open_bindings_busy_exhaustion_returns_structured_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("durable-bindings.sqlite");
+        // Create the database in default (rollback journal) mode and hold
+        // a write lock via BEGIN IMMEDIATE so open_bindings cannot change
+        // to WAL or create the schema table. With busy_timeout unset
+        // during init, every retry fails immediately; after 20 retries
+        // the function must return a structured SessionError, not panic.
+        let holder = Connection::open(&db_path).expect("open holder");
+        holder
+            .execute_batch("BEGIN IMMEDIATE; CREATE TABLE t(x);")
+            .expect("begin + create");
+        let result = open_bindings(&db_path);
+        assert!(
+            result.is_err(),
+            "should fail after retry exhaustion, got Ok"
+        );
+        match result {
+            Err(SessionError::DurableTurn(msg)) => {
+                assert!(
+                    msg.contains("binding index error"),
+                    "unexpected error message: {msg}"
+                );
+            }
+            other => panic!("expected DurableTurn, got {other:?}"),
+        }
     }
 }
