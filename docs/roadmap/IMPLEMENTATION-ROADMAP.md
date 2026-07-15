@@ -6,7 +6,11 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
-## Current Four-Month Scheduled Follow-Ups Sequence (2026-07-13)
+## Current Four-Month Product And Risk Plan (2026-07-15)
+
+The next candidate program is [`2026-07-15-four-month-product-risk-plan`](../tasks/2026-07-15-four-month-product-risk-plan.md), with its execution owner at [`2026-07-15-product-risk-execution-package`](../tasks/2026-07-15-product-risk-execution-package.md). It is ready for assignment but activates no iteration. It sequences a read-only rendered WEB-001 dashboard, TUI-030 composer history, TOOL-021's evidence-first audit, and ADR-gated TASK-001 and A2A-001 decisions. Historical Planned baselines I018-I020 remain deferred and must be disposed in an activation record before selecting any new iteration. No release, remote control, permission broadening, autonomous task execution, or multi-instance networking is authorized.
+
+## Completed Four-Month Scheduled Follow-Ups Sequence (2026-07-13)
 
 The completed I120-I123 reliability sequence is preserved in its owner docs. The current planning owner is
 [`2026-07-13-four-month-scheduled-followups-plan`](../tasks/2026-07-13-four-month-scheduled-followups-plan.md).
