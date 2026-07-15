@@ -26,7 +26,7 @@ index only; executable requirements remain in the owner docs listed below.
 | #25 thinking ripple animation | Closed | `TUI-028` | Native Alacritty review accepted the two-color, three-segment center-out ripple after `c68fd08`; visual-only semantics preserved. | Closed with maintainer evidence comment. |
 | #26 thinking content history | Closed | `TUI-029` | Typed reasoning history, safe resume projection, explicit `--include-thinking` export, and cancellation/error exclusion are implemented; owner record cites `6970af9`, `4ebf73e`, and `26211d3` plus workspace validation. | Closed during the 2026-07-15 issue refresh. |
 | #27 stale preview clear | Closed | `TUI-028` | Engine clears preview on cancel/error/turn lifecycle; conversation-loop tests cover terminal cleanup paths. | No action. |
-| #28 dashboard message format | Closed, superseded by #39 | `TUI-028` | Original issue remains unimplemented as transient notification; #39 is the active reopened issue. | Track through #39. |
+| #28 dashboard message format | Closed, superseded by #39 | `TUI-028` | #39 replaced the original requirement; its transient `UiOutput::Tip` behavior was later accepted with native PTY evidence. | No action. |
 | #31 model switch status-bar jump | Closed | `TUI-028` | Native Alacritty verification accepted compact model/provider status rendering after `823a8e0`; display-width truncation remains bounded. | Closed with maintainer evidence comment. |
 | #32 health-check thread proposal | Open | `RUNTIME-002` | RUNTIME-002 keeps health-check as optional future work; no background task added. | Keep open unless selected. |
 | #33 `/todo delete` | Closed | `TODO-002` | Implemented with confirmation and short-ID handling. | No action. |
@@ -46,6 +46,8 @@ index only; executable requirements remain in the owner docs listed below.
   - Closed #35.
   - Reopened #24.
   - Reopened #31.
+  - On 2026-07-15, closed #26 and confirmed #24, #25, #31, and #39 have subsequent accepted
+    closure evidence.
 - Local targeted tests added and run:
   - `cargo test -p talos-agent run_streaming_emits_error_event_on_provider_dispatch_timeout`
   - `cargo test -p talos-cli conversation_loop_clears_processing_on_dispatch_timeout_error`
