@@ -83,6 +83,122 @@ Micro-model output must be structured and bounded, for example:
 }
 ```
 
+## Reference Implementation: oh-my-pi Session Title Generator
+
+oh-my-pi (`can1357/oh-my-pi`, TypeScript) ships a non-authoritative micro-model helper
+for one specific task — session title generation — that already implements most of the
+architecture direction above. Treat it as an empirical data point when scoping this story,
+not as a port target: Talos is pure Rust and MODEL-002 is governed by Hard Boundaries
+below.
+
+### Dual-path dispatch (online default, local opt-in)
+
+The user picks one of three modes via `providers.tinyModel` (`models.ts:1-4`):
+
+| Key | Path | Default? |
+| --- | --- | --- |
+| `"online"` | `completeSimple()` against a configured `smol` role model via `pi-ai` | Yes — the session-title default |
+| `"lfm2-700m"` etc. | IPC to a hidden `__omp_worker_tiny_inference` subprocess running a local model | No — explicit user opt-in |
+| Anything else | Returns `null`, no fallback | Rejected after issue #3187 (silent billing leak) |
+
+The critical rule is **never silently fall back** from local to online. omp issue #3187:
+a user's local worker crashed, the code fell back through `priority.json` and silently
+billed the next provider holding an API key (OpenRouter in the reporter's case). After
+that, the local path returns `null` on any error and the session stays untitled —
+matching MODEL-002 Hard Boundary "low confidence → fall back to existing path".
+
+Entry: `generateSessionTitle()` — `packages/coding-agent/src/utils/title-generator.ts:72`.
+Online branch: `generateTitleOnline()` — same file line 142. Local branch:
+`tinyTitleClient.generate()` — `packages/coding-agent/src/tiny/title-client.ts:201`.
+
+### Deterministic pre-filter (intent / signal check)
+
+Before invoking any model, the first user message runs through
+`isLowSignalTitleInput()` (`packages/coding-agent/src/tiny/text.ts:127`):
+lowercase token match against a 78-entry filler set (`hi`, `hey`, `thanks`, `ok`, ...) plus
+digit-only tokens. If every word is filler, the generator returns `null` synchronously and
+the session stays unnamed until a substantive turn arrives. This mirrors the
+"deterministic rules first" flow in the Architecture Direction diagram.
+
+### Prompt and output contract (what to model after)
+
+`prompts/system/title-system.md` is 16 lines total:
+
+- 3-7 word target, sentence case, first word + names capitalized only;
+- `<title>...</title>` wrapping required, `<title/>` for "no task";
+- two worked examples in-prompt.
+
+The `<title>` wrapper — instead of a forced `tool_choice` JSON call — is chosen because
+some providers ignore or reject forced tool calls and then echo the prompt's
+`{"title": "..."}` example verbatim as the session title. Markers work uniformly. See
+`title-generator.ts:159-164` comment.
+
+`maxTokens=1024` is set deliberately — title is a 3-7 word task but some backends ignore
+`disableReasoning` and emit thinking tokens before the marker; raising the ceiling keeps
+the `<title>` reachable when reasoning is not actually suppressed (issue #4355).
+
+### Output parsing (anti-noise)
+
+`extractGeneratedTitle()` (`title-generator.ts:246`) strips three real-world failure modes
+before accepting the result:
+
+1. **Thinking-block leakage** — `<think>` / `<thinking>` / `<reasoning>` tags and
+   `` ```thinking `` fences are scanned; only `<title>` markers in *visible* text count
+   (sentinel-based visibility test at line 278).
+2. **JSON-shaped echo** — `unwrapJsonTitle()` (line 326) recovers the inner `title` field
+   if the model returns the structured shape it was trained on, including partial-JSON
+   salvage via `"title": "..."` regex.
+3. **Casing reconciliation** — `reconcileTitleCasing()` (`text.ts:186`) walks each title
+   token against the source message and applies a 5-rule decision tree: restore
+   user-cased identifiers (`TinyVMM`), restore ALL-CAPS acronyms the model
+   sentence-cased (`CNPG` → `Cnpg`), lowercase camelCase artifacts the model introduced
+   (`dAemon` → `daemon`), but never re-shout emphatic source text. Emphatic input is
+   detected via `isShoutySource()` (≥2 consecutive multi-letter ALL-CAPS tokens).
+
+### Worker lifecycle (Rust port reference)
+
+The local path runs in a refcount-shared subprocess:
+
+- `spawnTinyTitleWorker()` (`title-client.ts:169`) spawns the worker lazily, wraps it in
+  a `RefCountedWorkerHandle`.
+- `#failedModels: Set<TinyLocalModelKey>` (line 182) blacklists a key permanently after
+  the first failure — no retry storms.
+- `createUnavailableWorker()` is returned instead of throwing when spawn fails
+  (`title-client.ts:159`); `generate()` then returns `null` rather than degrading startup.
+- The whole process is a hidden subcommand dispatched by the omp CLI entrypoint
+  (`cli.ts` `__omp_worker_tiny_inference` selector). This matches the "must not make
+  startup fail when the local model is missing, slow, unsupported, or corrupted" Hard
+  Boundary.
+
+### Portable findings for MODEL-002
+
+When evaluating the three options in §Evaluation Plan, omp evidence suggests:
+
+- **Small models need non-trivial prompt engineering** (markers, examples, post-parse
+  cleanup). A pure-Rust inference engine is necessary but not sufficient — the binding
+  layer that protects the rest of the system from malformed output is half the work.
+- **The dual-path "online default, local opt-in" pattern** is compatible with MODEL-002's
+  "deterministic rules first, local model only for bounded hints". omp's online branch
+  is itself a "provider-backed hint" when the local path is unavailable, with no silent
+  switching.
+- **Failure isolation is the load-bearing property**, not raw inference speed. The
+  `#failedModels` blacklist + unavailable-worker fallback is what keeps the rest of omp
+  alive when the tiny worker misbehaves. Talos should design the equivalent gate before
+  benchmarking models.
+
+### Source anchors
+
+- `packages/coding-agent/src/utils/title-generator.ts` — dual-path dispatcher,
+  extractors, casing reconciliation, OSC 0 terminal title writer.
+- `packages/coding-agent/src/tiny/text.ts` — `FILLER_TITLE_TOKENS` set,
+  `isLowSignalTitleInput`, `reconcileTitleCasing`, `isShoutySource`.
+- `packages/coding-agent/src/tiny/title-client.ts` — `TinyTitleClient`, refcount
+  worker handle, `#failedModels` blacklist, unavailable-worker fallback.
+- `packages/coding-agent/src/tiny/models.ts` — `ONLINE_TINY_TITLE_MODEL_KEY`,
+  `DEFAULT_TINY_TITLE_LOCAL_MODEL_KEY = "lfm2-700m"`, local model spec table.
+- `packages/coding-agent/src/prompts/system/title-system.md`,
+  `title-marker-instruction.md` — the 16-line system prompt and the marker injection.
+
 ## Hard Boundaries
 
 - The local micro-model must not approve permissions.
