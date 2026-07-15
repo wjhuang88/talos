@@ -1,6 +1,6 @@
 # Iteration I127: Scheduler Reliability Closeout
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-13
 > Planned objective: prove scheduler cleanup, recovery, and operator documentation under failure
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -54,10 +54,11 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-13 | Planning | Blocked on I126 Complete; no activation claimed. |
+| 2026-07-15 | Activation | Gate 0 passed (workspace clean, rustc 1.97.0, governance 0 warnings, release preflight passed). I126 Complete. No other Active iteration. I127 activated; SF130-SF133 ready. |
 
 ## Verification Evidence
 
-- Pending activation.
+- Pending SF130-SF133 implementation.
 
 ## Variance And Residuals
 
