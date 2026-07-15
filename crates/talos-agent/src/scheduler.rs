@@ -3008,36 +3008,52 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn sf130_cmd_channel_full_does_not_panic() {
-        let (sq_tx, _sq_rx) = mpsc::channel(512);
-        let cancel_token = CancellationToken::new();
-        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+    async fn sf130_cmd_channel_full_returns_bounded_error() {
+        // Create a channel with capacity 4 and FILL it without a consumer.
+        // The sender must detect full capacity and return a bounded error
+        // via try_send — no panic, no infinite block.
+        let (cmd_tx, cmd_rx) = mpsc::channel::<ScheduleCommand>(4);
+        let _pending = PendingSchedulerActor { cmd_rx };
 
-        // Fill the cmd channel (cap=64) without the actor processing
-        // by sending Shutdown to stop processing first
-        // Actually, the actor IS processing. Let's just verify many commands work.
-        for i in 0..100 {
-            let (tx, rx) = oneshot::channel();
-            handle
-                .send(ScheduleCommand::RegisterOneShot {
-                    id: Some(format!("fill_{i}")),
+        // Fill all 4 slots
+        for i in 0..4 {
+            let (tx, _rx) = oneshot::channel::<ScheduleRegistrationResult>();
+            cmd_tx
+                .try_send(ScheduleCommand::RegisterOneShot {
+                    id: Some(format!("f{i}")),
                     message: format!("m{i}"),
                     delay: Duration::from_secs(3600),
                     response_tx: tx,
                 })
-                .await
-                .unwrap();
-            assert!(rx.await.is_ok(), "command {i} must succeed");
+                .expect("slot {i} should accept");
         }
 
-        let (ltx, lrx) = oneshot::channel();
-        handle
-            .send(ScheduleCommand::List { response_tx: ltx })
-            .await
-            .unwrap();
-        assert_eq!(lrx.await.unwrap().len(), 100, "all 100 commands processed");
+        // 5th slot must be rejected — channel is full
+        let result = cmd_tx.try_send(ScheduleCommand::Shutdown);
+        assert!(
+            matches!(result, Err(mpsc::error::TrySendError::Full(_))),
+            "5th command on capacity-4 channel must return Full, not panic"
+        );
 
-        handle.send(ScheduleCommand::Shutdown).await.unwrap();
+        // Tool-level: a tool using this handle should also see the failure.
+        // SchedulerHandle::send uses .await which blocks, but the tool wraps
+        // the error when the channel eventually closes. The bounded guarantee
+        // is: try_send returns Full immediately; no panic.
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn sf130_receiver_gone_produces_bounded_tool_error() {
+        let (cmd_tx, cmd_rx) = mpsc::channel::<ScheduleCommand>(64);
+        let handle = SchedulerHandle::new(cmd_tx);
+        drop(cmd_rx); // receiver gone — simulates actor shutdown
+
+        tokio::task::yield_now().await;
+
+        let result = handle.send(ScheduleCommand::Shutdown).await;
+        assert!(
+            result.is_err(),
+            "send after receiver gone must return Err, not hang or panic"
+        );
     }
 
     // ── SF131: Deterministic lifecycle stress suite ─────────────────────
@@ -3110,17 +3126,17 @@ mod tests {
         tokio::time::advance(Duration::from_secs(11)).await;
         yield_times(50).await;
 
-        // With MissedTickBehavior::Delay, each recurring task fires once
-        // (delayed tick). 10 tasks × 1 fire = ~10 messages.
+        // With MissedTickBehavior::Delay, each recurring task fires exactly
+        // once (delayed tick reschedules to now+interval). 10 tasks × 1 fire
+        // = 10 messages. Burst would produce 20 (2 per task at 2 boundaries).
         let mut count = 0;
         while sq_rx.try_recv().is_ok() {
             count += 1;
         }
-        assert!(
-            count <= 20,
-            "bounded fires: expected <= 20 for 10 tasks with Delay, got {count}"
+        assert_eq!(
+            count, 10,
+            "Delay produces exactly 10 fires (1 per task); Burst would produce 20. Got {count}"
         );
-        assert!(count >= 1, "at least some fires expected");
 
         handle.send(ScheduleCommand::Shutdown).await.unwrap();
     }

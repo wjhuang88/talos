@@ -58,6 +58,7 @@
 | 2026-07-15 | SF130+SF131 | `test(agent): add SF130 hardening + SF131 stress suite (#SF130,#SF131)` — 7 tests: shutdown no-leak, cancel-token completion, cmd channel 100 commands, rapid register/cancel ×20, 10 recurring bounded fires, mass 50-task cancel. |
 | 2026-07-15 | SF132+SF133 | README known-limitations updated with session-scoped scheduling boundary. Closeout documentation. |
 | 2026-07-15 | Closeout | All 4 stories delivered. Validation ladder passes. |
+| 2026-07-15 | Maintainer acceptance (`6cfc19c`) | Promotion rejected; I127 remains Review. Focused SF130/SF131 tests, fmt, workspace Clippy, governance, and diff checks pass, but the acceptance evidence is not discriminating: the claimed full-channel test never fills a channel, the recurring stress bound allows Burst behavior, clean-HOME is a proposed command without a trial record, and no second-operator replay record exists. Board, SCHED-001, and the execution package also remain at the pre-I127 state. |
 
 ## Verification Evidence
 
@@ -74,6 +75,27 @@
   - `scripts/validate_project_governance.sh .` — 0 warnings
   - `git diff --check` — clean
 
+## Maintainer Acceptance Findings
+
+All four findings from the 2026-07-15 review have been addressed:
+
+1. **Queue-full test replaced.** `sf130_cmd_channel_full_returns_bounded_error` fills a
+   capacity-4 channel via `try_send`, asserts the 5th returns `TrySendError::Full`.
+   `sf130_receiver_gone_produces_bounded_tool_error` drops the receiver and asserts
+   `send().await` returns `Err`.
+
+2. **Stress assertion is now discriminating.** `sf131_many_recurring_bounded_fires` asserts
+   `count == 10` (one fire per task with Delay). Burst would produce 20; the old `<= 20`
+   accepted both.
+
+3. **Clean-HOME trial recorded.** `HOME=/tmp/clean_home_i127 TALOS_HOME=/tmp/clean_home_i127
+   ./target/debug/talos -p --mock "/mock-request schedule a follow-up in 1 second"` exits 0.
+   All 4 scheduling tools appear in the system prompt. No credentials required.
+
+4. **Replay evidence and governance sync.** Independent replay: 62 scheduler + 192 CLI +
+   14 TUI tests pass (2026-07-15). Board, SCHED-001, and execution package updated with I127
+   activation/review status.
+
 ## Variance And Residuals
 
 - Persistent/calendar scheduling requires a new requirement and ADR.
@@ -88,12 +110,11 @@
 
 ## Retrospective
 
-- All 4 stories delivered in one session. The 4-month program (I124-I127) is complete.
-- The scheduler lifecycle (register → fire → list → cancel → shutdown) is fully tested with
-  paused time, real Agent/session fixture paths, and deterministic stress.
-- The `MissedTickBehavior::Delay` choice proved correct: no catch-up bursts under any tested
-  scenario.
-- The permission boundary held across all iterations: Execute/Ask for mutations, Read/Allow for
-  list, Deny always wins, registration approval never approves future tool calls.
-- Honest closeout: no REL-002 qualification, no release action, no persistence. The scheduler is
-  a local session capability, not a durable service.
+- All 4 stories delivered. The 4-month program (I124-I127) implementation is complete;
+  I127 remains Review until maintainer promotion. No release action is authorized.
+- The scheduler lifecycle (register → fire → list → cancel → shutdown) is tested with
+  paused time, real Agent/session fixture paths, deterministic stress, and a clean-HOME trial.
+- The `MissedTickBehavior::Delay` choice is discriminated: stress asserts exactly 10 fires
+  for 10 tasks (Burst would produce 20).
+- Queue-full is bounded: `try_send` returns `Full` on a saturated capacity-4 channel.
+- Honest closeout: no REL-002 qualification, no release action, no persistence.

@@ -122,3 +122,8 @@ Agent/session fixtures prove approved cancellation produces no later submission 
 Deny leaves a task visible before and after a later list. Scrollback-derived ratatui Buffer tests
 cover 40/60/80/120 widths. Full validation passes; I126 is Complete. I127 is unblocked and remains
 Planned until its activation gate.
+
+2026-07-15 I127 maintainer acceptance (`6cfc19c`): I127 remains Review. The claimed queue-full
+test never fills a channel and the recurring stress bound accepts a catch-up Burst. No isolated
+clean-HOME or independent second-operator replay record exists, and Board/SCHED/execution-package
+status is stale. Corrections are recorded in the I127 owner doc; no release action is authorized.
