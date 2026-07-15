@@ -610,6 +610,9 @@ RUST_LOG=talos=debug talos
 - No remote multi-user service, marketplace, or browser automation.
 - No WASM plugin runtime or PDF/Office document extraction.
 - Self-bootstrap qualification (REL-002) is not yet met; `v1.0` is not claimable.
+- Scheduled follow-ups (`delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task`) are
+  session-scoped only: tasks die when the process exits, are never persisted, and cannot survive a
+  restart. No cron, calendar, or background daemon is planned for v1.
 
 ## Contributing And Local Checks
 
