@@ -21,6 +21,7 @@ use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
 use talos_sandbox::SandboxProvider;
+use talos_session::{DurableSession, PersistencePolicy};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -48,6 +49,10 @@ pub enum RuntimeError {
     /// The underlying agent returned an error.
     #[error("agent error: {0}")]
     Agent(#[from] AgentError),
+
+    /// A durable session could not be read or committed.
+    #[error("durable session error: {0}")]
+    Session(#[from] talos_session::SessionError),
 }
 
 /// Result alias for runtime facade operations.
@@ -87,6 +92,7 @@ pub struct RuntimeBuilder {
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
     custom_prompt: Option<String>,
     append_prompt: Option<String>,
+    durable_session: Option<(DurableSession, PersistencePolicy)>,
 }
 
 impl RuntimeBuilder {
@@ -105,6 +111,7 @@ impl RuntimeBuilder {
             approval_handler: None,
             custom_prompt: None,
             append_prompt: None,
+            durable_session: None,
         }
     }
 
@@ -192,6 +199,30 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Binds this runtime to a host-selected durable Talos session.
+    ///
+    /// The session's model history is restored during [`Self::build`]. Every
+    /// successful turn is atomically persisted by Talos before its success
+    /// completion event is emitted; failed, cancelled, and denied turns are
+    /// not persisted. Calling this is optional and does not alter the existing
+    /// in-memory runtime behavior when omitted.
+    #[must_use]
+    pub fn durable_session(mut self, session: DurableSession) -> Self {
+        self.durable_session = Some((session, PersistencePolicy::default()));
+        self
+    }
+
+    /// Sets the filtering policy for a durable session binding.
+    #[must_use]
+    pub fn durable_session_with_policy(
+        mut self,
+        session: DurableSession,
+        policy: PersistencePolicy,
+    ) -> Self {
+        self.durable_session = Some((session, policy));
+        self
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned handle owns the command sender, event receiver, and actor
@@ -230,13 +261,21 @@ impl RuntimeBuilder {
         if let Some(prompt) = self.append_prompt {
             agent.set_append_prompt(prompt);
         }
+        let initial_history = if let Some((session, _)) = &self.durable_session {
+            session.read_messages()?
+        } else {
+            self.initial_history
+        };
         let config = SessionConfig {
             runtime_policy: RuntimePolicy::headless_deny(),
             workspace_root: self.workspace_root,
-            initial_history: self.initial_history,
+            initial_history,
             model_context_limit: self.model_context_limit,
         };
         let (handle, mut actor) = AppServerSession::new(agent, config);
+        if let Some((session, policy)) = self.durable_session {
+            actor.set_durable_persistence(session, policy);
+        }
         let actor_task = tokio::spawn(async move {
             actor.run().await;
         });
@@ -467,6 +506,7 @@ mod tests {
     use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
     use talos_permission::PermissionDecision;
     use talos_provider::mock::MockProvider;
+    use talos_session::SessionManager;
 
     use super::*;
 
@@ -884,6 +924,59 @@ mod tests {
         ));
 
         runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn durable_runtime_restores_history_and_reports_committed_entries() {
+        let directory = std::env::temp_dir().join(format!(
+            "talos-runtime-durable-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock after epoch")
+                .as_nanos()
+        ));
+        let manager = SessionManager::with_dir(directory.clone());
+        let session = manager
+            .create_or_open_session("task:durable-runtime")
+            .expect("durable session");
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(
+                MockProvider::new().with_response("persisted answer"),
+            ))
+            .durable_session(session.clone())
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("persist this user turn")
+            .await
+            .expect("submit");
+        let mut committed = false;
+        while let Some(event) = runtime.next_event().await {
+            if let SessionEvent::EntriesCommitted { entry_ids, .. } = &event {
+                committed = !entry_ids.is_empty();
+            }
+            if matches!(
+                event,
+                SessionEvent::TurnEvent {
+                    payload: talos_core::session::TurnEventPayload::Completed { .. },
+                    ..
+                }
+            ) {
+                break;
+            }
+        }
+        assert!(committed, "durable success must report committed entry IDs");
+        runtime.shutdown().await.expect("shutdown");
+
+        let restored = manager
+            .get_session_by_external_id("task:durable-runtime")
+            .expect("lookup")
+            .expect("binding exists");
+        let history = restored.read_messages().expect("history");
+        assert!(history.iter().any(|message| matches!(message, Message::User { content } if content == "persist this user turn")));
+        assert!(history.iter().any(|message| matches!(message, Message::Assistant { content, .. } if content == "persisted answer")));
+        std::fs::remove_dir_all(directory).expect("cleanup");
     }
 
     #[tokio::test]

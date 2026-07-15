@@ -154,6 +154,30 @@ cargo build --release -p talos-cli
 ./target/release/talos --help
 ```
 
+### Embedded Durable Runtime Session
+
+An embedding host can keep Talos model history in a host-selected directory without using
+`~/.talos`. The host persists only its stable logical ID; Talos maps it to a UUID-named TLOG and
+keeps the binding/index under the supplied directory.
+
+```rust
+use std::sync::Arc;
+use talos_runtime::RuntimeBuilder;
+use talos_session::SessionManager;
+
+let manager = SessionManager::with_dir(app_data_dir.join("messages"));
+let session = manager.create_or_open_session("assistant:account-uuid")?;
+let runtime = RuntimeBuilder::new()
+    .provider(provider)
+    .durable_session(session)
+    .build()?;
+```
+
+Durable runtime turns are committed atomically only after success. Rebuilding with the same
+external ID restores model context automatically. Failed, interrupted, and denied turns are not
+persisted. The transcript excludes raw provider responses and authentication material; host UI
+state, approval audits, artifacts, and provider conversation IDs remain host-owned.
+
 To build all release artifacts locally:
 
 ```bash

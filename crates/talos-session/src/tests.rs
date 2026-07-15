@@ -863,6 +863,7 @@ fn backward_compatibility_with_old_jsonl_format() {
 #[test]
 fn session_metadata_serialization() {
     let metadata = SessionMetadata {
+        turn_id: None,
         provider: Some("anthropic".into()),
         model: Some("claude-sonnet-4".into()),
         token_count: Some(1500),
@@ -889,6 +890,7 @@ fn session_entry_serialization() {
         role: "user".into(),
         content: "Hello".into(),
         metadata: SessionMetadata {
+            turn_id: None,
             provider: Some("anthropic".into()),
             model: Some("claude".into()),
             token_count: None,

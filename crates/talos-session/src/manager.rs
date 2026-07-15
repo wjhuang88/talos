@@ -2,7 +2,7 @@ use crate::sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
 use crate::store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
 use crate::todo::{TodoError, TodoRepository};
 use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
-use crate::{Session, SessionError, SessionInfo};
+use crate::{DurableSession, Session, SessionError, SessionInfo};
 use chrono::{DateTime, Duration, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -111,6 +111,40 @@ impl SessionManager {
             store: Arc::new(CompactTextSessionStore),
             jsonl_store: Arc::new(JsonlSessionStore),
         }
+    }
+
+    /// Creates or opens a UUID-backed durable session for a host logical ID.
+    ///
+    /// The external ID is stored only in a colocated binding index; it is never
+    /// used as a path component or filename.
+    pub fn create_or_open_session(
+        &self,
+        external_id: &str,
+    ) -> Result<DurableSession, SessionError> {
+        crate::durable::create_or_open(&self.sessions_dir, external_id)
+    }
+
+    /// Looks up a durable session by its host logical ID without creating one.
+    pub fn get_session_by_external_id(
+        &self,
+        external_id: &str,
+    ) -> Result<Option<DurableSession>, SessionError> {
+        crate::durable::get_by_external_id(&self.sessions_dir, external_id)
+    }
+
+    /// Returns whether a UUID-backed session exists without accepting a path.
+    pub fn session_exists(&self, id: &Uuid) -> bool {
+        self.get_session(id).is_ok()
+    }
+
+    /// Reads all normalized entries for a UUID-backed session.
+    pub fn read_session(&self, id: &Uuid) -> Result<Vec<crate::SessionEntry>, SessionError> {
+        self.get_session(id)?.read_entries()
+    }
+
+    /// Returns the byte size of a UUID-backed session file.
+    pub fn session_size(&self, id: &Uuid) -> Result<u64, SessionError> {
+        Ok(fs::metadata(self.find_session_file(id)?)?.len())
     }
 
     /// Return the root directory used for session JSONL files and the colocated index.
@@ -550,6 +584,7 @@ impl SessionManager {
         if file_path.exists() {
             fs::remove_file(&file_path)?;
         }
+        crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
         if let Ok(mut guard) = self.get_or_create_index() {
             if let Some(index) = guard.as_mut() {
                 let _ = index.delete_session(&id.to_string());

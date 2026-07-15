@@ -13,6 +13,9 @@ use uuid::Uuid;
 /// at the time the entry was created.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionMetadata {
+    /// Durable runtime turn that committed this entry, when applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,7 +33,8 @@ pub struct SessionMetadata {
 impl SessionMetadata {
     /// Returns `true` if all fields are `None`.
     pub(crate) fn is_empty(&self) -> bool {
-        self.provider.is_none()
+        self.turn_id.is_none()
+            && self.provider.is_none()
             && self.model.is_none()
             && self.token_count.is_none()
             && self.working_directory.is_none()

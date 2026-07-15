@@ -41,6 +41,18 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// A durable embedded session has atomically committed a completed turn.
+    ///
+    /// Emitted only after durable storage reports success. Existing unbound
+    /// runtimes never emit this event.
+    EntriesCommitted {
+        /// UUID-backed durable session identity.
+        session_id: String,
+        /// Idempotency identity of the committed turn.
+        turn_id: String,
+        /// Stable persisted entry IDs in transcript order.
+        entry_ids: Vec<String>,
+    },
     /// Canonical ordered event for one user turn.
     ///
     /// In-tree runtime consumers must use this envelope instead of inferring

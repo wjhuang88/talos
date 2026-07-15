@@ -31,4 +31,12 @@ pub enum SessionError {
     /// A per-session internal mutex was poisoned by a panicking thread.
     #[error("session lock poisoned")]
     LockPoisoned,
+
+    /// A host-provided external session identifier is invalid.
+    #[error("invalid external session identifier: {0}")]
+    InvalidExternalId(String),
+
+    /// A durable turn cannot be committed because its persisted state is inconsistent.
+    #[error("durable turn error: {0}")]
+    DurableTurn(String),
 }

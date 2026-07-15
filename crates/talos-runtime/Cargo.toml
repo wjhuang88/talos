@@ -15,6 +15,7 @@ talos-agent = { version = "0.3.4", path = "../talos-agent" }
 talos-core = { version = "0.3.4", path = "../talos-core" }
 talos-permission = { version = "0.3.4", path = "../talos-permission" }
 talos-sandbox = { version = "0.3.4", path = "../talos-sandbox" }
+talos-session = { version = "0.3.4", path = "../talos-session" }
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "sync"] }
 

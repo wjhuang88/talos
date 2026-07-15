@@ -18,6 +18,7 @@
 //!
 //! See `docs/decisions/037-compact-text-session-log-format.md` for the full design.
 
+use crate::store::temporary_sibling;
 use crate::{SessionEntry, SessionError, SessionInfo, SessionMetadata};
 use chrono::Utc;
 use std::fs::{self, OpenOptions};
@@ -67,6 +68,34 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         let mut file = OpenOptions::new().append(true).open(file_path)?;
         file.write_all(line.as_bytes())?;
         file.flush()?;
+        Ok(())
+    }
+
+    fn replace_entries_atomically(
+        &self,
+        file_path: &Path,
+        entries: &[SessionEntry],
+    ) -> Result<(), SessionError> {
+        let parent = file_path.parent().ok_or_else(|| {
+            SessionError::ParseError("session file has no parent directory".into())
+        })?;
+        fs::create_dir_all(parent)?;
+        let temporary = temporary_sibling(file_path);
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)?;
+        writeln!(
+            file,
+            "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
+            Utc::now().timestamp_millis()
+        )?;
+        for entry in entries {
+            file.write_all(encode_entry(entry).as_bytes())?;
+        }
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, file_path)?;
         Ok(())
     }
 
@@ -535,6 +564,7 @@ mod tests {
         let path = dir.join("meta.tlog");
 
         let meta = SessionMetadata {
+            turn_id: None,
             provider: Some("anthropic".into()),
             model: Some("claude-sonnet-4".into()),
             token_count: Some(42),
@@ -719,6 +749,7 @@ mod tests {
                     "This is message number {i} with some content to simulate a real conversation."
                 ),
                 metadata: SessionMetadata {
+                    turn_id: None,
                     provider: Some("anthropic".into()),
                     model: Some("claude-sonnet-4-20250514".into()),
                     token_count: Some(100 + i as u32),

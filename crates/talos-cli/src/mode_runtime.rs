@@ -30,6 +30,7 @@ pub(crate) fn request_preview_payload(input: &str) -> Option<String> {
 
 pub(crate) fn session_metadata_for_model(model: &str, provider: &str) -> SessionMetadata {
     SessionMetadata {
+        turn_id: None,
         provider: (!provider.is_empty()).then(|| provider.to_string()),
         model: (!model.is_empty()).then(|| model.to_string()),
         token_count: None,

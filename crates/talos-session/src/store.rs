@@ -7,7 +7,7 @@ use crate::{SessionEntry, SessionError, SessionInfo, SessionMetadata};
 use chrono::Utc;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use talos_core::message::Message;
 use uuid::Uuid;
 
@@ -23,6 +23,16 @@ pub trait SessionStore: Send + Sync + std::fmt::Debug {
 
     /// Append a single entry to a session file.
     fn append_entry(&self, file_path: &Path, entry: &SessionEntry) -> Result<(), SessionError>;
+
+    /// Replace a complete log using a temporary sibling file and atomic rename.
+    ///
+    /// Used only by durable turn commits, where all entries for a successful
+    /// turn must become visible together.
+    fn replace_entries_atomically(
+        &self,
+        file_path: &Path,
+        entries: &[SessionEntry],
+    ) -> Result<(), SessionError>;
 
     /// Read the ID of the last entry in the file.
     fn read_last_entry_id(&self, file_path: &Path) -> Option<String>;
@@ -65,6 +75,31 @@ impl SessionStore for JsonlSessionStore {
             .open(file_path)?;
         writeln!(file, "{line}")?;
 
+        Ok(())
+    }
+
+    fn replace_entries_atomically(
+        &self,
+        file_path: &Path,
+        entries: &[SessionEntry],
+    ) -> Result<(), SessionError> {
+        let parent = file_path.parent().ok_or_else(|| {
+            SessionError::ParseError("session file has no parent directory".into())
+        })?;
+        fs::create_dir_all(parent)?;
+        let temporary = temporary_sibling(file_path);
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)?;
+        for entry in entries {
+            let line = serde_json::to_string(entry)
+                .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+            writeln!(file, "{line}")?;
+        }
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, file_path)?;
         Ok(())
     }
 
@@ -131,6 +166,15 @@ impl SessionStore for JsonlSessionStore {
     fn file_extension(&self) -> &'static str {
         "jsonl"
     }
+}
+
+/// Returns a UUID-named temporary file next to a session file.
+pub(crate) fn temporary_sibling(file_path: &Path) -> PathBuf {
+    let file_name = file_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("session");
+    file_path.with_file_name(format!(".{file_name}.{}.tmp", Uuid::new_v4()))
 }
 
 fn read_last_entry_id(path: &Path) -> Option<String> {

@@ -33,6 +33,7 @@
 mod compact_text;
 pub mod compaction_engine;
 mod compression;
+mod durable;
 mod error;
 mod jsonl;
 mod manager;
@@ -46,6 +47,9 @@ mod transcript;
 pub use tool_compression::{ToolOutputCompression, compress_tool_output};
 mod types;
 
+pub use durable::{
+    DurableSession, DurableTranscriptEntry, PersistencePolicy, SessionCapabilities, TurnCommit,
+};
 pub use error::SessionError;
 pub use manager::{
     SessionCleanupCandidate, SessionCleanupPolicy, SessionCleanupReport, SessionManager,

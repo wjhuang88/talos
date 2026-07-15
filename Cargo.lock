@@ -5795,6 +5795,7 @@ dependencies = [
  "talos-permission",
  "talos-provider",
  "talos-sandbox",
+ "talos-session",
  "thiserror 2.0.18",
  "tokio",
 ]

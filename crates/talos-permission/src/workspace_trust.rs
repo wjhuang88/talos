@@ -126,12 +126,21 @@ pub fn is_within_repo(repo_root: &Path, target: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(1);
+
+    fn test_directory(label: &str) -> PathBuf {
+        let sequence = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+        let directory =
+            std::env::temp_dir().join(format!("{label}-{}-{sequence}", std::process::id()));
+        std::fs::create_dir_all(&directory).expect("create isolated test directory");
+        directory
+    }
 
     #[test]
     fn trust_store_grant_and_check() {
-        let dir = std::env::temp_dir().join("trust_test_grant");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_directory("trust_test_grant");
 
         let store = WorkspaceTrustStore::new(&dir);
         let ws = dir.join("my-project");
@@ -150,9 +159,7 @@ mod tests {
 
     #[test]
     fn trust_store_persists_across_instances() {
-        let dir = std::env::temp_dir().join("trust_test_persist");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_directory("trust_test_persist");
 
         let ws = dir.join("workspace-a");
         std::fs::create_dir_all(&ws).unwrap();
@@ -175,9 +182,7 @@ mod tests {
 
     #[test]
     fn is_git_workspace_detects_git_dir() {
-        let dir = std::env::temp_dir().join("trust_test_git");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_directory("trust_test_git");
 
         assert!(!is_git_workspace(&dir));
 
@@ -189,9 +194,7 @@ mod tests {
 
     #[test]
     fn is_within_repo_boundary_check() {
-        let dir = std::env::temp_dir().join("trust_test_boundary");
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = test_directory("trust_test_boundary");
         std::fs::create_dir_all(dir.join("subdir")).unwrap();
 
         let inner = dir.join("subdir").join("file.txt");

@@ -160,6 +160,7 @@ docs/iterations/
 | I125 | Recurring Scheduled Follow-Ups | **Complete (2026-07-14)** | Additive API compatibility, discriminating Delay semantics, competing-ready Cancel/Shutdown boundaries, fresh permission isolation, 9-root wiring, real configured-provider recurring turns, documentation, and the full validation ladder pass. See `I125-recurring-scheduled-followups.md`. |
 | I126 | Schedule Inspection And Control | **Complete (2026-07-15)** | Read-only no-message 20-row list cap; Execute/Ask cancel with approved no-fire and denied-unchanged real-session proof; multi-tick snapshots; semantic 40/60/80/120 scrollback Buffer coverage; full validation green. See `I126-schedule-inspection-control.md`. |
 | I127 | Scheduler Reliability Closeout | **Complete** (2026-07-15) | Month 4. SF130-SF133 closed: bounded production queue failures, deterministic lifecycle stress, clean-HOME independent replay packet, README limitations, and full validation. See `I127-scheduler-reliability-closeout.md`. |
+| I128 | Embedded Durable Runtime Sessions | **Complete** (2026-07-15) | Host-selected UUID TLOG sessions, opaque external-ID binding, atomic durable turns, filtered transcript/lifecycle APIs, and Runtime auto-recovery with committed-entry events. See `I128-embedded-durable-runtime-sessions.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.

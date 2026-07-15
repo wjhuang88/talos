@@ -149,6 +149,7 @@ mod tests {
             role: role.into(),
             content: content.into(),
             metadata: SessionMetadata {
+                turn_id: None,
                 provider: Some("anthropic".into()),
                 model: Some("claude-sonnet-4-20250514".into()),
                 token_count: Some(42),

@@ -30,7 +30,9 @@ mod turn;
 #[allow(warnings)]
 mod tests;
 
-use turn::{TurnForwarding, TurnPersistence, TurnRecord, run_turn_with_forwarding};
+use turn::{
+    DurableTurnPersistence, TurnForwarding, TurnPersistence, TurnRecord, run_turn_with_forwarding,
+};
 
 static NEXT_RUNTIME_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -47,7 +49,9 @@ pub struct AppServerSession {
     session_file: Option<PathBuf>,
     session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
+    durable_persistence: Option<DurableTurnPersistence>,
     session_id: String,
+    turn_prefix: String,
 }
 
 impl AppServerSession {
@@ -65,6 +69,7 @@ impl AppServerSession {
 
         let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
 
+        let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let actor = Self {
             agent: Arc::new(agent),
             sq_rx,
@@ -74,11 +79,11 @@ impl AppServerSession {
             session_file: None,
             session_dir: None,
             persistence: None,
-            session_id: format!(
-                "runtime_{}_{}",
-                std::process::id(),
-                NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed)
-            ),
+            durable_persistence: None,
+            session_id: format!("runtime_{}_{}", std::process::id(), instance_id),
+            // Keep durable turn IDs unique across Runtime reconstruction. A host that
+            // needs retry idempotency supplies the stable ID to `DurableSession`.
+            turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
         };
 
         (handle, actor)
@@ -97,6 +102,16 @@ impl AppServerSession {
     ) {
         self.session_id = session.id.to_string();
         self.persistence = Some(TurnPersistence { session, metadata });
+    }
+
+    /// Assigns an atomic durable session used only by the embedded runtime.
+    pub fn set_durable_persistence(
+        &mut self,
+        session: talos_session::DurableSession,
+        policy: talos_session::PersistencePolicy,
+    ) {
+        self.session_id = session.id().to_string();
+        self.durable_persistence = Some(DurableTurnPersistence { session, policy });
     }
 
     /// Runs the session actor loop until shutdown or SQ disconnect.
@@ -125,7 +140,7 @@ impl AppServerSession {
                     }
 
                     turn_counter += 1;
-                    let turn_id = format!("turn_{turn_counter}");
+                    let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
 
                     let _ = self.eq_tx.send(SessionEvent::TurnEvent {
                         session_id: self.session_id.clone(),
@@ -174,6 +189,7 @@ impl AppServerSession {
                     let token_clone = token.clone();
                     let history = self.history.clone();
                     let persistence = self.persistence.clone();
+                    let durable_persistence = self.durable_persistence.clone();
                     let session_id = self.session_id.clone();
 
                     let handle = tokio::spawn(async move {
@@ -192,6 +208,7 @@ impl AppServerSession {
                             session_id,
                             sequence,
                             persistence,
+                            durable_persistence,
                             result_tx,
                         }))
                         .catch_unwind()
@@ -211,7 +228,7 @@ impl AppServerSession {
                     }
 
                     turn_counter += 1;
-                    let turn_id = format!("turn_{turn_counter}");
+                    let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
 
                     let _ = self.eq_tx.send(SessionEvent::TurnEvent {
                         session_id: self.session_id.clone(),

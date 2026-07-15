@@ -18,6 +18,12 @@ pub(super) struct TurnPersistence {
     pub(super) metadata: talos_session::SessionMetadata,
 }
 
+#[derive(Clone)]
+pub(super) struct DurableTurnPersistence {
+    pub(super) session: talos_session::DurableSession,
+    pub(super) policy: talos_session::PersistencePolicy,
+}
+
 pub(super) struct TurnRecord {
     pub(super) new_messages: Vec<Message>,
 }
@@ -34,6 +40,7 @@ pub(super) struct TurnForwarding {
     pub(super) session_id: String,
     pub(super) sequence: Arc<AtomicU64>,
     pub(super) persistence: Option<TurnPersistence>,
+    pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
 }
 
@@ -50,6 +57,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         session_id,
         sequence,
         persistence,
+        durable_persistence,
         result_tx,
     } = turn;
 
@@ -130,8 +138,38 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                         status: TurnCompletionStatus::Error { message },
                     },
                 });
-                let _ = result_tx.send(TurnRecord { new_messages });
                 return;
+            }
+            let persisted_entry_ids = if let Some(persistence) = durable_persistence {
+                match persistence
+                    .session
+                    .commit_turn(&turn_id, &new_messages, &persistence.policy)
+                {
+                    Ok(commit) => commit.entry_ids,
+                    Err(error) => {
+                        let sequence = sequence.fetch_add(1, Ordering::Relaxed);
+                        let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
+                            session_id,
+                            turn_id,
+                            sequence,
+                            payload: TurnEventPayload::Completed {
+                                status: TurnCompletionStatus::Error {
+                                    message: format!("failed to persist completed turn: {error}"),
+                                },
+                            },
+                        });
+                        return;
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            if !persisted_entry_ids.is_empty() {
+                let _ = eq_tx_clone.send(SessionEvent::EntriesCommitted {
+                    session_id: session_id.clone(),
+                    turn_id: turn_id.clone(),
+                    entry_ids: persisted_entry_ids,
+                });
             }
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
