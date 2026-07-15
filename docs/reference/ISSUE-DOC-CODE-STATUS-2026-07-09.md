@@ -1,13 +1,13 @@
-# Issue / Document / Code Status Audit — 2026-07-09
+# Issue / Document / Code Status Audit — 2026-07-15
 
 This audit reconciles GitHub issues, local owner docs, and implementation evidence after the
-I106-I109 self-bootstrap closeout review. It is a status index only; executable requirements remain
-in the owner docs listed below.
+I106-I109 self-bootstrap closeout review and the 2026-07-15 remote-state refresh. It is a status
+index only; executable requirements remain in the owner docs listed below.
 
 ## Summary
 
-- Fixed and synchronized: #18, #35.
-- Correctly open after audit: #22, #24, #25, #26, #31, #39.
+- Fixed and synchronized: #18, #24, #25, #26, #31, #35, #39.
+- Correctly open after refresh: #22, #29, #30, #32, #36, #37, #38, #40.
 - Correctly closed from the earlier issue batch: #19, #20, #21, #23, #27, #33, #34.
 - Proposal/open backlog still needs separate intake or activation: #29, #30, #32, #36, #37, #38,
   #40.
@@ -22,12 +22,12 @@ in the owner docs listed below.
 | #21 git diff tool | Closed | `TOOL-018`, `TOOL-020` | Unified/staged/path-filtered git diff implemented; ref-to-ref comparison intentionally deferred to `TOOL-020`. | No action unless ref-to-ref is reselected. |
 | #22 workspace trust sandbox | Open | `PERM-004`, `PERM-005` | Design updated: non-Git strict mode; Git repo-root sandbox only after approval; bash/exec broadening waits for touched-path evidence/enforcement. | Keep open. |
 | #23 bash exit code classification | Closed | `TOOL-019` | Expected non-zero exit codes classified without false tool error. | No action. |
-| #24 processing animation cadence | Open | `TUI-028` | Code has a 50ms render interval, but no runtime/visual proof under heavy rendering or long-output load. | Reopened; add evidence or implementation. |
-| #25 thinking ripple animation | Open | `TUI-028` | Current code animates the `"thinking"` label gradient; it does not implement the requested two-color three-segment center-out ripple block animation. | Keep open; implement or revise requirement. |
-| #26 thinking content history | Open | `TUI-029` | ADR-034 v4 approved the bounded display projection on 2026-07-10. Implementation has not started; TUI-029 is Ready for Implementation in a new iteration. | Keep open until code, runtime evidence, and owner-doc acceptance are complete. |
+| #24 processing animation cadence | Closed | `TUI-028` | I114 native Alacritty PTY evidence accepted stable runtime cadence after `c68fd08`; closeout `072c726`. | Closed with maintainer evidence comment. |
+| #25 thinking ripple animation | Closed | `TUI-028` | Native Alacritty review accepted the two-color, three-segment center-out ripple after `c68fd08`; visual-only semantics preserved. | Closed with maintainer evidence comment. |
+| #26 thinking content history | Closed | `TUI-029` | Typed reasoning history, safe resume projection, explicit `--include-thinking` export, and cancellation/error exclusion are implemented; owner record cites `6970af9`, `4ebf73e`, and `26211d3` plus workspace validation. | Closed during the 2026-07-15 issue refresh. |
 | #27 stale preview clear | Closed | `TUI-028` | Engine clears preview on cancel/error/turn lifecycle; conversation-loop tests cover terminal cleanup paths. | No action. |
 | #28 dashboard message format | Closed, superseded by #39 | `TUI-028` | Original issue remains unimplemented as transient notification; #39 is the active reopened issue. | Track through #39. |
-| #31 model switch status-bar jump | Open | `TUI-028` | Code truncates labels, but no runtime/visual evidence proves transition stability. | Reopened; add evidence or implementation. |
+| #31 model switch status-bar jump | Closed | `TUI-028` | Native Alacritty verification accepted compact model/provider status rendering after `823a8e0`; display-width truncation remains bounded. | Closed with maintainer evidence comment. |
 | #32 health-check thread proposal | Open | `RUNTIME-002` | RUNTIME-002 keeps health-check as optional future work; no background task added. | Keep open unless selected. |
 | #33 `/todo delete` | Closed | `TODO-002` | Implemented with confirmation and short-ID handling. | No action. |
 | #34 todo create idempotency | Closed | `TODO-002` | Implemented with idempotent create/batch behavior. | No action. |
@@ -35,12 +35,12 @@ in the owner docs listed below.
 | #36 tool error propagation audit | Open | None selected in this audit | Not audited here. | Needs owner doc or selection. |
 | #37 input history up/down | Open | None selected in this audit | Not implemented here. | Needs owner doc or selection. |
 | #38 long-running task engine | Open | None selected in this audit | Not implemented here. | Needs owner doc or selection. |
-| #39 dashboard transient notification | Open | `TUI-028` | Not implemented: dashboard availability still enters persistent scrollback as System stream line. | Keep open. |
+| #39 dashboard transient notification | Closed | `TUI-028` | Native Alacritty evidence accepted `UiOutput::Tip` routing with no stale output or blank startup row after `823a8e0`; closeout `072c726`. | Closed with maintainer evidence comment. |
 | #40 multi-Talos discovery/communication | Open | None selected in this audit | Not implemented here. | Needs requirement intake; high architecture risk. |
 
 ## Verification Performed
 
-- GitHub issue states checked with `gh issue list --state all --limit 80`.
+- GitHub issue states checked with `gh issue list --state all --limit 100` on 2026-07-15.
 - GitHub status sync performed:
   - Closed #18.
   - Closed #35.
@@ -60,6 +60,6 @@ in the owner docs listed below.
 
 ## Residual Rule
 
-Do not close #24, #25, #31, or #39 until the owner doc records direct runtime/visual evidence or a
-reviewed requirement change. #26 may now be implemented only within ADR-034 v4 and TUI-029's
-activation/test gates; the issue remains open until runtime evidence closes acceptance.
+Keep #22, #29, #30, #32, #36, #37, #38, and #40 open until their owner docs record an activated,
+validated implementation or an explicit reviewed disposition. Do not reopen #24, #25, #26, #31, or
+#39 without contrary runtime/visual evidence or a new requirement.
