@@ -658,13 +658,25 @@ mod tests {
 
     // ── Schedule tool ratatui Buffer rendering (I126 acceptance) ────────
 
-    fn render_text_to_buffer(text: &str, width: u16) -> (ratatui::buffer::Buffer, u16) {
-        let line_count = text.lines().count().max(1) as u16;
-        let height = line_count.max(1);
+    fn render_tool_result_to_buffer(
+        display: &ToolResultDisplay,
+        width: u16,
+    ) -> (ratatui::buffer::Buffer, u16) {
+        let lines = build_tool_result_scrollback_lines(display, "", None);
+        let text = lines
+            .iter()
+            .map(|line| line.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        // Eight rows leaves room for the longest accepted schedule outcome to
+        // wrap at 40 columns while exercising the real scrollback formatter.
+        let height = 8;
         let area = ratatui::layout::Rect::new(0, 0, width, height);
         let mut buf = ratatui::buffer::Buffer::empty(area);
-        use ratatui::widgets::{Paragraph, Widget};
-        Paragraph::new(text).render(area, &mut buf);
+        use ratatui::widgets::{Paragraph, Widget, Wrap};
+        Paragraph::new(text)
+            .wrap(Wrap { trim: false })
+            .render(area, &mut buf);
         (buf, height)
     }
 
@@ -681,9 +693,13 @@ mod tests {
 
     #[test]
     fn schedule_list_buffer_renders_at_all_widths() {
-        let list_output = "2 active task(s):\n  sched_1 | one-shot | next: 45s\n  sched_2 | recurring (30s) | next: 12s";
+        let display = ToolResultDisplay {
+            tool_name: Some("list_scheduled_tasks".to_string()),
+            content: "2 active task(s):\n  sched_1 | one-shot | next: 45s\n  sched_2 | recurring (30s) | next: 12s".to_string(),
+            is_error: false,
+        };
         for width in [40u16, 60, 80, 120] {
-            let (buf, h) = render_text_to_buffer(list_output, width);
+            let (buf, h) = render_tool_result_to_buffer(&display, width);
             let content = buffer_text(&buf, width, h);
             assert!(
                 content.contains("sched_1"),
@@ -693,53 +709,85 @@ mod tests {
                 content.contains("one-shot"),
                 "list at {width} cols must retain kind: {content:?}"
             );
+            assert!(
+                content.contains("next: 45s"),
+                "list at {width} cols must retain timing/actionable state: {content:?}"
+            );
         }
     }
 
     #[test]
     fn schedule_cancelled_buffer_renders_at_all_widths() {
-        let cancelled = "Task sched_1 cancelled. No further fires will occur.";
+        let display = ToolResultDisplay {
+            tool_name: Some("cancel_scheduled_task".to_string()),
+            content: "Task sched_1 cancelled. No further fires will occur.".to_string(),
+            is_error: false,
+        };
         for width in [40u16, 60, 80, 120] {
-            let (buf, h) = render_text_to_buffer(cancelled, width);
+            let (buf, h) = render_tool_result_to_buffer(&display, width);
             let content = buffer_text(&buf, width, h);
             assert!(
-                content.contains("cancelled") || content.contains("sched_1"),
-                "cancelled at {width} cols must retain actionable result: {content:?}"
+                content.contains("sched_1"),
+                "cancelled at {width} cols must retain task ID: {content:?}"
+            );
+            assert!(
+                content.contains("cancelled"),
+                "cancelled at {width} cols must retain state/actionable result: {content:?}"
             );
         }
     }
 
     #[test]
     fn schedule_not_found_buffer_renders_at_all_widths() {
-        let not_found = "Task sched_99 not found or already completed.";
+        let display = ToolResultDisplay {
+            tool_name: Some("cancel_scheduled_task".to_string()),
+            content: "Task sched_99 not found or already completed.".to_string(),
+            is_error: false,
+        };
         for width in [40u16, 60, 80, 120] {
-            let (buf, h) = render_text_to_buffer(not_found, width);
+            let (buf, h) = render_tool_result_to_buffer(&display, width);
             let content = buffer_text(&buf, width, h);
             assert!(
-                content.contains("not found") || content.contains("sched_99"),
-                "not-found at {width} cols must retain state: {content:?}"
+                content.contains("sched_99"),
+                "not-found at {width} cols must retain task ID: {content:?}"
+            );
+            assert!(
+                content.contains("not found"),
+                "not-found at {width} cols must retain state/actionable result: {content:?}"
             );
         }
     }
 
     #[test]
     fn schedule_unavailable_buffer_renders_at_all_widths() {
-        let unavailable = "scheduler is not available";
+        let display = ToolResultDisplay {
+            tool_name: Some("cancel_scheduled_task".to_string()),
+            content: "scheduler is not available".to_string(),
+            is_error: true,
+        };
         for width in [40u16, 60, 80, 120] {
-            let (buf, h) = render_text_to_buffer(unavailable, width);
+            let (buf, h) = render_tool_result_to_buffer(&display, width);
             let content = buffer_text(&buf, width, h);
             assert!(
-                !content.trim().is_empty(),
-                "unavailable at {width} cols must not be empty"
+                content.contains("scheduler"),
+                "unavailable at {width} cols must retain state subject: {content:?}"
+            );
+            assert!(
+                content.contains("not available"),
+                "unavailable at {width} cols must retain actionable state: {content:?}"
             );
         }
     }
 
     #[test]
     fn schedule_empty_list_buffer_renders_at_all_widths() {
-        let empty = "No active scheduled tasks.";
+        let display = ToolResultDisplay {
+            tool_name: Some("list_scheduled_tasks".to_string()),
+            content: "No active scheduled tasks.".to_string(),
+            is_error: false,
+        };
         for width in [40u16, 60, 80, 120] {
-            let (buf, h) = render_text_to_buffer(empty, width);
+            let (buf, h) = render_tool_result_to_buffer(&display, width);
             let content = buffer_text(&buf, width, h);
             assert!(
                 content.contains("No active"),

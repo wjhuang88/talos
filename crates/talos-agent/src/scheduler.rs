@@ -1998,7 +1998,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn list_tool_output_hides_message_content_and_is_bounded() {
+    async fn list_tool_output_hides_message_content_and_caps_rows() {
         let (tools, pending) = create_scheduler_tools();
         let delay_tool = tools[0].clone();
         let list_tool = tools[2].clone();
@@ -2006,14 +2006,18 @@ mod tests {
         let (sq_tx, _sq_rx) = mpsc::channel(512);
         let _join = pending.spawn(sq_tx, CancellationToken::new());
 
-        let long_message = "secret-api-key-12345".repeat(20);
-        delay_tool
-            .execute(serde_json::json!({"message": long_message, "delay_secs": 60}))
-            .await;
+        for _ in 0..21 {
+            delay_tool
+                .execute(serde_json::json!({
+                    "message": "secret-api-key-12345".repeat(20),
+                    "delay_secs": 60
+                }))
+                .await;
+        }
 
         let result = list_tool.execute(serde_json::json!({})).await;
         assert!(
-            result.content.len() < 200,
+            result.content.len() < 1_500,
             "list output must be bounded: {} chars",
             result.content.len()
         );
@@ -2024,6 +2028,21 @@ mod tests {
         assert!(
             result.content.contains("sched_"),
             "list must show task ID even without message content"
+        );
+        assert_eq!(
+            result
+                .content
+                .lines()
+                .filter(|line| line.contains("sched_"))
+                .count(),
+            20,
+            "list must show at most 20 task rows: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("... and 1 more task(s) not shown"),
+            "list must report omitted tasks: {}",
+            result.content
         );
     }
 
@@ -2153,25 +2172,29 @@ mod tests {
             "before first fire: ~5s, got {remaining1}"
         );
 
-        // Advance past first fire
-        tokio::time::advance(Duration::from_secs(6)).await;
-        yield_times(10).await;
+        for tick in 1..=3 {
+            tokio::time::advance(Duration::from_secs(6)).await;
+            yield_times(10).await;
 
-        // List after first fire — next should be ~5s again (NOT 0)
-        let (list_tx2, list_rx2) = oneshot::channel();
-        handle
-            .send(ScheduleCommand::List {
-                response_tx: list_tx2,
-            })
-            .await
-            .unwrap();
-        let snap2 = list_rx2.await.unwrap();
-        assert_eq!(snap2.len(), 1, "recurring task must persist after tick");
-        let remaining2 = snap2[0].remaining().as_secs();
-        assert!(
-            remaining2 <= 5 && remaining2 >= 3,
-            "after first fire: should be ~5s again, got {remaining2}"
-        );
+            let (list_tx, list_rx) = oneshot::channel();
+            handle
+                .send(ScheduleCommand::List {
+                    response_tx: list_tx,
+                })
+                .await
+                .unwrap();
+            let snapshot = list_rx.await.unwrap();
+            assert_eq!(
+                snapshot.len(),
+                1,
+                "recurring task must persist after tick {tick}"
+            );
+            let remaining = snapshot[0].remaining().as_secs();
+            assert!(
+                remaining <= 5 && remaining >= 3,
+                "after tick {tick}: next should be ~5s, got {remaining}"
+            );
+        }
     }
 
     #[tokio::test(start_paused = true)]
@@ -2593,8 +2616,8 @@ mod tests {
         let _ = actor_task.await;
     }
 
-    /// Proves the full list/cancel lifecycle through the real Agent/session
-    /// path: pre-register task → list (task visible) → cancel → verify gone.
+    /// Proves the approved list/cancel lifecycle through the real Agent/session
+    /// path: list (task visible) → cancel → no later scheduled submission.
     #[tokio::test(start_paused = true)]
     async fn fixture_provider_list_cancel_full_lifecycle() {
         let (cmd_tx, cmd_rx) = mpsc::channel(64);
@@ -2606,39 +2629,21 @@ mod tests {
         registry.register(Arc::new(CancelScheduledTaskTool::new(sched_handle.clone())));
 
         // Spawn actor first, then register a task with a known ID
-        let (sq_tx_dummy, _sq_rx_dummy) = mpsc::channel(512);
-        let _sj = pending.spawn(sq_tx_dummy, CancellationToken::new());
+        let (scheduler_sq_tx, mut scheduler_sq_rx) = mpsc::channel(512);
+        let _sj = pending.spawn(scheduler_sq_tx, CancellationToken::new());
 
         let (resp_tx, resp_rx) = oneshot::channel();
         sched_handle
             .send(ScheduleCommand::RegisterOneShot {
                 id: Some("sched_test".to_string()),
-                message: "long delay".to_string(),
-                delay: Duration::from_secs(3600),
+                message: "cancelled task must not fire".to_string(),
+                delay: Duration::from_secs(5),
                 response_tx: resp_tx,
             })
             .await
             .unwrap();
         assert!(resp_rx.await.is_ok());
 
-        let tc = |id: &str, name: &str, input: serde_json::Value| {
-            vec![
-                AgentEvent::TurnStart,
-                AgentEvent::ToolCall {
-                    call: talos_core::message::ToolCall {
-                        id: id.into(),
-                        name: name.into(),
-                        input,
-                    },
-                    provenance: Default::default(),
-                    summary_fields: vec![],
-                },
-                AgentEvent::TurnEnd {
-                    stop_reason: StopReason::ToolUse,
-                    usage: Usage::default(),
-                },
-            ]
-        };
         let txt = |s: &str| {
             vec![
                 AgentEvent::TurnStart,
@@ -2681,7 +2686,12 @@ mod tests {
         ]);
         let observed = model.observed_requests.clone();
 
-        let engine = PermissionEngine::new();
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{ "decision": "Allow", "nature": "Execute" }]
+            }))
+            .unwrap();
         let hooks = Arc::new(HookRegistry::new());
         let agent = Agent::with_security_and_hooks(
             Arc::new(model),
@@ -2734,6 +2744,180 @@ mod tests {
         assert!(
             cancel_succeeded,
             "cancel result must show success through conversation pipeline"
+        );
+
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(10).await;
+        assert!(
+            matches!(
+                scheduler_sq_rx.try_recv(),
+                Err(mpsc::error::TryRecvError::Empty)
+            ),
+            "cancelled task must not submit a later scheduled turn"
+        );
+
+        let _ = sq_tx.send(SessionOp::Shutdown).await;
+        let _ = at.await;
+    }
+
+    /// Proves a denied cancellation through the real Agent/session path leaves
+    /// an active task visible before and after the denied request.
+    #[tokio::test(start_paused = true)]
+    async fn fixture_provider_denied_cancel_leaves_task_unchanged() {
+        let (cmd_tx, cmd_rx) = mpsc::channel(64);
+        let sched_handle = SchedulerHandle::new(cmd_tx);
+        let pending = PendingSchedulerActor { cmd_rx };
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(ListScheduledTasksTool::new(sched_handle.clone())));
+        registry.register(Arc::new(CancelScheduledTaskTool::new(sched_handle.clone())));
+
+        let (scheduler_sq_tx, _scheduler_sq_rx) = mpsc::channel(512);
+        let _sj = pending.spawn(scheduler_sq_tx, CancellationToken::new());
+        let (resp_tx, resp_rx) = oneshot::channel();
+        sched_handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: Some("sched_denied".to_string()),
+                message: "must remain scheduled".to_string(),
+                delay: Duration::from_secs(60),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        let model = MockLanguageModel::new(vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "before".into(),
+                        name: "list_scheduled_tasks".into(),
+                        input: serde_json::json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "deny".into(),
+                        name: "cancel_scheduled_task".into(),
+                        input: serde_json::json!({"task_id": "sched_denied"}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Denied cancellation recorded.".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "after".into(),
+                        name: "list_scheduled_tasks".into(),
+                        input: serde_json::json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Task remains scheduled.".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ],
+        ]);
+        let observed = model.observed_requests.clone();
+
+        let mut engine = PermissionEngine::new();
+        engine
+            .load_from_config(&serde_json::json!({
+                "rules": [{
+                    "decision": { "Deny": "cancel denied by fixture" },
+                    "nature": "Execute"
+                }]
+            }))
+            .unwrap();
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+            Arc::new(HookRegistry::new()),
+        );
+        let config = SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+        let sq_tx = handle.sq_tx.clone();
+        let at = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "list, deny cancel, and list again".into(),
+            })
+            .await
+            .unwrap();
+        yield_times(100).await;
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "list after denied cancellation".into(),
+            })
+            .await
+            .unwrap();
+        yield_times(100).await;
+
+        let results: Vec<String> = observed
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|messages| {
+                messages.iter().filter_map(|message| match message {
+                    Message::Tool { result } => Some(result.content.clone()),
+                    _ => None,
+                })
+            })
+            .collect();
+        assert!(
+            results
+                .iter()
+                .filter(|result| result.contains("sched_denied") && result.contains("active task"))
+                .count()
+                >= 2,
+            "task must be visible both before and after denied cancellation: {results:?}"
+        );
+        assert!(
+            results
+                .iter()
+                .any(|result| result.contains("cancel denied by fixture")),
+            "denied cancellation must be observable through the conversation pipeline: {results:?}"
         );
 
         let _ = sq_tx.send(SessionOp::Shutdown).await;

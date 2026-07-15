@@ -109,3 +109,16 @@ Recurring list timing becomes stale after the first fire; total list output and 
 are not safely bounded; SF123 lacks fixture-provider list/cancel proof; narrow-width tests do not
 exercise semantic ratatui buffers or all required fields; Deny/outcome evidence and governance
 sync are incomplete. Corrections are detailed in the I126 owner doc. I127 remains blocked.
+
+2026-07-15 I126 maintainer re-review (`7b5a0ab`): I126 remains Review. The remediation fixes
+first-tick metadata and user-visible message exposure and adds a happy-path Agent/session fixture,
+but it does not prove denied cancellation leaves a real task unchanged or that cancellation
+prevents a later fire. Multi-task cap, multiple-tick timing, and actual tool-result narrow-buffer
+proof also remain incomplete; owner evidence is stale. I127 remains blocked.
+
+2026-07-15 I126 closure: list output now hides message content, caps at 20 rows with an omitted
+count, and has a 21-task regression. Three paused recurring ticks refresh `next` timing. Real
+Agent/session fixtures prove approved cancellation produces no later submission and configured
+Deny leaves a task visible before and after a later list. Scrollback-derived ratatui Buffer tests
+cover 40/60/80/120 widths. Full validation passes; I126 is Complete. I127 is unblocked and remains
+Planned until its activation gate.
