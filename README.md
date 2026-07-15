@@ -41,9 +41,10 @@ automation surface, or autonomous background daemon.
 Currently shipped:
 
 - TUI, inline, and print execution modes.
-- Read-only loopback dashboard in TUI mode; startup prints the local URL. Binds to
-  `127.0.0.1`; the per-process bearer token is off by default. Set
-  `[dashboard] loopback_only = false` to re-enable the token.
+- Read-only loopback snapshot server in TUI mode; startup prints the local URL. It currently
+  exposes JSON/plain-text snapshots and an HTML links page, not rendered dashboard pages. It binds
+  to `127.0.0.1`; the per-process bearer token is off by default. Set `[dashboard] loopback_only =
+  false` to re-enable the token.
 - Local provider configuration with masked secrets.
 - Built-in coding tools with permission gating.
 - Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.

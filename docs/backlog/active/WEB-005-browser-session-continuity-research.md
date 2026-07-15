@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-005 |
 | Priority | P2 |
-| Status | In Progress — I077/T112 security review complete; T113 hardening fixes in Review |
+| Status | Research / mock-only — BrowserPageRecord and mock-connector redaction hardening are complete; no browser-page backend, `browser_page_read` permission facet, real connector, or UI exists. |
 | Depends On | WEBFETCH-001; TOOL-012; TOOL-013; TOOL-014 |
 | Relates To | WEB-001; REMOTE-001; PLUGIN-001 |
 | Blocks | Authenticated-page context ingestion; browser page access record design; browser connector ADR |
@@ -151,6 +151,14 @@ kept WEB-005 mock-only and found that selected link URLs needed the same credent
 sanitization as page record URLs. T113 fixed `BrowserPageRecord::with_links` to sanitize selected
 link URLs. No real connector, browser automation, `browser_page_read` permission facet, or
 standalone browser tool was authorized.
+
+## Current Implementation Boundary
+
+The repository contains only the safe data-model/mock slice: `BrowserPageRecord`, a mock browser
+page connector, and tests that exclude cookies, browser storage, credentials, DOM dumps, and
+selected-link query secrets. It is not callable through `fetch_url`, does not create a browser-page
+permission request, and has no rendered web page or browser UI. The Phase 1-3 items below remain
+unselected implementation work.
 
 ### Phase 1: Read-Only Browser Page Backend
 

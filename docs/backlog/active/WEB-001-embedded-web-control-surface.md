@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | In Progress — I077/T112 security review complete; T113 hardening fixes in Review |
+| Status | Partial — loopback-only read-only snapshot API, security hardening, and an HTML link landing page are implemented. No rendered dashboard pages, SSE log viewer, web config editor, or web actions exist. |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | Browser dashboard; live log viewer; web config editor |
@@ -36,24 +36,37 @@ write/session-mutating route remain out of scope until a later security review.
 T112/T113 security review update (2026-07-02): `docs/reference/WEB-DASHBOARD-BROWSER-SECURITY-REVIEW-2026-07-02.md`
 recorded the dashboard/browser boundary review. T113 added dashboard output-boundary redaction for
 snapshot data and regression coverage proving that, when `loopback_only = false`, unknown paths
-without a token are rejected before returning route information.
+without a token are rejected before returning route information. These slices are complete; the
+prior “in Review” label did not reflect their completed evidence.
 
-## Target Model
+## Current Implementation Boundary
+
+`talos-dashboard` serves a loopback-only, read-only snapshot API at `/status`, `/history`,
+`/governance`, `/config`, and `/extensions`. `/` is an inline HTML landing page containing links to
+those representations. The routes return JSON or plain text; they do not render a dashboard UI.
+
+Not implemented: status/history/config pages, a live log/SSE view, governance tables or Kanban,
+client-side navigation/state, config editing, approvals, session actions, WebSocket control, or
+remote/LAN access. The shipped capability is therefore an API foundation, not the product web
+control surface described by this story.
+
+## Target Model (Not Current Implementation)
 
 ```
    Browser (loopback)  ◄── HTTP / WS ──►  Talos runtime (tokio)
-                                             │  WebServer task (axum + rust-embed)
+                                             │  WebServer task (axum + static assets)
                                              │  reads/subscribes via proper channels
                                              ▼
                                   Session / Agent / Config / Logs
 ```
 
-## Minimum Viable Slice (research target)
+## Product MVP Target (Not Complete)
 
-- In-process loopback-only HTTP server serving one embedded static page.
-- Read-only `/status` (session, model, token/cost usage) + log-tail (SSE) off the OBS-001 sink.
-- Config read/edit via CONF-001 primitives (secret masking).
-- Web-driven actions go through the same permission pipeline as the TUI.
+- In-process loopback-only HTTP server serving a rendered static page.
+- Read-only status/history/governance/config presentation plus a log-tail (SSE) view.
+- Config editing via CONF-001 primitives (secret masking), only after an explicit write/permission
+  design is accepted.
+- Any web-driven action uses the same permission pipeline as the TUI.
 
 ## Open Questions
 
