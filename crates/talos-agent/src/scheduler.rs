@@ -251,6 +251,18 @@ pub(crate) struct SchedulerHandle {
     cmd_tx: mpsc::Sender<ScheduleCommand>,
 }
 
+/// The bounded failure modes for sending a scheduler command.
+///
+/// A full queue is reported immediately rather than awaiting capacity. This
+/// keeps tool calls bounded when the scheduler actor is overloaded or stalled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SchedulerSendError {
+    /// The bounded command queue has no spare capacity.
+    Full,
+    /// The scheduler actor has stopped and dropped its receiver.
+    Closed,
+}
+
 impl SchedulerHandle {
     /// Creates a new handle wrapping the given command sender.
     ///
@@ -264,14 +276,15 @@ impl SchedulerHandle {
 
     /// Sends a command to the scheduler actor.
     ///
-    /// Returns `Err` if the actor has shut down. Callers must handle this
-    /// gracefully — typically by returning a bounded error result to the
-    /// model, never by panicking.
-    pub(crate) async fn send(
-        &self,
-        command: ScheduleCommand,
-    ) -> Result<(), mpsc::error::SendError<ScheduleCommand>> {
-        self.cmd_tx.send(command).await
+    /// Returns immediately with `Err` if the command queue is full or the
+    /// actor has shut down. Callers must handle this gracefully — typically by
+    /// returning a bounded error result to the model, never by panicking.
+    pub(crate) async fn send(&self, command: ScheduleCommand) -> Result<(), SchedulerSendError> {
+        match self.cmd_tx.try_send(command) {
+            Ok(()) => Ok(()),
+            Err(mpsc::error::TrySendError::Full(_)) => Err(SchedulerSendError::Full),
+            Err(mpsc::error::TrySendError::Closed(_)) => Err(SchedulerSendError::Closed),
+        }
     }
 }
 
@@ -699,8 +712,13 @@ impl AgentTool for DelayTool {
             response_tx,
         };
 
-        if self.handle.send(command).await.is_err() {
-            return ToolResult::error("scheduler is not available (session may be shutting down)");
+        if let Err(error) = self.handle.send(command).await {
+            return ToolResult::error(match error {
+                SchedulerSendError::Full => "scheduler is busy; try again",
+                SchedulerSendError::Closed => {
+                    "scheduler is not available (session may be shutting down)"
+                }
+            });
         }
 
         match response_rx.await {
@@ -791,8 +809,13 @@ impl AgentTool for ScheduleTool {
             response_tx,
         };
 
-        if self.handle.send(command).await.is_err() {
-            return ToolResult::error("scheduler is not available (session may be shutting down)");
+        if let Err(error) = self.handle.send(command).await {
+            return ToolResult::error(match error {
+                SchedulerSendError::Full => "scheduler is busy; try again",
+                SchedulerSendError::Closed => {
+                    "scheduler is not available (session may be shutting down)"
+                }
+            });
         }
 
         match response_rx.await {
@@ -841,13 +864,15 @@ impl AgentTool for ListScheduledTasksTool {
 
     async fn execute(&self, _input: serde_json::Value) -> ToolResult {
         let (response_tx, response_rx) = oneshot::channel();
-        if self
+        if let Err(error) = self
             .handle
             .send(ScheduleCommand::List { response_tx })
             .await
-            .is_err()
         {
-            return ToolResult::error("scheduler is not available");
+            return ToolResult::error(match error {
+                SchedulerSendError::Full => "scheduler is busy; try again",
+                SchedulerSendError::Closed => "scheduler is not available",
+            });
         }
 
         match response_rx.await {
@@ -926,16 +951,18 @@ impl AgentTool for CancelScheduledTaskTool {
         };
 
         let (response_tx, response_rx) = oneshot::channel();
-        if self
+        if let Err(error) = self
             .handle
             .send(ScheduleCommand::Cancel {
                 id: task_id.clone(),
                 response_tx,
             })
             .await
-            .is_err()
         {
-            return ToolResult::error("scheduler is not available");
+            return ToolResult::error(match error {
+                SchedulerSendError::Full => "scheduler is busy; try again",
+                SchedulerSendError::Closed => "scheduler is not available",
+            });
         }
 
         match response_rx.await {
@@ -3007,38 +3034,46 @@ mod tests {
         assert!(result.is_ok(), "actor must exit after cancel token");
     }
 
+    fn saturated_scheduler_handle() -> (SchedulerHandle, mpsc::Receiver<ScheduleCommand>) {
+        let (cmd_tx, cmd_rx) = mpsc::channel::<ScheduleCommand>(1);
+        cmd_tx
+            .try_send(ScheduleCommand::Shutdown)
+            .expect("empty command queue must accept the saturating command");
+        (SchedulerHandle::new(cmd_tx), cmd_rx)
+    }
+
     #[tokio::test(start_paused = true)]
-    async fn sf130_cmd_channel_full_returns_bounded_error() {
-        // Create a channel with capacity 4 and FILL it without a consumer.
-        // The sender must detect full capacity and return a bounded error
-        // via try_send — no panic, no infinite block.
-        let (cmd_tx, cmd_rx) = mpsc::channel::<ScheduleCommand>(4);
-        let _pending = PendingSchedulerActor { cmd_rx };
+    async fn sf130_full_command_queue_returns_bounded_tool_errors() {
+        // Hold each receiver without consuming it so the production
+        // SchedulerHandle path sees a full bounded queue. Every scheduling
+        // tool must return promptly instead of awaiting sender capacity.
+        let (delay_handle, _delay_rx) = saturated_scheduler_handle();
+        let delay = DelayTool::new(delay_handle)
+            .execute(serde_json::json!({"message": "follow up", "delay_secs": 1}))
+            .await;
+        assert!(delay.is_error);
+        assert_eq!(delay.content, "scheduler is busy; try again");
 
-        // Fill all 4 slots
-        for i in 0..4 {
-            let (tx, _rx) = oneshot::channel::<ScheduleRegistrationResult>();
-            cmd_tx
-                .try_send(ScheduleCommand::RegisterOneShot {
-                    id: Some(format!("f{i}")),
-                    message: format!("m{i}"),
-                    delay: Duration::from_secs(3600),
-                    response_tx: tx,
-                })
-                .expect("slot {i} should accept");
-        }
+        let (schedule_handle, _schedule_rx) = saturated_scheduler_handle();
+        let schedule = ScheduleTool::new(schedule_handle)
+            .execute(serde_json::json!({"message": "follow up", "interval_secs": 5}))
+            .await;
+        assert!(schedule.is_error);
+        assert_eq!(schedule.content, "scheduler is busy; try again");
 
-        // 5th slot must be rejected — channel is full
-        let result = cmd_tx.try_send(ScheduleCommand::Shutdown);
-        assert!(
-            matches!(result, Err(mpsc::error::TrySendError::Full(_))),
-            "5th command on capacity-4 channel must return Full, not panic"
-        );
+        let (list_handle, _list_rx) = saturated_scheduler_handle();
+        let list = ListScheduledTasksTool::new(list_handle)
+            .execute(serde_json::json!({}))
+            .await;
+        assert!(list.is_error);
+        assert_eq!(list.content, "scheduler is busy; try again");
 
-        // Tool-level: a tool using this handle should also see the failure.
-        // SchedulerHandle::send uses .await which blocks, but the tool wraps
-        // the error when the channel eventually closes. The bounded guarantee
-        // is: try_send returns Full immediately; no panic.
+        let (cancel_handle, _cancel_rx) = saturated_scheduler_handle();
+        let cancel = CancelScheduledTaskTool::new(cancel_handle)
+            .execute(serde_json::json!({"task_id": "sched_1"}))
+            .await;
+        assert!(cancel.is_error);
+        assert_eq!(cancel.content, "scheduler is busy; try again");
     }
 
     #[tokio::test(start_paused = true)]
@@ -3049,11 +3084,11 @@ mod tests {
 
         tokio::task::yield_now().await;
 
-        let result = handle.send(ScheduleCommand::Shutdown).await;
-        assert!(
-            result.is_err(),
-            "send after receiver gone must return Err, not hang or panic"
-        );
+        let result = DelayTool::new(handle)
+            .execute(serde_json::json!({"message": "follow up", "delay_secs": 1}))
+            .await;
+        assert!(result.is_error);
+        assert!(result.content.contains("not available"));
     }
 
     // ── SF131: Deterministic lifecycle stress suite ─────────────────────
