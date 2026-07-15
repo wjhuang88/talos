@@ -40,7 +40,11 @@ homepage = "https://github.com/wjhuang88/talos"
 rust-version = "1.95"
 
 [profile.release]
-lto = true
+# Ship portable, whole-program-optimized binaries. A single codegen unit gives
+# LLVM maximum cross-crate optimization latitude; the longer release build is
+# intentional for runtime performance.
+lto = "fat"
+codegen-units = 1
 strip = true
 
 [workspace.lints.clippy]
