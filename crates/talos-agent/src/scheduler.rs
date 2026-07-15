@@ -2592,4 +2592,151 @@ mod tests {
         let _ = sq_tx.send(SessionOp::Shutdown).await;
         let _ = actor_task.await;
     }
+
+    /// Proves the full list/cancel lifecycle through the real Agent/session
+    /// path: pre-register task → list (task visible) → cancel → verify gone.
+    #[tokio::test(start_paused = true)]
+    async fn fixture_provider_list_cancel_full_lifecycle() {
+        let (cmd_tx, cmd_rx) = mpsc::channel(64);
+        let sched_handle = SchedulerHandle::new(cmd_tx);
+        let pending = PendingSchedulerActor { cmd_rx };
+
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(ListScheduledTasksTool::new(sched_handle.clone())));
+        registry.register(Arc::new(CancelScheduledTaskTool::new(sched_handle.clone())));
+
+        // Spawn actor first, then register a task with a known ID
+        let (sq_tx_dummy, _sq_rx_dummy) = mpsc::channel(512);
+        let _sj = pending.spawn(sq_tx_dummy, CancellationToken::new());
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        sched_handle
+            .send(ScheduleCommand::RegisterOneShot {
+                id: Some("sched_test".to_string()),
+                message: "long delay".to_string(),
+                delay: Duration::from_secs(3600),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        let tc = |id: &str, name: &str, input: serde_json::Value| {
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: id.into(),
+                        name: name.into(),
+                        input,
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ]
+        };
+        let txt = |s: &str| {
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta { delta: s.into() },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ]
+        };
+
+        let model = MockLanguageModel::new(vec![
+            // Both tool calls in one turn
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "c1".into(),
+                        name: "list_scheduled_tasks".into(),
+                        input: serde_json::json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "c2".into(),
+                        name: "cancel_scheduled_task".into(),
+                        input: serde_json::json!({"task_id": "sched_test"}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Usage::default(),
+                },
+            ],
+            txt("Done."),
+        ]);
+        let observed = model.observed_requests.clone();
+
+        let engine = PermissionEngine::new();
+        let hooks = Arc::new(HookRegistry::new());
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            PathBuf::from("/tmp"),
+            hooks,
+        );
+
+        let config = SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: "/tmp".into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        };
+        let (handle, mut actor) = AppServerSession::new(agent, config);
+        let sq_tx = handle.sq_tx.clone();
+        let at = tokio::spawn(async move { actor.run().await });
+
+        sq_tx
+            .send(SessionOp::Submit {
+                message: "list and cancel".into(),
+            })
+            .await
+            .unwrap();
+        yield_times(100).await;
+
+        let all_tool_results: Vec<String> = observed
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|msgs| {
+                msgs.iter().filter_map(|m| match m {
+                    Message::Tool { result } => Some(result.content.clone()),
+                    _ => None,
+                })
+            })
+            .collect();
+
+        let list_showed_task = all_tool_results
+            .iter()
+            .any(|c| c.contains("sched_test") && c.contains("active task"));
+        assert!(
+            list_showed_task,
+            "list result must show task through conversation pipeline"
+        );
+
+        let cancel_succeeded = all_tool_results.iter().any(|c| c.contains("cancelled"));
+        assert!(
+            cancel_succeeded,
+            "cancel result must show success through conversation pipeline"
+        );
+
+        let _ = sq_tx.send(SessionOp::Shutdown).await;
+        let _ = at.await;
+    }
 }
