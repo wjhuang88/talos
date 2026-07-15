@@ -103,3 +103,9 @@ Cancel/Shutdown tests now exercise a competing-ready timer boundary; a real `ali
 `glm-5.2` binary walkthrough registered `sched_1` and persisted eight labeled recurring turns;
 all documentation and full validation gates pass. I125 is Complete. I126 is unblocked but remains
 Planned until its activation inventory and Gate 0 are recorded.
+
+2026-07-15 I126 maintainer review: I126 remains Review despite a green validation ladder.
+Recurring list timing becomes stale after the first fire; total list output and sensitive previews
+are not safely bounded; SF123 lacks fixture-provider list/cancel proof; narrow-width tests do not
+exercise semantic ratatui buffers or all required fields; Deny/outcome evidence and governance
+sync are incomplete. Corrections are detailed in the I126 owner doc. I127 remains blocked.

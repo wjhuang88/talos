@@ -370,7 +370,18 @@ impl SchedulerActor {
                 }
 
                 Some(task_id) = self.fired_rx.recv() => {
-                    self.tasks.remove(&task_id);
+                    let kind = self.tasks.get(&task_id).map(|t| t.info.kind);
+                    match kind {
+                        Some(ScheduleKind::OneShot) => {
+                            self.tasks.remove(&task_id);
+                        }
+                        Some(ScheduleKind::Recurring { interval }) => {
+                            if let Some(task) = self.tasks.get_mut(&task_id) {
+                                task.info.fire_at = Instant::now() + interval;
+                            }
+                        }
+                        None => {}
+                    }
                 }
             }
         }
@@ -454,6 +465,7 @@ impl SchedulerActor {
         let labeled_message = label_scheduled_message(&message);
 
         let sq_tx = self.sq_tx.clone();
+        let fired_tx = self.fired_tx.clone();
         let task_id_for_fire = task_id.clone();
         let labeled_for_fire = labeled_message.clone();
 
@@ -478,6 +490,7 @@ impl SchedulerActor {
                     );
                     break;
                 }
+                let _ = fired_tx.send(task_id_for_fire.clone());
             }
         });
 
@@ -840,21 +853,22 @@ impl AgentTool for ListScheduledTasksTool {
         match response_rx.await {
             Ok(tasks) if tasks.is_empty() => ToolResult::success("No active scheduled tasks."),
             Ok(tasks) => {
-                let mut text = format!("{} active task(s):\n", tasks.len());
-                for info in &tasks {
-                    let preview: String = info.message.chars().take(60).collect();
-                    let preview = if info.message.chars().count() > 60 {
-                        format!("{preview}…")
-                    } else {
-                        preview
-                    };
+                const MAX_DISPLAY: usize = 20;
+                let total = tasks.len();
+                let display_count = total.min(MAX_DISPLAY);
+                let omitted = total.saturating_sub(MAX_DISPLAY);
+
+                let mut text = format!("{total} active task(s):\n");
+                for info in tasks.iter().take(display_count) {
                     text.push_str(&format!(
-                        "  {} | {} | next: {}s | {}\n",
+                        "  {} | {} | next: {}s\n",
                         info.id,
                         info.kind,
                         info.remaining().as_secs(),
-                        preview
                     ));
+                }
+                if omitted > 0 {
+                    text.push_str(&format!("... and {omitted} more task(s) not shown\n"));
                 }
                 ToolResult::success(text.trim_end().to_string())
             }
@@ -1984,7 +1998,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn list_tool_message_preview_is_bounded() {
+    async fn list_tool_output_hides_message_content_and_is_bounded() {
         let (tools, pending) = create_scheduler_tools();
         let delay_tool = tools[0].clone();
         let list_tool = tools[2].clone();
@@ -1992,20 +2006,24 @@ mod tests {
         let (sq_tx, _sq_rx) = mpsc::channel(512);
         let _join = pending.spawn(sq_tx, CancellationToken::new());
 
-        let long_message = "x".repeat(200);
+        let long_message = "secret-api-key-12345".repeat(20);
         delay_tool
             .execute(serde_json::json!({"message": long_message, "delay_secs": 60}))
             .await;
 
         let result = list_tool.execute(serde_json::json!({})).await;
         assert!(
-            result.content.len() < 300,
+            result.content.len() < 200,
             "list output must be bounded: {} chars",
             result.content.len()
         );
         assert!(
-            result.content.contains("…"),
-            "long message should be truncated"
+            !result.content.contains("secret-api-key"),
+            "list must not expose message content"
+        );
+        assert!(
+            result.content.contains("sched_"),
+            "list must show task ID even without message content"
         );
     }
 
@@ -2066,6 +2084,107 @@ mod tests {
             list_result.content.contains("No active"),
             "cancelled task should not appear in list"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancel_tool_returns_not_found_for_already_fired() {
+        let (tools, pending) = create_scheduler_tools();
+        let delay_tool = tools[0].clone();
+        let cancel_tool = tools[3].clone();
+
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let _join = pending.spawn(sq_tx, CancellationToken::new());
+
+        let reg = delay_tool
+            .execute(serde_json::json!({"message": "fires fast", "delay_secs": 1}))
+            .await;
+        let task_id = reg
+            .content
+            .split("Task ID: ")
+            .nth(1)
+            .and_then(|s| s.split('\n').next())
+            .unwrap()
+            .to_string();
+
+        tokio::time::advance(Duration::from_secs(2)).await;
+        yield_times(10).await;
+
+        let result = cancel_tool
+            .execute(serde_json::json!({"task_id": task_id}))
+            .await;
+        assert!(
+            result.content.contains("not found") || result.content.contains("already"),
+            "already-fired task should return not-found: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn recurring_fire_at_updates_after_tick() {
+        let (sq_tx, _sq_rx) = mpsc::channel(512);
+        let cancel_token = CancellationToken::new();
+        let (handle, _join) = spawn_scheduler_actor(sq_tx, cancel_token);
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::RegisterRecurring {
+                id: None,
+                message: "tick".to_string(),
+                interval: Duration::from_secs(5),
+                response_tx: resp_tx,
+            })
+            .await
+            .unwrap();
+        assert!(resp_rx.await.is_ok());
+
+        // List before first fire — next should be ~5s
+        let (list_tx1, list_rx1) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::List {
+                response_tx: list_tx1,
+            })
+            .await
+            .unwrap();
+        let snap1 = list_rx1.await.unwrap();
+        assert_eq!(snap1.len(), 1);
+        let remaining1 = snap1[0].remaining().as_secs();
+        assert!(
+            remaining1 <= 5 && remaining1 >= 3,
+            "before first fire: ~5s, got {remaining1}"
+        );
+
+        // Advance past first fire
+        tokio::time::advance(Duration::from_secs(6)).await;
+        yield_times(10).await;
+
+        // List after first fire — next should be ~5s again (NOT 0)
+        let (list_tx2, list_rx2) = oneshot::channel();
+        handle
+            .send(ScheduleCommand::List {
+                response_tx: list_tx2,
+            })
+            .await
+            .unwrap();
+        let snap2 = list_rx2.await.unwrap();
+        assert_eq!(snap2.len(), 1, "recurring task must persist after tick");
+        let remaining2 = snap2[0].remaining().as_secs();
+        assert!(
+            remaining2 <= 5 && remaining2 >= 3,
+            "after first fire: should be ~5s again, got {remaining2}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn list_tool_error_when_scheduler_dropped() {
+        let (tools, pending) = create_scheduler_tools();
+        let list_tool = &tools[2];
+
+        drop(pending);
+        tokio::task::yield_now().await;
+
+        let result = list_tool.execute(serde_json::json!({})).await;
+        assert!(result.is_error, "should error when scheduler unavailable");
+        assert!(result.content.contains("not available"));
     }
 
     // ── Fixture-provider test through real Agent/session path (SF103 re-review) ─

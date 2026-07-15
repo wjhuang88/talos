@@ -57,6 +57,7 @@
 | 2026-07-14 | SF120+SF121 | `feat(agent): add list_scheduled_tasks and cancel_scheduled_task tools (#SF120,#SF121)` — ListScheduledTasksTool (Read/Allow, bounded 60-char preview), CancelScheduledTaskTool (Execute/Ask, summary_fields task_id). Both added to create_scheduler_tools Vec (now 4 tools). |
 | 2026-07-14 | SF122+SF123 | `feat(i126): list/cancel tool tests + permission regression + docs (#SF122,#SF123)` — README updated, SCHED-001 checked, 8 tool unit tests, 3 CLI permission regression tests. |
 | 2026-07-14 | Closeout | All 4 stories delivered. Validation ladder passes. |
+| 2026-07-15 | Maintainer review (`924421a`) | Promotion rejected; I126 remains Review. Fmt, workspace Clippy, workspace tests, release preflight, governance, scale assessment, and diff checks pass. Acceptance evidence fails because recurring `next` timing becomes permanently stale after the first fire; list output is not bounded by task count and exposes raw message prefixes despite the sensitive-content/privacy requirement; SF123 has no fixture-provider list/cancel flow; the narrow-width tests do not render ratatui buffers or retain all required semantics at every width; Deny-leaves-task-unchanged lacks positive before/after evidence; and Board/checkpoint documentation is stale. I127 remains blocked. |
 
 ## Verification Evidence
 
@@ -78,6 +79,41 @@
 ## Variance And Residuals
 
 - Stress, recovery, and trial closeout are owned by I127.
+
+## Maintainer Review Findings
+
+1. **Recurring next timing is stale after the first fire.** `ScheduledTaskInfo.fire_at` is set only
+   during registration. The recurring timer submits later turns without updating actor metadata,
+   so `remaining()` reaches zero after the first interval and every later list result reports
+   `next: 0s`. Update recurring snapshot state on each fire (without catch-up bursts) and add a
+   paused-time regression that lists before and after multiple ticks.
+
+2. **The list snapshot is not fully bounded or privacy-safe.** Each message is truncated to 60
+   characters, but the tool emits every active task, so total output grows without a bound. It
+   also returns the raw first 60 characters, which can expose a sensitive message prefix despite
+   the published acceptance and planned README privacy note. Add an explicit task/output cap with
+   an omitted-count marker, define and test the sensitive-preview policy, and document it.
+
+3. **SF123 fixture-provider evidence is absent.** Existing fixture-provider tests cover one-shot
+   and recurring fire-time permission isolation only. Add a full Agent/session fixture in which
+   the provider registers tasks, lists them, receives an independently approved cancellation,
+   and verifies the cancelled task does not fire; include Deny with a positive list-before/list-after
+   assertion that the task remains unchanged.
+
+4. **Narrow-terminal acceptance is not proven.** The four new tests call
+   `truncate_single_line` on strings; they do not render a ratatui `Buffer`. Only task ID at 60
+   columns is asserted, while the baseline requires 40/60/80/120-column buffers to retain task
+   ID, state, and actionable result without panic. Add semantic buffer tests through the actual
+   tool-result rendering path for list, Cancelled, NotFound/already-finished, and unavailable
+   outcomes at every required width.
+
+5. **Outcome and governance evidence is incomplete.** Add explicit already-fired and
+   shutting-down tool-result tests. Synchronize Board with the recorded activation/review state,
+   append I126 activation/closeout/review checkpoints to the execution package, update the owner
+   evidence for the Unicode and TUI follow-up commits, and add the promised README privacy note.
+
+Re-run the focused actor/tool/fixture/TUI tests and the full locked validation ladder after these
+corrections. Do not activate I127 before I126 reaches Complete.
 
 ## Retrospective
 

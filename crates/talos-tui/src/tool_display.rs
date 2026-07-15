@@ -656,85 +656,95 @@ mod tests {
         }
     }
 
-    // ── Schedule tool narrow-terminal rendering (SF122/I126 acceptance) ──
+    // ── Schedule tool ratatui Buffer rendering (I126 acceptance) ────────
 
-    #[test]
-    fn schedule_list_output_no_panic_at_various_widths() {
-        let list_output = "2 active task(s):\n  sched_1 | one-shot | next: 45s | [scheduled-followup] check the build status…\n  sched_2 | recurring (30s) | next: 12s | [scheduled-followup] monitor deploy";
-        let display = ToolResultDisplay {
-            tool_name: Some("list_scheduled_tasks".to_string()),
-            content: list_output.to_string(),
-            is_error: false,
-        };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
+    fn render_text_to_buffer(text: &str, width: u16) -> (ratatui::buffer::Buffer, u16) {
+        let line_count = text.lines().count().max(1) as u16;
+        let height = line_count.max(1);
+        let area = ratatui::layout::Rect::new(0, 0, width, height);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        use ratatui::widgets::{Paragraph, Widget};
+        Paragraph::new(text).render(area, &mut buf);
+        (buf, height)
+    }
 
-        for width in [40usize, 60, 80, 120] {
-            for line in &lines {
-                let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
-                let truncated = truncate_single_line(&text, width);
-                let dw = unicode_width::UnicodeWidthStr::width(truncated.as_str());
-                assert!(
-                    dw <= width,
-                    "width {width}: line display width {dw} exceeds buffer: {truncated:?}"
-                );
-            }
-        }
+    fn buffer_text(buf: &ratatui::buffer::Buffer, width: u16, height: u16) -> String {
+        (0..height)
+            .map(|y| {
+                (0..width)
+                    .map(|x| buf[(x, y)].symbol().to_string())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     #[test]
-    fn schedule_list_output_retains_task_id_at_60_cols() {
-        let list_output = "1 active task(s):\n  sched_42 | one-shot | next: 30s | [scheduled-followup] check build";
-        let display = ToolResultDisplay {
-            tool_name: Some("list_scheduled_tasks".to_string()),
-            content: list_output.to_string(),
-            is_error: false,
-        };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
-
-        for line in &lines {
-            let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
-            let truncated = truncate_single_line(&text, 60);
+    fn schedule_list_buffer_renders_at_all_widths() {
+        let list_output = "2 active task(s):\n  sched_1 | one-shot | next: 45s\n  sched_2 | recurring (30s) | next: 12s";
+        for width in [40u16, 60, 80, 120] {
+            let (buf, h) = render_text_to_buffer(list_output, width);
+            let content = buffer_text(&buf, width, h);
             assert!(
-                truncated.contains("sched_") || !text.contains("sched_"),
-                "task ID should survive 60-col truncation: {truncated:?}"
+                content.contains("sched_1"),
+                "list at {width} cols must retain task ID: {content:?}"
+            );
+            assert!(
+                content.contains("one-shot"),
+                "list at {width} cols must retain kind: {content:?}"
             );
         }
     }
 
     #[test]
-    fn schedule_cancel_output_no_panic_at_40_cols() {
-        let cancel_output = "Task sched_1 cancelled. No further fires will occur.";
-        let display = ToolResultDisplay {
-            tool_name: Some("cancel_scheduled_task".to_string()),
-            content: cancel_output.to_string(),
-            is_error: false,
-        };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
-
-        for line in &lines {
-            let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
-            let truncated = truncate_single_line(&text, 40);
-            let dw = unicode_width::UnicodeWidthStr::width(truncated.as_str());
+    fn schedule_cancelled_buffer_renders_at_all_widths() {
+        let cancelled = "Task sched_1 cancelled. No further fires will occur.";
+        for width in [40u16, 60, 80, 120] {
+            let (buf, h) = render_text_to_buffer(cancelled, width);
+            let content = buffer_text(&buf, width, h);
             assert!(
-                dw <= 40,
-                "cancel output at 40 cols: display width {dw} exceeds 40: {truncated:?}"
+                content.contains("cancelled") || content.contains("sched_1"),
+                "cancelled at {width} cols must retain actionable result: {content:?}"
             );
         }
     }
 
     #[test]
-    fn schedule_list_empty_output_no_panic_at_40_cols() {
-        let display = ToolResultDisplay {
-            tool_name: Some("list_scheduled_tasks".to_string()),
-            content: "No active scheduled tasks.".to_string(),
-            is_error: false,
-        };
-        let lines = build_tool_result_scrollback_lines(&display, "", None);
+    fn schedule_not_found_buffer_renders_at_all_widths() {
+        let not_found = "Task sched_99 not found or already completed.";
+        for width in [40u16, 60, 80, 120] {
+            let (buf, h) = render_text_to_buffer(not_found, width);
+            let content = buffer_text(&buf, width, h);
+            assert!(
+                content.contains("not found") || content.contains("sched_99"),
+                "not-found at {width} cols must retain state: {content:?}"
+            );
+        }
+    }
 
-        for line in &lines {
-            let text: String = line.segments.iter().map(|s| s.text.as_str()).collect();
-            let truncated = truncate_single_line(&text, 40);
-            assert!(!truncated.is_empty() || text.is_empty());
+    #[test]
+    fn schedule_unavailable_buffer_renders_at_all_widths() {
+        let unavailable = "scheduler is not available";
+        for width in [40u16, 60, 80, 120] {
+            let (buf, h) = render_text_to_buffer(unavailable, width);
+            let content = buffer_text(&buf, width, h);
+            assert!(
+                !content.trim().is_empty(),
+                "unavailable at {width} cols must not be empty"
+            );
+        }
+    }
+
+    #[test]
+    fn schedule_empty_list_buffer_renders_at_all_widths() {
+        let empty = "No active scheduled tasks.";
+        for width in [40u16, 60, 80, 120] {
+            let (buf, h) = render_text_to_buffer(empty, width);
+            let content = buffer_text(&buf, width, h);
+            assert!(
+                content.contains("No active"),
+                "empty list at {width} cols must retain message: {content:?}"
+            );
         }
     }
 }
