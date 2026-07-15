@@ -1,8 +1,9 @@
 # 2026-07-15 Four-Month Product And Risk Plan
 
-**Status**: Ready for assignment; no iteration activated.
+**Status**: In Progress — I129/P100 Active; later packages remain sequential.
 **Timebox**: 2026-08-01 through 2026-11-30.
 **Execution package**: `docs/tasks/2026-07-15-product-risk-execution-package.md`.
+**Unattended authority**: `docs/tasks/2026-07-15-product-risk-unattended-authorization.md`.
 
 ## Objective
 

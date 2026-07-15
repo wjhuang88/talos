@@ -161,6 +161,7 @@ docs/iterations/
 | I126 | Schedule Inspection And Control | **Complete (2026-07-15)** | Read-only no-message 20-row list cap; Execute/Ask cancel with approved no-fire and denied-unchanged real-session proof; multi-tick snapshots; semantic 40/60/80/120 scrollback Buffer coverage; full validation green. See `I126-schedule-inspection-control.md`. |
 | I127 | Scheduler Reliability Closeout | **Complete** (2026-07-15) | Month 4. SF130-SF133 closed: bounded production queue failures, deterministic lifecycle stress, clean-HOME independent replay packet, README limitations, and full validation. See `I127-scheduler-reliability-closeout.md`. |
 | I128 | Embedded Durable Runtime Sessions | **Complete** (2026-07-15) | Host-selected UUID TLOG sessions, opaque external-ID binding, atomic durable turns, filtered transcript/lifecycle APIs, and Runtime auto-recovery with committed-entry events. See `I128-embedded-durable-runtime-sessions.md`. |
+| I129 | WEB-001 Rendered Dashboard Pages | Active (2026-07-15) | P100 active under unattended authority. Scope: loopback-only rendered HTML for status/history/governance/masked-config with conservative content negotiation. SESSION-005 is Complete. See `I129-web001-rendered-dashboard-pages.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -174,8 +175,8 @@ rewrite published iteration baselines.
 |---|---|---|
 | I011 | Complete (2026-06-30 closure) | S1 delivered; S2 (provider plugin arch) superseded by I015 (PROV-001 Complete). Removed from non-terminal inventory. |
 | I018 | Planned | Deferred; remains a valid future observability/prompt-assets baseline. |
-| I019 | Planned | Blocked from activation until I018 or an explicit dependency replan. |
-| I020 | Planned | Blocked from activation until I019 or an explicit research-priority replan. |
+| I019 | Complete (2026-06-29, via I050-I053) | Stale entry corrected 2026-07-15: I019 closed Complete; previously listed as Planned/blocked. |
+| I020 | Complete (2026-06-29, via I054-I055) | Stale entry corrected 2026-07-15: I020 closed Complete; previously listed as Planned/blocked. |
 | I028 | Superseded before implementation | Removed from activation inventory; I124-I127 own the changed Ask-gated acceptance target. |
 | I124 | Complete (2026-07-14) | Removed from non-terminal inventory after positive scheduled-turn/Deny proof, accepted ADR-041 change control, and a green validation ladder. |
 | I125 | Complete (2026-07-14) | Removed from non-terminal inventory after compatibility, race, permission, real-provider, documentation, and full validation closure. |

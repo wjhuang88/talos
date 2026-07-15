@@ -1,7 +1,8 @@
 # Execution Package: Four-Month Product And Risk Plan
 
-**Status**: Ready for assignment; no iteration activated.
+**Status**: In Progress — I129/P100 Active; later packages inactive.
 **Program plan**: `docs/tasks/2026-07-15-four-month-product-risk-plan.md`.
+**Unattended authority**: `docs/tasks/2026-07-15-product-risk-unattended-authorization.md`.
 
 ## Start Gate
 
@@ -42,3 +43,6 @@ Retry an unchanged failed command at most twice. If code and owner docs disagree
 | Time | Package | Branch/commit | State | Evidence | Changed files | Risk/deviation | Next exact action |
 |---|---|---|---|---|---|---|---|
 | 2026-07-15 | Planning handoff | `main` | Ready | Scope, inventory, ordered packages, gates, and escalation boundaries recorded. | Plan and execution package. | No iteration is active. | Assign P100; run Start Gate; inspect `talos-dashboard` and WEB-001; create only P100's iteration baseline. |
+| 2026-07-15 | P100 Start Gate | `main` (uncommitted) | Gate passed; SESSION-005 fix v2 applied | Start Gate ran: clean tree, rustc 1.97.0, cargo metadata OK, governance 0 warnings, release_preflight initially failed on I128 durable concurrency test (SESSION-005), fix applied. Dashboard inspected: 6 GET-only routes returning JSON/plain-text, no rendered HTML pages. I018-I020 disposition recorded. I129 baseline created (Planned). | `crates/talos-session/src/durable.rs`, `docs/backlog/active/SESSION-005-*.md`, `docs/iterations/I129-*.md` | Pre-existing I128 SQLite WAL race found and fixed. Non-terminal inventory stale for I019/I020 (both Complete). | Await architecture review before marking I129 Active. |
+| 2026-07-15 | P100 arch review v1 | `main` (uncommitted) | Fixes applied; awaiting re-review | Architecture review found: (1) SESSION-005 had expect() panic, wrong retry time semantics, missing tests; (2) I129 had /extensions scope creep, risky Accept default, stale checkpoint. All addressed: removed expect() and deferred busy_timeout after init (bounded ≤500ms), added deterministic tests for non-BUSY + retry exhaustion; removed /extensions, tightened to conservative JSON-default negotiation; fixed checkpoint text. SESSION-005 status → Review. | Same files | No format/API/dependency/permission change confirmed. | Re-run full validation ladder; submit for re-review. |
+| 2026-07-15 | P100 architecture acceptance | `main` (uncommitted) | Pass; I129 Active | Independent review accepted SESSION-005 and I129. Session crate tests (155), concurrent-open repetition (5), release preflight, governance, and diff checks passed. SESSION-005 is Complete. Maintainer granted unattended authority, including bounded Defer/Reject defaults for P120/P130/P140 and browser-test fallback. | SESSION-005/I129/Board/index/WEB-001/authority docs | No format/API/dependency/permission change. | Implement P100 only; retain all later packages inactive. |

@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | WEB-001 |
 | Priority | P2 (elevated 2026-06-27 — product differentiation track; informed by EXT-002/omp.sh reference) |
-| Status | Partial — loopback-only read-only snapshot API, security hardening, and an HTML link landing page are implemented. No rendered dashboard pages, SSE log viewer, web config editor, or web actions exist. |
+| Status | In Progress — I129 is rendering the existing loopback-only read-only snapshot data as browser pages. No SSE log viewer, web config editor, or web actions are selected. |
 | Depends On | talos-rpc infrastructure; OBS-001 (logs); CONF-001 (config primitives) |
 | Relates To | REMOTE-001 (remote/P2P surface — may share a handler backbone); OBS-001; CONF-001 |
 | Blocks | Browser dashboard; live log viewer; web config editor |
