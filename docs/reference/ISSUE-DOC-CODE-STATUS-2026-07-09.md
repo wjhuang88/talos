@@ -9,8 +9,7 @@ index only; executable requirements remain in the owner docs listed below.
 - Fixed and synchronized: #18, #24, #25, #26, #31, #35, #39.
 - Correctly open after refresh: #22, #29, #30, #32, #36, #37, #38, #40.
 - Correctly closed from the earlier issue batch: #19, #20, #21, #23, #27, #33, #34.
-- Proposal/open backlog still needs separate intake or activation: #29, #30, #32, #36, #37, #38,
-  #40.
+- Proposal or refinement work still needs separate activation: #29, #30, #32, #36, #37, #38, #40.
 
 ## Matrix
 
@@ -27,16 +26,18 @@ index only; executable requirements remain in the owner docs listed below.
 | #26 thinking content history | Closed | `TUI-029` | Typed reasoning history, safe resume projection, explicit `--include-thinking` export, and cancellation/error exclusion are implemented; owner record cites `6970af9`, `4ebf73e`, and `26211d3` plus workspace validation. | Closed during the 2026-07-15 issue refresh. |
 | #27 stale preview clear | Closed | `TUI-028` | Engine clears preview on cancel/error/turn lifecycle; conversation-loop tests cover terminal cleanup paths. | No action. |
 | #28 dashboard message format | Closed, superseded by #39 | `TUI-028` | #39 replaced the original requirement; its transient `UiOutput::Tip` behavior was later accepted with native PTY evidence. | No action. |
+| #29 talos desktop | Open | `docs/proposals/talos-desktop.md` | Proposal only; no implementation task is selected. | Keep open until a bounded feature intake is selected. |
+| #30 multi-agent architecture | Open | `docs/proposals/multi-agent-architecture.md` | Proposal only; no implementation task is selected. | Keep open until a bounded, ADR-aligned feature intake is selected. |
 | #31 model switch status-bar jump | Closed | `TUI-028` | Native Alacritty verification accepted compact model/provider status rendering after `823a8e0`; display-width truncation remains bounded. | Closed with maintainer evidence comment. |
-| #32 health-check thread proposal | Open | `RUNTIME-002` | RUNTIME-002 keeps health-check as optional future work; no background task added. | Keep open unless selected. |
+| #32 health-check thread proposal | Open | `RUNTIME-002` | RUNTIME-002 keeps health-check as optional future work; no background task added. | Keep open unless a separately scoped safety design is selected. |
 | #33 `/todo delete` | Closed | `TODO-002` | Implemented with confirmation and short-ID handling. | No action. |
 | #34 todo create idempotency | Closed | `TODO-002` | Implemented with idempotent create/batch behavior. | No action. |
 | #35 single data-flow audit | Closed | `ARCH-032` | I108 audit complete; zero `broadcast::channel` usages; channel topology documented. | Closed with status comment. |
-| #36 tool error propagation audit | Open | None selected in this audit | Not audited here. | Needs owner doc or selection. |
-| #37 input history up/down | Open | None selected in this audit | Not implemented here. | Needs owner doc or selection. |
-| #38 long-running task engine | Open | None selected in this audit | Not implemented here. | Needs owner doc or selection. |
+| #36 tool error propagation audit | Open | `TOOL-021` | Refinement audit only; no tool/provider behavior change selected. | Trace and review data-flow before activation. |
+| #37 input history up/down | Open | `TUI-030` | Refinement owner scopes an in-memory composer-history slice only. | Refine and select independently. |
+| #38 long-running task engine | Open | `TASK-001` | ADR-gated architecture/security spike; no engine or scheduler selected. | Produce reviewed decision before implementation. |
 | #39 dashboard transient notification | Closed | `TUI-028` | Native Alacritty evidence accepted `UiOutput::Tip` routing with no stale output or blank startup row after `823a8e0`; closeout `072c726`. | Closed with maintainer evidence comment. |
-| #40 multi-Talos discovery/communication | Open | None selected in this audit | Not implemented here. | Needs requirement intake; high architecture risk. |
+| #40 multi-Talos discovery/communication | Open | `A2A-001` | ADR-gated architecture/security spike; no discovery/protocol selected. | Produce threat-modelled decision before implementation. |
 
 ## Verification Performed
 
