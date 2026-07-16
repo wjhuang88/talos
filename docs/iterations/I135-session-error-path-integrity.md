@@ -1,6 +1,6 @@
 # Iteration I135: Session Error-Path Integrity
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-07-16
 > Planned objective: close SESSION-006 without weakening I128 durable-turn atomicity.
 > Baseline rule: preserve this target; changed persistence semantics use change control or a new iteration ID.
@@ -65,11 +65,30 @@
 
 | Date | Type | Record |
 |---|---|---|
-
+| 2026-07-16 | Activation | N200 Start Gate passed. I135 activated for N210. |
+| 2026-07-16 | Implementation | run_inner returns partial messages; turn.rs persists on error; ADR-042 preserved. |
+| 2026-07-16 | Commit | `9ed5779` pushed to origin/main. |
 ## Verification Evidence
 
-- Pending activation.
+- `cargo fmt --all -- --check`: clean.
+- `cargo check --workspace --locked`: clean.
+- `cargo clippy --workspace --locked -- -D warnings`: clean.
+- `cargo test --workspace --locked`: all pass (0 failures).
+- `./scripts/release_preflight.sh`: passed.
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `git diff --check`: clean.
+- **Integration test**: `fixture_provider_error_preserves_tool_results` proves tool result IS persisted after provider error.
+- **ADR-042 regression**: `fixture_adr042_durable_failed_turn_still_aborts` proves no EntriesCommitted on error path.
 
 ## Variance And Residuals
 
-- None at publication.
+- No variance from baseline. All acceptance criteria met.
+- SESSION-006 is Complete; Issue #36 may be closed.
+
+## Retrospective
+
+- Outcome: met. All acceptance criteria closed with integration evidence.
+- Documentation: SESSION-006, TOOL-021 audit, Issue #36, Board, iterations README, execution package.
+- Lessons: The fix separates interactive prefix persistence (always saves valid completed exchanges)
+  from durable Runtime turn commit (only on success). ADR-042's failed-turn abort is preserved
+  because no `commit_turn` call happens on the error path.

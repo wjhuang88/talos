@@ -165,7 +165,7 @@ docs/iterations/
 | I132 | TASK-001 Persistent Task Runtime — Defer | **Complete** (2026-07-16) | ADR-043 Defer: task runtime NOT implemented. I128 + I124-I127 provide reusable session/turn/scheduler primitives, but task lifecycle, phase checkpoints, incomplete-task recovery, and durable scheduling are unsatisfied. Defer due to no product need + P130 non-goals. See `I132-task001-persistent-task-defer.md`. |
 | I133 | A2A-001 Multi-Instance Discovery — Defer | **Complete** (2026-07-16) | ADR-044 Defer: no product need; REMOTE-001 prerequisite is P4 Research. Threat model: identity, auth, authorization, discovery, credentials, transcript exposure, retention all unresolved. Explicit host-managed is the only compatible path if future need arises. See `I133-a2a001-multi-instance-defer.md`. |
 | I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
-| I135 | Session Error-Path Integrity | **Planned** | First package of the 2026-07-16 unattended program: close SESSION-006 while preserving ADR-042 durable failed-turn abort semantics. See `I135-session-error-path-integrity.md`. |
+| I135 | Session Error-Path Integrity | **Complete** (2026-07-16) | SESSION-006 closed: provider error persists valid completed tool exchange; ADR-042 durable abort preserved. 2 integration tests. See `I135-session-error-path-integrity.md`. |
 | I136 | Read-Only Plugin Product Closure | **Planned — blocked on I135** | Verify and close the local explicit read-only WASM plugin slice and real `/plugins` diagnostics without authority expansion. See `I136-read-only-plugin-product-closure.md`. |
 | I137 | Memory Admission Benchmark | **Planned — blocked on I136** | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
 | I138 | Memory Admission Decision Application | **Planned — blocked on I137** | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
@@ -200,7 +200,7 @@ rewrite published iteration baselines.
 | I054 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I054 doc). |
 | I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
-| I135 | Planned | First selectable iteration; activate only after the N200 Start Gate. |
+| I135 | Complete (2026-07-16) | Removed from non-terminal inventory after integration proof and ADR-042 regression. |
 | I136 | Planned | Keep blocked until I135 is Complete. |
 | I137 | Planned | Keep blocked until I136 is Complete. |
 | I138 | Planned / conditional | Keep blocked until I137 records a Go/No-Go decision. |

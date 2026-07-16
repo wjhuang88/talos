@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | SESSION-006 |
 | Priority | P1 |
-| Status | Open — identified by TOOL-021 audit (I131, 2026-07-16) |
+| Status | Complete (2026-07-16, I135) — interactive prefix persistence implemented; ADR-042 preserved |
 | Depends On | SESSION-002, TOOL-021 |
 | Relates To | RUNTIME-002 |
 | Origin | TOOL-021 audit finding (`docs/reference/TOOL-021-ERROR-PROPAGATION-AUDIT-2026-07-16.md`) FINDING-2 |
