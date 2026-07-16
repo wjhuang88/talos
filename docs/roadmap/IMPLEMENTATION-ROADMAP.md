@@ -6,9 +6,21 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
-## Current Four-Month Product And Risk Plan (2026-07-15)
+## Current Four-Month Reliability, Extensibility, And Memory Quality Plan (2026-07-16)
 
-The next candidate program is [`2026-07-15-four-month-product-risk-plan`](../tasks/2026-07-15-four-month-product-risk-plan.md), with its execution owner at [`2026-07-15-product-risk-execution-package`](../tasks/2026-07-15-product-risk-execution-package.md). It is ready for assignment but activates no iteration. It sequences a read-only rendered WEB-001 dashboard, TUI-030 composer history, TOOL-021's evidence-first audit, and ADR-gated TASK-001 and A2A-001 decisions. Historical Planned baselines I018-I020 remain deferred and must be disposed in an activation record before selecting any new iteration. No release, remote control, permission broadening, autonomous task execution, or multi-instance networking is authorized.
+The current one-pass unattended program is
+[`2026-07-16-four-month-reliability-extensibility-plan`](../tasks/2026-07-16-four-month-reliability-extensibility-plan.md),
+with its durable execution owner at
+[`2026-07-16-reliability-extensibility-execution-package`](../tasks/2026-07-16-reliability-extensibility-execution-package.md).
+It publishes I135-I139 and activates none at planning time. The executor runs N200 first, then
+sequences SESSION-006 integrity, bounded local read-only plugin closure, an offline MEM-009
+benchmark, evidence-driven decision application, and clean-state closeout. Every phase must commit,
+push, and checkpoint, but the executor does not pause for intermediate acceptance; one final
+acceptance request follows the complete N200-N250 run. No release, dependency/API/format change,
+permission broadening, remote/write plugin, desktop, autonomous recovery, persistent task runtime,
+multi-instance networking, or v1 claim is authorized.
+
+The 2026-07-15 P100-P150 product/risk program is Complete and remains preserved in its owner docs.
 
 ## Completed Four-Month Scheduled Follow-Ups Sequence (2026-07-13)
 

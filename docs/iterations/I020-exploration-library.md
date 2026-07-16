@@ -3,7 +3,7 @@
 **User can**: Ask Talos to research a question, preserve sources and conclusions locally, and later
 reuse the result with provenance.
 
-## Status: Review (2026-06-26) — S1-S3 delivered via I054-I055; S4 deferred
+## Status: Complete (2026-06-29) — S1-S3 delivered via I054-I055; S4 explicitly deferred by ADR-017
 
 ## Scope
 
@@ -32,4 +32,3 @@ Evidence: I054 delivered ExplorationStore with full schema (research_runs, sourc
 - External database servers.
 - Cloud sync.
 - Fully autonomous unattended web crawling.
-

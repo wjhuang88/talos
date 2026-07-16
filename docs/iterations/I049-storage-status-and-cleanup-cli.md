@@ -1,6 +1,6 @@
 # I049: Storage Status And Cleanup CLI
 
-**Status**: Planned
+**Status**: Complete (2026-06-29)
 **Created**: 2026-06-26
 **Depends On**: I048 foundation; DATA-001; I047 release workflow evidence reviewed or explicitly deferred
 

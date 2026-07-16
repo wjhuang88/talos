@@ -53,8 +53,6 @@ docs/iterations/
 | I016 | Portable File And Search Tools | **Superseded** by I025 | Native tool outcome delivered through I025/TOOL-003; residual portability/index work remains TOOL-001. |
 | I017 | Embedded Git Tools | **Superseded** by I026 | P0-P2 Git outcome delivered through I026/GIT-001; advanced/fallback residuals remain GIT-001. |
 | I018 | Observability and Prompt Assets | Planned | Bounded file-log retention and compile-time embedded prompt assets. See `I018-observability-prompt-assets.md`. |
-| I019 | Layered Memory Foundation | Planned | Four-layer memory foundation under ADR-016. See `I019-layered-memory-foundation.md`. |
-| I020 | Exploration Library | Planned | Local research library, source/claim/synthesis storage, and vector/graph storage Spike under ADR-017. See `I020-exploration-library.md`. |
 | I021 | Evolution MenteDB Realignment | **Complete** (2026-06-06) | Root-cause fix for the 5MB knowledge.db bloat and `400 Bad Request` loop. 5 atomic commits (#I021-S1..S5): Signal/TurnObservation restructure, `find_marker + capture_window`, Pattern MenteDB fields, hard-reset migration, lesson #19 annotation. 615 tests pass; runtime evidence recorded (model responds normally to `cargo run -p talos-cli -- -p "你好"`). Defense layer (commit `7470ac5`) preserved as belt-and-suspenders. See `I021-evolution-mentedb-realignment.md`; EVOLUTION.md lessons #19 and #20. |
 | I022 | TUI Inline-by-Default | **Complete** (2026-06-08) | Codex-style inline-by-default TUI: viewport at cursor y, finalized turns push to scrollback, fixed 4-line viewport (input+status only), real-time scrollback flush, status bar tips with TTL, diff+force_clear rendering. 127 TUI tests pass; workspace clean. State model refactor deferred to I023. See `I022-tui-inline-default.md`; `docs/proposals/tui-codex-overhaul.md`; ADR-018. |
 | I023 | TUI State Model | **Complete** (2026-06-12) | Event-driven architecture: `talos-conversation` + `talos-tui` separation. Codex-style single-row history insertion with styled scrollback, 3-column prefix padding, multiline user messages with Nord bg color + top/bottom padding, one-row preview with Markdown block classifier, conservative styled Markdown rendering, animated braille spinner, native cursor sync. Review remediation closed: non-lossy mpsc delivery, agent abort-on-cancel, SIGINT fallback, engine-owned mutation verified. 114 focused tests pass (61 TUI + 53 conversation). See `I023-tui-state-model.md`. |
@@ -167,6 +165,11 @@ docs/iterations/
 | I132 | TASK-001 Persistent Task Runtime — Defer | **Complete** (2026-07-16) | ADR-043 Defer: task runtime NOT implemented. I128 + I124-I127 provide reusable session/turn/scheduler primitives, but task lifecycle, phase checkpoints, incomplete-task recovery, and durable scheduling are unsatisfied. Defer due to no product need + P130 non-goals. See `I132-task001-persistent-task-defer.md`. |
 | I133 | A2A-001 Multi-Instance Discovery — Defer | **Complete** (2026-07-16) | ADR-044 Defer: no product need; REMOTE-001 prerequisite is P4 Research. Threat model: identity, auth, authorization, discovery, credentials, transcript exposure, retention all unresolved. Explicit host-managed is the only compatible path if future need arises. See `I133-a2a001-multi-instance-defer.md`. |
 | I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
+| I135 | Session Error-Path Integrity | **Planned** | First package of the 2026-07-16 unattended program: close SESSION-006 while preserving ADR-042 durable failed-turn abort semantics. See `I135-session-error-path-integrity.md`. |
+| I136 | Read-Only Plugin Product Closure | **Planned — blocked on I135** | Verify and close the local explicit read-only WASM plugin slice and real `/plugins` diagnostics without authority expansion. See `I136-read-only-plugin-product-closure.md`. |
+| I137 | Memory Admission Benchmark | **Planned — blocked on I136** | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
+| I138 | Memory Admission Decision Application | **Planned — blocked on I137** | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
+| I139 | Four-Month Reliability Closeout | **Planned — blocked on I135-I138** | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -188,7 +191,7 @@ rewrite published iteration baselines.
 | I126 | Complete (2026-07-15) | Removed from non-terminal inventory after closure of both maintainer review rounds and a green full validation ladder. |
 | I127 | Complete (2026-07-15) | Removed from non-terminal inventory after production full-queue tool-error proof, clean-HOME lifecycle replay, and full validation closure. |
 | I047 | Complete (2026-06-29) | Removed from non-terminal inventory. v0.1.2 and v0.2.0 tags pushed and published. |
-| I048 | Planned | Scope fulfilled by I049–I055; superseded by actual execution flow. |
+| I048 | Complete (2026-06-29, via I049-I055) | Removed from non-terminal inventory; owner header reconciled 2026-07-16. |
 | I049 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I049 doc, delivered via I049–I055 sequence). |
 | I050 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I050 doc). |
 | I051 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I051 doc). |
@@ -197,6 +200,11 @@ rewrite published iteration baselines.
 | I054 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I054 doc). |
 | I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
+| I135 | Planned | First selectable iteration; activate only after the N200 Start Gate. |
+| I136 | Planned | Keep blocked until I135 is Complete. |
+| I137 | Planned | Keep blocked until I136 is Complete. |
+| I138 | Planned / conditional | Keep blocked until I137 records a Go/No-Go decision. |
+| I139 | Planned | Keep blocked until I135-I138 have terminal dispositions. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |
