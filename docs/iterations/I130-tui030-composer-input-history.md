@@ -121,7 +121,7 @@ Up/Down are **unused** when the slash menu is closed. Adding history navigation 
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-15 | Code inspection | Composer, approval, and slash-command key dispatch inspected. Findings appended above. |
-| 2026-07-15 | Implementation | History state fields, methods, Up/Down handlers added. 9 state tests + 5 semantic-buffer tests pass. |
+| 2026-07-15 | Implementation | History state fields, methods, Up/Down handlers added. 9 state tests + 5 entry-point tests pass (312 TUI total). |
 | 2026-07-15 | Commit | Pushed to origin/main. Working tree clean. |
 
 ## Verification Evidence
@@ -136,12 +136,13 @@ Up/Down are **unused** when the slash menu is closed. Adding history navigation 
 - **Semantic-buffer evidence**: 9 state tests cover navigation (newest→oldest→stays), draft restoration (exact multiline), boundaries (empty history, at-oldest, at-draft), dedup (consecutive and non-consecutive), cursor-to-end on load, and submit-resets-cursor.
 - **Priority evidence**: Code structure proves approval/credential/slash-menu handlers return early before history Up/Down arms. No regression in existing 298 TUI tests.
 - **No persistence change**: `input_submit()` records in-memory only; no file, session, or transcript write.
-- **Semantic-buffer evidence (review v1 supplement)**: 5 app-level tests in `app_tests.rs` verify the full key-dispatch contract:
-  - `semantic_buffer_up_down_history_through_submit_path`: submit via `submit_input_message`, then Up/Down navigation with draft restoration.
-  - `semantic_buffer_slash_menu_open_prevents_history_navigation`: slash-menu-open guard blocks history.
-  - `semantic_buffer_approval_active_prevents_history_navigation`: approval-active early return blocks history.
-  - `semantic_buffer_credential_input_prevents_history_navigation`: credential-input guard blocks history.
-  - `semantic_buffer_full_roundtrip_with_multiline_draft`: 3 entries, multiline draft, full roundtrip, submit-after-restore records.
+- **Entry-point evidence (review v2 supplement)**: 5 tests in `app_tests.rs` call `Tui::handle_input_event` with actual `Event::Key` events:
+  - `entry_point_up_down_history_navigation`: Up→newest→oldest→stays, Down→newer→draft restored.
+  - `entry_point_slash_menu_open_does_not_trigger_history`: slash menu open, Up via handler, history cursor stays None.
+  - `entry_point_approval_active_does_not_trigger_history`: approval active, Up via handler, history untouched.
+  - `entry_point_credential_input_does_not_trigger_history`: credential input active, Up via handler, history untouched.
+  - `entry_point_full_roundtrip_multiline_draft`: 3 entries, multiline draft, full roundtrip through handle_input_event.
+  Uses `Tui::for_test()` and `InlineTerminal::test_instance()` (both `#[cfg(test)]`) to construct a real `Tui` without terminal access.
 
 ## Variance And Residuals
 

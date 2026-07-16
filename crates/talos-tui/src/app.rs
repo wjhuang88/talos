@@ -91,6 +91,35 @@ impl Tui {
         })
     }
 
+    /// Creates a minimal Tui for unit testing key dispatch without terminal access.
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        state: TuiState,
+        user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
+    ) -> Self {
+        Self {
+            state,
+            terminal: InlineTerminal::test_instance(),
+            skill_sidebar: SkillSidebar::new(),
+            evolution_panel: EvolutionPanel::new(),
+            ui_output_rx: None,
+            user_input_tx,
+            pending_scrollback: Vec::new(),
+            queued_outputs: Vec::new(),
+            active_stream: None,
+            ordered_content_open: false,
+            stream_render: StreamRenderState::default(),
+            stream_opening_pending: false,
+            pending_stream_opening: Vec::new(),
+            text_filter: ToolSyntaxFilter::default(),
+            processing_frame: 0,
+            stream_count: 0,
+            session_id: None,
+            last_total_height: 0,
+            last_char_time: None,
+        }
+    }
+
     pub fn set_ui_output_rx(&mut self, rx: mpsc::UnboundedReceiver<UiOutput>) {
         self.ui_output_rx = Some(rx);
     }

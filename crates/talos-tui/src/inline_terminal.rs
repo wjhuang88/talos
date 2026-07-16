@@ -161,6 +161,24 @@ impl InlineTerminal {
         })
     }
 
+    /// Creates a minimal instance for unit testing without terminal access.
+    #[cfg(test)]
+    pub(crate) fn test_instance() -> Self {
+        let stdout = io::stdout();
+        let backend = CrosstermBackend::new(stdout);
+        let viewport_area = Rect::new(0, 0, 80, 24);
+        let buffers = [Buffer::empty(viewport_area), Buffer::empty(viewport_area)];
+        Self {
+            backend,
+            buffers,
+            current: 0,
+            viewport_area,
+            screen_size: Size::new(80, 24),
+            last_known_cursor_pos: Position::new(0, 0),
+            needs_clear: false,
+        }
+    }
+
     #[allow(dead_code)]
     pub const fn backend(&self) -> &CrosstermBackend<Stdout> {
         &self.backend

@@ -5,7 +5,7 @@
 | Story ID | TUI-030 |
 | Type | UI behavior story |
 | Priority | P3 |
-| Status | Complete (2026-07-15, I130) |
+| Status | Review (2026-07-15, I130) — awaiting architecture re-review after entry-point test supplement |
 | Source | [GitHub Issue #37](https://github.com/wjhuang88/talos/issues/37) |
 | Depends On | `TUI-004`, `TUI-010` |
 
