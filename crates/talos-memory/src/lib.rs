@@ -19,6 +19,8 @@
 
 pub mod consolidation;
 
+#[cfg(test)]
+mod benchmark;
 mod entities;
 mod graph;
 mod prompt;
