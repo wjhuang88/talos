@@ -56,6 +56,13 @@ pub(crate) struct TuiState {
     pub status: StatusSnapshot,
     pub thinking_preview: Option<String>,
     pub slash_menu: BottomPanelState,
+    /// In-memory submitted-input history (TUI-030). Index 0 = oldest.
+    pub input_history: Vec<String>,
+    /// `None` = editing the live draft; `Some(i)` = browsing `input_history[i]`.
+    pub history_cursor: Option<usize>,
+    /// Saved draft text when the user navigates into history. Restored on Down
+    /// past the newest entry.
+    pub draft_input: String,
 }
 
 impl TuiState {
@@ -385,8 +392,62 @@ impl TuiState {
 
     pub(crate) fn input_submit(&mut self) -> String {
         let content = self.input_buffer.clone();
+        if !content.is_empty() {
+            self.record_history(&content);
+        }
         self.input_clear();
+        self.history_cursor = None;
+        self.draft_input.clear();
         content
+    }
+
+    /// Record a submitted input, deduplicating consecutive duplicates (TUI-030).
+    pub(crate) fn record_history(&mut self, input: &str) {
+        if self.input_history.last().is_some_and(|last| last == input) {
+            return;
+        }
+        self.input_history.push(input.to_string());
+    }
+
+    /// Navigate to the previous (older) history entry (TUI-030).
+    pub(crate) fn history_prev(&mut self) {
+        if self.input_history.is_empty() {
+            return;
+        }
+        match self.history_cursor {
+            None => {
+                self.draft_input = self.input_buffer.clone();
+                self.history_cursor = Some(self.input_history.len() - 1);
+            }
+            Some(0) => return,
+            Some(i) => self.history_cursor = Some(i - 1),
+        }
+        self.load_history_entry();
+    }
+
+    /// Navigate to the next (newer) entry or restore the draft (TUI-030).
+    pub(crate) fn history_next(&mut self) {
+        match self.history_cursor {
+            None => {}
+            Some(i) => {
+                if i + 1 >= self.input_history.len() {
+                    self.history_cursor = None;
+                    self.input_buffer = self.draft_input.clone();
+                    self.draft_input.clear();
+                    self.cursor_pos = self.input_buffer.chars().count();
+                } else {
+                    self.history_cursor = Some(i + 1);
+                    self.load_history_entry();
+                }
+            }
+        }
+    }
+
+    fn load_history_entry(&mut self) {
+        if let Some(i) = self.history_cursor {
+            self.input_buffer = self.input_history[i].clone();
+            self.cursor_pos = self.input_buffer.chars().count();
+        }
     }
 
     pub(crate) fn cursor_byte_pos(&self) -> usize {

@@ -1005,6 +1005,14 @@ impl Tui {
                         let query = self.state.panel_query().to_string();
                         self.state.slash_menu.select_next(&query);
                     }
+                    KeyCode::Up if !self.state.slash_menu.is_open => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.history_prev();
+                    }
+                    KeyCode::Down if !self.state.slash_menu.is_open => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.history_next();
+                    }
                     KeyCode::Tab if self.state.slash_menu.is_open => {
                         let action = self.state.complete_selected_panel_item();
                         self.dispatch_panel_action(action);

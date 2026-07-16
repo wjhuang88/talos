@@ -495,3 +495,144 @@ fn tuistate_panel_query_strips_slash_for_slash_menu() {
 
     assert_eq!(state.panel_query(), "mo");
 }
+
+// ── TUI-030 composer input history tests ──────────────────────────────────
+
+#[test]
+fn history_prev_navigates_to_newest_then_oldest() {
+    let mut state = TuiState::new();
+    state.input_submit(); // empty, no record
+    state.input_append_str("hello");
+    state.input_submit();
+    state.input_append_str("world");
+    state.input_submit();
+
+    assert_eq!(state.input_history, vec!["hello", "world"]);
+
+    // First Up → newest entry
+    state.history_prev();
+    assert_eq!(state.input_buffer, "world");
+    assert_eq!(state.history_cursor, Some(1));
+
+    // Second Up → oldest entry
+    state.history_prev();
+    assert_eq!(state.input_buffer, "hello");
+    assert_eq!(state.history_cursor, Some(0));
+
+    // Third Up at oldest → stays
+    state.history_prev();
+    assert_eq!(state.input_buffer, "hello");
+    assert_eq!(state.history_cursor, Some(0));
+}
+
+#[test]
+fn history_next_restores_exact_draft() {
+    let mut state = TuiState::new();
+    state.input_append_str("first");
+    state.input_submit();
+
+    // Type a draft, then navigate
+    state.input_append_str("my draft");
+    state.history_prev();
+    assert_eq!(state.input_buffer, "first");
+    assert_eq!(state.draft_input, "my draft");
+
+    // Down past newest restores draft
+    state.history_next();
+    assert_eq!(state.input_buffer, "my draft");
+    assert!(state.history_cursor.is_none());
+    assert!(state.draft_input.is_empty());
+}
+
+#[test]
+fn history_next_at_draft_does_nothing() {
+    let mut state = TuiState::new();
+    state.input_append_str("entry");
+    state.input_submit();
+    state.history_next(); // no-op when already at draft
+    assert!(state.history_cursor.is_none());
+}
+
+#[test]
+fn history_prev_empty_history_does_nothing() {
+    let mut state = TuiState::new();
+    state.history_prev();
+    assert!(state.input_buffer.is_empty());
+    assert!(state.history_cursor.is_none());
+}
+
+#[test]
+fn history_dedup_consecutive_duplicates() {
+    let mut state = TuiState::new();
+    state.input_append_str("same");
+    state.input_submit();
+    state.input_append_str("same");
+    state.input_submit();
+    state.input_append_str("different");
+    state.input_submit();
+    state.input_append_str("different");
+    state.input_submit();
+
+    assert_eq!(state.input_history, vec!["same", "different"]);
+}
+
+#[test]
+fn history_submit_resets_cursor() {
+    let mut state = TuiState::new();
+    state.input_append_str("entry");
+    state.input_submit();
+
+    // Navigate to history, then submit
+    state.history_prev();
+    assert!(state.history_cursor.is_some());
+    state.input_submit();
+    assert!(state.history_cursor.is_none());
+    assert!(state.draft_input.is_empty());
+}
+
+#[test]
+fn history_navigation_roundtrip_preserves_draft() {
+    let mut state = TuiState::new();
+    state.input_append_str("a");
+    state.input_submit();
+    state.input_append_str("b");
+    state.input_submit();
+    state.input_append_str("c");
+    state.input_submit();
+
+    // Type a multiline draft
+    state.input_append_str("line one\nline two");
+    state.history_prev(); // → "c"
+    state.history_prev(); // → "b"
+    state.history_prev(); // → "a"
+    state.history_next(); // → "b"
+    state.history_next(); // → "c"
+    state.history_next(); // → draft
+
+    assert_eq!(state.input_buffer, "line one\nline two");
+    assert!(state.history_cursor.is_none());
+}
+
+#[test]
+fn history_non_consecutive_duplicates_kept() {
+    let mut state = TuiState::new();
+    state.input_append_str("x");
+    state.input_submit();
+    state.input_append_str("y");
+    state.input_submit();
+    state.input_append_str("x");
+    state.input_submit();
+
+    // Non-consecutive "x" is kept
+    assert_eq!(state.input_history, vec!["x", "y", "x"]);
+}
+
+#[test]
+fn history_load_sets_cursor_to_end() {
+    let mut state = TuiState::new();
+    state.input_append_str("hello world");
+    state.input_submit();
+
+    state.history_prev();
+    assert_eq!(state.cursor_pos, "hello world".chars().count());
+}
