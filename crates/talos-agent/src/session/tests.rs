@@ -963,3 +963,156 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
         "canonical persistence must not duplicate transient AgentEvents"
     );
 }
+
+// ── TOOL-021 fixture: provider error after tool execution drops tool results ──
+
+struct EchoTool;
+
+#[async_trait::async_trait]
+impl talos_core::tool::AgentTool for EchoTool {
+    fn name(&self) -> &str {
+        "echo"
+    }
+
+    fn description(&self) -> &str {
+        "Echoes input back"
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "message": { "type": "string" }
+            },
+            "required": ["message"]
+        })
+    }
+    async fn execute(&self, input: serde_json::Value) -> talos_core::tool::ToolResult {
+        let msg = input
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("empty");
+        talos_core::tool::ToolResult::success(format!("echo: {msg}"))
+    }
+}
+
+/// Model that sends a tool call, then on second call sends an error.
+struct ToolCallThenErrorModel {
+    call_count: Arc<std::sync::atomic::AtomicU8>,
+}
+
+impl ToolCallThenErrorModel {
+    fn new() -> Self {
+        Self {
+            call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+        }
+    }
+}
+#[async_trait]
+impl LanguageModel for ToolCallThenErrorModel {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let (tx, rx) = mpsc::channel(64);
+        let count = self.call_count.clone();
+        tokio::spawn(async move {
+            let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if n == 0 {
+                // First call: produce a tool call
+                let _ = tx
+                    .send(AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "call_echo_1".into(),
+                            name: "echo".into(),
+                            input: serde_json::json!({"message": "hello"}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    })
+                    .await;
+                let _ = tx
+                    .send(AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: talos_core::message::Usage::default(),
+                    })
+                    .await;
+            } else {
+                // Second call: simulate provider error
+                let _ = tx
+                    .send(AgentEvent::Error {
+                        message: "provider server error".into(),
+                    })
+                    .await;
+            }
+        });
+        Ok(rx)
+    }
+}
+
+/// Proves TOOL-021 FINDING-2: when a provider error occurs after tool execution,
+/// the session does NOT persist tool results. The tool result is lost.
+#[tokio::test]
+async fn fixture_provider_error_drops_tool_results() {
+    use talos_session::{SessionManager, SessionMetadata};
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
+    let session = manager.create_session("error-path", "").unwrap();
+
+    let mut registry = ToolRegistry::new();
+    registry.register(std::sync::Arc::new(EchoTool));
+    #[allow(deprecated)]
+    let agent = Agent::new(std::sync::Arc::new(ToolCallThenErrorModel::new()), registry);
+
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp_dir.path().to_path_buf(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("test".into()),
+            ..SessionMetadata::default()
+        },
+    );
+
+    let sq_tx = handle.sq_tx;
+    let eq_rx = handle.eq_rx;
+    let _actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::Submit {
+            message: "echo hello".into(),
+        })
+        .await
+        .unwrap();
+
+    // Wait for turn completion
+    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+
+    // Verify the turn completed with an error
+    let has_error_completion = events.iter().any(|e| {
+        matches!(
+            completed_status(e),
+            Some(TurnCompletionStatus::Error { .. })
+        )
+    });
+    assert!(
+        has_error_completion,
+        "turn should complete with error status"
+    );
+
+    // FINDING-2: The tool result is NOT persisted because the error branch
+    // in turn.rs:188-200 does not call persist_turn_messages.
+    let persisted = session.read_messages().unwrap();
+    let has_tool_result = persisted
+        .iter()
+        .any(|m| matches!(m, Message::Tool { result } if result.content.contains("echo: hello")));
+    assert!(
+        !has_tool_result,
+        "FINDING-2 CONFIRMED: tool result must NOT be persisted after provider error \
+         (current behavior — this is the data-loss risk documented in SESSION-006)"
+    );
+}

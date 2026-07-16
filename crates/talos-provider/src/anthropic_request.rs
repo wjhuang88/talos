@@ -553,4 +553,34 @@ mod tests {
             "Anthropic must NOT filter orphan tool results (provider difference from OpenAI)"
         );
     }
+
+    #[test]
+    fn fixture_anthropic_orphan_error_result_not_filtered() {
+        // F4-error: Anthropic does NOT filter orphan ERROR tool results either.
+        let messages = vec![Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "orphan_err".into(),
+                content: "command not found".into(),
+                is_error: true,
+            },
+        }];
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
+
+        let user_msgs: Vec<_> = body["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["role"] == "user")
+            .collect();
+        assert!(
+            !user_msgs.is_empty(),
+            "Anthropic must NOT filter orphan ERROR tool results"
+        );
+        // Verify is_error is still set on the orphan
+        let tool_block = &user_msgs[0]["content"][0];
+        assert_eq!(
+            tool_block["is_error"], true,
+            "orphan error result must preserve is_error flag"
+        );
+    }
 }

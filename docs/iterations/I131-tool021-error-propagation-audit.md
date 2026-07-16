@@ -1,6 +1,6 @@
 # Iteration I131: TOOL-021 Error Propagation Audit
 
-> Document status: Complete
+> Document status: Review — architecture review required correction of conclusion and additional fixtures
 > Published plan date: 2026-07-16
 > Planned objective: Establish whether tool failures are preserved, classified, and made available to the next model request on every supported provider path.
 > MVP deliverable: Reviewed fixture matrix proving each tool-error route is preserved or explicitly rejected; follow-up owner stories for any finding.
@@ -40,14 +40,14 @@
 - `scripts/validate_project_governance.sh .`: 0 warnings.
 - `git diff --check`: clean.
 - **Audit report**: `docs/reference/TOOL-021-ERROR-PROPAGATION-AUDIT-2026-07-16.md`
-- **Fixture tests**: 9 new tests (3 OpenAI, 3 Anthropic, 3 compaction).
+- **Fixture tests**: 15 total (3 OpenAI, 4 Anthropic incl. orphan-error, 3 compaction, 1 agent→session integration proving FINDING-2 data loss, 4 existing scheduler fixtures).
 - **Findings**: FINDING-1 (orphan result provider difference — observation), FINDING-2 (provider error may lose unpersisted tool results — caller-dependent).
-- **No silent loss found** in any observed path.
+- **FINDING-2 confirmed**: Integration test `fixture_provider_error_drops_tool_results` proves tool results are lost on provider error in the canonical session path.
 
 ## Variance And Residuals
 
 - No code changes to production paths — audit and fixtures only.
-- Follow-up stories recommended: (1) session-layer error persistence, (2) Anthropic orphan filtering (conditional).
+- Follow-up owner story created: SESSION-006 (session-layer error-path persistence). Anthropic orphan filtering remains conditional.
 
 ## Retrospective
 

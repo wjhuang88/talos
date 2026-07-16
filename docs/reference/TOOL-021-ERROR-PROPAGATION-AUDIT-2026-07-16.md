@@ -3,7 +3,7 @@
 **Date**: 2026-07-16
 **Iteration**: I131 / P120
 **Auditor**: glm-5.2 (unattended)
-**Status**: Complete — no silent loss found; two findings with follow-up recommendations
+**Status**: Review — FINDING-2 confirmed as data loss via integration test; follow-up owner story created
 
 ## Methodology
 
@@ -127,9 +127,21 @@ ToolResult { content, is_error }
 - **Impact**: If a tool executed successfully but the subsequent provider call failed, the tool result is not persisted. On retry/resume, the model doesn't see the tool result.
 - **Recommendation**: Consider persisting messages even on provider error (turn partial success). Create a follow-up story for session-layer error persistence.
 
-### NO SILENT LOSS FOUND
+### DATA-LOSS RISK CONFIRMED (FINDING-2)
 
-In all observed paths, tool errors are either:
+FINDING-2 is confirmed as actual data loss, not a conditional risk:
+`talos-agent/src/session/turn.rs:188-200` is the canonical session turn path. The `Ok(Err(e))`
+branch sends an error event but never calls `persist_turn_messages`. Tool results already
+executed and pushed to the message vector are dropped. Integration test
+`fixture_provider_error_drops_tool_results` proves this.
+
+Other paths preserve errors correctly:
+- Preserved with content and `is_error` flag (normal case)
+- Preserved with truncated/empty content but intact `is_error` flag (compaction)
+- Explicitly dropped with warning logging (orphan in OpenAI)
+- Modified with visible annotations ("[Analyze...]", "Error: ")
+
+But FINDING-2 represents a real gap where tool results can be silently lost on provider error.
 - Preserved with content and `is_error` flag (normal case)
 - Preserved with truncated/empty content but intact `is_error` flag (compaction)
 - Explicitly dropped with warning logging (orphan in OpenAI)
@@ -141,5 +153,5 @@ No path silently discards an error result without a trace.
 
 | ID | Description | Priority |
 |---|---|---|
-| (new) | Session-layer: persist turn messages on provider error to avoid losing tool results | P2 |
-| (new, conditional) | Anthropic: add orphan tool result filtering if API rejects them | P3 |
+| SESSION-006 | Session-layer: persist turn messages on provider error to avoid losing tool results | P1 |
+| (conditional) | Anthropic: add orphan tool result filtering if API rejects them | P3 |
