@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Existing GitHub Release tag whose Windows x86_64 asset will be installed
         required: true
-        default: v0.3.4
+        default: v0.3.5
         type: string
 
 permissions:

@@ -14,8 +14,8 @@ futures-util = "0.3"
 reqwest = { version = "0.13.4", features = ["json", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-talos-config = { version = "0.3.4", path = "../talos-config" }
-talos-core = { version = "0.3.4", path = "../talos-core" }
+talos-config = { version = "0.3.5", path = "../talos-config" }
+talos-core = { version = "0.3.5", path = "../talos-core" }
 thiserror = "2"
 tokio = { version = "1", features = ["sync", "macros"] }
 tokio-util = { version = "0.7", features = ["codec"] }

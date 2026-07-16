@@ -12,7 +12,7 @@ rust-version.workspace = true
 glob = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-talos-core = { version = "0.3.4", path = "../talos-core" }
+talos-core = { version = "0.3.5", path = "../talos-core" }
 thiserror = "2"
 url = "2"
 

@@ -10,8 +10,8 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-talos-core = { version = "0.3.4", path = "../talos-core" }
-talos-plugin = { version = "0.3.4", path = "../talos-plugin" }
+talos-core = { version = "0.3.5", path = "../talos-core" }
+talos-plugin = { version = "0.3.5", path = "../talos-plugin" }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
