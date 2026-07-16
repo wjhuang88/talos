@@ -1,6 +1,6 @@
 # Iteration I130: TUI-030 Composer Input History
 
-> Document status: Review — architecture review v1 requested semantic-buffer tests; 5 added
+> Document status: Complete (2026-07-16) — architecture re-review accepted five `handle_input_event` entry-point tests
 > Published plan date: 2026-07-15
 > Planned objective: Let a user navigate previously submitted composer input with Up and Down without losing the draft they were editing.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -129,7 +129,7 @@ Up/Down are **unused** when the slash menu is closed. Adding history navigation 
 - `cargo fmt --all -- --check`: clean.
 - `cargo check --workspace --locked`: clean.
 - `cargo clippy --workspace --locked -- -D warnings`: clean.
-- `cargo test --workspace --locked`: all pass (307 TUI tests incl. 9 new history tests).
+- `cargo test --workspace --locked`: all pass (312 TUI tests, including 9 state and 5 entry-point history tests).
 - `./scripts/release_preflight.sh`: passed.
 - `scripts/validate_project_governance.sh .`: 0 warnings.
 - `git diff --check`: clean.
@@ -142,7 +142,7 @@ Up/Down are **unused** when the slash menu is closed. Adding history navigation 
   - `entry_point_approval_active_does_not_trigger_history`: approval active, Up via handler, history untouched.
   - `entry_point_credential_input_does_not_trigger_history`: credential input active, Up via handler, history untouched.
   - `entry_point_full_roundtrip_multiline_draft`: 3 entries, multiline draft, full roundtrip through handle_input_event.
-  Uses `Tui::for_test()` and `InlineTerminal::test_instance()` (both `#[cfg(test)]`) to construct a real `Tui` without terminal access.
+  Uses `Tui::for_test()` and `InlineTerminal::test_instance()` (both `#[cfg(test)]`) to construct a real `Tui` through test-only helpers.
 
 ## Variance And Residuals
 
@@ -151,6 +151,6 @@ Up/Down are **unused** when the slash menu is closed. Adding history navigation 
 
 ## Retrospective
 
-- Outcome: met. All acceptance criteria closed with state-test evidence.
+- Outcome: met. All acceptance criteria closed with state tests and real `handle_input_event` entry-point evidence.
 - Documentation: I130, TUI-030, Board, iterations README, execution package updated.
 - Lessons: The existing key-dispatch priority chain made adding history navigation safe.
