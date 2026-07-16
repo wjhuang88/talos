@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | CMD-002 |
-| Status | **Partial — taxonomy and first diagnostics slices delivered; I122 selects read-only consistency closeout**. `/mcp`, `/plugins`, and `/hooks` exist; broader plugin packages and executable hook behavior remain excluded. |
+| Status | **Complete (2026-07-16, I136)** — `/mcp`, `/plugins`, `/hooks` diagnostics verified; plugin packages shown when loaded. |
 | Priority | P2 |
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | CMD-001, PLUGIN-001, EXT-001, HOOK-001, ADR-009 |

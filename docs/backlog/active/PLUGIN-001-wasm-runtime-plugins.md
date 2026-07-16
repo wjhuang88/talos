@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | PLUGIN-001 |
-| Status | **In Progress — I077/T111 read-only tool slice in Review**. Repositioned from "WASM-only protocol" to "plugin encapsulation system" covering skill/mcp/hook + tools. ADR-027/028/029/030 accepted; ADR-032 cleared the focused `wasmtime` dependency/security review for the first local explicit read-only WASM plugin MVP after manifest parsing. T110 cleared only a bounded local explicit read-only fixture plugin tool slice; T111 implemented that slice with confinement, provenance, permission facets, bounded output, collision rejection, no host calls, and `wasmtime v46.0.1`. |
+| Status | **Complete (T111 slice, 2026-07-16, I136)** — local explicit read-only WASM plugin verified and closed: manifest parser, WASM runtime (fuel/timeout/trap/bounds), output bound, collision/path-traversal rejection, provenance, no-host-imports. All tested behind opt-in `wasm` feature. |
 | Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
 | Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
 | Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
