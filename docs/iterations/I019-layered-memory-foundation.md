@@ -3,7 +3,7 @@
 **User can**: Trust that future memory work follows a four-layer architecture rather than an
 ad-hoc vector store or prompt-stuffing mechanism.
 
-## Status: Review (2026-06-26) — all acceptance criteria closed via I050-I053
+## Status: Complete (2026-06-29) — all acceptance criteria closed via I050-I053
 
 All known prerequisites are now satisfied as of I047:
 
@@ -19,10 +19,10 @@ This iteration turns ADR-016 into the first executable storage and retrieval fou
 
 ## Selected Stories
 
-- [ ] #I019-S1: define `talos-memory` crate boundaries and memory item types.
-- [ ] #I019-S2: implement episodic-to-semantic consolidation schema in SQLite.
-- [ ] #I019-S3: implement bounded memory retrieval for prompt assembly.
-- [ ] #I019-S4: add contradiction/provenance metadata and tests.
+- [x] #I019-S1: define `talos-memory` crate boundaries and memory item types.
+- [x] #I019-S2: implement episodic-to-semantic consolidation schema in SQLite.
+- [x] #I019-S3: implement bounded memory retrieval for prompt assembly.
+- [x] #I019-S4: add contradiction/provenance metadata and tests.
 
 ## Acceptance Criteria
 
@@ -34,6 +34,9 @@ This iteration turns ADR-016 into the first executable storage and retrieval fou
 - [x] `cargo test --workspace` passes.
 
 Evidence: I047 MEM-001-A starter (schema + retrieval), I050 consolidation pipeline (episodic→semantic with evidence), I051 bounded prompt injection (provenance + budgets + hidden-output guard), I052 entity linking + procedural memory (entity overlap boost + permission boundary regression), I053 quality hardening (status + retention dry-run + corruption tolerance). All delivered 2026-06-26.
+
+Post-completion refinement: MEM-009/ADR-046 replaces the future admission-policy direction without
+reopening or rewriting this completed iteration baseline.
 
 ## Out of Scope
 

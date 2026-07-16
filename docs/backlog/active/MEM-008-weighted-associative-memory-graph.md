@@ -10,6 +10,10 @@
 | Blocks | Associative recall; memory activation graph; optional associative memory prompt injection |
 | Origin | User request 2026-06-30; design a data structure for impression strength, association strength, and bounded multi-hop recall |
 
+ADR-046/MEM-009 is orthogonal: surprise-selected admission may improve which semantic/procedural
+items exist, but it does not require this graph and must not be implemented through graph expansion
+or automatic associative injection.
+
 ## Outcome
 
 Evaluate and design a **weighted associative memory graph** that can represent:
@@ -215,4 +219,5 @@ ADR-033 decides the automatic associative memory injection policy:
 - `docs/backlog/active/TOOL-014-conditional-tool-backends.md`
 - `docs/backlog/active/ARCH-006-prompt-cache-stability.md`
 - `docs/decisions/016-layered-memory-architecture.md`
+- `docs/decisions/046-surprise-selected-memory-admission.md`
 - `crates/talos-memory/src/`

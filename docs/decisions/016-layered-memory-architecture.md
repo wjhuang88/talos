@@ -6,10 +6,11 @@
 
 ## Context
 
-Talos already has session JSONL, SQLite session indexes, and an evolution store. That is not yet a
-complete agent memory architecture. The next stage needs to distinguish short-lived context,
-episodes, durable facts, and learned procedures so Talos can improve across sessions without
-turning every past event into prompt stuffing.
+Talos has durable session history, SQLite session indexes, and an evolution store. New sessions now
+use TLOG; JSONL remains legacy read compatibility under ADR-037. These storage mechanisms alone are
+not a complete agent memory architecture. The next stage needs to distinguish short-lived context,
+episodes, durable facts, and learned procedures so Talos can improve across sessions without turning
+every past event into prompt stuffing.
 
 Research and cognitive architecture references support this separation. Neuroscience literature
 describes consolidation as memories changing across brain networks over time, with hippocampal
@@ -21,7 +22,7 @@ such as Soar also separate working, semantic, episodic, and procedural memory.
 | Constraint | Type | Source | Can Change? |
 | --- | --- | --- | --- |
 | Memory writes are persistent local state and must be auditable | Hard | AGENTS.md storage/permission constraints | No |
-| Session JSONL remains source of truth for raw interaction history | Hard | ADR-002 | No |
+| Session/TLOG transcript remains source of truth for raw interaction history; JSONL is legacy read compatibility. | Hard | ADR-002, ADR-037, ADR-042 | No |
 | SQLite bundled is the approved structured local store | Hard | ADR-008 | Only by ADR |
 | Memory retrieval must be bounded before prompt injection | Hard | Safety/context-budget constraint | No |
 | Neuroscience analogies are design inspiration, not correctness proof | Hard | Engineering rigor | No |
@@ -38,7 +39,7 @@ The architecture should mirror the useful parts of cognitive memory without over
 | Layer | Brain/cognitive analogy | Talos responsibility | First storage |
 | --- | --- | --- | --- |
 | Working memory | Active task context | Current turn state, active goals, selected retrieved context | In-memory + bounded prompt sections |
-| Episodic memory | Context-bound events | Sessions, turns, tool calls, decisions, source snapshots | JSONL source + SQLite index |
+| Episodic memory | Context-bound events | Sessions, turns, tool calls, decisions, source snapshots | TLOG/session source + SQLite index; JSONL legacy read |
 | Semantic memory | Consolidated facts | Stable facts, entities, claims, preferences, project knowledge | SQLite tables + FTS5 |
 | Procedural memory | Learned how-to behavior | Skills, patterns, playbooks, approval heuristics, remediation recipes | Versioned text assets + SQLite metadata |
 
@@ -46,6 +47,20 @@ The important mechanism is consolidation: selected episodes become semantic fact
 patterns only after evidence, confidence, provenance, and contradiction checks.
 
 ## Decision
+
+### 2026-07-16 Admission Refinement
+
+[ADR-046](046-surprise-selected-memory-admission.md) supersedes the keyword/message-length
+candidate-confidence heuristic as the future admission direction. Admission becomes a
+benchmark-gated `novelty × committed_utility` decision; `MemoryItem.confidence` remains evidence
+confidence. Recency remains useful for freshness and same-key version resolution but is rejected as
+general admission or retention importance. Exact episode content remains only in normalized session
+storage (TLOG for new sessions; JSONL legacy read); any future exact-recall optimization is a
+content-free sparse reference index, not a new memory layer.
+
+This refinement does not change current runtime behavior until MEM-009 is selected and its
+benchmark gate passes. All four layers, ADD-only consolidation, provenance, contradictions,
+bounded/default-off injection, and no-vector-dependency boundaries remain unchanged.
 
 Talos will adopt a four-layer memory architecture:
 
@@ -164,4 +179,3 @@ less risk than maintaining our own hybrid schema.
 - Soar episodic memory manual: <https://soar.eecs.umich.edu/soar_manual/07_EpisodicMemory/>
 - mem0 V3 architecture (comparative analysis, 2026-06-23):
   <https://github.com/mem0ai/mem0> — ADD-only ingestion, three-signal retrieval, entity linking
-

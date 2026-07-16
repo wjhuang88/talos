@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-07-16"
-status_note: "I134 (2026-07-16): model-private two-hex file anchors closed with bounded full revisions, permission-gated atomic edits, sanitized UI/Hook/history/TLOG projections, real allowed/denied Runtime flows, legacy compatibility, and green locked workspace/preflight/governance validation. No release or permission-default change was authorized."
+status_note: "MEM-009/ADR-046 (2026-07-16): accepted a benchmark-gated replacement for keyword/length memory admission using novelty times committed utility, without adding a memory layer, copied transcript content, dependency, automatic injection, or runtime behavior. I019/MEM-001 stale owner status was reconciled to Complete. Implementation remains unactivated."
 
 governance:
   skill_name: "agent-project-governance"

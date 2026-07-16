@@ -100,3 +100,5 @@ Which Assumptions need validation?]
 - [044: Defer Multi-Instance Discovery And Communication](044-defer-multi-instance-discovery.md) — no product need; five threat-model risks unresolved; all paths violate P140 non-goals.
 
 - [045: Transient Model-Private Tool Projection](045-transient-model-private-tool-projection.md) — additive AgentTool projections let transient snapshot coordination reach only the active model while UI, approvals, Session/TLOG, and replay receive sanitized content; permission evaluation still uses original input.
+
+- [046: Surprise-Selected Memory Admission](046-surprise-selected-memory-admission.md) — replaces keyword/message-length admission direction with a benchmark-gated `novelty × committed_utility` policy, narrows recency to freshness/version resolution, and permits only an optional content-free sparse index over TLOG exact episodes. No HOLA simulation, extra memory layer, automatic injection, or new dependency.

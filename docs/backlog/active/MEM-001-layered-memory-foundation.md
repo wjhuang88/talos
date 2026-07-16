@@ -7,11 +7,10 @@ consolidation and provenance. Retrieval uses multi-signal fusion; ingestion is A
 
 ## Status
 
-Planned. Full baseline selected into I019. I047 selects a starter slice (`MEM-001-A`) and must
-satisfy every known I019 prerequisite first. **I024 (Working Memory + Episodic Memory wiring) is
-already complete; OBS-001/I018 bounded logs and embedded prompt assets are the remaining known
-prerequisite and are selected into I047.** Semantic Memory consolidation builds on top of persisted
-episode history.
+Complete via I019 and I050-I053 (2026-06-29). Working/episodic continuity, semantic/procedural
+storage, ADD-only evidence-backed consolidation, bounded prompt injection, entity linking,
+contradiction handling, status, retention dry-run, and corruption tolerance are delivered.
+MEM-009/ADR-046 owns the later admission-policy refinement and does not reopen this baseline.
 
 ## Priority
 
@@ -28,6 +27,7 @@ P2. I024 (MEM-002) is P0 and must land first.
 - `docs/iterations/I047-v012-release-readiness-and-runtime-polish.md`
 - `docs/tasks/2026-06-25-i047-i019-memory-release-sequence.md`
 - `docs/decisions/016-layered-memory-architecture.md` (including Comparative Analysis section)
+- `docs/decisions/046-surprise-selected-memory-admission.md` (future admission refinement)
 - `docs/decisions/002-local-storage-architecture.md`
 - `docs/decisions/008-sqlite-bundled-storage.md`
 - `docs/backlog/active/OBS-001-observability-prompt-assets.md`
@@ -94,16 +94,18 @@ Retrieval boost: `entity_score = |query_entities ∩ memory_entities| × 0.5`.
 
 ## Acceptance Criteria
 
-- [ ] Memory layers are distinct in types/modules and documentation.
-- [ ] Raw session JSONL remains the source of truth for episodes.
-- [ ] Semantic/procedural memory records link back to evidence.
-- [ ] ADD-only consolidation: same-key conflicts preserved, not overwritten.
-- [ ] Retrieval uses multi-signal fusion (FTS5 + recency + evidence at minimum).
-- [ ] Pattern has `last_accessed` field with search-time decay multiplier.
-- [ ] Entity linking: code entities from tool calls + concept entities from LLM extraction.
-- [ ] Retrieval is bounded and includes provenance, confidence, freshness, and contradiction metadata.
-- [ ] No vector or graph DB dependency is added.
+- [x] Memory layers are distinct in types/modules and documentation.
+- [x] Session/TLOG history remains the source of truth for episodes.
+- [x] Semantic/procedural memory records link back to evidence.
+- [x] ADD-only consolidation: same-key conflicts preserved, not overwritten.
+- [x] Retrieval uses multi-signal fusion (FTS5 + recency + evidence at minimum).
+- [x] Memory items have `last_accessed` for search-time ranking.
+- [x] Entity linking covers file, URL, code, and concept-like entities without external NLP.
+- [x] Retrieval is bounded and includes provenance, confidence, freshness, and contradiction metadata.
+- [x] No vector or graph database dependency is added.
 
 ## Residual Work Destination
 
-Vector/graph acceleration and exploration library integration stay in RES-001/I020.
+Admission-policy refinement is MEM-009/ADR-046. Vector acceleration and exploration library
+integration stay in STORE-001 and RES-001/I020. SQLite-backed bounded associative graph work is
+separately owned by MEM-008 and does not alter this completed foundation.

@@ -15,7 +15,10 @@ Research and prototype-evaluate 5 borrowable patterns from headroom's memory sys
 
 ### Patterns to evaluate
 
-1. **RecencyBoostRanker** — Re-rank retrieval candidates by `cosine × exp(-age_days / decay_days)`. Pure math, ~30 lines Rust. Our FTS5 ranking lacks temporal decay; stale high-FTS-score memories always win over fresh ones. **HIGH value, trivial effort.**
+1. **RecencyBoostRanker** — Narrowed by ADR-046. Current Talos retrieval already includes a
+   recency component, so the earlier “lacks temporal decay” premise is stale. Recency may still be
+   evaluated for explicit freshness/same-key version resolution, but it is rejected as general
+   admission or retention importance. **NARROW EXPERIMENT ONLY.**
 
 2. **Multi-Source MemoryQuery** — Construct retrieval query from user message + last N tool outputs + last K assistant turns, not just the user message. Tool outputs are the strongest retrieval signal in coding sessions. **HIGH value, trivial effort.**
 
@@ -45,10 +48,12 @@ Research and prototype-evaluate 5 borrowable patterns from headroom's memory sys
 - MEM-001 (Layered Memory Foundation) — complete via I050-I053.
 - MEM-007 (Active Context Compression) — evaluates Headroom's compression approach for Talos.
 - ADR-016 (memory architecture).
+- ADR-046 (surprise-selected admission; narrows the recency hypothesis).
 
 ## Required Reads
 
 - `docs/backlog/active/MEM-001-layered-memory-foundation.md`
 - `docs/iterations/I051-bounded-memory-prompt-injection.md`
+- `docs/decisions/046-surprise-selected-memory-admission.md`
 - `crates/talos-memory/src/lib.rs`
 - [headroom memory source](https://github.com/headroomlabs-ai/headroom/tree/main/headroom/memory)
