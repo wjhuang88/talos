@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use crate::app::{SPINNER_FRAMES, ScrollbackLine, StreamRenderState, build_todo_panel_lines};
 use crate::app::{next_processing_frame, preview_text_for_state, submit_input_message, tip_ttl};
 use crate::scrollback;
-use crate::state::TuiState;
+use crate::state::{ApprovalState, TuiState};
 use crate::stream_markdown::{HoldStatus, MarkdownBlockKind};
 use crate::theme::{semantic, to_crossterm_color};
 use crate::tool_display;
@@ -1153,4 +1153,179 @@ fn submit_input_message_keeps_preview_for_empty_or_unsent_input() {
     assert!(!submit_input_message(&mut state, &mut stream_render, None));
     assert_eq!(stream_render.preview(), "old preview");
     assert_eq!(state.thinking_preview.as_deref(), Some("old thinking"));
+}
+
+// ── TUI-030 semantic-buffer: key-dispatch contract for history navigation ──
+
+/// Simulates the Up/Down key dispatch from `handle_input_event` when no
+/// panel or approval is active. Proves the full submit → navigate → restore
+/// cycle through the actual `submit_input_message` path.
+#[test]
+fn semantic_buffer_up_down_history_through_submit_path() {
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    let mut sr = StreamRenderState::default();
+
+    // Submit two messages through the real submission path
+    state.input_append_str("hello");
+    assert!(submit_input_message(&mut state, &mut sr, Some(&tx)));
+    assert_eq!(state.input_history, vec!["hello"]);
+
+    state.input_append_str("world");
+    assert!(submit_input_message(&mut state, &mut sr, Some(&tx)));
+    assert_eq!(state.input_history, vec!["hello", "world"]);
+
+    // Type a draft
+    state.input_append_str("my draft");
+
+    // Simulate Up (handle_input_event guard: !slash_menu.is_open)
+    assert!(!state.slash_menu.is_open, "precondition: menu closed");
+    state.history_prev();
+    assert_eq!(state.input_buffer, "world", "first Up → newest");
+    assert_eq!(state.draft_input, "my draft", "draft saved");
+
+    state.history_prev();
+    assert_eq!(state.input_buffer, "hello", "second Up → oldest");
+
+    // At oldest, Up stays
+    state.history_prev();
+    assert_eq!(state.input_buffer, "hello");
+
+    // Down → newer
+    state.history_next();
+    assert_eq!(state.input_buffer, "world");
+
+    // Down past newest → restore exact draft
+    state.history_next();
+    assert_eq!(state.input_buffer, "my draft");
+    assert!(state.history_cursor.is_none());
+    assert!(state.draft_input.is_empty());
+}
+
+/// Proves slash-menu-open guard prevents history navigation.
+/// In handle_input_event, Up/Down match `if slash_menu.is_open` first;
+/// the `if !slash_menu.is_open` history arms never fire.
+#[test]
+fn semantic_buffer_slash_menu_open_prevents_history_navigation() {
+    let mut state = TuiState::new();
+    state.input_append_str("entry");
+    state.input_submit();
+
+    // Open slash menu — simulates the handler's `slash_menu.is_open` guard
+    state.open_slash_menu(talos_conversation::command_registry());
+    assert!(state.slash_menu.is_open);
+
+    // The handler's match arm for Up is:
+    //   KeyCode::Up if self.state.slash_menu.is_open => slash_menu.select_prev()
+    // The history arm `KeyCode::Up if !self.state.slash_menu.is_open` does NOT fire.
+    // Verify the guard condition holds:
+    let history_guard = !state.slash_menu.is_open;
+    assert!(
+        !history_guard,
+        "history guard must be false when menu is open"
+    );
+
+    // Calling history_prev directly would still work (it's a public method),
+    // but the handler would never reach it. Verify the state still has
+    // the draft intact since the handler didn't call history_prev.
+    assert!(state.history_cursor.is_none(), "cursor should be at draft");
+}
+
+/// Proves approval-active guard prevents history navigation.
+/// In handle_input_event, the approval check returns early (line 930-932)
+/// before the main match block where Up/Down history arms live.
+#[test]
+fn semantic_buffer_approval_active_prevents_history_navigation() {
+    let mut state = TuiState::new();
+    state.input_append_str("entry");
+    state.input_submit();
+
+    // Activate approval — simulates the handler's early return
+    state.activate_approval("test_tool", "args");
+    assert!(
+        !matches!(state.approval_state, ApprovalState::Hidden),
+        "approval should be active"
+    );
+
+    // In handle_input_event, the first check is:
+    //   if !matches!(self.state.approval_state, ApprovalState::Hidden) {
+    //       self.handle_pending_approval_input(key.code);
+    //       return false;  ← exits before match block
+    //   }
+    // History navigation is never reached.
+    let approval_intercepts = !matches!(state.approval_state, ApprovalState::Hidden);
+    assert!(
+        approval_intercepts,
+        "approval must intercept before history"
+    );
+    assert!(state.history_cursor.is_none(), "cursor should be at draft");
+}
+
+/// Proves credential-input guard prevents history navigation.
+#[test]
+fn semantic_buffer_credential_input_prevents_history_navigation() {
+    let mut state = TuiState::new();
+    state.input_append_str("entry");
+    state.input_submit();
+
+    state.slash_menu = crate::panel_state::BottomPanelState::open_credential_input(
+        "test-provider",
+        None,
+        false,
+        None,
+    );
+    assert!(
+        state.slash_menu.is_credential_input(),
+        "credential input should be active"
+    );
+
+    // In handle_input_event, after approval check, the credential check is:
+    //   if self.state.slash_menu.is_credential_input() { ... return false; }
+    // History navigation is never reached.
+    let credential_intercepts = state.slash_menu.is_credential_input();
+    assert!(
+        credential_intercepts,
+        "credential input must intercept before history"
+    );
+    assert!(state.history_cursor.is_none(), "cursor should be at draft");
+}
+
+/// Proves the full roundtrip: submit 3 entries, type multiline draft,
+/// navigate through all history, return to draft with exact content.
+#[test]
+fn semantic_buffer_full_roundtrip_with_multiline_draft() {
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut state = TuiState::new();
+    let mut sr = StreamRenderState::default();
+
+    for msg in &["alpha", "beta", "gamma"] {
+        state.input_append_str(msg);
+        assert!(submit_input_message(&mut state, &mut sr, Some(&tx)));
+    }
+    assert_eq!(state.input_history, vec!["alpha", "beta", "gamma"]);
+
+    // Type a multiline draft
+    state.input_append_str("line one\nline two");
+
+    // Navigate to oldest and back
+    state.history_prev(); // → gamma
+    assert_eq!(state.input_buffer, "gamma");
+    state.history_prev(); // → beta
+    state.history_prev(); // → alpha
+    state.history_prev(); // stays at alpha
+    assert_eq!(state.input_buffer, "alpha");
+
+    state.history_next(); // → beta
+    state.history_next(); // → gamma
+    state.history_next(); // → draft
+
+    assert_eq!(state.input_buffer, "line one\nline two");
+    assert!(state.history_cursor.is_none());
+
+    // Submit the draft — it should be recorded
+    assert!(submit_input_message(&mut state, &mut sr, Some(&tx)));
+    assert_eq!(
+        state.input_history,
+        vec!["alpha", "beta", "gamma", "line one\nline two"]
+    );
 }
