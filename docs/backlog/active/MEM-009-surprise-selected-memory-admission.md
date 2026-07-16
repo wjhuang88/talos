@@ -2,7 +2,7 @@
 
 **Type**: Technical Story / Policy Benchmark
 **Parent Epic**: MEM-001
-**Status**: Refinement — architecture accepted, implementation not activated
+**Status**: Complete (2026-07-16, I137/I138) — benchmark Go decision applied; novelty × committed_utility policy implemented
 **Priority**: P2
 **Source**: Maintainer request 2026-07-16; arXiv:2607.02303
 **Iteration**: None

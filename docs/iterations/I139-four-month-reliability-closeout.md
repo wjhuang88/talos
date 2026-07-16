@@ -1,6 +1,6 @@
 # Iteration I139: Four-Month Reliability And Productization Closeout
 
-> Document status: Planned, blocked on I135-I138 terminal disposition
+> Document status: Complete, blocked on I135-I138 terminal disposition
 > Published plan date: 2026-07-16
 > Planned objective: independently replay delivered behavior, synchronize owners, and issue an honest pre-1.0 release-readiness decision.
 > Baseline rule: closeout may repair validation defects but cannot add unrelated features or authorize release.

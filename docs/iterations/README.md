@@ -167,9 +167,9 @@ docs/iterations/
 | I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
 | I135 | Session Error-Path Integrity | **Complete** (2026-07-16) | SESSION-006 closed: provider error persists valid completed tool exchange; ADR-042 durable abort preserved. 2 integration tests. See `I135-session-error-path-integrity.md`. |
 | I136 | Read-Only Plugin Product Closure | **Complete** (2026-07-16) | Re-audited: manifest parser, WASM runtime (fuel/timeout/trap/bounds), output bound, collision/path-traversal rejection, provenance, no-host-imports. All already implemented and tested behind `wasm` feature. No code change (closure only). See `I136-read-only-plugin-product-closure.md`. |
-| I137 | Memory Admission Benchmark | **Planned — blocked on I136** | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
-| I138 | Memory Admission Decision Application | **Planned — blocked on I137** | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
-| I139 | Four-Month Reliability Closeout | **Planned — blocked on I135-I138** | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
+| I137 | Memory Admission Benchmark | **Complete** (2026-07-16) | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
+| I138 | Memory Admission Decision Application | **Complete** (2026-07-16) | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
+| I139 | Four-Month Reliability Closeout | **Complete** (2026-07-16) | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -202,9 +202,9 @@ rewrite published iteration baselines.
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
 | I135 | Complete (2026-07-16) | Removed from non-terminal inventory after integration proof and ADR-042 regression. |
 | I136 | Complete (2026-07-16) | Removed from non-terminal inventory after audit confirming existing implementation meets all acceptance. |
-| I137 | Planned | Keep blocked until I136 is Complete. |
-| I138 | Planned / conditional | Keep blocked until I137 records a Go/No-Go decision. |
-| I139 | Planned | Keep blocked until I135-I138 have terminal dispositions. |
+| I137 | Complete (2026-07-16) | Removed from non-terminal inventory after Go decision. |
+| I138 | Complete (2026-07-16) | Removed from non-terminal inventory after Go applied. |
+| I139 | Complete (2026-07-16) | Removed from non-terminal inventory after closeout. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |

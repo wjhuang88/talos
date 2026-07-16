@@ -1,6 +1,6 @@
 # Iteration I137: Memory Admission Benchmark
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-07-16
 > Planned objective: decide with reproducible evidence whether MEM-009 should replace the current admission heuristic.
 > Baseline rule: this is a benchmark/decision iteration; it does not authorize runtime replacement.
