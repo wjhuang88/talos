@@ -1,6 +1,6 @@
 # Reliability, Extensibility, And Memory Quality — Unattended Execution Package
 
-**Status**: N200 Complete; N210 (I135) activated
+**Status**: N200-N250 Complete (2026-07-16). All packages delivered.
 **Program**: `docs/tasks/2026-07-16-four-month-reliability-extensibility-plan.md`
 **Pre-plan predecessor**: `a6bd154`
 **Publication commit**: pending at document authoring; N200 records the actual commit containing
@@ -73,11 +73,11 @@ persistent task runtime, multi-instance communication, and v1 claims.
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | N200 | Publish/adopt baseline, Start Gate, and inventory | Pushed planning commit, clean baseline, actual tool versions, non-terminal disposition, checkpoint | None | Baseline commit pushed; commands below pass; no bypassed owner | Record blocker; do not activate I135 | Planned |
-| N210 | Activate and deliver I135 | SESSION-006 integrity repair and Issue #36 evidence | N200 | I135 acceptance + full ladder + runtime reconstruction | Keep I135 Partial/Blocked; preserve ADR-042 | Planned |
-| N220 | Activate and deliver I136 | Read-only local WASM plugin usable and diagnosed | N210 | I136 acceptance + offline binary fixture + security tests | Close evidence only; do not expand ABI/authority | Planned |
-| N230 | Activate and deliver I137 | Reproducible Go/No-Go benchmark report | N220 | Two stable runs + predeclared decision rule | No-Go; retain current policy | Planned |
-| N240 | Activate and deliver I138 | Minimal Go implementation or formal no-change closure | N230 | Branch-specific acceptance + full ladder | Disable/revert candidate; record No-Go | Planned |
-| N250 | Activate and deliver I139 | Clean-state closeout and release-readiness report | N240 | Replay, docs/issues/governance sync, residual owners | Mark program Partial with exact recovery | Planned |
+| N210 | Activate and deliver I135 | SESSION-006 integrity repair and Issue #36 evidence | N200 | I135 acceptance + full ladder + runtime reconstruction | Keep I135 Partial/Blocked; preserve ADR-042 | Complete |
+| N220 | Activate and deliver I136 | Read-only local WASM plugin usable and diagnosed | N210 | I136 acceptance + offline binary fixture + security tests | Close evidence only; do not expand ABI/authority | Complete |
+| N230 | Activate and deliver I137 | Reproducible Go/No-Go benchmark report | N220 | Two stable runs + predeclared decision rule | No-Go; retain current policy | Complete |
+| N240 | Activate and deliver I138 | Minimal Go implementation or formal no-change closure | N230 | Branch-specific acceptance + full ladder | Disable/revert candidate; record No-Go | Complete |
+| N250 | Activate and deliver I139 | Clean-state closeout and release-readiness report | N240 | Replay, docs/issues/governance sync, residual owners | Mark program Partial with exact recovery | Complete |
 
 ## N200 Start Gate Commands
 
