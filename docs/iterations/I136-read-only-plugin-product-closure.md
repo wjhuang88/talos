@@ -1,6 +1,6 @@
 # Iteration I136: Read-Only Plugin Product Closure
 
-> Document status: Planned
+> Document status: Complete
 > Published plan date: 2026-07-16
 > Planned objective: close the already-implemented local explicit read-only WASM plugin slice as a usable, bounded product capability.
 > Baseline rule: preserve this target; broader plugin carriers or permissions require a new iteration.
@@ -58,11 +58,30 @@
 
 | Date | Type | Record |
 |---|---|---|
-
+| 2026-07-16 | Activation | I135 Complete. I136 activated for N220. |
+| 2026-07-16 | Audit | Re-audited manifest parser, WASM runtime, fuel/timeout, output bound, collision, provenance, path traversal, no-host-imports. All implemented and tested behind `wasm` feature. |
+| 2026-07-16 | Closure | Existing behavior meets all acceptance criteria. `/plugins` transition notice is correct for current scope. No code change needed — documentation/status closure only. |
 ## Verification Evidence
 
-- Pending I135 completion and activation gate.
+- Manifest parser: validates name, version, carrier=wasm, artifact path, tools, hooks, skills (manifest.rs)
+- WASM runtime: fuel consumption, epoch interruption timeout, trap handling, bounds enforcement (wasm.rs, 13 tests)
+- No host imports: module attempting `wasi_snapshot_preview1` import fails with structured error
+- Path traversal: absolute and `../` paths rejected before loading
+- Tool name collision: rejected
+- Output bound: UTF-8-safe truncation at MAX_PLUGIN_TOOL_OUTPUT
+- `/plugins` command: reports transition notice (correct — read-only tools are available via opt-in `wasm` feature, not default)
+- `cargo tree -p talos-plugin --features wasm`: wasmtime v46.0.1 (ADR-032 approved)
+- With no plugin configured: existing Runtime/CLI/TUI behavior unchanged (default `wasm` feature is off)
+- All workspace tests pass.
 
 ## Variance And Residuals
 
+- No code change (existing implementation meets acceptance). Documentation/status closure only.
+- `/plugins` will show real plugin packages when a plugin is loaded at runtime; current transition notice is correct for the no-plugin default.
 - Executable hooks and remote distribution remain separate owners.
+
+## Retrospective
+
+- Outcome: met. All acceptance criteria already satisfied by the existing T111 implementation.
+- Documentation: PLUGIN-001, CMD-002, Board, iterations README, execution package.
+- Lessons: The local explicit read-only WASM plugin slice was already complete through T111. The closure was a documentation/status reconciliation, not a code task.

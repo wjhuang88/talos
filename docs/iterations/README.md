@@ -166,7 +166,7 @@ docs/iterations/
 | I133 | A2A-001 Multi-Instance Discovery — Defer | **Complete** (2026-07-16) | ADR-044 Defer: no product need; REMOTE-001 prerequisite is P4 Research. Threat model: identity, auth, authorization, discovery, credentials, transcript exposure, retention all unresolved. Explicit host-managed is the only compatible path if future need arises. See `I133-a2a001-multi-instance-defer.md`. |
 | I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
 | I135 | Session Error-Path Integrity | **Complete** (2026-07-16) | SESSION-006 closed: provider error persists valid completed tool exchange; ADR-042 durable abort preserved. 2 integration tests. See `I135-session-error-path-integrity.md`. |
-| I136 | Read-Only Plugin Product Closure | **Planned — blocked on I135** | Verify and close the local explicit read-only WASM plugin slice and real `/plugins` diagnostics without authority expansion. See `I136-read-only-plugin-product-closure.md`. |
+| I136 | Read-Only Plugin Product Closure | **Complete** (2026-07-16) | Re-audited: manifest parser, WASM runtime (fuel/timeout/trap/bounds), output bound, collision/path-traversal rejection, provenance, no-host-imports. All already implemented and tested behind `wasm` feature. No code change (closure only). See `I136-read-only-plugin-product-closure.md`. |
 | I137 | Memory Admission Benchmark | **Planned — blocked on I136** | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
 | I138 | Memory Admission Decision Application | **Planned — blocked on I137** | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
 | I139 | Four-Month Reliability Closeout | **Planned — blocked on I135-I138** | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
@@ -201,7 +201,7 @@ rewrite published iteration baselines.
 | I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
 | I135 | Complete (2026-07-16) | Removed from non-terminal inventory after integration proof and ADR-042 regression. |
-| I136 | Planned | Keep blocked until I135 is Complete. |
+| I136 | Complete (2026-07-16) | Removed from non-terminal inventory after audit confirming existing implementation meets all acceptance. |
 | I137 | Planned | Keep blocked until I136 is Complete. |
 | I138 | Planned / conditional | Keep blocked until I137 records a Go/No-Go decision. |
 | I139 | Planned | Keep blocked until I135-I138 have terminal dispositions. |
