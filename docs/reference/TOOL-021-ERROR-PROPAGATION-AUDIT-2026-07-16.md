@@ -3,7 +3,7 @@
 **Date**: 2026-07-16
 **Iteration**: I131 / P120
 **Auditor**: glm-5.2 (unattended)
-**Status**: Review — FINDING-2 confirmed as data loss via integration test; follow-up owner story created
+**Status**: Complete — audit deliverable closed. FINDING-2 confirmed data loss tracked by SESSION-006 (Open).
 
 ## Methodology
 
@@ -91,8 +91,8 @@ ToolResult { content, is_error }
 |---|---|---|
 | Normal turn success | `messages[persist_start..]` returned (line 614) | ✅ |
 | MaxTokens continuation | `messages[persist_start..]` returned (line 652) | ✅ |
-| Provider error | `Err(AgentError)` returned (line 434) — messages NOT in return value | ⚠️ Depends on caller |
-| Tool execution error | Tool error IS stored in messages before error (line 804) | ✅ within turn; persistence depends on caller |
+| Provider error | `Err(AgentError)` returned (line 434) — messages NOT in return value | ❌ **Data loss** (FINDING-2) |
+| Tool execution error | Tool error IS stored in messages before error (line 804) | ❌ Lost if subsequent provider call fails (FINDING-2) |
 | Doom loop detection | Messages returned (line 609-614) | ✅ |
 
 ## Fixture Matrix
@@ -103,7 +103,7 @@ ToolResult { content, is_error }
 | F2 | Execution error (exit 2) | `true` | + "[Analyze...]" suffix | `"Error: <content>"` | `is_error: true` | ✅ Preserved with guidance |
 | F3 | Paired result (call + result) | any | As above | Normal serialization | Normal serialization | ✅ Preserved |
 | F4 | Orphan result (no matching call) | any | As above | **Dropped** with warning | **Sent as-is** | ⚠️ FINDING-1: provider difference |
-| F5 | Retry after provider error | any | Already in messages | Depends on caller persistence | Depends on caller persistence | ⚠️ FINDING-2: caller-dependent |
+| F5 | Retry after provider error | any | Already in messages | **Lost** — not persisted | **Lost** — not persisted | ❌ FINDING-2: **confirmed data loss** in canonical session path |
 | F6 | Resume after budget compaction | preserved | Content truncated | Truncated content | Truncated content | ✅ Flag preserved, content may be partial |
 | F7 | Resume after trim compaction | preserved | Content emptied | Empty → `EMPTY_TOOL_RESULT_MESSAGE` | Empty content | ✅ Flag preserved, content empty |
 | F8 | Resume after microcompact | preserved | Content emptied for old dupes | Empty → `EMPTY_TOOL_RESULT_MESSAGE` | Empty content | ✅ Flag preserved, content empty |
@@ -119,7 +119,7 @@ ToolResult { content, is_error }
 - **Impact**: Same conversation can produce different model-visible content depending on provider. This is a provider API constraint difference, not a Talos bug.
 - **Recommendation**: No fix needed unless Anthropic API errors on orphan results. If it does, add matching orphan filtering to `anthropic_request.rs`. Create a follow-up story if needed.
 
-### FINDING-2: Provider error may lose unpersisted tool results (caller-dependent)
+### FINDING-2: Provider error drops executed tool results (confirmed data loss)
 
 - When a provider error occurs mid-turn, `run_inner` returns `Err(error)` without returning the `messages` vector (`lib.rs:434`).
 - Tool results already pushed to `messages` (line 804) are lost from the return value.
@@ -141,13 +141,7 @@ Other paths preserve errors correctly:
 - Explicitly dropped with warning logging (orphan in OpenAI)
 - Modified with visible annotations ("[Analyze...]", "Error: ")
 
-But FINDING-2 represents a real gap where tool results can be silently lost on provider error.
-- Preserved with content and `is_error` flag (normal case)
-- Preserved with truncated/empty content but intact `is_error` flag (compaction)
-- Explicitly dropped with warning logging (orphan in OpenAI)
-- Modified with visible annotations ("[Analyze...]", "Error: ")
 
-No path silently discards an error result without a trace.
 
 ## Follow-Up Owner Stories
 
@@ -155,3 +149,20 @@ No path silently discards an error result without a trace.
 |---|---|---|
 | SESSION-006 | Session-layer: persist turn messages on provider error to avoid losing tool results | P1 |
 | (conditional) | Anthropic: add orphan tool result filtering if API rejects them | P3 |
+
+
+## P120 Review Remediation / Re-Review Checkpoint (2026-07-16)
+
+**Architecture review v1** identified that the initial audit conclusion ("no silent loss")
+was incorrect. FINDING-2 is not "caller-dependent" — `session/turn.rs:188-200` is the
+canonical session turn path, and the `Ok(Err(e))` branch does not persist messages.
+
+**Corrected conclusion**: FINDING-2 is confirmed tool-result data loss in the canonical
+session path, proven by integration test `fixture_provider_error_drops_tool_results`.
+The audit deliverable (I131/TOOL-021) is complete; the product defect itself remains
+unfixed and is tracked by **SESSION-006** (Open).
+
+**Fixture count**: 15 total (3 OpenAI + 4 Anthropic incl. orphan-error + 3 compaction
++ 1 agent→session integration proving FINDING-2 + 4 existing scheduler fixtures).
+
+**Commits**: `726a366` (initial audit), `1f6ca5c` (corrected conclusion + SESSION-006).

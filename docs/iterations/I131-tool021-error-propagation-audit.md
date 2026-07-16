@@ -1,6 +1,6 @@
 # Iteration I131: TOOL-021 Error Propagation Audit
 
-> Document status: Review — architecture review required correction of conclusion and additional fixtures
+> Document status: Complete — audit deliverable closed; FINDING-2 data loss tracked by SESSION-006 (Open)
 > Published plan date: 2026-07-16
 > Planned objective: Establish whether tool failures are preserved, classified, and made available to the next model request on every supported provider path.
 > MVP deliverable: Reviewed fixture matrix proving each tool-error route is preserved or explicitly rejected; follow-up owner stories for any finding.
@@ -11,7 +11,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `TOOL-021` | none | Refinement | TOOL-019, TOOL-002, RUNTIME-002 (all Complete) | Audit report + 9 fixture tests. No silent loss found. Two findings with follow-up recommendations. |
+| `TOOL-021` | none | Refinement | TOOL-019, TOOL-002, RUNTIME-002 (all Complete) | Audit report + 15 fixture tests. FINDING-2 confirmed as data loss; SESSION-006 created. |
 
 ### Scope
 
@@ -41,7 +41,8 @@
 - `git diff --check`: clean.
 - **Audit report**: `docs/reference/TOOL-021-ERROR-PROPAGATION-AUDIT-2026-07-16.md`
 - **Fixture tests**: 15 total (3 OpenAI, 4 Anthropic incl. orphan-error, 3 compaction, 1 agent→session integration proving FINDING-2 data loss, 4 existing scheduler fixtures).
-- **Findings**: FINDING-1 (orphan result provider difference — observation), FINDING-2 (provider error may lose unpersisted tool results — caller-dependent).
+- **FINDING-2**: Confirmed tool-result data loss in canonical session path; integration test proves it. SESSION-006 tracks the fix.
+- **Findings**: FINDING-1 (orphan result provider difference — observation). FINDING-2 (confirmed data loss in canonical session path — tracked by SESSION-006).
 - **FINDING-2 confirmed**: Integration test `fixture_provider_error_drops_tool_results` proves tool results are lost on provider error in the canonical session path.
 
 ## Variance And Residuals
