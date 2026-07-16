@@ -96,3 +96,5 @@ Which Assumptions need validation?]
 42. [042: Embedded Durable Runtime Session Boundary](042-embedded-durable-runtime-session-boundary.md) — Accepted (2026-07-15). Makes `talos-session` the host-directory durable transcript boundary, uses opaque external-ID bindings to UUID TLOG files, commits only complete successful turns atomically, and keeps runtime dependency direction acyclic.
 
 - [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — task runtime not implemented; reusable components identified; defer due to no product need.
+
+- [044: Defer Multi-Instance Discovery And Communication](044-defer-multi-instance-discovery.md) — no product need; five threat-model risks unresolved; all paths violate P140 non-goals.

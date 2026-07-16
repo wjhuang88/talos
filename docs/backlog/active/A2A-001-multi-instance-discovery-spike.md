@@ -5,7 +5,7 @@
 | Story ID | A2A-001 |
 | Type | Architecture and security spike |
 | Priority | P3 |
-| Status | Refinement — ADR-gated |
+| Status | Deferred (2026-07-16, I133) — ADR-044: no product need; five threat-model risks unresolved; all implementation paths violate P140 non-goals |
 | Source | [GitHub Issue #40](https://github.com/wjhuang88/talos/issues/40) |
 | Depends On | `RUNTIME-001`, `REMOTE-001` |
 
