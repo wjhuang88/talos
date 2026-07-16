@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-07-16"
-status_note: "Release v0.3.5 preparation (2026-07-16): MEM-009/ADR-046 docs are committed; workspace/internal dependency versions and locked metadata are synchronized, and the pinned release preflight passed. The reviewed release commit and immutable tag workflow remain pending. REL-002 remains NO-GO; no crates.io publish is authorized."
+status_note: "Release v0.3.5 closeout (2026-07-16): workspace/internal dependency versions and locked metadata were synchronized; the pinned release preflight passed; release commit 899411a and immutable annotated tag v0.3.5 were pushed. Publication was handed to GitHub Actions, with CI-status tracking explicitly waived. REL-002 remains NO-GO; no crates.io publish occurred."
 
 governance:
   skill_name: "agent-project-governance"
