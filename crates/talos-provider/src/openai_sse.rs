@@ -2099,4 +2099,99 @@ mod tests {
             "normal request must not be dispatch-timed-out"
         );
     }
+
+    // ── TOOL-021 error propagation fixtures ──────────────────────────────
+
+    #[test]
+    fn fixture_openai_error_result_gets_error_prefix() {
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: serde_json::json!({"command": "false"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "command failed".into(),
+                    is_error: true,
+                },
+            },
+        ];
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+
+        // F2: error result must be prefixed with "Error: "
+        assert_eq!(
+            body["messages"][1]["role"], "tool",
+            "error tool result must be serialized as tool role"
+        );
+        let content = body["messages"][1]["content"].as_str().unwrap();
+        assert!(
+            content.starts_with("Error: "),
+            "error result must have 'Error: ' prefix, got: {content}"
+        );
+        assert!(
+            content.contains("command failed"),
+            "error content must be preserved"
+        );
+    }
+
+    #[test]
+    fn fixture_openai_success_result_no_error_prefix() {
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "read_file".into(),
+                    input: serde_json::json!({"path": "test.rs"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "fn main() {}".into(),
+                    is_error: false,
+                },
+            },
+        ];
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+
+        // F1/F3: success result must NOT have "Error: " prefix
+        let content = body["messages"][1]["content"].as_str().unwrap();
+        assert!(
+            !content.starts_with("Error: "),
+            "success result must not have Error prefix"
+        );
+    }
+
+    #[test]
+    fn fixture_openai_orphan_error_result_dropped() {
+        // F4: orphan tool result (no preceding assistant tool_call) must be dropped
+        let messages = vec![Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "orphan_1".into(),
+                content: "orphan error".into(),
+                is_error: true,
+            },
+        }];
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+
+        // Orphan must not appear in serialized messages
+        let tool_msgs: Vec<_> = body["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["role"] == "tool")
+            .collect();
+        assert!(
+            tool_msgs.is_empty(),
+            "orphan tool result must be dropped by OpenAI serializer"
+        );
+    }
 }

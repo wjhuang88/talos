@@ -459,4 +459,98 @@ mod tests {
         let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, Some(8192));
         assert_eq!(body["max_tokens"], 8192);
     }
+
+    // ── TOOL-021 error propagation fixtures ──────────────────────────────
+
+    #[test]
+    fn fixture_anthropic_error_result_has_is_error_flag() {
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "bash".into(),
+                    input: json!({"command": "false"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "command failed".into(),
+                    is_error: true,
+                },
+            },
+        ];
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
+
+        // F2: error result must have is_error: true
+        let tool_block = &body["messages"][1]["content"][0];
+        assert_eq!(tool_block["type"], "tool_result");
+        assert_eq!(
+            tool_block["is_error"], true,
+            "Anthropic must set is_error: true"
+        );
+        assert_eq!(
+            tool_block["content"], "command failed",
+            "error content must be preserved without modification"
+        );
+    }
+
+    #[test]
+    fn fixture_anthropic_success_result_no_is_error() {
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".into(),
+                    name: "read_file".into(),
+                    input: json!({"path": "test.rs"}),
+                }],
+                reasoning: None,
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "call_1".into(),
+                    content: "fn main() {}".into(),
+                    is_error: false,
+                },
+            },
+        ];
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
+
+        // F1/F3: success result must NOT have is_error flag
+        let tool_block = &body["messages"][1]["content"][0];
+        assert_eq!(tool_block["type"], "tool_result");
+        assert!(
+            tool_block.get("is_error").is_none(),
+            "success result must not set is_error"
+        );
+    }
+
+    #[test]
+    fn fixture_anthropic_orphan_result_not_filtered() {
+        // F4: Anthropic does NOT filter orphan tool results (unlike OpenAI).
+        // The result is sent as-is — the API may accept or reject it.
+        let messages = vec![Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "orphan_1".into(),
+                content: "orphan result".into(),
+                is_error: false,
+            },
+        }];
+        let body = build_request_body("claude-sonnet-4-20250514", &messages, &[], None, None);
+
+        // Anthropic serializes orphan tool results without filtering.
+        let user_msgs: Vec<_> = body["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|m| m["role"] == "user")
+            .collect();
+        assert!(
+            !user_msgs.is_empty(),
+            "Anthropic must NOT filter orphan tool results (provider difference from OpenAI)"
+        );
+    }
 }

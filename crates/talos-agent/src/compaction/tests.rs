@@ -714,3 +714,105 @@ fn test_compaction_status_never_contains_tool_content() {
         "CompactionStatus must never expose tool result content"
     );
 }
+
+// ── TOOL-021 error propagation fixtures: compaction preserves is_error ──
+
+fn error_tool_msg(id: &str, content: &str) -> Message {
+    Message::Tool {
+        result: MessageToolResult {
+            tool_use_id: id.into(),
+            content: content.into(),
+            is_error: true,
+        },
+    }
+}
+
+#[test]
+fn fixture_budget_truncation_preserves_is_error() {
+    // F6: budget truncation preserves is_error flag even when content is truncated
+    let large_content = "x".repeat(MAX_TOOL_RESULT_CHARS + 1000);
+    let messages = vec![error_tool_msg("call_1", &large_content)];
+    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+    let result = compactor.apply_budget(messages);
+
+    assert_eq!(result.len(), 1);
+    if let Message::Tool { result } = &result[0] {
+        assert!(result.is_error, "is_error must survive budget truncation");
+        assert!(
+            result.content.ends_with(TRUNCATION_SUFFIX),
+            "content must be truncated with suffix"
+        );
+        assert!(
+            result.content.len() <= MAX_TOOL_RESULT_CHARS + TRUNCATION_SUFFIX.len(),
+            "truncated content must be within budget"
+        );
+    } else {
+        panic!("expected Tool message");
+    }
+}
+
+#[test]
+fn fixture_trim_preserves_is_error() {
+    // F7: trim compaction empties content but preserves is_error
+    let mut messages = Vec::new();
+    for turn in 0..(TRIM_TURN_THRESHOLD + 5) {
+        messages.push(Message::User {
+            content: format!("turn {turn}"),
+        });
+        messages.push(Message::Assistant {
+            content: format!("reply {turn}"),
+            tool_calls: vec![],
+            reasoning: None,
+        });
+        messages.push(error_tool_msg(&format!("call_{turn}"), "error happened"));
+    }
+    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+    let result = compactor.apply_trim(messages);
+
+    // First few turns should have emptied tool content but preserved is_error
+    let first_tool = result
+        .iter()
+        .find_map(|m| {
+            if let Message::Tool { result } = m {
+                Some(result)
+            } else {
+                None
+            }
+        })
+        .expect("at least one tool message");
+    assert!(
+        first_tool.is_error,
+        "is_error must survive trim even when content is emptied"
+    );
+    assert!(
+        first_tool.content.is_empty(),
+        "trimmed old tool content must be empty"
+    );
+}
+
+#[test]
+fn fixture_microcompact_preserves_is_error() {
+    // F8: microcompact deduplicates by tool_use_id, preserves is_error on kept entry
+    let messages = vec![
+        error_tool_msg("dup_1", "first error"),
+        error_tool_msg("dup_1", "second error"),
+    ];
+    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
+    let result = compactor.apply_microcompact(messages);
+
+    assert_eq!(result.len(), 2);
+    // First (older) should have content emptied
+    if let Message::Tool { result } = &result[0] {
+        assert!(result.is_error, "is_error preserved on deduped entry");
+        assert!(result.content.is_empty(), "older duplicate content emptied");
+    } else {
+        panic!("expected Tool message");
+    }
+    // Second (newer) should retain content
+    if let Message::Tool { result } = &result[1] {
+        assert!(result.is_error, "is_error preserved on kept entry");
+        assert_eq!(result.content, "second error");
+    } else {
+        panic!("expected Tool message");
+    }
+}

@@ -5,7 +5,7 @@
 | Story ID | TOOL-021 |
 | Type | Technical audit |
 | Priority | P1 |
-| Status | Refinement |
+| Status | Complete (2026-07-16, I131) — audit report + 9 fixture tests; 2 findings with follow-up recommendations |
 | Source | [GitHub Issue #36](https://github.com/wjhuang88/talos/issues/36) |
 | Depends On | `TOOL-019`, `TOOL-002`, `RUNTIME-002` |
 
