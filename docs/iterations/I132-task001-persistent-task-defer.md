@@ -11,7 +11,7 @@
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
 |---|---|---|---|---|
-| `TASK-001` | none | Refinement — ADR-gated | RUNTIME-001, SESSION-004, PERM-005 | ADR-043 Defer: capability substantially delivered; no task engine needed. |
+| `TASK-001` | none | Refinement — ADR-gated | RUNTIME-001, SESSION-004, PERM-005 | ADR-043 Defer: task runtime NOT implemented; reusable components exist but task lifecycle, phase checkpoints, incomplete-task recovery, and durable scheduling are unsatisfied. |
 
 ### Scope
 

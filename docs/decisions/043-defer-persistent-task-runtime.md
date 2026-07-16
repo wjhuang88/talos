@@ -1,8 +1,9 @@
-# 043: Defer TASK-001 Persistent Task Runtime — Capability Substantially Delivered
+# 043: Defer TASK-001 Persistent Task Runtime
 
 > Status: Accepted (Defer)
 > Date: 2026-07-16
 > Iteration: I132 / P130
+> Revised: 2026-07-16 (review v1 — corrected capability assessment)
 
 ## Context
 
@@ -21,77 +22,78 @@ explicitly defer/reject.
 | No scheduler, daemon, direct tool path, permission reuse | Hard | P130 non-goals | No |
 | Crate public APIs are semver-bound | Hard | AGENTS.md #6 | No |
 
-## Evidence: Existing Infrastructure Coverage
+## Evidence: Reusable Components vs. Unsatisfied Requirements
 
-### I128 / ADR-042 (Embedded Durable Runtime Sessions)
+Existing iterations provide reusable building blocks, but the persistent, multi-phase, resumable
+task runtime itself is **not implemented**. Each TASK-001 requirement is assessed below.
 
-| TASK-001 requirement | I128 delivery |
-|---|---|
-| Task/turn/session identity | External ID → UUID TLOG binding; session ID is the stable task identity. Host owns only the opaque external ID. |
-| Talos-owned checkpoint storage | TLOG IS the checkpoint. Successful turns are written atomically (temp file + rename). Committed entries have stable IDs for replay. |
-| Crash recovery | Runtime auto-recovery from committed TLOG entries. Failed, interrupted, denied, and uncommitted turns leave NO durable messages — clean recovery boundary. |
-| Retention/cleanup | Session storage has `status`, `cleanup`, and `maintenance` commands. Workspace-scoped topology enables targeted cleanup. |
+| TASK-001 requirement | Status | Existing component | Gap |
+|---|---|---|---|
+| Session identity (external ID → stable handle) | **Partially satisfied** | I128/ADR-042: opaque external ID → UUID TLOG binding | Session identity exists; no TaskId or task-state entity above session |
+| Atomic turn persistence | **Satisfied** (as session primitive) | I128: successful turn TLOG written atomically | This is turn-level persistence, not task-level checkpoint or phase progress |
+| Crash recovery for successful turns | **Satisfied** (for committed turns only) | I128: auto-recovery from committed TLOG entries | Only successful turns recover; incomplete/uncommitted turns leave no records — no incomplete-task recovery |
+| **Task lifecycle (create/suspend/resume/complete/abort)** | **Not satisfied** | — | No TaskId, TaskState, phase tracking, or task-level lifecycle exists |
+| **Phase-level checkpoint storage** | **Not satisfied** | — | TLOG records turn messages, not task phase progress, branch points, or workflow state |
+| **Incomplete-task recovery** | **Not satisfied** | — | No mechanism to resume an interrupted multi-phase task from its last completed phase |
+| **Durable (cross-restart) scheduling** | **Not satisfied** | I124-I27 scheduler is session-scoped and non-persistent | Scheduled follow-ups are cancelled on process exit; no cross-restart task scheduling |
+| Cancellation | **Partially satisfied** | I124-I127: Cancel/Shutdown for scheduled follow-ups; CancellationToken in session actor | Covers scheduler follow-ups and session turns; no task-level cancellation semantic |
+| Permission re-authorization after resume | **Partially satisfied** | I124-I127: fresh Allow/Ask/Deny on every scheduled fire | Covers scheduled follow-ups; no task-resume permission re-authorization semantic exists |
+| Retention/cleanup | **Partially satisfied** | Session storage: status/cleanup/maintenance commands | Session-level retention; no task-level retention or phase-aware cleanup |
 
-### I124-I127 / ADR-041 (Scheduled Follow-Ups)
+### Key distinction
 
-| TASK-001 requirement | I124-I127 delivery |
-|---|---|
-| Cancellation | `Cancel` and `Shutdown` lifecycle operations with Execute/Ask semantics. CancellationToken in session actor. |
-| Permission re-authorization after resume | Fresh permission evaluation on every fire — no permission reuse. Resumed write-capable actions receive a new Allow/Ask/Deny decision through the normal permission pipeline. |
+I128 and I124-I127 provide reusable session persistence, atomic turns, in-process cancellation,
+and per-fire permission evaluation as **building blocks**. They do NOT constitute a persistent,
+multi-phase, resumable task runtime. The task lifecycle, phase checkpoints, incomplete-task
+recovery, and durable scheduling requirements are **unsatisfied**.
 
-### Permission re-authorization analysis
+## Decision: Defer Implementation
 
-When a durable session is resumed after a crash:
-1. The session replays committed TLOG messages as **read-only context** (history).
-2. The next turn is a **fresh agent turn** with fresh tool execution.
-3. Each tool execution goes through the **normal permission pipeline** (Allow/Ask/Deny).
-4. Therefore, permission re-authorization happens naturally — the resumed context is history; new
-   actions require fresh permission decisions. No separate re-authorization mechanism is needed.
+TASK-001's persistent, multi-phase, resumable task runtime is **not implemented**. This ADR defers
+implementation because:
 
-## Decision: Defer
+1. **No clear product need exists today** for a task runtime beyond what the `LONG-RUNNING-TASK.md`
+   SOP provides at the process/documentation level.
+2. **P130 non-goals prohibit implementation.** A task engine implies a scheduler, daemon, or
+   autonomous execution path — all explicitly excluded by the P130 contract.
+3. **AGENTS.md #7** (no speculative features) prevents building a task engine "in case" a need
+   appears later.
 
-**TASK-001 is deferred.** The persistent resumable task capability is substantially delivered by
-the combination of I128 (durable runtime sessions) and I124-I127 (scheduled follow-ups). A separate
-"task engine" would:
-
-1. **Duplicate existing infrastructure.** I128 already provides checkpoint storage, crash recovery,
-   and session identity. I124-I127 already provides cancellation and permission re-authorization.
-2. **Violate P130 non-goals.** A task engine implies a scheduler, daemon, or autonomous execution
-   path — all explicitly excluded.
-3. **Introduce speculative complexity.** No present need exists for a capability beyond what I128
-   and I124-I127 deliver (AGENTS.md #7).
-
-The long-running task pattern is already served by the `LONG-RUNNING-TASK.md` SOP, which operates
-at the process/documentation level — checkpoints in task docs, not in a task engine. This is the
-correct level of abstraction for Talos's current architecture.
+The existing I128 and I124-I127 components are **reusable foundations** if a future product need
+justifies a task runtime, but they are not themselves a task runtime.
 
 ## What This Decision Does NOT Approve
 
-- No task engine, cron service, or autonomous background process.
-- No new scheduler beyond I124-I127's existing Execute/Ask pattern.
+- No task engine, TaskId/TaskState, cron service, or autonomous background process.
+- No durable (cross-restart) scheduler beyond I124-I127's session-scoped, non-persistent pattern.
 - No global event bus or multi-subscriber task notification (ADR-006).
 - No permission reuse or bypass on resume.
 - No multi-agent orchestration.
+- No claim that the capability is "delivered" or "substantially delivered."
 
 ## Reversal Trigger
 
-Revisit this defer if **all** of the following hold:
+Revisit this defer if **any** of the following holds:
 
-1. A concrete need exists for task orchestration that **cannot** be expressed as a durable session
-   (I128) plus scheduled follow-ups (I124-I127); **and**
-2. The need requires cross-session coordination, multi-step workflow with branching, or persistent
-   task state beyond what TLOG provides; **and**
-3. The proposed design preserves ADR-006 (no global bus), AGENTS.md #4 (permission gating), and
-   #7 (no speculative features).
+1. A concrete product need requires **cross-restart task lifecycle** (create/suspend/resume/abort
+   surviving process restart); **or**
+2. A need requires **phase-level checkpoint storage and incomplete-task recovery** (resume from
+   last completed phase, not just last successful turn); **or**
+3. A need requires **durable scheduling** (tasks that survive process restart and fire
+   autonomously); **or**
+4. A need requires **task-level permission re-authorization** distinct from session-level
+   permission evaluation.
+
+Any such re-evaluation must preserve ADR-006 (no global bus), AGENTS.md #4 (permission gating),
+and #7 (no speculative features).
 
 ## Proves No Global Bus, Direct Tool Path, or Autonomous Process Required
 
-- **No global bus**: Session replay uses TLOG reads (file I/O), not event subscriptions. The SQ/EQ
-  seam (ADR-005) handles all turn communication. No new event flow is introduced.
-- **No direct tool path**: Resumed sessions execute tools through the normal agent turn loop and
-  permission pipeline. No bypass exists.
-- **No autonomous process**: Sessions are host-driven. The host decides when to resume, what
-  external ID to use, and whether to allow the next turn. Talos does not self-schedule.
+- **No global bus**: This defer introduces no event flow. A future task runtime would use the
+  existing SQ/EQ seam (ADR-005) and TLOG file I/O, not a global bus.
+- **No direct tool path**: A future task runtime would execute tools through the normal agent turn
+  loop and permission pipeline. No bypass is approved.
+- **No autonomous process**: This defer approves no process. Sessions remain host-driven.
 
 ## Related
 

@@ -95,4 +95,4 @@ Which Assumptions need validation?]
 41. [041: Scheduler Minimal Public API Boundary](041-scheduler-minimal-public-api.md) — Accepted (2026-07-14). Records the maintainer-approved I124 baseline variance for exactly two additive `talos-agent` composition exports; all scheduler commands, handles, task types, and future I125-I127 surfaces remain crate-private or separately gated.
 42. [042: Embedded Durable Runtime Session Boundary](042-embedded-durable-runtime-session-boundary.md) — Accepted (2026-07-15). Makes `talos-session` the host-directory durable transcript boundary, uses opaque external-ID bindings to UUID TLOG files, commits only complete successful turns atomically, and keeps runtime dependency direction acyclic.
 
-- [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — capability substantially delivered by I128 + I124-I127; no task engine needed.
+- [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — task runtime not implemented; reusable components identified; defer due to no product need.

@@ -5,7 +5,7 @@
 | Story ID | TASK-001 |
 | Type | Architecture and security spike |
 | Priority | P2 |
-| Status | Deferred (2026-07-16, I132) — ADR-043: capability substantially delivered by I128 + I124-I127 |
+| Status | Deferred (2026-07-16, I132) — ADR-043: task runtime not implemented; reusable components identified but not a delivered capability |
 | Source | [GitHub Issue #38](https://github.com/wjhuang88/talos/issues/38) |
 | Depends On | `RUNTIME-001`, `SESSION-004`, `PERM-005` |
 
