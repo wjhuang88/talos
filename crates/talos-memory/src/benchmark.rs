@@ -287,7 +287,7 @@ fn evaluate(name: &'static str, policy: fn(&Fixture) -> bool) -> PolicyMetrics {
     let mut important_total = 0;
     let mut important_caught = 0;
 
-    let mut admitted_contents: HashSet<&str> = HashSet::new();
+    let _admitted_contents: HashSet<&str> = HashSet::new();
 
     for f in FIXTURES {
         let admitted = policy(f);

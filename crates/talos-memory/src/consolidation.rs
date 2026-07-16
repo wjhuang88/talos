@@ -147,23 +147,79 @@ fn derive_key(content: &str) -> String {
     truncated.trim().to_string()
 }
 
-/// Compute confidence based on deterministic heuristics.
+/// Compute admission confidence using `novelty × committed_utility` (ADR-046).
+///
+/// This replaces the former keyword/message-length heuristic with a
+/// deterministic two-signal policy:
+/// - `novelty`: estimates how poorly existing memory covers the candidate.
+///   Uses keyword markers and content distinctiveness signals.
+/// - `committed_utility`: estimates whether the information changed or
+///   guided observable behavior: corrections, preferences, validated
+///   results, recovery, or explicit markers.
+///
+/// Both values are bounded to `[0, 1]`. The admission score is their
+/// product. Explicit user phrases contribute to utility but cannot
+/// alone establish admission. `MemoryItem.confidence` remains evidence
+/// confidence and is NOT this score.
 fn compute_confidence(content: &str, role: &str) -> f64 {
     let lower = content.trim_start().to_lowercase();
 
-    // High confidence: explicit memory markers.
-    let markers = ["remember", "note", "important", "always", "never"];
-    if markers.iter().any(|m| lower.starts_with(m)) {
-        return 0.8;
-    }
+    // Novelty: keyword markers indicating new/distinctive information.
+    let novelty = if lower.starts_with("actually")
+        || lower.starts_with("no,")
+        || lower.starts_with("correction")
+    {
+        0.9
+    } else if lower.starts_with("note")
+        || lower.starts_with("important")
+        || lower.contains("fix for")
+        || lower.contains("deadlock")
+    {
+        0.8
+    } else if lower.starts_with("prefer") || lower.contains("i prefer") {
+        0.6
+    } else if content.len() > 100 {
+        // Long content may contain distinctive information.
+        0.4
+    } else {
+        0.2
+    };
 
-    // Medium confidence: user message with substantial content.
-    if role == "user" && content.len() > 50 {
-        return 0.6;
-    }
+    // Committed utility: did the information change/guide behavior?
+    let utility = if lower.starts_with("always")
+        || lower.starts_with("never")
+        || lower.starts_with("remember")
+        || lower.starts_with("note")
+    {
+        // Explicit user directives have high utility.
+        0.9
+    } else if lower.starts_with("actually")
+        || lower.starts_with("no,")
+        || lower.contains("was wrong")
+        || lower.contains("is wrong")
+    {
+        // Corrections have high utility — they fix existing knowledge.
+        0.85
+    } else if lower.starts_with("important")
+        || lower.contains("fix for")
+        || lower.contains("caused by")
+        || lower.contains("fixed it")
+        || role == "assistant" && content.len() > 40
+    {
+        // Validated results and recovery explanations.
+        0.8
+    } else if lower.starts_with("prefer") || lower.contains("i prefer") {
+        0.7
+    } else if content.len() > 50 && role == "user" {
+        // Substantial user content may have moderate utility.
+        0.4
+    } else {
+        0.1
+    };
 
-    // Default confidence.
-    0.4
+    // Admission score = novelty × committed_utility, clamped to [0, 1].
+    let score: f64 = novelty * utility;
+    score.clamp(0.0, 1.0)
 }
 
 /// Configuration for the consolidation pipeline.
