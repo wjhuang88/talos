@@ -3,7 +3,7 @@
 > Document status: Complete
 > Published plan date: 2026-07-16
 > Planned objective: Decide task/turn/session identity, checkpoints, crash recovery, cancellation, retention, and permission re-authorization after resume.
-> MVP deliverable: ADR-043 (Defer) documenting that the capability is substantially delivered by I128 + I124-I127.
+> MVP deliverable: ADR-043 (Defer) — reviewed decision documenting that the persistent task runtime is NOT implemented; I128 + I124-I127 provide reusable primitives but do not constitute a task runtime.
 
 ## Published Baseline
 
@@ -37,11 +37,19 @@
 
 ## Variance And Residuals
 
-- TASK-001 GitHub Issue #38 remains Open with ADR-043 decision link.
-- No residuals from this package.
+- ADR-043 was revised after architecture review v1: original version incorrectly claimed
+  the capability was 'substantially delivered.' Corrected to state the task runtime is NOT
+  implemented.
+- TASK-001 capability gap (task lifecycle, phase checkpoints, incomplete-task recovery,
+  durable scheduling) remains Open via [Issue #38](https://github.com/wjhuang88/talos/issues/38)
+  and the ADR-043 reversal trigger.
+- SESSION-006 (P120 audit finding) remains a separate Open owner.
 
 ## Retrospective
 
-- Outcome: met. ADR-043 provides a reviewed Defer decision.
-- Documentation: TASK-001 owner doc, ADR index, Board, iterations README, execution package, Issue #38.
-- Lessons: I128 and I124-I127 already delivered the infrastructure TASK-001 sought. The right decision was to recognize this rather than design a redundant engine.
+- Outcome: met. ADR-043 (revised) provides a reviewed Defer with honest gap analysis.
+- Documentation: TASK-001 owner doc, ADR index, Board, iterations README, execution package,
+  PRODUCT-BACKLOG, Issue #38.
+- Lessons: The initial ADR overclaimed existing infrastructure coverage. Architecture review
+  correctly identified that session persistence ≠ task runtime. The revised ADR distinguishes
+  reusable primitives (satisfied) from task-runtime requirements (unsatisfied).
