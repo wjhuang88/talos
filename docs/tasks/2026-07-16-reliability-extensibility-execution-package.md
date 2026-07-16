@@ -1,6 +1,6 @@
 # Reliability, Extensibility, And Memory Quality — Unattended Execution Package
 
-**Status**: Ready for one-pass unattended assignment; N200 not yet executed
+**Status**: N200 Complete; N210 (I135) activated
 **Program**: `docs/tasks/2026-07-16-four-month-reliability-extensibility-plan.md`
 **Pre-plan predecessor**: `a6bd154`
 **Publication commit**: pending at document authoring; N200 records the actual commit containing
@@ -159,6 +159,7 @@ one-pass run before N250.
 | Time | Package | Branch/commit | State | Evidence | Changed files | Risk/deviation | Next exact action / resume |
 |---|---|---|---|---|---|---|---|
 | 2026-07-16 | Authoring | `main` after `a6bd154`; publication commit pending | Ready for assignment | Planning/status-sync diff prepared; implementation not activated | Plan, I135-I139, prompt, derived views | Release and authority expansion not authorized | Publish/adopt this exact baseline, then run N200 commands |
+| 2026-07-16 | N200 complete | `0232c2b` | Baseline published; I135 cleared to activate | Start Gate: clean main, rustc 1.97.0, cargo metadata OK, governance 0 warnings, release_preflight passed, git diff clean. Non-terminal inventory: I018 deferred; I135-I139 properly sequenced; no Active/Review bypassed. Publication commit `0232c2b` pushed to origin/main. | Plan, I135-I139, prompt, manifest, Board, index, PRODUCT-BACKLOG, roadmap | No code change (planning baseline only). | Activate I135 for N210 SESSION-006 repair. |
 
 ## Final Completion Rule
 
