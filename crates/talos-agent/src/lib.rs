@@ -373,11 +373,12 @@ impl Agent {
         }
 
         let (result, final_status) = 'turn_loop: loop {
-            let provider_messages = match self
+            let hook_messages = self.persistence_projection(&messages);
+            let observed_provider_messages = match self
                 .run_hook(
                     &hook_ctx,
                     HookEvent::BeforeProviderCall {
-                        messages: &messages,
+                        messages: &hook_messages,
                     },
                 )
                 .await
@@ -388,6 +389,11 @@ impl Agent {
                 Err(error) => {
                     break (Err(error), TurnStatus::Denied);
                 }
+            };
+            let provider_messages = if observed_provider_messages == hook_messages.as_slice() {
+                messages.as_slice()
+            } else {
+                observed_provider_messages
             };
 
             let filtered_provider_messages;
@@ -471,14 +477,28 @@ impl Agent {
                     AgentEvent::ToolCall {
                         call, provenance, ..
                     } => {
+                        let projected_call = self.project_tool_call(&call);
                         match self
-                            .run_hook(&hook_ctx, HookEvent::OnToolCallProposed { call: &call })
+                            .run_hook(
+                                &hook_ctx,
+                                HookEvent::OnToolCallProposed {
+                                    call: &projected_call,
+                                },
+                            )
                             .await
                         {
-                            Ok(HookOutcome::Continue(HookEvent::OnToolCallProposed { call }))
-                            | Ok(HookOutcome::Skip(HookEvent::OnToolCallProposed { call })) => {
+                            Ok(HookOutcome::Continue(HookEvent::OnToolCallProposed {
+                                call: observed_call,
+                            }))
+                            | Ok(HookOutcome::Skip(HookEvent::OnToolCallProposed {
+                                call: observed_call,
+                            })) => {
                                 turn_tool_calls.push(PendingToolCall {
-                                    call: call.clone(),
+                                    call: Self::restore_private_call_if_unchanged(
+                                        &call,
+                                        &projected_call,
+                                        observed_call,
+                                    ),
                                     provenance,
                                 });
                             }
@@ -611,7 +631,7 @@ impl Agent {
                     tool_calls: vec![],
                     reasoning,
                 });
-                let persisted = messages[persist_start..].to_vec();
+                let persisted = self.persistence_projection(&messages[persist_start..]);
                 break (Ok((turn_text, persisted)), TurnStatus::Success);
             }
 
@@ -619,17 +639,27 @@ impl Agent {
                 .iter()
                 .map(|pending| pending.call.clone())
                 .collect();
+            let projected_tool_calls = proposed_tool_calls
+                .iter()
+                .map(|call| self.project_tool_call(call))
+                .collect::<Vec<_>>();
 
             let effective_tool_calls = match self
                 .run_hook(
                     &hook_ctx,
                     HookEvent::BeforeToolBatch {
-                        calls: &proposed_tool_calls,
+                        calls: &projected_tool_calls,
                     },
                 )
                 .await
             {
-                Ok(HookOutcome::Continue(HookEvent::BeforeToolBatch { calls })) => calls.to_vec(),
+                Ok(HookOutcome::Continue(HookEvent::BeforeToolBatch { calls })) => {
+                    if calls == projected_tool_calls.as_slice() {
+                        proposed_tool_calls
+                    } else {
+                        calls.to_vec()
+                    }
+                }
                 Ok(HookOutcome::Skip(_)) => Vec::new(),
                 Ok(_) => proposed_tool_calls,
                 Err(error) => {
@@ -649,7 +679,7 @@ impl Agent {
                         },
                     )
                     .await;
-                let persisted = messages[persist_start..].to_vec();
+                let persisted = self.persistence_projection(&messages[persist_start..]);
                 break 'turn_loop (
                     Ok((
                         format!(
@@ -686,7 +716,7 @@ impl Agent {
                                  review — all results are preserved above. Adjust your approach \
                                  and reply \"continue\" to resume."
                             ),
-                            messages[persist_start..].to_vec(),
+                            self.persistence_projection(&messages[persist_start..]),
                         )),
                         TurnStatus::DoomLoopDetected,
                     );
@@ -744,9 +774,11 @@ impl Agent {
                 };
 
                 for (call, result) in effective_tool_calls.iter().zip(tool_results.iter()) {
+                    let projected_call = self.project_tool_call(call);
+                    let projected_result = self.project_tool_result(&call.name, result);
                     let observation = ToolObservation {
-                        call: call.clone(),
-                        result: result.clone(),
+                        call: projected_call.clone(),
+                        result: projected_result.clone(),
                     };
                     let observed = match self
                         .run_hook(
@@ -768,30 +800,51 @@ impl Agent {
                             break 'turn_loop (Err(error), TurnStatus::Denied);
                         }
                     };
+                    let observed = ToolObservation {
+                        call: Self::restore_private_call_if_unchanged(
+                            call,
+                            &projected_call,
+                            &observed.call,
+                        ),
+                        result: Self::restore_private_result_if_unchanged(
+                            result,
+                            &projected_result,
+                            &observed.result,
+                        ),
+                    };
 
+                    let projection = self
+                        .tools
+                        .get(&observed.call.name)
+                        .map(|tool| tool.project_result(&observed.result))
+                        .unwrap_or_else(|| {
+                            talos_core::tool::ToolResultProjection::shared(
+                                observed.result.content.clone(),
+                            )
+                        });
                     let ui_result = MessageToolResult {
                         tool_use_id: observed.call.id.clone(),
-                        content: observed.result.content.clone(),
+                        content: projection.display_content,
                         is_error: observed.result.is_error,
                     };
                     let llm_result = if observed.result.is_error {
                         MessageToolResult {
                             content: format!(
                                 "{}\n\n[Analyze the error above and try a different approach.]",
-                                observed.result.content
+                                projection.model_content
                             ),
                             ..ui_result.clone()
                         }
                     } else if self.bash_compression_enabled && observed.call.name == "bash" {
                         let compressed =
-                            BashOutputCompressor::new().compress(&observed.result.content);
+                            BashOutputCompressor::new().compress(&projection.model_content);
                         MessageToolResult {
                             content: compressed.content,
                             ..ui_result.clone()
                         }
-                    } else if observed.result.content.len() > self.tool_output_threshold {
+                    } else if projection.model_content.len() > self.tool_output_threshold {
                         let compressed = crate::tool_output::compress_tool_output(
-                            &observed.result.content,
+                            &projection.model_content,
                             self.tool_output_threshold,
                         );
                         MessageToolResult {
@@ -799,7 +852,10 @@ impl Agent {
                             ..ui_result.clone()
                         }
                     } else {
-                        ui_result.clone()
+                        MessageToolResult {
+                            content: projection.model_content,
+                            ..ui_result.clone()
+                        }
                     };
                     messages.push(Message::Tool { result: llm_result });
                 }
@@ -814,11 +870,16 @@ impl Agent {
                 &mut active_presented_tool_names,
             );
 
+            let projected_batch = effective_tool_calls
+                .iter()
+                .zip(tool_results.iter())
+                .map(|(call, result)| self.project_tool_result(&call.name, result))
+                .collect::<Vec<_>>();
             let _ = self
                 .run_hook(
                     &hook_ctx,
                     HookEvent::AfterToolBatch {
-                        results: &tool_results,
+                        results: &projected_batch,
                     },
                 )
                 .await;
@@ -826,6 +887,56 @@ impl Agent {
 
         self.emit_turn_complete(&hook_ctx, final_status).await;
         result
+    }
+
+    fn persistence_projection(&self, messages: &[Message]) -> Vec<Message> {
+        let mut tool_names = HashMap::<String, String>::new();
+        messages
+            .iter()
+            .map(|message| match message {
+                Message::Assistant {
+                    content,
+                    tool_calls,
+                    reasoning,
+                } => Message::Assistant {
+                    content: content.clone(),
+                    tool_calls: tool_calls
+                        .iter()
+                        .map(|call| {
+                            tool_names.insert(call.id.clone(), call.name.clone());
+                            let mut projected = call.clone();
+                            if let Some(tool) = self.tools.get(&call.name) {
+                                projected.input = tool.project_input(&call.input);
+                            }
+                            projected
+                        })
+                        .collect(),
+                    reasoning: reasoning.clone(),
+                },
+                Message::Tool { result } => {
+                    let content = tool_names
+                        .get(&result.tool_use_id)
+                        .and_then(|name| self.tools.get(name))
+                        .map(|tool| {
+                            let execution = talos_core::tool::ToolResult {
+                                content: result.content.clone(),
+                                is_error: result.is_error,
+                                continuations: Vec::new(),
+                            };
+                            tool.project_result(&execution).persistence_content
+                        })
+                        .unwrap_or_else(|| result.content.clone());
+                    Message::Tool {
+                        result: MessageToolResult {
+                            tool_use_id: result.tool_use_id.clone(),
+                            content,
+                            is_error: result.is_error,
+                        },
+                    }
+                }
+                _ => message.clone(),
+            })
+            .collect()
     }
 
     fn apply_tool_continuations(

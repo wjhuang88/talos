@@ -45,6 +45,8 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
 
     let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
     let mut registry = ToolRegistry::new();
+    let (read_tool, write_tool, edit_tool, delete_tool) =
+        talos_tools::snapshot_aware_file_tools(workspace_root.to_path_buf());
     for tool in sched_tools {
         registry.register(Arc::new(PermissionAwareTool {
             inner: tool,
@@ -58,17 +60,17 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(workspace_root.to_path_buf())),
+        inner: Arc::new(read_tool),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(workspace_root.to_path_buf())),
+        inner: Arc::new(write_tool),
         approval: approval.clone(),
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root.to_path_buf())),
+        inner: Arc::new(edit_tool),
         approval: approval.clone(),
         print_mode: false,
     }));
@@ -88,7 +90,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         print_mode: false,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DeleteTool::new(workspace_root.to_path_buf())),
+        inner: Arc::new(delete_tool),
         approval: approval.clone(),
         print_mode: false,
     }));

@@ -449,6 +449,14 @@ The default prompt asks models to prefer built-in tools and use shell commands a
 native tool cannot cover the task. It also emphasizes accuracy over approval: do not flatter,
 fabricate citations, or hide uncertainty when evidence is missing.
 
+In normal CLI/TUI/inline composition, `read` gives the active model compact two-hex line anchors
+backed by a bounded in-memory file snapshot. `edit` can use that snapshot for stale-read-resistant
+atomic line edits while retaining its legacy string-replacement input. Snapshot handles and hashes
+are transient model coordination data: they are omitted from hooks, approval presentation, visible
+history, exports, transcripts, and TLOG. Display/history retain ordinary sanitized file content; a
+resumed or rebuilt Runtime must read the file again, and every write still passes the current
+permission policy.
+
 ## Slash Commands
 
 Type `/` in the TUI to access these commands. The Skill commands are also available in inline

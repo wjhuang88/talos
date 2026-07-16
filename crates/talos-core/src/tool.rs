@@ -126,6 +126,35 @@ pub struct ToolResult {
     pub continuations: Vec<ToolContinuation>,
 }
 
+/// Model, display, and persistence views of one tool result.
+///
+/// Most tools use the same content for all three views. Tools that return
+/// transient model-only coordination data can override
+/// [`AgentTool::project_result`] so that UI and durable history receive a
+/// sanitized representation without changing the provider-facing result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolResultProjection {
+    /// Content supplied to the model during the active turn.
+    pub model_content: String,
+    /// Content emitted to user-facing runtime event projections.
+    pub display_content: String,
+    /// Content eligible for session persistence and replay.
+    pub persistence_content: String,
+}
+
+impl ToolResultProjection {
+    /// Creates a projection whose three views are identical.
+    #[must_use]
+    pub fn shared(content: impl Into<String>) -> Self {
+        let content = content.into();
+        Self {
+            model_content: content.clone(),
+            display_content: content.clone(),
+            persistence_content: content,
+        }
+    }
+}
+
 impl ToolResult {
     /// Creates a successful tool result with the given content.
     pub fn success(content: impl Into<String>) -> Self {
@@ -503,6 +532,22 @@ pub trait AgentTool: Send + Sync {
     /// The `input` is expected to conform to the schema returned by
     /// [`parameters`](Self::parameters).
     async fn execute(&self, input: Value) -> ToolResult;
+
+    /// Returns the observer-safe form of a tool input.
+    ///
+    /// Execution and permission evaluation always receive the original input.
+    /// This projection is used only for UI events, approval presentation, and
+    /// durable replay. The default preserves the complete input.
+    fn project_input(&self, input: &Value) -> Value {
+        input.clone()
+    }
+
+    /// Splits one execution result into model, display, and persistence views.
+    ///
+    /// The default keeps existing tools fully backward compatible.
+    fn project_result(&self, result: &ToolResult) -> ToolResultProjection {
+        ToolResultProjection::shared(result.content.clone())
+    }
 
     /// Returns whether this tool is read-only (does not modify external state).
     ///

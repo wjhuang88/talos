@@ -400,7 +400,11 @@ impl AgentTool for RuntimePermissionAwareTool {
                     .map(|field| (*field).to_string())
                     .collect::<Vec<_>>();
                 match handler
-                    .request_approval(self.inner.name(), &input, &summary_fields)
+                    .request_approval(
+                        self.inner.name(),
+                        &self.inner.project_input(&input),
+                        &summary_fields,
+                    )
                     .await
                 {
                     ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
@@ -436,6 +440,14 @@ impl AgentTool for RuntimePermissionAwareTool {
 
     fn summary_fields(&self) -> &'static [&'static str] {
         self.inner.summary_fields()
+    }
+
+    fn project_input(&self, input: &Value) -> Value {
+        self.inner.project_input(input)
+    }
+
+    fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
+        self.inner.project_result(result)
     }
 
     fn provenance(&self) -> talos_core::tool::ToolProvenance {
@@ -503,10 +515,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use talos_core::message::Message;
+    use talos_core::provider::ProviderResult;
     use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
     use talos_permission::PermissionDecision;
     use talos_provider::mock::MockProvider;
     use talos_session::SessionManager;
+    use talos_tools::snapshot_aware_file_tools;
 
     use super::*;
 
@@ -516,6 +530,114 @@ mod tests {
 
     struct RecordingHybridTool {
         executions: Arc<AtomicUsize>,
+    }
+
+    struct PrivateInputWriteTool;
+
+    struct PrivateResultReadTool;
+
+    struct SnapshotEditingModel {
+        step: AtomicUsize,
+        observed_snapshot: Arc<StdMutex<Option<String>>>,
+    }
+
+    impl SnapshotEditingModel {
+        fn new(observed_snapshot: Arc<StdMutex<Option<String>>>) -> Self {
+            Self {
+                step: AtomicUsize::new(0),
+                observed_snapshot,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl LanguageModel for SnapshotEditingModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let events = if step == 0 {
+                vec![
+                    AgentEvent::TurnStart,
+                    AgentEvent::ToolCall {
+                        call: ToolCall {
+                            id: "snapshot-read".into(),
+                            name: "read".into(),
+                            input: serde_json::json!({"path": "source.txt"}),
+                        },
+                        provenance: ToolProvenance::default(),
+                        summary_fields: Vec::new(),
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Usage::default(),
+                    },
+                ]
+            } else if step == 1 {
+                let content = messages
+                    .iter()
+                    .rev()
+                    .find_map(|message| match message {
+                        Message::Tool { result } => Some(result.content.as_str()),
+                        _ => None,
+                    })
+                    .expect("model receives read result");
+                let mut lines = content.lines();
+                let snapshot_id = lines
+                    .next()
+                    .and_then(|line| line.strip_prefix("[snapshot:"))
+                    .and_then(|line| line.strip_suffix(']'))
+                    .expect("model receives snapshot handle")
+                    .to_string();
+                let target = lines
+                    .next()
+                    .and_then(|line| line.split_once('|'))
+                    .map(|(reference, _)| reference.to_string())
+                    .expect("model receives line reference");
+                *self
+                    .observed_snapshot
+                    .lock()
+                    .expect("snapshot capture lock") = Some(snapshot_id.clone());
+                vec![
+                    AgentEvent::TurnStart,
+                    AgentEvent::ToolCall {
+                        call: ToolCall {
+                            id: "snapshot-edit".into(),
+                            name: "edit".into(),
+                            input: serde_json::json!({
+                                "path": "source.txt",
+                                "snapshot_id": snapshot_id,
+                                "operations": [{
+                                    "op": "replace",
+                                    "target": target,
+                                    "content": "updated"
+                                }]
+                            }),
+                        },
+                        provenance: ToolProvenance::default(),
+                        summary_fields: Vec::new(),
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Usage::default(),
+                    },
+                ]
+            } else {
+                vec![
+                    AgentEvent::TurnStart,
+                    AgentEvent::TextDelta {
+                        delta: "done".into(),
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::EndTurn,
+                        usage: Usage::default(),
+                    },
+                ]
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("runtime receiver remains open");
+            }
+            Ok(rx)
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -637,6 +759,68 @@ mod tests {
                     ToolResourceKind::Path,
                 ),
             ]
+        }
+    }
+
+    #[async_trait]
+    impl AgentTool for PrivateInputWriteTool {
+        fn name(&self) -> &str {
+            "private_write"
+        }
+
+        fn description(&self) -> &str {
+            "Projection test write"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type": "object"})
+        }
+
+        async fn execute(&self, _input: Value) -> ToolResult {
+            ToolResult::success("written")
+        }
+
+        fn nature(&self) -> ToolNature {
+            ToolNature::Write
+        }
+
+        fn project_input(&self, input: &Value) -> Value {
+            let mut input = input.clone();
+            if let Some(object) = input.as_object_mut() {
+                object.remove("snapshot_id");
+            }
+            input
+        }
+    }
+
+    #[async_trait]
+    impl AgentTool for PrivateResultReadTool {
+        fn name(&self) -> &str {
+            "private_read"
+        }
+
+        fn description(&self) -> &str {
+            "Projection test read"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type": "object"})
+        }
+
+        async fn execute(&self, _input: Value) -> ToolResult {
+            ToolResult::success("[snapshot:s1]\n1:aa|private line")
+        }
+
+        fn is_read_only(&self) -> bool {
+            true
+        }
+
+        fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
+            talos_core::tool::ToolResultProjection {
+                model_content: result.content.clone(),
+                display_content: "read 1 line".into(),
+                persistence_content: "read 1 line".into(),
+            }
         }
     }
 
@@ -786,6 +970,44 @@ mod tests {
         );
         assert_eq!(records[0].summary_fields, vec!["message"]);
 
+        runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn runtime_approval_receives_projected_input_without_private_snapshot_id() {
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call(
+                    "private_write",
+                    serde_json::json!({"path": "src/lib.rs", "snapshot_id": "s1"}),
+                )
+                .with_response("done"),
+        );
+        let approval_records = Arc::new(StdMutex::new(Vec::new()));
+        let approval_handler = Arc::new(RecordingApprovalHandler::new(
+            ApprovalChoice::ApproveOnce,
+            approval_records.clone(),
+        ));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(".")
+            .approval_handler(approval_handler)
+            .tool(Arc::new(PrivateInputWriteTool))
+            .build()
+            .expect("runtime builds");
+
+        runtime.submit("write").await.expect("submit succeeds");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        let records = approval_records.lock().expect("records lock");
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            records[0].arguments,
+            serde_json::json!({"path": "src/lib.rs"})
+        );
+        drop(records);
         runtime.shutdown().await.expect("shutdown succeeds");
     }
 
@@ -977,6 +1199,166 @@ mod tests {
         assert!(history.iter().any(|message| matches!(message, Message::User { content } if content == "persist this user turn")));
         assert!(history.iter().any(|message| matches!(message, Message::Assistant { content, .. } if content == "persisted answer")));
         std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[tokio::test]
+    async fn durable_runtime_never_persists_model_private_tool_result() {
+        let directory = std::env::temp_dir().join(format!(
+            "talos-runtime-private-projection-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        let manager = SessionManager::with_dir(directory.clone());
+        let session = manager
+            .create_or_open_session("private-projection")
+            .expect("durable session");
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call("private_read", serde_json::json!({"path": "src/lib.rs"}))
+                .with_response("done"),
+        );
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .tool(Arc::new(PrivateResultReadTool))
+            .durable_session(session.clone())
+            .build()
+            .expect("runtime builds");
+
+        runtime.submit("read").await.expect("submit");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        runtime.shutdown().await.expect("shutdown");
+
+        let messages = session.read_messages().expect("messages");
+        let serialized = serde_json::to_string(&messages).expect("serialize messages");
+        assert!(serialized.contains("read 1 line"));
+        assert!(!serialized.contains("snapshot:s1"));
+        assert!(!serialized.contains("1:aa|"));
+        for entry in std::fs::read_dir(&directory).expect("session directory") {
+            let path = entry.expect("directory entry").path();
+            if path.extension().and_then(|value| value.to_str()) == Some("tlog") {
+                let bytes = std::fs::read(&path).expect("tlog bytes");
+                let text = String::from_utf8_lossy(&bytes);
+                assert!(!text.contains("snapshot:s1"));
+                assert!(!text.contains("1:aa|"));
+            }
+        }
+        std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[tokio::test]
+    async fn real_snapshot_read_to_edit_is_atomic_permission_gated_and_never_durable() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let session_root = tempfile::tempdir().expect("session root");
+        let source = workspace.path().join("source.txt");
+        std::fs::write(&source, "original\n").expect("fixture write");
+        let manager = SessionManager::with_dir(session_root.path().join("messages"));
+        let session = manager
+            .create_or_open_session("snapshot:e2e")
+            .expect("durable session");
+        let observed_snapshot = Arc::new(StdMutex::new(None));
+        let provider = Arc::new(SnapshotEditingModel::new(observed_snapshot.clone()));
+        let (read, write, edit, delete) = snapshot_aware_file_tools(workspace.path().to_path_buf());
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(workspace.path())
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Write,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ))
+            .tool(Arc::new(read))
+            .tool(Arc::new(write))
+            .tool(Arc::new(edit))
+            .tool(Arc::new(delete))
+            .durable_session(session.clone())
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("update the first line")
+            .await
+            .expect("submit");
+        let mut serialized_events = Vec::new();
+        while let Some(event) = runtime.next_event().await {
+            serialized_events.push(serde_json::to_string(&event).expect("serialize event"));
+            if matches!(
+                event,
+                SessionEvent::TurnEvent {
+                    payload: talos_core::session::TurnEventPayload::Completed { .. },
+                    ..
+                }
+            ) {
+                break;
+            }
+        }
+        runtime.shutdown().await.expect("shutdown");
+
+        assert_eq!(
+            std::fs::read_to_string(&source).expect("read source"),
+            "updated\n"
+        );
+        let snapshot_id = observed_snapshot
+            .lock()
+            .expect("snapshot lock")
+            .clone()
+            .expect("model observed snapshot");
+        for event in &serialized_events {
+            assert!(!event.contains(&snapshot_id));
+            assert!(!event.contains("snapshot_id"));
+        }
+        let messages = session.read_messages().expect("durable messages");
+        let serialized = serde_json::to_string(&messages).expect("serialize messages");
+        assert!(!serialized.contains(&snapshot_id));
+        assert!(!serialized.contains("snapshot_id"));
+        assert!(serialized.contains("1: original"));
+        for entry in
+            std::fs::read_dir(session_root.path().join("messages")).expect("session directory")
+        {
+            let path = entry.expect("directory entry").path();
+            if path.extension().and_then(|value| value.to_str()) == Some("tlog") {
+                let bytes = std::fs::read(path).expect("tlog bytes");
+                let text = String::from_utf8_lossy(&bytes);
+                assert!(!text.contains(&snapshot_id));
+                assert!(!text.contains("snapshot_id"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn denied_real_snapshot_edit_leaves_the_file_unchanged() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let source = workspace.path().join("source.txt");
+        std::fs::write(&source, "original\n").expect("fixture write");
+        let observed_snapshot = Arc::new(StdMutex::new(None));
+        let provider = Arc::new(SnapshotEditingModel::new(observed_snapshot.clone()));
+        let (read, _, edit, _) = snapshot_aware_file_tools(workspace.path().to_path_buf());
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(workspace.path())
+            .tool(Arc::new(read))
+            .tool(Arc::new(edit))
+            .build()
+            .expect("runtime builds");
+
+        runtime
+            .submit("update the first line")
+            .await
+            .expect("submit");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("turn completes");
+        runtime.shutdown().await.expect("shutdown");
+
+        assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+        assert!(observed_snapshot.lock().expect("snapshot lock").is_some());
+        assert_eq!(
+            std::fs::read_to_string(source).expect("read source"),
+            "original\n"
+        );
     }
 
     #[tokio::test]

@@ -106,6 +106,30 @@ let mut handle = RuntimeBuilder::new()
 Without an approval handler, `Ask` decisions are **denied** by default. Always provide an
 `ApprovalHandler` for headless embedding unless all registered tools are read-only.
 
+For the Talos snapshot-aware file-tool set, construct one shared registry-backed group and register
+all four tools so writes and deletes invalidate read snapshots consistently:
+
+```rust,ignore
+let (read, write, edit, delete) =
+    talos_tools::snapshot_aware_file_tools(workspace_root.clone());
+let mut handle = RuntimeBuilder::new()
+    .provider(provider)
+    .workspace_root(workspace_root)
+    .tool(Arc::new(read))
+    .tool(Arc::new(write))
+    .tool(Arc::new(edit))
+    .tool(Arc::new(delete))
+    .approval_handler(approval_handler)
+    .build()?;
+```
+
+The snapshot handle is Runtime-memory-only. It reaches the active model but is removed from runtime
+events, hook observations, approval presentation, returned durable messages, transcript, and TLOG.
+Hooks that leave the sanitized projection unchanged do not disturb the active model payload; a hook
+that rewrites it intentionally replaces the private payload and may trigger a recoverable re-read.
+Rebuilt runtimes must read again before an anchored edit. Legacy `ReadTool::new` and
+`EditTool::new` remain available without snapshot behavior.
+
 ### Pattern 3: Prompt Customization
 
 - `custom_prompt(str)` — **Replaces** the default Talos system prompt entirely.

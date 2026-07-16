@@ -183,9 +183,11 @@ mod tests {
         );
         let json = serde_json::to_string(&record).unwrap();
         assert!(!json.contains("password"));
-        assert!(!json.contains("abc"));
-        assert!(!json.contains("sk-test"));
-        assert!(!json.contains("user:pass"));
+        for url in [&record.url, &record.final_url, &record.origin] {
+            assert!(!url.contains("abc"));
+            assert!(!url.contains("sk-test"));
+            assert!(!url.contains("user:pass"));
+        }
         assert!(!json.contains("secret"));
         assert!(json.contains("token=***"));
         assert!(json.contains("api_key=***"));

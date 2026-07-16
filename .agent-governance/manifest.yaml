@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-14"
-status_note: "I125 (2026-07-14): recurring scheduled follow-ups closed with additive public-API compatibility, competing-boundary cancellation/shutdown tests, fresh permission proof, a real configured-provider walkthrough, and green workspace/preflight/governance validation. I126 is Planned and unblocked but not activated."
+last_audited_at: "2026-07-16"
+status_note: "I134 (2026-07-16): model-private two-hex file anchors closed with bounded full revisions, permission-gated atomic edits, sanitized UI/Hook/history/TLOG projections, real allowed/denied Runtime flows, legacy compatibility, and green locked workspace/preflight/governance validation. No release or permission-default change was authorized."
 
 governance:
   skill_name: "agent-project-governance"

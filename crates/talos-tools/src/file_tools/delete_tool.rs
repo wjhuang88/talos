@@ -9,7 +9,7 @@ use talos_core::tool::{
 };
 use talos_core::tool_parameters;
 
-use super::{DeleteError, FileToolError, resolve_workspace_path};
+use super::{DeleteError, FileSnapshotRegistry, FileToolError, resolve_workspace_path};
 
 /// Input parameters for the [`DeleteTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -21,11 +21,27 @@ pub struct DeleteInput {
 /// A tool that deletes files or directories within the workspace.
 pub struct DeleteTool {
     workspace_root: PathBuf,
+    snapshots: Option<FileSnapshotRegistry>,
 }
 
 impl DeleteTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root }
+        Self {
+            workspace_root,
+            snapshots: None,
+        }
+    }
+
+    /// Creates a delete tool that invalidates shared file snapshots.
+    #[must_use]
+    pub fn with_snapshot_registry(
+        workspace_root: PathBuf,
+        snapshots: FileSnapshotRegistry,
+    ) -> Self {
+        Self {
+            workspace_root,
+            snapshots: Some(snapshots),
+        }
     }
 
     async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
@@ -53,6 +69,9 @@ impl DeleteTool {
             tokio::fs::remove_dir_all(&path).await?;
         } else {
             tokio::fs::remove_file(&path).await?;
+        }
+        if let Some(registry) = &self.snapshots {
+            registry.invalidate_path(&path)?;
         }
 
         let display = path

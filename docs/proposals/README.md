@@ -81,3 +81,6 @@ docs/proposals/
 - [Optional Runtime Asset Distribution](optional-runtime-asset-distribution.md) — ADR-ready policy
   for optional model weights, WASM plugin packages, and resource packs with explicit consent,
   checksums/signatures, cache layout, offline/mirror behavior, and graceful fallback.
+- [Model-Private Snapshot-Anchored File Edits](model-private-snapshot-anchored-file-edits.md) —
+  **implemented by I134**: compact two-hex line anchors backed by Runtime-memory full revisions,
+  with snapshot mechanics excluded from TUI/hooks/history/TLOG by ADR-045 projections.

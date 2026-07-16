@@ -7,12 +7,28 @@ use thiserror::Error;
 mod delete_tool;
 mod ls_tool;
 mod read_tool;
+mod snapshot;
 mod write_edit_tools;
 
 pub use delete_tool::{DeleteInput, DeleteTool};
 pub use ls_tool::{LsInput, LsTool};
 pub use read_tool::{ReadInput, ReadTool};
+pub use snapshot::FileSnapshotRegistry;
 pub use write_edit_tools::{EditInput, EditTool, WriteInput, WriteTool};
+
+/// Creates the four core file tools with one shared model-private snapshot registry.
+#[must_use]
+pub fn snapshot_aware_file_tools(
+    workspace_root: PathBuf,
+) -> (ReadTool, WriteTool, EditTool, DeleteTool) {
+    let snapshots = FileSnapshotRegistry::new();
+    (
+        ReadTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone()),
+        WriteTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone()),
+        EditTool::with_snapshot_registry(workspace_root.clone(), snapshots.clone()),
+        DeleteTool::with_snapshot_registry(workspace_root, snapshots),
+    )
+}
 
 /// Size threshold for binary file detection (8KB).
 const BINARY_CHECK_SIZE: usize = 8 * 1024;
@@ -43,6 +59,36 @@ pub enum FileToolError {
 
     #[error("file already exists: {0}. Use the edit tool to modify existing files")]
     FileExists(String),
+
+    #[error("SNAPSHOT_NOT_FOUND: snapshot expired or is unavailable; read the file again")]
+    SnapshotNotFound,
+
+    #[error("SNAPSHOT_PATH_MISMATCH: snapshot belongs to a different file")]
+    SnapshotPathMismatch,
+
+    #[error("FILE_REV_MISMATCH: file changed since it was read; read the file again")]
+    FileRevisionMismatch,
+
+    #[error("PATH_IDENTITY_CHANGED: file path changed since it was read; read the file again")]
+    PathIdentityChanged,
+
+    #[error("HASH_MISMATCH: line check code does not match the snapshot")]
+    HashMismatch,
+
+    #[error("INVALID_REF: {0}")]
+    InvalidRef(String),
+
+    #[error("INVALID_RANGE: {0}")]
+    InvalidEditRange(String),
+
+    #[error("SNAPSHOT_LIMIT: {0}")]
+    SnapshotLimit(String),
+
+    #[error("snapshot registry unavailable")]
+    SnapshotRegistryUnavailable,
+
+    #[error("ATOMIC_WRITE_FAILED: {0}")]
+    AtomicWriteFailed(String),
 }
 
 /// Errors specific to the delete tool.

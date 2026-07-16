@@ -7,7 +7,8 @@ use serde_json::Value;
 use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
-use super::{FileToolError, is_binary_file, resolve_workspace_path};
+use super::{FileSnapshotRegistry, FileToolError, is_binary_file, resolve_workspace_path};
+use crate::file_tools::snapshot::line_spans;
 
 /// Input parameters for the [`ReadTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -36,11 +37,27 @@ pub struct ReadInput {
 /// A tool that reads file content with optional line range support.
 pub struct ReadTool {
     workspace_root: PathBuf,
+    snapshots: Option<FileSnapshotRegistry>,
 }
 
 impl ReadTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root }
+        Self {
+            workspace_root,
+            snapshots: None,
+        }
+    }
+
+    /// Creates a read tool that emits compact model-private line anchors.
+    #[must_use]
+    pub fn with_snapshot_registry(
+        workspace_root: PathBuf,
+        snapshots: FileSnapshotRegistry,
+    ) -> Self {
+        Self {
+            workspace_root,
+            snapshots: Some(snapshots),
+        }
     }
 
     async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
@@ -92,9 +109,35 @@ impl ReadTool {
             || read_input.start_line.is_some()
             || read_input.end_line.is_some();
 
+        let snapshot = if let Some(registry) = &self.snapshots {
+            let bytes = content.as_bytes();
+            match registry.capture(&path, bytes) {
+                Ok((id, codes)) => Some((id, codes, line_spans(bytes))),
+                Err(FileToolError::SnapshotLimit(_)) => None,
+                Err(error) => return Err(error),
+            }
+        } else {
+            None
+        };
+
         let mut output = String::new();
+        if let Some((id, _, _)) = &snapshot {
+            output.push_str(&format!("[snapshot:{id}]\n"));
+        }
         for (i, line) in selected.iter().enumerate() {
-            if show_line_numbers {
+            if let Some((_, codes, spans)) = &snapshot {
+                let line_index = start + i;
+                let rendered = spans
+                    .get(line_index)
+                    .and_then(|span| content.get(span.content_start..span.content_end))
+                    .unwrap_or(line);
+                output.push_str(&format!(
+                    "{}:{}|{}\n",
+                    line_index + 1,
+                    codes.get(line_index).map(String::as_str).unwrap_or("00"),
+                    rendered
+                ));
+            } else if show_line_numbers {
                 let line_num = start + i + 1;
                 output.push_str(&format!("{line_num}: {line}\n"));
             } else {
@@ -122,7 +165,11 @@ impl AgentTool for ReadTool {
     }
 
     fn description(&self) -> &str {
-        "Read file content with optional line range or offset/limit pagination"
+        if self.snapshots.is_some() {
+            "Read file content with compact line:hh anchors and a transient snapshot id for precise edit calls"
+        } else {
+            "Read file content with optional line range or offset/limit pagination"
+        }
     }
 
     fn parameters(&self) -> Value {
@@ -147,5 +194,36 @@ impl AgentTool for ReadTool {
     }
     fn summary_fields(&self) -> &'static [&'static str] {
         &["path"]
+    }
+
+    fn project_result(
+        &self,
+        result: &talos_core::tool::ToolResult,
+    ) -> talos_core::tool::ToolResultProjection {
+        if !result.is_error && result.content.starts_with("[snapshot:") {
+            let mut sanitized = String::new();
+            for line in result.content.lines().skip(1) {
+                let ordinary = line
+                    .split_once('|')
+                    .and_then(|(reference, content)| {
+                        reference.split_once(':').and_then(|(number, code)| {
+                            (number.bytes().all(|byte| byte.is_ascii_digit())
+                                && code.len() == 2
+                                && code.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                            .then(|| format!("{number}: {content}"))
+                        })
+                    })
+                    .unwrap_or_else(|| line.to_string());
+                sanitized.push_str(&ordinary);
+                sanitized.push('\n');
+            }
+            talos_core::tool::ToolResultProjection {
+                model_content: result.content.clone(),
+                display_content: sanitized.clone(),
+                persistence_content: sanitized,
+            }
+        } else {
+            talos_core::tool::ToolResultProjection::shared(result.content.clone())
+        }
     }
 }

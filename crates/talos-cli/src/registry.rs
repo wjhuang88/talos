@@ -28,7 +28,7 @@ use talos_tools::symbol::{FindReferencesTool, FindSymbolTool, ListImportsTool, L
 use talos_tools::{
     BashTool, DeleteTool, DiffTool, DocumentExtractTool, EditTool, ExecTool, FetchUrlTool,
     GlobTool, GrepTool, HttpRequestTool, LsTool, ReadTool, SaveUrlTool, StatTool, TreeTool,
-    WebSearchTool, WriteTool,
+    WebSearchTool, WriteTool, snapshot_aware_file_tools,
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -94,20 +94,22 @@ impl TuiApprovalHandler {
         &self,
         tool_name: &str,
         profile: &[ToolPermissionFacet],
-        input: &serde_json::Value,
+        evaluation_input: &serde_json::Value,
+        presentation_input: &serde_json::Value,
         summary_fields: Vec<String>,
     ) -> ApprovalChoice {
         let decision = {
             let engine = self.engine.lock().expect("engine lock poisoned");
-            engine.evaluate_profile(tool_name, profile, input)
+            engine.evaluate_profile(tool_name, profile, evaluation_input)
         };
         match decision {
             PermissionDecision::Allow => ApprovalChoice::ApproveOnce,
             PermissionDecision::Deny(_) => ApprovalChoice::Deny,
             PermissionDecision::Ask => {
                 let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-                let always_scopes = always_allow_rule_descriptions(tool_name, profile, input);
-                let mut approval_arguments = input.clone();
+                let always_scopes =
+                    always_allow_rule_descriptions(tool_name, profile, evaluation_input);
+                let mut approval_arguments = presentation_input.clone();
                 let mut approval_summary_fields = summary_fields;
                 if !always_scopes.is_empty()
                     && let Some(obj) = approval_arguments.as_object_mut()
@@ -226,7 +228,13 @@ impl AgentTool for TuiPermissionAwareTool {
         let profile = self.inner.permission_profile(&input);
         let choice = self
             .approval
-            .request_approval(&tool_name, &profile, &input, summary_fields)
+            .request_approval(
+                &tool_name,
+                &profile,
+                &input,
+                &self.inner.project_input(&input),
+                summary_fields,
+            )
             .await;
 
         match choice {
@@ -283,6 +291,14 @@ impl AgentTool for TuiPermissionAwareTool {
     fn provenance(&self) -> talos_core::tool::ToolProvenance {
         self.inner.provenance()
     }
+
+    fn project_input(&self, input: &Value) -> Value {
+        self.inner.project_input(input)
+    }
+
+    fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
+        self.inner.project_result(result)
+    }
 }
 
 /// Permission-aware tool wrapper that checks the permission engine before
@@ -326,7 +342,8 @@ impl AgentTool for PermissionAwareTool {
                             "Print mode: interactive approval unavailable".to_string(),
                         )
                     } else {
-                        match approval.prompt_profile(&tool_name, &profile, &input) {
+                        let presentation_input = self.inner.project_input(&input);
+                        match approval.prompt_profile(&tool_name, &profile, &presentation_input) {
                             Ok(decision) => decision,
                             Err(e) => PermissionDecision::Deny(format!("Approval error: {e}")),
                         }
@@ -390,6 +407,14 @@ impl AgentTool for PermissionAwareTool {
 
     fn provenance(&self) -> talos_core::tool::ToolProvenance {
         self.inner.provenance()
+    }
+
+    fn project_input(&self, input: &Value) -> Value {
+        self.inner.project_input(input)
+    }
+
+    fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
+        self.inner.project_result(result)
     }
 }
 
@@ -462,6 +487,8 @@ impl AgentTool for StatusTool {
 pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>) -> ToolRegistry {
     let approval = Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new())));
     let ephemeral_session_id = Uuid::new_v4();
+    let (read_tool, write_tool, edit_tool, delete_tool) =
+        snapshot_aware_file_tools(PathBuf::from("."));
 
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(PermissionAwareTool {
@@ -475,7 +502,7 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(ReadTool::new(PathBuf::from("."))),
+        inner: Arc::new(read_tool),
         approval: approval.clone(),
         print_mode: true,
     }));
@@ -485,12 +512,12 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(WriteTool::new(PathBuf::from("."))),
+        inner: Arc::new(write_tool),
         approval: approval.clone(),
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(EditTool::new(PathBuf::from("."))),
+        inner: Arc::new(edit_tool),
         approval: approval.clone(),
         print_mode: true,
     }));
@@ -510,7 +537,7 @@ pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>
         print_mode: true,
     }));
     registry.register(Arc::new(PermissionAwareTool {
-        inner: Arc::new(DeleteTool::new(PathBuf::from("."))),
+        inner: Arc::new(delete_tool),
         approval: approval.clone(),
         print_mode: true,
     }));
@@ -604,6 +631,8 @@ pub(crate) fn build_tui_tool_registry(
     delay_tool: Vec<Arc<dyn AgentTool>>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
+    let (read_tool, write_tool, edit_tool, delete_tool) =
+        snapshot_aware_file_tools(workspace_root.clone());
     registry.register(Arc::new(TuiPermissionAwareTool {
         inner: Arc::new(BashTool::new(workspace_root.clone())),
         approval: approval_handler.clone(),
@@ -613,7 +642,7 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(ReadTool::new(workspace_root.clone())),
+        inner: Arc::new(read_tool),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -621,11 +650,11 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(WriteTool::new(workspace_root.clone())),
+        inner: Arc::new(write_tool),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(EditTool::new(workspace_root.clone())),
+        inner: Arc::new(edit_tool),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -641,7 +670,7 @@ pub(crate) fn build_tui_tool_registry(
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
-        inner: Arc::new(DeleteTool::new(workspace_root.clone())),
+        inner: Arc::new(delete_tool),
         approval: approval_handler.clone(),
     }));
     registry.register(Arc::new(TuiPermissionAwareTool {
@@ -851,6 +880,26 @@ mod tests {
                 server: "test".to_string()
             }
         );
+    }
+
+    #[tokio::test]
+    async fn print_composition_read_uses_model_private_snapshot_projection() {
+        let registry = build_print_tool_registry(Vec::new());
+        let read = registry.get("read").expect("read tool");
+        let result = read
+            .execute(serde_json::json!({"path": "Cargo.toml", "limit": 2}))
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.starts_with("[snapshot:s"));
+        let projection = read.project_result(&result);
+        assert!(projection.model_content.contains("snapshot:s"));
+        assert!(!projection.display_content.contains("snapshot:s"));
+        assert!(!projection.persistence_content.contains("snapshot:s"));
+
+        let edit = registry.get("edit").expect("edit tool");
+        let schema = edit.parameters().to_string();
+        assert!(schema.contains("snapshot_id"));
+        assert!(schema.contains("replace_range"));
     }
 
     #[test]

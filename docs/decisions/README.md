@@ -98,3 +98,5 @@ Which Assumptions need validation?]
 - [043: Defer Persistent Task Runtime](043-defer-persistent-task-runtime.md) — task runtime not implemented; reusable components identified; defer due to no product need.
 
 - [044: Defer Multi-Instance Discovery And Communication](044-defer-multi-instance-discovery.md) — no product need; five threat-model risks unresolved; all paths violate P140 non-goals.
+
+- [045: Transient Model-Private Tool Projection](045-transient-model-private-tool-projection.md) — additive AgentTool projections let transient snapshot coordination reach only the active model while UI, approvals, Session/TLOG, and replay receive sanitized content; permission evaluation still uses original input.

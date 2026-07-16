@@ -630,3 +630,17 @@ repeating known mistakes.
   1. **目录/数据集类文件的任何条目必须能溯源到上游实况**（实时 API 响应或官方文档），"符合命名惯例"不构成存在性证据。
   2. **测试断言目录数据时，测试本身不是真相来源。** 测试与数据同源于编造时会互相掩护。
   3. **机制化替代人工核验**：I085/MC101 的 build.rs 门控刷新落地后，此类漂移应由管道消除。已在 I085 执行记录中登记。
+
+## 2026-07-16 - Secret absence tests must isolate nondeterministic fields
+
+- Trigger: I134 targeted crate validation intermittently failed `record_excludes_credentials`.
+- Symptom: The test searched the complete serialized record for the short fixture value `abc`; a
+  random UUID record ID can independently contain that substring and produce a false failure.
+- Root cause: A security assertion used an unscoped low-entropy substring across deterministic and
+  nondeterministic fields.
+- Fix: Assert credential absence only in the URL/origin fields that can carry the credential while
+  retaining whole-record checks for semantic secret-key markers.
+- Prevention: Secret-leak fixtures must use distinctive values and scope assertions to fields or
+  projections that could contain the source secret; random IDs must not participate in equality or
+  substring absence claims.
+- Promoted to rule/check: `browser_page::tests::record_excludes_credentials` regression test.

@@ -30,8 +30,8 @@ pub use exec_tool::{ExecError, ExecInput, ExecTool};
 pub use fetch_url::{FetchUrlError, FetchUrlInput, FetchUrlTool};
 pub use file_tools::is_skip_dir;
 pub use file_tools::{
-    DeleteError, DeleteInput, DeleteTool, EditInput, EditTool, FileToolError, LsInput, LsTool,
-    ReadInput, ReadTool, WriteInput, WriteTool,
+    DeleteError, DeleteInput, DeleteTool, EditInput, EditTool, FileSnapshotRegistry, FileToolError,
+    LsInput, LsTool, ReadInput, ReadTool, WriteInput, WriteTool, snapshot_aware_file_tools,
 };
 pub use git::{GitToolError, git_dirty_count};
 pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};

@@ -121,15 +121,14 @@ impl Agent {
             .map(|r| r.expect("all results should be populated"))
             .collect())
     }
-
     pub(crate) fn tool_call_event(
         &self,
         call: &ToolCall,
         provenance: &ToolProvenance,
     ) -> AgentEvent {
-        let summary_fields = self
-            .tools
-            .get(&call.name)
+        let tool = self.tools.get(&call.name);
+        let summary_fields = tool
+            .as_ref()
             .map(|tool| {
                 tool.summary_fields()
                     .iter()
@@ -137,11 +136,65 @@ impl Agent {
                     .collect()
             })
             .unwrap_or_default();
+        let projected_call = self.project_tool_call(call);
 
         AgentEvent::ToolCall {
-            call: call.clone(),
+            call: projected_call,
             provenance: provenance.clone(),
             summary_fields,
+        }
+    }
+
+    pub(crate) fn project_tool_call(&self, call: &ToolCall) -> ToolCall {
+        let mut projected = call.clone();
+        if let Some(tool) = self.tools.get(&call.name) {
+            projected.input = tool.project_input(&call.input);
+        }
+        projected
+    }
+
+    pub(crate) fn project_tool_result(
+        &self,
+        tool_name: &str,
+        result: &ToolExecutionResult,
+    ) -> ToolExecutionResult {
+        let content = self
+            .tools
+            .get(tool_name)
+            .map(|tool| tool.project_result(result).persistence_content)
+            .unwrap_or_else(|| result.content.clone());
+        ToolExecutionResult {
+            content,
+            is_error: result.is_error,
+            continuations: result.continuations.clone(),
+        }
+    }
+
+    pub(crate) fn restore_private_call_if_unchanged(
+        original: &ToolCall,
+        projected: &ToolCall,
+        observed: &ToolCall,
+    ) -> ToolCall {
+        if observed == projected {
+            original.clone()
+        } else {
+            observed.clone()
+        }
+    }
+
+    pub(crate) fn restore_private_result_if_unchanged(
+        original: &ToolExecutionResult,
+        projected: &ToolExecutionResult,
+        observed: &ToolExecutionResult,
+    ) -> ToolExecutionResult {
+        if observed.content == projected.content && observed.is_error == projected.is_error {
+            ToolExecutionResult {
+                content: original.content.clone(),
+                is_error: original.is_error,
+                continuations: observed.continuations.clone(),
+            }
+        } else {
+            observed.clone()
         }
     }
 
@@ -198,9 +251,11 @@ impl Agent {
                     presented_tool_names,
                 )
                 .await?;
+            let projected_call = self.project_tool_call(&pending.call);
+            let projected_result = self.project_tool_result(&pending.call.name, &result);
             let observation = ToolObservation {
-                call: pending.call.clone(),
-                result,
+                call: projected_call.clone(),
+                result: projected_result.clone(),
             };
             let observed = match self
                 .run_hook(
@@ -218,28 +273,50 @@ impl Agent {
                 Ok(_) => observation,
                 Err(error) => return Err(error),
             };
+            let observed = ToolObservation {
+                call: Self::restore_private_call_if_unchanged(
+                    &pending.call,
+                    &projected_call,
+                    &observed.call,
+                ),
+                result: Self::restore_private_result_if_unchanged(
+                    &result,
+                    &projected_result,
+                    &observed.result,
+                ),
+            };
 
+            let projection = self
+                .tools
+                .get(&observed.call.name)
+                .map(|tool| tool.project_result(&observed.result))
+                .unwrap_or_else(|| {
+                    talos_core::tool::ToolResultProjection::shared(observed.result.content.clone())
+                });
             let ui_result = MessageToolResult {
                 tool_use_id: observed.call.id.clone(),
-                content: observed.result.content.clone(),
+                content: projection.display_content,
                 is_error: observed.result.is_error,
             };
             let llm_result = if observed.result.is_error {
                 MessageToolResult {
                     content: format!(
                         "{}\n\n[Analyze the error above and try a different approach.]",
-                        observed.result.content
+                        projection.model_content
                     ),
                     ..ui_result.clone()
                 }
             } else if self.bash_compression_enabled && observed.call.name == "bash" {
-                let compressed = BashOutputCompressor::new().compress(&observed.result.content);
+                let compressed = BashOutputCompressor::new().compress(&projection.model_content);
                 MessageToolResult {
                     content: compressed.content,
                     ..ui_result.clone()
                 }
             } else {
-                ui_result.clone()
+                MessageToolResult {
+                    content: projection.model_content,
+                    ..ui_result.clone()
+                }
             };
             messages.push(Message::Tool { result: llm_result });
             let _ = event_tx.send(AgentEvent::ToolResult { result: ui_result });
@@ -257,13 +334,26 @@ impl Agent {
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
     ) -> AgentResult<ToolExecutionResult> {
+        let original_call = call.clone();
+        let projected_call = self.project_tool_call(call);
         let effective_call = match self
-            .run_hook(hook_ctx, HookEvent::BeforeToolCall { call })
+            .run_hook(
+                hook_ctx,
+                HookEvent::BeforeToolCall {
+                    call: &projected_call,
+                },
+            )
             .await
         {
-            Ok(HookOutcome::Continue(HookEvent::BeforeToolCall { call })) => Some(call),
+            Ok(HookOutcome::Continue(HookEvent::BeforeToolCall {
+                call: observed_call,
+            })) => Some(Self::restore_private_call_if_unchanged(
+                &original_call,
+                &projected_call,
+                observed_call,
+            )),
             Ok(HookOutcome::Skip(_)) => return Ok(ToolExecutionResult::success(String::new())),
-            Ok(_) => Some(call),
+            Ok(_) => Some(original_call),
             Err(error) => return Err(error),
         };
         let call = effective_call.expect("tool call should be present");
@@ -294,13 +384,19 @@ impl Agent {
         }
 
         if let Some(engine) = self.permission_engine.as_deref() {
-            self.run_hook(hook_ctx, HookEvent::BeforePermissionCheck { call })
-                .await?;
+            let projected_call = self.project_tool_call(&call);
+            self.run_hook(
+                hook_ctx,
+                HookEvent::BeforePermissionCheck {
+                    call: &projected_call,
+                },
+            )
+            .await?;
 
             let profile = tool.permission_profile(&call.input);
             let decision = engine.evaluate_profile(&call.name, &profile, &call.input);
 
-            let evidence_diagnostics = collect_access_evidence_diagnostics(call)
+            let evidence_diagnostics = collect_access_evidence_diagnostics(&call)
                 .into_iter()
                 .map(|(command, evidence)| {
                     let _ = engine.evaluate_command_with_evidence(
@@ -320,7 +416,7 @@ impl Agent {
             self.run_hook(
                 hook_ctx,
                 HookEvent::AfterPermissionCheck {
-                    call,
+                    call: &projected_call,
                     decision: decision.clone(),
                 },
             )
@@ -362,19 +458,32 @@ impl Agent {
             tool.execute(normalized_input).await
         };
 
+        let projected_call = self.project_tool_call(&call);
+        let projected_result = self.project_tool_result(&call.name, &result);
+        let original_result = result;
         let result = match self
             .run_hook(
                 hook_ctx,
                 HookEvent::AfterToolCall {
-                    call,
-                    result: &result,
+                    call: &projected_call,
+                    result: &projected_result,
                 },
             )
             .await
         {
-            Ok(HookOutcome::Continue(HookEvent::AfterToolCall { result, .. }))
-            | Ok(HookOutcome::Skip(HookEvent::AfterToolCall { result, .. })) => result.clone(),
-            Ok(_) => result,
+            Ok(HookOutcome::Continue(HookEvent::AfterToolCall {
+                result: observed_result,
+                ..
+            }))
+            | Ok(HookOutcome::Skip(HookEvent::AfterToolCall {
+                result: observed_result,
+                ..
+            })) => Self::restore_private_result_if_unchanged(
+                &original_result,
+                &projected_result,
+                observed_result,
+            ),
+            Ok(_) => original_result,
             Err(error) => return Err(error),
         };
 

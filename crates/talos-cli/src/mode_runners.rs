@@ -32,10 +32,7 @@ use talos_tools::git::{
     GitAddTool, GitBranchListTool, GitCheckoutTool, GitCommitTool, GitDiffTool, GitLogTool,
     GitPullTool, GitPushTool, GitShowTool, GitStatusTool,
 };
-use talos_tools::{
-    BashTool, DeleteTool, DiffTool, EditTool, GlobTool, GrepTool, LsTool, ReadTool, StatTool,
-    TreeTool, WriteTool,
-};
+use talos_tools::{BashTool, DiffTool, GlobTool, GrepTool, LsTool, StatTool, TreeTool};
 use talos_tui::Tui;
 use tokio::sync::{mpsc, watch};
 

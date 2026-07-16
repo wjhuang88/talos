@@ -5796,6 +5796,8 @@ dependencies = [
  "talos-provider",
  "talos-sandbox",
  "talos-session",
+ "talos-tools",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
 ]
@@ -5864,6 +5866,7 @@ dependencies = [
  "scraper 0.27.0",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "similar 3.1.1",
  "talos-core",
  "talos-permission",

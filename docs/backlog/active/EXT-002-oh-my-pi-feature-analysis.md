@@ -20,7 +20,15 @@ Research and assess 5 standout features for Talos adoption.
    WEB-001 model: status, project/governance views, history, approvals, logs, and config. **HIGH
    strategic relevance.**
 
-1. **Hashline: Content-Hash-Anchored Edits** — Diff format where hunks are bound to file-content hashes. Stale anchors are rejected before corruption. Claims 61% fewer output tokens and 10x edit pass rate improvement (6.7% → 68.3%). Language-agnostic, portable to Rust. Directly improves our `edit` tool. **HIGH borrowability.**
+1. **Hashline: Content-Hash-Anchored Edits** — Diff format where hunks are bound to file-content
+   hashes. Stale anchors are rejected before corruption. Claims 61% fewer output tokens and 10x
+   edit pass rate improvement (6.7% → 68.3%). Language-agnostic, portable to Rust. Directly
+   improves our `edit` tool. **HIGH borrowability.** The 2026-07-16 Talos assessment is now recorded
+   in `docs/proposals/model-private-snapshot-anchored-file-edits.md` and child owner TOOL-022. Talos
+   adopts the principle, not an external protocol: exactly two model-visible hex digits are only a
+   compact check code; a full Runtime-memory file revision is authoritative; snapshot mechanics
+   remain absent from TUI/hooks/history/TLOG; automatic reapply is excluded from Phase 1. I134 and
+   TOOL-022 completed this child slice on 2026-07-16.
 
 2. **Internal URL Scheme System** — 12 protocols (`pr://`, `issue://`, `memory://`, `skill://`, `mcp://`, `conflict://`, etc.) that resolve transparently inside every filesystem-shaped tool. `read pr://1428` returns the same shape as `read src/foo.rs`. Unifies the tool surface — model learns one interface. Maps to Rust traits. **HIGH borrowability.**
 
@@ -39,7 +47,10 @@ Research and assess 5 standout features for Talos adoption.
 
 ## Acceptance
 
-- [ ] Hashline edit format analyzed for Rust port feasibility; grammar and prompt spec documented.
+- [x] Hashline edit format analyzed for Rust port feasibility; compact model protocol, hidden
+      projection boundary, collision/concurrency risks, dependency options, phased delivery, and
+      child owner TOOL-022 documented. This closes only the Hashline research sub-item; EXT-002
+      remains Research until its other acceptance items are decided.
 - [ ] omp.sh/browser control surface patterns mapped to WEB-001 MVP/non-goals.
 - [ ] Internal URL scheme trait interface sketched for Talos tool registry.
 - [ ] Decision recorded: which features to create backlog stories for, which to defer.
@@ -53,4 +64,6 @@ Research and assess 5 standout features for Talos adoption.
 
 - `docs/reference/REFERENCE-PROJECTS.md`
 - `docs/backlog/active/TOOL-002-tool-calling-remediation.md`
+- `docs/proposals/model-private-snapshot-anchored-file-edits.md`
+- `docs/backlog/active/TOOL-022-model-private-snapshot-anchored-edits.md`
 - [oh-my-pi repo](https://github.com/can1357/oh-my-pi)

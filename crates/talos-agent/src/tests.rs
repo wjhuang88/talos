@@ -125,6 +125,50 @@ struct TimedMockTool {
     execution_log: Arc<Mutex<Vec<String>>>,
 }
 
+struct ProjectedMockTool;
+
+#[async_trait]
+impl AgentTool for ProjectedMockTool {
+    fn name(&self) -> &str {
+        "projected_read"
+    }
+
+    fn description(&self) -> &str {
+        "Projection fixture"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({})
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+
+    async fn execute(&self, _input: Value) -> ToolExecutionResult {
+        ToolExecutionResult::success("[snapshot:s1]\n1:aa|secret model line")
+    }
+
+    fn project_input(&self, input: &Value) -> Value {
+        let mut input = input.clone();
+        if let Some(object) = input.as_object_mut() {
+            object.remove("snapshot_id");
+        }
+        input
+    }
+
+    fn project_result(
+        &self,
+        result: &ToolExecutionResult,
+    ) -> talos_core::tool::ToolResultProjection {
+        talos_core::tool::ToolResultProjection {
+            model_content: result.content.clone(),
+            display_content: "read 1 line".into(),
+            persistence_content: "read 1 line".into(),
+        }
+    }
+}
+
 #[async_trait]
 impl AgentTool for TimedMockTool {
     fn name(&self) -> &str {
@@ -401,6 +445,66 @@ impl LanguageModel for ToolDefinitionCapturingModel {
 
 struct CountingHook {
     events: Arc<Mutex<Vec<talos_plugin::HookEventKind>>>,
+}
+
+struct ProjectionCaptureHook {
+    payloads: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl HookHandler for ProjectionCaptureHook {
+    fn name(&self) -> &str {
+        "projection-capture"
+    }
+
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[
+            HookEventKind::BeforeProviderCall,
+            HookEventKind::OnToolCallProposed,
+            HookEventKind::BeforeToolBatch,
+            HookEventKind::BeforeToolCall,
+            HookEventKind::BeforePermissionCheck,
+            HookEventKind::AfterPermissionCheck,
+            HookEventKind::AfterToolCall,
+            HookEventKind::OnToolResultObserved,
+            HookEventKind::AfterToolBatch,
+        ]
+    }
+
+    async fn on_event(&self, _ctx: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
+        let payload = match event {
+            HookEvent::BeforeProviderCall { messages } => {
+                serde_json::to_string(messages).expect("serialize hook messages")
+            }
+            HookEvent::OnToolCallProposed { call }
+            | HookEvent::BeforeToolCall { call }
+            | HookEvent::BeforePermissionCheck { call }
+            | HookEvent::AfterPermissionCheck { call, .. } => {
+                serde_json::to_string(call).expect("serialize hook call")
+            }
+            HookEvent::BeforeToolBatch { calls } => {
+                serde_json::to_string(calls).expect("serialize hook batch")
+            }
+            HookEvent::AfterToolCall { call, result } => format!(
+                "{}:{}",
+                serde_json::to_string(call).expect("serialize hook call"),
+                result.content
+            ),
+            HookEvent::OnToolResultObserved { observation } => format!(
+                "{}:{}",
+                serde_json::to_string(&observation.call).expect("serialize hook observation"),
+                observation.result.content
+            ),
+            HookEvent::AfterToolBatch { results } => results
+                .iter()
+                .map(|result| result.content.as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
+            _ => String::new(),
+        };
+        self.payloads.lock().await.push(payload);
+        HookResult::Continue
+    }
 }
 
 #[async_trait]
@@ -1792,6 +1896,94 @@ async fn test_tool_result_events_broadcast() {
         "Expected 1 ToolResult event, got: {:?}",
         events
     );
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn model_private_projection_reaches_model_but_not_events_or_returned_history() {
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "private_call".into(),
+                    name: "projected_read".into(),
+                    input: serde_json::json!({"path": "src/lib.rs", "snapshot_id": "s1"}),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "done".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+    let (model, captured_messages) = CapturingMessagesModel::new(responses);
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(ProjectedMockTool));
+    let hook_payloads = Arc::new(Mutex::new(Vec::new()));
+    let mut hooks = HookRegistry::new();
+    hooks.register(Arc::new(ProjectionCaptureHook {
+        payloads: hook_payloads.clone(),
+    }));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        registry,
+        Some(Arc::new(PermissionEngine::new())),
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(hooks),
+    );
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let (_, returned) = agent
+        .run_streaming("read".into(), vec![], tx)
+        .await
+        .expect("turn succeeds");
+
+    let captured = captured_messages.lock().expect("capture lock");
+    let model_text = captured[1]
+        .iter()
+        .find_map(|message| match message {
+            Message::Tool { result } => Some(result.content.as_str()),
+            _ => None,
+        })
+        .expect("model tool result");
+    assert!(model_text.contains("snapshot:s1"));
+    assert!(model_text.contains("1:aa|"));
+    drop(captured);
+
+    let serialized = serde_json::to_string(&returned).expect("serialize returned messages");
+    assert!(!serialized.contains("snapshot_id"));
+    assert!(!serialized.contains("snapshot:s1"));
+    assert!(!serialized.contains("1:aa|"));
+    assert!(serialized.contains("read 1 line"));
+
+    while let Ok(event) = rx.try_recv() {
+        let event = serde_json::to_string(&event).expect("serialize event");
+        assert!(!event.contains("snapshot_id"));
+        assert!(!event.contains("snapshot:s1"));
+        assert!(!event.contains("1:aa|"));
+    }
+
+    let hook_payloads = hook_payloads.lock().await;
+    assert!(!hook_payloads.is_empty());
+    for payload in hook_payloads.iter() {
+        assert!(!payload.contains("snapshot_id"));
+        assert!(!payload.contains("snapshot:s1"));
+        assert!(!payload.contains("1:aa|"));
+    }
 }
 
 #[tokio::test]
