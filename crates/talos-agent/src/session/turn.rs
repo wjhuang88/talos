@@ -100,7 +100,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     });
 
     let mut agent_task =
-        tokio::spawn(async move { agent.run_streaming(message, history, event_tx).await });
+        tokio::spawn(async move { agent.run_for_session_turn(message, history, event_tx).await });
 
     let agent_result = tokio::select! {
         result = &mut agent_task => result,
@@ -123,11 +123,11 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let _ = forwarder.await;
 
     match agent_result {
-        Ok(Ok((final_text, new_messages))) => {
+        Ok((Ok(final_text), new_messages)) => {
             let cloned_messages = new_messages.clone();
-            if let Some(persistence) = persistence
+            if let Some(persistence) = &persistence
                 && let Err(message) =
-                    persist_turn_messages(&persistence, &new_messages, &raw_tool_outputs)
+                    persist_turn_messages(persistence, &new_messages, &raw_tool_outputs)
             {
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -140,7 +140,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 return;
             }
-            let persisted_entry_ids = if let Some(persistence) = durable_persistence {
+            let persisted_entry_ids = if let Some(persistence) = &durable_persistence {
                 match persistence
                     .session
                     .commit_turn(&turn_id, &new_messages, &persistence.policy)
@@ -185,7 +185,17 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
             let _ = result_tx.send(TurnRecord { new_messages });
         }
-        Ok(Err(e)) => {
+        Ok((Err(e), partial_messages)) => {
+            // SESSION-006 / I135: persist valid completed tool exchanges even
+            // when the agent turn fails. The partial_messages contain only
+            // normalized, complete exchanges — never half-streamed fragments
+            // or fabricated tool results. Durable Runtime (ADR-042) still
+            // aborts failed turns: no commit_turn call happens here.
+            if !partial_messages.is_empty()
+                && let Some(persistence) = &persistence
+            {
+                let _ = persist_turn_messages(persistence, &partial_messages, &raw_tool_outputs);
+            }
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
                 session_id,

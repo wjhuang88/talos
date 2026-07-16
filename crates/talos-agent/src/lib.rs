@@ -204,8 +204,8 @@ impl Agent {
     /// [`AgentError::TurnBudgetExceeded`] if the tool call budget is exceeded,
     /// or [`AgentError::DoomLoopDetected`] if a doom loop is detected.
     pub async fn run(&self, user_message: String) -> AgentResult<String> {
-        let (text, _) = self.run_inner(user_message, vec![], None).await?;
-        Ok(text)
+        let (result, _) = self.run_inner(user_message, vec![], None).await;
+        result
     }
 
     /// Runs a single turn with streaming events forwarded to the given
@@ -230,6 +230,25 @@ impl Agent {
         history: Vec<Message>,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> AgentResult<(String, Vec<Message>)> {
+        let (result, messages) = self.run_inner(user_message, history, Some(event_tx)).await;
+        result.map(|text| (text, messages))
+    }
+
+    /// Like [`run_streaming`] but returns partial messages even on error,
+    /// enabling the session layer to persist valid completed tool exchanges
+    /// across provider failures (SESSION-006 / I135).
+    ///
+    /// The returned messages are always the normalized slice from
+    /// `persist_start..` — i.e., the user message and any completed
+    /// assistant/tool messages. On error, this may contain a valid prefix
+    /// of completed exchanges that should be persisted; incomplete streamed
+    /// assistant fragments are never included.
+    pub(crate) async fn run_for_session_turn(
+        &self,
+        user_message: String,
+        history: Vec<Message>,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
+    ) -> (AgentResult<String>, Vec<Message>) {
         self.run_inner(user_message, history, Some(event_tx)).await
     }
 
@@ -343,7 +362,7 @@ impl Agent {
         user_message: String,
         history: Vec<Message>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-    ) -> AgentResult<(String, Vec<Message>)> {
+    ) -> (AgentResult<String>, Vec<Message>) {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
@@ -354,7 +373,7 @@ impl Agent {
             Ok(messages) => messages,
             Err(error) => {
                 self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
-                return Err(error);
+                return (Err(error), Vec::new());
             }
         };
 
@@ -369,7 +388,7 @@ impl Agent {
             .await
         {
             self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;
-            return Err(error);
+            return (Err(error), Vec::new());
         }
 
         let (result, final_status) = 'turn_loop: loop {
@@ -631,8 +650,7 @@ impl Agent {
                     tool_calls: vec![],
                     reasoning,
                 });
-                let persisted = self.persistence_projection(&messages[persist_start..]);
-                break (Ok((turn_text, persisted)), TurnStatus::Success);
+                break (Ok(turn_text), TurnStatus::Success);
             }
 
             let proposed_tool_calls: Vec<ToolCall> = turn_tool_calls
@@ -679,14 +697,10 @@ impl Agent {
                         },
                     )
                     .await;
-                let persisted = self.persistence_projection(&messages[persist_start..]);
                 break 'turn_loop (
-                    Ok((
-                        format!(
-                            "Reached the per-turn tool call limit ({MAX_TOOL_CALLS_PER_TURN}). \
+                    Ok(format!(
+                        "Reached the per-turn tool call limit ({MAX_TOOL_CALLS_PER_TURN}). \
                              All results so far are preserved above — reply \"continue\" to resume."
-                        ),
-                        persisted,
                     )),
                     TurnStatus::BudgetExceeded,
                 );
@@ -710,13 +724,10 @@ impl Agent {
                         )
                         .await;
                     break 'turn_loop (
-                        Ok((
-                            format!(
-                                "Detected a repeated call pattern ({signature}). Paused for \
+                        Ok(format!(
+                            "Detected a repeated call pattern ({signature}). Paused for \
                                  review — all results are preserved above. Adjust your approach \
                                  and reply \"continue\" to resume."
-                            ),
-                            self.persistence_projection(&messages[persist_start..]),
                         )),
                         TurnStatus::DoomLoopDetected,
                     );
@@ -886,7 +897,15 @@ impl Agent {
         };
 
         self.emit_turn_complete(&hook_ctx, final_status).await;
-        result
+
+        // Always extract the normalized partial messages from persist_start.
+        // On success, these are the complete turn messages. On error, they may
+        // contain valid completed tool exchanges that the session layer should
+        // persist. Incomplete streamed assistant fragments are never pushed to
+        // `messages` — only finalized assistant messages with complete tool
+        // calls are (SESSION-006 / I135).
+        let partial_messages = self.persistence_projection(&messages[persist_start..]);
+        (result, partial_messages)
     }
 
     fn persistence_projection(&self, messages: &[Message]) -> Vec<Message> {

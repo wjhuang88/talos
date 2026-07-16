@@ -1047,10 +1047,10 @@ impl LanguageModel for ToolCallThenErrorModel {
     }
 }
 
-/// Proves TOOL-021 FINDING-2: when a provider error occurs after tool execution,
-/// the session does NOT persist tool results. The tool result is lost.
+/// Proves SESSION-006 / I135 FIX: when a provider error occurs after tool execution,
+/// the session NOW persists the completed tool exchange for resume.
 #[tokio::test]
-async fn fixture_provider_error_drops_tool_results() {
+async fn fixture_provider_error_preserves_tool_results() {
     use talos_session::{SessionManager, SessionMetadata};
 
     let temp_dir = tempfile::tempdir().unwrap();
@@ -1103,16 +1103,99 @@ async fn fixture_provider_error_drops_tool_results() {
         has_error_completion,
         "turn should complete with error status"
     );
-
-    // FINDING-2: The tool result is NOT persisted because the error branch
-    // in turn.rs:188-200 does not call persist_turn_messages.
+    // SESSION-006 / I135 FIX: The tool result IS NOW persisted because the
+    // error branch in turn.rs calls persist_turn_messages with partial_messages.
     let persisted = session.read_messages().unwrap();
     let has_tool_result = persisted
         .iter()
         .any(|m| matches!(m, Message::Tool { result } if result.content.contains("echo: hello")));
     assert!(
-        !has_tool_result,
-        "FINDING-2 CONFIRMED: tool result must NOT be persisted after provider error \
-         (current behavior — this is the data-loss risk documented in SESSION-006)"
+        has_tool_result,
+        "SESSION-006 FIX: tool result must be persisted after provider error"
+    );
+    let has_user_msg = persisted
+        .iter()
+        .any(|m| matches!(m, Message::User { content } if content.contains("echo hello")));
+    assert!(
+        has_user_msg,
+        "user message must be persisted in the partial turn prefix"
+    );
+}
+
+/// Proves ADR-042 is preserved: interactive session persists partial messages,
+/// but durable Runtime still aborts failed turns (no commit_turn on error path).
+/// This test confirms the interactive prefix persistence does not leak into
+/// the durable Runtime path. It runs the same model that triggers a provider
+/// error after tool execution, but WITHOUT durable persistence, then verifies
+/// the interactive session has the tool result while no durable commit occurs.
+#[tokio::test]
+async fn fixture_adr042_durable_failed_turn_still_aborts() {
+    use talos_session::{SessionManager, SessionMetadata};
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
+    let session = manager.create_session("adr042-check", "").unwrap();
+
+    let mut registry = ToolRegistry::new();
+    registry.register(std::sync::Arc::new(EchoTool));
+    #[allow(deprecated)]
+    let agent = Agent::new(std::sync::Arc::new(ToolCallThenErrorModel::new()), registry);
+
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: temp_dir.path().to_path_buf(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    // Set interactive persistence only (no durable persistence)
+    actor.set_persistence(
+        session.clone(),
+        SessionMetadata {
+            provider: Some("mock".into()),
+            model: Some("test".into()),
+            ..SessionMetadata::default()
+        },
+    );
+
+    let sq_tx = handle.sq_tx;
+    let eq_rx = handle.eq_rx;
+    let _actor_task = tokio::spawn(async move { actor.run().await });
+
+    sq_tx
+        .send(SessionOp::Submit {
+            message: "echo hello".into(),
+        })
+        .await
+        .unwrap();
+
+    let events = collect_events(eq_rx, Duration::from_secs(5)).await;
+
+    // The turn must complete with an error (not success)
+    let has_error_completion = events.iter().any(|e| {
+        matches!(
+            completed_status(e),
+            Some(TurnCompletionStatus::Error { .. })
+        )
+    });
+    assert!(has_error_completion, "turn should error");
+
+    // No EntriesCommitted event should fire (ADR-042: failed turns abort)
+    let has_entries_committed = events
+        .iter()
+        .any(|e| matches!(e, SessionEvent::EntriesCommitted { .. }));
+    assert!(
+        !has_entries_committed,
+        "ADR-042: no EntriesCommitted on error path — durable failed turns abort"
+    );
+
+    // Interactive persistence DOES have the tool result (SESSION-006 fix)
+    let persisted = session.read_messages().unwrap();
+    let has_tool_result = persisted
+        .iter()
+        .any(|m| matches!(m, Message::Tool { result } if result.content.contains("echo: hello")));
+    assert!(
+        has_tool_result,
+        "interactive session persists tool result on error (SESSION-006 fix)"
     );
 }
