@@ -1,0 +1,232 @@
+{
+  "categories": 11,
+  "decision": "No-Go",
+  "decision_rule": "precision > 0.80; important_recall >= 0.70; zero sensitive/chatter/duplicate admissions; retain old-important; handle contradiction",
+  "fixtures_count": 16,
+  "policies": [
+    {
+      "admitted_chars": 574,
+      "contradiction_correct": true,
+      "duplicate_admitted": true,
+      "failures": [
+        {
+          "actual": false,
+          "category": "correction",
+          "expected": true,
+          "fixture_id": "correction-command"
+        },
+        {
+          "actual": false,
+          "category": "preference",
+          "expected": true,
+          "fixture_id": "preference-theme"
+        },
+        {
+          "actual": true,
+          "category": "routine-length",
+          "expected": false,
+          "fixture_id": "routine-question"
+        },
+        {
+          "actual": true,
+          "category": "duplicate",
+          "expected": false,
+          "fixture_id": "duplicate-tests"
+        }
+      ],
+      "fn": 2,
+      "fp": 2,
+      "important_recall": 0.7777777777777778,
+      "name": "current_heuristic",
+      "old_important_retained": true,
+      "precision": 0.7777777777777778,
+      "reason_counts": {
+        "below_baseline": 7,
+        "length": 3,
+        "marker": 6
+      },
+      "tn": 5,
+      "tp": 7
+    },
+    {
+      "admitted_chars": 242,
+      "contradiction_correct": false,
+      "duplicate_admitted": true,
+      "failures": [
+        {
+          "actual": false,
+          "category": "correction",
+          "expected": true,
+          "fixture_id": "correction-path"
+        },
+        {
+          "actual": false,
+          "category": "correction",
+          "expected": true,
+          "fixture_id": "correction-command"
+        },
+        {
+          "actual": false,
+          "category": "preference",
+          "expected": true,
+          "fixture_id": "preference-theme"
+        },
+        {
+          "actual": false,
+          "category": "preference",
+          "expected": true,
+          "fixture_id": "preference-tests"
+        },
+        {
+          "actual": false,
+          "category": "old-important",
+          "expected": true,
+          "fixture_id": "old-important-secrets"
+        },
+        {
+          "actual": false,
+          "category": "contradiction",
+          "expected": true,
+          "fixture_id": "contradiction-sqlite"
+        },
+        {
+          "actual": false,
+          "category": "validated",
+          "expected": true,
+          "fixture_id": "validated-timeout"
+        },
+        {
+          "actual": false,
+          "category": "recovery",
+          "expected": true,
+          "fixture_id": "recovery-retry"
+        },
+        {
+          "actual": true,
+          "category": "chatter",
+          "expected": false,
+          "fixture_id": "chatter-hello"
+        },
+        {
+          "actual": true,
+          "category": "chatter",
+          "expected": false,
+          "fixture_id": "chatter-thanks"
+        },
+        {
+          "actual": true,
+          "category": "routine-length",
+          "expected": false,
+          "fixture_id": "routine-question"
+        },
+        {
+          "actual": true,
+          "category": "duplicate",
+          "expected": false,
+          "fixture_id": "duplicate-tests"
+        }
+      ],
+      "fn": 8,
+      "fp": 4,
+      "important_recall": 0.1111111111111111,
+      "name": "recency",
+      "old_important_retained": false,
+      "precision": 0.2,
+      "reason_counts": {
+        "recent": 8,
+        "stale": 8
+      },
+      "tn": 3,
+      "tp": 1
+    },
+    {
+      "admitted_chars": 536,
+      "contradiction_correct": true,
+      "duplicate_admitted": true,
+      "failures": [
+        {
+          "actual": true,
+          "category": "duplicate",
+          "expected": false,
+          "fixture_id": "duplicate-tests"
+        }
+      ],
+      "fn": 0,
+      "fp": 1,
+      "important_recall": 1.0,
+      "name": "novelty_only",
+      "old_important_retained": true,
+      "precision": 0.9,
+      "reason_counts": {
+        "low_novelty": 6,
+        "novel_marker": 10
+      },
+      "tn": 6,
+      "tp": 9
+    },
+    {
+      "admitted_chars": 536,
+      "contradiction_correct": true,
+      "duplicate_admitted": true,
+      "failures": [
+        {
+          "actual": true,
+          "category": "duplicate",
+          "expected": false,
+          "fixture_id": "duplicate-tests"
+        }
+      ],
+      "fn": 0,
+      "fp": 1,
+      "important_recall": 1.0,
+      "name": "committed_utility_only",
+      "old_important_retained": true,
+      "precision": 0.9,
+      "reason_counts": {
+        "low_utility": 6,
+        "utility_signal": 10
+      },
+      "tn": 6,
+      "tp": 9
+    },
+    {
+      "admitted_chars": 470,
+      "contradiction_correct": true,
+      "duplicate_admitted": true,
+      "failures": [
+        {
+          "actual": false,
+          "category": "recency-conflict",
+          "expected": true,
+          "fixture_id": "recency-conflict-endpoint"
+        },
+        {
+          "actual": true,
+          "category": "duplicate",
+          "expected": false,
+          "fixture_id": "duplicate-tests"
+        }
+      ],
+      "fn": 1,
+      "fp": 1,
+      "important_recall": 0.8888888888888888,
+      "name": "novelty_times_committed_utility",
+      "old_important_retained": true,
+      "precision": 0.8888888888888888,
+      "reason_counts": {
+        "admitted": 9,
+        "below_threshold": 4,
+        "sensitive": 3
+      },
+      "tn": 6,
+      "tp": 8
+    }
+  ],
+  "production_action": "retain_current_heuristic",
+  "schema_version": 1,
+  "sparse_reference_index": {
+    "decision": "No-Go",
+    "implemented": false,
+    "reason": "no frozen exact-recall query corpus or material-benefit evidence; direct TLOG transcript remains canonical"
+  }
+}

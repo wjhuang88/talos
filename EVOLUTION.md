@@ -48,8 +48,27 @@ repeating known mistakes.
 | 36 | Config | `Config::load()` 不应做"可执行性"校验；否则损坏的磁盘配置会挡住向导/`config set` 自我修复路径 | 2026-07-03 |
 | 37 | Governance | ADR 冲突是 change-control gate，不是 Agent 永久拒绝用户产品需求的授权 | 2026-07-10 |
 | 38 | Architecture | 单消费者 channel 拓扑不等于单数据流；必须审计排序域、生命周期权威和持久化写者 | I115 |
+| 39 | Governance / Testing | 状态文档和同源 mock 不能证明产品闭环；失败必须由真实边界触发，运行时可见性必须来自真实状态 | I135-I139 corrective review |
 
 ## Lessons
+
+## 2026-07-17 - Status-only closure and same-origin mocks do not prove delivery
+
+- Trigger: Maintainer re-review of I135-I139 and SEC-001 after the program had been marked Complete.
+- Symptom: A persistence test asserted a fabricated failure string without causing storage failure;
+  `/plugins` claimed loaded-package behavior while only rendering a transition notice; the memory
+  benchmark and production candidate shared assumptions and an incomplete artifact yet reported Go.
+- Root cause: Closure evidence was derived from the implementation's own claims instead of crossing
+  the real boundary: filesystem failure, explicit package loading into typed runtime state, and a
+  frozen common corpus with predeclared disqualifiers.
+- Fix: Inject a real filesystem failure and reconstruct durable state; add explicit local package
+  loading and typed `/plugins` state; run five policies on one frozen corpus, check in byte-stable
+  JSON, select No-Go on duplicate admission, and restore the production baseline.
+- Prevention: A completion test must make the dependency fail, observe a real composition root,
+  or compare independent policies on frozen evidence. A status flip or mock that directly returns
+  the expected assertion text is not acceptance evidence.
+- Promoted to rule/check: I135 real failure-injection regression, I136 checked-in package fixture,
+  MEM-009 artifact equality test, and iteration workflow runtime-evidence gate.
 
 ### 38. 2026-07-11 - Single-consumer topology does not prove semantic single flow
 

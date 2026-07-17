@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | CMD-002 |
-| Status | **Complete (2026-07-16, I136)** — `/mcp`, `/plugins`, `/hooks` diagnostics verified; plugin packages shown when loaded. |
+| Status | **Complete (2026-07-17, I136 correction)** — `/plugins` consumes typed explicitly loaded package state. |
 | Priority | P2 |
 | Source | Owner architecture declaration, 2026-06-30 |
 | Relates To | CMD-001, PLUGIN-001, EXT-001, HOOK-001, ADR-009 |
@@ -55,7 +55,7 @@ I091 A7 status note (2026-07-04):
 
 - [x] `/mcp` shows MCP server status and observed MCP tool provenance.
 - [x] `/plugins` shows a transition notice (not aliased to `/mcp`) until plugin packages ship.
-- [ ] `/hooks` lists registered hooks once HOOK-001 ships.
+- [x] `/hooks` lists the currently registered/declared read-only hook diagnostics; executable config-introduced carriers remain HOOK-001.
 - [x] `/skills` unchanged.
 - [x] README, slash-command menu, and help text updated.
 - [x] No command-name collision or silent override.

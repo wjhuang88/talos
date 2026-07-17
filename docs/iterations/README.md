@@ -161,15 +161,16 @@ docs/iterations/
 | I128 | Embedded Durable Runtime Sessions | **Complete** (2026-07-15) | Host-selected UUID TLOG sessions, opaque external-ID binding, atomic durable turns, filtered transcript/lifecycle APIs, and Runtime auto-recovery with committed-entry events. See `I128-embedded-durable-runtime-sessions.md`. |
 | I129 | WEB-001 Rendered Dashboard Pages | **Complete** (2026-07-15) | P100 Complete. Rendered HTML pages for status/history/governance/config with content negotiation, redaction, and browser evidence. /extensions stays JSON-only. Scope: loopback-only rendered HTML for status/history/governance/masked-config with conservative content negotiation. SESSION-005 is Complete. See `I129-web001-rendered-dashboard-pages.md`. |
 | I130 | TUI-030 Composer Input History | **Complete** (2026-07-16) | In-memory Up/Down composer input history with draft restoration and consecutive-duplicate dedup. Nine state tests and five `handle_input_event` entry-point tests prove navigation, multiline draft restoration, and slash-menu/approval/credential priority guards. No persistence or transcript-format change. See `I130-tui030-composer-input-history.md`. |
-| I131 | TOOL-021 Error Propagation Audit | **Complete** (2026-07-16) | Audit with 15 fixture tests. FINDING-2 is confirmed tool-result data loss in canonical session path (integration test proves it). SESSION-006 created for fix. Audit deliverable complete; product defect remains Open. See `I131-tool021-error-propagation-audit.md`. |
+| I131 | TOOL-021 Error Propagation Audit | **Complete** (2026-07-16) | Audit with 15 fixture tests. FINDING-2 was confirmed and subsequently fixed by I135/SESSION-006 on 2026-07-17. See `I131-tool021-error-propagation-audit.md`. |
 | I132 | TASK-001 Persistent Task Runtime — Defer | **Complete** (2026-07-16) | ADR-043 Defer: task runtime NOT implemented. I128 + I124-I127 provide reusable session/turn/scheduler primitives, but task lifecycle, phase checkpoints, incomplete-task recovery, and durable scheduling are unsatisfied. Defer due to no product need + P130 non-goals. See `I132-task001-persistent-task-defer.md`. |
 | I133 | A2A-001 Multi-Instance Discovery — Defer | **Complete** (2026-07-16) | ADR-044 Defer: no product need; REMOTE-001 prerequisite is P4 Research. Threat model: identity, auth, authorization, discovery, credentials, transcript exposure, retention all unresolved. Explicit host-managed is the only compatible path if future need arises. See `I133-a2a001-multi-instance-defer.md`. |
 | I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
-| I135 | Session Error-Path Integrity | **Complete** (2026-07-16) | SESSION-006 closed: provider error persists valid completed tool exchange; ADR-042 durable abort preserved. 2 integration tests. See `I135-session-error-path-integrity.md`. |
-| I136 | Read-Only Plugin Product Closure | **Complete** (2026-07-16) | Re-audited: manifest parser, WASM runtime (fuel/timeout/trap/bounds), output bound, collision/path-traversal rejection, provenance, no-host-imports. All already implemented and tested behind `wasm` feature. No code change (closure only). See `I136-read-only-plugin-product-closure.md`. |
-| I137 | Memory Admission Benchmark | **Complete** (2026-07-16) | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
-| I138 | Memory Admission Decision Application | **Complete** (2026-07-16) | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
-| I139 | Four-Month Reliability Closeout | **Complete** (2026-07-16) | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
+| I135 | Session Error-Path Integrity | **Complete** (corrected 2026-07-17) | Real filesystem failure injection and reconstructed durable-transcript proof accepted with the final locked replay. See `I135-session-error-path-integrity.md`. |
+| I136 | Read-Only Plugin Product Closure | **Complete** (corrected 2026-07-17) | Explicit package loading, permission/provenance execution, typed `/plugins`, and checked-in offline fixture accepted. See `I136-read-only-plugin-product-closure.md`. |
+| I137 | Memory Admission Benchmark | **Complete** (corrected 2026-07-17) | Byte-stable five-policy MEM-009 artifact selects No-Go and rejects sparse indexing for insufficient evidence. See `I137-memory-admission-benchmark.md`. |
+| I138 | Memory Admission Decision Application | **Complete** (corrected 2026-07-17) | No-Go applied: production baseline retained; already-published experimental API held inert for compatibility; independent sensitive filter preserved. See `I138-memory-admission-decision-application.md`. |
+| I139 | Four-Month Reliability Closeout | **Review** (corrected 2026-07-17) | Corrected working-tree ladder passes; commit/push and clean-main replay remain required before program completion. REL-002 remains NO-GO. See `I139-four-month-reliability-closeout.md`. |
+| I140 | SEC-001 External-Path Authorization | **Complete** (2026-07-17) | Exact tool/nature/path approval across Runtime/CLI/TUI accepted after Deny/headless/symlink fail-closed security review and full locked replay. See `I140-sec001-external-path-authorization.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -200,11 +201,8 @@ rewrite published iteration baselines.
 | I054 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I054 doc). |
 | I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
-| I135 | Complete (2026-07-16) | Removed after failure-injection + durable transcript tests. |
-| I136 | Complete (2026-07-16) | Removed after /plugins shows loaded packages. |
-| I137 | Complete (2026-07-16) | Removed after 4-policy benchmark with JSON output. |
-| I138 | Complete (2026-07-16) | Removed after noise detection and threshold fix. |
-| I139 | Complete (2026-07-16) | Removed after all predecessors Complete. |
+| I135-I138, I140 | Complete (corrected 2026-07-17) | Removed after corrective evidence, security review, full locked workspace tests, release preflight, governance validation, and diff check passed. |
+| I139 | Review (corrected 2026-07-17) | Commit/push the accepted correction, then replay the close gate from clean `main`. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |

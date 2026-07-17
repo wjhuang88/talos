@@ -5,9 +5,10 @@ use talos_core::tool::ToolProvenance;
 
 use crate::engine::ConversationEngine;
 use crate::types::{
-    ChatMessage, ContentOutput, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    ModelPickerItem, PluginObservation, SkillCommandRequest, SkillDiagnostic, TipKind,
-    TodoCommandAction, TodoExportFormat, ToolCallDisplay, ToolResultDisplay, TurnPhase, UiOutput,
+    ChatMessage, ContentOutput, LoadedPluginDiagnostic, McpServerDiagnostic, MessageRole,
+    MessageSource, MessageStatus, ModelPickerItem, PluginObservation, SkillCommandRequest,
+    SkillDiagnostic, TipKind, TodoCommandAction, TodoExportFormat, ToolCallDisplay,
+    ToolResultDisplay, TurnPhase, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -588,11 +589,12 @@ async fn slash_plugins_notice_does_not_leak_mcp_status() {
 
 #[tokio::test]
 async fn slash_plugins_shows_loaded_plugin_packages() {
-    let mut engine = new_engine();
-    engine.plugin_observations.push(PluginObservation {
-        key: "plugin:demo@0.1.0/wasm".to_string(),
-        count: 3,
-    });
+    let mut engine = new_engine().with_loaded_plugins(vec![LoadedPluginDiagnostic {
+        name: "demo".to_string(),
+        version: "0.1.0".to_string(),
+        carrier: "wasm".to_string(),
+        capabilities: vec!["demo.greet".to_string()],
+    }]);
 
     let outputs = engine.handle_slash_command("/plugins");
 
@@ -602,12 +604,12 @@ async fn slash_plugins_shows_loaded_plugin_packages() {
         "/plugins must show loaded packages: {text}"
     );
     assert!(
-        text.contains("plugin:demo@0.1.0/wasm"),
+        text.contains("demo@0.1.0/wasm"),
         "/plugins must show package identity: {text}"
     );
     assert!(
-        text.contains("invocations: 3"),
-        "/plugins must show invocation count: {text}"
+        text.contains("capabilities: demo.greet"),
+        "/plugins must show declared capability: {text}"
     );
 }
 

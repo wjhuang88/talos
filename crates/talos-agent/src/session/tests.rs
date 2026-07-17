@@ -1218,13 +1218,16 @@ async fn fixture_persistence_failure_is_observable_in_error() {
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
     let session = manager.create_session("persist-fail", "").unwrap();
 
-    // Corrupt the session store by making the sessions directory unreadable
-    // after creation. This causes append_with_metadata to fail.
-    let sessions_dir = temp_dir.path().join("sessions");
-    if sessions_dir.exists() {
-        // Write a file where the session expects a directory
-        // This forces an I/O error on append
-    }
+    // Deterministically block the concrete session path on every platform:
+    // replace its parent directory with a regular file after creation.
+    let session_parent = session
+        .file_path
+        .parent()
+        .expect("session file has parent")
+        .to_path_buf();
+    std::fs::remove_file(&session.file_path).expect("remove initial session log");
+    std::fs::remove_dir_all(&session_parent).expect("remove session parent");
+    std::fs::write(&session_parent, "not a directory").expect("block session parent");
 
     let mut registry = ToolRegistry::new();
     registry.register(std::sync::Arc::new(EchoTool));
@@ -1266,15 +1269,15 @@ async fn fixture_persistence_failure_is_observable_in_error() {
         _ => None,
     });
 
-    if let Some(msg) = error_message {
-        // Even if persistence succeeded (the store is valid), the error message
-        // must contain the provider error. If persistence failed, it would
-        // also contain the warning. We verify the provider error is present.
-        assert!(
-            msg.contains("provider server error") || msg.contains("failed to persist"),
-            "error message should contain provider error or persistence warning: {msg}"
-        );
-    }
+    let message = error_message.expect("turn must emit a structured terminal error");
+    assert!(
+        message.contains("provider server error"),
+        "provider error remains observable: {message}"
+    );
+    assert!(
+        message.contains("failed to persist partial turn messages"),
+        "persistence failure must be appended to the terminal error: {message}"
+    );
 }
 
 /// Proves ADR-042 durable transcript is empty after failed turn:

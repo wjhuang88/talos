@@ -16,7 +16,7 @@ Talos has published its first stable pre-1.0 release line. The current release v
 workspace is `v0.3.5`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
 user-facing behavior; research tracks such as web control expansion beyond the read-only loopback
-dashboard, dotagents shared Skills, WASM plugins, and advanced document ingestion are tracked separately under
+dashboard, dotagents shared Skills, broader plugin carriers, and advanced document ingestion are tracked separately under
 [Project Status](#project-status).
 
 ## Highlights
@@ -30,7 +30,7 @@ dashboard, dotagents shared Skills, WASM plugins, and advanced document ingestio
 - **Built-in coding tools**: file, search, edit, shell, symbol, directory tree, diff/stat, Git, HTTP request, and web search operations.
 - **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
-- **Extensible surface**: MCP tools, hooks, JSON-RPC, and governance-aware project status are implemented; plugin/WASM and browser control surfaces remain research tracks.
+- **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
 
 ## Current Release Boundary
 
@@ -53,6 +53,8 @@ Currently shipped:
 - Session storage, search, cleanup, maintenance, memory consolidation, and exploration ingestion.
 - Runtime Skills from `.talos/skills/`, `~/.talos/skills/`, and inherited parent `.talos/skills/`.
 - MCP tools via stdio, SSE, and Streamable HTTP transports.
+- Explicit local read-only WASM packages via repeatable `--plugin DIRECTORY`; packages remain
+  confined, permission-wrapped, provenance-bearing, and absent unless selected by the operator.
 - Initial Rust embedding facade in the `talos-runtime` crate.
 
 Not shipped yet:
@@ -60,7 +62,7 @@ Not shipped yet:
 - Stable 1.0 SDK guarantees for the embedded runtime facade.
 - `~/.agents/skills/` discovery from the dotagents shared directory.
 - Remote web control, browser automation, web approvals, and web write/action routes.
-- WASM plugin runtime and plugin marketplace.
+- Plugin marketplace, remote install, automatic discovery, host calls, and write-capable plugins.
 - PDF/Office document extraction beyond the current web/fetch foundations.
 - Remote or P2P session control.
 
@@ -457,6 +459,20 @@ history, exports, transcripts, and TLOG. Display/history retain ordinary sanitiz
 resumed or rebuilt Runtime must read the file again, and every write still passes the current
 permission policy.
 
+File tools remain workspace-confined by default. When an interactive permission-aware mode requests
+an external path, Talos asks the operator; approval carries only the selected tool operation and
+normalized path. Denial, missing headless approval, path reuse, operation reuse, and changed
+symlink targets fail closed.
+
+Load a confined local read-only plugin package explicitly:
+
+```bash
+talos --plugin /path/to/plugin-package
+```
+
+Repeat `--plugin` for multiple packages. `/plugins` reports the packages that successfully loaded
+and their registered capabilities; with no flag, existing behavior is unchanged.
+
 ## Slash Commands
 
 Type `/` in the TUI to access these commands. The Skill commands are also available in inline
@@ -467,7 +483,7 @@ mode.
 | `/help` | Show available commands |
 | `/quit`, `/exit` | Exit Talos |
 | `/status` | Show session info (model, token usage) |
-| `/plugins` | Plugin packages (not yet available — use /mcp for MCP status) |
+| `/plugins` | Show explicitly loaded local plugin packages and registered capabilities |
 | `/mcp` | Show MCP server status and observed tool provenance |
 | `/skills` | List available runtime skills and active state |
 | `/skills activate <name>` | Activate one Skill body for subsequent provider requests |
@@ -588,6 +604,7 @@ manifest-ready but blocked by dependency closure; see
 
 - Read-only workspace tools can run without approval.
 - File writes, deletes, Git writes, and shell execution are routed through permissions.
+- External file paths require an exact interactive authorization; unresolved headless requests are denied.
 - Tool display focuses on key arguments instead of raw JSON where the tool definition provides summary fields.
 - Local secrets should live in environment variables or private config files, never in source.
 - Talos does not auto-commit changes. Git commits happen only through explicit tool/user action.

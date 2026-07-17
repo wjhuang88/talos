@@ -1,6 +1,6 @@
 # Iteration I136: Read-Only Plugin Product Closure
 
-> Document status: Complete — WASM runtime verified but /plugins product acceptance not met: no real loaded-package visibility path
+> Document status: Complete — corrective product path and full locked replay accepted 2026-07-17
 > Published plan date: 2026-07-16
 > Planned objective: close the already-implemented local explicit read-only WASM plugin slice as a usable, bounded product capability.
 > Baseline rule: preserve this target; broader plugin carriers or permissions require a new iteration.
@@ -88,3 +88,22 @@
 - Outcome: met. All acceptance criteria already satisfied by the existing T111 implementation.
 - Documentation: PLUGIN-001, CMD-002, Board, iterations README, execution package.
 - Lessons: The local explicit read-only WASM plugin slice was already complete through T111. The closure was a documentation/status reconciliation, not a code task.
+
+## 2026-07-17 Corrective Review
+
+The original closure was invalid: a transition notice is not evidence that `/plugins` reports a
+loaded package. The corrective implementation adds repeatable `--plugin DIRECTORY`, loads only the
+conventional confined `talos-plugin.toml` package, wraps registered tools in the existing
+permission adapters, preserves plugin provenance/resource limits, and passes typed loaded-package
+state to the TUI conversation engine and dashboard snapshot.
+
+The checked-in `read-only-demo` WAT fixture proves offline load, registration, provenance, bounded
+execution, and typed identity/capability state. Conversation tests prove `/plugins` renders that
+state. With no `--plugin`, composition and presentation policy are unchanged.
+
+## 2026-07-17 Corrective Acceptance
+
+The checked-in package fixture, explicit CLI loading path, permission/provenance execution, typed
+diagnostics, no-plugin compatibility, and all resource/failure bounds pass the final locked
+workspace test and release-preflight replay. No remote loading, host call, write authority, new
+dependency, or default activation was introduced.

@@ -143,6 +143,13 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     register_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval.clone(), false);
+    let loaded_plugin_packages = register_explicit_permission_aware_plugins(
+        &mut registry,
+        &cli.plugin_packages,
+        approval,
+        false,
+    )
+    .map_err(anyhow::Error::msg)?;
 
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
@@ -153,6 +160,16 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    if !loaded_plugin_packages.is_empty() {
+        let mut policy = ToolPresentationPolicy::runtime_default();
+        for capability in loaded_plugin_packages
+            .iter()
+            .flat_map(|package| package.capabilities.iter())
+        {
+            policy = policy.disclose_tool(capability.clone());
+        }
+        agent.set_tool_presentation_policy(policy);
+    }
     let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);

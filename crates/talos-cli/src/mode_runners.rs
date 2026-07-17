@@ -25,7 +25,7 @@ use talos_core::message::Message;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
 };
-use talos_core::tool::ToolRegistry;
+use talos_core::tool::{ToolPresentationPolicy, ToolRegistry};
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_plugin::HookRegistry;
 use talos_tools::git::{
@@ -51,7 +51,9 @@ use crate::model_lifecycle::{
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
     PermissionAwareTool, TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
-    build_tui_tool_registry, register_permission_aware_tools, register_tui_permission_aware_tools,
+    build_tui_tool_registry, register_explicit_permission_aware_plugins,
+    register_explicit_tui_plugins, register_permission_aware_tools,
+    register_tui_permission_aware_tools,
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
@@ -99,7 +101,19 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
-    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
+    register_permission_aware_tools(
+        &mut registry,
+        mcp_runtime.tools(),
+        mcp_approval.clone(),
+        true,
+    );
+    let loaded_plugin_packages = register_explicit_permission_aware_plugins(
+        &mut registry,
+        &cli.plugin_packages,
+        mcp_approval,
+        true,
+    )
+    .map_err(anyhow::Error::msg)?;
     let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     let mut agent = Agent::with_security_and_hooks(
         build_provider(&config, &api_key, cli.mock),
@@ -110,6 +124,16 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    if !loaded_plugin_packages.is_empty() {
+        let mut policy = ToolPresentationPolicy::runtime_default();
+        for capability in loaded_plugin_packages
+            .iter()
+            .flat_map(|package| package.capabilities.iter())
+        {
+            policy = policy.disclose_tool(capability.clone());
+        }
+        agent.set_tool_presentation_policy(policy);
+    }
     apply_runtime_skills(&mut agent, &runtime_skills);
     maybe_set_memory_provider(&mut agent, &config);
 
@@ -242,7 +266,14 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         session.id,
         sched_tools,
     );
-    register_tui_permission_aware_tools(&mut registry, mcp_runtime.tools(), approval_handler);
+    register_tui_permission_aware_tools(
+        &mut registry,
+        mcp_runtime.tools(),
+        approval_handler.clone(),
+    );
+    let loaded_plugin_packages =
+        register_explicit_tui_plugins(&mut registry, &cli.plugin_packages, approval_handler)
+            .map_err(anyhow::Error::msg)?;
 
     let mut agent = Agent::with_security_and_hooks(
         provider,
@@ -253,6 +284,16 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         hooks.clone(),
     );
     agent.set_tool_protocol(config.tool_protocol());
+    if !loaded_plugin_packages.is_empty() {
+        let mut policy = ToolPresentationPolicy::runtime_default();
+        for capability in loaded_plugin_packages
+            .iter()
+            .flat_map(|package| package.capabilities.iter())
+        {
+            policy = policy.disclose_tool(capability.clone());
+        }
+        agent.set_tool_presentation_policy(policy);
+    }
     let runtime_skills = discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);
     let runtime_skills = Arc::new(Mutex::new(runtime_skills));
@@ -557,10 +598,20 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         .iter()
         .map(|d| (d.name.clone(), d.event.clone(), d.enabled))
         .collect();
+    let loaded_plugin_diagnostics = loaded_plugin_packages
+        .iter()
+        .map(|package| talos_conversation::LoadedPluginDiagnostic {
+            name: package.name.clone(),
+            version: package.version.clone(),
+            carrier: package.carrier.clone(),
+            capabilities: package.capabilities.clone(),
+        })
+        .collect::<Vec<_>>();
     let engine = ConversationEngine::new(config.model.clone(), config.provider.clone())
         .with_skills(skill_diagnostics)
         .with_mcp_servers(mcp_runtime.diagnostics().to_vec())
         .with_hook_declarations(hook_decls.clone())
+        .with_loaded_plugins(loaded_plugin_diagnostics.clone())
         .with_workspace_root(workspace_root.clone());
     let session_tx_for_wizard = session_tx.clone();
     let sq_tx_watch_for_loop = sq_tx_watch_rx.clone();
@@ -601,10 +652,11 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
     }
 
     if config.dashboard.enabled {
-        let ext_snapshot = talos_conversation::build_extension_snapshot(
+        let ext_snapshot = talos_conversation::build_extension_snapshot_with_plugins(
             mcp_runtime.diagnostics(),
             &hook_decls,
             &[],
+            &loaded_plugin_diagnostics,
         );
         let extensions = serde_json::to_value(&ext_snapshot).unwrap_or(serde_json::Value::Null);
         let snapshot = crate::dashboard_helpers::build_dashboard_snapshot(

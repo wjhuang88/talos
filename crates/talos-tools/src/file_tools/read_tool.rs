@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
+use talos_core::tool::{AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolResult};
 use talos_core::tool_parameters;
 
 use super::{FileSnapshotRegistry, FileToolError, is_binary_file, resolve_authorized_path};
@@ -60,11 +60,21 @@ impl ReadTool {
         }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let read_input: ReadInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_authorized_path(&self.workspace_root, &read_input.path)?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &read_input.path,
+            "read",
+            ToolNature::Read,
+            authorizations,
+        )?;
 
         if !path.exists() {
             return Err(FileToolError::FileNotFound(read_input.path));
@@ -177,7 +187,18 @@ impl AgentTool for ReadTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }

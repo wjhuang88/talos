@@ -44,6 +44,19 @@ pub struct PluginObservation {
     pub count: usize,
 }
 
+/// One explicitly loaded local plugin package exposed to diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LoadedPluginDiagnostic {
+    /// Stable manifest package name.
+    pub name: String,
+    /// Manifest package version.
+    pub version: String,
+    /// Runtime carrier, currently `wasm`.
+    pub carrier: String,
+    /// Namespaced, read-only tool capabilities registered from the package.
+    pub capabilities: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct McpServerDiagnostic {
     pub name: String,
@@ -64,6 +77,8 @@ pub struct SkillDiagnostic {
 pub struct ExtensionSnapshot {
     pub mcp_servers: Vec<McpServerDiagnostic>,
     pub hooks: HookSnapshot,
+    /// Explicitly loaded local plugin packages, independent of invocation observations.
+    pub loaded_plugins: Vec<LoadedPluginDiagnostic>,
     pub provenance: Vec<PluginObservation>,
     pub collisions: Vec<String>,
 }

@@ -177,6 +177,177 @@ mod file_tool_tests {
     }
 
     #[tokio::test]
+    async fn external_file_tools_require_exact_structured_authorization() {
+        use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
+
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let external_file = external.path().join("outside.txt");
+        fs::write(&external_file, "before").unwrap();
+        let external_path = external_file.to_string_lossy().to_string();
+
+        let read = ReadTool::new(workspace.path().to_path_buf());
+        let denied = read.execute(json!({"path": external_path.clone()})).await;
+        assert!(denied.is_error);
+        assert!(denied.content.contains("path escapes workspace root"));
+
+        let read_grant = ToolExecutionAuthorization::for_path(
+            "read",
+            ToolNature::Read,
+            workspace.path(),
+            &external_path,
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+        let allowed = read
+            .execute_authorized(json!({"path": external_path.clone()}), &[read_grant])
+            .await;
+        assert!(!allowed.is_error, "{}", allowed.content);
+        assert!(allowed.content.contains("before"));
+
+        let edit_grant = ToolExecutionAuthorization::for_path(
+            "edit",
+            ToolNature::Write,
+            workspace.path(),
+            &external_path,
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+        let edit = EditTool::new(workspace.path().to_path_buf());
+        let edited = edit
+            .execute_authorized(
+                json!({
+                    "path": external_path.clone(),
+                    "old_string": "before",
+                    "new_string": "after"
+                }),
+                &[edit_grant],
+            )
+            .await;
+        assert!(!edited.is_error, "{}", edited.content);
+        assert_eq!(fs::read_to_string(&external_file).unwrap(), "after");
+
+        let ls_grant = ToolExecutionAuthorization::for_path(
+            "ls",
+            ToolNature::Read,
+            workspace.path(),
+            &external_path,
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+        let listed = LsTool::new(workspace.path().to_path_buf())
+            .execute_authorized(json!({"path": external_path.clone()}), &[ls_grant])
+            .await;
+        assert!(!listed.is_error, "{}", listed.content);
+
+        let new_file = external.path().join("new.txt");
+        let new_path = new_file.to_string_lossy().to_string();
+        let write_grant = ToolExecutionAuthorization::for_path(
+            "write",
+            ToolNature::Write,
+            workspace.path(),
+            &new_path,
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+        let written = WriteTool::new(workspace.path().to_path_buf())
+            .execute_authorized(
+                json!({"path": new_path.clone(), "content": "new"}),
+                &[write_grant],
+            )
+            .await;
+        assert!(!written.is_error, "{}", written.content);
+        assert_eq!(fs::read_to_string(&new_file).unwrap(), "new");
+
+        let delete_grant = ToolExecutionAuthorization::for_path(
+            "delete",
+            ToolNature::Write,
+            workspace.path(),
+            &new_path,
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+        let deleted = DeleteTool::new(workspace.path().to_path_buf())
+            .execute_authorized(json!({"path": new_path}), &[delete_grant])
+            .await;
+        assert!(!deleted.is_error, "{}", deleted.content);
+        assert!(!new_file.exists());
+    }
+
+    #[tokio::test]
+    async fn structured_authorization_cannot_be_reused_for_another_path_or_operation() {
+        use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
+
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let first = external.path().join("first.txt");
+        let second = external.path().join("second.txt");
+        fs::write(&first, "first").unwrap();
+        fs::write(&second, "second").unwrap();
+        let grant = ToolExecutionAuthorization::for_path(
+            "read",
+            ToolNature::Read,
+            workspace.path(),
+            &first.to_string_lossy(),
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+
+        let wrong_path = ReadTool::new(workspace.path().to_path_buf())
+            .execute_authorized(
+                json!({"path": second.to_string_lossy()}),
+                std::slice::from_ref(&grant),
+            )
+            .await;
+        assert!(wrong_path.is_error);
+
+        let wrong_operation = DeleteTool::new(workspace.path().to_path_buf())
+            .execute_authorized(
+                json!({"path": first.to_string_lossy()}),
+                std::slice::from_ref(&grant),
+            )
+            .await;
+        assert!(wrong_operation.is_error);
+        assert!(first.exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn structured_authorization_fails_closed_after_symlink_target_changes() {
+        use std::os::unix::fs::symlink;
+        use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
+
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let first = external.path().join("first.txt");
+        let second = external.path().join("second.txt");
+        let link = external.path().join("selected.txt");
+        fs::write(&first, "first").unwrap();
+        fs::write(&second, "second").unwrap();
+        symlink(&first, &link).unwrap();
+
+        let link_path = link.to_string_lossy().to_string();
+        let grant = ToolExecutionAuthorization::for_path(
+            "read",
+            ToolNature::Read,
+            workspace.path(),
+            &link_path,
+            ToolAuthorizationScope::Once,
+        )
+        .unwrap();
+
+        fs::remove_file(&link).unwrap();
+        symlink(&second, &link).unwrap();
+
+        let result = ReadTool::new(workspace.path().to_path_buf())
+            .execute_authorized(json!({"path": link_path}), &[grant])
+            .await;
+        assert!(result.is_error);
+        assert!(result.content.contains("path escapes workspace root"));
+        assert!(!result.content.contains("second"));
+    }
+
+    #[tokio::test]
     async fn test_read_tool_binary_detection() {
         let temp_dir = tempfile::tempdir().unwrap();
         fs::write(temp_dir.path().join("binary.bin"), &[0u8, 1, 2, 3]).unwrap();

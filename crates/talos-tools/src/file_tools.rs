@@ -106,8 +106,9 @@ pub(crate) fn resolve_workspace_path(
 ) -> Result<PathBuf, FileToolError> {
     let canon_root = workspace_root.canonicalize()?;
 
-    let joined = if relative.starts_with('/') {
-        PathBuf::from(relative)
+    let requested = Path::new(relative);
+    let joined = if requested.is_absolute() {
+        requested.to_path_buf()
     } else {
         workspace_root.join(relative)
     };
@@ -151,81 +152,24 @@ pub(crate) fn resolve_workspace_path(
 pub(crate) fn resolve_authorized_path(
     workspace_root: &Path,
     relative: &str,
+    tool_name: &str,
+    nature: talos_core::tool::ToolNature,
+    authorizations: &[talos_core::tool::ToolExecutionAuthorization],
 ) -> Result<PathBuf, FileToolError> {
-    // First try workspace resolution (fast path for in-workspace files).
     if let Ok(path) = resolve_workspace_path(workspace_root, relative) {
         return Ok(path);
     }
-    // SEC-001: External path authorization.
-    // Only ABSOLUTE paths may resolve outside the workspace. Relative paths
-    // that escape via `..` are still rejected (they use resolve_workspace_path
-    // which already failed above).
-    if !relative.starts_with('/') {
+    let authorization = authorizations
+        .iter()
+        .find(|authorization| {
+            authorization.authorizes_path(tool_name, nature, workspace_root, relative)
+        })
+        .ok_or_else(|| FileToolError::PathEscape(relative.to_owned()))?;
+    let path = authorization.normalized_path();
+    if path.parent().is_none() {
         return Err(FileToolError::PathEscape(relative.to_owned()));
     }
-
-    // Check for symlink escape: if the absolute path is inside the workspace
-    // but canonicalizes outside, it's a symlink attack — reject it.
-    let canon_root = workspace_root
-        .canonicalize()
-        .unwrap_or_else(|_| workspace_root.to_path_buf());
-    let abs_path = PathBuf::from(relative);
-    if abs_path.starts_with(&canon_root) && abs_path.exists() {
-        let canon = abs_path.canonicalize()?;
-        if !canon.starts_with(&canon_root) {
-            return Err(FileToolError::PathEscape(relative.to_owned()));
-        }
-    }
-
-    // External path: resolve with security checks but no workspace restriction.
-    let joined = if relative.starts_with('/') {
-        PathBuf::from(relative)
-    } else {
-        workspace_root.join(relative)
-    };
-
-    // Reject path traversal that escapes to filesystem root.
-    let normalized = {
-        let mut buf = PathBuf::new();
-        for component in joined.components() {
-            match component {
-                std::path::Component::CurDir => {}
-                std::path::Component::ParentDir => {
-                    if !buf.pop() {
-                        return Err(FileToolError::PathEscape(relative.to_owned()));
-                    }
-                }
-                other => buf.push(other.as_os_str()),
-            }
-        }
-        buf
-    };
-
-    // Refuse to resolve filesystem root (delete-root protection).
-    let normalized_str = normalized.to_string_lossy();
-    if normalized_str == "/" || normalized.parent().is_none() {
-        return Err(FileToolError::PathEscape(relative.to_owned()));
-    }
-
-    // Canonicalize if the path exists (symlink resolution).
-    let canonical = if normalized.exists() {
-        normalized.canonicalize()?
-    } else if let Some(parent) = normalized.parent() {
-        if parent.exists() {
-            let canon_parent = parent.canonicalize()?;
-            let file_name = normalized
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
-            canon_parent.join(file_name)
-        } else {
-            normalized
-        }
-    } else {
-        normalized
-    };
-
-    Ok(canonical)
+    Ok(path.to_path_buf())
 }
 
 /// Checks if a file appears to be binary by looking for null bytes

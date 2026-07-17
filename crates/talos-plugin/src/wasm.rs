@@ -19,12 +19,31 @@ use talos_core::tool::{
 };
 use thiserror::Error;
 
+use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
 
 const MAX_PLUGIN_TOOL_OUTPUT: usize = 2_000;
+/// Manifest filename for an explicitly selected local plugin package.
+pub const PLUGIN_MANIFEST_FILE: &str = "talos-plugin.toml";
+
+/// Typed runtime state for one successfully loaded plugin package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoadedPluginPackage {
+    /// Stable manifest package name.
+    pub name: String,
+    /// Manifest package version.
+    pub version: String,
+    /// Runtime carrier, currently `wasm`.
+    pub carrier: String,
+    /// Namespaced tool capabilities registered by the package.
+    pub capabilities: Vec<String>,
+}
 
 #[derive(Debug, Error)]
 pub enum WasmError {
+    /// The conventional package manifest could not be read or validated.
+    #[error("plugin manifest failed: {0}")]
+    Manifest(String),
     #[error("module compilation failed: {0}")]
     Compile(String),
     #[error("module instantiation failed: {0}")]
@@ -164,7 +183,16 @@ impl WasmPluginTool {
         let _plugin_artifact = confined_package_path(package_root, &manifest.plugin.artifact)?;
         let handler = confined_package_path(package_root, &tool.handler)?;
         let bytes = std::fs::read(&handler).map_err(|e| WasmError::Io(e.to_string()))?;
-        let module = WasmModule::from_bytes(runtime, &bytes)?;
+        let module = if handler
+            .extension()
+            .is_some_and(|extension| extension == "wat")
+        {
+            let text = std::str::from_utf8(&bytes)
+                .map_err(|error| WasmError::Compile(error.to_string()))?;
+            WasmModule::from_wat(runtime, text)?
+        } else {
+            WasmModule::from_bytes(runtime, &bytes)?
+        };
         let name = plugin_tool_name(&manifest.plugin.name, &tool.name);
         Ok(Self {
             description: format!(
@@ -245,18 +273,58 @@ pub fn register_read_only_wasm_tools(
     package_root: &Path,
     manifest: &PluginManifest,
 ) -> Result<usize, WasmError> {
+    let (tools, _) = build_read_only_wasm_tools(runtime, package_root, manifest)?;
     let mut registered = 0;
-    for tool in &manifest.tools {
-        let name = plugin_tool_name(&manifest.plugin.name, &tool.name);
+    for plugin_tool in tools {
+        let name = plugin_tool.name().to_string();
         if registry.get(&name).is_some() {
             return Err(WasmError::ToolCollision(name));
         }
-        let plugin_tool =
-            WasmPluginTool::from_manifest_tool(runtime.clone(), package_root, manifest, tool)?;
-        registry.register(Arc::new(plugin_tool));
+        registry.register(plugin_tool);
         registered += 1;
     }
     Ok(registered)
+}
+
+/// Builds the tools and typed package state for one validated local manifest.
+///
+/// The returned tools are not registered automatically, allowing a host to
+/// wrap them in its normal permission adapter before exposure.
+pub fn build_read_only_wasm_tools(
+    runtime: Arc<WasmRuntime>,
+    package_root: &Path,
+    manifest: &PluginManifest,
+) -> Result<(Vec<Arc<dyn AgentTool>>, LoadedPluginPackage), WasmError> {
+    let mut tools: Vec<Arc<dyn AgentTool>> = Vec::with_capacity(manifest.tools.len());
+    let mut capabilities = Vec::with_capacity(manifest.tools.len());
+    for tool in &manifest.tools {
+        let plugin_tool =
+            WasmPluginTool::from_manifest_tool(runtime.clone(), package_root, manifest, tool)?;
+        capabilities.push(plugin_tool.name().to_string());
+        tools.push(Arc::new(plugin_tool));
+    }
+    Ok((
+        tools,
+        LoadedPluginPackage {
+            name: manifest.plugin.name.clone(),
+            version: manifest.plugin.version.clone(),
+            carrier: manifest.plugin.carrier.clone(),
+            capabilities,
+        },
+    ))
+}
+
+/// Loads the conventional manifest from an explicitly selected local package
+/// directory and builds its read-only WASM tools.
+pub fn load_read_only_wasm_package(
+    runtime: Arc<WasmRuntime>,
+    package_root: &Path,
+) -> Result<(Vec<Arc<dyn AgentTool>>, LoadedPluginPackage), WasmError> {
+    let manifest_path = package_root.join(PLUGIN_MANIFEST_FILE);
+    let text = std::fs::read_to_string(&manifest_path)
+        .map_err(|error| WasmError::Io(error.to_string()))?;
+    let manifest = parse_manifest(&text).map_err(|error| WasmError::Manifest(error.to_string()))?;
+    build_read_only_wasm_tools(runtime, package_root, &manifest)
 }
 
 fn plugin_tool_name(plugin_name: &str, tool_name: &str) -> String {
@@ -314,6 +382,27 @@ mod tests {
 
     fn runtime() -> Arc<WasmRuntime> {
         Arc::new(WasmRuntime::new(FUEL, TIMEOUT_MS).expect("runtime"))
+    }
+
+    #[tokio::test]
+    async fn checked_in_package_loads_with_typed_capabilities_and_executes_offline() {
+        let package =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/read-only-demo");
+        let (tools, loaded) =
+            load_read_only_wasm_package(runtime(), &package).expect("fixture loads");
+
+        assert_eq!(loaded.name, "read-only-demo");
+        assert_eq!(loaded.version, "0.1.0");
+        assert_eq!(loaded.carrier, "wasm");
+        assert_eq!(loaded.capabilities, vec!["read-only-demo.answer"]);
+        assert_eq!(tools.len(), 1);
+        let result = tools[0].execute(json!({})).await;
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("returned 7"));
+        assert!(matches!(
+            tools[0].provenance(),
+            ToolProvenance::Plugin { ref name, .. } if name == "read-only-demo"
+        ));
     }
 
     fn wasm_i32_const(value: u8) -> Vec<u8> {

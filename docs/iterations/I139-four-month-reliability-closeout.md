@@ -1,6 +1,6 @@
 # Iteration I139: Four-Month Reliability And Productization Closeout
 
-> Document status: Complete — predecessors I135-I138 not yet Complete; closeout cannot finalize
+> Document status: Review — corrected implementation accepted; clean-main integration replay pending
 > Published plan date: 2026-07-16
 > Planned objective: independently replay delivered behavior, synchronize owners, and issue an honest pre-1.0 release-readiness decision.
 > Baseline rule: closeout may repair validation defects but cannot add unrelated features or authorize release.
@@ -63,3 +63,13 @@
 ## Variance And Residuals
 
 - None at publication.
+
+## 2026-07-17 Corrective Review
+
+The original closeout evidence was reopened and superseded. I135-I138 now close on real persistence
+failure injection, a real loaded-package product path, a byte-stable five-policy No-Go benchmark,
+and restoration of the production memory baseline with semver-compatible inert API retention.
+`cargo fmt`, locked check/Clippy/workspace tests, release preflight, governance validation, and
+`git diff --check` all pass on the corrected working tree. I139 remains Review until the correction
+is committed/pushed and replayed from clean `main`, as required by its published acceptance and the
+execution package final completion rule. REL-002 remains NO-GO; no release action is implied.

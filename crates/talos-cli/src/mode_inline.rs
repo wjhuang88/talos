@@ -13,6 +13,7 @@ use talos_core::message::AgentEvent;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
 };
+use talos_core::tool::ToolPresentationPolicy;
 use tokio::sync::mpsc;
 
 use crate::approval::ApprovalPrompt;
@@ -22,7 +23,10 @@ use crate::mode_runtime::{
     session_metadata_for_model, set_todo_prompt_provider,
 };
 use crate::provider_setup::{build_provider, parse_provider};
-use crate::registry::{build_print_tool_registry, register_permission_aware_tools};
+use crate::registry::{
+    build_print_tool_registry, register_explicit_permission_aware_plugins,
+    register_permission_aware_tools,
+};
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
     resolve_workspace_root, workspace_display_name,
@@ -61,7 +65,19 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
     )));
-    register_permission_aware_tools(&mut registry, mcp_runtime.tools(), mcp_approval, true);
+    register_permission_aware_tools(
+        &mut registry,
+        mcp_runtime.tools(),
+        mcp_approval.clone(),
+        true,
+    );
+    let loaded_plugin_packages = register_explicit_permission_aware_plugins(
+        &mut registry,
+        &cli.plugin_packages,
+        mcp_approval,
+        true,
+    )
+    .map_err(anyhow::Error::msg)?;
 
     let mut agent = Agent::with_security_and_hooks(
         provider,
@@ -72,6 +88,16 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         hooks,
     );
     agent.set_tool_protocol(config.tool_protocol());
+    if !loaded_plugin_packages.is_empty() {
+        let mut policy = ToolPresentationPolicy::runtime_default();
+        for capability in loaded_plugin_packages
+            .iter()
+            .flat_map(|package| package.capabilities.iter())
+        {
+            policy = policy.disclose_tool(capability.clone());
+        }
+        agent.set_tool_presentation_policy(policy);
+    }
     let mut runtime_skills =
         discover_runtime_skills(&workspace_root, config.skills.discover_shared)?;
     apply_runtime_skills(&mut agent, &runtime_skills);

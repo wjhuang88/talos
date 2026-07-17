@@ -2,7 +2,7 @@
 
 **Type**: Technical Story / Policy Benchmark
 **Parent Epic**: MEM-001
-**Status**: Complete (2026-07-16, I137/I138) — 4-policy benchmark with JSON output; novelty × utility policy implemented with noise detection and sensitive filter
+**Status**: Complete (2026-07-17, I137/I138 correction) — five-policy benchmark selects No-Go; production baseline retained
 **Priority**: P2
 **Source**: Maintainer request 2026-07-16; arXiv:2607.02303
 **Iteration**: None
@@ -134,21 +134,22 @@ If implementation is selected, update memory configuration/reference documentati
 
 ## Acceptance For Technical / Governance Work
 
-- [ ] A fixture corpus covers correction, preference, routine length, duplication, validation,
+- [x] A fixture corpus covers correction, preference, routine length, duplication, validation,
       recovery, recency conflict, contradiction, and sensitive-content rejection.
-- [ ] Current heuristic, recency, novelty-only, and `novelty × committed_utility` are compared on the
+- [x] Current heuristic, recency, novelty-only, committed-utility-only, and `novelty × committed_utility` are compared on the
       same corpus.
-- [ ] Evidence reports precision, important-item recall, duplicate admission, contradiction
+- [x] Evidence reports precision, important-item recall, duplicate admission, contradiction
       handling, old-important retention, deterministic reason codes, and context cost.
-- [ ] The chosen policy beats the current heuristic on the agreed primary metrics before runtime
+- [x] The candidate is rejected because it does not satisfy every agreed primary metric before runtime
       behavior changes.
-- [ ] Public-API compatibility and SQLite migration plans are recorded before coding.
-- [ ] If sparse references advance, tests prove no content duplication, session-delete cleanup,
+- [x] No runtime replacement or SQLite migration is selected by the No-Go; the already-published
+      experimental API remains inert for source compatibility under ADR-046.
+- [x] Sparse references do not advance; the report records No-Go for insufficient exact-recall benefit evidence. If reconsidered, tests must prove no content duplication, session-delete cleanup,
       path/ID validation, missing-source failure, and transcript filtering.
-- [ ] Prompt injection remains unchanged unless separately activated under ADR-033.
-- [ ] Locked fmt/check/clippy/test, release preflight, governance validation, and `git diff --check`
+- [x] Prompt injection remains unchanged under ADR-033.
+- [x] Locked fmt/check/clippy/test, release preflight, governance validation, and `git diff --check`
       pass for any implementation iteration.
-- [ ] Owner, future iteration, backlog, Board, README/config reference, and any source issue are
+- [x] Owner, future iteration, backlog, Board, README/config reference, and any source issue are
       synchronized at implementation closeout.
 
 ## Minimum Deliverable Slice
@@ -163,3 +164,10 @@ follow-on only if the report demonstrates additional value.
 - Automatic direct/associative injection: ADR-033 and a separately authorized story.
 - Vector retrieval: STORE-001 or a future dependency Spike.
 - Model-internal HOLA support: provider/model selection research, not `talos-memory`.
+
+## 2026-07-17 Decision Evidence
+
+The byte-stable artifact at `docs/reference/MEM-009-BENCHMARK-RESULT-2026-07-17.json` records
+No-Go. The combined policy admits a duplicate and misses a recency-conflict fixture, so I138 keeps
+the production extractor baseline. Sensitive-content rejection remains as an independent safety
+filter, not evidence that the candidate admission policy passed.

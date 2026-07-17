@@ -3,7 +3,7 @@
 **Date**: 2026-07-16
 **Iteration**: I131 / P120
 **Auditor**: glm-5.2 (unattended)
-**Status**: Complete — audit deliverable closed. FINDING-2 confirmed data loss tracked by SESSION-006 (Open).
+**Status**: Complete — audit deliverable closed. FINDING-2 repair was accepted in I135 on 2026-07-17.
 
 ## Methodology
 
@@ -160,7 +160,7 @@ canonical session turn path, and the `Ok(Err(e))` branch does not persist messag
 **Corrected conclusion**: FINDING-2 is confirmed tool-result data loss in the canonical
 session path, proven by integration test `fixture_provider_error_drops_tool_results`.
 The audit deliverable (I131/TOOL-021) is complete; the product defect itself remains
-unfixed and is tracked by **SESSION-006** (Open).
+implemented and under corrective verification in **SESSION-006 / I135**.
 
 **Fixture count**: 15 total (3 OpenAI + 4 Anthropic incl. orphan-error + 3 compaction
 + 1 agent→session integration proving FINDING-2 + 4 existing scheduler fixtures).

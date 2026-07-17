@@ -8,8 +8,8 @@ use talos_core::tool::ToolProvenance;
 use crate::command_registry::{MOCK_REQUEST_COMMAND, command_registry};
 use crate::types::{
     ChatMessage, ContentOutput, CopyScope, ExtensionSnapshot, HookDeclarationDiagnostic,
-    HookSnapshot, McpServerDiagnostic, MessageRole, MessageSource, MessageStatus,
-    ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
+    HookSnapshot, LoadedPluginDiagnostic, McpServerDiagnostic, MessageRole, MessageSource,
+    MessageStatus, ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
     SkillDiagnostic, StatusSnapshot, TipKind, TodoCommandAction, TodoCommandRequest,
     TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput,
@@ -167,6 +167,7 @@ pub struct ConversationEngine {
     pub(crate) provider_name: String,
     pub(crate) branch_id: Option<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
+    pub(crate) loaded_plugins: Vec<LoadedPluginDiagnostic>,
     pub(crate) hook_declarations: Vec<(String, String, bool)>,
     pub(crate) mcp_servers: Vec<McpServerDiagnostic>,
     pub(crate) skills: Vec<SkillDiagnostic>,
@@ -202,6 +203,7 @@ impl ConversationEngine {
             provider_name,
             branch_id: None,
             plugin_observations: Vec::new(),
+            loaded_plugins: Vec::new(),
             hook_declarations: Vec::new(),
             mcp_servers: Vec::new(),
             skills: Vec::new(),
@@ -219,6 +221,13 @@ impl ConversationEngine {
 
     pub fn with_workspace_root(mut self, workspace_root: PathBuf) -> Self {
         self.workspace_root = Some(workspace_root);
+        self
+    }
+
+    /// Supplies the typed set of explicitly loaded plugin packages.
+    #[must_use]
+    pub fn with_loaded_plugins(mut self, plugins: Vec<LoadedPluginDiagnostic>) -> Self {
+        self.loaded_plugins = plugins;
         self
     }
 
@@ -870,22 +879,20 @@ impl ConversationEngine {
             "[System]   Provenance observations: {}\n",
             snap.provenance.len()
         ));
-        let plugin_obs: Vec<_> = snap
-            .provenance
-            .iter()
-            .filter(|o| o.key.starts_with("plugin:"))
-            .collect();
-        if plugin_obs.is_empty() {
+        if snap.loaded_plugins.is_empty() {
             text.push_str("[System]   WASM plugin packages: none loaded\n");
         } else {
             text.push_str(&format!(
                 "[System]   WASM plugin packages: {} loaded\n",
-                plugin_obs.len()
+                snap.loaded_plugins.len()
             ));
-            for obs in &plugin_obs {
+            for plugin in &snap.loaded_plugins {
                 text.push_str(&format!(
-                    "[System]     {} (invocations: {})\n",
-                    obs.key, obs.count
+                    "[System]     {}@{}/{} — capabilities: {}\n",
+                    plugin.name,
+                    plugin.version,
+                    plugin.carrier,
+                    plugin.capabilities.join(", ")
                 ));
             }
         }
@@ -1146,10 +1153,11 @@ impl ConversationEngine {
     }
 
     pub fn extension_snapshot(&self) -> ExtensionSnapshot {
-        build_extension_snapshot(
+        build_extension_snapshot_with_plugins(
             &self.mcp_servers,
             &self.hook_declarations,
             &self.plugin_observations,
+            &self.loaded_plugins,
         )
     }
 }
@@ -1158,6 +1166,16 @@ pub fn build_extension_snapshot(
     mcp_servers: &[McpServerDiagnostic],
     hook_declarations: &[(String, String, bool)],
     provenance: &[PluginObservation],
+) -> ExtensionSnapshot {
+    build_extension_snapshot_with_plugins(mcp_servers, hook_declarations, provenance, &[])
+}
+
+/// Builds an extension snapshot including typed loaded-plugin state.
+pub fn build_extension_snapshot_with_plugins(
+    mcp_servers: &[McpServerDiagnostic],
+    hook_declarations: &[(String, String, bool)],
+    provenance: &[PluginObservation],
+    loaded_plugins: &[LoadedPluginDiagnostic],
 ) -> ExtensionSnapshot {
     let sanitized_mcp: Vec<McpServerDiagnostic> = mcp_servers
         .iter()
@@ -1204,6 +1222,7 @@ pub fn build_extension_snapshot(
             executable_carriers_enabled: false,
             event_catalog,
         },
+        loaded_plugins: loaded_plugins.to_vec(),
         provenance: provenance.to_vec(),
         collisions,
     }

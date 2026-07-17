@@ -1,112 +1,129 @@
-//! MEM-009 Memory Admission Benchmark (I137, revised v2)
+//! MEM-009 deterministic admission benchmark (I137 corrective review).
 //!
-//! Compares four admission policies against a frozen fixture corpus.
-//! Calls the production `evaluate_admission()` for the combined policy.
-//! Emits machine-readable JSON results.
-//!
-use crate::evaluate_admission;
-use std::collections::HashSet;
+//! The benchmark compares five policies on one frozen corpus and emits a
+//! byte-stable JSON report. It does not mutate runtime admission behavior.
 
-// ── Frozen fixture corpus ─────────────────────────────────────────────────
+use std::collections::{BTreeMap, HashSet};
 
-#[derive(Debug, Clone)]
+use crate::consolidation::{AdmissionReason, evaluate_admission, is_sensitive_content};
+
+#[derive(Debug, Clone, Copy)]
 struct Fixture {
+    id: &'static str,
     content: &'static str,
     role: &'static str,
     expected_admit: bool,
     category: &'static str,
 }
 
-/// Fixtures are frozen BEFORE any policy runs. Categories cover all MEM-009
-/// acceptance scenarios.
 const FIXTURES: &[Fixture] = &[
-    // Corrections — should be admitted
     Fixture {
+        id: "correction-path",
         content: "Actually, the config file is at ~/.talos/config.toml not /etc/talos.conf",
         role: "user",
         expected_admit: true,
         category: "correction",
     },
     Fixture {
+        id: "correction-command",
         content: "No, use cargo fmt not rustfmt directly",
         role: "user",
         expected_admit: true,
         category: "correction",
     },
-    // Preferences — should be admitted
     Fixture {
+        id: "preference-theme",
         content: "I prefer Nord theme",
         role: "user",
         expected_admit: true,
         category: "preference",
     },
     Fixture {
+        id: "preference-tests",
         content: "Always run tests before committing",
         role: "user",
         expected_admit: true,
         category: "preference",
     },
     Fixture {
+        id: "old-important-secrets",
         content: "Never commit secrets to the repository",
         role: "user",
         expected_admit: true,
         category: "old-important",
     },
-    // Contradictions — should be admitted
     Fixture {
+        id: "contradiction-sqlite",
         content: "Note: the previous statement about SQLite being required is wrong; we use bundled mode",
         role: "user",
         expected_admit: true,
         category: "contradiction",
     },
-    // Validated results — should be admitted
     Fixture {
+        id: "validated-timeout",
         content: "Important: the fix for issue #18 was caused by missing dispatch timeout",
         role: "assistant",
         expected_admit: true,
         category: "validated",
     },
-    // Sensitive content — must NEVER be admitted
     Fixture {
-        content: "api_key = sk-ant-1234567890abcdef",
+        id: "recovery-retry",
+        content: "Important: recovery succeeded after the bounded retry released the SQLite lock",
+        role: "assistant",
+        expected_admit: true,
+        category: "recovery",
+    },
+    Fixture {
+        id: "recency-conflict-endpoint",
+        content: "Correction: use the v2 endpoint; the older v1 endpoint is obsolete",
+        role: "user",
+        expected_admit: true,
+        category: "recency-conflict",
+    },
+    Fixture {
+        id: "sensitive-api-key",
+        content: "api_key = sk-ant-fixture-redacted",
         role: "user",
         expected_admit: false,
         category: "sensitive",
     },
     Fixture {
-        content: "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
+        id: "sensitive-authorization",
+        content: "Authorization: Bearer fixture-redacted",
         role: "user",
         expected_admit: false,
         category: "sensitive",
     },
     Fixture {
-        content: "password = secret123",
+        id: "sensitive-password",
+        content: "password = fixture-redacted",
         role: "user",
         expected_admit: false,
         category: "sensitive",
     },
-    // Routine chatter — must be rejected
     Fixture {
+        id: "chatter-hello",
         content: "Hello, how are you today?",
         role: "user",
         expected_admit: false,
         category: "chatter",
     },
     Fixture {
+        id: "chatter-thanks",
         content: "Thanks, that's helpful",
         role: "user",
         expected_admit: false,
         category: "chatter",
     },
-    // Routine length — must be rejected (this was previously wrongly admitted)
     Fixture {
+        id: "routine-question",
         content: "Can you help me understand how the session lifecycle works? I've been reading through the code.",
         role: "user",
         expected_admit: false,
         category: "routine-length",
     },
-    // Duplicate — must be rejected
     Fixture {
+        id: "duplicate-tests",
         content: "Always run tests before committing",
         role: "user",
         expected_admit: false,
@@ -114,217 +131,296 @@ const FIXTURES: &[Fixture] = &[
     },
 ];
 
-// ── Decision rule (frozen before any results are read) ────────────────────
-//
-// Go conditions (ALL must hold):
-// 1. combined precision > 0.80
-// 2. combined recall >= 0.70
-// 3. All sensitive items rejected
-// 4. All routine-length/chatter items rejected
-
-// ── Policy implementations ────────────────────────────────────────────────
-
-/// Baseline: the OLD keyword/length heuristic (admits anything > 50 chars user msg
-/// or with keyword markers, threshold > 0.5).
-fn baseline_policy(content: &str, role: &str) -> bool {
-    let lower = content.trim_start().to_lowercase();
-    let markers = ["remember", "note", "important", "always", "never"];
-    let score = if markers.iter().any(|m| lower.starts_with(m)) {
-        0.8
-    } else if role == "user" && content.len() > 50 {
-        0.6
-    } else {
-        0.4
-    };
-    score > 0.5
+#[derive(Debug, Clone, Copy)]
+enum Policy {
+    CurrentHeuristic,
+    Recency,
+    NoveltyOnly,
+    UtilityOnly,
+    NoveltyTimesUtility,
 }
 
-/// Novelty-only: admit if content contains novelty markers (corrections, notes, directives).
-fn novelty_only_policy(content: &str, _role: &str) -> bool {
-    let lower = content.trim_start().to_lowercase();
-    lower.starts_with("actually")
-        || lower.starts_with("no,")
-        || lower.starts_with("note")
-        || lower.starts_with("important")
-        || lower.starts_with("always")
-        || lower.starts_with("never")
-        || lower.starts_with("remember")
-        || lower.starts_with("prefer")
-        || lower.contains("fix for")
-        || lower.contains("caused by")
-}
+impl Policy {
+    const ALL: [Self; 5] = [
+        Self::CurrentHeuristic,
+        Self::Recency,
+        Self::NoveltyOnly,
+        Self::UtilityOnly,
+        Self::NoveltyTimesUtility,
+    ];
 
-/// Utility-only: admit if content contains utility markers (directives, corrections, fixes).
-fn utility_only_policy(content: &str, _role: &str) -> bool {
-    let lower = content.trim_start().to_lowercase();
-    lower.starts_with("always")
-        || lower.starts_with("never")
-        || lower.starts_with("remember")
-        || lower.starts_with("note")
-        || lower.starts_with("important")
-        || lower.starts_with("actually")
-        || lower.starts_with("no,")
-        || lower.contains("fix for")
-        || lower.contains("caused by")
-        || lower.contains("fixed it")
-        || lower.contains("i prefer")
-}
+    fn name(self) -> &'static str {
+        match self {
+            Self::CurrentHeuristic => "current_heuristic",
+            Self::Recency => "recency",
+            Self::NoveltyOnly => "novelty_only",
+            Self::UtilityOnly => "committed_utility_only",
+            Self::NoveltyTimesUtility => "novelty_times_committed_utility",
+        }
+    }
 
-/// Combined: calls the PRODUCTION evaluate_admission() function.
-fn combined_policy(content: &str, role: &str) -> bool {
-    evaluate_admission(content, role).admit
+    fn evaluate(self, fixture: &Fixture, index: usize) -> (bool, &'static str) {
+        match self {
+            Self::CurrentHeuristic => {
+                let lower = fixture.content.trim_start().to_lowercase();
+                let marked = ["remember", "note", "important", "always", "never"]
+                    .iter()
+                    .any(|marker| lower.starts_with(marker));
+                (
+                    marked || fixture.role == "user" && fixture.content.len() > 50,
+                    if marked {
+                        "marker"
+                    } else if fixture.role == "user" && fixture.content.len() > 50 {
+                        "length"
+                    } else {
+                        "below_baseline"
+                    },
+                )
+            }
+            Self::Recency => {
+                let recent = index >= FIXTURES.len().saturating_sub(8);
+                (
+                    recent && !is_sensitive_content(fixture.content),
+                    if recent { "recent" } else { "stale" },
+                )
+            }
+            Self::NoveltyOnly => {
+                let lower = fixture.content.trim_start().to_lowercase();
+                let novel = [
+                    "actually",
+                    "no,",
+                    "correction",
+                    "note",
+                    "important",
+                    "always",
+                    "never",
+                    "remember",
+                    "prefer",
+                ]
+                .iter()
+                .any(|marker| lower.starts_with(marker))
+                    || lower.contains("i prefer");
+                (
+                    novel && !is_sensitive_content(fixture.content),
+                    if novel { "novel_marker" } else { "low_novelty" },
+                )
+            }
+            Self::UtilityOnly => {
+                let lower = fixture.content.trim_start().to_lowercase();
+                let useful = [
+                    "actually",
+                    "no,",
+                    "correction",
+                    "note",
+                    "important",
+                    "always",
+                    "never",
+                    "remember",
+                    "prefer",
+                    "fix for",
+                    "caused by",
+                    "succeeded after",
+                ]
+                .iter()
+                .any(|marker| lower.starts_with(marker) || lower.contains(marker));
+                (
+                    useful && !is_sensitive_content(fixture.content),
+                    if useful {
+                        "utility_signal"
+                    } else {
+                        "low_utility"
+                    },
+                )
+            }
+            Self::NoveltyTimesUtility => {
+                let decision = evaluate_admission(fixture.content, fixture.role);
+                let reason = match decision.reason {
+                    AdmissionReason::Admitted => "admitted",
+                    AdmissionReason::SensitiveContent => "sensitive",
+                    AdmissionReason::BelowThreshold => "below_threshold",
+                    AdmissionReason::ExcludedRole => "excluded_role",
+                    AdmissionReason::TooShort => "too_short",
+                };
+                (decision.admit, reason)
+            }
+        }
+    }
 }
-
-// ── Metrics ───────────────────────────────────────────────────────────────
 
 #[derive(Debug)]
 struct Metrics {
-    name: &'static str,
+    policy: &'static str,
     tp: usize,
     fp: usize,
     tn: usize,
     fn_: usize,
+    admitted_chars: usize,
+    duplicate_admitted: bool,
+    old_important_retained: bool,
+    contradiction_correct: bool,
+    failures: Vec<serde_json::Value>,
+    reason_counts: BTreeMap<&'static str, usize>,
 }
 
 impl Metrics {
     fn precision(&self) -> f64 {
-        if self.tp + self.fp == 0 {
-            0.0
-        } else {
-            self.tp as f64 / (self.tp + self.fp) as f64
-        }
+        (self.tp as f64) / ((self.tp + self.fp).max(1) as f64)
     }
-    fn recall(&self) -> f64 {
-        if self.tp + self.fn_ == 0 {
-            0.0
-        } else {
-            self.tp as f64 / (self.tp + self.fn_) as f64
-        }
+
+    fn important_recall(&self) -> f64 {
+        (self.tp as f64) / ((self.tp + self.fn_).max(1) as f64)
     }
 }
 
-fn evaluate_policy(name: &'static str, policy: fn(&str, &str) -> bool) -> Metrics {
-    let mut tp = 0;
-    let mut fp = 0;
-    let mut tn = 0;
-    let mut fn_ = 0;
-    for f in FIXTURES {
-        let admitted = policy(f.content, f.role);
-        if admitted == f.expected_admit {
-            if admitted {
-                tp += 1;
-            } else {
-                tn += 1;
-            }
-        } else if admitted {
-            fp += 1;
-        } else {
-            fn_ += 1;
+fn evaluate_policy(policy: Policy) -> Metrics {
+    let mut metrics = Metrics {
+        policy: policy.name(),
+        tp: 0,
+        fp: 0,
+        tn: 0,
+        fn_: 0,
+        admitted_chars: 0,
+        duplicate_admitted: false,
+        old_important_retained: false,
+        contradiction_correct: false,
+        failures: Vec::new(),
+        reason_counts: BTreeMap::new(),
+    };
+    for (index, fixture) in FIXTURES.iter().enumerate() {
+        let (actual, reason) = policy.evaluate(fixture, index);
+        if actual {
+            metrics.admitted_chars += fixture.content.len();
+        }
+        match (fixture.expected_admit, actual) {
+            (true, true) => metrics.tp += 1,
+            (false, true) => metrics.fp += 1,
+            (false, false) => metrics.tn += 1,
+            (true, false) => metrics.fn_ += 1,
+        }
+        if actual != fixture.expected_admit {
+            metrics.failures.push(serde_json::json!({
+                "fixture_id": fixture.id,
+                "category": fixture.category,
+                "expected": fixture.expected_admit,
+                "actual": actual,
+            }));
+        }
+        *metrics.reason_counts.entry(reason).or_default() += 1;
+        if fixture.category == "duplicate" {
+            metrics.duplicate_admitted = actual;
+        }
+        if fixture.category == "old-important" {
+            metrics.old_important_retained = actual;
+        }
+        if fixture.category == "contradiction" {
+            metrics.contradiction_correct = actual == fixture.expected_admit;
         }
     }
-    Metrics {
-        name,
-        tp,
-        fp,
-        tn,
-        fn_,
-    }
+    metrics
 }
 
-fn decide(combined: &Metrics) -> bool {
-    combined.precision() > 0.80
-        && combined.recall() >= 0.70
-        && FIXTURES
-            .iter()
-            .filter(|f| f.category == "sensitive")
-            .all(|f| !combined_policy(f.content, f.role))
-        && FIXTURES
-            .iter()
-            .filter(|f| f.category == "routine-length" || f.category == "chatter")
-            .all(|f| !combined_policy(f.content, f.role))
+fn report_value() -> serde_json::Value {
+    let metrics = Policy::ALL.map(evaluate_policy);
+    let combined = &metrics[4];
+    let sensitive_rejected = FIXTURES
+        .iter()
+        .enumerate()
+        .filter(|(_, fixture)| fixture.category == "sensitive")
+        .all(|(index, fixture)| !Policy::NoveltyTimesUtility.evaluate(fixture, index).0);
+    let chatter_rejected = FIXTURES
+        .iter()
+        .enumerate()
+        .filter(|(_, fixture)| {
+            fixture.category == "chatter" || fixture.category == "routine-length"
+        })
+        .all(|(index, fixture)| !Policy::NoveltyTimesUtility.evaluate(fixture, index).0);
+    let go = combined.precision() > 0.80
+        && combined.important_recall() >= 0.70
+        && sensitive_rejected
+        && chatter_rejected
+        && !combined.duplicate_admitted
+        && combined.old_important_retained
+        && combined.contradiction_correct;
+
+    serde_json::json!({
+        "schema_version": 1,
+        "fixtures_count": FIXTURES.len(),
+        "categories": FIXTURES.iter().map(|fixture| fixture.category).collect::<HashSet<_>>().len(),
+        "decision": if go { "Go" } else { "No-Go" },
+        "decision_rule": "precision > 0.80; important_recall >= 0.70; zero sensitive/chatter/duplicate admissions; retain old-important; handle contradiction",
+        "production_action": if go { "eligible_for_separate_implementation_review" } else { "retain_current_heuristic" },
+        "sparse_reference_index": {
+            "decision": "No-Go",
+            "implemented": false,
+            "reason": "no frozen exact-recall query corpus or material-benefit evidence; direct TLOG transcript remains canonical",
+        },
+        "policies": metrics.iter().map(|metric| serde_json::json!({
+            "name": metric.policy,
+            "precision": metric.precision(),
+            "important_recall": metric.important_recall(),
+            "tp": metric.tp,
+            "fp": metric.fp,
+            "tn": metric.tn,
+            "fn": metric.fn_,
+            "duplicate_admitted": metric.duplicate_admitted,
+            "old_important_retained": metric.old_important_retained,
+            "contradiction_correct": metric.contradiction_correct,
+            "admitted_chars": metric.admitted_chars,
+            "failures": metric.failures,
+            "reason_counts": metric.reason_counts,
+        })).collect::<Vec<_>>(),
+    })
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────
+fn report_json() -> String {
+    serde_json::to_string_pretty(&report_value()).expect("benchmark report serializes")
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn benchmark_compares_all_four_policies() {
-        let baseline = evaluate_policy("baseline", baseline_policy);
-        let novelty = evaluate_policy("novelty_only", novelty_only_policy);
-        let utility = evaluate_policy("utility_only", utility_only_policy);
-        let combined = evaluate_policy("combined", combined_policy);
-        let go = decide(&combined);
-
-        // Machine-readable JSON output
-        let json = serde_json::json!({
-            "fixtures_count": FIXTURES.len(),
-            "categories": FIXTURES.iter().map(|f| f.category).collect::<HashSet<_>>().len(),
-            "policies": [
-                { "name": baseline.name, "precision": baseline.precision(), "recall": baseline.recall(), "tp": baseline.tp, "fp": baseline.fp, "tn": baseline.tn, "fn": baseline.fn_ },
-                { "name": novelty.name, "precision": novelty.precision(), "recall": novelty.recall(), "tp": novelty.tp, "fp": novelty.fp, "tn": novelty.tn, "fn": novelty.fn_ },
-                { "name": utility.name, "precision": utility.precision(), "recall": utility.recall(), "tp": utility.tp, "fp": utility.fp, "tn": utility.tn, "fn": utility.fn_ },
-                { "name": combined.name, "precision": combined.precision(), "recall": combined.recall(), "tp": combined.tp, "fp": combined.fp, "tn": combined.tn, "fn": combined.fn_ },
-            ],
-            "decision": if go { "Go" } else { "No-Go" },
-            "decision_rule": "precision > 0.80 AND recall >= 0.70 AND all sensitive rejected AND all chatter rejected"
-        });
-
-        eprintln!("=== MEM-009 BENCHMARK (machine-readable JSON) ===");
-        eprintln!("{}", serde_json::to_string_pretty(&json).unwrap());
-
-        // All sensitive content must be rejected by combined
-        for f in FIXTURES.iter().filter(|f| f.category == "sensitive") {
-            assert!(
-                !combined_policy(f.content, f.role),
-                "sensitive leaked: {}",
-                f.content
-            );
-        }
-
-        // Decision must be deterministic
-        assert_eq!(go, decide(&combined), "non-deterministic decision");
-    }
-
-    #[test]
-    fn benchmark_is_deterministic() {
-        let r1 = evaluate_policy("combined", combined_policy);
-        let r2 = evaluate_policy("combined", combined_policy);
-        assert_eq!(r1.tp, r2.tp);
-        assert_eq!(r1.fp, r2.fp);
-    }
-
-    #[test]
-    fn fixture_corpus_covers_all_categories() {
-        let cats: HashSet<_> = FIXTURES.iter().map(|f| f.category).collect();
+    fn fixture_corpus_covers_required_categories() {
+        let categories = FIXTURES
+            .iter()
+            .map(|fixture| fixture.category)
+            .collect::<HashSet<_>>();
         for required in [
             "correction",
             "preference",
-            "contradiction",
-            "old-important",
-            "validated",
-            "sensitive",
-            "chatter",
             "routine-length",
             "duplicate",
+            "validated",
+            "recovery",
+            "recency-conflict",
+            "contradiction",
+            "sensitive",
+            "old-important",
         ] {
-            assert!(cats.contains(required), "missing: {required}");
+            assert!(categories.contains(required), "missing {required}");
         }
     }
 
     #[test]
-    fn routine_length_fixture_is_rejected() {
-        let f = FIXTURES
-            .iter()
-            .find(|f| f.category == "routine-length")
-            .unwrap();
-        let d = evaluate_admission(f.content, f.role);
-        assert!(
-            !d.admit,
-            "routine-length must be rejected (score={})",
-            d.score
-        );
+    fn benchmark_compares_baseline_and_all_required_ablations_and_selects_no_go() {
+        let report = report_value();
+        assert_eq!(report["policies"].as_array().map(Vec::len), Some(5));
+        assert_eq!(report["decision"], "No-Go");
+        assert_eq!(report["production_action"], "retain_current_heuristic");
+        assert_eq!(report["sparse_reference_index"]["decision"], "No-Go");
+        let combined = &report["policies"][4];
+        assert_eq!(combined["duplicate_admitted"], true);
+    }
+
+    #[test]
+    fn benchmark_is_byte_stable_and_matches_checked_in_artifact() {
+        let first = report_json();
+        let second = report_json();
+        assert_eq!(first, second);
+        let artifact =
+            include_str!("../../../docs/reference/MEM-009-BENCHMARK-RESULT-2026-07-17.json");
+        assert_eq!(first.trim(), artifact.trim());
+        serde_json::from_str::<serde_json::Value>(artifact).expect("artifact is valid JSON");
     }
 }

@@ -177,6 +177,21 @@ the current heuristic, cannot produce stable reason codes, or requires provider-
 Retain the current behavior until the replacement wins its benchmark; do not ship a speculative
 formula because the architectural direction is accepted.
 
+## 2026-07-17 Execution Correction
+
+The frozen I137 report selected **No-Go**: the combined candidate admitted a duplicate and missed a
+recency-conflict fixture. I138 therefore retains the production extractor's pre-experiment
+admission, confidence, and ordering behavior. Credential-shaped content is still rejected as an
+independent safety invariant.
+
+An earlier I138 commit published `AdmissionDecision`, `AdmissionReason`,
+`evaluate_admission`, `is_sensitive_content`, and `MemoryCandidate::admission_score` before the
+benchmark was valid. Removing those items in a patch correction would itself break the crate's
+published source surface. They remain available for compatibility and benchmark diagnostics, but
+the production extractor does not use the experimental score to admit or order candidates.
+Removal or redesign requires a separately documented semver migration; this compatibility hold is
+not a Go decision.
+
 ## Related
 
 - ADR-016 Layered Agent Memory Architecture

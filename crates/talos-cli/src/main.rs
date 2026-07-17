@@ -233,6 +233,13 @@ pub(crate) struct Cli {
     workspace: Option<String>,
 
     #[arg(
+        long = "plugin",
+        value_name = "DIRECTORY",
+        help = "Explicitly load a confined local read-only WASM plugin package. May be repeated."
+    )]
+    plugin_packages: Vec<PathBuf>,
+
+    #[arg(
         long,
         help = "Use mock LLM provider for testing (no API key required)."
     )]

@@ -5,11 +5,15 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use talos_core::tool::{
-    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+    AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolPermissionFacet,
+    ToolResourceKind, ToolResult,
 };
 use talos_core::tool_parameters;
 
-use super::{DeleteError, FileSnapshotRegistry, FileToolError, resolve_workspace_path};
+use super::{
+    DeleteError, FileSnapshotRegistry, FileToolError, resolve_authorized_path,
+    resolve_workspace_path,
+};
 
 /// Input parameters for the [`DeleteTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -44,11 +48,21 @@ impl DeleteTool {
         }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let delete_input: DeleteInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_workspace_path(&self.workspace_root, &delete_input.path)?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &delete_input.path,
+            "delete",
+            ToolNature::Write,
+            authorizations,
+        )?;
 
         if !path.exists() {
             return Err(FileToolError::FileNotFound(delete_input.path));
@@ -103,7 +117,18 @@ impl AgentTool for DeleteTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }

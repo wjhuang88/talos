@@ -1,6 +1,6 @@
 # Iteration I131: TOOL-021 Error Propagation Audit
 
-> Document status: Complete — audit deliverable closed; FINDING-2 data loss tracked by SESSION-006 (Open)
+> Document status: Complete — audit deliverable closed; FINDING-2 fixed by I135/SESSION-006 on 2026-07-17
 > Published plan date: 2026-07-16
 > Planned objective: Establish whether tool failures are preserved, classified, and made available to the next model request on every supported provider path.
 > MVP deliverable: Reviewed fixture matrix proving each tool-error route is preserved or explicitly rejected; follow-up owner stories for any finding.

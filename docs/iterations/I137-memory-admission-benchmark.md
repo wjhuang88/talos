@@ -1,6 +1,6 @@
 # Iteration I137: Memory Admission Benchmark
 
-> Document status: Complete — benchmark calls production function but does not compare all 4 policies, no machine-readable artifact, routine-length fixture wrongly admitted
+> Document status: Complete — corrective No-Go benchmark accepted 2026-07-17
 > Published plan date: 2026-07-16
 > Planned objective: decide with reproducible evidence whether MEM-009 should replace the current admission heuristic.
 > Baseline rule: this is a benchmark/decision iteration; it does not authorize runtime replacement.
@@ -67,3 +67,26 @@
 ## Variance And Residuals
 
 - Runtime application, if justified, belongs to I138.
+
+## 2026-07-17 Corrective Review
+
+The prior “Go” did not satisfy the published benchmark baseline. The corrected frozen corpus has 16
+fixtures across 11 categories and compares the current heuristic, recency, novelty-only,
+committed-utility-only, and combined policy on identical labels. It reports precision,
+important-item recall, duplicate admission, contradiction handling, old-important retention,
+admitted characters, bounded false-positive/false-negative examples, and deterministic reason
+counts.
+
+The checked-in report is
+`docs/reference/MEM-009-BENCHMARK-RESULT-2026-07-17.json`; a test generates it twice and compares
+bytes. The predeclared combined-policy rule yields **No-Go** because the duplicate fixture is
+admitted (and the recency-conflict fixture is missed). The sparse reference index also remains
+No-Go because no frozen exact-recall corpus demonstrates material benefit. No production policy
+change is authorized.
+
+## 2026-07-17 Corrective Acceptance
+
+The five-policy report is byte-stable under repeated generation, covers all frozen categories, and
+selects No-Go using the predeclared rule. The final locked workspace test and release-preflight
+replay pass. I137 closes as a decision benchmark; it does not authorize production replacement or
+sparse indexing.

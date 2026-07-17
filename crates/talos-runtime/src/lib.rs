@@ -16,7 +16,9 @@ use talos_core::provider::LanguageModel;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus,
 };
-use talos_core::tool::{AgentTool, ToolPermissionFacet, ToolRegistry, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolAuthorizationScope, ToolPermissionFacet, ToolRegistry, ToolResult,
+};
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
@@ -357,6 +359,32 @@ struct RuntimePermissionAwareTool {
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
 }
 
+impl RuntimePermissionAwareTool {
+    async fn execute_with_authorization(
+        &self,
+        input: Value,
+        profile: &[ToolPermissionFacet],
+        scope: ToolAuthorizationScope,
+    ) -> ToolResult {
+        let authorizations = match self.engine.lock() {
+            Ok(engine) => {
+                match engine.execution_authorizations(self.inner.name(), profile, &input, scope) {
+                    Ok(authorizations) => authorizations,
+                    Err(error) => {
+                        return ToolResult::error(format!(
+                            "Permission denied: invalid execution authorization: {error}"
+                        ));
+                    }
+                }
+            }
+            Err(_) => {
+                return ToolResult::error("Permission denied: permission engine lock poisoned");
+            }
+        };
+        self.inner.execute_authorized(input, &authorizations).await
+    }
+}
+
 #[async_trait]
 impl AgentTool for RuntimePermissionAwareTool {
     fn name(&self) -> &str {
@@ -383,7 +411,10 @@ impl AgentTool for RuntimePermissionAwareTool {
         };
 
         match decision {
-            PermissionDecision::Allow => self.inner.execute(input).await,
+            PermissionDecision::Allow => {
+                self.execute_with_authorization(input, &profile, ToolAuthorizationScope::Persisted)
+                    .await
+            }
             PermissionDecision::Deny(reason) => {
                 ToolResult::error(format!("Permission denied: {reason}"))
             }
@@ -407,10 +438,22 @@ impl AgentTool for RuntimePermissionAwareTool {
                     )
                     .await
                 {
-                    ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
+                    ApprovalChoice::ApproveOnce => {
+                        self.execute_with_authorization(
+                            input,
+                            &profile,
+                            ToolAuthorizationScope::Once,
+                        )
+                        .await
+                    }
                     ApprovalChoice::AlwaysApprove => {
                         add_always_allow_rules(&self.engine, &profile, &input);
-                        self.inner.execute(input).await
+                        self.execute_with_authorization(
+                            input,
+                            &profile,
+                            ToolAuthorizationScope::Persisted,
+                        )
+                        .await
                     }
                     ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied"),
                 }
@@ -472,7 +515,7 @@ fn add_always_allow_rules(
             .resource_kind
             .map(ResourceKind::from)
             .or_else(|| Some(default_resource_kind(facet.nature)));
-        engine.add_rule(PermissionRule::new_nature(
+        engine.add_runtime_allow_rule(PermissionRule::new_nature(
             facet.nature,
             resource,
             resource_kind,
@@ -520,7 +563,7 @@ mod tests {
     use talos_permission::PermissionDecision;
     use talos_provider::mock::MockProvider;
     use talos_session::SessionManager;
-    use talos_tools::snapshot_aware_file_tools;
+    use talos_tools::{ReadTool, snapshot_aware_file_tools};
 
     use super::*;
 
@@ -971,6 +1014,112 @@ mod tests {
         assert_eq!(records[0].summary_fields, vec!["message"]);
 
         runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn external_read_requires_approval_and_receives_exact_path_authorization() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let external = tempfile::NamedTempFile::new().expect("external file");
+        std::fs::write(external.path(), "external content").expect("write fixture");
+        let records = Arc::new(StdMutex::new(Vec::new()));
+        let handler = Arc::new(RecordingApprovalHandler::new(
+            ApprovalChoice::ApproveOnce,
+            records.clone(),
+        ));
+        let tool = RuntimePermissionAwareTool {
+            inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
+            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
+                workspace.path().to_path_buf(),
+            ))),
+            approval_handler: Some(handler),
+        };
+
+        let result = tool
+            .execute(serde_json::json!({"path": external.path().to_string_lossy()}))
+            .await;
+
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("external content"));
+        assert_eq!(records.lock().expect("records lock").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn external_read_without_handler_fails_closed() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let external = tempfile::NamedTempFile::new().expect("external file");
+        std::fs::write(external.path(), "must not be read").expect("write fixture");
+        let tool = RuntimePermissionAwareTool {
+            inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
+            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
+                workspace.path().to_path_buf(),
+            ))),
+            approval_handler: None,
+        };
+
+        let result = tool
+            .execute(serde_json::json!({"path": external.path().to_string_lossy()}))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("approval required"));
+        assert!(!result.content.contains("must not be read"));
+    }
+
+    #[tokio::test]
+    async fn external_read_explicit_denial_fails_closed() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let external = tempfile::NamedTempFile::new().expect("external file");
+        std::fs::write(external.path(), "private").expect("write fixture");
+        let handler = Arc::new(RecordingApprovalHandler::new(
+            ApprovalChoice::Deny,
+            Arc::new(StdMutex::new(Vec::new())),
+        ));
+        let tool = RuntimePermissionAwareTool {
+            inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
+            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
+                workspace.path().to_path_buf(),
+            ))),
+            approval_handler: Some(handler),
+        };
+
+        let result = tool
+            .execute(serde_json::json!({"path": external.path().to_string_lossy()}))
+            .await;
+
+        assert!(result.is_error);
+        assert!(result.content.contains("User denied"));
+        assert!(!result.content.contains("private"));
+    }
+
+    #[tokio::test]
+    async fn external_read_always_approve_reuses_exact_rule_without_second_prompt() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let external = tempfile::NamedTempFile::new().expect("external file");
+        std::fs::write(external.path(), "external content").expect("write fixture");
+        let records = Arc::new(StdMutex::new(Vec::new()));
+        let handler = Arc::new(RecordingApprovalHandler::new(
+            ApprovalChoice::AlwaysApprove,
+            records.clone(),
+        ));
+        let tool = RuntimePermissionAwareTool {
+            inner: Arc::new(ReadTool::new(workspace.path().to_path_buf())),
+            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
+                workspace.path().to_path_buf(),
+            ))),
+            approval_handler: Some(handler),
+        };
+        let input = serde_json::json!({"path": external.path().to_string_lossy()});
+
+        let first = tool.execute(input.clone()).await;
+        let second = tool.execute(input).await;
+
+        assert!(!first.is_error, "{}", first.content);
+        assert!(!second.is_error, "{}", second.content);
+        assert_eq!(
+            records.lock().expect("records lock").len(),
+            1,
+            "persisted exact-path Allow must suppress the second prompt"
+        );
     }
 
     #[tokio::test]

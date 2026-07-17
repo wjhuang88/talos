@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-16"
-status_note: "The 2026-07-16 four-month reliability/extensibility/memory-quality baseline is ready for one-pass unattended assignment: N200 then I135-I139, with per-phase commit/push/checkpoint and one final acceptance after N250. SESSION-006 is first; plugin authority stays local/read-only; MEM-009 is benchmark-gated; no release, dependency/API/format, permission, sandbox, credential, desktop, autonomous task, multi-instance, or v1 authority is granted. REL-002 remains NO-GO."
+last_audited_at: "2026-07-17"
+status_note: "I135-I138 corrective evidence and I140 SEC-001 exact external-path authorization are Complete after locked fmt/check/Clippy/workspace tests, release preflight, security review, governance validation, and diff check. I139 remains Review until commit/push and clean-main replay; REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"
@@ -63,7 +63,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "N200: publish/adopt the 2026-07-16 unattended baseline, run the full Start Gate, and activate only I135"
-    - "I135: close SESSION-006 while preserving ADR-042 durable failed-turn abort semantics"
-    - "I136-I139: continue one-pass only after predecessor gates, with per-stage commit/push/checkpoint and final-only acceptance"
+    - "Preserve the accepted I135-I138 and I140 corrective evidence and explicit residual boundaries"
+    - "Commit and push the accepted correction only on maintainer request, then replay I139 from clean main"
+    - "Keep REL-002 NO-GO until its independent qualifying evidence changes"
     - "Keep docs/BOARD.md synchronized as a derived operating view only; owner docs remain the source of truth"

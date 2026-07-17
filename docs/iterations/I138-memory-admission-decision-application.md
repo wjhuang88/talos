@@ -1,6 +1,6 @@
 # Iteration I138: Memory Admission Decision Application
 
-> Document status: Complete — AdmissionDecision and sensitive filter added but novelty is keyword heuristic not memory-coverage; routine chatter admitted; MemoryCandidate API changed
+> Document status: Complete — I137 No-Go applied and compatibility boundary accepted 2026-07-17
 > Published plan date: 2026-07-16
 > Planned objective: apply I137's predeclared Go/No-Go result without exceeding ADR-046.
 > Baseline rule: Go permits the minimal policy replacement below; No-Go permits evidence closure only and no runtime change.
@@ -64,3 +64,24 @@
 ## Variance And Residuals
 
 - None at publication.
+
+## 2026-07-17 Corrective Review
+
+The earlier implementation incorrectly treated an insufficient benchmark as Go, changed
+`MemoryCandidate`, and replaced production admission with another keyword heuristic. The corrected
+I137 result is No-Go, so I138 restores the pre-experiment extractor admission, confidence
+calculation, and ordering. Because the experimental types/field had already landed on `main`, they
+remain as an inert compatibility/benchmark surface under ADR-046 rather than being removed in a
+breaking patch.
+
+Credential-shaped content remains rejected before memory writes as an independent hard safety
+control; that filter does not select the experimental policy. Sparse indexing is not implemented.
+The reversal trigger is a new frozen corpus/report that passes every declared decision condition,
+including duplicate rejection and exact-recall material-benefit evidence.
+
+## 2026-07-17 Corrective Acceptance
+
+The production extractor uses the pre-experiment confidence, admission, and ordering behavior.
+The already-published experimental API remains inert for semver compatibility, while the
+independent credential-shaped-content rejection remains active. The locked workspace tests and
+release preflight pass with no storage-format, dependency, or runtime-policy expansion.

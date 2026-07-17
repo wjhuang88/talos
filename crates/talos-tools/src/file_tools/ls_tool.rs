@@ -4,10 +4,13 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolPermissionFacet,
+    ToolResourceKind, ToolResult,
+};
 use talos_core::tool_parameters;
 
-use super::{FileToolError, is_skip_dir, resolve_workspace_path};
+use super::{FileToolError, is_skip_dir, resolve_authorized_path};
 
 /// Input parameters for the [`LsTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -32,7 +35,11 @@ impl LsTool {
         Self { workspace_root }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let ls_input: LsInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
@@ -42,7 +49,13 @@ impl LsTool {
             .unwrap_or_else(|_| self.workspace_root.clone());
 
         let target = match &ls_input.path {
-            Some(p) => resolve_workspace_path(&self.workspace_root, p)?,
+            Some(p) => resolve_authorized_path(
+                &self.workspace_root,
+                p,
+                "ls",
+                ToolNature::Read,
+                authorizations,
+            )?,
             None => canonical_root.clone(),
         };
 
@@ -113,7 +126,18 @@ impl AgentTool for LsTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
@@ -124,6 +148,17 @@ impl AgentTool for LsTool {
     }
     fn family(&self) -> ToolFamily {
         ToolFamily::File
+    }
+
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        match input.get("path").and_then(Value::as_str) {
+            Some(path) => vec![ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                path,
+                ToolResourceKind::Path,
+            )],
+            None => vec![ToolPermissionFacet::new(ToolNature::Read)],
+        }
     }
     fn is_always_on(&self) -> bool {
         true

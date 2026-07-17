@@ -1299,3 +1299,57 @@ fn deny_rule_still_wins_for_external_path() {
 
     std::fs::remove_file(&external).ok();
 }
+
+#[test]
+fn exact_allow_rule_is_reused_for_external_path() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
+
+    let root = std::env::temp_dir().join(format!("talos-sec001-allow-{}", std::process::id()));
+    let external =
+        std::env::temp_dir().join(format!("talos-sec001-allow-out-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    std::fs::write(&external, "data").expect("external file");
+
+    let mut engine = PermissionEngine::with_workspace_root(root);
+    engine.add_runtime_allow_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        Some(external.to_string_lossy().to_string()),
+        Some(ResourceKind::Path),
+        PermissionDecision::Allow,
+    ));
+    let facet = ToolPermissionFacet::with_resource(
+        ToolNature::Read,
+        external.to_string_lossy(),
+        ToolResourceKind::Path,
+    );
+    let input = serde_json::json!({"path": external.to_string_lossy()});
+
+    assert_eq!(
+        engine.evaluate_facet("read", &facet, &input),
+        PermissionDecision::Allow,
+        "an exact persisted external-path Allow must suppress repeated prompts"
+    );
+
+    std::fs::remove_file(&external).ok();
+}
+
+#[test]
+fn read_facet_without_path_keeps_default_allow() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet};
+
+    let root = std::env::temp_dir().join(format!("talos-sec001-no-path-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    let engine = PermissionEngine::with_workspace_root(root.clone());
+
+    assert_eq!(
+        engine.evaluate_facet(
+            "remote_metadata",
+            &ToolPermissionFacet::new(ToolNature::Read),
+            &serde_json::json!({})
+        ),
+        PermissionDecision::Allow,
+        "a read-only tool with no path resource is not an external file access"
+    );
+
+    std::fs::remove_dir_all(root).ok();
+}

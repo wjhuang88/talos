@@ -1,0 +1,10 @@
+[plugin]
+name = "read-only-demo"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "demo.wat"
+description = "Offline read-only plugin fixture"
+
+[[tools]]
+name = "answer"
+handler = "demo.wat"

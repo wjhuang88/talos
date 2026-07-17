@@ -12,9 +12,11 @@ use serde_json::Value;
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
 use talos_core::tool::{
-    AgentTool, ToolBackend, ToolFamily, ToolPermissionFacet, ToolRegistry, ToolResult,
+    AgentTool, ToolAuthorizationScope, ToolBackend, ToolExecutionAuthorization, ToolFamily,
+    ToolPermissionFacet, ToolRegistry, ToolResult,
 };
 use talos_permission::{PermissionDecision, PermissionEngine};
+use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
 use talos_session::{
     SessionManager, TodoAddDependencyTool, TodoCreateBatchTool, TodoCreateTool, TodoDeleteTool,
     TodoQueryTool, TodoRemoveDependencyTool, TodoUpdateBatchTool, TodoUpdateStatusTool,
@@ -156,6 +158,20 @@ impl TuiApprovalHandler {
         let mut engine = self.engine.lock().expect("engine lock poisoned");
         add_always_allow_rules(&mut engine, tool_name, profile, input);
     }
+
+    fn execution_authorizations(
+        &self,
+        tool_name: &str,
+        profile: &[ToolPermissionFacet],
+        input: &Value,
+        scope: ToolAuthorizationScope,
+    ) -> Result<Vec<ToolExecutionAuthorization>, String> {
+        self.engine
+            .lock()
+            .map_err(|_| "permission engine lock poisoned".to_string())?
+            .execution_authorizations(tool_name, profile, input, scope)
+            .map_err(|error| error.to_string())
+    }
 }
 
 fn default_todo_tools(session_id: Uuid) -> Vec<Arc<dyn AgentTool>> {
@@ -238,11 +254,39 @@ impl AgentTool for TuiPermissionAwareTool {
             .await;
 
         match choice {
-            ApprovalChoice::ApproveOnce => self.inner.execute(input).await,
+            ApprovalChoice::ApproveOnce => {
+                let authorizations = match self.approval.execution_authorizations(
+                    &tool_name,
+                    &profile,
+                    &input,
+                    ToolAuthorizationScope::Once,
+                ) {
+                    Ok(authorizations) => authorizations,
+                    Err(error) => {
+                        return ToolResult::error(format!(
+                            "Permission denied: invalid execution authorization: {error}"
+                        ));
+                    }
+                };
+                self.inner.execute_authorized(input, &authorizations).await
+            }
             ApprovalChoice::AlwaysApprove => {
                 self.approval
                     .add_always_allow_rules(&tool_name, &profile, &input);
-                self.inner.execute(input).await
+                let authorizations = match self.approval.execution_authorizations(
+                    &tool_name,
+                    &profile,
+                    &input,
+                    ToolAuthorizationScope::Persisted,
+                ) {
+                    Ok(authorizations) => authorizations,
+                    Err(error) => {
+                        return ToolResult::error(format!(
+                            "Permission denied: invalid execution authorization: {error}"
+                        ));
+                    }
+                };
+                self.inner.execute_authorized(input, &authorizations).await
             }
             ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
         }
@@ -353,7 +397,30 @@ impl AgentTool for PermissionAwareTool {
         };
 
         match decision {
-            PermissionDecision::Allow => self.inner.execute(input).await,
+            PermissionDecision::Allow => {
+                let authorizations = {
+                    let approval = match self.approval.lock() {
+                        Ok(approval) => approval,
+                        Err(_) => {
+                            return ToolResult::error("Permission denied: approval lock poisoned");
+                        }
+                    };
+                    match approval.engine().execution_authorizations(
+                        &tool_name,
+                        &profile,
+                        &input,
+                        ToolAuthorizationScope::Persisted,
+                    ) {
+                        Ok(authorizations) => authorizations,
+                        Err(error) => {
+                            return ToolResult::error(format!(
+                                "Permission denied: invalid execution authorization: {error}"
+                            ));
+                        }
+                    }
+                };
+                self.inner.execute_authorized(input, &authorizations).await
+            }
             PermissionDecision::Deny(reason) => {
                 ToolResult::error(format!("Permission denied: {reason}"))
             }
@@ -444,6 +511,75 @@ pub(crate) fn register_tui_permission_aware_tools(
             approval: approval.clone(),
         }));
     }
+}
+
+type LoadedPluginTools = (Vec<Arc<dyn AgentTool>>, LoadedPluginPackage);
+
+fn load_explicit_plugin_tools(
+    registry: &ToolRegistry,
+    package_roots: &[PathBuf],
+) -> Result<Vec<LoadedPluginTools>, String> {
+    if package_roots.is_empty() {
+        return Ok(Vec::new());
+    }
+    let runtime = Arc::new(
+        WasmRuntime::new(100_000, 250)
+            .map_err(|error| format!("failed to initialize WASM runtime: {error}"))?,
+    );
+    let mut loaded = Vec::with_capacity(package_roots.len());
+    let mut pending_names = HashSet::new();
+    for package_root in package_roots {
+        let (tools, package) =
+            load_read_only_wasm_package(runtime.clone(), package_root).map_err(|error| {
+                format!(
+                    "failed to load plugin package '{}': {error}",
+                    package_root.display()
+                )
+            })?;
+        for tool in &tools {
+            let name = tool.name().to_string();
+            if registry.get(&name).is_some() || !pending_names.insert(name.clone()) {
+                return Err(format!(
+                    "plugin tool name collides with registered tool: {name}"
+                ));
+            }
+        }
+        loaded.push((tools, package));
+    }
+    Ok(loaded)
+}
+
+/// Loads explicitly selected local packages and registers their tools behind
+/// the blocking/print permission adapter.
+pub(crate) fn register_explicit_permission_aware_plugins(
+    registry: &mut ToolRegistry,
+    package_roots: &[PathBuf],
+    approval: Arc<Mutex<ApprovalPrompt>>,
+    print_mode: bool,
+) -> Result<Vec<LoadedPluginPackage>, String> {
+    let loaded = load_explicit_plugin_tools(registry, package_roots)?;
+    let mut packages = Vec::with_capacity(loaded.len());
+    for (tools, package) in loaded {
+        register_permission_aware_tools(registry, &tools, approval.clone(), print_mode);
+        packages.push(package);
+    }
+    Ok(packages)
+}
+
+/// Loads explicitly selected local packages and registers their tools behind
+/// the non-blocking TUI permission adapter.
+pub(crate) fn register_explicit_tui_plugins(
+    registry: &mut ToolRegistry,
+    package_roots: &[PathBuf],
+    approval: Arc<TuiApprovalHandler>,
+) -> Result<Vec<LoadedPluginPackage>, String> {
+    let loaded = load_explicit_plugin_tools(registry, package_roots)?;
+    let mut packages = Vec::with_capacity(loaded.len());
+    for (tools, package) in loaded {
+        register_tui_permission_aware_tools(registry, &tools, approval.clone());
+        packages.push(package);
+    }
+    Ok(packages)
 }
 
 /// A lightweight health/status tool for MCP mode.
@@ -880,6 +1016,43 @@ mod tests {
                 server: "test".to_string()
             }
         );
+    }
+
+    #[tokio::test]
+    async fn explicit_checked_in_plugin_loads_registers_and_executes_offline() {
+        let package = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../talos-plugin/tests/fixtures/read-only-demo");
+        let mut registry = ToolRegistry::new();
+        let approval = Arc::new(Mutex::new(ApprovalPrompt::new(
+            PermissionEngine::with_workspace_root(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .expect("workspace parent")
+                    .parent()
+                    .expect("workspace root")
+                    .to_path_buf(),
+            ),
+        )));
+
+        let packages =
+            register_explicit_permission_aware_plugins(&mut registry, &[package], approval, true)
+                .expect("plugin loads");
+
+        assert_eq!(packages.len(), 1);
+        assert_eq!(
+            packages[0].capabilities,
+            vec!["read-only-demo.answer".to_string()]
+        );
+        let tool = registry
+            .get("read-only-demo.answer")
+            .expect("plugin tool registered");
+        assert!(matches!(
+            tool.provenance(),
+            ToolProvenance::Plugin { ref name, .. } if name == "read-only-demo"
+        ));
+        let result = tool.execute(serde_json::json!({})).await;
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("returned 7"));
     }
 
     #[tokio::test]

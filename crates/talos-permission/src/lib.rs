@@ -67,7 +67,9 @@ pub use rule::{PermissionError, PermissionRule};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use talos_core::tool::{ToolNature, ToolPermissionFacet};
+use talos_core::tool::{
+    ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature, ToolPermissionFacet,
+};
 
 /// The decision produced by the permission engine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -201,12 +203,12 @@ impl PermissionEngine {
         self.rules.push(rule);
     }
 
-    /// Adds a runtime "always allow" rule ahead of the default catch-all ask.
+    /// Adds a runtime "always allow" rule ahead of the default catch-all rule.
     ///
     /// This is used for user-approved session rules. It preserves existing
     /// deny rules and other custom policy rules that appear before the default
     /// catch-all ask rule for the same nature, while ensuring the newly approved
-    /// resource is not shadowed by the default ask rule.
+    /// resource is not shadowed by the default read-allow or mutating ask rule.
     pub fn add_runtime_allow_rule(&mut self, rule: PermissionRule) {
         let insert_at = rule
             .nature
@@ -214,7 +216,8 @@ impl PermissionEngine {
                 self.rules.iter().position(|existing| {
                     existing.nature == Some(nature)
                         && existing.resource.is_none()
-                        && existing.decision == PermissionDecision::Ask
+                        && existing.path_pattern.is_none()
+                        && !matches!(existing.decision, PermissionDecision::Deny(_))
                 })
             })
             .unwrap_or(self.rules.len());
@@ -295,7 +298,7 @@ impl PermissionEngine {
         for rule in &self.rules {
             match rule.matches(tool_name, nature, input, facet.resource.as_deref()) {
                 Ok(true) => {
-                    matched_rule = Some(rule.decision.clone());
+                    matched_rule = Some(rule);
                     break;
                 }
                 Ok(false) => continue,
@@ -306,7 +309,11 @@ impl PermissionEngine {
         // A persisted workspace trust decision is deliberately narrower than a
         // general permission Allow: it applies only to repo-contained writes.
         // Explicit Deny rules remain authoritative.
-        if let Some(PermissionDecision::Deny(reason)) = &matched_rule {
+        if let Some(PermissionRule {
+            decision: PermissionDecision::Deny(reason),
+            ..
+        }) = matched_rule
+        {
             return PermissionDecision::Deny(reason.clone());
         }
 
@@ -318,32 +325,27 @@ impl PermissionEngine {
             return PermissionDecision::Allow;
         }
 
-        // SEC-001: External path check BEFORE default rule returns Allow.
-        // When a workspace root is configured and the file path is outside,
-        // require Ask even for reads. Deny rules already checked above.
-        if let Some(root) = &self.workspace_root {
+        // SEC-001: only concrete path resources participate in the workspace
+        // boundary. Read-only tools without a path retain their previous
+        // default behavior.
+        if facet_uses_path_resource(facet, input)
+            && let Some(root) = &self.workspace_root
+        {
             let in_workspace =
                 is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref());
             if !in_workspace {
+                if let Some(rule) = matched_rule
+                    && rule_has_concrete_path_scope(rule)
+                    && rule.decision == PermissionDecision::Allow
+                {
+                    return PermissionDecision::Allow;
+                }
                 return PermissionDecision::Ask;
             }
         }
 
-        if let Some(decision) = matched_rule {
-            return decision;
-        }
-
-        // SEC-001: When a workspace root is configured, check if the file path
-        // is inside or outside the workspace. External paths require explicit
-        // user approval (Ask) even for reads, rather than default Allow.
-        if let Some(root) = &self.workspace_root {
-            let in_workspace =
-                is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref());
-            if !in_workspace {
-                // External path: require approval for all natures.
-                // Deny rules already checked above. No explicit Allow rule matched.
-                return PermissionDecision::Ask;
-            }
+        if let Some(rule) = matched_rule {
+            return rule.decision.clone();
         }
 
         match nature {
@@ -354,6 +356,59 @@ impl PermissionEngine {
             | talos_core::tool::ToolNature::Execute
             | talos_core::tool::ToolNature::Network => PermissionDecision::Ask,
         }
+    }
+
+    /// Returns the configured workspace root, if any.
+    #[must_use]
+    pub fn workspace_root(&self) -> Option<&Path> {
+        self.workspace_root.as_deref()
+    }
+
+    /// Builds exact path authorizations after a permission decision has been
+    /// resolved by a composition root.
+    ///
+    /// Non-path facets do not produce an authorization. This method does not
+    /// evaluate permission and must only be called after `Allow` or explicit
+    /// user approval.
+    pub fn execution_authorizations(
+        &self,
+        tool_name: &str,
+        profile: &[ToolPermissionFacet],
+        input: &Value,
+        scope: ToolAuthorizationScope,
+    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionError> {
+        let Some(root) = self.workspace_root.as_deref() else {
+            return Ok(Vec::new());
+        };
+        let mut authorizations = Vec::new();
+        for facet in profile {
+            if !facet_uses_path_resource(facet, input) {
+                continue;
+            }
+            let resource = facet
+                .resource
+                .clone()
+                .or_else(|| ResourceExtractor::extract(facet.nature, input))
+                .ok_or_else(|| {
+                    PermissionError::InvalidRule(
+                        "path permission facet has no concrete resource".to_string(),
+                    )
+                })?;
+            let authorization = ToolExecutionAuthorization::for_path(
+                tool_name,
+                facet.nature,
+                root,
+                &resource,
+                scope,
+            )
+            .map_err(|error| {
+                PermissionError::InvalidRule(format!(
+                    "failed to normalize authorized path '{resource}': {error}"
+                ))
+            })?;
+            authorizations.push(authorization);
+        }
+        Ok(authorizations)
     }
 
     /// Evaluates a command execution request with access evidence (ADR-040).
@@ -507,6 +562,30 @@ fn is_workspace_path_allowed_with_resource(
         }
     }
     false
+}
+
+fn facet_uses_path_resource(facet: &ToolPermissionFacet, input: &Value) -> bool {
+    let kind = facet
+        .resource_kind
+        .map(ResourceKind::from)
+        .unwrap_or_else(|| match facet.nature {
+            ToolNature::Read | ToolNature::Write => ResourceKind::Path,
+            ToolNature::Execute => ResourceKind::Command,
+            ToolNature::Network => ResourceKind::Domain,
+            ToolNature::Internal => ResourceKind::Remote,
+        });
+    kind == ResourceKind::Path
+        && (facet.resource.is_some() || ResourceExtractor::extract(facet.nature, input).is_some())
+}
+
+fn rule_has_concrete_path_scope(rule: &PermissionRule) -> bool {
+    let kind = rule.resource_kind.unwrap_or(match rule.nature {
+        Some(ToolNature::Read | ToolNature::Write) => ResourceKind::Path,
+        Some(ToolNature::Execute) => ResourceKind::Command,
+        Some(ToolNature::Network) => ResourceKind::Domain,
+        Some(ToolNature::Internal) | None => ResourceKind::Remote,
+    });
+    kind == ResourceKind::Path && (rule.resource.is_some() || rule.path_pattern.is_some())
 }
 
 /// Checks whether `path` is within (or relative to) the workspace `root`.

@@ -1,7 +1,7 @@
 # I139: Four-Month Reliability Closeout — Final Acceptance Packet
 
 **Date**: 2026-07-16
-**Status**: Complete — all packages N200-N250 delivered
+**Status**: Review after superseding corrective acceptance (2026-07-17)
 
 ## Package Summary
 
@@ -85,3 +85,32 @@ Remaining gaps for a future pre-1.0 patch:
 - No release, tag, publish, deploy, permission, or API change authorized
 
 **Publication remains a separate maintainer decision.**
+
+## 2026-07-17 Superseding Correction
+
+The original packet is retained as historical evidence but is not the current acceptance truth.
+Its I135 failure injection was synthetic, I136 did not expose a real loaded-package path, I137 did
+not meet the published comparison/artifact requirements, and I138 applied an unsupported Go.
+
+Current truth lives in I135-I140 and the execution package checkpoint: real persistence failure
+injection, explicit local package loading with typed `/plugins` state, a byte-stable five-policy
+No-Go report, restored production memory behavior, and SEC-001 exact external-path authorization.
+This packet may be marked Complete again only after the corrective full locked ladder passes.
+
+## 2026-07-17 Corrective Acceptance
+
+The corrective ladder passed: locked fmt/check/Clippy/workspace tests, release preflight,
+governance validation, and `git diff --check` are green on the corrected working tree. The
+accepted implementation package is:
+
+- I135: real persistence failure injection plus reconstructed durable transcript evidence.
+- I136: explicit confined offline package loading, permission/provenance execution, and typed
+  `/plugins` state.
+- I137: a byte-stable five-policy benchmark selecting No-Go.
+- I138: production memory baseline restored; published experimental API retained inert for semver
+  compatibility; credential-shaped-content rejection remains independent.
+- I140: exact external-path authorization accepted under ADR-047 and its security review.
+
+The earlier Go/transition-notice/synthetic-failure claims remain historical and superseded.
+I139 itself remains Review until these corrections are committed/pushed and replayed from clean
+`main`. REL-002 remains NO-GO, and this acceptance does not publish a release.

@@ -1,6 +1,6 @@
 # Iteration I135: Session Error-Path Integrity
 
-> Document status: Complete — persistence failure handling improved but failure-injection test and durable transcript verification still needed
+> Document status: Complete — corrective evidence and full locked replay accepted 2026-07-17
 > Published plan date: 2026-07-16
 > Planned objective: close SESSION-006 without weakening I128 durable-turn atomicity.
 > Baseline rule: preserve this target; changed persistence semantics use change control or a new iteration ID.
@@ -95,3 +95,19 @@
 - Lessons: The fix separates interactive prefix persistence (always saves valid completed exchanges)
   from durable Runtime turn commit (only on success). ADR-042's failed-turn abort is preserved
   because no `commit_turn` call happens on the error path.
+
+## 2026-07-17 Corrective Review
+
+The earlier persistence-failure fixture only asserted a synthetic error string and did not make the
+store fail. It now removes the session parent directory and replaces it with a regular file before
+the provider error is persisted. The terminal error must contain both the provider failure and the
+real filesystem persistence failure. `fixture_durable_transcript_empty_after_failed_turn` reopens
+the durable binding and proves the transcript remains empty. Final status returns to Complete only
+after the full locked ladder passes on this corrective diff.
+
+## 2026-07-17 Corrective Acceptance
+
+The real filesystem-failure and reconstructed durable-transcript regressions pass. The final
+locked workspace test run, release preflight, governance validation, and diff check are green.
+SESSION-006 is Complete without changing ADR-042, TLOG format, public API, dependencies, or
+permission semantics.

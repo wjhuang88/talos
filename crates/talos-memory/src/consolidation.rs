@@ -3,10 +3,10 @@
 //! Reads session episodes, extracts semantic memory candidates via a pluggable
 //! [`EpisodeExtractor`], and writes them to [`MemoryStore`] with evidence links.
 //!
-//! Admission scoring (`novelty × committed_utility`) is separated from evidence
-//! confidence (`MemoryItem.confidence`). Sensitive content is rejected before
-//! any memory write.
-//! [`RuleBasedExtractor`]. No LLM or network calls are made.
+//! The I137 benchmark selected No-Go, so [`RuleBasedExtractor`] retains the
+//! production baseline. Previously published admission types remain as a
+//! compatibility/benchmark surface only. Sensitive content is rejected before
+//! any memory write. No LLM or network calls are made.
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -243,6 +243,7 @@ pub struct SessionEpisode {
 }
 
 /// A memory candidate extracted from session episodes.
+#[derive(Debug, Clone)]
 pub struct MemoryCandidate {
     /// The kind of memory this candidate represents.
     pub kind: MemoryKind,
@@ -250,12 +251,11 @@ pub struct MemoryCandidate {
     pub key: String,
     /// The full content of the memory.
     pub content: String,
-    /// Evidence confidence (0.0 to 1.0) — how well-supported the claim is.
-    /// Separate from admission score per ADR-046.
+    /// Confidence score (0.0 to 1.0).
     pub confidence: f64,
-    /// Admission score (novelty × committed_utility, 0.0 to 1.0) — whether
-    /// this candidate should be written to memory. Separate from evidence
-    /// confidence per ADR-046.
+    /// Compatibility-only admission score published during the I138
+    /// experiment. The production extractor does not use this field for
+    /// admission or ordering after the I137 No-Go correction.
     pub admission_score: f64,
     /// The session this candidate was extracted from.
     pub source_session_id: String,
@@ -307,32 +307,41 @@ impl EpisodeExtractor for RuleBasedExtractor {
         let mut candidates: Vec<MemoryCandidate> = Vec::new();
 
         for episode in episodes {
-            // Evaluate admission (handles role, length, sensitive content,
-            // and novelty × utility threshold).
-            let decision = evaluate_admission(&episode.content, &episode.role);
-            if !decision.admit {
+            if episode.content.len() < 10 {
+                continue;
+            }
+            if episode.role == "system" || episode.role == "tool" {
+                continue;
+            }
+            if episode.role != "user" && episode.role != "assistant" {
+                continue;
+            }
+            // Credential-shaped content is a hard safety rejection independent
+            // of the I137 policy experiment.
+            if is_sensitive_content(&episode.content) {
                 continue;
             }
 
             let key = derive_key(&episode.content);
-            let evidence_confidence = 0.5_f64;
+            let confidence = compute_confidence(&episode.content, &episode.role);
 
             candidates.push(MemoryCandidate {
                 kind: MemoryKind::Semantic,
                 key,
                 content: episode.content.clone(),
-                confidence: evidence_confidence,
-                admission_score: decision.score,
+                confidence,
+                admission_score: confidence,
                 source_session_id: episode.session_id.clone(),
                 source_entry_id: episode.entry_id.clone(),
                 source_turn_index: episode.turn_index,
             });
         }
 
-        // Sort by admission score descending, then by turn_index ascending.
+        // I137 selected No-Go, so the production extractor retains its
+        // pre-experiment confidence ordering.
         candidates.sort_by(|a, b| {
-            b.admission_score
-                .partial_cmp(&a.admission_score)
+            b.confidence
+                .partial_cmp(&a.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.source_turn_index.cmp(&b.source_turn_index))
         });
@@ -340,6 +349,19 @@ impl EpisodeExtractor for RuleBasedExtractor {
         candidates.truncate(self.max_candidates);
         candidates
     }
+}
+
+/// Compute confidence using the production baseline retained by I137 No-Go.
+fn compute_confidence(content: &str, role: &str) -> f64 {
+    let lower = content.trim_start().to_lowercase();
+    let markers = ["remember", "note", "important", "always", "never"];
+    if markers.iter().any(|marker| lower.starts_with(marker)) {
+        return 0.8;
+    }
+    if role == "user" && content.len() > 50 {
+        return 0.6;
+    }
+    0.4
 }
 
 /// Derive a memory key from content: first 40 chars, truncated at first newline, trimmed.
@@ -773,7 +795,7 @@ mod tests {
     }
 
     #[test]
-    fn admission_score_separate_from_evidence_confidence() {
+    fn no_go_keeps_memory_candidate_shape_and_baseline_confidence() {
         let episodes = vec![SessionEpisode {
             session_id: "s1".into(),
             entry_id: "e1".into(),
@@ -786,17 +808,11 @@ mod tests {
         let candidates = extractor.extract(&episodes);
         assert!(!candidates.is_empty());
         let c = &candidates[0];
-        // Evidence confidence is a fixed value (0.5)
-        assert_eq!(c.confidence, 0.5, "evidence confidence should be fixed");
-        // Admission score is different and based on novelty × utility
-        assert_ne!(
-            c.admission_score, c.confidence,
-            "admission score must differ from evidence confidence"
-        );
-        assert!(
-            c.admission_score > 0.0,
-            "directive should have non-zero admission score"
-        );
+        assert_eq!(c.confidence, 0.8);
+        assert_eq!(c.admission_score, c.confidence);
+        let cloned = c.clone();
+        assert_eq!(cloned.key, c.key);
+        assert!(format!("{cloned:?}").contains("MemoryCandidate"));
     }
 
     #[test]

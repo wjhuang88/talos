@@ -5,7 +5,7 @@
 | Story ID | TOOL-021 |
 | Type | Technical audit |
 | Priority | P1 |
-| Status | Complete (2026-07-16, I131) — audit deliverable closed. FINDING-2 confirmed data loss tracked by SESSION-006 (Open). |
+| Status | Complete (2026-07-16, I131) — audit deliverable closed. FINDING-2 was fixed by I135/SESSION-006 on 2026-07-17. |
 | Source | [GitHub Issue #36](https://github.com/wjhuang88/talos/issues/36) |
 | Depends On | `TOOL-019`, `TOOL-002`, `RUNTIME-002` |
 

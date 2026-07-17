@@ -4,10 +4,10 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
+use talos_core::tool::{AgentTool, ToolExecutionAuthorization, ToolFamily, ToolNature, ToolResult};
 use talos_core::tool_parameters;
 
-use super::{FileSnapshotRegistry, FileToolError, resolve_workspace_path};
+use super::{FileSnapshotRegistry, FileToolError, resolve_authorized_path};
 use crate::file_tools::snapshot::{atomic_replace, digest, line_spans};
 
 const MAX_PREVIEW_LINES: usize = 20;
@@ -47,11 +47,21 @@ impl WriteTool {
         }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let write_input: WriteInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_workspace_path(&self.workspace_root, &write_input.path)?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &write_input.path,
+            "write",
+            ToolNature::Write,
+            authorizations,
+        )?;
 
         if path.exists() {
             return Err(FileToolError::FileExists(write_input.path));
@@ -90,7 +100,18 @@ impl AgentTool for WriteTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
@@ -143,14 +164,24 @@ impl EditTool {
         }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         if input.get("snapshot_id").is_some() {
-            return self.execute_anchored(input).await;
+            return self.execute_anchored(input, authorizations).await;
         }
         let edit_input: EditInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_workspace_path(&self.workspace_root, &edit_input.path)?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &edit_input.path,
+            "edit",
+            ToolNature::Write,
+            authorizations,
+        )?;
 
         if !path.exists() {
             return Err(FileToolError::FileNotFound(edit_input.path));
@@ -182,7 +213,11 @@ impl EditTool {
         ))
     }
 
-    async fn execute_anchored(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_anchored(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let anchored: AnchoredEditInput = serde_json::from_value(input)
             .map_err(|error| FileToolError::InvalidInput(error.to_string()))?;
         let registry = self
@@ -194,7 +229,13 @@ impl EditTool {
                 "at least one operation is required".into(),
             ));
         }
-        let path = resolve_workspace_path(&self.workspace_root, &anchored.path)?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &anchored.path,
+            "edit",
+            ToolNature::Write,
+            authorizations,
+        )?;
         if !path.exists() {
             return Err(FileToolError::FileNotFound(anchored.path));
         }
@@ -329,7 +370,18 @@ impl AgentTool for EditTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
