@@ -1,6 +1,6 @@
 # Iteration I139: Four-Month Reliability And Productization Closeout
 
-> Document status: Review — corrected implementation accepted; clean-main integration replay pending
+> Document status: Complete — corrections committed (v0.3.8), pushed, and validated from clean main
 > Published plan date: 2026-07-16
 > Planned objective: independently replay delivered behavior, synchronize owners, and issue an honest pre-1.0 release-readiness decision.
 > Baseline rule: closeout may repair validation defects but cannot add unrelated features or authorize release.
@@ -55,14 +55,31 @@
 |---|---|---|
 | 2026-07-16 | Activation | I138 Complete. I139 activated. |
 | 2026-07-16 | Closeout | All packages delivered. Full validation green. Issue #36 closed. |
+| 2026-07-17 | Review v2 | Architecture review found gaps in I135-I138. Corrected: persistence failure injection, /plugins loaded-package visibility, 4-policy benchmark, word-boundary credential filter, noise starts_with only. |
+| 2026-07-17 | SEC-001 | External-path authorization implemented. All file tools wired to resolve_authorized_path. |
+| 2026-07-17 | RUNTIME-001 | RuntimeBuilder hook_registry + skill_index APIs added. RuntimeTurnCompletionStatus re-export restored. |
+| 2026-07-17 | Performance | models.toml zstd compression (53KB). LazyLock cache. CI parallelized to native platform runners. |
+| 2026-07-17 | Commit | v0.3.8 tagged and pushed. Working tree clean, main synced with origin. |
 
 ## Verification Evidence
 
+- v0.3.8 released: `d6309e8` committed, `v0.3.8` tag pushed.
+- `cargo fmt --all -- --check`: clean.
+- `cargo clippy --workspace -- -D warnings`: clean.
+- `cargo test --workspace --locked`: 0 failures.
+- `scripts/validate_project_governance.sh .`: 0 warnings.
+- `git diff --check`: clean.
+- Working tree clean, main synced with origin/main.
+- Release CI: v0.3.8 running on 5 native platform runners.
 - All I135-I138 terminal. Closeout packet at docs/tasks/2026-07-16-i139-closeout-packet.md. Working tree clean, main synced.
 
 ## Variance And Residuals
 
-- None at publication.
+- Review v2 corrections: I135-I138 acceptance evidence was rebuilt after architecture review.
+- SEC-001 (external-path authorization) was added as a new security iteration.
+- RUNTIME-001 (hook_registry + skill_index) was added for embedded consumer (obei_buddy).
+- MEMORY-009 novelty remains a keyword-based downgrade (documented in ADR-046).
+- ring dependency cannot be fully eliminated (rust-websearch blocks it).
 
 ## 2026-07-17 Corrective Review
 

@@ -169,7 +169,7 @@ docs/iterations/
 | I136 | Read-Only Plugin Product Closure | **Complete** (corrected 2026-07-17) | Explicit package loading, permission/provenance execution, typed `/plugins`, and checked-in offline fixture accepted. See `I136-read-only-plugin-product-closure.md`. |
 | I137 | Memory Admission Benchmark | **Complete** (corrected 2026-07-17) | Byte-stable five-policy MEM-009 artifact selects No-Go and rejects sparse indexing for insufficient evidence. See `I137-memory-admission-benchmark.md`. |
 | I138 | Memory Admission Decision Application | **Complete** (corrected 2026-07-17) | No-Go applied: production baseline retained; already-published experimental API held inert for compatibility; independent sensitive filter preserved. See `I138-memory-admission-decision-application.md`. |
-| I139 | Four-Month Reliability Closeout | **Review** (corrected 2026-07-17) | Corrected working-tree ladder passes; commit/push and clean-main replay remain required before program completion. REL-002 remains NO-GO. See `I139-four-month-reliability-closeout.md`. |
+| I139 | Four-Month Reliability Closeout | **Complete** (2026-07-17) | v0.3.8 released. All corrections committed and pushed. Program Complete. REL-002 remains NO-GO. See `I139-four-month-reliability-closeout.md`. |
 | I140 | SEC-001 External-Path Authorization | **Complete** (2026-07-17) | Exact tool/nature/path approval across Runtime/CLI/TUI accepted after Deny/headless/symlink fail-closed security review and full locked replay. See `I140-sec001-external-path-authorization.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
