@@ -472,6 +472,7 @@ fn row_to_model(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelMetadata> {
             image_input: attachment,
         },
         release_date,
+        variants: vec![],
         source: str_to_model_source(&source_str),
     })
 }
@@ -867,6 +868,7 @@ mod tests {
             pricing: None,
             capabilities: ModelCapabilities::default(),
             release_date: None,
+            variants: vec![],
             source: ModelSource::ModelsDev {
                 refreshed_at: "2025-07-03T00:00:00Z".to_string(),
             },
@@ -1027,6 +1029,7 @@ mod tests {
             pricing: None,
             capabilities: ModelCapabilities::default(),
             release_date: None,
+            variants: vec![],
             source: ModelSource::Builtin,
         };
         seed_models(&catalog, &[model], "t");

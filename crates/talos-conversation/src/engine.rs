@@ -268,6 +268,7 @@ impl ConversationEngine {
             context_limit: self.context_limit,
             input_price_per_million: self.input_price_per_million,
             output_price_per_million: self.output_price_per_million,
+            variant: None,
         }
     }
 

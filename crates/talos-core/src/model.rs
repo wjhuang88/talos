@@ -85,6 +85,9 @@ pub struct ModelMetadata {
     /// Where this metadata originated.
     #[serde(default)]
     pub source: ModelSource,
+    /// Named invocation presets for this model (ADR-048).
+    #[serde(default)]
+    pub variants: Vec<VariantDef>,
 }
 
 /// Look up a model by id in a dataset.
@@ -191,6 +194,7 @@ mod tests {
                 pricing: None,
                 capabilities: ModelCapabilities::default(),
                 release_date: None,
+                variants: vec![],
                 source: ModelSource::Builtin,
             },
             ModelMetadata {
@@ -201,6 +205,7 @@ mod tests {
                 pricing: None,
                 capabilities: ModelCapabilities::default(),
                 release_date: None,
+                variants: vec![],
                 source: ModelSource::Builtin,
             },
         ];
@@ -227,6 +232,7 @@ mod tests {
                 pricing: None,
                 capabilities: ModelCapabilities::default(),
                 release_date: None,
+                variants: vec![],
                 source: ModelSource::Builtin,
             },
             ModelMetadata {
@@ -237,6 +243,7 @@ mod tests {
                 pricing: None,
                 capabilities: ModelCapabilities::default(),
                 release_date: None,
+                variants: vec![],
                 source: ModelSource::Builtin,
             },
             ModelMetadata {
@@ -247,6 +254,7 @@ mod tests {
                 pricing: None,
                 capabilities: ModelCapabilities::default(),
                 release_date: None,
+                variants: vec![],
                 source: ModelSource::Builtin,
             },
         ];
@@ -301,4 +309,13 @@ mod tests {
         assert_eq!(meta.capabilities, roundtrip.capabilities);
         assert_eq!(meta.source, roundtrip.source);
     }
+}
+
+/// A named invocation preset (ADR-048). Lives in talos-core to avoid
+/// a talos-config dependency from talos-conversation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+pub struct VariantDef {
+    pub id: String,
+    pub label: String,
+    pub reasoning_effort: Option<String>,
 }

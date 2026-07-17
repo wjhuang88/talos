@@ -53,6 +53,21 @@ pub struct ReasoningOptions {
     /// Replay captured reasoning in request history (ADR-034 replay policy).
     pub replay: bool,
 }
+/// A named invocation preset for a specific model (ADR-048).
+///
+/// A variant projects existing `ReasoningOptions` into a user-selectable
+/// named choice. It contains no secrets or arbitrary request JSON.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[allow(dead_code)]
+pub struct VariantDef {
+    /// Stable identifier, e.g. "default", "high-reasoning".
+    pub id: String,
+    /// Display label, e.g. "High Reasoning".
+    pub label: String,
+    /// Optional reasoning effort override.
+    #[serde(default)]
+    pub reasoning_effort: Option<ReasoningEffort>,
+}
 
 impl Default for ReasoningOptions {
     fn default() -> Self {
@@ -217,6 +232,10 @@ pub struct Config {
     #[serde(default)]
     pub model: String,
 
+    /// Selected variant ID (ADR-048). Defaults to "default".
+    #[serde(default)]
+    pub variant: Option<String>,
+
     /// Named provider definitions.
     #[serde(default)]
     pub providers: HashMap<String, ProviderConfig>,
@@ -259,6 +278,7 @@ impl Default for Config {
         Self {
             provider: default_provider_name(),
             model: String::new(),
+            variant: None,
             providers: HashMap::new(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),

@@ -177,6 +177,7 @@ pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
         context_limit: Some(context_limit),
         input_price_per_million: input_price,
         output_price_per_million: output_price,
+        variant: config.variant.clone(),
     }
 }
 

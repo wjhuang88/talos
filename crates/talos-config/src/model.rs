@@ -198,6 +198,7 @@ fn import_models_dev_object(
             pricing,
             capabilities,
             release_date,
+            variants: vec![],
             source: ModelSource::ModelsDev {
                 refreshed_at: now.to_string(),
             },
@@ -290,6 +291,7 @@ fn import_models_dev_array(
             pricing,
             capabilities,
             release_date,
+            variants: vec![],
             source: ModelSource::ModelsDev {
                 refreshed_at: now.to_string(),
             },

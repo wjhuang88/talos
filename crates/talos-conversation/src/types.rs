@@ -184,6 +184,8 @@ pub struct StatusSnapshot {
     pub context_limit: Option<u32>,
     pub input_price_per_million: Option<f64>,
     pub output_price_per_million: Option<f64>,
+    /// Selected variant ID (ADR-048).
+    pub variant: Option<String>,
 }
 
 /// Model metadata passed from the CLI layer to the conversation engine.
@@ -194,6 +196,8 @@ pub struct ModelInfo {
     pub context_limit: Option<u32>,
     pub input_price_per_million: Option<f64>,
     pub output_price_per_million: Option<f64>,
+    /// Selected variant ID (ADR-048).
+    pub variant: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -505,4 +509,18 @@ pub enum UserInput {
     ProviderSetup(String),
     Cancel,
     Exit,
+}
+
+/// A selectable variant for the three-stage model picker (ADR-048).
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelPickerVariantItem {
+    /// Variant identifier, e.g. "default", "high-reasoning".
+    pub variant_id: String,
+    /// Display label, e.g. "High Reasoning".
+    pub label: String,
+    /// Provider for this variant's model.
+    pub provider: String,
+    /// Model ID for this variant.
+    pub model_id: String,
 }

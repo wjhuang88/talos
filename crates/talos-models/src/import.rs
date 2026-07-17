@@ -82,6 +82,7 @@ pub fn import_models_dev_api(json: &str, refreshed_at: &str) -> Result<ImportRes
                 pricing,
                 capabilities,
                 release_date,
+                variants: vec![],
                 source: ModelSource::ModelsDev {
                     refreshed_at: refreshed_at.to_string(),
                 },
@@ -159,6 +160,7 @@ pub fn import_models_dev_models(
                 pricing: None,
                 capabilities,
                 release_date,
+                variants: vec![],
                 source: ModelSource::ModelsDev {
                     refreshed_at: refreshed_at.to_string(),
                 },

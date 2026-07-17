@@ -421,6 +421,7 @@ impl Config {
                         pricing: None,
                         capabilities: model::ModelCapabilities::default(),
                         release_date: None,
+                        variants: vec![],
                         source: model::ModelSource::Manual,
                     });
                 }
