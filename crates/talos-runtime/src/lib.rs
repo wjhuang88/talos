@@ -32,8 +32,8 @@ use tokio::task::JoinHandle;
 
 pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 pub use talos_core::provider::{ProviderError, ToolDefinition};
-pub use talos_core::tool::{ToolNature, ToolProvenance};
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
+pub use talos_core::tool::{ToolNature, ToolProvenance};
 pub use talos_plugin::HookRegistry as RuntimeHookRegistry;
 pub use talos_skill::SkillIndex as RuntimeSkillIndex;
 
