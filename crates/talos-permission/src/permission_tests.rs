@@ -1222,3 +1222,80 @@ fn evidence_never_produces_allow_by_itself() {
     );
     std::fs::remove_dir_all(root).ok();
 }
+
+// ── SEC-001: external path authorization tests ─────────────────────────────
+
+#[test]
+fn external_read_path_requires_ask_not_allow() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet};
+
+    let root =
+        std::env::temp_dir().join(format!("talos-sec001-ext-{}/workspace", std::process::id()));
+    let external = std::env::temp_dir().join(format!("talos-sec001-out-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    std::fs::write(&external, "secret").expect("external file");
+
+    let engine = PermissionEngine::with_workspace_root(root.clone());
+
+    let facet = ToolPermissionFacet::new(ToolNature::Read);
+    let input = serde_json::json!({"path": external.to_string_lossy().to_string()});
+    let decision = engine.evaluate_facet("read", &facet, &input);
+
+    assert_eq!(
+        decision,
+        PermissionDecision::Ask,
+        "external read must require Ask, not Allow (SEC-001)"
+    );
+
+    std::fs::remove_dir_all(&root).ok();
+    std::fs::remove_file(&external).ok();
+}
+
+#[test]
+fn internal_read_path_still_allowed() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet};
+
+    let root = std::env::temp_dir().join(format!("talos-sec001-int-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    std::fs::write(root.join("inside.txt"), "data").expect("file");
+
+    let engine = PermissionEngine::with_workspace_root(root.clone());
+
+    let facet = ToolPermissionFacet::new(ToolNature::Read);
+    let input = serde_json::json!({"path": "inside.txt"});
+    let decision = engine.evaluate_facet("read", &facet, &input);
+
+    assert_eq!(
+        decision,
+        PermissionDecision::Allow,
+        "internal read must remain Allow (SEC-001 preserves workspace behavior)"
+    );
+
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn deny_rule_still_wins_for_external_path() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet};
+
+    let root = std::env::temp_dir().join(format!("talos-sec001-deny-{}", std::process::id()));
+    let external =
+        std::env::temp_dir().join(format!("talos-sec001-deny-out-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("workspace");
+    std::fs::write(&external, "data").expect("external file");
+
+    let mut engine = PermissionEngine::with_workspace_root(root);
+    let config = serde_json::json!({"rules": [{"nature": "Read", "decision": "Deny"}]});
+    engine.load_from_config(&config).unwrap();
+
+    let facet = ToolPermissionFacet::new(ToolNature::Read);
+    let input = serde_json::json!({"path": external.to_string_lossy().to_string()});
+    let decision = engine.evaluate_facet("read", &facet, &input);
+
+    assert!(
+        matches!(decision, PermissionDecision::Deny(_)),
+        "Deny rule must win over external-path Ask (SEC-001)"
+    );
+
+    std::fs::remove_file(&external).ok();
+}

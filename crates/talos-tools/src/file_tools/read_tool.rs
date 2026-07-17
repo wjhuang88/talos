@@ -7,7 +7,7 @@ use serde_json::Value;
 use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
-use super::{FileSnapshotRegistry, FileToolError, is_binary_file, resolve_workspace_path};
+use super::{FileSnapshotRegistry, FileToolError, is_binary_file, resolve_authorized_path};
 use crate::file_tools::snapshot::line_spans;
 
 /// Input parameters for the [`ReadTool`].
@@ -64,7 +64,7 @@ impl ReadTool {
         let read_input: ReadInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_workspace_path(&self.workspace_root, &read_input.path)?;
+        let path = resolve_authorized_path(&self.workspace_root, &read_input.path)?;
 
         if !path.exists() {
             return Err(FileToolError::FileNotFound(read_input.path));

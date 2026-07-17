@@ -318,15 +318,32 @@ impl PermissionEngine {
             return PermissionDecision::Allow;
         }
 
+        // SEC-001: External path check BEFORE default rule returns Allow.
+        // When a workspace root is configured and the file path is outside,
+        // require Ask even for reads. Deny rules already checked above.
+        if let Some(root) = &self.workspace_root {
+            let in_workspace =
+                is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref());
+            if !in_workspace {
+                return PermissionDecision::Ask;
+            }
+        }
+
         if let Some(decision) = matched_rule {
             return decision;
         }
 
-        if let Some(ref root) = self.workspace_root
-            && nature == talos_core::tool::ToolNature::Read
-            && is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
-        {
-            return PermissionDecision::Allow;
+        // SEC-001: When a workspace root is configured, check if the file path
+        // is inside or outside the workspace. External paths require explicit
+        // user approval (Ask) even for reads, rather than default Allow.
+        if let Some(root) = &self.workspace_root {
+            let in_workspace =
+                is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref());
+            if !in_workspace {
+                // External path: require approval for all natures.
+                // Deny rules already checked above. No explicit Allow rule matched.
+                return PermissionDecision::Ask;
+            }
         }
 
         match nature {
