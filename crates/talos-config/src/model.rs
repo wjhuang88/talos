@@ -31,18 +31,21 @@ pub enum ModelError {
 
 /// Embedded zstd-compressed models.toml (compiled at build time).
 /// 1.1 MB compressed to ~53 KB (22× compression). Decompressed and
-/// deserialized at runtime <1ms.
+/// deserialized ONCE at first use via LazyLock, then cached for the
+/// process lifetime. Subsequent calls are zero-cost.
 const MODELS_TOML_ZST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/models_data.zst"));
 
-fn load_embedded_dataset() -> TomlDataset {
+use std::sync::LazyLock;
+
+static EMBEDDED_DATASET: LazyLock<TomlDataset> = LazyLock::new(|| {
     let toml_bytes =
         zstd::decode_all(MODELS_TOML_ZST).expect("failed to decompress embedded models.toml");
     let toml_str = String::from_utf8(toml_bytes).expect("embedded models.toml must be valid UTF-8");
     toml::from_str(&toml_str).expect("embedded models.toml must be valid TOML")
-}
+});
 
 pub fn builtin_models() -> Vec<ModelMetadata> {
-    load_embedded_dataset().models
+    EMBEDDED_DATASET.models.clone()
 }
 
 /// Provider metadata from the built-in `models.toml` `[[providers]]` section.
@@ -61,17 +64,18 @@ pub struct BuiltinProvider {
     /// Documentation URL.
     pub doc_url: Option<String>,
 }
+
 pub fn builtin_providers() -> Vec<BuiltinProvider> {
-    load_embedded_dataset()
+    EMBEDDED_DATASET
         .providers
-        .into_iter()
+        .iter()
         .map(|p| BuiltinProvider {
-            id: p.id,
-            name: p.name,
-            api_base_url: p.api_base_url,
-            protocol: p.protocol.map(catalog_protocol_to_config),
-            env_var: p.env_var,
-            doc_url: p.doc_url,
+            id: p.id.clone(),
+            name: p.name.clone(),
+            api_base_url: p.api_base_url.clone(),
+            protocol: p.protocol.clone().map(catalog_protocol_to_config),
+            env_var: p.env_var.clone(),
+            doc_url: p.doc_url.clone(),
         })
         .collect()
 }
