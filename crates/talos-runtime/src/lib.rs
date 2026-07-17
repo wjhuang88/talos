@@ -22,16 +22,19 @@ use talos_core::tool::{
 use talos_permission::{
     PermissionDecision, PermissionEngine, PermissionRule, ResourceExtractor, ResourceKind,
 };
+use talos_plugin::HookRegistry;
 use talos_sandbox::SandboxProvider;
 use talos_session::{DurableSession, PersistencePolicy};
+use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
 pub use talos_core::provider::{ProviderError, ToolDefinition};
-pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
 pub use talos_core::tool::{ToolNature, ToolProvenance};
+pub use talos_plugin::HookRegistry as RuntimeHookRegistry;
+pub use talos_skill::SkillIndex as RuntimeSkillIndex;
 
 /// Errors returned by the embeddable runtime facade.
 #[derive(Debug, Error)]
@@ -94,6 +97,8 @@ pub struct RuntimeBuilder {
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
     custom_prompt: Option<String>,
     append_prompt: Option<String>,
+    hook_registry: Option<Arc<HookRegistry>>,
+    skill_index: Vec<SkillIndex>,
     durable_session: Option<(DurableSession, PersistencePolicy)>,
 }
 
@@ -113,6 +118,8 @@ impl RuntimeBuilder {
             approval_handler: None,
             custom_prompt: None,
             append_prompt: None,
+            hook_registry: None,
+            skill_index: Vec::new(),
             durable_session: None,
         }
     }
@@ -225,6 +232,32 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Injects a pre-populated [`HookRegistry`] into the runtime.
+    ///
+    /// This allows embedders to register reviewed hooks (e.g., from a curated
+    /// hook catalog) before the runtime starts, following the same builder
+    /// pattern as [`RuntimeBuilder::approval_handler`].
+    ///
+    /// If not called, the runtime uses an empty `HookRegistry`.
+    #[must_use]
+    pub fn hook_registry(mut self, registry: Arc<HookRegistry>) -> Self {
+        self.hook_registry = Some(registry);
+        self
+    }
+
+    /// Sets the skill index for the runtime's system prompt.
+    ///
+    /// Embedders that discover skills via [`talos_skill::SkillLoader`] (e.g.,
+    /// from a local or remote skill store) can inject the Level 0 index here,
+    /// following the same pattern as the CLI's `skill_runtime.rs`.
+    ///
+    /// If not called, the runtime has no skills in its system prompt.
+    #[must_use]
+    pub fn skill_index(mut self, skills: Vec<SkillIndex>) -> Self {
+        self.skill_index = skills;
+        self
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned handle owns the command sender, event receiver, and actor
@@ -250,18 +283,32 @@ impl RuntimeBuilder {
             }));
         }
 
-        let mut agent = Agent::with_security(
-            provider,
-            registry,
-            Some(agent_engine),
-            self.sandbox,
-            self.workspace_root.clone(),
-        );
+        let mut agent = if let Some(hooks) = self.hook_registry {
+            Agent::with_security_and_hooks(
+                provider,
+                registry,
+                Some(agent_engine),
+                self.sandbox,
+                self.workspace_root.clone(),
+                hooks,
+            )
+        } else {
+            Agent::with_security(
+                provider,
+                registry,
+                Some(agent_engine),
+                self.sandbox,
+                self.workspace_root.clone(),
+            )
+        };
         if let Some(prompt) = self.custom_prompt {
             agent.set_custom_prompt(prompt);
         }
         if let Some(prompt) = self.append_prompt {
             agent.set_append_prompt(prompt);
+        }
+        if !self.skill_index.is_empty() {
+            agent.set_skill_index(self.skill_index);
         }
         let initial_history = if let Some((session, _)) = &self.durable_session {
             session.read_messages()?
