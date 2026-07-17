@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
+use talos_core::tool::{AgentTool, ToolExecutionAuthorization, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
-use crate::file_tools::{FileToolError, resolve_workspace_path};
+use crate::file_tools::{FileToolError, resolve_authorized_path};
 use crate::search_engine::{RipgrepSearchEngine, SearchEngine, SearchError as EngineError};
 
 /// Input parameters for the [`GrepTool`].
@@ -39,7 +39,11 @@ impl GrepTool {
         Self { workspace_root }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let grep_input: GrepInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
@@ -49,7 +53,13 @@ impl GrepTool {
             .unwrap_or_else(|_| self.workspace_root.clone());
 
         let search_path = match &grep_input.path {
-            Some(p) => resolve_workspace_path(&self.workspace_root, p)?,
+            Some(p) => resolve_authorized_path(
+                &self.workspace_root,
+                p,
+                "grep",
+                talos_core::tool::ToolNature::Read,
+                authorizations,
+            )?,
             None => canonical_root.clone(),
         };
 
@@ -107,7 +117,18 @@ impl AgentTool for GrepTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
@@ -220,7 +241,11 @@ impl GlobTool {
         Self { workspace_root }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let glob_input: GlobInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
@@ -230,7 +255,13 @@ impl GlobTool {
             .unwrap_or_else(|_| self.workspace_root.clone());
 
         let base_path = match &glob_input.path {
-            Some(p) => resolve_workspace_path(&self.workspace_root, p)?,
+            Some(p) => resolve_authorized_path(
+                &self.workspace_root,
+                p,
+                "glob",
+                talos_core::tool::ToolNature::Read,
+                authorizations,
+            )?,
             None => canonical_root.clone(),
         };
 
@@ -289,7 +320,18 @@ impl AgentTool for GlobTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }

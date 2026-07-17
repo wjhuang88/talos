@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
+use talos_core::tool::{AgentTool, ToolExecutionAuthorization, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
-use crate::file_tools::{FileToolError, resolve_workspace_path};
+use crate::file_tools::{FileToolError, resolve_authorized_path};
 
 /// Input parameters for the [`DiffTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -28,12 +28,28 @@ impl DiffTool {
         Self { workspace_root }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let diff_input: DiffInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let old_path = resolve_workspace_path(&self.workspace_root, &diff_input.old_path)?;
-        let new_path = resolve_workspace_path(&self.workspace_root, &diff_input.new_path)?;
+        let old_path = resolve_authorized_path(
+            &self.workspace_root,
+            &diff_input.old_path,
+            "diff",
+            talos_core::tool::ToolNature::Read,
+            authorizations,
+        )?;
+        let new_path = resolve_authorized_path(
+            &self.workspace_root,
+            &diff_input.new_path,
+            "diff",
+            talos_core::tool::ToolNature::Read,
+            authorizations,
+        )?;
 
         if !old_path.exists() {
             return Err(FileToolError::FileNotFound(diff_input.old_path));
@@ -92,7 +108,18 @@ impl AgentTool for DiffTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
@@ -125,11 +152,21 @@ impl StatTool {
         Self { workspace_root }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, FileToolError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<String, FileToolError> {
         let stat_input: StatInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_workspace_path(&self.workspace_root, &stat_input.path)?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &stat_input.path,
+            "stat",
+            talos_core::tool::ToolNature::Read,
+            authorizations,
+        )?;
 
         if !path.exists() {
             return Err(FileToolError::FileNotFound(stat_input.path));
@@ -185,7 +222,18 @@ impl AgentTool for StatTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
+            Ok(content) => ToolResult::success(content),
+            Err(e) => ToolResult::error(e.to_string()),
+        }
+    }
+
+    async fn execute_authorized(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolResult {
+        match self.execute_inner(input, authorizations).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }

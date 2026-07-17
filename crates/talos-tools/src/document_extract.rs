@@ -13,7 +13,7 @@ use talos_core::tool_parameters;
 use thiserror::Error;
 
 use super::FileToolError;
-use crate::file_tools::resolve_workspace_path;
+use crate::file_tools::resolve_authorized_path;
 
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 const DEFAULT_MAX_BYTES: usize = 32768;
@@ -416,17 +416,26 @@ impl DocumentExtractTool {
         Self { workspace_root }
     }
 
-    async fn execute_inner(&self, input: Value) -> Result<String, DocumentExtractError> {
+    async fn execute_inner(
+        &self,
+        input: Value,
+        _authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<String, DocumentExtractError> {
         let extract_input: DocumentExtractInput = serde_json::from_value(input)
             .map_err(|e| DocumentExtractError::InvalidInput(e.to_string()))?;
 
-        let path = resolve_workspace_path(&self.workspace_root, &extract_input.path).map_err(
-            |e| match e {
-                FileToolError::PathEscape(msg) => DocumentExtractError::PathEscape(msg),
-                FileToolError::Io(e) => DocumentExtractError::Io(e),
-                _ => DocumentExtractError::FileNotFound(extract_input.path.clone()),
-            },
-        )?;
+        let path = resolve_authorized_path(
+            &self.workspace_root,
+            &extract_input.path,
+            "extract",
+            talos_core::tool::ToolNature::Read,
+            _authorizations,
+        )
+        .map_err(|e| match e {
+            FileToolError::PathEscape(msg) => DocumentExtractError::PathEscape(msg),
+            FileToolError::Io(e) => DocumentExtractError::Io(e),
+            _ => DocumentExtractError::FileNotFound(extract_input.path.clone()),
+        })?;
 
         if !path.exists() {
             return Err(DocumentExtractError::FileNotFound(
@@ -537,7 +546,7 @@ impl AgentTool for DocumentExtractTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        match self.execute_inner(input).await {
+        match self.execute_inner(input, &[]).await {
             Ok(content) => ToolResult::success(content),
             Err(e) => ToolResult::error(e.to_string()),
         }
