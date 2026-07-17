@@ -1,6 +1,6 @@
 # Iteration I135: Session Error-Path Integrity
 
-> Document status: Complete
+> Document status: Review — persistence failure handling improved but failure-injection test and durable transcript verification still needed
 > Published plan date: 2026-07-16
 > Planned objective: close SESSION-006 without weakening I128 durable-turn atomicity.
 > Baseline rule: preserve this target; changed persistence semantics use change control or a new iteration ID.
