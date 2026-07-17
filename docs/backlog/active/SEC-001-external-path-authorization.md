@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | SEC-001 |
 | Priority | P1 — security boundary |
-| Status | Open — identified during I139 closeout review (2026-07-16) |
+| Status | Complete (2026-07-16) — external paths require Ask; workspace reads still Allow; Deny wins; symlink escape rejected |
 | Depends On | PERM-004, PERM-005 |
 | Relates To | ADR-038 (workspace trust), ADR-040 (command access evidence) |
 | Origin | Architecture review v2 of the four-month reliability plan |
