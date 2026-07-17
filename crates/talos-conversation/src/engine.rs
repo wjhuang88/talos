@@ -870,7 +870,25 @@ impl ConversationEngine {
             "[System]   Provenance observations: {}\n",
             snap.provenance.len()
         ));
-        text.push_str("[System]   WASM plugin packages: not yet available\n");
+        let plugin_obs: Vec<_> = snap
+            .provenance
+            .iter()
+            .filter(|o| o.key.starts_with("plugin:"))
+            .collect();
+        if plugin_obs.is_empty() {
+            text.push_str("[System]   WASM plugin packages: none loaded\n");
+        } else {
+            text.push_str(&format!(
+                "[System]   WASM plugin packages: {} loaded\n",
+                plugin_obs.len()
+            ));
+            for obs in &plugin_obs {
+                text.push_str(&format!(
+                    "[System]     {} (invocations: {})\n",
+                    obs.key, obs.count
+                ));
+            }
+        }
         text.push_str("[System] Use /mcp for MCP detail, /hooks for hook detail.\n");
         if !snap.collisions.is_empty() {
             text.push_str(&format!(

@@ -551,7 +551,7 @@ async fn slash_status_shows_model_and_tokens() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn slash_plugins_shows_transition_notice() {
+async fn slash_plugins_shows_diagnostics() {
     let mut engine = new_engine();
     engine.plugin_observations.push(PluginObservation {
         key: "native".to_string(),
@@ -562,10 +562,9 @@ async fn slash_plugins_shows_transition_notice() {
 
     assert_eq!(outputs.len(), 1);
     let (_, text) = collect_stream(outputs).await.unwrap();
-    assert!(text.contains("WASM plugin packages: not yet available"));
+    assert!(text.contains("WASM plugin packages: none loaded"));
     assert!(text.contains("Use /mcp for MCP detail"));
     assert!(text.contains("Provenance observations: 1"));
-    assert!(!text.contains("Observed tool provenance"));
 }
 
 #[tokio::test]
@@ -584,6 +583,31 @@ async fn slash_plugins_notice_does_not_leak_mcp_status() {
     assert!(
         !text.contains("github"),
         "individual server names must not appear in /plugins: {text}"
+    );
+}
+
+#[tokio::test]
+async fn slash_plugins_shows_loaded_plugin_packages() {
+    let mut engine = new_engine();
+    engine.plugin_observations.push(PluginObservation {
+        key: "plugin:demo@0.1.0/wasm".to_string(),
+        count: 3,
+    });
+
+    let outputs = engine.handle_slash_command("/plugins");
+
+    let (_, text) = collect_stream(outputs).await.unwrap();
+    assert!(
+        text.contains("WASM plugin packages: 1 loaded"),
+        "/plugins must show loaded packages: {text}"
+    );
+    assert!(
+        text.contains("plugin:demo@0.1.0/wasm"),
+        "/plugins must show package identity: {text}"
+    );
+    assert!(
+        text.contains("invocations: 3"),
+        "/plugins must show invocation count: {text}"
     );
 }
 
