@@ -41,8 +41,9 @@ pub struct AdmissionDecision {
     /// Stable reason code explaining the decision.
     pub reason: AdmissionReason,
 }
-
-const ADMISSION_THRESHOLD: f64 = 0.05;
+/// Admission threshold: candidates with score below this are rejected.
+/// Set to 0.15 to reject routine chatter.
+const ADMISSION_THRESHOLD: f64 = 0.15;
 
 /// Patterns that indicate sensitive content that must never enter memory.
 const SENSITIVE_PATTERNS: &[&str] = &[
@@ -57,6 +58,7 @@ const SENSITIVE_PATTERNS: &[&str] = &[
     "password:",
     "password=",
     "password =",
+    "secret:",
     "private_key",
     "-----begin",
     "sk-ant-",
@@ -66,17 +68,45 @@ const SENSITIVE_PATTERNS: &[&str] = &[
     "credential",
 ];
 
+/// Patterns indicating conversational noise that should not be admitted.
+const NOISE_PATTERNS: &[&str] = &[
+    "can you help",
+    "how are you",
+    "thanks",
+    "thank you",
+    "that's helpful",
+    "hello",
+    "hi ",
+    "hey ",
+    "ok ",
+    "sure",
+    "got it",
+    "i see",
+    "makes sense",
+    "understood",
+    "sounds good",
+    "let me think",
+    "i was wondering",
+    "i've been reading",
+    "i'm trying to figure out",
+    "i'm not sure",
+    "seems like",
+];
+
 /// Check if content contains sensitive patterns that must not be persisted.
-///
-/// This is a defense-in-depth filter. The session transcript may already
-/// redact or omit some of these, but the admission gate enforces it
-/// independently before any write.
 #[must_use]
 pub fn is_sensitive_content(content: &str) -> bool {
     let lower = content.to_lowercase();
-    SENSITIVE_PATTERNS
+    SENSITIVE_PATTERNS.iter().any(|p| lower.contains(p))
+}
+
+/// Check if content is conversational noise.
+#[must_use]
+fn is_noise_content(content: &str) -> bool {
+    let lower = content.trim_start().to_lowercase();
+    NOISE_PATTERNS
         .iter()
-        .any(|pattern| lower.contains(pattern))
+        .any(|p| lower.starts_with(p) || lower.contains(p))
 }
 
 /// Evaluate a memory candidate for admission using ADR-046 policy.
@@ -112,6 +142,15 @@ pub fn evaluate_admission(content: &str, role: &str) -> AdmissionDecision {
         };
     }
 
+    // Conversational noise is always rejected.
+    if is_noise_content(content) {
+        return AdmissionDecision {
+            admit: false,
+            score: 0.0,
+            reason: AdmissionReason::BelowThreshold,
+        };
+    }
+
     // Compute admission score: novelty × committed_utility.
     let score = compute_admission_score(content, role);
 
@@ -128,33 +167,38 @@ pub fn evaluate_admission(content: &str, role: &str) -> AdmissionDecision {
 
 /// Compute the admission score (novelty × committed_utility) for content.
 ///
-/// Novelty estimates how poorly existing memory covers the candidate.
-/// Committed utility estimates whether the information changed or guided
-/// observable behavior. Both are bounded to [0, 1].
-fn compute_admission_score(content: &str, role: &str) -> f64 {
+/// Novelty is based on content markers, NOT message length. ADR-046 envisions
+/// novelty computed against existing memory coverage; the current implementation
+/// is a documented keyword-based downgrade.
+fn compute_admission_score(content: &str, _role: &str) -> f64 {
     let lower = content.trim_start().to_lowercase();
 
-    // Novelty signal.
+    // Novelty: corrections and technical content are inherently novel.
+    // Length alone is NOT a novelty signal.
     let novelty: f64 = if lower.starts_with("actually")
         || lower.starts_with("no,")
         || lower.starts_with("correction")
     {
-        0.9
+        0.9 // Corrections are inherently novel
     } else if lower.starts_with("note")
         || lower.starts_with("important")
         || lower.contains("fix for")
         || lower.contains("deadlock")
+        || lower.contains("caused by")
     {
-        0.8
+        0.8 // Technical notes and fixes
+    } else if lower.starts_with("remember")
+        || lower.starts_with("always")
+        || lower.starts_with("never")
+    {
+        0.7 // Directives and explicit memory requests
     } else if lower.starts_with("prefer") || lower.contains("i prefer") {
-        0.6
-    } else if content.len() > 100 {
-        0.4
+        0.6 // Preferences
     } else {
-        0.2
+        0.1 // Default: likely not novel
     };
 
-    // Committed utility signal.
+    // Committed utility: did the information change/guide behavior?
     let utility: f64 = if lower.starts_with("always")
         || lower.starts_with("never")
         || lower.starts_with("remember")
@@ -171,17 +215,13 @@ fn compute_admission_score(content: &str, role: &str) -> f64 {
         || lower.contains("fix for")
         || lower.contains("caused by")
         || lower.contains("fixed it")
-        || (role == "assistant" && content.len() > 40)
     {
         0.8
     } else if lower.starts_with("prefer") || lower.contains("i prefer") {
         0.7
-    } else if content.len() > 50 && role == "user" {
-        0.4
     } else {
-        0.1
+        0.05 // Default: low utility (was 0.1)
     };
-
     novelty * utility
 }
 
@@ -574,14 +614,14 @@ mod tests {
                 "entry-a",
                 0,
                 "user",
-                "Python is a dynamically typed programming language with great ecosystem",
+                "Note: Python is a dynamically typed programming language with great ecosystem",
             ),
             make_episode(
                 "sess-2",
                 "entry-b",
                 1,
                 "user",
-                "Python is a statically typed programming language with strict type checking",
+                "Note: Python is a statically typed programming language with strict type checking",
             ),
         ];
 
@@ -726,8 +766,9 @@ mod tests {
             It seems like there's a turn loop that processes events and then calls tools.";
         let decision = evaluate_admission(long_noise, "user");
         assert!(
-            !decision.admit || decision.score < 0.2,
-            "routine chatter should have low or rejected admission"
+            !decision.admit,
+            "routine chatter must be rejected (admit={}), score={}",
+            decision.admit, decision.score
         );
     }
 
