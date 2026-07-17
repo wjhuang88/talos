@@ -45,41 +45,43 @@ pub struct AdmissionDecision {
 /// Set to 0.15 to reject routine chatter.
 const ADMISSION_THRESHOLD: f64 = 0.15;
 
-/// Patterns that indicate sensitive content that must never enter memory.
-const SENSITIVE_PATTERNS: &[&str] = &[
+/// Bare tokens matched as word boundaries to catch prose-form credentials.
+const SENSITIVE_WORD_TOKENS: &[&str] = &[
+    "password",
+    "secret",
+    "token",
+    "credential",
     "api_key",
     "apikey",
+];
+
+/// Structured patterns always sensitive (unambiguous multi-char sequences).
+const SENSITIVE_SUBSTRINGS: &[&str] = &[
     "access_token",
     "refresh_token",
     "authorization:",
     "bearer ",
     "cookie:",
     "set-cookie",
-    "password:",
-    "password=",
-    "password =",
-    "secret:",
     "private_key",
     "-----begin",
     "sk-ant-",
     "sk-proj-",
-    "sk-",
-    "token=",
-    "credential",
 ];
 
-/// Patterns indicating conversational noise that should not be admitted.
-const NOISE_PATTERNS: &[&str] = &[
+/// Leading chatter prefixes. Only matched at START of message to avoid
+/// vetoing substantive content that contains a noise word mid-sentence.
+const NOISE_PREFIXES: &[&str] = &[
     "can you help",
     "how are you",
     "thanks",
     "thank you",
     "that's helpful",
     "hello",
-    "hi ",
+    "hi,",
+    "hi!",
     "hey ",
-    "ok ",
-    "sure",
+    "ok,",
     "got it",
     "i see",
     "makes sense",
@@ -94,19 +96,52 @@ const NOISE_PATTERNS: &[&str] = &[
 ];
 
 /// Check if content contains sensitive patterns that must not be persisted.
+///
+/// Uses word-boundary matching for bare tokens (password, secret, token)
+/// to catch prose-form credentials like "my password is hunter2".
+/// Uses substring matching for structured patterns (sk-ant-, bearer, etc.).
+/// Does NOT use bare `sk-` substring (matches task-, risk-, disk-).
 #[must_use]
 pub fn is_sensitive_content(content: &str) -> bool {
     let lower = content.to_lowercase();
-    SENSITIVE_PATTERNS.iter().any(|p| lower.contains(p))
+
+    // Structured patterns: safe substring match.
+    if SENSITIVE_SUBSTRINGS.iter().any(|p| lower.contains(p)) {
+        return true;
+    }
+
+    // Word-boundary tokens: match as whole words.
+    for token in SENSITIVE_WORD_TOKENS {
+        let mut search_from = 0;
+        while let Some(pos) = lower[search_from..].find(token) {
+            let abs_pos = search_from + pos;
+            let after = abs_pos + token.len();
+            let before_ok = abs_pos == 0
+                || lower
+                    .as_bytes()
+                    .get(abs_pos - 1)
+                    .is_some_and(|&c| !c.is_ascii_alphanumeric());
+            let after_ok = after >= lower.len()
+                || lower
+                    .as_bytes()
+                    .get(after)
+                    .is_some_and(|&c| !c.is_ascii_alphanumeric());
+            if before_ok && after_ok {
+                return true;
+            }
+            search_from = abs_pos + 1;
+        }
+    }
+
+    false
 }
 
-/// Check if content is conversational noise.
+/// Check if content starts with conversational noise.
+/// Only matches at the START to avoid vetoing substantive content.
 #[must_use]
 fn is_noise_content(content: &str) -> bool {
     let lower = content.trim_start().to_lowercase();
-    NOISE_PATTERNS
-        .iter()
-        .any(|p| lower.starts_with(p) || lower.contains(p))
+    NOISE_PREFIXES.iter().any(|p| lower.starts_with(p))
 }
 
 /// Evaluate a memory candidate for admission using ADR-046 policy.
@@ -771,6 +806,50 @@ mod tests {
         let decision3 = evaluate_admission("password = secret123", "user");
         assert!(!decision3.admit, "password content must not be admitted");
         assert_eq!(decision3.reason, AdmissionReason::SensitiveContent);
+
+        // Prose-form credentials (review fix)
+        let prose1 = evaluate_admission("my password is hunter2xyz", "user");
+        assert!(!prose1.admit, "prose-form password must not be admitted");
+        assert_eq!(prose1.reason, AdmissionReason::SensitiveContent);
+
+        let prose2 = evaluate_admission("the deploy secret is prod-live-9f8a", "user");
+        assert!(!prose2.admit, "prose-form secret must not be admitted");
+        assert_eq!(prose2.reason, AdmissionReason::SensitiveContent);
+
+        let prose3 = evaluate_admission("session token is abc123", "user");
+        assert!(!prose3.admit, "prose-form token must not be admitted");
+
+        // sk- false positive fix: ordinary words must NOT be rejected
+        let normal1 = evaluate_admission("Always break the task-list into subtasks", "user");
+        assert!(
+            normal1.reason != AdmissionReason::SensitiveContent,
+            "'task-list' must not be flagged as sk- credential"
+        );
+
+        let normal2 = evaluate_admission("Important: the risk-averse policy applies here", "user");
+        assert!(
+            normal2.reason != AdmissionReason::SensitiveContent,
+            "'risk-averse' must not be flagged as sk- credential"
+        );
+
+        // Noise contains fix: mid-sentence noise words must NOT reject
+        let substantive1 = evaluate_admission(
+            "Note: make sure the deadlock fix lands before release",
+            "user",
+        );
+        assert!(
+            substantive1.admit,
+            "'make sure' mid-sentence must not be treated as noise: {:?}",
+            substantive1.reason
+        );
+
+        let substantive2 =
+            evaluate_admission("Note: the API returns ok status codes on success", "user");
+        assert!(
+            substantive2.admit,
+            "'ok' mid-sentence must not be treated as noise: {:?}",
+            substantive2.reason
+        );
     }
 
     #[test]

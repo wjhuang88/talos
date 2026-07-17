@@ -1345,14 +1345,13 @@ async fn fixture_durable_transcript_empty_after_failed_turn() {
     let reopened = manager
         .get_session_by_external_id(durable_external_id)
         .expect("durable lookup");
-    if let Some(durable_session) = reopened {
-        let transcript = durable_session
-            .transcript(None, 100)
-            .expect("transcript read");
-        assert!(
-            transcript.is_empty(),
-            "ADR-042: durable transcript must be empty after failed turn (got {} entries)",
-            transcript.len()
-        );
-    }
+    let durable_session = reopened.expect("durable session must exist after failed turn");
+    let transcript = durable_session
+        .transcript(None, 100)
+        .expect("transcript read");
+    assert!(
+        transcript.is_empty(),
+        "ADR-042: durable transcript must be empty after failed turn (got {} entries)",
+        transcript.len()
+    );
 }
