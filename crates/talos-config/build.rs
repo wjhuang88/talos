@@ -15,20 +15,24 @@ const API_JSON_URL: &str = "https://models.dev/api.json";
 fn main() {
     println!("cargo:rerun-if-changed=src/models.toml");
 
-    // Embed the raw models.toml as binary bytes. Runtime deserialization
-    // via serde is ~1000× faster than compiling 42K lines of Rust vec!
-    // literals, and avoids the multi-minute compilation bottleneck.
+    // Compress models.toml with zstd and embed the compressed bytes.
+    // 1.1 MB → ~53 KB (22× compression). Runtime decompression via zstd
+    // takes <1ms on first call. zstd is already in the dependency tree
+    // via talos-session, so zero extra compile time.
     let toml_bytes = std::fs::read("src/models.toml").expect("models.toml must exist");
 
-    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR must be set");
-    let dest = std::path::Path::new(&out_dir).join("models_data.bin");
-    std::fs::write(&dest, &toml_bytes).expect("failed to write models_data.bin");
+    let compressed = zstd::encode_all(toml_bytes.as_slice(), 22)
+        .expect("failed to compress models.toml with zstd");
 
-    // Also write the byte count for diagnostics.
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR must be set");
+    let dest = std::path::Path::new(&out_dir).join("models_data.zst");
+    std::fs::write(&dest, &compressed).expect("failed to write models_data.zst");
+
     println!(
-        "cargo:warning=models.toml embedded: {} bytes ({} models)",
+        "cargo:warning=models.toml compressed: {} → {} bytes ({:.1}×)",
         toml_bytes.len(),
-        toml_bytes.iter().filter(|&&b| b == b'\n').count()
+        compressed.len(),
+        toml_bytes.len() as f64 / compressed.len() as f64
     );
 
     if std::env::var("BUILD_MODELS").is_err() {
@@ -36,14 +40,14 @@ fn main() {
     }
 
     println!("cargo:rerun-if-env-changed=BUILD_MODELS");
-
     match refresh_models_toml() {
         Ok(count) => {
             println!("cargo:warning=BUILD_MODELS: refreshed {count} models into src/models.toml");
-            // Re-embed after refresh
             let toml_bytes =
                 std::fs::read("src/models.toml").expect("models.toml must exist after refresh");
-            std::fs::write(&dest, &toml_bytes).expect("failed to re-write models_data.bin");
+            let compressed =
+                zstd::encode_all(toml_bytes.as_slice(), 22).expect("re-compress with zstd");
+            std::fs::write(&dest, &compressed).expect("failed to re-write models_data.zst");
         }
         Err(e) => {
             println!("cargo:warning=BUILD_MODELS: failed to refresh models.toml: {e}");

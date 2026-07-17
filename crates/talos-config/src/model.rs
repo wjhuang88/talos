@@ -29,15 +29,20 @@ pub enum ModelError {
     ImportError(String),
 }
 
-/// Embedded raw models.toml bytes (compiled at build time, deserialized at runtime).
-/// This replaces the previous 42K-line generated Rust vec! that caused
-/// multi-minute compilation. Runtime serde deserialization takes <1ms.
-const MODELS_TOML_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/models_data.bin"));
+/// Embedded zstd-compressed models.toml (compiled at build time).
+/// 1.1 MB compressed to ~53 KB (22× compression). Decompressed and
+/// deserialized at runtime <1ms.
+const MODELS_TOML_ZST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/models_data.zst"));
+
+fn load_embedded_dataset() -> TomlDataset {
+    let toml_bytes =
+        zstd::decode_all(MODELS_TOML_ZST).expect("failed to decompress embedded models.toml");
+    let toml_str = String::from_utf8(toml_bytes).expect("embedded models.toml must be valid UTF-8");
+    toml::from_str(&toml_str).expect("embedded models.toml must be valid TOML")
+}
 
 pub fn builtin_models() -> Vec<ModelMetadata> {
-    let dataset: TomlDataset =
-        toml::from_slice(MODELS_TOML_BYTES).expect("embedded models.toml must be valid");
-    dataset.models
+    load_embedded_dataset().models
 }
 
 /// Provider metadata from the built-in `models.toml` `[[providers]]` section.
@@ -56,11 +61,8 @@ pub struct BuiltinProvider {
     /// Documentation URL.
     pub doc_url: Option<String>,
 }
-
 pub fn builtin_providers() -> Vec<BuiltinProvider> {
-    let dataset: TomlDataset =
-        toml::from_slice(MODELS_TOML_BYTES).expect("embedded models.toml must be valid");
-    dataset
+    load_embedded_dataset()
         .providers
         .into_iter()
         .map(|p| BuiltinProvider {
