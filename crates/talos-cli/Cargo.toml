@@ -14,25 +14,25 @@ name = "talos"
 path = "src/main.rs"
 
 [dependencies]
-talos-core = { version = "0.3.6", path = "../talos-core" }
-talos-config = { version = "0.3.6", path = "../talos-config" }
-talos-provider = { version = "0.3.6", path = "../talos-provider" }
-talos-agent = { version = "0.3.6", path = "../talos-agent" }
-talos-plugin = { version = "0.3.6", path = "../talos-plugin", features = ["wasm"] }
+talos-core = { version = "0.3.7", path = "../talos-core" }
+talos-config = { version = "0.3.7", path = "../talos-config" }
+talos-provider = { version = "0.3.7", path = "../talos-provider" }
+talos-agent = { version = "0.3.7", path = "../talos-agent" }
+talos-plugin = { version = "0.3.7", path = "../talos-plugin", features = ["wasm"] }
 # I009-S3 begin
-talos-mcp = { version = "0.3.6", path = "../talos-mcp" }
+talos-mcp = { version = "0.3.7", path = "../talos-mcp" }
 # I009-S3 end
 # I009-S5 begin
-talos-rpc = { version = "0.3.6", path = "../talos-rpc" }
+talos-rpc = { version = "0.3.7", path = "../talos-rpc" }
 # I009-S5 end
-talos-tools = { version = "0.3.6", path = "../talos-tools" }
-talos-session = { version = "0.3.6", path = "../talos-session" }
-talos-memory = { version = "0.3.6", path = "../talos-memory" }
-talos-permission = { version = "0.3.6", path = "../talos-permission" }
-talos-evolution = { version = "0.3.6", path = "../talos-evolution" }
-talos-skill = { version = "0.3.6", path = "../talos-skill" }
-talos-exploration = { version = "0.3.6", path = "../talos-exploration" }
-talos-dashboard = { version = "0.3.6", path = "../talos-dashboard" }
+talos-tools = { version = "0.3.7", path = "../talos-tools" }
+talos-session = { version = "0.3.7", path = "../talos-session" }
+talos-memory = { version = "0.3.7", path = "../talos-memory" }
+talos-permission = { version = "0.3.7", path = "../talos-permission" }
+talos-evolution = { version = "0.3.7", path = "../talos-evolution" }
+talos-skill = { version = "0.3.7", path = "../talos-skill" }
+talos-exploration = { version = "0.3.7", path = "../talos-exploration" }
+talos-dashboard = { version = "0.3.7", path = "../talos-dashboard" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1.2"
@@ -41,8 +41,8 @@ clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 tokio-util = "0.7"
-talos-tui = { version = "0.3.6", path = "../talos-tui" }
-talos-conversation = { version = "0.3.6", path = "../talos-conversation" }
+talos-tui = { version = "0.3.7", path = "../talos-tui" }
+talos-conversation = { version = "0.3.7", path = "../talos-conversation" }
 uuid = { version = "1", features = ["v4"] }
 dirs = "6"
 tracing = "0.1"
