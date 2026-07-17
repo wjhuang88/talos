@@ -53,10 +53,12 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-16 | Activation | I138 Complete. I139 activated. |
+| 2026-07-16 | Closeout | All packages delivered. Full validation green. Issue #36 closed. |
 
 ## Verification Evidence
 
-- Blocked on I135-I138.
+- All I135-I138 terminal. Closeout packet at docs/tasks/2026-07-16-i139-closeout-packet.md. Working tree clean, main synced.
 
 ## Variance And Residuals
 

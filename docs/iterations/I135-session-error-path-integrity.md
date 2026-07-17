@@ -65,6 +65,9 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-16 | Activation | N200 Start Gate passed. I135 activated. |
+| 2026-07-16 | v1 Implementation | run_inner returns partial messages; turn.rs persists on error. |
+| 2026-07-16 | Review v1 fix | Persistence failure now observable (appended to error message). ADR-042 regression uses real durable persistence. 9ed5779 + ca43287. |
 | 2026-07-16 | Activation | N200 Start Gate passed. I135 activated for N210. |
 | 2026-07-16 | Implementation | run_inner returns partial messages; turn.rs persists on error; ADR-042 preserved. |
 | 2026-07-16 | Commit | `9ed5779` pushed to origin/main. |

@@ -56,10 +56,13 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-16 | Activation | I136 Complete. I137 activated. |
+| 2026-07-16 | v1 Benchmark | 14-item fixture corpus; 4 policies compared; Go decision. |
+| 2026-07-16 | Review fix | Rewritten to call production evaluate_admission(); no separate policy impl. 8740a93. |
 
 ## Verification Evidence
 
-- Pending I136 completion and activation gate.
+- Production evaluate_admission() called by benchmark tests. 3 tests: precision/recall, determinism, category coverage. Go: precision >= 0.8, recall >= 0.7, all sensitive rejected.
 
 ## Variance And Residuals
 

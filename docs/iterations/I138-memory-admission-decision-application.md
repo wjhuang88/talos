@@ -53,10 +53,13 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-16 | Activation | I137 Go decision. I138 activated. |
+| 2026-07-16 | v1 Implementation | compute_confidence replaced with novelty × utility. |
+| 2026-07-16 | Review fix | AdmissionDecision struct added; admission_score separated from evidence confidence; sensitive content filter before writes; 6 new admission tests. ca43287. |
 
 ## Verification Evidence
 
-- Blocked on I137.
+- Production admission gate: evaluate_admission() with AdmissionDecision { admit, score, reason }. Sensitive content filter (api_key, token, password, bearer, cookie, etc.). Admission threshold 0.05. MemoryCandidate.confidence = evidence (0.5); admission_score = novelty × utility. 68 memory tests pass.
 
 ## Variance And Residuals
 

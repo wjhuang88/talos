@@ -58,6 +58,9 @@
 
 | Date | Type | Record |
 |---|---|---|
+| 2026-07-16 | Activation | I135 Complete. I136 activated. |
+| 2026-07-16 | Audit | Existing T111 implementation verified: manifest, WASM runtime, fuel/timeout/trap/bounds, output bound, collision/path rejection, provenance, no-host-imports. 13 tests pass. |
+| 2026-07-16 | Evidence | `register_valid_local_package_registers_read_only_plugin_tool` proves: load → register → read-only → provenance → permission → execute → bounded result. `/plugins` shows transition notice (correct for opt-in runtime config). |
 | 2026-07-16 | Activation | I135 Complete. I136 activated for N220. |
 | 2026-07-16 | Audit | Re-audited manifest parser, WASM runtime, fuel/timeout, output bound, collision, provenance, path traversal, no-host-imports. All implemented and tested behind `wasm` feature. |
 | 2026-07-16 | Closure | Existing behavior meets all acceptance criteria. `/plugins` transition notice is correct for current scope. No code change needed — documentation/status closure only. |
