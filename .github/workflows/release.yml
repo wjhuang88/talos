@@ -16,10 +16,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-release:
-    name: Check + Test + Build all platforms
+  # ── Gate: fmt + check + clippy + test ───────────────────────────────────
+  gate:
+    name: Release preflight
     runs-on: macos-14
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,36 +28,170 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.0
-          components: clippy
-          targets: |
-            aarch64-apple-darwin
-            x86_64-apple-darwin
-            aarch64-unknown-linux-musl
-            x86_64-unknown-linux-musl
-            x86_64-pc-windows-msvc
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Release preflight
         run: ./scripts/release_preflight.sh "${GITHUB_REF_NAME}"
 
-      - name: Install zig
-        run: brew install zig
+  # ── macOS ARM64 ─────────────────────────────────────────────────────────
+  build-macos-arm:
+    name: Build macOS ARM64
+    needs: gate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-apple-darwin
+      - name: Build
+        run: cargo build --release --target aarch64-apple-darwin -p talos-cli
+      - name: Package
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar -czf talos-aarch64-darwin.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-aarch64-darwin
+          path: target/aarch64-apple-darwin/release/talos-aarch64-darwin.tar.gz
 
-      - name: Install cargo-zigbuild
-        run: pip install cargo-zigbuild
+  # ── macOS x86_64 ────────────────────────────────────────────────────────
+  build-macos-intel:
+    name: Build macOS x86_64
+    needs: gate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-apple-darwin
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin -p talos-cli
+      - name: Package
+        run: |
+          cd target/x86_64-apple-darwin/release
+          tar -czf talos-x86_64-darwin.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-darwin
+          path: target/x86_64-apple-darwin/release/talos-x86_64-darwin.tar.gz
 
-      - name: Install cargo-xwin
-        run: pip install cargo-xwin
+  # ── Linux x86_64 musl ───────────────────────────────────────────────────
+  build-linux-x86:
+    name: Build Linux x86_64 (musl)
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools pkg-config
+      - name: Build
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          AR_x86_64_unknown_linux_musl: musl-ar
+        run: cargo build --release --target x86_64-unknown-linux-musl -p talos-cli
+      - name: Package
+        run: |
+          cd target/x86_64-unknown-linux-musl/release
+          tar -czf talos-x86_64-linux.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-linux
+          path: target/x86_64-unknown-linux-musl/release/talos-x86_64-linux.tar.gz
 
-      - name: Install LLVM (provides llvm-lib and lld-link for cargo-xwin)
-        run: brew install llvm
+  # ── Linux ARM64 musl ────────────────────────────────────────────────────
+  build-linux-arm:
+    name: Build Linux ARM64 (musl)
+    needs: gate
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+          targets: aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools pkg-config
+      - name: Build
+        env:
+          CC_aarch64_unknown_linux_musl: musl-gcc
+          AR_aarch64_unknown_linux_musl: musl-ar
+        run: cargo build --release --target aarch64-unknown-linux-musl -p talos-cli
+      - name: Package
+        run: |
+          cd target/aarch64-unknown-linux-musl/release
+          tar -czf talos-aarch64-linux.tar.gz talos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-aarch64-linux
+          path: target/aarch64-unknown-linux-musl/release/talos-aarch64-linux.tar.gz
 
-      - name: Add LLVM to PATH
-        run: echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+  # ── Windows x86_64 ──────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows x86_64
+    needs: gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-pc-windows-msvc
+      - name: Build
+        run: cargo build --release -p talos-cli
+      - name: Package
+        shell: pwsh
+        run: |
+          cd target/release
+          Compress-Archive -Path talos.exe -DestinationPath talos-x86_64-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talos-x86_64-windows
+          path: target/release/talos-x86_64-windows.zip
 
-      - name: Build all platforms
-        run: ./build.sh
+  # ── Release: collect artifacts, checksum, publish ───────────────────────
+  release:
+    name: Create GitHub Release
+    needs: [build-macos-arm, build-macos-intel, build-linux-x86, build-linux-arm, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksum
+        run: |
+          cd dist
+          sha256sum talos-* > checksum.sha256
+          echo "=== Artifacts ==="
+          ls -lh
+          echo "=== Checksums ==="
+          cat checksum.sha256
 
       - name: Detect pre-release
         id: prerelease
@@ -131,8 +265,6 @@ jobs:
             echo '# Windows (PowerShell)'
             echo "irm ${RAW_URL_BASE}/install/install.ps1 | iex"
             echo '```'
-            echo
-            echo "Installer scripts are published under \`install/\`. The old \`scripts/install.*\` paths are not kept after the pre-1.0 installer layout cleanup."
             echo
             echo "Each archive contains a single \`talos\` (or \`talos.exe\`) binary."
           } > RELEASE_BODY.md
