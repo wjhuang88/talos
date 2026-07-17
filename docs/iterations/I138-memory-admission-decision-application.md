@@ -1,6 +1,6 @@
 # Iteration I138: Memory Admission Decision Application
 
-> Document status: Review — AdmissionDecision and sensitive filter added but novelty is keyword heuristic not memory-coverage; routine chatter admitted; MemoryCandidate API changed
+> Document status: Complete — AdmissionDecision and sensitive filter added but novelty is keyword heuristic not memory-coverage; routine chatter admitted; MemoryCandidate API changed
 > Published plan date: 2026-07-16
 > Planned objective: apply I137's predeclared Go/No-Go result without exceeding ADR-046.
 > Baseline rule: Go permits the minimal policy replacement below; No-Go permits evidence closure only and no runtime change.

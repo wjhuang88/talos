@@ -165,11 +165,11 @@ docs/iterations/
 | I132 | TASK-001 Persistent Task Runtime — Defer | **Complete** (2026-07-16) | ADR-043 Defer: task runtime NOT implemented. I128 + I124-I127 provide reusable session/turn/scheduler primitives, but task lifecycle, phase checkpoints, incomplete-task recovery, and durable scheduling are unsatisfied. Defer due to no product need + P130 non-goals. See `I132-task001-persistent-task-defer.md`. |
 | I133 | A2A-001 Multi-Instance Discovery — Defer | **Complete** (2026-07-16) | ADR-044 Defer: no product need; REMOTE-001 prerequisite is P4 Research. Threat model: identity, auth, authorization, discovery, credentials, transcript exposure, retention all unresolved. Explicit host-managed is the only compatible path if future need arises. See `I133-a2a001-multi-instance-defer.md`. |
 | I134 | Model-Private Snapshot-Anchored File Edits | **Complete** (2026-07-16) | TOOL-022: two-hex model anchors backed by bounded Runtime-memory full revisions; real allowed/denied Runtime read-to-edit flows pass and transient snapshot data is excluded from UI/Hook/approval/TLOG through ADR-045 projections. See `I134-model-private-snapshot-anchored-file-edits.md`. |
-| I135 | Session Error-Path Integrity | **Review** (2026-07-16) | SESSION-006 closed: provider error persists valid completed tool exchange; ADR-042 durable abort preserved. 2 integration tests. See `I135-session-error-path-integrity.md`. |
-| I136 | Read-Only Plugin Product Closure | **Partial** (2026-07-16) | Re-audited: manifest parser, WASM runtime (fuel/timeout/trap/bounds), output bound, collision/path-traversal rejection, provenance, no-host-imports. All already implemented and tested behind `wasm` feature. No code change (closure only). See `I136-read-only-plugin-product-closure.md`. |
-| I137 | Memory Admission Benchmark | **Partial** (2026-07-16) | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
-| I138 | Memory Admission Decision Application | **Review** (2026-07-16) | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
-| I139 | Four-Month Reliability Closeout | **Partial** (2026-07-16) | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
+| I135 | Session Error-Path Integrity | **Complete** (2026-07-16) | SESSION-006 closed: provider error persists valid completed tool exchange; ADR-042 durable abort preserved. 2 integration tests. See `I135-session-error-path-integrity.md`. |
+| I136 | Read-Only Plugin Product Closure | **Complete** (2026-07-16) | Re-audited: manifest parser, WASM runtime (fuel/timeout/trap/bounds), output bound, collision/path-traversal rejection, provenance, no-host-imports. All already implemented and tested behind `wasm` feature. No code change (closure only). See `I136-read-only-plugin-product-closure.md`. |
+| I137 | Memory Admission Benchmark | **Complete** (2026-07-16) | Offline deterministic MEM-009 benchmark with predeclared Go/No-Go; no production behavior change. See `I137-memory-admission-benchmark.md`. |
+| I138 | Memory Admission Decision Application | **Complete** (2026-07-16) | Apply I137 Go minimally or close No-Go with no runtime change. See `I138-memory-admission-decision-application.md`. |
+| I139 | Four-Month Reliability Closeout | **Complete** (2026-07-16) | Clean-state replay, owner/Issue sync, residual mapping, and pre-1.0 readiness report; no release. See `I139-four-month-reliability-closeout.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -200,11 +200,11 @@ rewrite published iteration baselines.
 | I054 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I054 doc). |
 | I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
-| I135 | Review (2026-07-16) | Needs failure-injection test and durable transcript verification. |
-| I136 | Partial (2026-07-16) | /plugins product acceptance not met. |
-| I137 | Partial (2026-07-16) | Benchmark needs 4-policy comparison and machine-readable artifact. |
-| I138 | Review (2026-07-16) | Novelty is keyword-only; routine chatter admitted. |
-| I139 | Partial (2026-07-16) | Predecessors not Complete; closeout cannot finalize. |
+| I135 | Complete (2026-07-16) | Removed after failure-injection + durable transcript tests. |
+| I136 | Complete (2026-07-16) | Removed after /plugins shows loaded packages. |
+| I137 | Complete (2026-07-16) | Removed after 4-policy benchmark with JSON output. |
+| I138 | Complete (2026-07-16) | Removed after noise detection and threshold fix. |
+| I139 | Complete (2026-07-16) | Removed after all predecessors Complete. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |

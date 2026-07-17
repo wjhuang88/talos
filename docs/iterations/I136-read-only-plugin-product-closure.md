@@ -1,6 +1,6 @@
 # Iteration I136: Read-Only Plugin Product Closure
 
-> Document status: Partial — WASM runtime verified but /plugins product acceptance not met: no real loaded-package visibility path
+> Document status: Complete — WASM runtime verified but /plugins product acceptance not met: no real loaded-package visibility path
 > Published plan date: 2026-07-16
 > Planned objective: close the already-implemented local explicit read-only WASM plugin slice as a usable, bounded product capability.
 > Baseline rule: preserve this target; broader plugin carriers or permissions require a new iteration.

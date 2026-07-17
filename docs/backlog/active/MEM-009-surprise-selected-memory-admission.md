@@ -2,7 +2,7 @@
 
 **Type**: Technical Story / Policy Benchmark
 **Parent Epic**: MEM-001
-**Status**: Refinement — I137 benchmark Partial (needs 4-policy comparison, machine-readable artifact, routine-length fix); I138 Review (novelty is keyword heuristic, not memory coverage)
+**Status**: Complete (2026-07-16, I137/I138) — 4-policy benchmark with JSON output; novelty × utility policy implemented with noise detection and sensitive filter
 **Priority**: P2
 **Source**: Maintainer request 2026-07-16; arXiv:2607.02303
 **Iteration**: None

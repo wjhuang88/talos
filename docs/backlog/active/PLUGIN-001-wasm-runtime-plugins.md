@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Story ID | PLUGIN-001 |
-| Status | **In Progress — T111 read-only WASM verified but /plugins product visibility not closed**. I136 Partial: WASM runtime, fuel/timeout/trap/bounds, provenance, output bound all pass; /plugins transition notice does not show loaded packages. |
+| Status | **Complete (T111 slice + I136 product closure, 2026-07-16)** — local explicit read-only WASM plugin verified and closed: /plugins shows loaded packages. |
 | Priority | P2 (elevated from P4, 2026-06-20 — unblocks TOOL-008 Phase 3 + WEBFETCH Phase 2+ WASM consumers) |
 | Source | User request, 2026-06-18; model expanded 2026-06-30 (four-entity architecture) |
 | Relates To | CMD-001, CMD-002, HOOK-001, I009 extensibility, ADR-009, ADR-013, `talos-plugin`, `talos-mcp`, `talos-rpc`, TOOL-008, DIST-001 |
