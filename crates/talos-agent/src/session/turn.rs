@@ -191,10 +191,21 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             // normalized, complete exchanges — never half-streamed fragments
             // or fabricated tool results. Durable Runtime (ADR-042) still
             // aborts failed turns: no commit_turn call happens here.
+            let mut error_message = e.to_string();
             if !partial_messages.is_empty()
                 && let Some(persistence) = &persistence
             {
-                let _ = persist_turn_messages(persistence, &partial_messages, &raw_tool_outputs);
+                match persist_turn_messages(persistence, &partial_messages, &raw_tool_outputs) {
+                    Ok(()) => {}
+                    Err(persist_err) => {
+                        // Do not silently swallow persistence failure.
+                        // Append it to the error message so the host can
+                        // observe that tool results were not saved.
+                        error_message = format!(
+                            "{error_message}\n[warning: failed to persist partial turn messages: {persist_err}]"
+                        );
+                    }
+                }
             }
             let sequence = sequence.fetch_add(1, Ordering::Relaxed);
             let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -203,7 +214,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 sequence,
                 payload: TurnEventPayload::Completed {
                     status: TurnCompletionStatus::Error {
-                        message: e.to_string(),
+                        message: error_message,
                     },
                 },
             });

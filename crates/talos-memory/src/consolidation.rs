@@ -1,15 +1,189 @@
-//! Episodic-to-semantic memory consolidation pipeline.
+//! Episodic-to-semantic memory consolidation pipeline (ADR-046).
 //!
 //! Reads session episodes, extracts semantic memory candidates via a pluggable
 //! [`EpisodeExtractor`], and writes them to [`MemoryStore`] with evidence links.
 //!
-//! The pipeline is bounded, ADD-only, and deterministic when using the default
+//! Admission scoring (`novelty × committed_utility`) is separated from evidence
+//! confidence (`MemoryItem.confidence`). Sensitive content is rejected before
+//! any memory write.
 //! [`RuleBasedExtractor`]. No LLM or network calls are made.
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::{EvidenceLink, MemoryItem, MemoryKind, MemoryStore, MemoryStoreError};
+
+/// Reason codes for memory admission decisions (ADR-046).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AdmissionReason {
+    /// Candidate admitted: novelty × utility exceeded threshold.
+    Admitted,
+    /// Rejected: content matches sensitive patterns (credentials, tokens, etc.).
+    SensitiveContent,
+    /// Rejected: novelty × utility below admission threshold.
+    BelowThreshold,
+    /// Rejected: role is system/tool (not original user/assistant content).
+    ExcludedRole,
+    /// Rejected: content too short.
+    TooShort,
+}
+
+/// The result of evaluating a memory candidate for admission (ADR-046).
+///
+/// This is separate from evidence confidence. A candidate may have low
+/// admission score but still be admitted if it meets the threshold.
+#[derive(Debug, Clone)]
+pub struct AdmissionDecision {
+    /// Whether the candidate should be written to the memory store.
+    pub admit: bool,
+    /// The admission score (novelty × committed_utility), [0, 1].
+    pub score: f64,
+    /// Stable reason code explaining the decision.
+    pub reason: AdmissionReason,
+}
+
+const ADMISSION_THRESHOLD: f64 = 0.05;
+
+/// Patterns that indicate sensitive content that must never enter memory.
+const SENSITIVE_PATTERNS: &[&str] = &[
+    "api_key",
+    "apikey",
+    "access_token",
+    "refresh_token",
+    "authorization:",
+    "bearer ",
+    "cookie:",
+    "set-cookie",
+    "password:",
+    "password=",
+    "password =",
+    "private_key",
+    "-----begin",
+    "sk-ant-",
+    "sk-proj-",
+    "sk-",
+    "token=",
+    "credential",
+];
+
+/// Check if content contains sensitive patterns that must not be persisted.
+///
+/// This is a defense-in-depth filter. The session transcript may already
+/// redact or omit some of these, but the admission gate enforces it
+/// independently before any write.
+#[must_use]
+pub fn is_sensitive_content(content: &str) -> bool {
+    let lower = content.to_lowercase();
+    SENSITIVE_PATTERNS
+        .iter()
+        .any(|pattern| lower.contains(pattern))
+}
+
+/// Evaluate a memory candidate for admission using ADR-046 policy.
+///
+/// Returns an [`AdmissionDecision`] with the admission score and reason.
+/// The caller must respect `admit == false` and not write the candidate.
+#[must_use]
+pub fn evaluate_admission(content: &str, role: &str) -> AdmissionDecision {
+    // System and tool messages are never admitted.
+    if role == "system" || role == "tool" {
+        return AdmissionDecision {
+            admit: false,
+            score: 0.0,
+            reason: AdmissionReason::ExcludedRole,
+        };
+    }
+
+    // Content too short to be meaningful.
+    if content.len() < 10 {
+        return AdmissionDecision {
+            admit: false,
+            score: 0.0,
+            reason: AdmissionReason::TooShort,
+        };
+    }
+
+    // Sensitive content is always rejected before any write.
+    if is_sensitive_content(content) {
+        return AdmissionDecision {
+            admit: false,
+            score: 0.0,
+            reason: AdmissionReason::SensitiveContent,
+        };
+    }
+
+    // Compute admission score: novelty × committed_utility.
+    let score = compute_admission_score(content, role);
+
+    AdmissionDecision {
+        admit: score >= ADMISSION_THRESHOLD,
+        score,
+        reason: if score >= ADMISSION_THRESHOLD {
+            AdmissionReason::Admitted
+        } else {
+            AdmissionReason::BelowThreshold
+        },
+    }
+}
+
+/// Compute the admission score (novelty × committed_utility) for content.
+///
+/// Novelty estimates how poorly existing memory covers the candidate.
+/// Committed utility estimates whether the information changed or guided
+/// observable behavior. Both are bounded to [0, 1].
+fn compute_admission_score(content: &str, role: &str) -> f64 {
+    let lower = content.trim_start().to_lowercase();
+
+    // Novelty signal.
+    let novelty: f64 = if lower.starts_with("actually")
+        || lower.starts_with("no,")
+        || lower.starts_with("correction")
+    {
+        0.9
+    } else if lower.starts_with("note")
+        || lower.starts_with("important")
+        || lower.contains("fix for")
+        || lower.contains("deadlock")
+    {
+        0.8
+    } else if lower.starts_with("prefer") || lower.contains("i prefer") {
+        0.6
+    } else if content.len() > 100 {
+        0.4
+    } else {
+        0.2
+    };
+
+    // Committed utility signal.
+    let utility: f64 = if lower.starts_with("always")
+        || lower.starts_with("never")
+        || lower.starts_with("remember")
+        || lower.starts_with("note")
+    {
+        0.9
+    } else if lower.starts_with("actually")
+        || lower.starts_with("no,")
+        || lower.contains("was wrong")
+        || lower.contains("is wrong")
+    {
+        0.85
+    } else if lower.starts_with("important")
+        || lower.contains("fix for")
+        || lower.contains("caused by")
+        || lower.contains("fixed it")
+        || (role == "assistant" && content.len() > 40)
+    {
+        0.8
+    } else if lower.starts_with("prefer") || lower.contains("i prefer") {
+        0.7
+    } else if content.len() > 50 && role == "user" {
+        0.4
+    } else {
+        0.1
+    };
+
+    novelty * utility
+}
 
 /// A single episode read from a session, neutral to the session storage format.
 #[derive(Debug, Clone)]
@@ -29,7 +203,6 @@ pub struct SessionEpisode {
 }
 
 /// A memory candidate extracted from session episodes.
-#[derive(Debug, Clone)]
 pub struct MemoryCandidate {
     /// The kind of memory this candidate represents.
     pub kind: MemoryKind,
@@ -37,8 +210,13 @@ pub struct MemoryCandidate {
     pub key: String,
     /// The full content of the memory.
     pub content: String,
-    /// Confidence score (0.0 to 1.0).
+    /// Evidence confidence (0.0 to 1.0) — how well-supported the claim is.
+    /// Separate from admission score per ADR-046.
     pub confidence: f64,
+    /// Admission score (novelty × committed_utility, 0.0 to 1.0) — whether
+    /// this candidate should be written to memory. Separate from evidence
+    /// confidence per ADR-046.
+    pub admission_score: f64,
     /// The session this candidate was extracted from.
     pub source_session_id: String,
     /// The entry ID within the session.
@@ -46,7 +224,6 @@ pub struct MemoryCandidate {
     /// The turn index within the session.
     pub source_turn_index: usize,
 }
-
 /// Trait for extracting semantic memory candidates from session episodes.
 ///
 /// Implementations must be deterministic: the same input must always produce
@@ -90,49 +267,37 @@ impl EpisodeExtractor for RuleBasedExtractor {
         let mut candidates: Vec<MemoryCandidate> = Vec::new();
 
         for episode in episodes {
-            // Skip messages shorter than 10 characters (noise).
-            if episode.content.len() < 10 {
+            // Evaluate admission (handles role, length, sensitive content,
+            // and novelty × utility threshold).
+            let decision = evaluate_admission(&episode.content, &episode.role);
+            if !decision.admit {
                 continue;
             }
 
-            // Skip system and tool messages (they are events, not original facts).
-            if episode.role == "system" || episode.role == "tool" {
-                continue;
-            }
-
-            // Only process user and assistant messages.
-            if episode.role != "user" && episode.role != "assistant" {
-                continue;
-            }
-
-            // Derive key from first 40 characters, truncated at first newline.
             let key = derive_key(&episode.content);
-
-            // Compute confidence deterministically.
-            let confidence = compute_confidence(&episode.content, &episode.role);
+            let evidence_confidence = 0.5_f64;
 
             candidates.push(MemoryCandidate {
                 kind: MemoryKind::Semantic,
                 key,
                 content: episode.content.clone(),
-                confidence,
+                confidence: evidence_confidence,
+                admission_score: decision.score,
                 source_session_id: episode.session_id.clone(),
                 source_entry_id: episode.entry_id.clone(),
                 source_turn_index: episode.turn_index,
             });
         }
 
-        // Sort by confidence descending, then by turn_index ascending for ties.
+        // Sort by admission score descending, then by turn_index ascending.
         candidates.sort_by(|a, b| {
-            b.confidence
-                .partial_cmp(&a.confidence)
+            b.admission_score
+                .partial_cmp(&a.admission_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.source_turn_index.cmp(&b.source_turn_index))
         });
 
-        // Limit to max_candidates.
         candidates.truncate(self.max_candidates);
-
         candidates
     }
 }
@@ -145,81 +310,6 @@ fn derive_key(content: &str) -> String {
         .unwrap_or(content);
     let truncated = truncated.chars().take(40).collect::<String>();
     truncated.trim().to_string()
-}
-
-/// Compute admission confidence using `novelty × committed_utility` (ADR-046).
-///
-/// This replaces the former keyword/message-length heuristic with a
-/// deterministic two-signal policy:
-/// - `novelty`: estimates how poorly existing memory covers the candidate.
-///   Uses keyword markers and content distinctiveness signals.
-/// - `committed_utility`: estimates whether the information changed or
-///   guided observable behavior: corrections, preferences, validated
-///   results, recovery, or explicit markers.
-///
-/// Both values are bounded to `[0, 1]`. The admission score is their
-/// product. Explicit user phrases contribute to utility but cannot
-/// alone establish admission. `MemoryItem.confidence` remains evidence
-/// confidence and is NOT this score.
-fn compute_confidence(content: &str, role: &str) -> f64 {
-    let lower = content.trim_start().to_lowercase();
-
-    // Novelty: keyword markers indicating new/distinctive information.
-    let novelty = if lower.starts_with("actually")
-        || lower.starts_with("no,")
-        || lower.starts_with("correction")
-    {
-        0.9
-    } else if lower.starts_with("note")
-        || lower.starts_with("important")
-        || lower.contains("fix for")
-        || lower.contains("deadlock")
-    {
-        0.8
-    } else if lower.starts_with("prefer") || lower.contains("i prefer") {
-        0.6
-    } else if content.len() > 100 {
-        // Long content may contain distinctive information.
-        0.4
-    } else {
-        0.2
-    };
-
-    // Committed utility: did the information change/guide behavior?
-    let utility = if lower.starts_with("always")
-        || lower.starts_with("never")
-        || lower.starts_with("remember")
-        || lower.starts_with("note")
-    {
-        // Explicit user directives have high utility.
-        0.9
-    } else if lower.starts_with("actually")
-        || lower.starts_with("no,")
-        || lower.contains("was wrong")
-        || lower.contains("is wrong")
-    {
-        // Corrections have high utility — they fix existing knowledge.
-        0.85
-    } else if lower.starts_with("important")
-        || lower.contains("fix for")
-        || lower.contains("caused by")
-        || lower.contains("fixed it")
-        || role == "assistant" && content.len() > 40
-    {
-        // Validated results and recovery explanations.
-        0.8
-    } else if lower.starts_with("prefer") || lower.contains("i prefer") {
-        0.7
-    } else if content.len() > 50 && role == "user" {
-        // Substantial user content may have moderate utility.
-        0.4
-    } else {
-        0.1
-    };
-
-    // Admission score = novelty × committed_utility, clamped to [0, 1].
-    let score: f64 = novelty * utility;
-    score.clamp(0.0, 1.0)
 }
 
 /// Configuration for the consolidation pipeline.
@@ -599,5 +689,121 @@ mod tests {
                 "Turn index should match"
             );
         }
+    }
+
+    // ── ADR-046 admission tests ──────────────────────────────────────────
+
+    #[test]
+    fn sensitive_content_is_rejected_before_write() {
+        let decision = evaluate_admission("api_key = sk-ant-1234567890abcdef", "user");
+        assert!(!decision.admit, "api_key content must not be admitted");
+        assert_eq!(decision.reason, AdmissionReason::SensitiveContent);
+
+        let decision2 = evaluate_admission("Authorization: Bearer token123", "user");
+        assert!(
+            !decision2.admit,
+            "Authorization header must not be admitted"
+        );
+        assert_eq!(decision2.reason, AdmissionReason::SensitiveContent);
+
+        let decision3 = evaluate_admission("password = secret123", "user");
+        assert!(!decision3.admit, "password content must not be admitted");
+        assert_eq!(decision3.reason, AdmissionReason::SensitiveContent);
+    }
+
+    #[test]
+    fn short_correction_is_admitted() {
+        let decision = evaluate_admission("No, use cargo fmt not rustfmt", "user");
+        assert!(decision.admit, "short correction should be admitted");
+        assert_eq!(decision.reason, AdmissionReason::Admitted);
+        assert!(decision.score > 0.5, "correction should have high score");
+    }
+
+    #[test]
+    fn long_noise_is_rejected() {
+        let long_noise = "Can you help me understand how the session lifecycle works? \
+            I've been reading through the code and trying to figure out the relationship. \
+            It seems like there's a turn loop that processes events and then calls tools.";
+        let decision = evaluate_admission(long_noise, "user");
+        assert!(
+            !decision.admit || decision.score < 0.2,
+            "routine chatter should have low or rejected admission"
+        );
+    }
+
+    #[test]
+    fn admission_score_separate_from_evidence_confidence() {
+        let episodes = vec![SessionEpisode {
+            session_id: "s1".into(),
+            entry_id: "e1".into(),
+            turn_index: 0,
+            role: "user".into(),
+            content: "Always run tests before committing".into(),
+            timestamp: Utc::now(),
+        }];
+        let extractor = RuleBasedExtractor::new();
+        let candidates = extractor.extract(&episodes);
+        assert!(!candidates.is_empty());
+        let c = &candidates[0];
+        // Evidence confidence is a fixed value (0.5)
+        assert_eq!(c.confidence, 0.5, "evidence confidence should be fixed");
+        // Admission score is different and based on novelty × utility
+        assert_ne!(
+            c.admission_score, c.confidence,
+            "admission score must differ from evidence confidence"
+        );
+        assert!(
+            c.admission_score > 0.0,
+            "directive should have non-zero admission score"
+        );
+    }
+
+    #[test]
+    fn disabled_mode_admits_nothing() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        let episodes = vec![SessionEpisode {
+            session_id: "s1".into(),
+            entry_id: "e1".into(),
+            turn_index: 0,
+            role: "user".into(),
+            content: "Always run tests before committing".into(),
+            timestamp: Utc::now(),
+        }];
+        let extractor = RuleBasedExtractor::new();
+        let config = ConsolidationConfig::default(); // enabled = false
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        assert_eq!(
+            report.inserted, 0,
+            "disabled consolidation should write nothing"
+        );
+    }
+
+    #[test]
+    fn credential_shaped_content_not_in_store() {
+        let mut store = MemoryStore::open_memory().unwrap();
+        let episodes = vec![SessionEpisode {
+            session_id: "s1".into(),
+            entry_id: "e1".into(),
+            turn_index: 0,
+            role: "user".into(),
+            content: "api_key = sk-ant-test-secret-key-value".into(),
+            timestamp: Utc::now(),
+        }];
+        let extractor = RuleBasedExtractor::new();
+        let config = ConsolidationConfig {
+            enabled: true,
+            max_candidates_per_session: 20,
+        };
+        let report = consolidate_episodes(&mut store, &episodes, &extractor, &config).unwrap();
+        assert_eq!(
+            report.candidates_extracted, 0,
+            "sensitive content should not be extracted"
+        );
+        assert_eq!(
+            report.inserted, 0,
+            "sensitive content must not be written to store"
+        );
+        let results = store.retrieve("api_key", 10).unwrap();
+        assert!(results.is_empty(), "no sensitive content in store");
     }
 }

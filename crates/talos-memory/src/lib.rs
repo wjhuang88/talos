@@ -28,11 +28,12 @@ mod store;
 #[cfg(test)]
 mod tests;
 mod types;
-
 pub use consolidation::{
-    ConsolidationConfig, ConsolidationReport, EpisodeExtractor, MemoryCandidate,
-    RuleBasedExtractor, SessionEpisode, consolidate_episodes,
+    AdmissionDecision, AdmissionReason, ConsolidationConfig, ConsolidationReport, EpisodeExtractor,
+    MemoryCandidate, RuleBasedExtractor, SessionEpisode, consolidate_episodes, evaluate_admission,
+    is_sensitive_content,
 };
+
 pub use entities::extract_entities;
 pub use graph::{AssociationResult, GraphEdge, GraphNode};
 pub use prompt::{MemoryPromptConfig, format_memory_prompt};

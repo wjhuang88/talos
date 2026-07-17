@@ -1122,19 +1122,22 @@ async fn fixture_provider_error_preserves_tool_results() {
     );
 }
 
-/// Proves ADR-042 is preserved: interactive session persists partial messages,
-/// but durable Runtime still aborts failed turns (no commit_turn on error path).
-/// This test confirms the interactive prefix persistence does not leak into
-/// the durable Runtime path. It runs the same model that triggers a provider
-/// error after tool execution, but WITHOUT durable persistence, then verifies
-/// the interactive session has the tool result while no durable commit occurs.
+/// Proves ADR-042 is preserved with REAL durable persistence: when both
+/// interactive and durable persistence are configured, a provider error
+/// still results in NO durable commit (no EntriesCommitted) while the
+/// interactive session retains the completed tool exchange.
 #[tokio::test]
-async fn fixture_adr042_durable_failed_turn_still_aborts() {
-    use talos_session::{SessionManager, SessionMetadata};
+async fn fixture_adr042_durable_failed_turn_aborts_with_real_durable() {
+    use talos_session::{DurableSession, PersistencePolicy, SessionManager, SessionMetadata};
 
     let temp_dir = tempfile::tempdir().unwrap();
     let manager = SessionManager::with_dir(temp_dir.path().to_path_buf());
-    let session = manager.create_session("adr042-check", "").unwrap();
+    let session = manager.create_session("adr042-real", "").unwrap();
+
+    // Create a real durable session
+    let durable = manager
+        .create_or_open_session("adr042-real-durable")
+        .expect("durable session");
 
     let mut registry = ToolRegistry::new();
     registry.register(std::sync::Arc::new(EchoTool));
@@ -1148,7 +1151,8 @@ async fn fixture_adr042_durable_failed_turn_still_aborts() {
         model_context_limit: 128_000,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
-    // Set interactive persistence only (no durable persistence)
+
+    // Set BOTH interactive and durable persistence
     actor.set_persistence(
         session.clone(),
         SessionMetadata {
@@ -1157,6 +1161,7 @@ async fn fixture_adr042_durable_failed_turn_still_aborts() {
             ..SessionMetadata::default()
         },
     );
+    actor.set_durable_persistence(durable, PersistencePolicy::default());
 
     let sq_tx = handle.sq_tx;
     let eq_rx = handle.eq_rx;
@@ -1171,16 +1176,16 @@ async fn fixture_adr042_durable_failed_turn_still_aborts() {
 
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
-    // The turn must complete with an error (not success)
-    let has_error_completion = events.iter().any(|e| {
+    // Turn must error
+    let has_error = events.iter().any(|e| {
         matches!(
             completed_status(e),
             Some(TurnCompletionStatus::Error { .. })
         )
     });
-    assert!(has_error_completion, "turn should error");
+    assert!(has_error, "turn should error");
 
-    // No EntriesCommitted event should fire (ADR-042: failed turns abort)
+    // ADR-042: NO EntriesCommitted on error path — durable failed turns abort
     let has_entries_committed = events
         .iter()
         .any(|e| matches!(e, SessionEvent::EntriesCommitted { .. }));
@@ -1198,4 +1203,7 @@ async fn fixture_adr042_durable_failed_turn_still_aborts() {
         has_tool_result,
         "interactive session persists tool result on error (SESSION-006 fix)"
     );
+    // The actor owns the DurableSession. We verify ADR-042 via the
+    // EntriesCommitted event absence (checked above), which is the
+    // authoritative signal that commit_turn was never called.
 }
