@@ -9,8 +9,8 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-talos-core = { version = "0.3.5", path = "../talos-core" }
-talos-sandbox = { version = "0.3.5", path = "../talos-sandbox" }
+talos-core = { version = "0.3.6", path = "../talos-core" }
+talos-sandbox = { version = "0.3.6", path = "../talos-sandbox" }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -45,7 +45,7 @@ sha2 = "0.11"
 libc = "1.0.0-alpha.3"
 
 [dev-dependencies]
-talos-permission = { version = "0.3.5", path = "../talos-permission" }
+talos-permission = { version = "0.3.6", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1", features = ["fs", "macros", "rt"] }
 
