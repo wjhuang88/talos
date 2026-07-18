@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// Reasoning effort levels for OpenAI o-series models.
+pub use talos_core::model::ReasoningEffort;
+
 /// Wire protocol used to talk to a provider.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -28,15 +31,6 @@ pub struct ModelConfig {
     /// Per-model reasoning/thinking configuration (ADR-034).
     #[serde(default)]
     pub reasoning: Option<ReasoningOptions>,
-}
-
-/// Reasoning effort levels for OpenAI o-series models.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ReasoningEffort {
-    Low,
-    Medium,
-    High,
 }
 
 /// Per-model reasoning/thinking options.

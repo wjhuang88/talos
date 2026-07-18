@@ -962,6 +962,7 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn available_model_name_is_provider_qualified() {
         let model = talos_config::model::ModelMetadata {
+            variants: vec![],
             provider: "openai".to_string(),
             id: "gpt-4.1".to_string(),
             context_limit: None,
@@ -978,6 +979,7 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn available_model_filter_matches_provider_model_and_qualified_id() {
         let model = talos_config::model::ModelMetadata {
+            variants: vec![],
             provider: "openai".to_string(),
             id: "gpt-4.1".to_string(),
             context_limit: None,
@@ -997,6 +999,7 @@ api_key_env = "ANTHROPIC_API_KEY"
     #[test]
     fn empty_available_model_filter_matches_everything() {
         let model = talos_config::model::ModelMetadata {
+            variants: vec![],
             provider: "openai".to_string(),
             id: "gpt-4.1".to_string(),
             context_limit: None,

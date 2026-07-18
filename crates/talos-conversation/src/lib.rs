@@ -35,11 +35,11 @@ pub use types::{
     ChatMessage, ConnectPickerData, ConnectPickerItem, ContentOutput, CopyScope,
     CredentialRequestData, CredentialResponseData, ExtensionSnapshot, HookDeclarationDiagnostic,
     HookSnapshot, LoadedPluginDiagnostic, McpServerDiagnostic, MessageRole, MessageSource,
-    MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem, ModelSwitchRequest,
-    PluginObservation, ProviderSetupItem, ScrollbackState, SessionDeleteRequest,
-    SessionForkRequest, SessionNewRequest, SessionPickerItem, SessionResumeRequest,
-    SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage, TipKind,
-    TodoCommandAction, TodoCommandRequest, TodoExportFormat, TodoPanelData, TodoPanelRow,
+    MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem, ModelPickerVariantItem,
+    ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
+    SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
+    SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,
+    TipKind, TodoCommandAction, TodoCommandRequest, TodoExportFormat, TodoPanelData, TodoPanelRow,
     ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput, UserInput,
 };
 pub use validation::{

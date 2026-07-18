@@ -429,6 +429,14 @@ pub struct ModelPickerItem {
     pub authenticated: bool,
     /// `true` → this is the currently active model+provider.
     pub is_current: bool,
+    /// Named invocation presets declared for this model (ADR-048).
+    ///
+    /// An empty list means the picker must switch directly without opening a
+    /// variant selection stage.
+    pub variants: Vec<ModelPickerVariantItem>,
+    /// Recorded variant for this entry, used by Recent items to direct-switch
+    /// with their last-used variant. `None` for ordinary model rows.
+    pub variant: Option<String>,
 }
 
 /// Payload for [`UiOutput::ModelPicker`] — drives the two-layer picker.
@@ -438,6 +446,7 @@ pub struct ModelPickerItem {
 /// UX leaves unauthenticated provider setup to `/connect`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelPickerData {
+    pub recent: Vec<ModelPickerItem>,
     pub ready_models: Vec<ModelPickerItem>,
     pub setup_providers: Vec<ProviderSetupItem>,
 }

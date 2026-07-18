@@ -5,53 +5,172 @@ use ratatui::{
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::scrollback::truncate_end_to_width;
+use crate::scrollback_status_git;
 use crate::theme::semantic;
 
-struct StatusFlags {
-    queue_total: usize,
-    phase_label: Option<String>,
-}
-
+/// Width-aware thresholds:
+/// - Expanded (>= 100 cols): Shows all fields.
+/// - Standard (>= 80 cols): Drops platform label.
+/// - Narrow (>= 60 cols): Drops platform label and Git details.
+/// - Minimal (< 60 cols): Truncates workspace heavily, drops variant and noncritical metrics.
 pub(crate) fn build_status_text(
     status: &talos_conversation::StatusSnapshot,
     width: u16,
 ) -> Text<'static> {
-    let compact = width < 80;
+    let dim = Style::default().fg(semantic::DIM_TEXT);
+    let accent = Style::default().fg(semantic::TEXT_ACCENT);
+    let val = Style::default().fg(semantic::STATUS_VALUE);
+
+    let expanded = width >= 100;
+    let standard = width >= 80;
+    let narrow = width >= 60;
 
     let model_name = &status.model_name;
-    let provider = &status.provider;
+    let provider = status_provider_for_display(model_name, &status.provider);
     let workspace = &status.workspace_path;
-    let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
-    let output_tokens = status.usage.output_tokens;
-    let reasoning_tokens = status.usage.reasoning_tokens;
-    let output_usage_label = format_output_usage(output_tokens, reasoning_tokens);
-    let flags = StatusFlags {
-        queue_total: status.steering_count + status.followup_count,
-        phase_label: phase_status_label(status),
-    };
-    let context_label = format_context_label(status.context_limit, total_tokens);
+    let variant = &status.variant;
 
-    if compact {
-        return build_compact_status(
-            model_name,
-            &context_label,
-            status_provider_for_display(model_name, provider),
-            workspace,
-            &output_usage_label,
-            &flags,
-            width,
-        );
+    let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
+    let context_label = format_context_label(status.context_limit, total_tokens);
+    let output_usage_label =
+        format_output_usage(status.usage.output_tokens, status.usage.reasoning_tokens);
+
+    let queue_total = status.steering_count + status.followup_count;
+    let phase_label = phase_status_label(status);
+
+    let ctx_len = if context_label.is_empty() {
+        0
+    } else {
+        display_width(&context_label) + 2
+    };
+
+    let platform_part = if expanded {
+        let os = match std::env::consts::OS {
+            "macos" => "macOS",
+            "linux" => "Linux",
+            "windows" => "Windows",
+            other => other,
+        };
+        format!(" · {os}")
+    } else {
+        String::new()
+    };
+
+    let git_part = if standard && !workspace.is_empty() {
+        if let Some(git_summary) = scrollback_status_git::get_git_status(workspace) {
+            let branch = git_summary.branch.as_deref().unwrap_or("");
+            let dirty = if git_summary.dirty { "*" } else { "" };
+            if branch.is_empty() && dirty.is_empty() {
+                String::new()
+            } else if branch.is_empty() {
+                format!(" · {dirty}")
+            } else {
+                format!(" · ⎇ {branch}{dirty}")
+            }
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let variant_part = if narrow {
+        if let Some(v) = variant {
+            format!(" · {v}")
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let metrics_part = if narrow {
+        let q = if queue_total > 0 {
+            format!(" · ⬡ {queue_total} queued")
+        } else {
+            String::new()
+        };
+        let p = phase_label
+            .as_deref()
+            .map(|l| format!(" · {l}"))
+            .unwrap_or_default();
+        format!("{output_usage_label}{q}{p}")
+    } else {
+        String::new()
+    };
+
+    let right_part = if narrow {
+        metrics_part.to_string()
+    } else {
+        String::new()
+    };
+
+    let reserved = 1
+        + display_width(&right_part)
+        + 5
+        + ctx_len
+        + display_width(&platform_part)
+        + display_width(&git_part)
+        + display_width(&variant_part);
+    let available = (width as usize).saturating_sub(reserved);
+
+    let provider_budget = if provider.is_empty() || !narrow {
+        0
+    } else {
+        display_width(provider).min(18) + 3
+    };
+    let model_limit = if workspace.is_empty() {
+        available.saturating_sub(provider_budget).clamp(10, 40)
+    } else {
+        (available / 2)
+            .saturating_sub(provider_budget / 2)
+            .clamp(10, 36)
+    };
+
+    let workspace_limit = available
+        .saturating_sub(model_limit)
+        .saturating_sub(provider_budget)
+        .clamp(12, 48);
+
+    let ctx_part = if context_label.is_empty() {
+        String::new()
+    } else {
+        format!(" ({context_label})")
+    };
+    let model_part = format!("⬡ {}{}", truncate_str(model_name, model_limit), ctx_part);
+
+    let provider_part = if narrow && !provider.is_empty() {
+        format!(" ({})", truncate_str(provider, 18))
+    } else {
+        String::new()
+    };
+
+    let workspace_part = if workspace.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " ▸ {}",
+            truncate_end_to_width(workspace, workspace_limit as u16)
+        )
+    };
+
+    let left_spans = vec![
+        Span::styled(" ", dim),
+        Span::styled(format!("{model_part}{provider_part}"), accent),
+        Span::styled(workspace_part, val),
+        Span::styled(git_part, dim),
+        Span::styled(platform_part, dim),
+        Span::styled(variant_part, accent),
+    ];
+
+    let right_spans = vec![Span::styled("     ", dim), Span::styled(right_part, val)];
+
+    let mut all_spans = left_spans;
+    if narrow {
+        all_spans.extend(right_spans);
     }
 
-    build_expanded_status(
-        model_name,
-        &context_label,
-        status_provider_for_display(model_name, provider),
-        workspace,
-        &output_usage_label,
-        &flags,
-        width,
-    )
+    Text::from(Line::from(all_spans))
 }
 
 fn format_output_usage(output_tokens: u32, reasoning_tokens: u32) -> String {
@@ -98,162 +217,6 @@ fn context_usage_percent(limit: Option<u32>, total_tokens: u64) -> Option<u64> {
     }
 
     Some((total_tokens.saturating_mul(100) + (limit / 2)) / limit)
-}
-
-fn build_compact_status(
-    model_name: &str,
-    context_label: &str,
-    provider: &str,
-    workspace: &str,
-    output_usage_label: &str,
-    flags: &StatusFlags,
-    width: u16,
-) -> Text<'static> {
-    let dim = Style::default().fg(semantic::DIM_TEXT);
-    let accent = Style::default().fg(semantic::TEXT_ACCENT);
-    let val = Style::default().fg(semantic::STATUS_VALUE);
-
-    let tokens_part = format!(" {output_usage_label}");
-    let queue_part = if flags.queue_total > 0 {
-        format!(" · ⬡{}", flags.queue_total)
-    } else {
-        String::new()
-    };
-    let phase_part = flags
-        .phase_label
-        .as_deref()
-        .map(|label| format!(" · {label}"))
-        .unwrap_or_default();
-    let ctx_len = if context_label.is_empty() {
-        0
-    } else {
-        display_width(context_label) + 2
-    };
-    let reserved = display_width(&tokens_part)
-        + display_width(&queue_part)
-        + display_width(&phase_part)
-        + ctx_len
-        + 1;
-    let available = (width as usize).saturating_sub(reserved);
-    let model_limit = if workspace.is_empty() {
-        available.saturating_sub(2).clamp(8, 20)
-    } else {
-        (available / 2).clamp(8, 20)
-    };
-    let workspace_limit = available
-        .saturating_sub(model_limit)
-        .saturating_sub(display_width(provider).min(14))
-        .clamp(8, 16);
-
-    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
-    let ctx_part = if context_label.is_empty() {
-        String::new()
-    } else {
-        format!(" ({context_label})")
-    };
-    let provider_part = if provider.is_empty() {
-        String::new()
-    } else {
-        format!(" ({})", truncate_str(provider, 12))
-    };
-    let workspace_part = if workspace.is_empty() {
-        String::new()
-    } else {
-        format!(
-            " ▸ {}",
-            truncate_end_to_width(workspace, workspace_limit as u16)
-        )
-    };
-
-    Text::from(Line::from(vec![
-        Span::styled(" ", dim),
-        Span::styled(format!("{model_part}{ctx_part}{provider_part}"), accent),
-        Span::styled(workspace_part, val),
-        Span::styled("", dim),
-        Span::styled(tokens_part, val),
-        Span::styled(queue_part, dim),
-        Span::styled(phase_part, dim),
-    ]))
-}
-
-fn build_expanded_status(
-    model_name: &str,
-    context_label: &str,
-    provider: &str,
-    workspace: &str,
-    output_usage_label: &str,
-    flags: &StatusFlags,
-    width: u16,
-) -> Text<'static> {
-    let dim = Style::default().fg(semantic::DIM_TEXT);
-    let accent = Style::default().fg(semantic::TEXT_ACCENT);
-    let val = Style::default().fg(semantic::STATUS_VALUE);
-
-    let tokens_part = output_usage_label.to_string();
-    let queue_part = if flags.queue_total > 0 {
-        format!(" · ⬡ {} queued", flags.queue_total)
-    } else {
-        String::new()
-    };
-    let phase_part = flags
-        .phase_label
-        .as_deref()
-        .map(|label| format!(" · {label}"))
-        .unwrap_or_default();
-
-    let ctx_len = if context_label.is_empty() {
-        0
-    } else {
-        display_width(context_label) + 2
-    };
-    let right_part = format!("{tokens_part}{queue_part}{phase_part}");
-    let reserved = 1 + display_width(&right_part) + 5 + ctx_len;
-    let available = (width as usize).saturating_sub(reserved);
-    let provider_budget = if provider.is_empty() {
-        0
-    } else {
-        display_width(provider).min(18) + 3
-    };
-    let model_limit = if workspace.is_empty() {
-        available.saturating_sub(provider_budget).clamp(10, 40)
-    } else {
-        (available / 2)
-            .saturating_sub(provider_budget / 2)
-            .clamp(10, 36)
-    };
-    let workspace_limit = available
-        .saturating_sub(model_limit)
-        .saturating_sub(provider_budget)
-        .clamp(12, 48);
-
-    let model_part = format!("⬡ {}", truncate_str(model_name, model_limit));
-    let ctx_part = if context_label.is_empty() {
-        String::new()
-    } else {
-        format!(" ({context_label})")
-    };
-    let provider_part = if provider.is_empty() {
-        String::new()
-    } else {
-        format!(" ({})", truncate_str(provider, 18))
-    };
-    let workspace_part = if workspace.is_empty() {
-        String::new()
-    } else {
-        format!(
-            " ▸ {}",
-            truncate_end_to_width(workspace, workspace_limit as u16)
-        )
-    };
-
-    Text::from(Line::from(vec![
-        Span::styled(" ", dim),
-        Span::styled(format!("{model_part}{ctx_part}{provider_part}"), accent),
-        Span::styled(workspace_part, val),
-        Span::styled("", dim),
-        Span::styled("     ", dim),
-        Span::styled(right_part, val),
-    ]))
 }
 
 fn status_provider_for_display<'a>(model_name: &str, provider: &'a str) -> &'a str {

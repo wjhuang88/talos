@@ -6,9 +6,9 @@ use talos_core::tool::ToolProvenance;
 use crate::engine::ConversationEngine;
 use crate::types::{
     ChatMessage, ContentOutput, LoadedPluginDiagnostic, McpServerDiagnostic, MessageRole,
-    MessageSource, MessageStatus, ModelPickerItem, PluginObservation, SkillCommandRequest,
-    SkillDiagnostic, TipKind, TodoCommandAction, TodoExportFormat, ToolCallDisplay,
-    ToolResultDisplay, TurnPhase, UiOutput,
+    MessageSource, MessageStatus, ModelInfo, ModelPickerItem, PluginObservation,
+    SkillCommandRequest, SkillDiagnostic, TipKind, TodoCommandAction, TodoExportFormat,
+    ToolCallDisplay, ToolResultDisplay, TurnPhase, UiOutput,
 };
 
 fn new_engine() -> ConversationEngine {
@@ -1674,6 +1674,12 @@ fn status_snapshot_reflects_current_state() {
     engine.followup_queue.push("up".to_string());
     engine.is_processing = true;
     engine.branch_id = Some("b-123".to_string());
+    engine.set_model_info(&ModelInfo {
+        model_name: "claude-sonnet-4".to_string(),
+        provider: "anthropic".to_string(),
+        variant: Some("medium-reasoning".to_string()),
+        ..Default::default()
+    });
 
     let snapshot = engine.status_snapshot();
 
@@ -1682,6 +1688,7 @@ fn status_snapshot_reflects_current_state() {
     assert_eq!(snapshot.followup_count, 2);
     assert!(snapshot.is_processing);
     assert_eq!(snapshot.branch_id, Some("b-123".to_string()));
+    assert_eq!(snapshot.variant.as_deref(), Some("medium-reasoning"));
 }
 
 // ---------------------------------------------------------------------------
@@ -2035,6 +2042,8 @@ fn model_picker_item_fields_accessible() {
         pricing: Some("$3/$15 per 1M".to_string()),
         authenticated: true,
         is_current: false,
+        variants: vec![],
+        variant: None,
     };
     assert_eq!(item.command, "/model");
     assert_eq!(item.model_id, "claude-sonnet-4-20250514");
@@ -2055,6 +2064,8 @@ fn model_picker_item_unauthenticated_flag() {
         pricing: None,
         authenticated: false,
         is_current: false,
+        variants: vec![],
+        variant: None,
     };
     assert!(!item.authenticated);
     assert!(item.pricing.is_none());

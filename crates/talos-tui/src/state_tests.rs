@@ -176,6 +176,7 @@ fn paste_is_ignored_while_approval_is_visible() {
 fn paste_updates_filter_when_picker_is_visible() {
     let mut state = TuiState::new();
     let data = ModelPickerData {
+        recent: vec![],
         ready_models: vec![],
         setup_providers: vec![],
     };
@@ -232,11 +233,14 @@ fn model_item(id: &str, provider: &str, is_current: bool) -> talos_conversation:
         pricing: None,
         authenticated: true,
         is_current,
+        variants: vec![],
+        variant: None,
     }
 }
 
 fn sample_model_picker_data() -> ModelPickerData {
     ModelPickerData {
+        recent: vec![],
         ready_models: vec![
             model_item("claude-sonnet-4-5", "anthropic", true),
             model_item("claude-opus-4-1", "anthropic", false),
@@ -273,13 +277,11 @@ fn sample_connect_picker_data() -> talos_conversation::ConnectPickerData {
 }
 
 #[test]
-fn model_picker_search_matching_provider_hides_other_groups() {
+fn model_picker_level1_search_matches_provider_names() {
     let data = sample_model_picker_data();
     let menu = BottomPanelState::open_model_picker(&data);
 
-    // Groups: "Current" (claude-sonnet-4-5/anthropic), "anthropic"
-    // (claude-opus-4-1), "openai" (gpt-4o, o3).
-    let indices = menu.filtered_indices("gpt");
+    let indices = menu.filtered_indices("openai");
     let visible_labels: Vec<&str> = indices
         .iter()
         .map(|&i| menu.items[i].label.as_str())
@@ -287,23 +289,44 @@ fn model_picker_search_matching_provider_hides_other_groups() {
 
     assert!(
         visible_labels.contains(&"openai"),
-        "openai header must be visible: {visible_labels:?}"
+        "openai provider row must be visible when querying 'openai': {visible_labels:?}"
     );
     assert!(
-        visible_labels.iter().any(|l| l.contains("gpt-4o")),
-        "matching item must be visible: {visible_labels:?}"
+        !visible_labels.contains(&"anthropic"),
+        "non-matching anthropic provider must be hidden: {visible_labels:?}"
     );
-    assert!(
-        !visible_labels.iter().any(|l| l.contains("o3")),
-        "non-matching sibling must be hidden: {visible_labels:?}"
+}
+
+#[test]
+fn model_picker_level2_navigation_skips_headers_and_filtered_items() {
+    let data = sample_model_picker_data();
+    let mut menu = BottomPanelState::open_model_list("openai", &data);
+
+    let navigable: Vec<usize> = menu
+        .filtered_indices("")
+        .into_iter()
+        .filter(|&i| menu.items[i].action != PanelItemAction::Header)
+        .collect();
+    assert_eq!(navigable.len(), 2, "openai should have 2 models");
+
+    menu.selected_index = navigable[0];
+    menu.select_next("");
+    assert_ne!(
+        menu.items[menu.selected_index].action,
+        PanelItemAction::Header,
+        "select_next must never land on a Header"
     );
-    assert!(
-        !visible_labels.contains(&"Current"),
-        "non-matching Current group must be hidden: {visible_labels:?}"
+    assert_ne!(
+        menu.selected_index, navigable[0],
+        "select_next must move to the next model"
     );
+
+    menu.select_next("");
     assert!(
-        !visible_labels.iter().any(|l| l.contains("claude")),
-        "non-matching anthropic group must be hidden entirely: {visible_labels:?}"
+        menu.items[menu.selected_index].label.contains("gpt-4o")
+            || menu.items[menu.selected_index].label.contains("o3"),
+        "wrapped selection must stay within openai models, got {:?}",
+        menu.items[menu.selected_index].label
     );
 }
 
@@ -326,22 +349,18 @@ fn model_picker_empty_query_shows_everything() {
 }
 
 #[test]
-fn model_picker_navigation_skips_headers_and_filtered_out_items() {
+fn model_picker_level2_navigation_within_filtered_set() {
     let data = sample_model_picker_data();
-    let mut menu = BottomPanelState::open_model_picker(&data);
+    let mut menu = BottomPanelState::open_model_list("openai", &data);
 
-    // Filter to only the "openai" group (gpt-4o, o3).
     menu.selected_index = menu
         .filtered_indices("openai")
         .into_iter()
         .find(|&i| menu.items[i].action != PanelItemAction::Header)
-        .unwrap();
+        .unwrap_or(0);
 
     let first_selection = menu.selected_index;
-    assert_eq!(
-        menu.items[first_selection].action != PanelItemAction::Header,
-        true
-    );
+    assert!(menu.items[first_selection].action != PanelItemAction::Header);
 
     menu.select_next("openai");
     assert_ne!(
@@ -351,17 +370,15 @@ fn model_picker_navigation_skips_headers_and_filtered_out_items() {
     );
     assert_ne!(
         menu.selected_index, first_selection,
-        "select_next must move within the filtered openai group"
+        "select_next must move within the filtered openai model set"
     );
 
-    // Navigating past the last item in the filtered set wraps back
-    // without ever landing on a hidden (anthropic) item or a header.
     menu.select_next("openai");
     let after_wrap = menu.selected_index;
     assert!(
         menu.items[after_wrap].label.contains("gpt-4o")
             || menu.items[after_wrap].label.contains("o3"),
-        "wrapped selection must stay within the openai group, got {:?}",
+        "wrapped selection must stay within openai models, got {:?}",
         menu.items[after_wrap].label
     );
 }
@@ -388,32 +405,38 @@ fn model_picker_select_next_prev_never_select_header() {
 }
 
 #[test]
-fn model_picker_enter_selects_correct_original_item_after_filtering() {
+fn model_picker_level1_lists_providers_not_models() {
     let data = sample_model_picker_data();
-    let mut menu = BottomPanelState::open_model_picker(&data);
+    let menu = BottomPanelState::open_model_picker(&data);
 
-    let target_idx = menu
+    let open_model_list_count = menu
         .items
         .iter()
-        .position(
-            |i| matches!(&i.action, PanelItemAction::Select { value, .. } if value == "gpt-4o"),
-        )
-        .expect("gpt-4o item must exist");
-    menu.selected_index = target_idx;
+        .filter(|i| {
+            matches!(
+                &i.action,
+                PanelItemAction::OpenModelList { .. } | PanelItemAction::SwitchModel { .. }
+            )
+        })
+        .count();
+    assert!(
+        open_model_list_count > 0,
+        "Level 1 must contain provider or recent rows"
+    );
 
-    // selected_index must remain the correct raw index even though the
-    // filtered/visible set has shrunk to a single group.
-    let indices = menu.filtered_indices("gpt");
-    assert!(indices.contains(&target_idx));
-
-    let action = menu.items[menu.selected_index].action.clone();
-    match action {
-        PanelItemAction::Select { command, value } => {
-            assert_eq!(command, "/model");
-            assert_eq!(value, "gpt-4o");
-        }
-        other => panic!("expected Select action, got {other:?}"),
-    }
+    let providers: Vec<&str> = menu
+        .items
+        .iter()
+        .filter_map(|i| match &i.action {
+            PanelItemAction::OpenModelList { provider } => Some(provider.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(providers.contains(&"openai"), "openai provider must appear");
+    assert!(
+        providers.contains(&"anthropic"),
+        "anthropic provider must appear"
+    );
 }
 
 #[test]
@@ -452,7 +475,7 @@ fn connect_picker_is_picker_and_supports_filtering() {
 #[test]
 fn reset_selection_for_query_lands_on_first_navigable_match() {
     let data = sample_model_picker_data();
-    let mut menu = BottomPanelState::open_model_picker(&data);
+    let mut menu = BottomPanelState::open_model_list("openai", &data);
 
     menu.reset_selection_for_query("openai");
     assert_ne!(

@@ -10,6 +10,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+gix = { version = "0.85", default-features = false, features = ["basic", "status", "revision", "blob-diff", "index", "sha1"] }
 talos-core = { version = "0.3.8", path = "../talos-core" }
 talos-permission = { version = "0.3.8", path = "../talos-permission" }
 talos-conversation = { version = "0.3.8", path = "../talos-conversation" }

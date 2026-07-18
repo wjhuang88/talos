@@ -48,6 +48,18 @@ pub struct ModelCapabilities {
     pub image_input: bool,
 }
 
+/// Reasoning effort levels for OpenAI o-series models.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningEffort {
+    /// Low reasoning effort.
+    Low,
+    /// Medium reasoning effort.
+    Medium,
+    /// High reasoning effort.
+    High,
+}
+
 /// Provider API protocol advertised by catalog metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 pub enum CatalogProviderProtocol {
@@ -295,6 +307,7 @@ mod tests {
                 image_input: true,
             },
             release_date: Some("2025-01-01".to_string()),
+            variants: vec![],
             source: ModelSource::ModelsDev {
                 refreshed_at: "2025-07-03T00:00:00Z".to_string(),
             },
@@ -315,7 +328,11 @@ mod tests {
 /// a talos-config dependency from talos-conversation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct VariantDef {
+    /// Stable identifier, e.g. "default", "high-reasoning".
     pub id: String,
+    /// Display label, e.g. "High Reasoning".
     pub label: String,
-    pub reasoning_effort: Option<String>,
+    /// Optional reasoning effort override.
+    #[serde(default)]
+    pub reasoning_effort: Option<ReasoningEffort>,
 }

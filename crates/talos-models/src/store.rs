@@ -543,6 +543,7 @@ mod tests {
             id: id.to_string(),
             provider: provider.to_string(),
             context_limit: Some(200_000),
+            variants: vec![],
             output_limit: Some(8_192),
             pricing: Some(ModelPricing {
                 input_per_1m: Some(3.0),

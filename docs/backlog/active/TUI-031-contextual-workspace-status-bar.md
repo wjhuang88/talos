@@ -1,6 +1,6 @@
 # TUI-031: Contextual Workspace Status Bar
 
-**Status**: Ready
+**Status**: Complete (I141, 2026-07-18)
 **Priority**: P2
 **Source**: Maintainer request 2026-07-17
 **Relates To**: TUI-011, TUI-017, TUI-018, TUI-028, MODEL-007

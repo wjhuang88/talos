@@ -171,6 +171,7 @@ docs/iterations/
 | I138 | Memory Admission Decision Application | **Complete** (corrected 2026-07-17) | No-Go applied: production baseline retained; already-published experimental API held inert for compatibility; independent sensitive filter preserved. See `I138-memory-admission-decision-application.md`. |
 | I139 | Four-Month Reliability Closeout | **Complete** (2026-07-17) | v0.3.8 released. All corrections committed and pushed. Program Complete. REL-002 remains NO-GO. See `I139-four-month-reliability-closeout.md`. |
 | I140 | SEC-001 External-Path Authorization | **Complete** (2026-07-17) | Exact tool/nature/path approval across Runtime/CLI/TUI accepted after Deny/headless/symlink fail-closed security review and full locked replay. See `I140-sec001-external-path-authorization.md`. |
+| I141 | MODEL-007 Variant Picker And TUI-031 Contextual Status Bar | **Complete** (2026-07-18) | Three-stage Provider → Model → Variant picker (ADR-048 amended) with conditional variant stage mirroring `/connect` UX, Recent group persisted at `~/.talos/recent_models.json`, and contextual status bar (`gix`-based branch/dirty, platform label, width-aware tiers). Full locked validation ladder, release preflight, and governance validation all green. See `I141-model-variant-picker-and-status-bar.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.

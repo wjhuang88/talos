@@ -374,6 +374,19 @@ mod tests {
     }
 
     #[test]
+    fn test_builtin_models_parse_declared_variants() {
+        let models = builtin_models();
+        let o3 = find_model_by_provider(&models, "openai", "o3").expect("openai/o3 exists");
+
+        assert_eq!(o3.variants.len(), 2);
+        assert_eq!(o3.variants[0].id, "high-reasoning");
+        assert_eq!(
+            o3.variants[0].reasoning_effort,
+            Some(talos_core::model::ReasoningEffort::High)
+        );
+    }
+
+    #[test]
     fn test_find_model_by_id() {
         let models = builtin_models();
         // Should find some model with the given ID (note: bare ID lookup returns

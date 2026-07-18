@@ -12,6 +12,7 @@ mod scrollback;
 mod scrollback_input;
 mod scrollback_markdown;
 mod scrollback_status;
+mod scrollback_status_git;
 mod sidebar;
 mod splash;
 mod state;

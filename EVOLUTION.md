@@ -663,3 +663,39 @@ repeating known mistakes.
   projections that could contain the source secret; random IDs must not participate in equality or
   substring absence claims.
 - Promoted to rule/check: `browser_page::tests::record_excludes_credentials` regression test.
+
+## 2026-07-18 - "Mirror feature X" refers to UX idioms, not necessarily navigation structure
+
+- Trigger: I141 S6 (MODEL-007 picker UX) misread the maintainer's "菜单的逻辑和用户体验请参考 connect 的已有实现" as "flatten the navigation structure to mirror `/connect`'s single-screen-with-groups layout", when the maintainer actually meant "mirror `/connect`'s UX details (keyboard, filtering, screen replacement, styling) — but keep MODEL-007's specified three-level Provider → Model → 条件 Variant navigation."
+- Symptom: Implementer shipped a single-screen picker with Current/Recent/Provider groups, not the three-level navigation. The maintainer hit it during live testing ("还是单层菜单") and also caught a downstream double-prefix bug (`Unknown model 'zai-coding-plan/zai-coding-plan/glm-5.2'`) that no unit test caught because test fixtures didn't exercise the provider-qualification path.
+- Root cause: The phrase "mirror X's UX" is ambiguous between "UX details" and "overall structure". Without explicit confirmation, the implementer picked the wrong interpretation.
+- Fix: Manual rewrite to true three-level navigation (`PanelKind::ModelPicker` → `ModelList { provider }` → `VariantPicker`), plus fixed the double-prefix bug, plus added regression test coverage.
+- Prevention: When a requirement says "mirror feature X", explicitly confirm with the maintainer whether that includes navigation structure or only rendering/keyboard idioms. Cost of asking: ~30 seconds. Cost of misimplementing: hours.
+- Promoted to rule/check: `apply_variant_change_*` regression tests (5 branches); SwitchModel dispatch carries a `// Do NOT re-prefix` comment as a bug-trap guard.
+
+## 2026-07-18 - Cross-handler shared semantics must be extracted to a single helper
+
+- Trigger: I141 Oracle first-pass found that `handle_session_model` cleared `Config.variant` correctly but `handle_session_model_with_credential` did not — or more precisely, both paths originally only assigned `Some(variant)` and never cleared to `None`, so switching from a variant model to a variant-less model left stale variant state.
+- Symptom: Switching from `o3@high-reasoning` to plain `gpt-4o` (no variants) left `Config.variant = Some("high-reasoning")` in the persisted config, polluting subsequent rebuilds and Recent list entries.
+- Root cause: Two sibling handlers each open-coded the variant-clearing logic with the same `if let Some(v) = variant` pattern. The bug existed in both, but even if one had been correct, the duplication invited drift.
+- Fix: Extracted `apply_variant_change(&mut Config, Option<&str>) -> bool` to `model_lifecycle.rs` as the single source of truth. Both handlers now call it. Added 5 regression tests covering all branches.
+- Prevention: When two code paths share semantics (model-switch entry points, permission checks, persistence mutations, etc.), extract a single helper even if the duplication looks trivial. The cost is one extra function; the benefit is no drift and a single testable unit.
+- Promoted to rule/check: `model_lifecycle::tests::apply_variant_change_*` (5 tests).
+
+## 2026-07-18 - Native-code dependency integration must wrap panics at the boundary
+
+- Trigger: I141 Oracle first-pass found that `scrollback_status_git.rs::compute_git_status` called `gix::discover`, `head_name`, and `into_index_worktree_iter` without `catch_unwind`, violating AGENTS.md hard constraint #9.
+- Symptom: No production panic observed yet, but the draw loop could crash if `gix` panics on a corrupt repository, malformed index, or edge-case platform path.
+- Root cause: The integration treated `gix` like a safe Rust library, but it is a native-code dependency per ADR-010 and the project rule requires panic containment at the integration boundary.
+- Fix: Wrapped `compute_git_status` body in `catch_unwind(AssertUnwindSafe(...))`; panic path returns `None` and that `None` is cached for the 500ms TTL so the draw loop doesn't re-panic every frame.
+- Prevention: Any new integration with `gix`, `tree-sitter`, `rusqlite`, `libc`, or other native-code dependencies must use `catch_unwind(AssertUnwindSafe(...))` at the boundary. The wrap is not optional even when "this call shouldn't panic" — the runtime cannot crash on a library bug.
+- Promoted to rule/check: `scrollback_status_git.rs` carries an explicit `// AGENTS.md hard constraint #9` comment on the catch_unwind so future maintainers don't optimize it away.
+
+## 2026-07-18 - Independent architect pass is part of the cost of multi-crate changes
+
+- Trigger: I141 passed all unit tests (62 suites) and the full locked validation ladder, but Oracle first-pass still found 3 blockers: variant-not-cleared semantics bug, gix panic containment gap, and an undocumented public-API semver impact.
+- Symptom: Tests passed but contract-level issues were invisible to "works on my machine" validation. The variant-clearing bug in particular would have shipped a UX regression (stale reasoning_effort after switching models) that no unit test caught because no test simulated the `Some → None` transition.
+- Root cause: Unit tests exercise code paths, not contracts. Validation ladders check the build, not the design. Multi-crate changes have system-level invariants that only an architect-level review can verify.
+- Fix: Two Oracle passes — first identified blockers, second verified fixes. Both passes were read-only and inexpensive relative to the cost of shipping the bugs.
+- Prevention: Budget an Oracle pass (or equivalent senior review) for any iteration that touches multiple crates, public APIs, persistence formats, or security boundaries. The first pass finds issues; the second verifies the fixes are complete and don't introduce regressions.
+- Promoted to rule/check: I141 closeout evidence now records Oracle first-pass findings + second-pass verification as part of the standard validation ladder for multi-crate iterations.

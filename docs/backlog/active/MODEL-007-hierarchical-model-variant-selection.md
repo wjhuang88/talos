@@ -1,9 +1,29 @@
 # MODEL-007: Hierarchical Runtime Model And Variant Selection
 
-**Status**: Refinement
+**Status**: Complete (I141, 2026-07-18)
 **Priority**: P1
 **Source**: Maintainer request 2026-07-17
 **Parent / Relates To**: MODEL-005, MODEL-003, TUI-010
+
+## Change Control (2026-07-18)
+
+Two acceptance requirements are amended by the maintainer before I141 implementation
+landed, recorded under `docs/sop/CHANGE-CONTROL.md`:
+
+1. **Conditional variant stage.** The original "A provider/model with no declared
+   variant must expose one explicit `Default` option rather than silently skipping
+   stage 3" requirement is reversed. A model with no declared variants skips the
+   variant picker stage entirely; selecting such a model switches the runtime
+   immediately on Enter.
+2. **Mirror `/connect` UX.** The original "Keep `Esc`/Back deterministic: variant ->
+   model -> provider -> close" requirement is replaced by the existing `/connect`
+   pattern. `/model` stays a single provider-grouped picker screen; a Variant picker
+   screen replaces the panel content conditionally when the selected model has
+   declared variants. `Esc` closes the panel entirely (no stage-by-stage Back).
+   ADR-048 is amended identically.
+
+The Compatibility Gate (Architecture / Compatibility Gate section below) remains
+satisfied by ADR-048 (amended).
 
 ## Identity / Goal / Value
 

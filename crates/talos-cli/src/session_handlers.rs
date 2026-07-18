@@ -293,19 +293,36 @@ pub(crate) async fn handle_session_model(
         return None;
     }
 
+    let (parsed_model_id, variant) = if let Some(idx) = model_id.rfind('@') {
+        (
+            model_id[..idx].to_string(),
+            Some(model_id[idx + 1..].to_string()),
+        )
+    } else {
+        (model_id.clone(), None)
+    };
+
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
     let mut model_config = config.clone();
-    if let Err(e) = model_config.set_active_model(&model_id) {
-        let text = format!("[Error] Unknown model '{model_id}': {e}\n");
+    if let Err(e) = model_config.set_active_model(&parsed_model_id) {
+        let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return None;
     }
 
+    if crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref())
+        && let Err(e) = model_config.save()
+    {
+        tracing::warn!("Failed to persist model variant: {e}");
+    }
+
     let provider_name = model_config.provider.clone();
 
-    // No-op if the selected model+provider is already active.
-    if config.model == model_id && config.provider == provider_name {
+    if config.model == parsed_model_id
+        && config.provider == provider_name
+        && config.variant == variant
+    {
         return None;
     }
 
@@ -345,9 +362,10 @@ pub(crate) async fn handle_session_model(
         api_key,
         previous_model,
         previous_provider,
-        model_id: model_id.clone(),
-        provider_for_status: provider_name,
-        success_message: format!("[System] Switched to model {model_id}.\n"),
+        model_id: parsed_model_id.clone(),
+        variant: model_config.variant.clone(),
+        provider_for_status: provider_name.clone(),
+        success_message: format!("[System] Switched to model {parsed_model_id}.\n"),
         mock,
     })
     .await
@@ -406,10 +424,25 @@ pub(crate) async fn handle_session_model_with_credential(
         },
     };
 
-    if let Err(e) = model_config.set_active_model(&model_id) {
-        let text = format!("[Error] Unknown model '{model_id}': {e}\n");
+    let (parsed_model_id, variant) = if let Some(idx) = model_id.rfind('@') {
+        (
+            model_id[..idx].to_string(),
+            Some(model_id[idx + 1..].to_string()),
+        )
+    } else {
+        (model_id.clone(), None)
+    };
+
+    if let Err(e) = model_config.set_active_model(&parsed_model_id) {
+        let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return None;
+    }
+
+    if crate::model_lifecycle::apply_variant_change(&mut model_config, variant.as_deref())
+        && let Err(e) = model_config.save()
+    {
+        tracing::warn!("Failed to persist model variant: {e}");
     }
 
     let api_key = cred.api_key.clone();
@@ -430,9 +463,12 @@ pub(crate) async fn handle_session_model_with_credential(
         api_key,
         previous_model,
         previous_provider,
-        model_id: model_id.clone(),
+        model_id: parsed_model_id.clone(),
+        variant: model_config.variant.clone(),
         provider_for_status,
-        success_message: format!("[System] Credentials saved. Switched to model {model_id}.\n"),
+        success_message: format!(
+            "[System] Credentials saved. Switched to model {parsed_model_id}.\n"
+        ),
         mock,
     })
     .await

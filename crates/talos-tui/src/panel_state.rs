@@ -26,6 +26,22 @@ pub(crate) enum PanelItemAction {
     Select { command: String, value: String },
     /// Unauthenticated provider — triggers provider-level credential entry.
     ProviderSetup { provider: String },
+    /// Level 1 → Level 2: open the model list scoped to this provider.
+    OpenModelList { provider: String },
+    /// Level 2 → Level 3: open the variant list for this `(provider, model)`.
+    OpenVariantPicker {
+        provider: String,
+        model_id: String,
+        variants: Vec<talos_conversation::ModelPickerVariantItem>,
+    },
+    /// Direct switch (used by Recent items, variant-less models, and variant
+    /// selections). `variant` carries the recorded/selected variant, if any.
+    /// `model_id` is already provider-qualified when needed — do not re-prefix.
+    SwitchModel {
+        provider: String,
+        model_id: String,
+        variant: Option<String>,
+    },
     /// Non-navigable group header.
     Header,
 }
@@ -42,7 +58,12 @@ pub(crate) struct PanelItem {
 pub(crate) enum PanelKind {
     SlashCommand,
     SessionPicker,
+    /// `/model` Level 1: Recent (optional) + provider list.
     ModelPicker,
+    /// `/model` Level 2: models scoped to a single provider.
+    ModelList {
+        provider: String,
+    },
     ConnectPicker,
     CredentialInput {
         provider: String,
@@ -53,6 +74,12 @@ pub(crate) enum PanelKind {
     Approval {
         tool_name: String,
         arguments: String,
+    },
+    /// `/model` Level 3: variants for a single `(provider, model)`.
+    VariantPicker {
+        provider: String,
+        model_id: String,
+        variants: Vec<talos_conversation::ModelPickerVariantItem>,
     },
 }
 
@@ -76,6 +103,9 @@ pub(crate) struct BottomPanelState {
     pub(crate) credential_buffer: String,
     pub(crate) base_url_buffer: String,
     pub(crate) credential_field: CredentialField,
+    /// Retained while any `/model` level is active so Level 2/3 can derive
+    /// their items without an engine round-trip. `None` for non-ModelPicker panels.
+    pub(crate) model_picker_data: Option<ModelPickerData>,
 }
 
 impl BottomPanelState {
@@ -102,6 +132,7 @@ impl BottomPanelState {
             credential_buffer: String::new(),
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
+            model_picker_data: None,
         }
     }
 
@@ -137,61 +168,63 @@ impl BottomPanelState {
             credential_buffer: String::new(),
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
+            model_picker_data: None,
         }
     }
 
     pub(crate) fn open_model_picker(data: &ModelPickerData) -> Self {
         let mut panel_items: Vec<PanelItem> = Vec::new();
 
-        let (current_models, other_ready): (Vec<&ModelPickerItem>, Vec<&ModelPickerItem>) =
-            data.ready_models.iter().partition(|m| m.is_current);
-
-        if !current_models.is_empty() {
+        // Level 1 layout: Recent (optional, separated top region) + Providers.
+        // The status bar already shows the active model, so there is no
+        // separate "Current" group. Recent items direct-switch (using their
+        // recorded variant); provider rows enter Level 2.
+        if !data.recent.is_empty() {
             panel_items.push(PanelItem {
-                label: "Current".into(),
+                label: "Recent".into(),
                 description: String::new(),
                 action: PanelItemAction::Header,
                 is_current: false,
             });
-            panel_items.extend(current_models.iter().map(|m| PanelItem {
+            panel_items.extend(data.recent.iter().map(|m| PanelItem {
                 label: m.label.clone(),
                 description: m.provider.clone(),
-                action: PanelItemAction::Select {
-                    command: m.command.clone(),
-                    value: m.model_id.clone(),
+                action: PanelItemAction::SwitchModel {
+                    provider: m.provider.clone(),
+                    model_id: m.model_id.clone(),
+                    variant: m.variant.clone(),
                 },
-                is_current: true,
+                is_current: false,
             }));
         }
 
-        let mut provider_groups: std::collections::BTreeMap<&str, Vec<&ModelPickerItem>> =
-            std::collections::BTreeMap::new();
-        for m in &other_ready {
-            provider_groups
-                .entry(m.provider.as_str())
-                .or_default()
-                .push(m);
+        // Deduplicate providers from ready_models. Each provider row enters Level 2.
+        let mut providers: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        for m in &data.ready_models {
+            providers.insert(m.provider.as_str());
         }
 
-        for (provider, models) in &provider_groups {
+        if !providers.is_empty() {
             panel_items.push(PanelItem {
-                label: (*provider).to_string(),
-                description: format!(
-                    "{} model{}",
-                    models.len(),
-                    if models.len() == 1 { "" } else { "s" }
-                ),
+                label: "Providers".into(),
+                description: String::new(),
                 action: PanelItemAction::Header,
                 is_current: false,
             });
-            panel_items.extend(models.iter().map(|m| PanelItem {
-                label: m.label.clone(),
-                description: m.provider.clone(),
-                action: PanelItemAction::Select {
-                    command: m.command.clone(),
-                    value: m.model_id.clone(),
-                },
-                is_current: false,
+            panel_items.extend(providers.iter().map(|provider| {
+                let count = data
+                    .ready_models
+                    .iter()
+                    .filter(|m| m.provider == *provider)
+                    .count();
+                PanelItem {
+                    label: (*provider).to_string(),
+                    description: format!("{} model{}", count, if count == 1 { "" } else { "s" }),
+                    action: PanelItemAction::OpenModelList {
+                        provider: (*provider).to_string(),
+                    },
+                    is_current: false,
+                }
             }));
         }
 
@@ -219,12 +252,7 @@ impl BottomPanelState {
 
         let initial_index = panel_items
             .iter()
-            .position(|i| i.is_current && i.action != PanelItemAction::Header)
-            .or_else(|| {
-                panel_items
-                    .iter()
-                    .position(|i| i.action != PanelItemAction::Header)
-            })
+            .position(|i| i.action != PanelItemAction::Header)
             .unwrap_or(0);
         Self {
             is_open: true,
@@ -234,6 +262,66 @@ impl BottomPanelState {
             credential_buffer: String::new(),
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
+            model_picker_data: Some(data.clone()),
+        }
+    }
+
+    /// Level 2: build a picker of models scoped to a single provider. Items
+    /// either direct-switch (no variants) or open Level 3 (has variants).
+    /// Requires `model_picker_data` to be populated by a prior `open_model_picker`.
+    pub(crate) fn open_model_list(provider: &str, data: &ModelPickerData) -> Self {
+        let models: Vec<&ModelPickerItem> = data
+            .ready_models
+            .iter()
+            .filter(|m| m.provider == provider)
+            .collect();
+
+        let panel_items: Vec<PanelItem> = models
+            .iter()
+            .map(|m| {
+                let action = if m.variants.is_empty() {
+                    PanelItemAction::SwitchModel {
+                        provider: m.provider.clone(),
+                        model_id: m.model_id.clone(),
+                        variant: None,
+                    }
+                } else {
+                    PanelItemAction::OpenVariantPicker {
+                        provider: m.provider.clone(),
+                        model_id: m.model_id.clone(),
+                        variants: m.variants.clone(),
+                    }
+                };
+                PanelItem {
+                    label: m.label.clone(),
+                    description: m.pricing.clone().unwrap_or_default(),
+                    action,
+                    is_current: m.is_current,
+                }
+            })
+            .collect();
+
+        let initial_index = panel_items
+            .iter()
+            .position(|i| !i.is_current)
+            .or_else(|| {
+                panel_items
+                    .iter()
+                    .position(|i| i.action != PanelItemAction::Header)
+            })
+            .unwrap_or(0);
+
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::ModelList {
+                provider: provider.to_string(),
+            }),
+            items: panel_items,
+            selected_index: initial_index,
+            credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
+            model_picker_data: Some(data.clone()),
         }
     }
 
@@ -307,6 +395,7 @@ impl BottomPanelState {
             credential_buffer: String::new(),
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
+            model_picker_data: None,
         }
     }
 
@@ -320,15 +409,51 @@ impl BottomPanelState {
             is_open: true,
             kind: Some(PanelKind::CredentialInput {
                 provider: provider.to_string(),
-                model_id: model_id.map(|s| s.to_string()),
+                model_id: model_id.map(str::to_string),
                 connect_mode,
                 default_base_url,
             }),
-            items: vec![],
+            items: Vec::new(),
             selected_index: 0,
             credential_buffer: String::new(),
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
+            model_picker_data: None,
+        }
+    }
+
+    pub(crate) fn open_variant_picker(
+        provider: String,
+        model_id: String,
+        variants: Vec<talos_conversation::ModelPickerVariantItem>,
+        data: Option<ModelPickerData>,
+    ) -> Self {
+        let items = variants
+            .iter()
+            .map(|v| PanelItem {
+                label: v.label.clone(),
+                description: v.variant_id.clone(),
+                action: PanelItemAction::SwitchModel {
+                    provider: provider.clone(),
+                    model_id: model_id.clone(),
+                    variant: Some(v.variant_id.clone()),
+                },
+                is_current: false,
+            })
+            .collect();
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::VariantPicker {
+                provider,
+                model_id,
+                variants,
+            }),
+            items,
+            selected_index: 0,
+            credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
+            model_picker_data: data,
         }
     }
 
@@ -341,6 +466,8 @@ impl BottomPanelState {
             self.kind,
             Some(PanelKind::SessionPicker)
                 | Some(PanelKind::ModelPicker)
+                | Some(PanelKind::ModelList { .. })
+                | Some(PanelKind::VariantPicker { .. })
                 | Some(PanelKind::ConnectPicker)
         )
     }
@@ -351,6 +478,14 @@ impl BottomPanelState {
 
     pub(crate) fn is_credential_input(&self) -> bool {
         matches!(self.kind, Some(PanelKind::CredentialInput { .. }))
+    }
+
+    pub(crate) fn is_variant_picker(&self) -> bool {
+        matches!(self.kind, Some(PanelKind::VariantPicker { .. }))
+    }
+
+    pub(crate) fn is_model_list(&self) -> bool {
+        matches!(self.kind, Some(PanelKind::ModelList { .. }))
     }
 
     pub(crate) fn open_approval(tool_name: &str, arguments: &str) -> Self {
@@ -393,6 +528,7 @@ impl BottomPanelState {
             credential_buffer: String::new(),
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
+            model_picker_data: None,
         }
     }
 

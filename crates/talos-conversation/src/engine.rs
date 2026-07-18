@@ -165,6 +165,7 @@ pub struct ConversationEngine {
     pub(crate) current_thinking_text: String,
     pub(crate) model_name: String,
     pub(crate) provider_name: String,
+    variant: Option<String>,
     pub(crate) branch_id: Option<String>,
     pub(crate) plugin_observations: Vec<PluginObservation>,
     pub(crate) loaded_plugins: Vec<LoadedPluginDiagnostic>,
@@ -201,6 +202,7 @@ impl ConversationEngine {
             current_thinking_text: String::new(),
             model_name,
             provider_name,
+            variant: None,
             branch_id: None,
             plugin_observations: Vec::new(),
             loaded_plugins: Vec::new(),
@@ -268,7 +270,7 @@ impl ConversationEngine {
             context_limit: self.context_limit,
             input_price_per_million: self.input_price_per_million,
             output_price_per_million: self.output_price_per_million,
-            variant: None,
+            variant: self.variant.clone(),
         }
     }
 
@@ -278,6 +280,7 @@ impl ConversationEngine {
         self.context_limit = info.context_limit;
         self.input_price_per_million = info.input_price_per_million;
         self.output_price_per_million = info.output_price_per_million;
+        self.variant = info.variant.clone();
     }
 
     pub fn is_processing(&self) -> bool {

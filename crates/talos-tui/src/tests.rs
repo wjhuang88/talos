@@ -840,9 +840,9 @@ mod tests {
 
     #[test]
     fn test_slash_menu_capped_rows_reserve_overflow_indicator() {
-        assert_eq!(bottom_panel_rows(5, 3), (1, true, true));
-        assert_eq!(bottom_panel_rows(5, 6), (5, true, false));
-        assert_eq!(bottom_panel_rows(10, 10), (8, true, true));
+        assert_eq!(bottom_panel_rows(5, 3, 0), (1, true, true));
+        assert_eq!(bottom_panel_rows(5, 6, 0), (5, true, false));
+        assert_eq!(bottom_panel_rows(10, 10, 0), (8, true, true));
     }
 
     // ── Approval panel height_hint (F110) ──────────────────────────────
@@ -1738,6 +1738,7 @@ mod tests {
             context_limit: Some(200_000),
             input_price_per_million: Some(3.0),
             output_price_per_million: Some(15.0),
+            variant: None,
         };
         let lines = build_exit_summary_lines(
             &status,
@@ -1783,6 +1784,7 @@ mod tests {
             context_limit: Some(128_000),
             input_price_per_million: None,
             output_price_per_million: None,
+            variant: None,
         };
         let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5, None);
         let text: String = lines.iter().map(|l| l.text.as_str()).collect();

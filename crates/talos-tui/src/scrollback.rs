@@ -339,9 +339,13 @@ pub(crate) const fn bottom_panel_placement(
     }
 }
 
-pub(crate) fn bottom_panel_rows(total: usize, area_height: u16) -> (usize, bool, bool) {
-    let show_separator = area_height >= 2;
-    let row_capacity = area_height.saturating_sub(u16::from(show_separator)) as usize;
+pub(crate) fn bottom_panel_rows(
+    total: usize,
+    area_height: u16,
+    header_rows: u16,
+) -> (usize, bool, bool) {
+    let show_separator = area_height > header_rows;
+    let row_capacity = area_height.saturating_sub(header_rows + u16::from(show_separator)) as usize;
     let initial_visible = total
         .min(crate::state::SLASH_MENU_MAX_VISIBLE)
         .min(row_capacity);
@@ -380,12 +384,17 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             .min(self.max_height);
         }
         let filtered = self.menu.filtered_items(self.query).len();
+        let extra_header = if self.menu.is_variant_picker() || self.menu.is_model_list() {
+            2
+        } else {
+            0
+        };
         let natural_height = if filtered == 0 {
-            1
+            1 + extra_header
         } else {
             let visible = filtered.min(crate::state::SLASH_MENU_MAX_VISIBLE) as u16;
             let indicator = u16::from(filtered > crate::state::SLASH_MENU_MAX_VISIBLE);
-            1 + visible + indicator
+            1 + extra_header + visible + indicator
         };
         natural_height.min(self.max_height)
     }
@@ -516,7 +525,13 @@ impl ViewportComponent for BottomPanelComponent<'_> {
         }
 
         let total = indices.len();
-        let (visible, show_separator, show_indicator) = bottom_panel_rows(total, area.height);
+        let extra_header = if self.menu.is_variant_picker() || self.menu.is_model_list() {
+            2
+        } else {
+            0
+        };
+        let (visible, show_separator, show_indicator) =
+            bottom_panel_rows(total, area.height, extra_header);
 
         let selected_pos = indices
             .iter()
@@ -544,6 +559,29 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             .bold();
 
         let mut lines: Vec<Line<'static>> = Vec::with_capacity(area.height as usize);
+
+        if let Some(crate::state::PanelKind::VariantPicker {
+            provider, model_id, ..
+        }) = &self.menu.kind
+        {
+            lines.push(Line::from(Span::styled(
+                format!(" Model: {model_id}   Provider: {provider}"),
+                Style::default().fg(crate::nord::NORD8).bold(),
+            )));
+            lines.push(Line::from(Span::styled(
+                " Select a variant (or press Esc to cancel)",
+                dim,
+            )));
+        } else if let Some(crate::state::PanelKind::ModelList { provider }) = &self.menu.kind {
+            lines.push(Line::from(Span::styled(
+                format!(" Provider: {provider}"),
+                Style::default().fg(crate::nord::NORD8).bold(),
+            )));
+            lines.push(Line::from(Span::styled(
+                " Select a model (or press Esc to cancel)",
+                dim,
+            )));
+        }
 
         if show_separator {
             let separator = format!(" {}", "─".repeat(area.width.saturating_sub(1) as usize));
@@ -597,9 +635,19 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 let desc = format!("{mode}; {}", item.description);
                 (name, desc)
             } else {
-                let marker = if item.is_current { "▶ " } else { "  " };
+                let marker = if self.menu.is_variant_picker() || self.menu.is_model_list() {
+                    if is_selected { "▶ " } else { "  " }
+                } else if item.is_current {
+                    "▶ "
+                } else {
+                    "  "
+                };
                 let name = format!("{marker}{}", item.label);
-                let desc = format!("  —  {}", item.description);
+                let desc = if item.description.is_empty() {
+                    String::new()
+                } else {
+                    format!("  —  {}", item.description)
+                };
                 (name, desc)
             };
 

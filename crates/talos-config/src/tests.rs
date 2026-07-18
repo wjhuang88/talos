@@ -65,6 +65,7 @@ fn test_api_key_from_env_anthropic() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key-anthropic") };
     let config = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::new(),
@@ -128,6 +129,7 @@ fn test_api_key_from_env_openai() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::set_var("OPENAI_API_KEY", "env-key-openai") };
     let config = Config {
+        variant: None,
         provider: "openai".to_string(),
         model: "gpt-test".to_string(),
         providers: HashMap::new(),
@@ -149,6 +151,7 @@ fn test_api_key_from_env_openai_compat() {
     unsafe { env::remove_var("OPENAI_API_KEY") };
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-style-key") };
     let config = Config {
+        variant: None,
         provider: "openai".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::new(),
@@ -170,6 +173,7 @@ fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
     unsafe { env::set_var("OPENAI_API_KEY", "real-openai-key") };
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-key") };
     let config = Config {
+        variant: None,
         provider: "openai".to_string(),
         model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
@@ -192,6 +196,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "should-not-be-used") };
     let config = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::new(),
@@ -216,6 +221,7 @@ fn test_api_key_missing_error() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     let config = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::new(),
@@ -236,6 +242,7 @@ fn test_api_key_missing_error() {
 #[test]
 fn test_base_url_getter() {
     let config = Config {
+        variant: None,
         provider: "dashscope".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::from([(
@@ -286,6 +293,7 @@ fn test_base_url_parsed_from_toml() {
 #[test]
 fn test_anthropic_catalog_endpoint_normalized_for_legacy_minimax_config() {
     let config = Config {
+        variant: None,
         provider: "minimax-coding-plan".to_string(),
         model: "MiniMax-M2.7".to_string(),
         providers: HashMap::from([(
@@ -312,6 +320,7 @@ fn test_anthropic_catalog_endpoint_normalized_for_legacy_minimax_config() {
 #[test]
 fn test_builtin_anthropic_custom_endpoint_keeps_anthropic_protocol() {
     let config = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::from([(
@@ -340,6 +349,7 @@ fn test_custom_provider_api_key_env() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::set_var("DASHSCOPE_API_KEY", "dashscope-key") };
     let config = Config {
+        variant: None,
         provider: "dashscope".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::from([(
@@ -370,6 +380,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
     // Builtin limits resolve via resolve_model_limits() (catalog lookup),
     // not context_limit() (user-config only).
     let builtin = Config {
+        variant: None,
         provider: "openai".to_string(),
         model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
@@ -386,6 +397,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
     assert_eq!(builtin_out, Some(32_768));
 
     let custom = Config {
+        variant: None,
         provider: "dashscope".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::from([(
@@ -534,6 +546,7 @@ fn test_load_then_set_model_recovers_from_empty_model_on_disk() {
 #[test]
 fn test_provider_serialization() {
     let config_anthropic = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "test".to_string(),
         providers: HashMap::new(),
@@ -546,6 +559,7 @@ fn test_provider_serialization() {
         dashboard: DashboardConfig::default(),
     };
     let config_openai = Config {
+        variant: None,
         provider: "openai".to_string(),
         model: "test".to_string(),
         providers: HashMap::new(),
@@ -666,6 +680,7 @@ fn test_validate_accepts_either_api_key_or_api_key_env() {
 #[test]
 fn test_validate_rejects_neither_api_key_nor_api_key_env() {
     let config = Config {
+        variant: None,
         provider: "custom".to_string(),
         model: "model-x".to_string(),
         providers: HashMap::from([(
@@ -708,6 +723,7 @@ fn test_inline_api_key_is_serialized_in_config_toml() {
 #[test]
 fn test_resolve_model_limits_returns_user_config_when_set() {
     let config = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "claude-sonnet-4-5".to_string(),
         providers: HashMap::from([(
@@ -734,6 +750,7 @@ fn test_resolve_model_limits_returns_user_config_when_set() {
 #[test]
 fn test_resolve_model_limits_falls_back_to_builtin_catalog() {
     let config = Config {
+        variant: None,
         provider: "google".to_string(),
         model: "gemini-2.5-pro".to_string(),
         providers: HashMap::from([(
@@ -753,6 +770,7 @@ fn test_resolve_model_limits_falls_back_to_builtin_catalog() {
 #[test]
 fn test_resolve_model_limits_falls_back_to_conservative_when_not_in_catalog() {
     let config = Config {
+        variant: None,
         provider: "custom-provider".to_string(),
         model: "unknown-model-xyz".to_string(),
         providers: HashMap::from([(
@@ -772,6 +790,7 @@ fn test_resolve_model_limits_falls_back_to_conservative_when_not_in_catalog() {
 #[test]
 fn test_resolve_model_limits_output_limit_from_catalog() {
     let config = Config {
+        variant: None,
         provider: "openai".to_string(),
         model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
@@ -785,6 +804,7 @@ fn test_resolve_model_limits_output_limit_from_catalog() {
 #[test]
 fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
     let config = Config {
+        variant: None,
         provider: "anthropic".to_string(),
         model: "claude-sonnet-4-5".to_string(),
         providers: HashMap::from([(
@@ -876,6 +896,7 @@ fn test_provider_authenticated_returns_false_when_no_key() {
     let _lock = ENV_MUTEX.lock().unwrap();
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     let config = Config {
+        variant: None,
         providers: HashMap::from([(
             "custom".to_string(),
             ProviderConfig {
@@ -1181,6 +1202,7 @@ fn test_all_models_preserves_duplicates_across_providers() {
 #[test]
 fn test_all_models_user_override_matches_by_provider_and_id() {
     let config = Config {
+        variant: None,
         provider: "cortecs".to_string(),
         model: "glm-5.2".to_string(),
         providers: HashMap::from([(
@@ -1241,6 +1263,7 @@ fn test_credentials_debug_masks_keys() {
 #[test]
 fn test_config_debug_masks_provider_api_keys() {
     let config = Config {
+        variant: None,
         provider: "custom".to_string(),
         model: "test".to_string(),
         providers: HashMap::from([(
@@ -1282,6 +1305,7 @@ discover_shared = true
 #[test]
 fn test_skill_config_serializes() {
     let config = Config {
+        variant: None,
         skills: SkillConfig {
             discover_shared: true,
         },
@@ -1336,6 +1360,7 @@ fn test_all_models_with_catalog_overlays_builtin() {
     let builtin_count = config.all_models().len();
 
     let catalog_models = vec![model::ModelMetadata {
+        variants: vec![],
         id: "catalog-only-model".to_string(),
         provider: "catalog-provider".to_string(),
         context_limit: Some(500_000),
@@ -1366,6 +1391,7 @@ fn test_all_models_with_catalog_replaces_builtin_entry() {
     let first = &builtins[0];
 
     let catalog_models = vec![model::ModelMetadata {
+        variants: vec![],
         id: first.id.clone(),
         provider: first.provider.clone(),
         context_limit: Some(999_999),
@@ -1405,6 +1431,7 @@ fn test_all_models_with_catalog_user_config_overrides_catalog() {
     );
 
     let catalog_models = vec![model::ModelMetadata {
+        variants: vec![],
         id: "m1".to_string(),
         provider: "test".to_string(),
         context_limit: Some(500_000),
@@ -1439,6 +1466,7 @@ fn test_resolve_model_limits_with_catalog_precedence() {
     config.model = "test-model".to_string();
 
     let catalog_models = vec![model::ModelMetadata {
+        variants: vec![],
         id: "test-model".to_string(),
         provider: "test-provider".to_string(),
         context_limit: Some(300_000),
@@ -1475,6 +1503,7 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
     );
 
     let catalog_models = vec![model::ModelMetadata {
+        variants: vec![],
         id: "tm".to_string(),
         provider: "tp".to_string(),
         context_limit: Some(300_000),

@@ -5889,6 +5889,7 @@ dependencies = [
  "arborium",
  "crossterm",
  "futures",
+ "gix",
  "mermaid-text",
  "ratatui",
  "serde_json",

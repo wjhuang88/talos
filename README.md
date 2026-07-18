@@ -421,9 +421,15 @@ completes the selected command into the composer. `Backspace` edits the filter a
 menu without clearing the composer. Use `/help` to list the commands available in the current
 session.
 
-Use `/model` to switch among models whose providers are already configured. The picker shows only
-usable models, grouped by provider, with the active model pinned in a `Current` group. Use
-`/connect` to add or update provider credentials. `/connect` shows provider setup choices from the
+Use `/model` to switch among models whose providers are already configured. The picker
+uses **three-level navigation**: Level 1 lists recent models (when available, persisted
+at `~/.talos/recent_models.json`) and providers; selecting a provider enters Level 2,
+which lists that provider's models; selecting a model with declared invocation variants
+(for example `high-reasoning` or `low-reasoning` on reasoning-capable models) enters
+Level 3 to pick a variant, while selecting a variant-less model switches immediately.
+`Esc` closes the picker at any level. Use
+`/connect` to add or update provider credentials.
+`/connect` shows provider setup choices from the
 packaged offline `models.toml`, asks for an API key, then offers an optional custom endpoint
 (`base_url`) for gateway-compatible providers. Standard providers whose catalog metadata supplies a
 default endpoint submit after the API key without prompting for a URL; custom providers (or any row
@@ -495,7 +501,7 @@ mode.
 | `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
-| `/model` | Open the model picker to browse and switch models at runtime; models are grouped by provider with the current model in a top group, and typing filters by group |
+| `/model` | Open the model picker — three-level navigation: Level 1 lists Recent (≤5 most-recently-used models, persisted) and providers; selecting a provider enters Level 2 (that provider's models); selecting a model with declared variants enters Level 3 (variant list), while variant-less models switch immediately; `Esc` closes the picker |
 | `/connect` | Open the provider picker to connect a new provider (credential and optional custom endpoint/`base_url`), or a specific `/connect <provider>` to connect it directly |
 | `/todo`, `/todo list`, `/todo show <id>`, `/todo stats`, `/todo export [json|markdown]` | View or export active-session todos (read-only) |
 | `/todo delete <id> --confirm` | Delete a session todo item by short-ID or full UUID; requires `--confirm` |
