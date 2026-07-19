@@ -1,6 +1,6 @@
 # Iteration I142: TUI-032 Composer Multiline Wrap
 
-> Document status: Review (2026-07-20) — cross-terminal remediation pending runtime re-test
+> Document status: Complete (2026-07-20) — maintainer runtime acceptance passed
 > Published plan date: 2026-07-19
 > Objective: make the TUI composer render multi-line and auto-wrap input correctly — width-aware line counting and cursor math (Unicode/CJK cell widths), `Shift+Enter` to insert `\n`, max composer height cap (~10 lines) with bottom-anchored scroll, and wrap-aware terminal cursor placement.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -40,7 +40,7 @@ scrollback wrapping is an in-scope correction under `CHANGE-CONTROL.md`.
 ## Acceptance (summary — see plan file for full test cases)
 
 - [x] `input_line_count_with_width` + `cursor_line_col_with_width` pass ASCII, CJK, newline, and edge (width=0/empty/exact-boundary) tests with content-vs-cursor separation.
-- [ ] Shift+Enter inserts `\n`; bare Enter still submits — automated event test passes; rebuilt-binary terminal re-test pending.
+- [x] Shift+Enter inserts `\n`; bare Enter still submits — automated event test and maintainer rebuilt-binary acceptance pass.
 - [x] Terminal capability is probed before enabling complete modified-key reporting; unsupported terminals degrade to normal input and support `Ctrl+J` as a portable newline fallback.
 - [x] Composer height capped at 10 visual lines with bottom-anchored scroll keeping the cursor visible (including at exact wrap boundaries).
 - [x] `build_input_text` renders wrapped lines and correct cursor position via new helpers.
@@ -71,6 +71,7 @@ See "Risk Register" and "Rollback" sections of the plan file. Summary:
 | 2026-07-19 | Change control | Classified all three runtime findings as in-scope corrections: terminal key disambiguation is required for the published Shift+Enter behavior; explicit finalized-history wrapping was already required by the owner story; right-padding accounting repairs the shared width convention. Story identity was corrected to `TUI-032` without changing the iteration objective. |
 | 2026-07-19 | Remediation | Terminal initialization now pushes Crossterm modified-key disambiguation and restore pops it exactly once; finalized history lines are explicitly width-wrapped with styles/background and three-column continuation indentation preserved; composer width subtracts both left prefix and right block padding. Added event-path, ASCII/CJK history-wrap, keyboard-flag, and exact-boundary Buffer tests. |
 | 2026-07-20 | Protocol correction | Review of the Kitty keyboard protocol showed that disambiguation alone intentionally leaves Enter and Shift+Enter identical. Terminal initialization now probes support, enables all-key escape reporting plus alternate keys on supported terminals, and leaves unsupported terminals untouched. `Ctrl+J` provides a protocol-independent newline fallback. |
+| 2026-07-20 | Maintainer acceptance | Maintainer completed the guided rebuilt-binary scenarios and judged the result passing: modified/fallback newline input, composer and finalized-history wrapping, CJK width, multiline editing/cursor placement, height/scroll cap, and bare-Enter submission. I142 and TUI-032 moved to Complete. |
 
 ## Closeout Evidence (2026-07-19)
 
@@ -101,7 +102,7 @@ Protocol-correction replay on 2026-07-20:
 - `crates/talos-tui/src/app_stream.rs` — display-cell-aware styled scrollback row wrapping with continuation indentation.
 - `crates/talos-tui/src/inline_terminal.rs` — support probe plus paired complete keyboard-enhancement push/pop for modified Enter reporting.
 - `crates/talos-tui/src/state_tests.rs` and `crates/talos-tui/src/app/app_tests.rs` — helper, event-path, exact-boundary Buffer, and ASCII/CJK scrollback regressions.
-- `docs/backlog/active/TUI-032-composer-multiline-wrap.md` — status → Review pending Alacritty re-test.
+- `docs/backlog/active/TUI-032-composer-multiline-wrap.md` — status → Complete after maintainer runtime acceptance.
 - `docs/backlog/active/TUI-014-grep-result-summary.md` — status → Complete (already-implemented discovery during I142 story selection).
 - `docs/iterations/I142-composer-multiline-wrap.md` — iteration plan + execution records + closeout evidence (this file).
 - `docs/iterations/README.md` — I141 row added then updated to Complete; I142 row added.
@@ -112,7 +113,7 @@ Protocol-correction replay on 2026-07-20:
 - Automated targeted tests: passing.
 - `cargo test -p talos-tui --locked`: 335 passed, 0 failed.
 - Full locked workspace validation, release preflight, governance validation, and release build: passing.
-- Real rebuilt-binary tests: pending direct Alacritty Shift+Enter and unsupported-terminal/legacy-multiplexer Ctrl+J checks; I142 must remain Review until they pass.
+- Real rebuilt-binary guided acceptance: maintainer judged all requested scenarios passing on 2026-07-20.
 
 ## Retrospective
 

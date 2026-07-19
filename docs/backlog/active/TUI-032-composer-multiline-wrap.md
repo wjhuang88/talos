@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-032 |
 | Priority | P1 |
-| Status | Review (I142 cross-terminal acceptance remediation, 2026-07-20) |
+| Status | Complete (I142 maintainer runtime acceptance, 2026-07-20) |
 | Source | Maintainer request recorded 2026-07-19 — 单行输入框超出后内容不可见 |
 | Depends on | TUI-010 (slash command menu), TUI-002 (composer/keymap) |
 | Blocks | — |
@@ -76,14 +76,17 @@ Maintainer runtime acceptance in Alacritty found two blockers:
 Acceptance remediation enables modified-key disambiguation with a paired terminal
 push/pop boundary, explicitly wraps finalized scrollback rows while preserving styles
 and continuation indentation, and corrects the composer effective width to include its
-right padding. The story remains Review until a rebuilt binary passes real Alacritty
-acceptance.
+right padding.
 
 Follow-up protocol review on 2026-07-20 found that disambiguation alone deliberately
 keeps Enter and Shift+Enter identical. Talos now probes protocol support before enabling
 `DISAMBIGUATE_ESCAPE_CODES | REPORT_ALL_KEYS_AS_ESCAPE_CODES |
 REPORT_ALTERNATE_KEYS`; unsupported terminals and multiplexers retain normal input and
 can use `Ctrl+J` as the portable newline fallback.
+
+Maintainer-guided rebuilt-binary acceptance completed on 2026-07-20 and was judged
+passing. This closes the Shift+Enter, portable fallback, composer/history wrapping,
+CJK, cursor/editing, height/scroll, and bare-Enter submission checks.
 
 ## Required Reads
 
