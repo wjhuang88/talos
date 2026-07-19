@@ -11,9 +11,9 @@ publish = false
 
 [dependencies]
 gix = { version = "0.85", default-features = false, features = ["basic", "status", "revision", "blob-diff", "index", "sha1"] }
-talos-core = { version = "0.3.8", path = "../talos-core" }
-talos-permission = { version = "0.3.8", path = "../talos-permission" }
-talos-conversation = { version = "0.3.8", path = "../talos-conversation" }
+talos-core = { version = "0.3.9", path = "../talos-core" }
+talos-permission = { version = "0.3.9", path = "../talos-permission" }
+talos-conversation = { version = "0.3.9", path = "../talos-conversation" }
 ratatui = { version = "0.30", features = ["scrolling-regions"] }
 unicode-width = "0.2"
 crossterm = { version = "0.29", features = ["event-stream"] }

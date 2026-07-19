@@ -11,20 +11,20 @@ rust-version.workspace = true
 [dependencies]
 async-trait = "0.1"
 serde_json = "1"
-talos-agent = { version = "0.3.8", path = "../talos-agent" }
-talos-core = { version = "0.3.8", path = "../talos-core" }
-talos-permission = { version = "0.3.8", path = "../talos-permission" }
-talos-plugin = { version = "0.3.8", path = "../talos-plugin" }
-talos-sandbox = { version = "0.3.8", path = "../talos-sandbox" }
-talos-session = { version = "0.3.8", path = "../talos-session" }
-talos-skill = { version = "0.3.8", path = "../talos-skill" }
+talos-agent = { version = "0.3.9", path = "../talos-agent" }
+talos-core = { version = "0.3.9", path = "../talos-core" }
+talos-permission = { version = "0.3.9", path = "../talos-permission" }
+talos-plugin = { version = "0.3.9", path = "../talos-plugin" }
+talos-sandbox = { version = "0.3.9", path = "../talos-sandbox" }
+talos-session = { version = "0.3.9", path = "../talos-session" }
+talos-skill = { version = "0.3.9", path = "../talos-skill" }
 
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "sync"] }
 
 [dev-dependencies]
-talos-provider = { version = "0.3.8", path = "../talos-provider" }
-talos-tools = { version = "0.3.8", path = "../talos-tools" }
+talos-provider = { version = "0.3.9", path = "../talos-provider" }
+talos-tools = { version = "0.3.9", path = "../talos-tools" }
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 
