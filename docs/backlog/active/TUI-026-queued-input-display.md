@@ -5,8 +5,8 @@
 | Story ID | TUI-026 |
 | Priority | P2 |
 | Status | Refinement |
-| Source | Maintainer request 2026-08-05 — 执行中排队逻辑显示有问题 |
-| Depends on | TUI-025 (composer 多行), TUI-004 (state model) |
+| Source | Maintainer request recorded 2026-07-19 — 执行中排队逻辑显示有问题 |
+| Depends on | TUI-032 (composer 多行), TUI-004 (state model) |
 | Blocks | — |
 
 ## 问题
@@ -21,7 +21,7 @@
 2. **排队期间可编辑**：排队后用户可以继续编辑已排队的内容，还是锁定当前排队内容？
 3. **取消排队**：应该支持取消排队吗（如 `Esc` 清除已排队内容）？
 4. **显示位置**：排队内容是在 composer 中继续显示，还是移到别处（如状态栏提示）？
-5. **与多行输入的交互**：TUI-025 的多行 composer 会让排队逻辑更复杂——换行后哪些行属于排队内容？
+5. **与多行输入的交互**：TUI-032 的多行 composer 会让排队逻辑更复杂——换行后哪些行属于排队内容？
 
 ## Codex 参考
 
@@ -49,4 +49,4 @@ Codex 在 Agent 运行期间：
 - `crates/talos-tui/src/app.rs` — 输入事件处理、排队逻辑
 - `crates/talos-tui/src/state.rs` — `TuiState`
 - `docs/backlog/active/TUI-004-state-model.md` — 状态模型
-- `docs/backlog/active/TUI-025-composer-multiline-wrap.md` — 多行输入（依赖项）
+- `docs/backlog/active/TUI-032-composer-multiline-wrap.md` — 多行输入（依赖项）

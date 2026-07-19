@@ -742,7 +742,11 @@ impl Tui {
             return Ok(());
         }
         let lines = std::mem::take(&mut self.pending_scrollback);
-        for line in lines {
+        let history_width = self.terminal.screen_size().width;
+        for line in lines
+            .into_iter()
+            .flat_map(|line| crate::app_stream::wrap_scrollback_line(line, history_width))
+        {
             if line.has_plain_segments_only() {
                 self.terminal.insert_history(&line.text, line.bg)?;
             } else {
@@ -1069,6 +1073,13 @@ impl Tui {
                     KeyCode::Esc if self.state.slash_menu.is_open => {
                         self.state.slash_menu.close();
                     }
+                    KeyCode::Char('j')
+                        if key.modifiers.contains(event::KeyModifiers::CONTROL)
+                            && !self.state.slash_menu.is_open =>
+                    {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.input_append_char('\n');
+                    }
                     KeyCode::Char('/') if self.state.input_buffer.is_empty() => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         let registry = talos_conversation::command_registry();
@@ -1126,7 +1137,7 @@ impl Tui {
         false
     }
 
-    fn restore(&self) {
+    fn restore(&mut self) {
         self.terminal.restore();
     }
 }

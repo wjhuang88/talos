@@ -1160,12 +1160,93 @@ fn submit_input_message_keeps_preview_for_empty_or_unsent_input() {
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 fn key_press(code: KeyCode) -> Event {
+    key_press_with_modifiers(code, KeyModifiers::NONE)
+}
+
+fn key_press_with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Event {
     Event::Key(KeyEvent::new_with_kind_and_state(
         code,
-        KeyModifiers::NONE,
+        modifiers,
         KeyEventKind::Press,
         crossterm::event::KeyEventState::NONE,
     ))
+}
+
+#[test]
+fn entry_point_shift_enter_inserts_newline_without_sending() {
+    let mut state = TuiState::new();
+    state.input_append_str("line one");
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Enter,
+        KeyModifiers::SHIFT,
+    ));
+
+    assert_eq!(tui.state.input_buffer, "line one\n");
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn entry_point_ctrl_j_inserts_newline_without_sending() {
+    let mut state = TuiState::new();
+    state.input_append_str("line one");
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(state, Some(tx));
+
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Char('j'),
+        KeyModifiers::CONTROL,
+    ));
+
+    assert_eq!(tui.state.input_buffer, "line one\n");
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn history_user_message_wraps_to_terminal_width_with_continuation_indent() {
+    let mut stream_count = 0;
+    let lines = scrollback::render_history_message(
+        &mut stream_count,
+        MessageSource::User,
+        "12345678901234567890",
+    );
+    let wrapped = lines
+        .into_iter()
+        .flat_map(|line| crate::app_stream::wrap_scrollback_line(line, 12))
+        .filter(|line| !line.text.is_empty())
+        .collect::<Vec<_>>();
+
+    assert_eq!(wrapped.len(), 3);
+    assert_eq!(wrapped[0].text, " > 123456789");
+    assert_eq!(wrapped[1].text, "   012345678");
+    assert_eq!(wrapped[2].text, "   90");
+    assert!(
+        wrapped
+            .iter()
+            .all(|line| { unicode_width::UnicodeWidthStr::width(line.text.as_str()) <= 12 })
+    );
+}
+
+#[test]
+fn history_user_message_wrap_does_not_split_cjk_cells() {
+    let mut stream_count = 0;
+    let lines =
+        scrollback::render_history_message(&mut stream_count, MessageSource::User, "你好世界你好");
+    let wrapped = lines
+        .into_iter()
+        .flat_map(|line| crate::app_stream::wrap_scrollback_line(line, 10))
+        .filter(|line| !line.text.is_empty())
+        .collect::<Vec<_>>();
+
+    assert_eq!(wrapped[0].text, " > 你好世");
+    assert_eq!(wrapped[1].text, "   界你好");
+    assert!(
+        wrapped
+            .iter()
+            .all(|line| { unicode_width::UnicodeWidthStr::width(line.text.as_str()) <= 10 })
+    );
 }
 
 /// Entry-point test: Up/Down through the actual `handle_input_event` method.

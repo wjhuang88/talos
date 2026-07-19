@@ -1,11 +1,11 @@
-# TUI-025: 输入框多行支持（自动换行 + Shift+Enter 手动换行）
+# TUI-032: 输入框多行支持（自动换行 + Shift+Enter 手动换行）
 
 | Field | Value |
 |-------|-------|
-| Story ID | TUI-025 |
+| Story ID | TUI-032 |
 | Priority | P1 |
-| Status | Complete (I142, 2026-07-19) |
-| Source | Maintainer request 2026-08-05 — 单行输入框超出后内容不可见 |
+| Status | Review (I142 cross-terminal acceptance remediation, 2026-07-20) |
+| Source | Maintainer request recorded 2026-07-19 — 单行输入框超出后内容不可见 |
 | Depends on | TUI-010 (slash command menu), TUI-002 (composer/keymap) |
 | Blocks | — |
 
@@ -60,6 +60,30 @@ Codex 的 TUI 输入框：
 - 不改变 Enter 提交的语义
 - 不改变 Esc / Ctrl+C 的行为
 - 不引入富文本编辑
+
+## I142 Acceptance Remediation (2026-07-19)
+
+The original closeout reused the already-assigned `TUI-025` ID. This document was
+renumbered to `TUI-032`; the objective and I142 baseline are unchanged.
+
+Maintainer runtime acceptance in Alacritty found two blockers:
+
+1. `Shift+Enter` was indistinguishable from bare Enter because Talos did not enable
+   progressive keyboard enhancement at terminal startup.
+2. Composer wrapping was not preserved when the submitted user message moved into
+   terminal scrollback because finalized history lines relied on implicit terminal wrap.
+
+Acceptance remediation enables modified-key disambiguation with a paired terminal
+push/pop boundary, explicitly wraps finalized scrollback rows while preserving styles
+and continuation indentation, and corrects the composer effective width to include its
+right padding. The story remains Review until a rebuilt binary passes real Alacritty
+acceptance.
+
+Follow-up protocol review on 2026-07-20 found that disambiguation alone deliberately
+keeps Enter and Shift+Enter identical. Talos now probes protocol support before enabling
+`DISAMBIGUATE_ESCAPE_CODES | REPORT_ALL_KEYS_AS_ESCAPE_CODES |
+REPORT_ALTERNATE_KEYS`; unsupported terminals and multiplexers retain normal input and
+can use `Ctrl+J` as the portable newline fallback.
 
 ## Required Reads
 

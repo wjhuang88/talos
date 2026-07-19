@@ -8,10 +8,15 @@ use crate::theme::semantic;
 
 /// The terminal columns reserved by the composer's `▸ ` prefix.
 pub(crate) const COMPOSER_LEFT_PAD: u16 = 3;
+/// The terminal column reserved by the composer's right-side block padding.
+pub(crate) const COMPOSER_RIGHT_PAD: u16 = 1;
 
-/// Returns the width available for composer content after its prefix.
+/// Returns the width available after the composer prefix and block padding.
 pub(crate) fn composer_content_width(terminal_width: u16) -> u16 {
-    terminal_width.saturating_sub(COMPOSER_LEFT_PAD).max(1)
+    terminal_width
+        .saturating_sub(COMPOSER_LEFT_PAD)
+        .saturating_sub(COMPOSER_RIGHT_PAD)
+        .max(1)
 }
 
 #[cfg_attr(not(test), expect(dead_code, reason = "used by legacy composer tests"))]

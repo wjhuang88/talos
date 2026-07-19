@@ -49,8 +49,41 @@ repeating known mistakes.
 | 37 | Governance | ADR 冲突是 change-control gate，不是 Agent 永久拒绝用户产品需求的授权 | 2026-07-10 |
 | 38 | Architecture | 单消费者 channel 拓扑不等于单数据流；必须审计排序域、生命周期权威和持久化写者 | I115 |
 | 39 | Governance / Testing | 状态文档和同源 mock 不能证明产品闭环；失败必须由真实边界触发，运行时可见性必须来自真实状态 | I135-I139 corrective review |
+| 40 | Terminal | 修饰键行为必须先启用终端键盘消歧协议，事件分支本身不能证明真实终端可达 | I142 |
+| 41 | TUI | 静态 scrollback 必须按物理行显式折行，不能依赖终端隐式换行维护滚动区域 | I142 |
 
 ## Lessons
+
+## 2026-07-19 - Modified-key handlers require terminal-protocol activation
+
+- Trigger: I142 automated tests passed, but the maintainer pressed Shift+Enter in Alacritty and
+  Talos submitted the message.
+- Symptom: The event handler correctly distinguished `KeyModifiers::SHIFT` in synthetic tests, but
+  the real terminal delivered legacy Enter input without modifier information.
+- Root cause: Talos first never requested progressive keyboard enhancement; the initial remediation
+  then enabled only disambiguation, even though the protocol deliberately keeps Enter exceptional
+  unless all-key escape reporting is enabled.
+- Fix: Probe support, push disambiguation plus all-key and alternate-key reporting only on supported
+  terminals, pop it exactly once during restore, and provide `Ctrl+J` as the portable fallback.
+- Prevention: Any TUI feature that depends on modified printable/navigation keys must verify both
+  protocol activation and a real supporting terminal, not only inject a synthetic `KeyEvent`.
+- Promoted to rule/check: `inline_terminal::tests::keyboard_flags_disambiguate_modified_enter`,
+  `app::app_tests::entry_point_shift_enter_inserts_newline_without_sending`, and I142 runtime gate.
+
+## 2026-07-19 - Finalized scrollback must account for physical terminal rows
+
+- Trigger: I142 runtime acceptance found that a correctly wrapped composer message lost its layout
+  after submission into terminal history.
+- Symptom: A long logical history line visually wrapped, but Talos inserted and scrolled it as one
+  row; continuation alignment and scroll-region accounting were wrong.
+- Root cause: Finalized history relied on the terminal's implicit auto-wrap while the inline
+  viewport API tracks explicitly inserted physical rows.
+- Fix: Wrap finalized styled lines by Unicode display-cell width before insertion, preserve segment
+  styles/backgrounds, and indent continuation rows beneath the history prefix.
+- Prevention: Inline/static terminal history renderers must convert logical lines to explicit
+  physical rows at the terminal boundary and test ASCII, CJK, and exact-width cases.
+- Promoted to rule/check: `history_user_message_wraps_to_terminal_width_with_continuation_indent`
+  and `history_user_message_wrap_does_not_split_cjk_cells`.
 
 ## 2026-07-17 - Status-only closure and same-origin mocks do not prove delivery
 

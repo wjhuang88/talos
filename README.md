@@ -421,6 +421,11 @@ completes the selected command into the composer. `Backspace` edits the filter a
 menu without clearing the composer. Use `/help` to list the commands available in the current
 session.
 
+The composer wraps long input to the terminal width. `Shift+Enter` inserts a newline while bare
+`Enter` submits. Talos probes for the progressive keyboard protocol before enabling complete
+modified-key reporting; `Ctrl+J` is the portable newline fallback for terminals or multiplexers
+that do not support the protocol.
+
 Use `/model` to switch among models whose providers are already configured. The picker
 uses **three-level navigation**: Level 1 lists recent models (when available, persisted
 at `~/.talos/recent_models.json`) and providers; selecting a provider enters Level 2,

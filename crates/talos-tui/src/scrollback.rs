@@ -18,9 +18,9 @@ pub(crate) use crate::scrollback_input::cursor_line_col;
 #[cfg(test)]
 pub(crate) use crate::scrollback_input::input_line_count;
 pub(crate) use crate::scrollback_input::{
-    COMPOSER_LEFT_PAD, build_input_text, composer_content_width, composer_scroll_offset,
-    credential_cursor_col, credential_display_text, cursor_line_col_with_width,
-    input_line_count_with_width,
+    COMPOSER_LEFT_PAD, COMPOSER_RIGHT_PAD, build_input_text, composer_content_width,
+    composer_scroll_offset, credential_cursor_col, credential_display_text,
+    cursor_line_col_with_width, input_line_count_with_width,
 };
 #[cfg(test)]
 pub(crate) use crate::scrollback_markdown::history_segments_width;
@@ -310,7 +310,7 @@ impl ViewportComponent for InputComponent<'_> {
         let input_text = build_input_text(self.state, composer_content_width(area.width));
         let input_block = Block::default()
             .style(Style::default().bg(semantic::INPUT_BG))
-            .padding(Padding::new(0, 1, 0, 0));
+            .padding(Padding::new(0, COMPOSER_RIGHT_PAD, 0, 0));
         frame.render_widget(Paragraph::new(input_text).block(input_block), area);
     }
 }

@@ -2,7 +2,10 @@ use std::io::{self, Stdout};
 
 use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
-    event::{DisableBracketedPaste, EnableBracketedPaste},
+    event::{
+        DisableBracketedPaste, EnableBracketedPaste, KeyboardEnhancementFlags,
+        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute, queue,
     style::{
         Attribute, Color as CColor, Print, SetAttribute, SetBackgroundColor, SetForegroundColor,
@@ -135,6 +138,17 @@ pub struct InlineTerminal {
     screen_size: Size,
     last_known_cursor_pos: Position,
     needs_clear: bool,
+    keyboard_enhancement_enabled: bool,
+}
+
+fn keyboard_enhancement_flags() -> KeyboardEnhancementFlags {
+    KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+        | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+        | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+}
+
+fn keyboard_enhancement_supported(result: io::Result<bool>) -> bool {
+    result.unwrap_or(false)
 }
 
 impl InlineTerminal {
@@ -145,6 +159,16 @@ impl InlineTerminal {
         let screen_size = backend.size()?;
         let cursor_pos = backend.get_cursor_position().unwrap_or(Position::new(0, 0));
 
+        let keyboard_enhancement_enabled =
+            if keyboard_enhancement_supported(terminal::supports_keyboard_enhancement()) {
+                execute!(
+                    backend,
+                    PushKeyboardEnhancementFlags(keyboard_enhancement_flags())
+                )
+                .is_ok()
+            } else {
+                false
+            };
         let _ = execute!(backend, Hide, EnableBracketedPaste);
         let viewport_area = Rect::new(0, cursor_pos.y, screen_size.width, 0);
 
@@ -158,6 +182,7 @@ impl InlineTerminal {
             screen_size,
             last_known_cursor_pos: cursor_pos,
             needs_clear: false,
+            keyboard_enhancement_enabled,
         })
     }
 
@@ -176,6 +201,7 @@ impl InlineTerminal {
             screen_size: Size::new(80, 24),
             last_known_cursor_pos: Position::new(0, 0),
             needs_clear: false,
+            keyboard_enhancement_enabled: false,
         }
     }
 
@@ -402,13 +428,16 @@ impl InlineTerminal {
         Ok(())
     }
 
-    pub fn restore(&self) {
+    pub fn restore(&mut self) {
         let _ = execute!(
             io::stdout(),
             MoveTo(0, self.viewport_area.top()),
             Clear(ClearType::FromCursorDown),
         );
-        let _ = terminal::disable_raw_mode();
+        if self.keyboard_enhancement_enabled {
+            let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
+            self.keyboard_enhancement_enabled = false;
+        }
         let _ = execute!(
             io::stdout(),
             DisableBracketedPaste,
@@ -416,6 +445,7 @@ impl InlineTerminal {
             SetCursorStyle::DefaultUserShape,
             Show
         );
+        let _ = terminal::disable_raw_mode();
     }
 
     #[allow(dead_code)]
@@ -473,5 +503,34 @@ fn segments_width(segments: &[HistorySegment]) -> usize {
 impl Drop for InlineTerminal {
     fn drop(&mut self) {
         self.restore();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keyboard_flags_disambiguate_modified_enter() {
+        assert!(
+            keyboard_enhancement_flags()
+                .contains(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        );
+        assert!(
+            keyboard_enhancement_flags()
+                .contains(KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES)
+        );
+        assert!(
+            keyboard_enhancement_flags().contains(KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS)
+        );
+    }
+
+    #[test]
+    fn keyboard_support_probe_degrades_on_false_or_error() {
+        assert!(keyboard_enhancement_supported(Ok(true)));
+        assert!(!keyboard_enhancement_supported(Ok(false)));
+        assert!(!keyboard_enhancement_supported(Err(io::Error::other(
+            "probe failed"
+        ))));
     }
 }

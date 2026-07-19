@@ -4,6 +4,7 @@ use crate::scrollback_input::{
     input_line_count_with_width,
 };
 use crate::{inline_terminal::ViewportComponent, scrollback::InputComponent};
+use ratatui::{buffer::Buffer, layout::Rect};
 
 #[test]
 fn input_line_count_with_width_counts_content_rows() {
@@ -29,9 +30,24 @@ fn cursor_line_col_with_width_tracks_wrapped_cursor_position() {
 
 #[test]
 fn composer_content_width_reserves_prefix_columns() {
-    assert_eq!(composer_content_width(80), 77);
+    assert_eq!(composer_content_width(80), 76);
     assert_eq!(composer_content_width(3), 1);
     assert_eq!(composer_content_width(0), 1);
+}
+
+#[test]
+fn input_component_exact_boundary_keeps_last_cell_visible() {
+    let mut state = TuiState::new();
+    state.input_buffer = "a".repeat(76);
+    state.cursor_pos = state.input_buffer.chars().count();
+    let area = Rect::new(0, 0, 80, 2);
+    let mut buffer = Buffer::empty(area);
+    let mut frame = crate::inline_terminal::InlineFrame::new(area, &mut buffer);
+
+    InputComponent { state: &state }.render(&mut frame, area);
+
+    assert_eq!(buffer[(78, 0)].symbol(), "a");
+    assert_eq!(buffer[(79, 0)].symbol(), " ");
 }
 
 #[test]

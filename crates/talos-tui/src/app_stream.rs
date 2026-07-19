@@ -1,5 +1,6 @@
 use crossterm::style::Color as CColor;
 use talos_conversation::MessageSource;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::highlight::HighlightEngine;
 use crate::inline_terminal::{HistoryAttrs, HistorySegment};
@@ -63,6 +64,81 @@ impl ScrollbackLine {
             .iter()
             .all(|segment| segment.fg.is_none() && segment.attrs == HistoryAttrs::default())
     }
+}
+
+/// Wraps one finalized history line to the terminal width.
+///
+/// Finalized scrollback is inserted one physical row at a time. Relying on the
+/// terminal's implicit wrap would scroll the viewport by only one row even when
+/// a logical line occupied several rows. This helper makes every occupied row
+/// explicit, preserves segment styling/backgrounds, and aligns continuations
+/// beneath the standard three-column history prefix.
+pub(crate) fn wrap_scrollback_line(line: ScrollbackLine, width: u16) -> Vec<ScrollbackLine> {
+    if width == 0
+        || line.fill.is_some()
+        || UnicodeWidthStr::width(line.text.as_str()) <= width as usize
+    {
+        return vec![line];
+    }
+
+    let continuation = line
+        .segments
+        .first()
+        .filter(|_| line.segments.len() > 1)
+        .and_then(|segment| {
+            let prefix_width = UnicodeWidthStr::width(segment.text.as_str());
+            (prefix_width > 0 && prefix_width <= 3 && prefix_width < width as usize).then(|| {
+                HistorySegment::styled(
+                    " ".repeat(prefix_width),
+                    segment.fg,
+                    HistoryAttrs::default(),
+                )
+            })
+        });
+
+    let mut rows = Vec::new();
+    let mut current = Vec::new();
+    let mut used = 0usize;
+
+    for segment in line.segments {
+        for ch in segment.text.chars() {
+            let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if used > 0 && used.saturating_add(char_width) > width as usize {
+                rows.push(ScrollbackLine::styled(
+                    std::mem::take(&mut current),
+                    line.bg,
+                ));
+                used = 0;
+                if let Some(prefix) = continuation.as_ref() {
+                    used = UnicodeWidthStr::width(prefix.text.as_str());
+                    current.push(prefix.clone());
+                }
+            }
+
+            append_styled_char(&mut current, ch, &segment);
+            used = used.saturating_add(char_width);
+        }
+    }
+
+    if !current.is_empty() {
+        rows.push(ScrollbackLine::styled(current, line.bg));
+    }
+    rows
+}
+
+fn append_styled_char(segments: &mut Vec<HistorySegment>, ch: char, source: &HistorySegment) {
+    if let Some(last) = segments.last_mut()
+        && last.fg == source.fg
+        && last.attrs == source.attrs
+    {
+        last.text.push(ch);
+        return;
+    }
+    segments.push(HistorySegment::styled(
+        ch.to_string(),
+        source.fg,
+        source.attrs,
+    ));
 }
 
 #[derive(Default)]

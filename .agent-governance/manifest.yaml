@@ -3,8 +3,8 @@ managed_by: "agent-project-governance"
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
-last_audited_at: "2026-07-17"
-status_note: "I135-I138 corrective evidence and I140 SEC-001 exact external-path authorization are Complete after locked fmt/check/Clippy/workspace tests, release preflight, security review, governance validation, and diff check. I139 remains Review until commit/push and clean-main replay; REL-002 remains NO-GO."
+last_audited_at: "2026-07-20"
+status_note: "I141 is Complete and shipped in v0.3.9. I142/TUI-032 is Review during cross-terminal composer acceptance remediation; rebuilt-binary direct-terminal and fallback evidence remain required. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"

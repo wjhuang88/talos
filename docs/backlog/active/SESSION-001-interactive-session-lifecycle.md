@@ -5,7 +5,7 @@
 | Story ID | SESSION-001 |
 | Type | Epic |
 | Priority | P1 |
-| Status | Refinement |
+| Status | Complete (I040/I041 — 2026-06-22; owner status reconciled 2026-07-19) |
 | Depends On | MEM-002 and MEM-004 complete; CMD-001 registry foundation; ADR-005 and ADR-006 |
 | Integrates With | TUI-010 command menu; `talos-session`; CLI/TUI composition root |
 
@@ -29,9 +29,9 @@ sessions.
 
 | Child | Outcome | Status | Depends On | Iteration |
 |---|---|---|---|---|
-| [SESSION-001-A](SESSION-001-A-runtime-transition-service.md) | Prepare/commit/rollback one atomic runtime transition | Ready | MEM-002, MEM-004, ADR-005/006 | - |
-| [SESSION-001-B](SESSION-001-B-new-resume.md) | Users create or resume a workspace session interactively | Proposed | SESSION-001-A, CMD-001 | - |
-| [SESSION-001-C](SESSION-001-C-fork.md) | Users fork without writing subsequent turns to the source | Proposed | SESSION-001-A, CMD-001 | - |
+| [SESSION-001-A](SESSION-001-A-runtime-transition-service.md) | Prepare/commit/rollback one atomic runtime transition | Complete | MEM-002, MEM-004, ADR-005/006 | I040 |
+| [SESSION-001-B](SESSION-001-B-new-resume.md) | Users create or resume a workspace session interactively | Complete | SESSION-001-A, CMD-001 | I041 |
+| [SESSION-001-C](SESSION-001-C-fork.md) | Users fork without writing subsequent turns to the source | Complete | SESSION-001-A, CMD-001 | I041 |
 
 The Epic completes when all three child outcomes pass their runtime evidence and documentation
 gates. Iterations select child Stories, not this parent.
@@ -87,22 +87,22 @@ is shut down deterministically.
 
 ## Acceptance Criteria
 
-- [ ] One session lifecycle service owns `New`, `ListResumable`, `Resume`, and `Fork` operations.
-- [ ] `/new`, `/resume`, and `/fork` are registered as CMD-001 BuiltinCommands only after their
+- [x] One session lifecycle service owns `New`, `ListResumable`, `Resume`, and `Fork` operations.
+- [x] `/new`, `/resume`, and `/fork` are registered as CMD-001 BuiltinCommands only after their
       typed runtime operations are executable.
-- [ ] A successful transition atomically updates Agent context, persistence target, conversation
+- [x] A successful transition atomically updates Agent context, persistence target, conversation
       state, status, and visible history.
-- [ ] A failed transition leaves the original session active and usable without partial mutation.
-- [ ] Resume candidates are limited to the active workspace and ordered deterministically.
-- [ ] Forked turns persist only to the fork target and never contaminate the source session.
-- [ ] Active-turn behavior is explicit and tested for model streaming and tool execution.
-- [ ] Session-owned tasks and handles are cancelled/closed when the old runtime is replaced.
-- [ ] Skill/MCP startup state and prompt-cache behavior are rebuilt or safely preserved according
+- [x] A failed transition leaves the original session active and usable without partial mutation.
+- [x] Resume candidates are limited to the active workspace and ordered deterministically.
+- [x] Forked turns persist only to the fork target and never contaminate the source session.
+- [x] Active-turn behavior is explicit and tested for model streaming and tool execution.
+- [x] Session-owned tasks and handles are cancelled/closed when the old runtime is replaced.
+- [x] Skill/MCP startup state and prompt-cache behavior are rebuilt or safely preserved according
       to their session contracts.
-- [ ] CLI startup and interactive transitions do not maintain incompatible lifecycle algorithms.
-- [ ] Tests cover new, resume, fork, rollback, workspace isolation, active-turn handling, visible
+- [x] CLI startup and interactive transitions do not maintain incompatible lifecycle algorithms.
+- [x] Tests cover new, resume, fork, rollback, workspace isolation, active-turn handling, visible
       history hydration, persistence routing, and resource cleanup.
-- [ ] README command documentation is updated only when the commands become executable.
+- [x] README command documentation is updated only when the commands become executable.
 
 ## Delivery Slices
 
