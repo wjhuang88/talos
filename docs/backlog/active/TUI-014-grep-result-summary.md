@@ -1,9 +1,17 @@
 # TUI-014: Grep Result Summary Rendering
 
-**Status**: Refinement
+**Status**: Complete (shipped before I142; discovered implemented during I142 story selection on 2026-07-19)
 **Priority**: P3
 **Source**: User request 2026-06-26
-**Iteration**: None yet
+**Iteration**: None recorded — the implementation landed earlier (likely with TUI-028 in I114 or a sibling display-layer pass) but the owner doc was not updated.
+
+## Implementation state (verified 2026-07-19)
+
+- `grep` is in `THRESHOLD_SUMMARIZE` at `crates/talos-tui/src/tool_display.rs:137`.
+- `summarize_grep_result()` at `tool_display.rs:91-116` produces `grep matched {N} lines in {M} files, {X} bytes` (consistent with `read`/`glob`/`ls` byte-unit convention; the original owner-doc "X KB" was the odd one out).
+- Tests at `crates/talos-tui/src/app/app_tests.rs:820-847` cover both the >30-line summary path and the unrecognized-shape fallback.
+
+The original problem statement below is preserved as historical context.
 
 ## Problem
 

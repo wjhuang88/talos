@@ -2,13 +2,43 @@ use ratatui::{
     style::Style,
     text::{Line, Span, Text},
 };
+use unicode_width::UnicodeWidthChar;
 
 use crate::theme::semantic;
 
+/// The terminal columns reserved by the composer's `▸ ` prefix.
+pub(crate) const COMPOSER_LEFT_PAD: u16 = 3;
+
+/// Returns the width available for composer content after its prefix.
+pub(crate) fn composer_content_width(terminal_width: u16) -> u16 {
+    terminal_width.saturating_sub(COMPOSER_LEFT_PAD).max(1)
+}
+
+#[cfg_attr(not(test), expect(dead_code, reason = "used by legacy composer tests"))]
 pub(crate) fn input_line_count(buffer: &str) -> u16 {
     buffer.split('\n').count().max(1) as u16
 }
 
+/// Counts the visual content rows occupied by `buffer` at the given cell width.
+pub(crate) fn input_line_count_with_width(buffer: &str, width: u16) -> u16 {
+    if width == 0 {
+        return 1;
+    }
+
+    buffer.split('\n').fold(0u16, |rows, segment| {
+        let (_, segment_rows) = segment.chars().fold((0u16, 1u16), |(used, rows), ch| {
+            let char_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+            if used.saturating_add(char_width) > width && used > 0 {
+                (char_width, rows.saturating_add(1))
+            } else {
+                (used.saturating_add(char_width), rows)
+            }
+        });
+        rows.saturating_add(segment_rows)
+    })
+}
+
+#[cfg_attr(not(test), expect(dead_code, reason = "used by legacy composer tests"))]
 pub(crate) fn cursor_line_col(buffer_before_cursor: &str) -> (u16, u16) {
     let row = buffer_before_cursor.matches('\n').count() as u16;
     let col = buffer_before_cursor
@@ -17,6 +47,59 @@ pub(crate) fn cursor_line_col(buffer_before_cursor: &str) -> (u16, u16) {
         .map(unicode_width::UnicodeWidthStr::width)
         .unwrap_or(0) as u16;
     (row, col)
+}
+
+/// Returns the visual cursor row and column at the given content width.
+pub(crate) fn cursor_line_col_with_width(buffer_before_cursor: &str, width: u16) -> (u16, u16) {
+    if width == 0 {
+        return (0, 0);
+    }
+
+    let (row, col) = buffer_before_cursor
+        .chars()
+        .fold((0u16, 0u16), |(row, used), ch| {
+            if ch == '\n' {
+                return (row.saturating_add(1), 0);
+            }
+
+            let char_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+            if used.saturating_add(char_width) > width && used > 0 {
+                (row.saturating_add(1), char_width)
+            } else {
+                (row, used.saturating_add(char_width))
+            }
+        });
+
+    if col == width {
+        (row.saturating_add(1), 0)
+    } else {
+        (row, col)
+    }
+}
+
+/// Returns the first visual row shown by a capped composer while keeping its cursor visible.
+pub(crate) fn composer_scroll_offset(
+    buffer_before_cursor: &str,
+    buffer: &str,
+    width: u16,
+    max_lines: u16,
+) -> u16 {
+    let content_rows = input_line_count_with_width(buffer, width);
+    let cursor_row = cursor_line_col_with_width(buffer_before_cursor, width).0;
+    let visible_rows = content_rows.max(cursor_row.saturating_add(1));
+
+    if visible_rows <= max_lines {
+        return 0;
+    }
+
+    let mut offset = visible_rows.saturating_sub(max_lines);
+    if cursor_row < offset {
+        offset = cursor_row;
+    } else if cursor_row >= offset.saturating_add(max_lines) {
+        offset = cursor_row.saturating_sub(max_lines).saturating_add(1);
+    }
+
+    offset
 }
 
 pub(crate) fn credential_display_text(buffer: &str) -> std::borrow::Cow<'_, str> {
@@ -31,23 +114,60 @@ pub(crate) fn credential_cursor_col(buffer: &str) -> u16 {
     3u16.saturating_add(buffer.chars().count() as u16)
 }
 
-pub(crate) fn build_input_text(state: &crate::state::TuiState) -> Text<'static> {
+pub(crate) fn build_input_text(state: &crate::state::TuiState, width: u16) -> Text<'static> {
     let buffer = &state.input_buffer;
     let prompt_style = Style::default().fg(semantic::APPROVAL_PROMPT);
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    let mut line_index = 0usize;
-    let mut spans = vec![Span::styled(" > ", prompt_style)];
+    let content_rows = input_line_count_with_width(buffer, width);
+    let cursor_byte_pos = state.cursor_byte_pos();
+    let (cursor_row, _) = cursor_line_col_with_width(&buffer[..cursor_byte_pos], width);
+    let scroll_offset = composer_scroll_offset(
+        &buffer[..cursor_byte_pos],
+        buffer,
+        width,
+        crate::scrollback::MAX_COMPOSER_LINES,
+    );
+    let total_rows = content_rows.max(cursor_row.saturating_add(1));
+    let visible_rows = total_rows
+        .saturating_sub(scroll_offset)
+        .min(crate::scrollback::MAX_COMPOSER_LINES) as usize;
+    let mut visual_lines = Vec::with_capacity(total_rows as usize);
+    let mut current_line = String::new();
+    let mut used = 0u16;
 
     for ch in buffer.chars() {
         if ch == '\n' {
-            lines.push(Line::from(spans));
-            line_index += 1;
-            spans = vec![Span::raw(input_prefix_for_line(line_index))];
-        } else {
-            spans.push(Span::raw(ch.to_string()));
+            visual_lines.push(std::mem::take(&mut current_line));
+            used = 0;
+            continue;
         }
+
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        if used.saturating_add(char_width) > width && used > 0 {
+            visual_lines.push(std::mem::take(&mut current_line));
+            used = 0;
+        }
+        current_line.push(ch);
+        used = used.saturating_add(char_width);
     }
-    lines.push(Line::from(spans));
+    visual_lines.push(current_line);
+    visual_lines.resize(total_rows as usize, String::new());
+
+    let mut lines = Vec::with_capacity(visible_rows);
+    for (line_index, line) in visual_lines
+        .into_iter()
+        .skip(scroll_offset as usize)
+        .take(visible_rows)
+        .enumerate()
+    {
+        let absolute_line_index = scroll_offset as usize + line_index;
+        let prefix = input_prefix_for_line(absolute_line_index);
+        let prefix_span = if absolute_line_index == 0 {
+            Span::styled(prefix, prompt_style)
+        } else {
+            Span::raw(prefix)
+        };
+        lines.push(Line::from(vec![prefix_span, Span::raw(line)]));
+    }
 
     Text::from(lines)
 }

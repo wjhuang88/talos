@@ -13,9 +13,14 @@ use crate::inline_terminal::{InlineFrame, ViewportComponent};
 use crate::stream_markdown::HoldStatus;
 use crate::theme::{semantic, to_crossterm_color};
 
+#[cfg(test)]
+pub(crate) use crate::scrollback_input::cursor_line_col;
+#[cfg(test)]
+pub(crate) use crate::scrollback_input::input_line_count;
 pub(crate) use crate::scrollback_input::{
-    build_input_text, credential_cursor_col, credential_display_text, cursor_line_col,
-    input_line_count,
+    COMPOSER_LEFT_PAD, build_input_text, composer_content_width, composer_scroll_offset,
+    credential_cursor_col, credential_display_text, cursor_line_col_with_width,
+    input_line_count_with_width,
 };
 #[cfg(test)]
 pub(crate) use crate::scrollback_markdown::history_segments_width;
@@ -285,13 +290,24 @@ pub(crate) struct InputComponent<'a> {
     pub(crate) state: &'a crate::state::TuiState,
 }
 
+pub(crate) const MAX_COMPOSER_LINES: u16 = 10;
+
 impl ViewportComponent for InputComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 {
-        input_line_count(&self.state.input_buffer)
+    fn height_hint(&self, width: u16) -> u16 {
+        let content_width = composer_content_width(width);
+        let content_rows = input_line_count_with_width(&self.state.input_buffer, content_width);
+        let cursor_byte_pos = self.state.cursor_byte_pos();
+        let cursor_row =
+            cursor_line_col_with_width(&self.state.input_buffer[..cursor_byte_pos], content_width)
+                .0;
+
+        content_rows
+            .max(cursor_row.saturating_add(1))
+            .min(MAX_COMPOSER_LINES)
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let input_text = build_input_text(self.state);
+        let input_text = build_input_text(self.state, composer_content_width(area.width));
         let input_block = Block::default()
             .style(Style::default().bg(semantic::INPUT_BG))
             .padding(Padding::new(0, 1, 0, 0));

@@ -1,4 +1,146 @@
 use super::*;
+use crate::scrollback_input::{
+    build_input_text, composer_content_width, composer_scroll_offset, cursor_line_col_with_width,
+    input_line_count_with_width,
+};
+use crate::{inline_terminal::ViewportComponent, scrollback::InputComponent};
+
+#[test]
+fn input_line_count_with_width_counts_content_rows() {
+    assert_eq!(input_line_count_with_width(&"a".repeat(80), 20), 4);
+    assert_eq!(input_line_count_with_width("你好你好你好你好你好", 5), 5);
+    assert_eq!(input_line_count_with_width("aaaa\nbbbbbbbb", 4), 3);
+    assert_eq!(input_line_count_with_width("", 20), 1);
+    assert_eq!(input_line_count_with_width("abc", 0), 1);
+    assert_eq!(input_line_count_with_width(&"a".repeat(20), 20), 1);
+}
+
+#[test]
+fn cursor_line_col_with_width_tracks_wrapped_cursor_position() {
+    assert_eq!(cursor_line_col_with_width("abc", 80), (0, 3));
+    assert_eq!(cursor_line_col_with_width(&"a".repeat(25), 20), (1, 5));
+    assert_eq!(cursor_line_col_with_width(&"a".repeat(20), 20), (1, 0));
+    assert_eq!(cursor_line_col_with_width("你好你", 4), (1, 2));
+    assert_eq!(cursor_line_col_with_width("你好你好", 4), (2, 0));
+    assert_eq!(cursor_line_col_with_width("aaaa\nbbbbb", 4), (2, 1));
+    assert_eq!(cursor_line_col_with_width("", 20), (0, 0));
+    assert_eq!(cursor_line_col_with_width("abc", 0), (0, 0));
+}
+
+#[test]
+fn composer_content_width_reserves_prefix_columns() {
+    assert_eq!(composer_content_width(80), 77);
+    assert_eq!(composer_content_width(3), 1);
+    assert_eq!(composer_content_width(0), 1);
+}
+
+#[test]
+fn height_hint_cap_uses_wrapped_content_and_cursor_spill_row() {
+    let mut state = TuiState::new();
+    state.input_buffer = "one\ntwo\nthree".to_string();
+    state.cursor_pos = state.input_buffer.chars().count();
+    assert_eq!(InputComponent { state: &state }.height_hint(80), 3);
+
+    state.input_buffer = std::iter::repeat_n("line", 25)
+        .collect::<Vec<_>>()
+        .join("\n");
+    state.cursor_pos = state.input_buffer.chars().count();
+    assert_eq!(InputComponent { state: &state }.height_hint(80), 10);
+
+    state.input_buffer = "a".repeat(20);
+    state.cursor_pos = state.input_buffer.chars().count();
+    assert_eq!(InputComponent { state: &state }.height_hint(23), 2);
+}
+
+#[test]
+fn composer_scroll_offset_keeps_cursor_in_capped_window() {
+    let buffer = std::iter::repeat_n("line", 25)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_eq!(composer_scroll_offset(&buffer, &buffer, 80, 10), 15);
+
+    let short_buffer = std::iter::repeat_n("line", 5)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_eq!(
+        composer_scroll_offset(&short_buffer, &short_buffer, 80, 10),
+        0
+    );
+
+    let cursor_at_row_three = "line\n".repeat(3);
+    assert_eq!(
+        composer_scroll_offset(&cursor_at_row_three, &buffer, 80, 10),
+        3
+    );
+
+    let boundary = "a".repeat(20);
+    assert_eq!(composer_scroll_offset(&boundary, &boundary, 20, 10), 0);
+
+    let max_boundary = "a".repeat(200);
+    assert_eq!(
+        composer_scroll_offset(&max_boundary, &max_boundary, 20, 10),
+        1
+    );
+}
+
+#[test]
+fn build_input_text_wraps_long_buffer_at_content_width() {
+    let mut state = TuiState::new();
+    state.input_buffer = "a".repeat(200);
+    state.cursor_pos = state.input_buffer.chars().count();
+
+    let text = build_input_text(&state, 77);
+
+    assert_eq!(text.lines.len(), 3);
+    assert_eq!(cursor_line_col_with_width(&state.input_buffer, 77), (2, 46));
+}
+
+#[test]
+fn build_input_text_shows_last_ten_visual_lines() {
+    let mut state = TuiState::new();
+    state.input_buffer = (0..25)
+        .map(|line| format!("line-{line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    state.cursor_pos = state.input_buffer.chars().count();
+
+    let text = build_input_text(&state, 77);
+
+    assert_eq!(text.lines.len(), 10);
+    assert_eq!(text.lines[0].to_string(), "   line-15");
+    assert_eq!(text.lines[9].to_string(), "   line-24");
+}
+
+#[test]
+fn build_input_text_keeps_short_buffer_on_one_line() {
+    let mut state = TuiState::new();
+    state.input_buffer = "abcdefghij".to_string();
+    state.cursor_pos = state.input_buffer.chars().count();
+
+    let text = build_input_text(&state, 77);
+
+    assert_eq!(text.lines.len(), 1);
+    assert_eq!(text.lines[0].to_string(), " > abcdefghij");
+    assert_eq!(
+        composer_scroll_offset(&state.input_buffer, &state.input_buffer, 77, 10),
+        0
+    );
+}
+
+#[test]
+fn cursor_placement_wrap_and_scroll_math_stays_in_visible_window() {
+    let wrapped = "a".repeat(25);
+    assert_eq!(cursor_line_col_with_width(&wrapped, 20), (1, 5));
+    assert_eq!(composer_scroll_offset(&wrapped, &wrapped, 20, 10), 0);
+
+    let scrolled = std::iter::repeat_n("line", 30)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let (cursor_row, _) = cursor_line_col_with_width(&scrolled, 20);
+    let offset = composer_scroll_offset(&scrolled, &scrolled, 20, 10);
+    assert_eq!(offset, 20);
+    assert_eq!(cursor_row.saturating_sub(offset), 9);
+}
 
 #[test]
 fn credential_input_collects_pasted_text_and_submits() {
@@ -517,6 +659,31 @@ fn tuistate_panel_query_strips_slash_for_slash_menu() {
     state.append_slash_query_char('o');
 
     assert_eq!(state.panel_query(), "mo");
+}
+
+#[test]
+fn input_append_char_newline_inserts_multiline_buffer() {
+    let mut state = TuiState::new();
+    state.input_append_char('h');
+    state.input_append_char('i');
+    state.input_append_char('\n');
+    state.input_append_char('t');
+    state.input_append_char('h');
+    state.input_append_char('e');
+    state.input_append_char('r');
+    state.input_append_char('e');
+    assert_eq!(state.input_buffer, "hi\nthere");
+    assert_eq!(state.cursor_pos, 8);
+}
+
+#[test]
+fn input_append_char_newline_at_cursor_mid_buffer() {
+    let mut state = TuiState::new();
+    state.input_append_str("hello");
+    state.cursor_pos = 2;
+    state.input_append_char('\n');
+    assert_eq!(state.input_buffer, "he\nllo");
+    assert_eq!(state.cursor_pos, 3);
 }
 
 // ── TUI-030 composer input history tests ──────────────────────────────────

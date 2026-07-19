@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-025 |
 | Priority | P1 |
-| Status | Refinement |
+| Status | Complete (I142, 2026-07-19) |
 | Source | Maintainer request 2026-08-05 — 单行输入框超出后内容不可见 |
 | Depends on | TUI-010 (slash command menu), TUI-002 (composer/keymap) |
 | Blocks | — |

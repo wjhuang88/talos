@@ -939,10 +939,21 @@ impl Tui {
                 }
                 let input_top = stack_top + input_y_offset;
                 let byte_pos = self.state.cursor_byte_pos();
+                let content_w = crate::scrollback::composer_content_width(screen_w);
                 let (cursor_row_offset, cursor_col_offset) =
-                    crate::scrollback::cursor_line_col(&self.state.input_buffer[..byte_pos]);
-                let input_row = input_top.saturating_add(cursor_row_offset);
-                let cursor_col = 3u16 + cursor_col_offset;
+                    crate::scrollback::cursor_line_col_with_width(
+                        &self.state.input_buffer[..byte_pos],
+                        content_w,
+                    );
+                let scroll_offset = crate::scrollback::composer_scroll_offset(
+                    &self.state.input_buffer[..byte_pos],
+                    &self.state.input_buffer,
+                    content_w,
+                    crate::scrollback::MAX_COMPOSER_LINES,
+                );
+                let input_row =
+                    input_top.saturating_add(cursor_row_offset.saturating_sub(scroll_offset));
+                let cursor_col = crate::scrollback::COMPOSER_LEFT_PAD + cursor_col_offset;
                 self.terminal.set_cursor(cursor_col, input_row)?;
             }
         }
@@ -1090,11 +1101,15 @@ impl Tui {
                     }
                     KeyCode::Enter => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        submit_input_message(
-                            &mut self.state,
-                            &mut self.stream_render,
-                            self.user_input_tx.as_ref(),
-                        );
+                        if key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                            self.state.input_append_char('\n');
+                        } else {
+                            submit_input_message(
+                                &mut self.state,
+                                &mut self.stream_render,
+                                self.user_input_tx.as_ref(),
+                            );
+                        }
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;

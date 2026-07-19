@@ -437,7 +437,7 @@ mod tests {
         let mut state = TuiState::new();
         state.input_append_str("first\nsecond");
 
-        let text = build_input_text(&state);
+        let text = build_input_text(&state, 77);
 
         assert_eq!(text.lines.len(), 2);
         assert_eq!(text.lines[0].to_string(), " > first");
