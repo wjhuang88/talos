@@ -3,12 +3,13 @@
 | Field | Value |
 | --- | --- |
 | Story ID | MODEL-008 |
-| Type | Product / Configuration Story |
+| Type | Product / Configuration Story (Epic) |
 | Priority | P2 |
-| Status | Refinement |
+| Status | Refinement — split into child Stories MODEL-008-A (I147) and MODEL-008-B (I148) on 2026-07-20 |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | MODEL-005 / MODEL-006 existing `/connect` flow; configuration schema ADR-013; credential boundary ADR-023 |
 | Blocks | — |
+| Child Stories | [MODEL-008-A](MODEL-008-A-interactive-custom-provider-wizard.md) (I147 wizard + atomic config) · [MODEL-008-B](MODEL-008-B-model-discovery-manual-fallback-activation.md) (I148 discovery + manual fallback + activation) |
 
 ## Problem
 

@@ -5,10 +5,11 @@
 | Story ID | TUI-033 |
 | Type | Product / Interaction Story |
 | Priority | P2 |
-| Status | Refinement |
+| Status | Ready — selected into I146 (2026-07-20) |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | MODEL-007 picker; MODEL-008 custom-provider flow; TUI-010 slash panel |
 | Blocks | — |
+| Selected Into | [I146](../../iterations/I146-tui-parameterless-model-connect-commands.md) |
 
 ## Problem
 
