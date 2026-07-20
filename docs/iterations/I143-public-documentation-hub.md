@@ -1,6 +1,6 @@
 # Iteration I143: Public Documentation Hub And v0.4.0 Site Sync
 
-> Document status: Planned
+> Document status: In Progress
 > Published plan date: 2026-07-20
 > Planned objective: deliver WEB-006 as a release-grade bilingual documentation site.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -37,6 +37,9 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-20 | Planning | Baseline published; not activated and no site implementation performed. |
+| 2026-07-20 | Activation | Maintainer selected I143 as the active iteration. WEB-006-A and WEB-006-B may proceed in parallel within the static-site boundary; WEB-006-C follows their completed content and CSS contracts. |
+| 2026-07-20 | Implementation | Frontline delivery added paired EN/zh-CN Documentation hubs, synchronized the 16 public pages to v0.4.0, repaired CTA cascade/focus styling, and added static drift checks. |
+| 2026-07-20 | Independent static review | `validate_public_site.sh`, installer validation, governance validation, and `git diff --check` passed. Browser automation could not start because the controlled environment omitted its required execution-policy metadata; browser QA remains outstanding, so this iteration stays In Progress. |
 
 ## Planning Verification
 

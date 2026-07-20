@@ -18,6 +18,7 @@ script_dir=$(cd "$(dirname "$0")" && pwd)
 project_root=$(cd "$script_dir/.." && pwd)
 site_root="$project_root/site"
 readme="$project_root/README.md"
+readme_zh="$project_root/README.zh-CN.md"
 
 errors=0
 warnings=0
@@ -43,7 +44,7 @@ if [ ! -d "$site_root" ]; then
 fi
 
 # 2. Required files
-for required in index.html install.html capabilities.html safety.html roadmap.html releases.html 404.html assets/styles.css assets/site.js CNAME.example README.md zh/index.html zh/install.html zh/capabilities.html zh/safety.html zh/roadmap.html zh/releases.html zh/404.html; do
+for required in index.html install.html docs.html capabilities.html safety.html roadmap.html releases.html 404.html assets/styles.css assets/site.js CNAME.example README.md zh/index.html zh/install.html zh/docs.html zh/capabilities.html zh/safety.html zh/roadmap.html zh/releases.html zh/404.html; do
   if [ ! -f "$site_root/$required" ]; then
     log_error "site/$required is missing"
   fi
@@ -93,6 +94,51 @@ if [ -s "$site_root/.broken-links.tmp" ]; then
   while IFS= read -r line; do
     log_error "broken link: $line"
   done < "$site_root/.broken-links.tmp"
+fi
+
+# 2b. The public IA is mirrored: every page must expose the documentation
+# hub and each English page has an equivalent zh-CN page.
+for page in index install docs capabilities safety roadmap releases 404; do
+  if [ ! -f "$site_root/$page.html" ] || [ ! -f "$site_root/zh/$page.html" ]; then
+    log_error "site locale pair is incomplete for $page"
+    continue
+  fi
+  if ! grep -F 'href="docs.html"' "$site_root/$page.html" >/dev/null 2>&1; then
+    log_error "site/$page.html is missing the Documentation navigation link"
+  fi
+  if ! grep -F 'href="docs.html"' "$site_root/zh/$page.html" >/dev/null 2>&1; then
+    log_error "site/zh/$page.html is missing the 文档 navigation link"
+  fi
+done
+
+# The documentation hubs must retain the same release-grade section IA.
+for section in quick-start configuration models modes tools sessions extensions safety troubleshooting; do
+  if ! grep -F "id=\"$section\"" "$site_root/docs.html" >/dev/null 2>&1; then
+    log_error "site/docs.html is missing #$section"
+  fi
+  if ! grep -F "id=\"$section\"" "$site_root/zh/docs.html" >/dev/null 2>&1; then
+    log_error "site/zh/docs.html is missing #$section"
+  fi
+done
+
+# v0.4.0 is the current public release. Historical GitHub URLs are allowed,
+# but stale v0.2.2 copy is not.
+if grep -rEn 'v?0\.2\.2' "$site_root" --include='*.html' >/dev/null 2>&1; then
+  log_error "site/ still claims stale v0.2.2 release content"
+fi
+if ! grep -F 'v0.4.0' "$site_root/index.html" >/dev/null 2>&1 || ! grep -F 'v0.4.0' "$site_root/zh/index.html" >/dev/null 2>&1; then
+  log_error "home pages must name the current v0.4.0 release"
+fi
+if ! grep -F 'v0.4.0' "$readme" >/dev/null 2>&1 || ! grep -F 'v0.4.0' "$readme_zh" >/dev/null 2>&1; then
+  log_error "English and zh-CN READMEs must name the current v0.4.0 release"
+fi
+
+# CTA regression guard: prose-link styling must not override button foregrounds.
+if ! grep -F '.talos-main a:not(.talos-button)' "$site_root/assets/styles.css" >/dev/null 2>&1; then
+  log_error "stylesheet lacks the scoped prose-link selector"
+fi
+if ! grep -F '.talos-main .talos-button' "$site_root/assets/styles.css" >/dev/null 2>&1 || ! grep -F 'color: #fff;' "$site_root/assets/styles.css" >/dev/null 2>&1 || ! grep -F '.talos-button:focus-visible' "$site_root/assets/styles.css" >/dev/null 2>&1; then
+  log_error "stylesheet lacks the CTA foreground or keyboard-focus contract"
 fi
 rm -f "$site_root/.broken-links.tmp"
 

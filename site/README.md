@@ -9,6 +9,7 @@ separate from the internal engineering docs in `docs/`.
 | Path | Purpose |
 | --- | --- |
 | `index.html` | Product overview and current release callout. |
+| `docs.html` | Complete getting-started, operation, extension, safety, and troubleshooting hub. |
 | `install.html` | Install instructions and the release archive table. |
 | `capabilities.html` | Built-in tools, slash commands, Skills, MCP. |
 | `safety.html` | Safety model, permission posture, secret masking. |
@@ -20,7 +21,7 @@ separate from the internal engineering docs in `docs/`.
 | `assets/talos-mark.svg` | Branded wordmark (matches TUI-005 scrollback mark). |
 | `assets/favicon.svg` | Inline-friendly favicon. |
 | `CNAME.example` | Custom-domain template. Copy to `CNAME` when a domain is ready. |
-| `zh/` | Chinese (zh-CN) mirror of all 7 pages. Shared assets in `../assets/`. Language switcher on every page (`EN` / `中文`). English is the fallback for browsers without `zh` preference. |
+| `zh/` | Chinese (zh-CN) mirror of all 8 pages. Shared assets in `../assets/`. Language switcher on every page (`EN` / `中文`). English is the fallback for browsers without `zh` preference. |
 
 ## Local preview
 
@@ -71,19 +72,29 @@ After setup, every push to `main` that changes files under `site/` triggers
 
 ## Updating the site after a release
 
-After the maintainer tags a new release (e.g. `v0.2.2`), the public
+After the maintainer tags a new release (for example, the current `v0.4.0`), the public
 materials must be updated in this order:
 
 1. Update `README.md` and `README.zh-CN.md` with the new tag, install
    changes, and capability boundary.
-2. Update the version string on the home page (`index.html`) and the current
-   release card on the releases page (`releases.html`).
-3. Run the D8 static-validation harness to confirm internal links and
-   relative paths still resolve.
+2. Update EN and zh-CN home, documentation, release, capability, safety, and
+   roadmap claims; keep the eight-page locale pairs structurally aligned.
+3. Run `sh scripts/validate_public_site.sh` and
+   `sh scripts/validate_installers.sh`, then review desktop/mobile, light/dark,
+   and keyboard focus in both locales. Local validation is not a Pages deployment.
 4. Open a PR titled `docs(site): sync vX.Y.Z release notes` referencing the
    iteration or release that produced the change.
 5. After the PR merges, GitHub Pages publishes on its normal schedule;
    no separate release action is required for the site.
+
+## Source of truth and rollback
+
+Use the English and Chinese READMEs for shipped behavior, the configuration
+reference for settings, the command registry for interactive commands, and the
+published GitHub Release for install artifacts. Do not publish internal Board,
+backlog, iteration, or task content. If a site update must be rolled back,
+revert the site/docs/CSS change as one release-scoped patch and re-run the
+static validator; deployment observation is a separate Pages workflow handoff.
 
 ## Owned by
 

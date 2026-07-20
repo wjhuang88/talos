@@ -23,8 +23,8 @@ Run the relevant rows before marking any implementation slice complete:
 |---|---|---|---|
 | Root README (en) | `README.md` | Product docs | Install path, tool list, slash commands, capabilities, SDK boundary, config schema |
 | Root README (zh-CN) | `README.zh-CN.md` | Product docs | Mirror every user-visible change in the English README |
-| Public site (en) | `site/index.html` + `site/*.html` | Product docs | Roadmap positioning, install, capabilities, feature list |
-| Public site (zh-CN) | `site/zh/*.html` (when WEB-003 lands) | Product docs | Mirror English site pages |
+| Public site (en) | `site/index.html` + `site/*.html`, especially `site/docs.html` | Product docs | Release version, install, capabilities, configuration, commands, safety, and support links |
+| Public site (zh-CN) | `site/zh/*.html`, especially `site/zh/docs.html` | Product docs | Mirror English public claims and documentation section structure |
 | Site assets | `site/assets/` | Product docs | Branding/theme changes (WEB-004) |
 | AGENTS.md | `AGENTS.md` | Governance | Task router, hard constraints, current traps, session checklist |
 | Crate docs (`//!`) | `crates/*/src/lib.rs` | Crate owner | Public API, support boundary, safety notes — required before publish |
@@ -42,7 +42,7 @@ When a built-in tool changes (name, permission, summary, presentation), update *
 
 1. `README.md` "Built-In Capabilities" section — the bullet list of tools.
 2. `README.zh-CN.md` equivalent section.
-3. `site/index.html` or relevant site capability page.
+3. `site/docs.html`, `site/zh/docs.html`, and any relevant site capability page.
 4. `docs/backlog/active/TOOL-007-tool-set-design-audit.md` if the audit roster changes.
 5. Agent system prompt assets (`crates/talos-agent/src/prompt/assets/`) if tool identity text
    references the changed tool.
@@ -58,7 +58,7 @@ When a slash command changes, update:
 
 1. `README.md` "Slash Commands" table.
 2. `README.zh-CN.md` equivalent.
-3. Site command/capability page.
+3. Both site documentation hubs and the command/capability page.
 4. `docs/backlog/active/CMD-001-interactive-command-runtime-contract.md` registry.
 5. TUI `/help` output (driven by the registry, but verify rendering).
 
@@ -68,7 +68,7 @@ When the install path changes, update **in lockstep**:
 
 1. `README.md` "Install" section (release archive, `install.sh`, `cargo install` path).
 2. `README.zh-CN.md` equivalent.
-3. `site/index.html` install/getting-started section.
+3. `site/index.html`, `site/zh/index.html`, and both documentation hubs' getting-started sections.
 4. `docs/reference/CRATE-PUBLICATION-MATRIX.md` if crate publish state changed.
 5. `scripts/check_publish_guard.sh` expectations if `publish` flags changed.
 
@@ -84,6 +84,23 @@ When `talos-runtime` public API changes, update:
 
 ## Validation
 
-- `scripts/validate_public_site.sh .` when any `site/` file changes.
+- `sh scripts/validate_public_site.sh` when any `site/` file changes. It checks
+  locale pairs, Documentation navigation, current-release drift, and the CTA
+  component selector/focus contract in addition to links and external-resource
+  guardrails.
+- `sh scripts/validate_installers.sh` when the public install copy changes.
 - `scripts/validate_project_governance.sh .` when backlog/board/iteration docs change.
+- Manual for a public-site release: inspect desktop and narrow mobile widths in EN and zh-CN,
+  light and dark themes, and keyboard focus. Confirm that a local static pass is not reported
+  as a successful Pages deployment.
 - Manual: diff the English and zh-CN READMEs after every user-visible change to catch drift.
+
+## Public Site Release Order
+
+1. Establish the release truth from the tagged release, README pair, command registry,
+   configuration reference, and accepted public-boundary decisions.
+2. Update all eight EN/ZH page pairs, including the two documentation hubs; classify
+   shipped, planned, and research work conservatively.
+3. Run the static and installer validators, then complete the browser QA matrix above.
+4. Hand deployment to the Pages workflow separately. Record its run URL/status only when
+   deployment observation is authorized; a local validator pass is never deployment evidence.

@@ -26,6 +26,7 @@
         <nav class="talos-nav" aria-label="Primary">
           <a href="index.html" data-nav-slug="home">Home</a>
           <a href="install.html" data-nav-slug="install">Install</a>
+          <a href="docs.html" data-nav-slug="docs">Documentation</a>
           <a href="capabilities.html" data-nav-slug="capabilities">Capabilities</a>
           <a href="safety.html" data-nav-slug="safety">Safety</a>
           <a href="roadmap.html" data-nav-slug="roadmap">Roadmap</a>
@@ -40,12 +41,12 @@
         <h1>Safety</h1>
         <p>
           The permission posture, secret-masking boundary, and sandbox
-          boundary that Talos commits to in v0.2.2.
+          boundary that Talos commits to in v0.4.0.
         </p>
       </header>
 
       <section>
-        <h2>What ships in v0.2.2</h2>
+        <h2>What ships in v0.4.0</h2>
         <p>
           Talos is a local coding agent for developers who review the
           actions it takes. The safety model is built on three explicit
@@ -177,7 +178,7 @@
       <section>
         <h2>Sandbox posture</h2>
         <p>
-          Talos is a local process, not a remote service. In v0.2.2 the
+          Talos is a local process, not a remote service. In v0.4.0 the
           only startup web surface is the read-only, token-gated loopback
           dashboard; approvals, writes, logs, and session control do not
           move to a remote web plane. The runtime is designed to keep the default
@@ -206,7 +207,7 @@
         <p>
           Talos is also <strong>not</strong> a remote multi-user
           service, marketplace runtime, browser automation product, web
-          approval surface, or autonomous background daemon in v0.2.2. See the
+          approval surface, or autonomous background daemon in v0.4.0. See the
           <a href="roadmap.html">Roadmap</a> for the shipped /
           planned / research split.
         </p>

@@ -4,7 +4,7 @@
 |---|---|
 | Type | Product/UX Story |
 | Parent Epic | WEB-006 |
-| Status | Ready |
+| Status | In Progress — I143 |
 | Priority | P1 |
 
 ## Problem And Root Cause

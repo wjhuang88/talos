@@ -15,6 +15,9 @@
   --talos-border: #d8dbe0;
   --talos-accent: #5e81ac;
   --talos-accent-strong: #81a1c1;
+  --talos-button-primary-bg: #3d5a80;
+  --talos-button-primary-hover-bg: #2f4763;
+  --talos-focus: #bf616a;
   --talos-link: #5e81ac;
   --talos-shipped: #a3be8c;
   --talos-planned: #ebcb8b;
@@ -41,6 +44,9 @@
     --talos-border: #4c566a;
     --talos-accent: #88c0d0;
     --talos-accent-strong: #81a1c1;
+    --talos-button-primary-bg: #3d5a80;
+    --talos-button-primary-hover-bg: #2f4763;
+    --talos-focus: #ebcb8b;
     --talos-link: #88c0d0;
     --talos-shipped: #a3be8c;
     --talos-planned: #ebcb8b;
@@ -187,13 +193,13 @@ body {
 .talos-main li {
   margin: 0.25rem 0;
 }
-.talos-main a {
+.talos-main a:not(.talos-button) {
   color: var(--talos-link);
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-thickness: 0.05em;
 }
-.talos-main a:hover {
+.talos-main a:not(.talos-button):hover {
   text-decoration-thickness: 0.12em;
 }
 .talos-main strong {
@@ -239,13 +245,19 @@ body {
   font-size: 0.95rem;
   line-height: 1.2;
 }
+.talos-main .talos-button {
+  text-decoration: none;
+}
 .talos-button--primary {
-  background: var(--talos-accent);
+  background: var(--talos-button-primary-bg);
   color: #fff;
 }
 .talos-button--primary:hover {
-  background: var(--talos-accent-strong);
+  background: var(--talos-button-primary-hover-bg);
   text-decoration: none;
+}
+.talos-button--primary:visited {
+  color: #fff;
 }
 .talos-button--secondary {
   background: var(--talos-bg);
@@ -255,6 +267,11 @@ body {
 .talos-button--secondary:hover {
   background: var(--talos-bg-subtle);
   text-decoration: none;
+}
+.talos-button:focus-visible,
+.talos-main .talos-button:focus-visible {
+  outline: 3px solid var(--talos-focus);
+  outline-offset: 3px;
 }
 
 /* Callout / note boxes */
