@@ -258,6 +258,28 @@ On a hard stop:
   4. Activate I146: mark it Active in the iteration owner doc and `docs/iterations/README.md` "Current Iterations" table, then begin implementation per its Published Baseline.
   5. After I146 implementation + validation, create a single `feat(tui): ...` commit, push to `origin/main`, and append Checkpoint I146 to this file.
 
+### Checkpoint I146 — 2026-07-20
+
+- Completed task items: I146 (TUI-033 parameterless `/model` and `/connect` commands).
+- Current commit: `3e0e6b8` (origin/main).
+- Commands run and actual results:
+  - `cargo fmt --all -- --check` → exit 0 (clean).
+  - `cargo check --workspace --locked` → exit 0.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0 (all tests pass, 0 failures).
+  - `scripts/validate_project_governance.sh .` → 0 warnings (passed).
+  - `git diff --check` → exit 0 (clean).
+- Open risks or deviations:
+  - Real-terminal walkthrough is pending maintainer acceptance. The iteration is marked Review, not Complete.
+  - The `UserInput` enum gained two new variants (`SwitchModel`, `ConnectSelect`). This is a pre-1.0 semver break for exhaustive matches. The release containing this change must be a minor bump, not a patch. Documented in the iteration owner doc.
+  - The search query from parameterized `/model <text>` and `/connect <text>` is not pre-filled in the picker — the correction message mentions the arg, and the picker opens with empty search showing all items. This is the "where feasible" fallback per TUI-033 scope.
+- Next task item: I147 — MODEL-008-A custom provider wizard and atomic config. Create the I147 iteration owner doc as a Planned baseline, then activate and implement.
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint I146).
+  3. Confirm `docs/backlog/active/MODEL-008-A-interactive-custom-provider-wizard.md` exists and is Ready.
+  4. Create `docs/iterations/I147-*.md` as a Planned baseline, then activate and begin implementation per MODEL-008-A acceptance criteria.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
