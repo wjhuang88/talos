@@ -1,7 +1,8 @@
 # Iteration I147: MODEL-008-A Custom Provider Wizard And Atomic Config
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-07-20
+> Activated: 2026-07-20 (after I146 completion)
 > Planned objective: let a user register an OpenAI-compatible or Anthropic-compatible
 > custom provider entirely from `/connect` without editing TOML, through a cancel-safe
 > five-step wizard with atomic config persistence.
@@ -131,3 +132,6 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-20 | Planning | Baseline published. Activation follows I146 completion. |
+| 2026-07-20 | Activation | I146 implementation pushed (`3e0e6b8`). I147 marked Active. |
+| 2026-07-20 | Implementation (core logic) | 1. `talos-config::endpoint`: `validate_provider_name` (slug 1-64 chars), `validate_provider_protocol` (closed set `openai-chat`/`anthropic-messages`), `validate_provider_base_url` (HTTPS + loopback HTTP only). 2. `talos-conversation::types`: `UserInput::RegisterCustomProvider { name, protocol, base_url, api_key }`. 3. `session_handlers.rs`: `handle_register_custom_provider` — validates all fields, checks duplicate (update flow), builds `ProviderConfig`, one atomic `Config::save()`, key masked via ADR-023 `Debug` impl. 4. `tui_bridge.rs`: `SessionLifecycleRequest::RegisterCustomProvider` + bridge arm. 5. `mode_runners.rs`: handler dispatch. 6. Tests: validation (slug, protocol, URL, loopback, IPv6), handler (openai-chat, anthropic-messages, update, invalid name/protocol/URL/key, loopback HTTP, no-partial-write). |
+| 2026-07-20 | Remaining | TUI wizard panel (`PanelKind::ProviderWizard` with step state machine: name → protocol → base_url → api_key → confirm), "Add custom provider" entry in connect picker, wizard field input handling, wizard state-machine tests, README/site/config reference documentation. |

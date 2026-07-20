@@ -517,6 +517,26 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         config_for_handler = new_config;
                     }
                 }
+                SessionLifecycleRequest::RegisterCustomProvider {
+                    name,
+                    protocol,
+                    base_url,
+                    api_key,
+                } => {
+                    if let Some(new_config) = handle_register_custom_provider(
+                        &ui_tx_for_handler,
+                        &config_for_handler,
+                        &name,
+                        &protocol,
+                        &base_url,
+                        &api_key,
+                    )
+                    .await
+                    {
+                        let _ = model_info_tx_for_handler.send(resolve_model_info(&new_config));
+                        config_for_handler = new_config;
+                    }
+                }
             }
         }
     });

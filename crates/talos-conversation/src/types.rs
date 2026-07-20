@@ -570,6 +570,17 @@ pub enum UserInput {
         /// Provider key to connect or re-connect.
         provider: String,
     },
+    /// User completed the custom provider wizard (MODEL-008-A/I147).
+    /// Carries all four fields structurally so the bridge can forward
+    /// them to the lifecycle handler for atomic config save without
+    /// reserializing into command text. The `api_key` is masked in all
+    /// display surfaces per ADR-023.
+    RegisterCustomProvider {
+        name: String,
+        protocol: String,
+        base_url: String,
+        api_key: String,
+    },
     Cancel,
     Exit,
 }

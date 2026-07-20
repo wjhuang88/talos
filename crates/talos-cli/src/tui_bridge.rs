@@ -226,6 +226,14 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                     UserInput::ConnectSelect { provider } => {
                         let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
                     }
+                    UserInput::RegisterCustomProvider { name, protocol, base_url, api_key } => {
+                        let _ = session_tx.send(SessionLifecycleRequest::RegisterCustomProvider {
+                            name,
+                            protocol,
+                            base_url,
+                            api_key,
+                        });
+                    }
                     UserInput::Cancel => {
                         let sq_tx = sq_tx_watch.borrow().clone();
                         let _ = sq_tx.send(talos_core::session::SessionOp::Interrupt).await;
@@ -325,6 +333,14 @@ pub(crate) enum SessionLifecycleRequest {
     ModelSwitch(ModelSwitchRequest),
     ModelSwitchWithCredential(CredentialResponseData),
     ProviderSetup(String),
-    ConnectRequest { provider: String },
+    ConnectRequest {
+        provider: String,
+    },
     ConnectWithCredential(CredentialResponseData),
+    RegisterCustomProvider {
+        name: String,
+        protocol: String,
+        base_url: String,
+        api_key: String,
+    },
 }

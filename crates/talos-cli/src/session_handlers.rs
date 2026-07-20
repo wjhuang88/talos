@@ -217,6 +217,81 @@ pub(crate) async fn handle_connect(
     ));
 }
 
+pub(crate) async fn handle_register_custom_provider(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    config: &Config,
+    name: &str,
+    protocol: &str,
+    base_url: &str,
+    api_key: &str,
+) -> Option<Config> {
+    if let Err(e) = talos_config::validate_provider_name(name) {
+        send_stream(ui_tx, MessageSource::Error, format!("[Error] {e}\n"));
+        return None;
+    }
+    let typed_protocol = match talos_config::validate_provider_protocol(protocol) {
+        Ok(p) => p,
+        Err(e) => {
+            send_stream(ui_tx, MessageSource::Error, format!("[Error] {e}\n"));
+            return None;
+        }
+    };
+    let endpoint = match talos_config::validate_provider_base_url(base_url) {
+        Ok(e) => e,
+        Err(e) => {
+            send_stream(ui_tx, MessageSource::Error, format!("[Error] {e}\n"));
+            return None;
+        }
+    };
+    if api_key.trim().is_empty() {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            "[Error] API key cannot be empty.\n".to_string(),
+        );
+        return None;
+    }
+
+    let is_update = config.providers.contains_key(name);
+    if is_update {
+        send_stream(
+            ui_tx,
+            MessageSource::System,
+            format!(
+                "[System] Updating existing provider '{name}'. Unrelated providers and models are preserved.\n"
+            ),
+        );
+    }
+
+    let mut new_config = config.clone();
+    let provider_entry = new_config.providers.entry(name.to_string()).or_default();
+    provider_entry.protocol = typed_protocol;
+    provider_entry.base_url = Some(endpoint.base_url);
+    provider_entry.api_key = Some(api_key.to_string());
+    if provider_entry.api_key_env.is_none() {
+        provider_entry.api_key_env = Some(format!("{}_API_KEY", name.to_uppercase()));
+    }
+
+    if let Err(e) = new_config.save() {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!("[Error] Failed to save provider config: {e}\n"),
+        );
+        return None;
+    }
+
+    send_stream(
+        ui_tx,
+        MessageSource::System,
+        format!(
+            "[System] Custom provider '{name}' {}. Use /model to browse its models.\n",
+            if is_update { "updated" } else { "registered" }
+        ),
+    );
+    Some(new_config)
+}
+
 pub(crate) async fn handle_connect_with_credential(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
     config: &Config,

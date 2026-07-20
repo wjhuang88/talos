@@ -341,3 +341,236 @@ fn dashboard_notifications_are_transient_and_never_include_tokens() {
         } if text == "Dashboard failed to start: address in use"
     ));
 }
+
+#[tokio::test]
+async fn handle_register_custom_provider_openai_chat_succeeds() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let new_config = with_isolated_home(|| async {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        let result = handle_register_custom_provider(
+            &tx,
+            &config,
+            "my-gateway",
+            "openai-chat",
+            "https://api.example.com/v1",
+            "gw-secret-key",
+        )
+        .await;
+        drop(tx);
+        while rx.recv().await.is_some() {}
+        result
+    })
+    .await
+    .expect("registration must succeed");
+
+    let provider = new_config
+        .providers
+        .get("my-gateway")
+        .expect("my-gateway entry created");
+    assert_eq!(provider.api_key.as_deref(), Some("gw-secret-key"));
+    assert_eq!(provider.api_key_env.as_deref(), Some("MY-GATEWAY_API_KEY"));
+    assert_eq!(
+        provider.base_url.as_deref(),
+        Some("https://api.example.com/v1")
+    );
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_anthropic_messages_succeeds() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let new_config = with_isolated_home(|| async {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        let result = handle_register_custom_provider(
+            &tx,
+            &config,
+            "anthropic-gw",
+            "anthropic-messages",
+            "https://api.example.com/anthropic/v1",
+            "sk-ant-secret",
+        )
+        .await;
+        drop(tx);
+        while rx.recv().await.is_some() {}
+        result
+    })
+    .await
+    .expect("registration must succeed");
+
+    let provider = new_config
+        .providers
+        .get("anthropic-gw")
+        .expect("anthropic-gw entry created");
+    assert_eq!(provider.api_key.as_deref(), Some("sk-ant-secret"));
+    assert_eq!(
+        provider.base_url.as_deref(),
+        Some("https://api.example.com/anthropic/v1/messages")
+    );
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_invalid_name_no_partial_write() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let result = with_isolated_home(|| async {
+        let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        handle_register_custom_provider(
+            &tx,
+            &config,
+            "Invalid_Name",
+            "openai-chat",
+            "https://api.example.com/v1",
+            "key",
+        )
+        .await
+    })
+    .await;
+    assert!(result.is_none(), "invalid name must return None");
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_invalid_protocol_no_partial_write() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let result = with_isolated_home(|| async {
+        let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        handle_register_custom_provider(
+            &tx,
+            &config,
+            "valid-name",
+            "custom-protocol",
+            "https://api.example.com/v1",
+            "key",
+        )
+        .await
+    })
+    .await;
+    assert!(result.is_none(), "invalid protocol must return None");
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_non_https_url_no_partial_write() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let result = with_isolated_home(|| async {
+        let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        handle_register_custom_provider(
+            &tx,
+            &config,
+            "valid-name",
+            "openai-chat",
+            "ftp://bad.example.com",
+            "key",
+        )
+        .await
+    })
+    .await;
+    assert!(result.is_none(), "non-HTTPS URL must return None");
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_empty_key_no_partial_write() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let result = with_isolated_home(|| async {
+        let (tx, _rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        handle_register_custom_provider(
+            &tx,
+            &config,
+            "valid-name",
+            "openai-chat",
+            "https://api.example.com/v1",
+            "   ",
+        )
+        .await
+    })
+    .await;
+    assert!(result.is_none(), "empty key must return None");
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_update_preserves_unrelated_providers() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let new_config = with_isolated_home(|| async {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let mut config = Config::default();
+        config.providers.insert(
+            "existing-gw".to_string(),
+            ProviderConfig {
+                api_key: Some("old-key".to_string()),
+                base_url: Some("https://old.example.com/v1".to_string()),
+                ..Default::default()
+            },
+        );
+        config.providers.insert(
+            "other-provider".to_string(),
+            ProviderConfig {
+                api_key: Some("other-key".to_string()),
+                ..Default::default()
+            },
+        );
+        let result = handle_register_custom_provider(
+            &tx,
+            &config,
+            "existing-gw",
+            "openai-chat",
+            "https://new.example.com/v1",
+            "new-key",
+        )
+        .await;
+        drop(tx);
+        while rx.recv().await.is_some() {}
+        result
+    })
+    .await
+    .expect("update must succeed");
+
+    let updated = new_config
+        .providers
+        .get("existing-gw")
+        .expect("existing-gw still present");
+    assert_eq!(updated.api_key.as_deref(), Some("new-key"));
+    assert_eq!(
+        updated.base_url.as_deref(),
+        Some("https://new.example.com/v1")
+    );
+
+    let other = new_config
+        .providers
+        .get("other-provider")
+        .expect("other-provider preserved");
+    assert_eq!(other.api_key.as_deref(), Some("other-key"));
+}
+
+#[tokio::test]
+async fn handle_register_custom_provider_loopback_http_allowed() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let new_config = with_isolated_home(|| async {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        let result = handle_register_custom_provider(
+            &tx,
+            &config,
+            "local-gw",
+            "openai-chat",
+            "http://127.0.0.1:8080/v1",
+            "local-key",
+        )
+        .await;
+        drop(tx);
+        while rx.recv().await.is_some() {}
+        result
+    })
+    .await
+    .expect("loopback HTTP must succeed");
+
+    let provider = new_config
+        .providers
+        .get("local-gw")
+        .expect("local-gw entry created");
+    assert_eq!(
+        provider.base_url.as_deref(),
+        Some("http://127.0.0.1:8080/v1")
+    );
+}

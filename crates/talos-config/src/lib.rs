@@ -19,7 +19,10 @@ mod tests;
 mod types;
 
 pub use credentials::Credentials;
-pub use endpoint::{NormalizedProviderEndpoint, normalize_provider_endpoint};
+pub use endpoint::{
+    NormalizedProviderEndpoint, normalize_provider_endpoint, validate_provider_base_url,
+    validate_provider_name, validate_provider_protocol,
+};
 pub use error::ConfigError;
 pub use types::{
     Config, DashboardConfig, HookConfig, HookDeclaration, LogConfig, LogFileConfig, LogFormat,
