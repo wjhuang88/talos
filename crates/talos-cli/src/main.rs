@@ -31,6 +31,7 @@ mod mode_runtime;
 mod model_lifecycle;
 mod models_browser;
 mod permissions;
+mod provider_discovery;
 mod provider_setup;
 mod recent_models;
 mod registry;

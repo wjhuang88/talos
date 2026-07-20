@@ -5550,6 +5550,7 @@ dependencies = [
  "crossterm",
  "dirs",
  "futures",
+ "reqwest 0.13.4",
  "rmcp",
  "serde",
  "serde_json",
