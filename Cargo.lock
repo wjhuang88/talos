@@ -5755,6 +5755,7 @@ name = "talos-provider"
 version = "0.4.0"
 dependencies = [
  "async-trait",
+ "base64",
  "futures-util",
  "mockito",
  "reqwest 0.13.4",

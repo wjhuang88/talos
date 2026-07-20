@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use talos_config::{ReasoningEffort, ReasoningOptions};
@@ -19,7 +20,7 @@ pub(crate) const EMPTY_TOOL_RESULT_MESSAGE: &str = "(done)";
 pub(crate) struct OpenAIMessage {
     pub(crate) role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) content: Option<String>,
+    pub(crate) content: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tool_calls: Option<Vec<OpenAIToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -60,7 +61,7 @@ pub(crate) fn build_request_body(
                 pending_tool_call_ids.clear();
                 OpenAIMessage {
                     role: "system".into(),
-                    content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                    content: Some(Value::String(non_empty_content(content, EMPTY_USER_MESSAGE))),
                     tool_calls: None,
                     tool_call_id: None,
                     reasoning_content: None,
@@ -71,7 +72,7 @@ pub(crate) fn build_request_body(
                 pending_tool_call_ids.clear();
                 OpenAIMessage {
                     role: "user".into(),
-                    content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                    content: Some(Value::String(non_empty_content(content, EMPTY_USER_MESSAGE))),
                     tool_calls: None,
                     tool_call_id: None,
                     reasoning_content: None,
@@ -82,7 +83,7 @@ pub(crate) fn build_request_body(
                 pending_tool_call_ids.clear();
                 OpenAIMessage {
                     role: "user".into(),
-                    content: Some(non_empty_content(content, EMPTY_USER_MESSAGE)),
+                    content: Some(Value::String(non_empty_content(content, EMPTY_USER_MESSAGE))),
                     tool_calls: None,
                     tool_call_id: None,
                     reasoning_content: None,
@@ -91,17 +92,22 @@ pub(crate) fn build_request_body(
             }
             Message::Multimodal { parts } => {
                 pending_tool_call_ids.clear();
-                let text: String = parts
+                let content_parts: Vec<Value> = parts
                     .iter()
-                    .filter_map(|p| match p {
-                        talos_core::message::ContentPart::Text { text } => Some(text.as_str()),
-                        _ => None,
+                    .map(|p| match p {
+                        talos_core::message::ContentPart::Text { text } => {
+                            json!({"type": "text", "text": text})
+                        }
+                        talos_core::message::ContentPart::Image { path, mime, .. } => {
+                            let bytes = std::fs::read(path).unwrap_or_default();
+                            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                            json!({"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{b64}")}})
+                        }
                     })
-                    .collect::<Vec<_>>()
-                    .join("\n");
+                    .collect();
                 OpenAIMessage {
                     role: "user".into(),
-                    content: Some(non_empty_content(&text, EMPTY_USER_MESSAGE)),
+                    content: Some(Value::Array(content_parts)),
                     tool_calls: None,
                     tool_call_id: None,
                     reasoning_content: None,
@@ -160,13 +166,13 @@ pub(crate) fn build_request_body(
                 OpenAIMessage {
                     role: "assistant".into(),
                     content: if content.trim().is_empty() {
-                        Some(if openai_tool_calls.is_some() {
+                        Some(Value::String(if openai_tool_calls.is_some() {
                             EMPTY_ASSISTANT_TOOL_CALL_MESSAGE.to_string()
                         } else {
                             EMPTY_ASSISTANT_MESSAGE.to_string()
-                        })
+                        }))
                     } else {
-                        Some(content.clone())
+                        Some(Value::String(content.clone()))
                     },
                     tool_calls: openai_tool_calls,
                     tool_call_id: None,
@@ -189,7 +195,7 @@ pub(crate) fn build_request_body(
                 };
                 OpenAIMessage {
                     role: "tool".into(),
-                    content: Some(content),
+                    content: Some(Value::String(content)),
                     tool_calls: None,
                     tool_call_id: Some(result.tool_use_id.clone()),
                     reasoning_content: None,

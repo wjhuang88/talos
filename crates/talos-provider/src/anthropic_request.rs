@@ -1,5 +1,6 @@
 //! Anthropic Messages API request assembly.
 
+use base64::Engine;
 use serde_json::{Value, json};
 use talos_config::ReasoningOptions;
 use talos_core::message::{
@@ -61,17 +62,29 @@ pub(crate) fn build_request_body(
                 "content": content,
             }),
             Message::Multimodal { parts } => {
-                let text: String = parts
+                let content_blocks: Vec<Value> = parts
                     .iter()
-                    .filter_map(|p| match p {
-                        talos_core::message::ContentPart::Text { text } => Some(text.as_str()),
-                        _ => None,
+                    .map(|p| match p {
+                        talos_core::message::ContentPart::Text { text } => {
+                            json!({"type": "text", "text": text})
+                        }
+                        talos_core::message::ContentPart::Image { path, mime, .. } => {
+                            let bytes = std::fs::read(path).unwrap_or_default();
+                            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                            json!({
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": mime,
+                                    "data": b64,
+                                }
+                            })
+                        }
                     })
-                    .collect::<Vec<_>>()
-                    .join("\n");
+                    .collect();
                 json!({
                     "role": "user",
-                    "content": text,
+                    "content": content_blocks,
                 })
             }
             Message::Assistant {
