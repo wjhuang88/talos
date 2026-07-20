@@ -19,6 +19,13 @@ pub(crate) enum PanelAction {
     ConnectSelect {
         provider: String,
     },
+    #[allow(dead_code)]
+    RegisterCustomProvider {
+        name: String,
+        protocol: String,
+        base_url: String,
+        api_key: String,
+    },
 }
 
 /// What happens when a [`PanelItem`] is accepted.
@@ -54,6 +61,8 @@ pub(crate) enum PanelItemAction {
     /// so the TUI can emit `UserInput::ConnectSelect` instead of reserializing
     /// to `/connect name` command text (TUI-033).
     ConnectSelect { provider: String },
+    /// Open the custom provider wizard (MODEL-008-A/I147).
+    OpenWizard,
     /// Non-navigable group header.
     Header,
 }
@@ -361,6 +370,13 @@ impl BottomPanelState {
 
     pub(crate) fn open_connect_picker(data: &talos_conversation::ConnectPickerData) -> Self {
         let mut panel_items: Vec<PanelItem> = Vec::new();
+
+        panel_items.push(PanelItem {
+            label: "Add custom provider".into(),
+            description: "Register an OpenAI-compatible or Anthropic-compatible gateway".into(),
+            action: PanelItemAction::OpenWizard,
+            is_current: false,
+        });
 
         if !data.connected.is_empty() {
             panel_items.push(PanelItem {

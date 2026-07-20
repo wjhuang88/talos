@@ -174,6 +174,21 @@ impl Tui {
                     let _ = tx.send(UserInput::ConnectSelect { provider });
                 }
             }
+            PanelAction::RegisterCustomProvider {
+                name,
+                protocol,
+                base_url,
+                api_key,
+            } => {
+                if let Some(ref tx) = self.user_input_tx {
+                    let _ = tx.send(UserInput::RegisterCustomProvider {
+                        name,
+                        protocol,
+                        base_url,
+                        api_key,
+                    });
+                }
+            }
             PanelAction::None => {}
         }
     }

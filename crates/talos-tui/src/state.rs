@@ -383,6 +383,10 @@ impl TuiState {
                 self.slash_menu.close();
                 PanelAction::ConnectSelect { provider }
             }
+            PanelItemAction::OpenWizard => {
+                self.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+                PanelAction::None
+            }
             PanelItemAction::OpenModelList { provider } => {
                 if let Some(data) = self.slash_menu.model_picker_data.clone() {
                     self.slash_menu =
