@@ -60,6 +60,20 @@ pub(crate) fn build_request_body(
                 "role": "user",
                 "content": content,
             }),
+            Message::Multimodal { parts } => {
+                let text: String = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        talos_core::message::ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                json!({
+                    "role": "user",
+                    "content": text,
+                })
+            }
             Message::Assistant {
                 content,
                 tool_calls,

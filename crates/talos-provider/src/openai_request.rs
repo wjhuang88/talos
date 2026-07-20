@@ -89,6 +89,25 @@ pub(crate) fn build_request_body(
                 }
                 .into()
             }
+            Message::Multimodal { parts } => {
+                pending_tool_call_ids.clear();
+                let text: String = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        talos_core::message::ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                OpenAIMessage {
+                    role: "user".into(),
+                    content: Some(non_empty_content(&text, EMPTY_USER_MESSAGE)),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    reasoning_content: None,
+                }
+                .into()
+            }
             Message::Assistant {
                 content,
                 tool_calls,

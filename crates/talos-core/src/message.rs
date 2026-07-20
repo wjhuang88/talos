@@ -78,6 +78,24 @@ pub struct AssistantReasoning {
     pub blocks: Vec<ReasoningBlock>,
 }
 
+/// One part of an ordered multimodal message content (ADR-050).
+///
+/// Provider wire format (data URL, base64 source) is constructed inside
+/// `talos-provider` adapters at request time. The core type carries only
+/// the path, MIME type, and byte count — no image bytes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentPart {
+    Text {
+        text: String,
+    },
+    Image {
+        path: std::path::PathBuf,
+        mime: String,
+        byte_count: u64,
+    },
+}
+
 /// A message in the conversation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "role", rename_all = "snake_case")]
@@ -99,6 +117,16 @@ pub enum Message {
     User {
         /// The user's message text.
         content: String,
+    },
+    /// Multimodal user message with ordered text and image parts (ADR-050).
+    ///
+    /// The existing `User { content: String }` variant is preserved for
+    /// text-only backward compatibility. This variant is additive and requires
+    /// a pre-1.0 minor release for exhaustive match migration.
+    Multimodal {
+        /// Ordered content parts — text and image interleaved in the order
+        /// the user composed them.
+        parts: Vec<ContentPart>,
     },
     /// Response from the assistant.
     Assistant {
@@ -334,6 +362,57 @@ Done."#;
         let calls = extract_tool_calls_from_text(text);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].id, "tc_0");
+    }
+
+    #[test]
+    fn content_part_text_roundtrip() {
+        let part = ContentPart::Text {
+            text: "Hello, image!".into(),
+        };
+        let json = serde_json::to_string(&part).unwrap();
+        let decoded: ContentPart = serde_json::from_str(&json).unwrap();
+        assert_eq!(part, decoded);
+    }
+
+    #[test]
+    fn content_part_image_roundtrip() {
+        let part = ContentPart::Image {
+            path: "/tmp/test.png".into(),
+            mime: "image/png".into(),
+            byte_count: 12345,
+        };
+        let json = serde_json::to_string(&part).unwrap();
+        let decoded: ContentPart = serde_json::from_str(&json).unwrap();
+        assert_eq!(part, decoded);
+    }
+
+    #[test]
+    fn message_multimodal_roundtrip() {
+        let msg = Message::Multimodal {
+            parts: vec![
+                ContentPart::Text {
+                    text: "What is in this image?".into(),
+                },
+                ContentPart::Image {
+                    path: "/tmp/screenshot.png".into(),
+                    mime: "image/png".into(),
+                    byte_count: 67890,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let decoded: Message = serde_json::from_str(&json).unwrap();
+        assert_eq!(msg, decoded);
+    }
+
+    #[test]
+    fn message_user_still_works_after_multimodal_addition() {
+        let msg = Message::User {
+            content: "text only".into(),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let decoded: Message = serde_json::from_str(&json).unwrap();
+        assert_eq!(msg, decoded);
     }
 }
 

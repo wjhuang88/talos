@@ -586,6 +586,17 @@ fn messages_to_text(messages: &[Message]) -> String {
             Message::Tool { result } => {
                 format!("Tool result ({}): {}", result.tool_use_id, result.content)
             }
+            Message::Multimodal { parts } => {
+                let text: String = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        talos_core::message::ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                format!("User: {text}")
+            }
         })
         .collect::<Vec<_>>()
         .join("\n\n")

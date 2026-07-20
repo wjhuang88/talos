@@ -203,6 +203,27 @@ pub(crate) fn message_parts(message: &Message) -> (String, String) {
         }
         Message::System { content, .. } => ("system".to_string(), format!("__SYSTEM__:{content}")),
         Message::Context { content } => ("user".to_string(), content.clone()),
+        Message::Multimodal { parts } => {
+            let mut content = String::new();
+            for part in parts {
+                match part {
+                    talos_core::message::ContentPart::Text { text } => content.push_str(text),
+                    talos_core::message::ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                    } => {
+                        content.push_str(&format!(
+                            " [Image: {} ({} bytes, {})]",
+                            path.display(),
+                            byte_count,
+                            mime
+                        ));
+                    }
+                }
+            }
+            ("user".to_string(), content)
+        }
     }
 }
 

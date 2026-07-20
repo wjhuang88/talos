@@ -500,6 +500,25 @@ fn filtered_message(message: &Message, policy: &PersistencePolicy) -> Message {
                 is_error: result.is_error,
             },
         },
+        Message::Multimodal { parts } => Message::Multimodal {
+            parts: parts
+                .iter()
+                .map(|part| match part {
+                    talos_core::message::ContentPart::Text { text } => {
+                        talos_core::message::ContentPart::Text { text: redact(text) }
+                    }
+                    talos_core::message::ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                    } => talos_core::message::ContentPart::Image {
+                        path: path.clone(),
+                        mime: mime.clone(),
+                        byte_count: *byte_count,
+                    },
+                })
+                .collect(),
+        },
     }
 }
 

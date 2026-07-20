@@ -48,6 +48,43 @@ pub struct ModelCapabilities {
     pub image_input: bool,
 }
 
+/// Image input capability provenance for a model (ADR-050).
+///
+/// `Supported` and `Unsupported` are resolved from confirmed catalog
+/// metadata. `Unknown` applies to custom/discovered models with no
+/// confirmed capability. Both `Unknown` and `Unsupported` fail-closed
+/// for the attachment UI; the distinction is diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageInputCapability {
+    /// Catalog metadata confirms `image_input = true`.
+    Supported,
+    /// Catalog metadata confirms `image_input = false`.
+    Unsupported,
+    /// No confirmed capability (custom/discovered model).
+    Unknown,
+}
+
+impl ImageInputCapability {
+    /// Resolves the capability from a model's catalog metadata.
+    ///
+    /// Returns `Supported` when `image_input = true`, `Unsupported` when
+    /// `image_input = false`, and `Unknown` when no metadata is available
+    /// (custom/discovered models).
+    pub fn from_metadata(metadata: Option<&ModelMetadata>) -> Self {
+        match metadata {
+            Some(m) if m.capabilities.image_input => Self::Supported,
+            Some(_) => Self::Unsupported,
+            None => Self::Unknown,
+        }
+    }
+
+    /// Returns `true` when image attachment is allowed.
+    pub fn allows_attachment(self) -> bool {
+        matches!(self, Self::Supported)
+    }
+}
+
 /// Reasoning effort levels for OpenAI o-series models.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -321,6 +358,55 @@ mod tests {
         assert_eq!(meta.output_limit, roundtrip.output_limit);
         assert_eq!(meta.capabilities, roundtrip.capabilities);
         assert_eq!(meta.source, roundtrip.source);
+    }
+
+    #[test]
+    fn image_input_capability_supported_when_metadata_image_input_true() {
+        let metadata = ModelMetadata {
+            id: "test-model".into(),
+            provider: "test".into(),
+            context_limit: None,
+            output_limit: None,
+            pricing: None,
+            capabilities: ModelCapabilities {
+                image_input: true,
+                ..Default::default()
+            },
+            release_date: None,
+            source: ModelSource::default(),
+            variants: vec![],
+        };
+        let cap = ImageInputCapability::from_metadata(Some(&metadata));
+        assert_eq!(cap, ImageInputCapability::Supported);
+        assert!(cap.allows_attachment());
+    }
+
+    #[test]
+    fn image_input_capability_unsupported_when_metadata_image_input_false() {
+        let metadata = ModelMetadata {
+            id: "test-model".into(),
+            provider: "test".into(),
+            context_limit: None,
+            output_limit: None,
+            pricing: None,
+            capabilities: ModelCapabilities {
+                image_input: false,
+                ..Default::default()
+            },
+            release_date: None,
+            source: ModelSource::default(),
+            variants: vec![],
+        };
+        let cap = ImageInputCapability::from_metadata(Some(&metadata));
+        assert_eq!(cap, ImageInputCapability::Unsupported);
+        assert!(!cap.allows_attachment());
+    }
+
+    #[test]
+    fn image_input_capability_unknown_when_no_metadata() {
+        let cap = ImageInputCapability::from_metadata(None);
+        assert_eq!(cap, ImageInputCapability::Unknown);
+        assert!(!cap.allows_attachment());
     }
 }
 

@@ -134,6 +134,19 @@ impl TokenEstimator {
                 Message::Tool { result } => {
                     Self::estimate_text(&result.content) + Self::estimate_text(&result.tool_use_id)
                 }
+                Message::Multimodal { parts } => parts
+                    .iter()
+                    .map(|p| match p {
+                        talos_core::message::ContentPart::Text { text } => {
+                            Self::estimate_text(text)
+                        }
+                        talos_core::message::ContentPart::Image {
+                            mime, byte_count, ..
+                        } => {
+                            Self::estimate_text(mime) + Self::estimate_text(&byte_count.to_string())
+                        }
+                    })
+                    .sum(),
             })
             .sum()
     }

@@ -180,6 +180,7 @@ docs/iterations/
 | I147 | MODEL-008-A Custom Provider Wizard And Atomic Config | **Review** (2026-07-20) | Five-step wizard (name → protocol → base URL → API key → confirm) with cancel-safe state machine, closed protocol set, HTTPS-only (loopback HTTP), ADR-023 key masking, duplicate → explicit update flow, and one atomic config save. Implementation + locked validation complete; real-terminal walkthrough pending. See `I147-custom-provider-wizard-atomic-config.md`. |
 | I148 | MODEL-008-B Model Discovery, Manual Fallback, And Immediate Activation | **Planned** (2026-07-20) | Protocol-specific model discovery (`openai-chat` `GET /models` from normalized gateway root; `anthropic-messages` documented models-list endpoint), bounded response, searchable picker, Retry/Edit/Enter-manually fallback on every failure path, structured `(provider, model)` activation, and immediate `/model` + status bar visibility. See `I148-model-discovery-manual-fallback-activation.md`. |
 | I149 | MODEL-009-A Image Input ADR And Security Spike | **Complete** (2026-07-20) | ADR-050 Accepted on all 10 safety-critical points. Security review complete. No production image sending. I150 may proceed. See `I149-image-input-adr-security-spike.md`. |
+| I150 | MODEL-009-B Capability Model, Content Types, And Persistence | **Active** (2026-07-20) | `ContentPart` enum, `Message::Multimodal` variant, `ImageInputCapability` enum with provenance resolution. All exhaustive matches updated. Text-only behavior preserved. See `I150-capability-content-types-persistence.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -219,6 +220,7 @@ rewrite published iteration baselines.
 | I147 | Review (2026-07-20) | MODEL-008-A custom provider wizard and atomic config. Implementation + locked validation complete (validation functions, handler, wizard panel, state-machine tests, docs). Real-terminal walkthrough remains pending maintainer acceptance — **must not be marked Complete**. |
 | I148 | Planned (2026-07-20) | MODEL-008-B model discovery, manual fallback, and immediate activation. Plan published; activation follows I147 completion. |
 | I149 | Complete (2026-07-20) | MODEL-009-A image input ADR and security spike. ADR-050 Accepted on all 10 points. Security review complete. No production image sending. I150 may proceed. Removed from non-terminal inventory. |
+| I150 | Active (2026-07-20) | MODEL-009-B capability model, content types, and persistence foundation. `ContentPart` + `Message::Multimodal` + `ImageInputCapability` implemented. All exhaustive matches updated. Tests added. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |
