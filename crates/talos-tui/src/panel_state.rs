@@ -83,6 +83,17 @@ pub(crate) enum PanelKind {
         connect_mode: bool,
         default_base_url: Option<String>,
     },
+    /// Custom provider wizard (MODEL-008-A/I147). Five-step state machine:
+    /// Name → Protocol → BaseUrl → ApiKey → Confirm.
+    #[allow(dead_code)]
+    ProviderWizard {
+        step: WizardStep,
+        name: String,
+        protocol: String,
+        base_url: String,
+        api_key: String,
+        is_update: bool,
+    },
     Approval {
         tool_name: String,
         arguments: String,
@@ -93,6 +104,17 @@ pub(crate) enum PanelKind {
         model_id: String,
         variants: Vec<talos_conversation::ModelPickerVariantItem>,
     },
+}
+
+/// Wizard step for the custom provider registration flow (MODEL-008-A/I147).
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WizardStep {
+    Name,
+    Protocol,
+    BaseUrl,
+    ApiKey,
+    Confirm,
 }
 
 /// Which input field the credential panel is currently editing.
@@ -464,6 +486,27 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: data,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn open_provider_wizard() -> Self {
+        Self {
+            is_open: true,
+            kind: Some(PanelKind::ProviderWizard {
+                step: WizardStep::Name,
+                name: String::new(),
+                protocol: String::new(),
+                base_url: String::new(),
+                api_key: String::new(),
+                is_update: false,
+            }),
+            items: Vec::new(),
+            selected_index: 0,
+            credential_buffer: String::new(),
+            base_url_buffer: String::new(),
+            credential_field: CredentialField::ApiKey,
+            model_picker_data: None,
         }
     }
 
