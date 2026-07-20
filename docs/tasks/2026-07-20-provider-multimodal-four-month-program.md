@@ -280,6 +280,39 @@ On a hard stop:
   3. Confirm `docs/backlog/active/MODEL-008-A-interactive-custom-provider-wizard.md` exists and is Ready.
   4. Create `docs/iterations/I147-*.md` as a Planned baseline, then activate and begin implementation per MODEL-008-A acceptance criteria.
 
+### Checkpoint I147 (partial) — 2026-07-20
+
+- Completed task items: I147 core logic slice (validation functions, structured UserInput variant, lifecycle handler, atomic config save, tests).
+- Current commit: `62f5c81` (origin/main).
+- Commands run and actual results:
+  - `cargo fmt --all` → clean.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0 (all tests pass, 0 failures).
+  - `scripts/validate_project_governance.sh .` → 0 warnings.
+  - `git diff --check` → clean.
+- Open risks or deviations:
+  - I147 is **not complete**. The TUI wizard panel (`PanelKind::ProviderWizard` with step state machine: name → protocol → base_url → api_key → confirm) is not yet implemented. The connect picker does not yet have an "Add custom provider" entry. Without the TUI panel, the wizard is not usable from the TUI — only the core logic (validation, handler, atomic save) is implemented and tested.
+  - The `UserInput` enum gained another new variant (`RegisterCustomProvider`). Cumulative pre-1.0 semver break with I146's `SwitchModel`/`ConnectSelect`.
+- Remaining for I147:
+  1. `PanelKind::ProviderWizard` with `WizardStep` enum and field buffers.
+  2. "Add custom provider" entry in the connect picker (`ConnectPickerData` or `PanelItemAction`).
+  3. Wizard field input handling in TUI state/app (name entry, protocol selection, URL entry, key entry, confirm screen).
+  4. Wizard state-machine tests (every step transition, every cancel point, every validation error).
+  5. README/site/config reference documentation.
+  6. Real-terminal walkthrough checklist.
+- Next task item: Complete I147 TUI wizard panel, then run validation and commit.
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint I147 partial).
+  3. Open `docs/iterations/I147-custom-provider-wizard-atomic-config.md` — the "Remaining" row lists the unimplemented pieces.
+  4. Implement `PanelKind::ProviderWizard` in `crates/talos-tui/src/panel_state.rs` with a `WizardStep` enum (Name, Protocol, BaseUrl, ApiKey, Confirm) and field buffers.
+  5. Add "Add custom provider" to the connect picker in `session_handlers.rs::build_connect_picker_data` or as a `PanelItemAction::OpenWizard` in `panel_state.rs::open_connect_picker`.
+  6. Handle wizard input events in `state.rs` and `app.rs`.
+  7. On confirm, emit `UserInput::RegisterCustomProvider { name, protocol, base_url, api_key }`.
+  8. Write wizard state-machine tests.
+  9. Update README/site/config reference.
+  10. Run locked validation, commit, push, and update this checkpoint.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
