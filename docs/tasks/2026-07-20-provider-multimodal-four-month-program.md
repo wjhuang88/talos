@@ -367,6 +367,29 @@ On a hard stop:
   8. Write integration tests.
   9. Run locked validation, commit, push, update checkpoint.
 
+### Checkpoint I149 (Complete) — 2026-07-20
+
+- Completed task items: I149 (MODEL-009-A image input ADR and security spike) — ADR-050 Accepted.
+- Current commit: `9332f2a` (origin/main).
+- Commands run and actual results:
+  - `scripts/validate_project_governance.sh .` → 0 warnings.
+  - No code changes in this iteration (research/ADR only).
+- Deliverables:
+  - ADR-050 (`docs/decisions/050-multimodal-image-input-architecture.md`) — Accepted on all 10 safety-critical points.
+  - Security review (`docs/reference/I149-MODEL-009-A-SECURITY-REVIEW-2026-07-20.md`) — covers new dependency, file-reading, decoder panic containment, persistence/privacy boundaries.
+  - I149 iteration owner doc — Complete status.
+- Open risks or deviations: none. ADR is Accepted, hard gate cleared. I150 may proceed.
+- Next task item: I150 — MODEL-009-B capability model, content types, and persistence foundation.
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint I149 Complete).
+  3. Confirm ADR-050 is Accepted.
+  4. Create `docs/iterations/I150-*.md` as a Planned baseline.
+  5. Implement `ContentPart` enum and `ImageInputCapability` enum in `talos-core/src/message.rs` and `talos-core/src/model.rs`.
+  6. Implement the path-reference storage policy (store path + mime + byte_count, not bytes).
+  7. Write typed content serde round-trip tests, text-only regression, capability provenance tests.
+  8. Run locked validation, commit, push, update checkpoint.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
