@@ -8,7 +8,7 @@
 # alignment of the install commands against the root README.
 #
 # Usage:
-#   sh scripts/validate_public_site.sh
+#   sh scripts/validate_public_site.sh [vX.Y.Z]
 #
 # Exit code 0 on success, 1 on any check failure.
 
@@ -19,6 +19,19 @@ project_root=$(cd "$script_dir/.." && pwd)
 site_root="$project_root/site"
 readme="$project_root/README.md"
 readme_zh="$project_root/README.zh-CN.md"
+requested_version="${1:-}"
+workspace_version=$(sed -n '/^\[workspace.package\]/,/^\[/p' "$project_root/Cargo.toml" | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1)
+
+if [ -z "$workspace_version" ]; then
+  echo "public site validation: unable to read workspace version" >&2
+  exit 1
+fi
+
+release_version="v$workspace_version"
+if [ -n "$requested_version" ] && [ "$requested_version" != "$release_version" ]; then
+  echo "public site validation: requested version $requested_version does not match workspace $release_version" >&2
+  exit 1
+fi
 
 errors=0
 warnings=0
@@ -121,16 +134,56 @@ for section in quick-start configuration models modes tools sessions extensions 
   fi
 done
 
-# v0.4.0 is the current public release. Historical GitHub URLs are allowed,
-# but stale v0.2.2 copy is not.
-if grep -rEn 'v?0\.2\.2' "$site_root" --include='*.html' >/dev/null 2>&1; then
-  log_error "site/ still claims stale v0.2.2 release content"
-fi
-if ! grep -F 'v0.4.0' "$site_root/index.html" >/dev/null 2>&1 || ! grep -F 'v0.4.0' "$site_root/zh/index.html" >/dev/null 2>&1; then
-  log_error "home pages must name the current v0.4.0 release"
-fi
-if ! grep -F 'v0.4.0' "$readme" >/dev/null 2>&1 || ! grep -F 'v0.4.0' "$readme_zh" >/dev/null 2>&1; then
-  log_error "English and zh-CN READMEs must name the current v0.4.0 release"
+# Release truth is derived from Cargo.toml, not a hard-coded site version. Each
+# user-facing release surface must name it. Historical release examples remain
+# valid, so the stale check targets only the immediately preceding workspace
+# release when the version was bumped.
+for release_surface in \
+  "$readme" \
+  "$readme_zh" \
+  "$site_root/index.html" \
+  "$site_root/zh/index.html" \
+  "$site_root/docs.html" \
+  "$site_root/zh/docs.html" \
+  "$site_root/install.html" \
+  "$site_root/zh/install.html" \
+  "$site_root/capabilities.html" \
+  "$site_root/zh/capabilities.html" \
+  "$site_root/safety.html" \
+  "$site_root/zh/safety.html" \
+  "$site_root/roadmap.html" \
+  "$site_root/zh/roadmap.html" \
+  "$site_root/releases.html" \
+  "$site_root/zh/releases.html"; do
+  if ! grep -F "$release_version" "$release_surface" >/dev/null 2>&1; then
+    log_error "${release_surface#"$project_root"/} must name current release $release_version"
+  fi
+done
+
+previous_workspace_version=$(git -C "$project_root" show HEAD:Cargo.toml 2>/dev/null | sed -n '/^\[workspace.package\]/,/^\[/p' | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n 1 || true)
+if [ -n "$previous_workspace_version" ] && [ "$previous_workspace_version" != "$workspace_version" ]; then
+  previous_release_version="v$previous_workspace_version"
+  for release_surface in \
+    "$readme" \
+    "$readme_zh" \
+    "$site_root/index.html" \
+    "$site_root/zh/index.html" \
+    "$site_root/docs.html" \
+    "$site_root/zh/docs.html" \
+    "$site_root/install.html" \
+    "$site_root/zh/install.html" \
+    "$site_root/capabilities.html" \
+    "$site_root/zh/capabilities.html" \
+    "$site_root/safety.html" \
+    "$site_root/zh/safety.html" \
+    "$site_root/roadmap.html" \
+    "$site_root/zh/roadmap.html" \
+    "$site_root/releases.html" \
+    "$site_root/zh/releases.html"; do
+    if grep -F "$previous_release_version" "$release_surface" >/dev/null 2>&1; then
+      log_error "${release_surface#"$project_root"/} still names previous release $previous_release_version"
+    fi
+  done
 fi
 
 # CTA regression guard: prose-link styling must not override button foregrounds.
@@ -218,6 +271,7 @@ fi
 # Summary
 printf '\n'
 printf 'Public site validation summary\n'
+printf '  Expected release:     %s\n' "$release_version"
 printf '  HTML files checked:   %d\n' "$html_count"
 printf '  Errors:               %d\n' "$errors"
 printf '  Warnings:             %d\n' "$warnings"

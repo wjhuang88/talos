@@ -25,6 +25,8 @@ if [[ "${versions}" != "${workspace_version}" ]]; then
 fi
 
 echo "release preflight: Talos version ${workspace_version}"
+./scripts/validate_public_site.sh "v${workspace_version}"
+./scripts/validate_installers.sh
 cargo fmt --all -- --check
 cargo check --locked --workspace
 cargo clippy --locked --workspace -- -D warnings

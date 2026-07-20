@@ -14,7 +14,7 @@ Run the relevant rows before marking any implementation slice complete:
 - A slash command was added, removed, or renamed.
 - The install path or package metadata changed.
 - The runtime SDK surface (`talos-runtime`) changed.
-- A release tag was created or install instructions changed.
+- A release version is being prepared or install instructions changed.
 - Configuration keys or defaults changed.
 
 ## Surfaces
@@ -89,6 +89,9 @@ When `talos-runtime` public API changes, update:
   component selector/focus contract in addition to links and external-resource
   guardrails.
 - `sh scripts/validate_installers.sh` when the public install copy changes.
+- `./scripts/release_preflight.sh vX.Y.Z` for every release candidate. It derives the expected
+  `vX.Y.Z` from `Cargo.toml` and blocks the tag if the README pair, EN/zh-CN release pages,
+  site links/accessibility contract, or installer instructions are out of sync.
 - `scripts/validate_project_governance.sh .` when backlog/board/iteration docs change.
 - Manual for a public-site release: inspect desktop and narrow mobile widths in EN and zh-CN,
   light and dark themes, and keyboard focus. Confirm that a local static pass is not reported
