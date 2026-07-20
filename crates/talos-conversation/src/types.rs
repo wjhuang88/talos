@@ -311,8 +311,40 @@ pub enum UiOutput {
     CredentialRequest(CredentialRequestData),
     /// TUI returns a collected API key to the lifecycle handler.
     CredentialResponse(CredentialResponseData),
+    /// Bounded FIFO snapshot of the engine-owned steering queue. Emitted on
+    /// every authoritative queue mutation (enqueue, post-turn drain, session
+    /// replacement/clear). The TUI renders this transiently above the composer;
+    /// it never enters scrollback history (ADR-035). See ADR-049 for the
+    /// projection boundary and migration notes.
+    ///
+    /// **Semver (pre-1.0):** This is a new public enum variant. Downstream
+    /// exhaustive `UiOutput` matches must add an arm or a wildcard fallback.
+    /// The release containing this variant must be a minor bump, not a patch.
+    SteeringQueueSnapshot(SteeringQueueSnapshot),
     HydrateHistory(Vec<talos_core::message::Message>),
     Exit,
+}
+
+/// One entry in a [`SteeringQueueSnapshot`]. Text is capped at 4 KiB UTF-8;
+/// `truncated` is `true` when the original message exceeded the cap.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SteeringQueueEntry {
+    /// Preview text, at most 4096 UTF-8 bytes (plus a trailing `…` if truncated).
+    pub text: String,
+    /// `true` if the original message was longer than the 4 KiB cap.
+    pub truncated: bool,
+}
+
+/// Bounded projection of the engine steering queue (ADR-049).
+/// At most 8 FIFO entries; `omitted_count` is exact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SteeringQueueSnapshot {
+    /// FIFO entries, at most the first 8.
+    pub entries: Vec<SteeringQueueEntry>,
+    /// Total entries in the authoritative queue (may exceed `entries.len()`).
+    pub total_count: usize,
+    /// Entries outside the 8-entry projection window.
+    pub omitted_count: usize,
 }
 
 /// Provider + optional model context for a credential collection prompt.

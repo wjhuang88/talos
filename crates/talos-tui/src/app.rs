@@ -718,6 +718,9 @@ impl Tui {
                 self.state.open_connect_picker(&data);
             }
             UiOutput::ConnectProviderRequest { .. } => {}
+            UiOutput::SteeringQueueSnapshot(snapshot) => {
+                self.state.steering_queue_snapshot = Some(snapshot);
+            }
             UiOutput::CredentialRequest(req) => {
                 self.state.open_credential_input(
                     &req.provider,
@@ -811,47 +814,68 @@ impl Tui {
             text_color: preview_text_color,
             thinking_label_frame,
         };
-        let queue = crate::scrollback::QueuePreviewComponent {
-            count: status.steering_count + status.followup_count,
-            steering: status.steering_count,
-            followup: status.followup_count,
-        };
         let tips = crate::scrollback::TipsComponent {
             tip: state.tip.as_ref(),
         };
         let input_pad_top = crate::scrollback::InputPadComponent;
-        let input = crate::scrollback::InputComponent { state };
+        let input_pad_bot = crate::scrollback::InputPadComponent;
         let query_for_panel = state.panel_query();
         let mut bottom_panel = crate::scrollback::BottomPanelComponent {
             menu: &state.slash_menu,
             query: query_for_panel,
             max_height: u16::MAX,
         };
-        let input_pad_bot = crate::scrollback::InputPadComponent;
 
         let screen_size = self.terminal.screen_size();
         let width = screen_size.width;
         let status_comp = crate::scrollback::StatusComponent { status, width };
 
-        let base_height = preview.height_hint(width)
-            + queue.height_hint(width)
+        let input_natural = crate::scrollback::InputComponent {
+            state,
+            max_height: crate::scrollback::MAX_COMPOSER_LINES,
+        }
+        .height_hint(width);
+        let modal_natural = bottom_panel.height_hint(width);
+        let fixed_heights = preview.height_hint(width)
             + tips.height_hint(width)
             + input_pad_top.height_hint(width)
-            + input.height_hint(width)
             + input_pad_bot.height_hint(width)
             + status_comp.height_hint(width);
-        let natural_menu_height = bottom_panel.height_hint(width);
+        let queue_natural = crate::scrollback::QueuePreviewComponent {
+            snapshot: state.steering_queue_snapshot.as_ref(),
+            followup_count: status.followup_count,
+            max_rows: 6,
+        }
+        .height_hint(width);
+
+        let content_budget = screen_size.height.saturating_sub(fixed_heights);
+        let compressed = crate::scrollback::compress_layout(
+            content_budget,
+            modal_natural,
+            input_natural,
+            queue_natural,
+        );
+        bottom_panel.max_height = compressed.panel_max_height;
+
+        let input = crate::scrollback::InputComponent {
+            state,
+            max_height: compressed.input_max_height,
+        };
+        let queue = crate::scrollback::QueuePreviewComponent {
+            snapshot: state.steering_queue_snapshot.as_ref(),
+            followup_count: status.followup_count,
+            max_rows: compressed.queue_max_rows,
+        };
+
+        let actual_input_h = input.height_hint(width);
+        // `bottom_panel_placement` adds its third argument itself, so this base
+        // deliberately excludes the panel height.
+        let base_height = fixed_heights + actual_input_h + queue.height_hint(width);
         let menu_placement = crate::scrollback::bottom_panel_placement(
             screen_size.height,
             base_height,
-            natural_menu_height,
+            modal_natural,
         );
-        if matches!(
-            menu_placement,
-            crate::scrollback::BottomPanelPlacement::AboveInput
-        ) {
-            bottom_panel.max_height = screen_size.height.saturating_sub(base_height);
-        }
 
         let stack = match menu_placement {
             crate::scrollback::BottomPanelPlacement::AboveInput => ComponentStack::new(vec![
@@ -953,7 +977,7 @@ impl Tui {
                     &self.state.input_buffer[..byte_pos],
                     &self.state.input_buffer,
                     content_w,
-                    crate::scrollback::MAX_COMPOSER_LINES,
+                    actual_input_h,
                 );
                 let input_row =
                     input_top.saturating_add(cursor_row_offset.saturating_sub(scroll_offset));

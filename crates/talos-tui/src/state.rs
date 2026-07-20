@@ -55,6 +55,7 @@ pub(crate) struct TuiState {
     pub tip: Option<Tip>,
     pub status: StatusSnapshot,
     pub thinking_preview: Option<String>,
+    pub steering_queue_snapshot: Option<talos_conversation::SteeringQueueSnapshot>,
     pub slash_menu: BottomPanelState,
     /// In-memory submitted-input history (TUI-030). Index 0 = oldest.
     pub input_history: Vec<String>,

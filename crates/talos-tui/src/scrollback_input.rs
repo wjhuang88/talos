@@ -119,22 +119,26 @@ pub(crate) fn credential_cursor_col(buffer: &str) -> u16 {
     3u16.saturating_add(buffer.chars().count() as u16)
 }
 
+#[cfg(test)]
 pub(crate) fn build_input_text(state: &crate::state::TuiState, width: u16) -> Text<'static> {
+    build_input_text_with_max_height(state, width, crate::scrollback::MAX_COMPOSER_LINES)
+}
+
+/// Build the visible composer window for an explicitly allocated height.
+pub(crate) fn build_input_text_with_max_height(
+    state: &crate::state::TuiState,
+    width: u16,
+    max_height: u16,
+) -> Text<'static> {
     let buffer = &state.input_buffer;
     let prompt_style = Style::default().fg(semantic::APPROVAL_PROMPT);
     let content_rows = input_line_count_with_width(buffer, width);
     let cursor_byte_pos = state.cursor_byte_pos();
     let (cursor_row, _) = cursor_line_col_with_width(&buffer[..cursor_byte_pos], width);
-    let scroll_offset = composer_scroll_offset(
-        &buffer[..cursor_byte_pos],
-        buffer,
-        width,
-        crate::scrollback::MAX_COMPOSER_LINES,
-    );
+    let scroll_offset =
+        composer_scroll_offset(&buffer[..cursor_byte_pos], buffer, width, max_height);
     let total_rows = content_rows.max(cursor_row.saturating_add(1));
-    let visible_rows = total_rows
-        .saturating_sub(scroll_offset)
-        .min(crate::scrollback::MAX_COMPOSER_LINES) as usize;
+    let visible_rows = total_rows.saturating_sub(scroll_offset).min(max_height) as usize;
     let mut visual_lines = Vec::with_capacity(total_rows as usize);
     let mut current_line = String::new();
     let mut used = 0u16;

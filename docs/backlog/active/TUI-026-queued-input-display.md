@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | TUI-026 |
 | Priority | P2 |
-| Status | Ready |
+| Status | Review (I145, 2026-07-20) |
 | Source | Maintainer requirement refined 2026-07-20 |
 | Depends on | TUI-032 (composer 多行), TUI-004 (state model) |
 | Blocks | — |

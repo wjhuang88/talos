@@ -14,13 +14,15 @@ use crate::stream_markdown::HoldStatus;
 use crate::theme::{semantic, to_crossterm_color};
 
 #[cfg(test)]
+pub(crate) use crate::scrollback_input::build_input_text;
+#[cfg(test)]
 pub(crate) use crate::scrollback_input::cursor_line_col;
 #[cfg(test)]
 pub(crate) use crate::scrollback_input::input_line_count;
 pub(crate) use crate::scrollback_input::{
-    COMPOSER_LEFT_PAD, COMPOSER_RIGHT_PAD, build_input_text, composer_content_width,
-    composer_scroll_offset, credential_cursor_col, credential_display_text,
-    cursor_line_col_with_width, input_line_count_with_width,
+    COMPOSER_LEFT_PAD, COMPOSER_RIGHT_PAD, composer_content_width, composer_scroll_offset,
+    credential_cursor_col, credential_display_text, cursor_line_col_with_width,
+    input_line_count_with_width,
 };
 #[cfg(test)]
 pub(crate) use crate::scrollback_markdown::history_segments_width;
@@ -173,70 +175,201 @@ fn thinking_ripple_spans(frame: usize) -> [Span<'static>; 3] {
     ]
 }
 
-pub(crate) struct QueuePreviewComponent {
-    pub(crate) count: usize,
-    pub(crate) steering: usize,
-    pub(crate) followup: usize,
+pub(crate) struct QueuePreviewComponent<'a> {
+    pub(crate) snapshot: Option<&'a talos_conversation::SteeringQueueSnapshot>,
+    pub(crate) followup_count: usize,
+    pub(crate) max_rows: u16,
 }
 
-impl ViewportComponent for QueuePreviewComponent {
-    fn height_hint(&self, _w: u16) -> u16 {
-        if self.count == 0 {
-            0
-        } else {
-            1 + (self.count as u16).min(2)
+pub(crate) struct QueuePlan {
+    pub(crate) total_rows: u16,
+    pub(crate) entries_to_show: usize,
+    pub(crate) hidden_count: usize,
+    pub(crate) show_summary: bool,
+    pub(crate) show_followup: bool,
+}
+
+/// Compressed layout budget for constrained terminal heights.
+/// Returned by `compress_layout` to guide component construction.
+pub(crate) struct CompressedLayout {
+    pub(crate) panel_max_height: u16,
+    pub(crate) queue_max_rows: u16,
+    pub(crate) input_max_height: u16,
+}
+
+/// Allocate the height remaining after fixed viewport components.
+///
+/// Priority: modal panels (approval/credential/slash) > composer (minimum one row
+/// whenever the budget permits) > queue preview. The returned allocations always
+/// sum to no more than `content_budget`.
+pub(crate) fn compress_layout(
+    content_budget: u16,
+    panel_natural: u16,
+    composer_natural: u16,
+    queue_natural: u16,
+) -> CompressedLayout {
+    let composer_floor = u16::from(composer_natural > 0 && content_budget > 0);
+    let panel_max_height = panel_natural.min(content_budget.saturating_sub(composer_floor));
+    let after_panel = content_budget.saturating_sub(panel_max_height);
+    let input_max_height = composer_natural.min(after_panel);
+    let queue_max_rows = queue_natural.min(after_panel.saturating_sub(input_max_height));
+
+    CompressedLayout {
+        panel_max_height,
+        queue_max_rows,
+        input_max_height,
+    }
+}
+
+impl QueuePreviewComponent<'_> {
+    pub(crate) fn plan(&self) -> QueuePlan {
+        let steering_total = self.snapshot.map(|s| s.total_count).unwrap_or(0);
+        let total = steering_total + self.followup_count;
+        if total == 0 || self.max_rows == 0 {
+            return QueuePlan {
+                total_rows: 0,
+                entries_to_show: 0,
+                hidden_count: 0,
+                show_summary: false,
+                show_followup: false,
+            };
         }
+
+        let max_rows = self.max_rows.min(6);
+        let content_budget = ((max_rows - 1) as usize).min(5);
+        let available = self.snapshot.map(|s| s.entries.len()).unwrap_or(0);
+
+        let entries_if_full = available.min(content_budget);
+        let would_hide = steering_total.saturating_sub(entries_if_full);
+        let reserve_summary = would_hide > 0;
+        let entry_budget = if reserve_summary {
+            content_budget.saturating_sub(1)
+        } else {
+            content_budget
+        };
+
+        let entries_to_show = available.min(entry_budget);
+        let hidden_count = steering_total.saturating_sub(entries_to_show);
+        let show_summary = hidden_count > 0;
+
+        let remaining = content_budget
+            .saturating_sub(entries_to_show)
+            .saturating_sub(if show_summary { 1 } else { 0 });
+        let show_followup = self.followup_count > 0 && remaining > 0;
+
+        let total_rows = 1
+            + entries_to_show as u16
+            + if show_summary { 1 } else { 0 }
+            + if show_followup { 1 } else { 0 };
+
+        QueuePlan {
+            total_rows,
+            entries_to_show,
+            hidden_count,
+            show_summary,
+            show_followup,
+        }
+    }
+}
+
+impl ViewportComponent for QueuePreviewComponent<'_> {
+    fn height_hint(&self, _w: u16) -> u16 {
+        self.plan().total_rows
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
+        let plan = self.plan();
+        if plan.total_rows == 0 {
+            return;
+        }
+
         let dim = Style::default().fg(semantic::DIM_TEXT);
-        let mut lines = Vec::new();
+        let steering_total = self.snapshot.map(|s| s.total_count).unwrap_or(0);
+        let total = steering_total + self.followup_count;
+
+        let mut lines: Vec<Line> = Vec::new();
         lines.push(Line::from(vec![
             Span::styled(" ", dim),
             Span::styled(
                 format!(
                     "{} queued input{}",
-                    self.count,
-                    if self.count == 1 { "" } else { "s" }
+                    total,
+                    if total == 1 { "" } else { "s" }
                 ),
                 dim,
             ),
             Span::styled(" (will send after current turn)", dim),
         ]));
-        let max_width = (area.width as usize).saturating_sub(4);
-        let show_steering = self.steering.min(2);
-        for i in 0..show_steering {
-            let label = if i == 0 { "steering" } else { "…" };
-            let text = if label.len() > max_width {
-                format!("{}…", &label[..max_width - 1])
-            } else {
-                label.to_string()
-            };
+
+        let max_width = (area.width as usize).saturating_sub(4).max(1);
+
+        if let Some(snap) = &self.snapshot {
+            for entry in snap.entries.iter().take(plan.entries_to_show) {
+                let normalized = normalize_single_line(&entry.text);
+                let suffix = if entry.truncated { " ⚠" } else { "" };
+                let suffix_width = if entry.truncated { 2 } else { 0 }; // " ⚠" = 2 display cols
+                let text_budget = max_width.saturating_sub(suffix_width);
+                let display = truncate_to_display_width(&normalized, text_budget);
+                lines.push(Line::from(vec![
+                    Span::styled("  ", dim),
+                    Span::styled("↳ ", dim.add_modifier(Modifier::DIM)),
+                    Span::styled(display, dim),
+                    Span::styled(suffix, dim),
+                ]));
+            }
+        }
+
+        if plan.show_summary {
             lines.push(Line::from(vec![
                 Span::styled("  ", dim),
-                Span::styled("↳ ", dim.add_modifier(Modifier::DIM)),
-                Span::styled(text, dim),
+                Span::styled(format!("+{} more…", plan.hidden_count), dim),
             ]));
         }
-        if self.followup > 0 && lines.len() < 3 {
-            let label = if self.followup == 1 {
+
+        if plan.show_followup {
+            let label = if self.followup_count == 1 {
                 "followup".to_string()
             } else {
-                format!("followup x{}", self.followup)
+                format!("followup ×{}", self.followup_count)
             };
-            let text = if label.len() > max_width {
-                format!("{}…", &label[..max_width - 1])
-            } else {
-                label
-            };
+            let display = truncate_to_display_width(&label, max_width);
             lines.push(Line::from(vec![
                 Span::styled("  ", dim),
                 Span::styled("↳ ", dim.add_modifier(Modifier::DIM)),
-                Span::styled(text, dim),
+                Span::styled(display, dim),
             ]));
         }
+
+        debug_assert_eq!(
+            lines.len(),
+            plan.total_rows as usize,
+            "render line count must match height_hint"
+        );
         frame.render_widget(Paragraph::new(lines), area);
     }
+}
+
+pub(crate) fn normalize_single_line(text: &str) -> String {
+    text.replace('\r', "").replace('\n', " ⏎ ")
+}
+
+pub(crate) fn truncate_to_display_width(text: &str, max_width: usize) -> String {
+    use unicode_width::UnicodeWidthStr;
+    if text.width() <= max_width {
+        return text.to_string();
+    }
+    let mut result = String::new();
+    let mut current = 0usize;
+    for ch in text.chars() {
+        let w = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if current + w > max_width.saturating_sub(1) {
+            result.push('…');
+            break;
+        }
+        result.push(ch);
+        current += w;
+    }
+    result
 }
 
 pub(crate) struct TipsComponent<'a> {
@@ -288,6 +421,8 @@ impl ViewportComponent for InputPadComponent {
 
 pub(crate) struct InputComponent<'a> {
     pub(crate) state: &'a crate::state::TuiState,
+    /// Height allocated by the viewport layout after fixed/modal/queue budgeting.
+    pub(crate) max_height: u16,
 }
 
 pub(crate) const MAX_COMPOSER_LINES: u16 = 10;
@@ -301,13 +436,18 @@ impl ViewportComponent for InputComponent<'_> {
             cursor_line_col_with_width(&self.state.input_buffer[..cursor_byte_pos], content_width)
                 .0;
 
-        content_rows
+        let natural = content_rows
             .max(cursor_row.saturating_add(1))
-            .min(MAX_COMPOSER_LINES)
+            .min(MAX_COMPOSER_LINES);
+        natural.min(self.max_height)
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let input_text = build_input_text(self.state, composer_content_width(area.width));
+        let input_text = crate::scrollback_input::build_input_text_with_max_height(
+            self.state,
+            composer_content_width(area.width),
+            self.max_height,
+        );
         let input_block = Block::default()
             .style(Style::default().bg(semantic::INPUT_BG))
             .padding(Padding::new(0, COMPOSER_RIGHT_PAD, 0, 0));

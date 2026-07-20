@@ -419,7 +419,7 @@ async fn error_clears_turn_and_produces_stream_and_status() {
     assert_eq!(engine.messages[0].role, MessageRole::Error);
     assert_eq!(engine.messages[0].content, "[Error] rate limited");
 
-    assert_eq!(outputs.len(), 3);
+    assert_eq!(outputs.len(), 4);
     let tip = outputs.iter().find_map(|o| match o {
         UiOutput::Tip { kind, text } => Some((kind.clone(), text.clone())),
         _ => None,
@@ -2570,4 +2570,152 @@ fn build_extension_snapshot_matches_engine_snapshot() {
         from_builder.hooks.declarations
     );
     assert_eq!(from_engine.collisions, from_builder.collisions);
+}
+
+#[test]
+fn steering_queue_snapshot_empty() {
+    let engine = new_engine();
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.total_count, 0);
+    assert_eq!(snap.omitted_count, 0);
+    assert!(snap.entries.is_empty());
+}
+
+#[test]
+fn steering_queue_snapshot_fifo_order_and_bounds() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("msg1".into());
+    engine.enqueue_steering("msg2".into());
+    engine.enqueue_steering("msg3".into());
+
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.total_count, 3);
+    assert_eq!(snap.omitted_count, 0);
+    assert_eq!(snap.entries.len(), 3);
+    assert_eq!(snap.entries[0].text, "msg1");
+    assert_eq!(snap.entries[1].text, "msg2");
+    assert_eq!(snap.entries[2].text, "msg3");
+    assert!(!snap.entries[0].truncated);
+}
+
+#[test]
+fn steering_queue_snapshot_caps_at_8_entries() {
+    let mut engine = new_engine();
+    for i in 0..12 {
+        engine.enqueue_steering(format!("msg{i}"));
+    }
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.total_count, 12);
+    assert_eq!(snap.omitted_count, 4);
+    assert_eq!(snap.entries.len(), 8);
+    assert_eq!(snap.entries[0].text, "msg0");
+    assert_eq!(snap.entries[7].text, "msg7");
+}
+
+#[test]
+fn steering_queue_snapshot_truncates_over_4kib() {
+    let mut engine = new_engine();
+    let big = "x".repeat(5000);
+    engine.enqueue_steering(big);
+
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.entries.len(), 1);
+    assert!(snap.entries[0].truncated);
+    assert!(snap.entries[0].text.ends_with('…'));
+    assert!(
+        snap.entries[0].text.len() <= 4096,
+        "truncated entry must be <= 4096 bytes, got {}",
+        snap.entries[0].text.len()
+    );
+}
+
+#[test]
+fn steering_queue_snapshot_reflects_drain() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("first".into());
+    engine.enqueue_steering("second".into());
+
+    let drained = engine.drain_steering_queue();
+    assert_eq!(drained, Some("first".to_string()));
+
+    let snap = engine.steering_queue_snapshot();
+    assert_eq!(snap.total_count, 1);
+    assert_eq!(snap.entries.len(), 1);
+    assert_eq!(snap.entries[0].text, "second");
+}
+
+#[test]
+fn enqueue_steering_emits_snapshot_in_outputs() {
+    let mut engine = new_engine();
+    let outputs = engine.enqueue_steering("hello".into());
+    let has_snapshot = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::SteeringQueueSnapshot(s) if s.total_count == 1));
+    assert!(
+        has_snapshot,
+        "enqueue outputs must include SteeringQueueSnapshot"
+    );
+}
+
+#[test]
+fn cancel_turn_emits_snapshot_preserving_queue() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("queued".into());
+    let outputs = engine.cancel_turn();
+    let has_snapshot = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::SteeringQueueSnapshot(s) if s.total_count == 1));
+    assert!(
+        has_snapshot,
+        "cancel_turn must emit snapshot showing preserved queue"
+    );
+}
+
+#[test]
+fn handle_turn_completed_cancelled_emits_snapshot() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("queued".into());
+    let outputs =
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Cancelled);
+    let has_snapshot = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::SteeringQueueSnapshot(s) if s.total_count == 1));
+    assert!(
+        has_snapshot,
+        "handle_turn_completed(Cancelled) must emit snapshot"
+    );
+}
+
+#[test]
+fn handle_turn_completed_error_emits_snapshot() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("queued".into());
+    let outputs = engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Error {
+        message: "test error".into(),
+    });
+    let has_snapshot = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::SteeringQueueSnapshot(s) if s.total_count == 1));
+    assert!(
+        has_snapshot,
+        "handle_turn_completed(Error) must emit snapshot"
+    );
+}
+
+#[test]
+fn handle_turn_completed_success_emits_snapshot() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("queued".into());
+    let outputs =
+        engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Success {
+            final_text: "done".to_string(),
+            new_messages: Vec::new(),
+        });
+    let has_snapshot = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::SteeringQueueSnapshot(s) if s.total_count == 1));
+    assert!(
+        has_snapshot,
+        "handle_turn_completed(Success) must emit snapshot"
+    );
 }

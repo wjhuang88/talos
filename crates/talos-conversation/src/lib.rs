@@ -38,9 +38,10 @@ pub use types::{
     MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem, ModelPickerVariantItem,
     ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
-    SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, StreamMessage,
-    TipKind, TodoCommandAction, TodoCommandRequest, TodoExportFormat, TodoPanelData, TodoPanelRow,
-    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput, UserInput,
+    SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, SteeringQueueEntry,
+    SteeringQueueSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
+    TodoExportFormat, TodoPanelData, TodoPanelRow, ToolCallDisplay, ToolCallInfo,
+    ToolResultDisplay, TurnPhase, UiOutput, UserInput,
 };
 pub use validation::{
     EvidenceStatus, FindingSeverity, ProjectType, ProjectTypeDetectorDescriptor, ValidationCheck,

@@ -44,7 +44,11 @@ fn input_component_exact_boundary_keeps_last_cell_visible() {
     let mut buffer = Buffer::empty(area);
     let mut frame = crate::inline_terminal::InlineFrame::new(area, &mut buffer);
 
-    InputComponent { state: &state }.render(&mut frame, area);
+    InputComponent {
+        state: &state,
+        max_height: crate::scrollback::MAX_COMPOSER_LINES,
+    }
+    .render(&mut frame, area);
 
     assert_eq!(buffer[(78, 0)].symbol(), "a");
     assert_eq!(buffer[(79, 0)].symbol(), " ");
@@ -55,17 +59,38 @@ fn height_hint_cap_uses_wrapped_content_and_cursor_spill_row() {
     let mut state = TuiState::new();
     state.input_buffer = "one\ntwo\nthree".to_string();
     state.cursor_pos = state.input_buffer.chars().count();
-    assert_eq!(InputComponent { state: &state }.height_hint(80), 3);
+    assert_eq!(
+        InputComponent {
+            state: &state,
+            max_height: crate::scrollback::MAX_COMPOSER_LINES
+        }
+        .height_hint(80),
+        3
+    );
 
     state.input_buffer = std::iter::repeat_n("line", 25)
         .collect::<Vec<_>>()
         .join("\n");
     state.cursor_pos = state.input_buffer.chars().count();
-    assert_eq!(InputComponent { state: &state }.height_hint(80), 10);
+    assert_eq!(
+        InputComponent {
+            state: &state,
+            max_height: crate::scrollback::MAX_COMPOSER_LINES
+        }
+        .height_hint(80),
+        10
+    );
 
     state.input_buffer = "a".repeat(20);
     state.cursor_pos = state.input_buffer.chars().count();
-    assert_eq!(InputComponent { state: &state }.height_hint(23), 2);
+    assert_eq!(
+        InputComponent {
+            state: &state,
+            max_height: crate::scrollback::MAX_COMPOSER_LINES
+        }
+        .height_hint(23),
+        2
+    );
 }
 
 #[test]
@@ -125,6 +150,26 @@ fn build_input_text_shows_last_ten_visual_lines() {
     assert_eq!(text.lines.len(), 10);
     assert_eq!(text.lines[0].to_string(), "   line-15");
     assert_eq!(text.lines[9].to_string(), "   line-24");
+}
+
+#[test]
+fn build_input_text_respects_compressed_composer_height() {
+    let mut state = TuiState::new();
+    state.input_buffer = (0..5)
+        .map(|line| format!("line-{line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    state.cursor_pos = state.input_buffer.chars().count();
+
+    let text = crate::scrollback_input::build_input_text_with_max_height(&state, 77, 2);
+
+    assert_eq!(text.lines.len(), 2);
+    assert_eq!(text.lines[0].to_string(), "   line-3");
+    assert_eq!(text.lines[1].to_string(), "   line-4");
+    assert_eq!(
+        composer_scroll_offset(&state.input_buffer, &state.input_buffer, 77, 2),
+        3
+    );
 }
 
 #[test]
@@ -841,4 +886,439 @@ fn history_load_sets_cursor_to_end() {
 
     state.history_prev();
     assert_eq!(state.cursor_pos, "hello world".chars().count());
+}
+
+// ── I145 / TUI-026 queue preview tests ─────────────────────────────────────
+
+use talos_conversation::{SteeringQueueEntry, SteeringQueueSnapshot};
+
+fn snap(entries: &[&str], total: usize) -> SteeringQueueSnapshot {
+    let omitted = total.saturating_sub(entries.len());
+    SteeringQueueSnapshot {
+        entries: entries
+            .iter()
+            .map(|t| SteeringQueueEntry {
+                text: t.to_string(),
+                truncated: false,
+            })
+            .collect(),
+        total_count: total,
+        omitted_count: omitted,
+    }
+}
+
+#[test]
+fn queue_preview_height_zero_when_empty() {
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: None,
+        followup_count: 0,
+        max_rows: 6,
+    };
+    assert_eq!(c.height_hint(80), 0);
+}
+
+#[test]
+fn queue_preview_height_respects_six_row_cap() {
+    let entries: Vec<String> = (0..8).map(|i| format!("msg{i}")).collect();
+    let refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let s = snap(&refs, 8);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    let h = c.height_hint(80);
+    assert!(h <= 6, "height_hint must be <= 6, got {h}");
+}
+
+#[test]
+fn queue_preview_height_shows_hidden_count_for_8_entries() {
+    let entries: Vec<String> = (0..8).map(|i| format!("msg{i}")).collect();
+    let refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let s = snap(&refs, 8);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    let h = c.height_hint(80);
+    // 1 header + 4 entries + 1 summary (+3 more) = 6
+    assert_eq!(
+        h, 6,
+        "8 entries at max_rows=6 should produce header + 4 entries + summary"
+    );
+}
+
+#[test]
+fn queue_preview_height_compresses_on_narrow_max_rows() {
+    let entries: Vec<String> = (0..8).map(|i| format!("msg{i}")).collect();
+    let refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let s = snap(&refs, 8);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 3,
+    };
+    let h = c.height_hint(80);
+    assert!(h <= 3, "max_rows=3 must cap height at 3, got {h}");
+}
+
+#[test]
+fn queue_preview_hidden_count_covers_unrendered_entries() {
+    let entries: Vec<String> = (0..8).map(|i| format!("msg{i}")).collect();
+    let refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let s = snap(&refs, 8);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    let plan = c.plan();
+    assert_eq!(
+        plan.entries_to_show, 4,
+        "should show 4 entries (reserving 1 for summary)"
+    );
+    assert_eq!(plan.hidden_count, 4, "8 total - 4 shown = 4 hidden");
+    assert!(plan.show_summary, "must show +4 more summary");
+}
+
+#[test]
+fn queue_preview_no_summary_when_all_fit() {
+    let s = snap(&["a", "b"], 2);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    let plan = c.plan();
+    assert_eq!(plan.entries_to_show, 2);
+    assert_eq!(plan.hidden_count, 0);
+    assert!(!plan.show_summary);
+    assert_eq!(plan.total_rows, 3); // 1 header + 2 entries
+}
+
+#[test]
+fn normalize_single_line_replaces_newlines() {
+    assert_eq!(
+        crate::scrollback::normalize_single_line("hello\nworld"),
+        "hello ⏎ world"
+    );
+    assert_eq!(
+        crate::scrollback::normalize_single_line("a\rb\r\nc"),
+        "ab ⏎ c"
+    );
+}
+
+#[test]
+fn truncate_to_display_width_cjk_safe() {
+    assert_eq!(
+        crate::scrollback::truncate_to_display_width("abc", 10),
+        "abc"
+    );
+    assert_eq!(
+        crate::scrollback::truncate_to_display_width("你好世界", 5),
+        "你好…"
+    );
+    assert_eq!(
+        crate::scrollback::truncate_to_display_width("abcdef", 4),
+        "abc…"
+    );
+}
+
+// ── I145 render tests using Buffer + InlineFrame ────────────────────────────
+
+use crate::inline_terminal::InlineFrame;
+use crate::scrollback::QueuePreviewComponent;
+
+fn render_queue(
+    snapshot: Option<&SteeringQueueSnapshot>,
+    followup: usize,
+    max_rows: u16,
+    width: u16,
+) -> (ratatui::buffer::Buffer, u16) {
+    let comp = QueuePreviewComponent {
+        snapshot,
+        followup_count: followup,
+        max_rows,
+    };
+    let h = comp.height_hint(width);
+    let area = Rect::new(0, 0, width, h.max(1));
+    let mut buf = ratatui::buffer::Buffer::empty(area);
+    let mut frame = InlineFrame::new(area, &mut buf);
+    comp.render(&mut frame, area);
+    (buf, h)
+}
+
+fn buffer_line(buf: &ratatui::buffer::Buffer, y: u16, width: u16) -> String {
+    (0..width)
+        .map(|x| buf[(x, y)].symbol().to_string())
+        .collect::<String>()
+        .trim_end()
+        .to_string()
+}
+
+#[test]
+fn render_8_entries_produces_header_4_entries_summary_total_6_rows() {
+    let entries: Vec<String> = (0..8).map(|i| format!("msg{i}")).collect();
+    let refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let s = snap(&refs, 8);
+    let (buf, h) = render_queue(Some(&s), 0, 6, 80);
+
+    assert_eq!(h, 6);
+    assert!(buffer_line(&buf, 0, 80).contains("8 queued inputs"));
+    for i in 0..4 {
+        let line = buffer_line(&buf, (i + 1) as u16, 80);
+        assert!(
+            line.contains(&format!("msg{i}")),
+            "row {} should contain msg{}",
+            i + 1,
+            i
+        );
+    }
+    assert!(
+        buffer_line(&buf, 5, 80).contains("+4 more"),
+        "row 5 should show +4 more"
+    );
+}
+
+#[test]
+fn render_truncated_entry_with_narrow_width_no_overflow() {
+    let s = SteeringQueueSnapshot {
+        entries: vec![SteeringQueueEntry {
+            text: "x".repeat(100),
+            truncated: true,
+        }],
+        total_count: 1,
+        omitted_count: 0,
+    };
+    let width = 20u16;
+    let (buf, h) = render_queue(Some(&s), 0, 6, width);
+    assert_eq!(h, 2); // header + 1 entry
+
+    let entry_line = buffer_line(&buf, 1, width);
+    let display_width = unicode_width::UnicodeWidthStr::width(entry_line.as_str());
+    assert!(
+        display_width <= width as usize,
+        "entry line display width {display_width} must be <= area width {width}"
+    );
+    assert!(
+        entry_line.contains("⚠"),
+        "truncated entry must show warning marker"
+    );
+}
+
+#[test]
+fn render_cjk_entry_uses_display_width_not_byte_count() {
+    let s = snap(&["你好世界你好世界"], 1);
+    let width = 15u16;
+    let (buf, h) = render_queue(Some(&s), 0, 6, width);
+    assert_eq!(h, 2); // header + 1 entry
+
+    let entry_line = buffer_line(&buf, 1, width);
+    assert!(
+        entry_line.contains('…'),
+        "CJK text exceeding budget must be truncated with ellipsis, got: {entry_line}"
+    );
+}
+
+#[test]
+fn render_multiline_entry_normalized_to_single_line() {
+    let s = snap(&["line one\nline two"], 1);
+    let (buf, h) = render_queue(Some(&s), 0, 6, 80);
+    assert_eq!(h, 2); // header + 1 entry (not 3)
+
+    let entry_line = buffer_line(&buf, 1, 80);
+    assert!(
+        entry_line.contains("⏎"),
+        "newline should be normalized to visible indicator"
+    );
+    assert!(
+        !entry_line.contains('\n'),
+        "no raw newline in rendered line"
+    );
+}
+
+#[test]
+fn render_empty_snapshot_when_total_zero() {
+    let s = snap(&[], 0);
+    let (_, h) = render_queue(Some(&s), 0, 6, 80);
+    assert_eq!(h, 0, "empty snapshot must produce 0 rows");
+}
+
+#[test]
+fn render_narrow_terminal_compresses_queue_max_rows() {
+    let entries: Vec<String> = (0..8).map(|i| format!("msg{i}")).collect();
+    let refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let s = snap(&refs, 8);
+    let (_, h) = render_queue(Some(&s), 0, 2, 80);
+    assert!(h <= 2, "max_rows=2 must cap at 2, got {h}");
+}
+
+#[test]
+fn session_boundary_empty_snapshot_produces_zero_height() {
+    let empty = SteeringQueueSnapshot {
+        entries: vec![],
+        total_count: 0,
+        omitted_count: 0,
+    };
+    assert_eq!(empty.total_count, 0);
+    assert_eq!(empty.omitted_count, 0);
+    assert!(empty.entries.is_empty());
+
+    let comp = QueuePreviewComponent {
+        snapshot: Some(&empty),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    assert_eq!(
+        comp.height_hint(80),
+        0,
+        "empty snapshot must produce 0 height"
+    );
+}
+
+// ── I145 app-level layout tests using compress_layout (production helper) ──
+
+#[test]
+fn compress_layout_no_compression_when_fits() {
+    let r = crate::scrollback::compress_layout(24, 5, 3, 4);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.queue_max_rows, 4);
+    assert_eq!(r.input_max_height, 3);
+}
+
+#[test]
+fn compress_layout_preserves_panel_then_composer_then_queue() {
+    // Content budget 10: panel=5 and composer=3 are preserved; queue gets 2.
+    let r = crate::scrollback::compress_layout(10, 5, 3, 6);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.input_max_height, 3);
+    assert_eq!(r.queue_max_rows, 2);
+}
+
+#[test]
+fn compress_layout_queue_zeroed_before_composer_is_reduced() {
+    // Content budget 8: panel=5, composer=3, queue=0.
+    let r = crate::scrollback::compress_layout(8, 5, 5, 6);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.queue_max_rows, 0);
+    assert_eq!(r.input_max_height, 3);
+}
+
+#[test]
+fn compress_layout_composer_never_below_one() {
+    // Content budget 7: panel=5, queue=0, composer retains 2 rows.
+    let r = crate::scrollback::compress_layout(7, 5, 10, 6);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.queue_max_rows, 0);
+    assert_eq!(r.input_max_height, 2, "composer must not disappear");
+}
+
+#[test]
+fn compress_layout_compresses_panel_only_after_reserving_composer() {
+    // Content budget 1: no queue and no panel rows, but composer retains one row.
+    let r = crate::scrollback::compress_layout(6, 5, 10, 6);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.queue_max_rows, 0);
+    assert_eq!(r.input_max_height, 1);
+
+    let r = crate::scrollback::compress_layout(1, 5, 10, 6);
+    assert_eq!(r.panel_max_height, 0);
+    assert_eq!(r.queue_max_rows, 0);
+    assert_eq!(r.input_max_height, 1);
+}
+
+#[test]
+fn compress_layout_zero_queue_natural() {
+    let r = crate::scrollback::compress_layout(10, 5, 3, 0);
+    assert_eq!(r.panel_max_height, 5);
+    assert_eq!(r.queue_max_rows, 0);
+    assert_eq!(r.input_max_height, 3);
+}
+
+// ── I145 ComponentStack layout verification ──────────────────────────────
+//
+// Construct real component stacks (same types as draw_frame) and verify
+// ComponentStack::total_height respects compressed heights.
+
+struct StubComponent {
+    h: u16,
+}
+
+impl crate::inline_terminal::ViewportComponent for StubComponent {
+    fn height_hint(&self, _w: u16) -> u16 {
+        self.h
+    }
+    fn render(&self, _: &mut crate::inline_terminal::InlineFrame, _: ratatui::layout::Rect) {}
+}
+
+#[test]
+fn stack_total_height_matches_sum_of_components() {
+    let c1 = StubComponent { h: 3 };
+    let c2 = StubComponent { h: 5 };
+    let c3 = StubComponent { h: 2 };
+    let stack = crate::inline_terminal::ComponentStack::new(vec![&c1, &c2, &c3]);
+    assert_eq!(stack.total_height(80), 10);
+}
+
+#[test]
+fn stack_total_height_with_zero_height_component() {
+    let c1 = StubComponent { h: 3 };
+    let c2 = StubComponent { h: 0 };
+    let c3 = StubComponent { h: 2 };
+    let stack = crate::inline_terminal::ComponentStack::new(vec![&c1, &c2, &c3]);
+    // total_height sums ALL components including 0
+    assert_eq!(stack.total_height(80), 5);
+    // But layout() skips 0-height components
+    let area = ratatui::layout::Rect::new(0, 0, 80, 24);
+    let layout = stack.layout(area, 80);
+    assert_eq!(
+        layout.len(),
+        2,
+        "0-height component should be skipped in layout"
+    );
+}
+
+#[test]
+fn stack_layout_compressed_queue_and_composer_fit_screen() {
+    // Screen=9, fixed=5, so the production content budget is 4.
+    // Panel is closed, composer gets 4 rows, and queue is compressed to zero.
+    let compressed = crate::scrollback::compress_layout(4, 0, 5, 4);
+    assert_eq!(compressed.queue_max_rows, 0);
+    assert_eq!(compressed.input_max_height, 4);
+
+    // Build stack with compressed heights
+    let modal = StubComponent { h: 0 };
+    let fixed = StubComponent { h: 5 };
+    let composer = StubComponent { h: 4 };
+    let queue = StubComponent { h: 0 };
+    let stack =
+        crate::inline_terminal::ComponentStack::new(vec![&modal, &fixed, &composer, &queue]);
+    let total = stack.total_height(80);
+    assert!(
+        total <= 9,
+        "compressed stack total {} must fit screen height 9",
+        total
+    );
+}
+
+#[test]
+fn stack_layout_composer_always_at_least_one() {
+    // Screen=7, fixed=5, so the production content budget is 2.
+    let compressed = crate::scrollback::compress_layout(2, 0, 10, 6);
+    let composer_h = compressed.input_max_height;
+    assert!(
+        composer_h >= 1,
+        "composer must be at least 1 row, got {}",
+        composer_h
+    );
+
+    let fixed = StubComponent { h: 5 };
+    let composer = StubComponent { h: composer_h };
+    let queue = StubComponent {
+        h: compressed.queue_max_rows,
+    };
+    let stack = crate::inline_terminal::ComponentStack::new(vec![&fixed, &composer, &queue]);
+    let total = stack.total_height(80);
+    assert!(total <= 7, "stack total {} must fit screen height 7", total);
 }

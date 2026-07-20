@@ -221,7 +221,7 @@ mod tests {
 
         let mut saw_queued_user_stream = false;
         let mut saw_queue_drained_status = false;
-        for _ in 0..8 {
+        for _ in 0..20 {
             let Some(output) = ui_rx.recv().await else {
                 break;
             };
@@ -1583,6 +1583,84 @@ api_key_env = "ANTHROPIC_API_KEY"
         assert_eq!(
             config_get_dotted(&reloaded, "providers.my-gw.models.glm-5.context_limit").unwrap(),
             "200000"
+        );
+    }
+}
+
+#[cfg(test)]
+mod steering_snapshot_tests {
+    use super::*;
+    use talos_conversation::{ConversationEngine, SteeringQueueSnapshot, UiOutput};
+
+    fn new_engine() -> ConversationEngine {
+        ConversationEngine::new("test-model".to_string(), "test-provider".to_string())
+    }
+
+    fn build_empty_snapshot() -> SteeringQueueSnapshot {
+        SteeringQueueSnapshot {
+            entries: vec![],
+            total_count: 0,
+            omitted_count: 0,
+        }
+    }
+
+    #[test]
+    fn engine_snapshot_empty_after_drain() {
+        let mut engine = new_engine();
+        engine.enqueue_steering("a".into());
+        engine.enqueue_steering("b".into());
+
+        let drained1 = engine.drain_steering_queue();
+        let snap1 = engine.steering_queue_snapshot();
+        assert_eq!(drained1, Some("a".into()));
+        assert_eq!(snap1.total_count, 1);
+        assert_eq!(snap1.omitted_count, 0);
+        assert_eq!(snap1.entries.len(), 1);
+
+        let drained2 = engine.drain_steering_queue();
+        let snap2 = engine.steering_queue_snapshot();
+        assert_eq!(drained2, Some("b".into()));
+        assert_eq!(snap2.total_count, 0);
+        assert_eq!(snap2.omitted_count, 0);
+        assert!(snap2.entries.is_empty());
+
+        let empty = build_empty_snapshot();
+        assert_eq!(empty.total_count, 0);
+        assert!(empty.entries.is_empty());
+    }
+
+    #[test]
+    fn non_empty_snapshot_preserved_on_error_path() {
+        // On error/cancel paths, the engine does NOT clear the steering queue.
+        // The snapshot correctly reflects the preserved queue.
+        let mut engine = new_engine();
+        engine.enqueue_steering("queued".into());
+
+        let cancel_outputs = engine.cancel_turn();
+        let snap = cancel_outputs.iter().find_map(|o| match o {
+            UiOutput::SteeringQueueSnapshot(s) => Some(s.clone()),
+            _ => None,
+        });
+        assert!(snap.is_some(), "cancel must emit snapshot");
+        assert_eq!(
+            snap.unwrap().total_count,
+            1,
+            "cancel must preserve queued message"
+        );
+
+        let error_outputs =
+            engine.handle_turn_completed(&talos_core::session::TurnCompletionStatus::Error {
+                message: "test".into(),
+            });
+        let snap2 = error_outputs.iter().find_map(|o| match o {
+            UiOutput::SteeringQueueSnapshot(s) => Some(s.clone()),
+            _ => None,
+        });
+        assert!(snap2.is_some(), "error must emit snapshot");
+        assert_eq!(
+            snap2.unwrap().total_count,
+            1,
+            "error must preserve queued message"
         );
     }
 }

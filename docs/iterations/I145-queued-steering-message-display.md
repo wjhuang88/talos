@@ -1,6 +1,6 @@
 # Iteration I145: Queued Steering Message Display
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-07-20
 > Planned objective: implement TUI-026's bounded, engine-owned display of queued steering message
 > content without changing steering delivery semantics.
@@ -90,3 +90,26 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-20 | Planning | Created after I144 completed. No implementation, release, tag, or production-code change has started. |
+| 2026-07-20 | Implementation | Core types + engine snapshot + TUI rendering + bridge lifecycle + tests. |
+| 2026-07-20 | Rework 1 | Fixed 6 blockers: 6-row cap via `plan()`, hidden count = total - rendered, multiline normalization (`\n` → `⏎`), 4 KiB truncation reserves ellipsis bytes, lifecycle snapshots (cancel/error/success), TUI regression tests. |
+| 2026-07-20 | Rework 2 | Session boundary cleanup: `/new`, `/resume`, `/fork` success paths emit empty `SteeringQueueSnapshot`. Truncation marker `⚠` width reserved in text budget. Buffer+InlineFrame render tests added (8-entry header/4-entry/+4 summary, truncated+narrow, CJK, multiline, empty, narrow-height compress). |
+| 2026-07-20 | Rework 3 | Added lifecycle and render coverage for queue projection, and updated README/README.zh-CN with user-facing queued-steering documentation. The initial layout coverage duplicated application arithmetic; Rework 4 replaced it with tests of the production allocator. Status changed to Review. |
+| 2026-07-20 | Rework 4 | Corrected narrow-height layout through the production `compress_layout()` helper: `draw_frame` first reserves fixed rows, then allocates the remaining budget in modal → composer (minimum one row when possible) → queue order. The bottom panel is counted once for placement. Composer text rendering and cursor scrolling use the same allocated height. `/new`, `/resume`, and `/fork` now share a tested ordered boundary helper that emits queue-clear before `SessionIdentity`. |
+
+## Actual Validation Results (2026-07-20)
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | ✅ clean |
+| `cargo clippy --workspace --locked -- -D warnings` | ✅ clean |
+| `cargo test --workspace --locked` | ✅ workspace unit, integration, and doctests pass (including dashboard loopback tests) |
+| `scripts/validate_project_governance.sh .` | ✅ 0 warnings |
+| `git diff --check` | ✅ clean |
+
+## Remaining: Real Terminal Acceptance
+
+The following acceptance items require real terminal verification and are deferred for manual acceptance:
+
+- Enqueue multiple messages during tool-running turn, verify FIFO display.
+- Verify `+N more` summary appears for queues longer than 6 lines.
+- Verify queue preview clears when queue empties.

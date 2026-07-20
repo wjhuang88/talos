@@ -2,6 +2,54 @@
 
 use super::*;
 
+/// Publish the UI boundary between two successfully committed sessions.
+///
+/// The queue belongs to the retired conversation engine, so its preview must be
+/// cleared before the new session identity becomes visible. Keeping this small
+/// ordered helper shared by `/new`, `/resume`, and `/fork` makes the boundary
+/// independently testable without constructing a full session runtime.
+pub(crate) fn emit_session_identity_after_queue_clear(
+    ui_tx: &mpsc::UnboundedSender<UiOutput>,
+    session_id: String,
+) {
+    let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+        talos_conversation::SteeringQueueSnapshot {
+            entries: vec![],
+            total_count: 0,
+            omitted_count: 0,
+        },
+    ));
+    let _ = ui_tx.send(UiOutput::SessionIdentity { id: session_id });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn committed_session_boundary_clears_preview_before_identity() {
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        emit_session_identity_after_queue_clear(&ui_tx, "new-session".to_string());
+
+        assert!(matches!(
+            ui_rx.try_recv().expect("queue-clear output"),
+            UiOutput::SteeringQueueSnapshot(talos_conversation::SteeringQueueSnapshot {
+                entries,
+                total_count: 0,
+                omitted_count: 0,
+            }) if entries.is_empty()
+        ));
+        assert!(matches!(
+            ui_rx.try_recv().expect("session identity output"),
+            UiOutput::SessionIdentity { id } if id == "new-session"
+        ));
+        assert!(
+            ui_rx.try_recv().is_err(),
+            "boundary helper emits only two outputs"
+        );
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_session_delete(
     ui_tx: &mpsc::UnboundedSender<UiOutput>,
@@ -592,9 +640,7 @@ pub(crate) async fn handle_session_new(
                     "[Error] Bridge forwarder unavailable; new session events will not be persisted or displayed."
                 );
             }
-            let _ = ui_tx.send(UiOutput::SessionIdentity {
-                id: new_session_for_watch.id.to_string(),
-            });
+            emit_session_identity_after_queue_clear(ui_tx, new_session_for_watch.id.to_string());
             let text = "[System] New session started. Previous session preserved.\n".to_string();
             send_stream(ui_tx, MessageSource::System, text);
         }
@@ -842,9 +888,7 @@ pub(crate) async fn handle_session_resume(
                 );
             }
             let _ = ui_tx.send(UiOutput::HydrateHistory(resume_history_for_hydrate));
-            let _ = ui_tx.send(UiOutput::SessionIdentity {
-                id: target_session_for_watch.id.to_string(),
-            });
+            emit_session_identity_after_queue_clear(ui_tx, target_session_for_watch.id.to_string());
             let text = format!(
                 "[System] Resumed session {}.\n",
                 target_session_for_watch.id
@@ -1012,9 +1056,7 @@ pub(crate) async fn handle_session_fork(
                     "[Error] Bridge forwarder unavailable; forked session events will not be persisted or displayed."
                 );
             }
-            let _ = ui_tx.send(UiOutput::SessionIdentity {
-                id: child_session_for_watch.id.to_string(),
-            });
+            emit_session_identity_after_queue_clear(ui_tx, child_session_for_watch.id.to_string());
             let text = format!(
                 "[System] Forked session {child_id} (source: {}).\n",
                 result.old_session.id

@@ -75,6 +75,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             for output in outputs {
                                 let _ = ui_tx.send(output);
                             }
+                            let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+                                engine.steering_queue_snapshot(),
+                            ));
                             let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
                             if submit_session_message(&sq_tx_watch, msg).await.is_err() {
                                 for output in engine.handle_turn_completed(
@@ -85,6 +88,10 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     let _ = ui_tx.send(output);
                                 }
                             }
+                        } else if turn_completed {
+                            let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+                                engine.steering_queue_snapshot(),
+                            ));
                         }
                     }
                     Some(SessionEvent::Error { message }) => {

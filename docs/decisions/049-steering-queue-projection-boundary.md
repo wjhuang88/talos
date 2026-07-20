@@ -77,3 +77,14 @@ this projection into a queue-control API opportunistically.
 - ADR-039: Runtime Event Semantic Single-Flow Boundary
 - TUI-004: State Model
 - TUI-026: Queued Steering Message Display
+
+## Implementation Facts (I145, 2026-07-20)
+
+- `SteeringQueueSnapshot` and `SteeringQueueEntry` types live in `talos-conversation/src/types.rs`.
+- `ConversationEngine::steering_queue_snapshot()` builds the bounded projection: 8 entries, 4 KiB per entry (ellipsis bytes reserved before char-boundary truncation).
+- Snapshot emitted on: `enqueue_steering`, post-drain (success and empty), `cancel_turn`, `handle_turn_completed` (Success/Cancelled/Error), and session boundary (`/new`, `/resume`, `/fork` success paths in `session_handlers.rs`). Session error/cancel paths do NOT clear the queue.
+- TUI `QueuePreviewComponent` uses a `plan()` helper shared between `height_hint` and `render`; hidden count = `total_count - entries_to_show`; truncation marker `⚠` width reserved in text budget; newlines normalized to `⏎`. For constrained terminals, `app.rs` reserves fixed rows before `compress_layout()` allocates the remainder to modal panels, composer, and queue in that priority order. Composer rendering and cursor scrolling share the allocated height.
+- The `UiOutput::SteeringQueueSnapshot` variant is a pre-1.0 semver break. Release must be a minor bump.
+- App-level layout reserves fixed rows first, then bounds the modal, composer, and queue allocations with `compress_layout()`. The composer retains one row whenever the remaining content budget permits it.
+- Validation covers engine and bridge lifecycle snapshots, the shared session-boundary event helper, layout allocation, and Buffer+InlineFrame rendering. Exact suite totals are intentionally not recorded here because the workspace test count changes independently of this decision.
+- README (EN + zh-CN) updated with user-facing queued steering documentation.

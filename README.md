@@ -426,6 +426,11 @@ The composer wraps long input to the terminal width. `Shift+Enter` inserts a new
 modified-key reporting; `Ctrl+J` is the portable newline fallback for terminals or multiplexers
 that do not support the protocol.
 
+If you type a message while the model is still processing, it queues automatically and is sent
+FIFO after the current turn completes. The TUI shows a compact preview of queued messages
+above the composer (up to 6 lines; longer queues show a `+N more` summary). The preview clears
+when the queue empties.
+
 Use `/model` to switch among models whose providers are already configured. The picker
 uses **three-level navigation**: Level 1 lists recent models (when available, persisted
 at `~/.talos/recent_models.json`) and providers; selecting a provider enters Level 2,

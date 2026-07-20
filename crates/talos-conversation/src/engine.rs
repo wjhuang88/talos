@@ -11,8 +11,9 @@ use crate::types::{
     HookSnapshot, LoadedPluginDiagnostic, McpServerDiagnostic, MessageRole, MessageSource,
     MessageStatus, ModelSwitchRequest, PluginObservation, ScrollbackState, SessionDeleteRequest,
     SessionForkRequest, SessionNewRequest, SessionResumeRequest, SkillCommandRequest,
-    SkillDiagnostic, StatusSnapshot, TipKind, TodoCommandAction, TodoCommandRequest,
-    TodoExportFormat, ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput,
+    SkillDiagnostic, StatusSnapshot, SteeringQueueEntry, SteeringQueueSnapshot, TipKind,
+    TodoCommandAction, TodoCommandRequest, TodoExportFormat, ToolCallDisplay, ToolCallInfo,
+    ToolResultDisplay, TurnPhase, UiOutput,
 };
 
 fn is_timeout_error(message: &str) -> bool {
@@ -307,6 +308,9 @@ impl ConversationEngine {
                 self.last_flushed_message = self.messages.len();
                 self.is_processing = false;
                 self.current_phase = None;
+                outputs.push(UiOutput::SteeringQueueSnapshot(
+                    self.steering_queue_snapshot(),
+                ));
                 outputs.push(UiOutput::Status(self.status_snapshot()));
                 outputs
             }
@@ -318,6 +322,9 @@ impl ConversationEngine {
                 self.is_processing = false;
                 self.current_phase = Some(TurnPhase::Cancelled);
                 outputs.push(UiOutput::ThinkingPreview { text: None });
+                outputs.push(UiOutput::SteeringQueueSnapshot(
+                    self.steering_queue_snapshot(),
+                ));
                 outputs.push(UiOutput::Status(self.status_snapshot()));
                 outputs
             }
@@ -341,6 +348,7 @@ impl ConversationEngine {
                 text: "Message queued and will send after current turn.".into(),
                 kind: TipKind::QueueHint,
             },
+            UiOutput::SteeringQueueSnapshot(self.steering_queue_snapshot()),
             UiOutput::Status(self.status_snapshot()),
         ]
     }
@@ -361,6 +369,7 @@ impl ConversationEngine {
                 text: "Turn cancellation requested.".into(),
                 kind: TipKind::ExitHint,
             },
+            UiOutput::SteeringQueueSnapshot(self.steering_queue_snapshot()),
             UiOutput::Status(self.status_snapshot()),
         ]);
         outputs
@@ -506,6 +515,9 @@ impl ConversationEngine {
                 });
                 self.last_flushed_message = self.messages.len();
 
+                outputs.push(UiOutput::SteeringQueueSnapshot(
+                    self.steering_queue_snapshot(),
+                ));
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
             AgentEvent::ReasoningComplete { .. } => {}
@@ -976,6 +988,49 @@ impl ConversationEngine {
             None
         } else {
             Some(self.steering_queue.remove(0))
+        }
+    }
+
+    /// Bounded FIFO snapshot of the steering queue (ADR-049).
+    /// First 8 entries, 4 KiB UTF-8 per entry, exact total/omitted counts.
+    pub fn steering_queue_snapshot(&self) -> SteeringQueueSnapshot {
+        const MAX_ENTRIES: usize = 8;
+        const MAX_BYTES: usize = 4096;
+        const ELLIPSIS: &str = "…";
+        let total_count = self.steering_queue.len();
+        let omitted_count = total_count.saturating_sub(MAX_ENTRIES);
+        let entries = self
+            .steering_queue
+            .iter()
+            .take(MAX_ENTRIES)
+            .map(|msg| {
+                if msg.len() > MAX_BYTES {
+                    let budget = MAX_BYTES - ELLIPSIS.len();
+                    let mut end = budget.min(msg.len());
+                    while end > 0 && !msg.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    let text = format!("{}{ELLIPSIS}", &msg[..end]);
+                    debug_assert!(
+                        text.len() <= MAX_BYTES,
+                        "truncated entry must be <= {MAX_BYTES} bytes"
+                    );
+                    SteeringQueueEntry {
+                        text,
+                        truncated: true,
+                    }
+                } else {
+                    SteeringQueueEntry {
+                        text: msg.clone(),
+                        truncated: false,
+                    }
+                }
+            })
+            .collect();
+        SteeringQueueSnapshot {
+            entries,
+            total_count,
+            omitted_count,
         }
     }
 
