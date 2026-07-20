@@ -4,11 +4,11 @@
 |-------|-------|
 | Story ID | TUI-026 |
 | Priority | P2 |
-| Status | Refinement |
+| Status | Ready |
 | Source | Maintainer requirement refined 2026-07-20 |
 | Depends on | TUI-032 (composer 多行), TUI-004 (state model) |
 | Blocks | — |
-| Decision Gate | A compatible, engine-owned queued-message projection must be selected before this story is Ready. |
+| Decision Gate | Cleared by ADR-049: bounded snapshots travel through the existing ordered `UiOutput` stream. |
 
 ## 问题
 
@@ -50,17 +50,11 @@ Agent 正在处理一个 turn（包括工具调用）时，后续输入已由
 - 不在本故事中提供编辑、删除、重排或取消已排队消息的控制；这些需独立需求。
 - 不将 finalized conversation history 移入 ratatui viewport。
 
-## Architecture / Semver Gate
+## Architecture / Semver Decision
 
-当前 canonical `UiOutput` / `StatusSnapshot` 只带 queue count，不携带 queue content。
-给公开 enum 或 struct 添加字段/variant 可能破坏下游 Rust 的穷尽匹配或 struct literal。
-实施前必须形成 ADR 或兼容性方案，明确以下之一：
-
-1. 兼容的、版本化的 queue snapshot projection；或
-2. 不改变公开协议且仍能保证 engine-owned truth 的内部投影路径。
-
-方案必须写明外部消费者迁移、顺序语义，以及为何不会引入第二状态源。完成该 gate
-前，本故事保持 Refinement。
+ADR-049 选择 `UiOutput::SteeringQueueSnapshot`：engine 在既有有序 UI 流中发送最多 8 条
+FIFO、每条最多 4 KiB 的预览和精确计数；TUI 只读渲染，不维护镜像队列。公开 enum 新
+variant 要求下一个 pre-1.0 minor release 和下游 exhaustive-match 迁移说明。
 
 ## Acceptance
 
@@ -83,6 +77,7 @@ Agent 正在处理一个 turn（包括工具调用）时，后续输入已由
 
 - `docs/decisions/035-tui-history-scrollback-boundary.md`
 - `docs/decisions/039-runtime-event-semantic-single-flow.md`
+- `docs/decisions/049-steering-queue-projection-boundary.md`
 - `docs/backlog/active/TUI-004-state-model.md`
 - `docs/backlog/active/TUI-032-composer-multiline-wrap.md`
 - `crates/talos-conversation/src/engine.rs`
@@ -100,15 +95,3 @@ Agent 正在处理一个 turn（包括工具调用）时，后续输入已由
 - `cargo check --workspace --locked`
 - `cargo clippy --workspace --locked -- -D warnings`
 - `cargo test --workspace --locked`
-
-## 非目标
-
-- 不改变 Agent 的消息投递机制
-- 不引入多消息并发队列
-
-## Required Reads
-
-- `crates/talos-tui/src/app.rs` — 输入事件处理、排队逻辑
-- `crates/talos-tui/src/state.rs` — `TuiState`
-- `docs/backlog/active/TUI-004-state-model.md` — 状态模型
-- `docs/backlog/active/TUI-032-composer-multiline-wrap.md` — 多行输入（依赖项）
