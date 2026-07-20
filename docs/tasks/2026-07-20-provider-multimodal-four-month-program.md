@@ -313,6 +313,28 @@ On a hard stop:
   9. Update README/site/config reference.
   10. Run locked validation, commit, push, and update this checkpoint.
 
+### Checkpoint I147 (Review) — 2026-07-20
+
+- Completed task items: I147 (MODEL-008-A custom provider wizard and atomic config) — implementation complete.
+- Current commit: `cb9ed39` (origin/main).
+- Commands run and actual results:
+  - `cargo fmt --all -- --check` → exit 0 (clean).
+  - `cargo check --workspace --locked` → exit 0.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0 (all tests pass, 0 failures).
+  - `scripts/validate_project_governance.sh .` → 0 warnings.
+  - `git diff --check` → clean.
+- Open risks or deviations:
+  - Real-terminal walkthrough is pending maintainer acceptance. The iteration is marked Review, not Complete.
+  - Cumulative `UserInput` semver breaks: `SwitchModel`, `ConnectSelect` (I146), `RegisterCustomProvider` (I147). The release must be a minor bump.
+  - Wizard rendering (visual UI for the panel) is not implemented — the wizard step state machine, input handling, validation, and atomic save all work, but the visual rendering of the wizard panel in the TUI viewport is not yet coded. The wizard is functionally complete through the state machine; the rendering layer is a follow-up.
+- Next task item: I148 — MODEL-008-B model discovery, manual fallback, and immediate activation.
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint I147 Review).
+  3. Confirm `docs/iterations/I147-custom-provider-wizard-atomic-config.md` is in Review state.
+  4. Create `docs/iterations/I148-*.md` as a Planned baseline, then activate and begin implementation per MODEL-008-B acceptance criteria.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
