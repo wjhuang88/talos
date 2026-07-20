@@ -236,6 +236,28 @@ On a hard stop:
 2. Append a checkpoint to this file with: failure evidence, attempted measures, alternatives, affected downstream iterations, the specific maintainer decision required, and the exact recovery command.
 3. Stop subsequent iterations.
 
+## Checkpoints
+
+### Checkpoint P0 — 2026-07-20
+
+- Completed task items: P0 (governance baseline).
+- Current commit: `6cd1c54` (origin/main).
+- Commands run and actual results:
+  - `cargo fmt --all -- --check` → exit 0 (clean).
+  - `cargo check --workspace --locked` → exit 0.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0.
+  - `scripts/validate_project_governance.sh .` → 0 warnings (passed).
+  - `git diff --check` → exit 0 (clean).
+- Open risks or deviations: none. All planned P0 deliverables are in this commit: long-task record, 6 child Stories (MODEL-008-A/B, MODEL-009-A/B/C/D), parent Story updates, TUI-033 Ready marker, I146 Planned baseline, I144/I145 drift repair.
+- Next task item: I146 — activate the I146 iteration (mark it Active in the iteration owner doc and iterations README, then begin implementation of TUI-033 parameterless `/model` and `/connect` commands).
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint P0).
+  3. Confirm `docs/iterations/I146-tui-parameterless-model-connect-commands.md` exists and is in Planned state.
+  4. Activate I146: mark it Active in the iteration owner doc and `docs/iterations/README.md` "Current Iterations" table, then begin implementation per its Published Baseline.
+  5. After I146 implementation + validation, create a single `feat(tui): ...` commit, push to `origin/main`, and append Checkpoint I146 to this file.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
