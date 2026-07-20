@@ -390,6 +390,39 @@ On a hard stop:
   7. Write typed content serde round-trip tests, text-only regression, capability provenance tests.
   8. Run locked validation, commit, push, update checkpoint.
 
+### Checkpoint I150 (Review) — 2026-07-20
+
+- Completed task items: I150 (MODEL-009-B capability model, content types, and persistence foundation) — core types implemented.
+- Current commit: `b3cc943` (origin/main).
+- Commands run and actual results:
+  - `cargo fmt --all -- --check` → clean.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0 (all tests pass, 0 failures).
+  - `scripts/validate_project_governance.sh .` → 0 warnings.
+  - `git diff --check` → clean.
+- Deliverables:
+  - `ContentPart` enum (Text + Image with path/mime/byte_count) in `talos-core/src/message.rs`.
+  - `Message::Multimodal { parts: Vec<ContentPart> }` additive variant.
+  - `ImageInputCapability` enum (Supported/Unsupported/Unknown) with `from_metadata()` and `allows_attachment()` in `talos-core/src/model.rs`.
+  - All exhaustive match sites updated: session (jsonl + durable), provider (openai + anthropic), agent (compaction + token), TUI (scrollback).
+  - 7 tests: ContentPart Text/Image serde round-trip, Message::Multimodal serde round-trip, Message::User regression, ImageInputCapability Supported/Unsupported/Unknown.
+- Open risks or deviations:
+  - Provider adapters extract text only from Multimodal (image wire mapping is I152 scope).
+  - TUI scrollback returns None for Multimodal (rendering is I151/I152 scope).
+  - Session resume/export/copy tests for Multimodal path-reference persistence not yet written.
+  - Public API semver impact inventory and migration notes not yet documented.
+  - The `image` crate dependency not yet added (needed for I151 decoder boundary).
+- Next task item: I151 — MODEL-009-C safe local image ingestion (path authorization, MIME/magic-byte, size/pixel/count limits, catch_unwind).
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint I150 Review).
+  3. Confirm `ContentPart` and `ImageInputCapability` are in `talos-core`.
+  4. Add `image` crate dependency to workspace Cargo.toml.
+  5. Implement image path validation (canonicalize, regular file, MIME, magic-byte, size/pixel/count limits).
+  6. Add `catch_unwind` at every decoder boundary.
+  7. Write adversarial fixture tests.
+  8. Run locked validation, commit, push, update checkpoint.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
