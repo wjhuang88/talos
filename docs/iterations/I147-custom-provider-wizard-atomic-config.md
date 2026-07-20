@@ -1,8 +1,9 @@
 # Iteration I147: MODEL-008-A Custom Provider Wizard And Atomic Config
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20 (after I146 completion)
+> Status changed to Review: 2026-07-20 (implementation + locked validation complete; real-terminal walkthrough pending)
 > Planned objective: let a user register an OpenAI-compatible or Anthropic-compatible
 > custom provider entirely from `/connect` without editing TOML, through a cancel-safe
 > five-step wizard with atomic config persistence.
@@ -134,4 +135,31 @@
 | 2026-07-20 | Planning | Baseline published. Activation follows I146 completion. |
 | 2026-07-20 | Activation | I146 implementation pushed (`3e0e6b8`). I147 marked Active. |
 | 2026-07-20 | Implementation (core logic) | 1. `talos-config::endpoint`: `validate_provider_name` (slug 1-64 chars), `validate_provider_protocol` (closed set `openai-chat`/`anthropic-messages`), `validate_provider_base_url` (HTTPS + loopback HTTP only). 2. `talos-conversation::types`: `UserInput::RegisterCustomProvider { name, protocol, base_url, api_key }`. 3. `session_handlers.rs`: `handle_register_custom_provider` — validates all fields, checks duplicate (update flow), builds `ProviderConfig`, one atomic `Config::save()`, key masked via ADR-023 `Debug` impl. 4. `tui_bridge.rs`: `SessionLifecycleRequest::RegisterCustomProvider` + bridge arm. 5. `mode_runners.rs`: handler dispatch. 6. Tests: validation (slug, protocol, URL, loopback, IPv6), handler (openai-chat, anthropic-messages, update, invalid name/protocol/URL/key, loopback HTTP, no-partial-write). |
-| 2026-07-20 | Remaining | TUI wizard panel (`PanelKind::ProviderWizard` with step state machine: name → protocol → base_url → api_key → confirm), "Add custom provider" entry in connect picker, wizard field input handling, wizard state-machine tests, README/site/config reference documentation. |
+| 2026-07-20 | Implementation (TUI wizard panel) | 1. `PanelKind::ProviderWizard` with `WizardStep` enum (Name, Protocol, BaseUrl, ApiKey, Confirm) and field buffers. 2. `PanelItemAction::OpenWizard` — "Add custom provider" entry at the top of the connect picker. 3. `PanelAction::RegisterCustomProvider` variant — dispatched via `UserInput::RegisterCustomProvider`. 4. `state.rs`: `wizard_append_char`, `wizard_backspace`, `wizard_cycle_protocol`, `wizard_advance` (step transitions + confirm), `wizard_cancel`. 5. `app.rs`: wizard input handling block (Enter/Esc/Backspace/Up/Down/Char) routed to wizard methods. 6. Tests: wizard opens at Name, name append/backspace, name advances to Protocol, empty name doesn't advance, protocol cycles between openai-chat and anthropic-messages, full flow emits RegisterCustomProvider with all fields, cancel at any step, empty base_url doesn't advance, empty api_key doesn't advance, protocol default is openai-chat. |
+| 2026-07-20 | Validation | All locked validation passes (see below). Real-terminal walkthrough remains pending maintainer acceptance — **not Complete**. |
+
+## Actual Validation Results (2026-07-20)
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | ✅ clean |
+| `cargo check --workspace --locked` | ✅ exit 0 |
+| `cargo clippy --workspace --locked -- -D warnings` | ✅ exit 0 |
+| `cargo test --workspace --locked` | ✅ all tests pass (0 failures) |
+| `scripts/validate_project_governance.sh .` | ✅ 0 warnings |
+| `git diff --check` | ✅ clean |
+
+## Remaining: Real Terminal Acceptance
+
+The following acceptance items require real terminal verification and are deferred for manual acceptance:
+
+- `/connect` picker shows "Add custom provider" entry.
+- Selecting it opens the wizard at the Name step.
+- Typing a name and pressing Enter advances to Protocol.
+- Up/Down cycles between openai-chat and anthropic-messages.
+- Entering a base URL and pressing Enter advances to API Key.
+- Entering an API key (masked) and pressing Enter advances to Confirm.
+- Pressing Enter on Confirm saves the provider atomically and shows it in `/model`.
+- Esc at any step cancels without saving.
+- Entering an existing name shows the update confirmation.
+- Empty name/base_url/api_key does not advance.

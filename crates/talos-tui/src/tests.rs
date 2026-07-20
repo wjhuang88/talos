@@ -2055,4 +2055,215 @@ mod tests {
         let text: String = lines.iter().map(|l| l.text.as_str()).collect();
         assert!(text.contains("200 thinking"));
     }
+
+    // ── I147 wizard state-machine tests ──────────────────────────────
+
+    #[test]
+    fn wizard_opens_at_name_step() {
+        let state = TuiState::new();
+        let panel = crate::panel_state::BottomPanelState::open_provider_wizard();
+        assert!(panel.is_open);
+        assert!(panel.is_provider_wizard());
+    }
+
+    #[test]
+    fn wizard_name_step_appends_and_backspaces() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+
+        state.wizard_append_char('m');
+        state.wizard_append_char('y');
+        state.wizard_append_char('-');
+        state.wizard_append_char('g');
+        state.wizard_append_char('w');
+
+        let name = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { name, .. }) => name.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(name, "my-gw");
+
+        state.wizard_backspace();
+        let name = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { name, .. }) => name.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(name, "my-g");
+    }
+
+    #[test]
+    fn wizard_name_advances_to_protocol() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        for ch in "my-gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        let action = state.wizard_advance();
+        assert_eq!(action, None);
+        let step = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { step, .. }) => *step,
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(step, crate::state::WizardStep::Protocol);
+    }
+
+    #[test]
+    fn wizard_empty_name_does_not_advance() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        let action = state.wizard_advance();
+        assert_eq!(action, None);
+        let step = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { step, .. }) => *step,
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(step, crate::state::WizardStep::Name);
+    }
+
+    #[test]
+    fn wizard_protocol_cycles_between_openai_and_anthropic() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        for ch in "gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        state.wizard_advance();
+
+        let protocol = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(protocol, "openai-chat");
+
+        state.wizard_cycle_protocol();
+        let protocol = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(protocol, "anthropic-messages");
+
+        state.wizard_cycle_protocol();
+        let protocol = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(protocol, "openai-chat");
+    }
+
+    #[test]
+    fn wizard_full_flow_emits_register_action() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+
+        // Step 1: Name
+        for ch in "my-gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        assert_eq!(state.wizard_advance(), None);
+
+        // Step 2: Protocol (default openai-chat, cycle to anthropic)
+        state.wizard_cycle_protocol();
+        assert_eq!(state.wizard_advance(), None);
+
+        // Step 3: Base URL
+        for ch in "https://api.example.com/v1".chars() {
+            state.wizard_append_char(ch);
+        }
+        assert_eq!(state.wizard_advance(), None);
+
+        // Step 4: API Key
+        for ch in "secret-key".chars() {
+            state.wizard_append_char(ch);
+        }
+        assert_eq!(state.wizard_advance(), None);
+
+        // Step 5: Confirm
+        let action = state.wizard_advance();
+        assert!(action.is_some());
+        match action.unwrap() {
+            crate::state::PanelAction::RegisterCustomProvider {
+                name,
+                protocol,
+                base_url,
+                api_key,
+            } => {
+                assert_eq!(name, "my-gw");
+                assert_eq!(protocol, "anthropic-messages");
+                assert_eq!(base_url, "https://api.example.com/v1");
+                assert_eq!(api_key, "secret-key");
+            }
+            other => panic!("expected RegisterCustomProvider, got {other:?}"),
+        }
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn wizard_cancel_at_any_step_closes_without_side_effects() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        for ch in "gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        state.wizard_advance();
+        state.wizard_cancel();
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn wizard_empty_base_url_does_not_advance() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        for ch in "gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        state.wizard_advance();
+        state.wizard_advance();
+        let step = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { step, .. }) => *step,
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(step, crate::state::WizardStep::BaseUrl);
+        assert_eq!(state.wizard_advance(), None);
+        let step = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { step, .. }) => *step,
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(step, crate::state::WizardStep::BaseUrl);
+    }
+
+    #[test]
+    fn wizard_empty_api_key_does_not_advance() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        for ch in "gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        state.wizard_advance();
+        state.wizard_advance();
+        for ch in "https://api.example.com/v1".chars() {
+            state.wizard_append_char(ch);
+        }
+        state.wizard_advance();
+        assert_eq!(state.wizard_advance(), None);
+        let step = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { step, .. }) => *step,
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(step, crate::state::WizardStep::ApiKey);
+    }
+
+    #[test]
+    fn wizard_protocol_step_default_is_openai_chat() {
+        let mut state = TuiState::new();
+        state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+        for ch in "gw".chars() {
+            state.wizard_append_char(ch);
+        }
+        state.wizard_advance();
+        let protocol = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(protocol, "openai-chat");
+    }
 }

@@ -445,10 +445,14 @@ provider credentials. `/connect` shows provider setup choices from the
 packaged offline `models.toml`, asks for an API key, then offers an optional custom endpoint
 (`base_url`) for gateway-compatible providers. Standard providers whose catalog metadata supplies a
 default endpoint submit after the API key without prompting for a URL; custom providers (or any row
-without a built-in endpoint) still require a non-empty `base_url`. A fresh install does not need a
-manual catalog initialization step: Talos does not create a runtime `catalog.db` for model
-metadata. Model/provider metadata updates are build-time only through `BUILD_MODELS=1`; the legacy
-`--import-models` flag is kept as a no-op compatibility notice.
+without a built-in endpoint) still require a non-empty `base_url`. The `/connect` picker also has an
+**Add custom provider** entry that opens a cancel-safe wizard: enter a provider name (1–64 char
+slug), choose a protocol (`openai-chat` or `anthropic-messages`), enter an HTTPS base URL (HTTP only
+for loopback), enter an API key (masked), and confirm. The wizard saves all fields as one atomic
+config update — cancellation or any validation error leaves your existing config unchanged. A fresh
+install does not need a manual catalog initialization step: Talos does not create a runtime
+`catalog.db` for model metadata. Model/provider metadata updates are build-time only through
+`BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
 
 ## Built-In Capabilities
 

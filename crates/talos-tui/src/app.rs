@@ -1062,6 +1062,37 @@ impl Tui {
                     }
                     return false;
                 }
+                if self.state.slash_menu.is_provider_wizard() {
+                    match key.code {
+                        KeyCode::Enter => {
+                            if let Some(t) = self.last_char_time
+                                && t.elapsed() < IME_ENTER_WINDOW
+                            {
+                                return false;
+                            }
+                            if let Some(action) = self.state.wizard_advance() {
+                                self.dispatch_panel_action(action);
+                            }
+                            self.state.input_clear();
+                        }
+                        KeyCode::Esc => {
+                            self.state.wizard_cancel();
+                            self.state.input_clear();
+                        }
+                        KeyCode::Backspace => {
+                            self.state.wizard_backspace();
+                        }
+                        KeyCode::Up | KeyCode::Down => {
+                            self.state.wizard_cycle_protocol();
+                        }
+                        KeyCode::Char(c) => {
+                            self.last_char_time = Some(Instant::now());
+                            self.state.wizard_append_char(c);
+                        }
+                        _ => {}
+                    }
+                    return false;
+                }
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         let was_processing = self.state.status.is_processing;

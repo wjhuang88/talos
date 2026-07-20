@@ -19,7 +19,6 @@ pub(crate) enum PanelAction {
     ConnectSelect {
         provider: String,
     },
-    #[allow(dead_code)]
     RegisterCustomProvider {
         name: String,
         protocol: String,
@@ -94,7 +93,6 @@ pub(crate) enum PanelKind {
     },
     /// Custom provider wizard (MODEL-008-A/I147). Five-step state machine:
     /// Name → Protocol → BaseUrl → ApiKey → Confirm.
-    #[allow(dead_code)]
     ProviderWizard {
         step: WizardStep,
         name: String,
@@ -116,7 +114,6 @@ pub(crate) enum PanelKind {
 }
 
 /// Wizard step for the custom provider registration flow (MODEL-008-A/I147).
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WizardStep {
     Name,
@@ -547,6 +544,10 @@ impl BottomPanelState {
 
     pub(crate) fn is_credential_input(&self) -> bool {
         matches!(self.kind, Some(PanelKind::CredentialInput { .. }))
+    }
+
+    pub(crate) fn is_provider_wizard(&self) -> bool {
+        matches!(self.kind, Some(PanelKind::ProviderWizard { .. }))
     }
 
     pub(crate) fn is_variant_picker(&self) -> bool {

@@ -384,7 +384,7 @@ talos --available-models --available-models-filter openai/gpt-4
 talos --available-models --available-models-all
 ```
 
-使用 `/model` 在已配置凭据的提供商之间切换模型。选择器仅显示当前可用的模型，按提供商分组，并将当前使用的模型固定在"当前"分组中。`/model` 和 `/connect` 均为**严格无参数命令**：输入 `/model gpt-4o` 或 `/connect openai` 不会直接切换模型或开始凭据录入，而是显示一条纠正信息并打开相应选择器，让用户在面板中搜索和选择。使用 `/connect` 添加或更新提供商凭据。`/connect` 会从打包的离线 `models.toml` 显示提供商配置选项，提示输入 API key，并可选地提供自定义端点（`base_url`）以适配兼容网关的提供商。对于目录元数据已内置默认端点的标准提供商，在输入 API key 后可直接提交，无需填写 URL；自定义提供商（或任何没有内置端点的行）仍需填写非空的 `base_url`。全新安装无需手动初始化目录：Talos 不再为模型元数据创建运行时 `catalog.db`。模型/提供商元数据更新只通过 `BUILD_MODELS=1` 在构建期完成；旧的 `--import-models` 标志仅保留为 no-op 兼容提示。
+使用 `/model` 在已配置凭据的提供商之间切换模型。选择器仅显示当前可用的模型，按提供商分组，并将当前使用的模型固定在"当前"分组中。`/model` 和 `/connect` 均为**严格无参数命令**：输入 `/model gpt-4o` 或 `/connect openai` 不会直接切换模型或开始凭据录入，而是显示一条纠正信息并打开相应选择器，让用户在面板中搜索和选择。使用 `/connect` 添加或更新提供商凭据。`/connect` 会从打包的离线 `models.toml` 显示提供商配置选项，提示输入 API key，并可选地提供自定义端点（`base_url`）以适配兼容网关的提供商。对于目录元数据已内置默认端点的标准提供商，在输入 API key 后可直接提交，无需填写 URL；自定义提供商（或任何没有内置端点的行）仍需填写非空的 `base_url`。`/connect` 选择器还提供**添加自定义提供商**入口，打开一个可取消的向导：输入提供商名称（1–64 位 slug）、选择协议（`openai-chat` 或 `anthropic-messages`）、输入 HTTPS base URL（仅 loopback 可用 HTTP）、输入 API key（已脱敏），然后确认。向导以一次原子配置更新保存所有字段——取消或任何验证错误都会保持现有配置不变。全新安装无需手动初始化目录：Talos 不再为模型元数据创建运行时 `catalog.db`。模型/提供商元数据更新只通过 `BUILD_MODELS=1` 在构建期完成；旧的 `--import-models` 标志仅保留为 no-op 兼容提示。
 
 ## Skills
 

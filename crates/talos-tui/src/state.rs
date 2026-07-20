@@ -13,7 +13,7 @@ use talos_core::ApprovalChoice;
 
 pub(crate) use crate::panel_state::{
     BottomPanelState, CredentialField, PanelAcceptMode, PanelAction, PanelItemAction, PanelKind,
-    SLASH_MENU_MAX_VISIBLE,
+    SLASH_MENU_MAX_VISIBLE, WizardStep,
 };
 
 pub(crate) const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
@@ -95,6 +95,10 @@ impl TuiState {
         }
         if self.slash_menu.is_credential_input() {
             self.credential_append_str(text);
+        } else if self.slash_menu.is_provider_wizard() {
+            for ch in text.chars() {
+                self.wizard_append_char(ch);
+            }
         } else if self.slash_menu.is_open {
             self.input_append_str(text);
             let query = self.panel_query().to_string();
@@ -296,6 +300,120 @@ impl TuiState {
     pub(crate) fn credential_cancel(&mut self) {
         self.slash_menu.credential_buffer.clear();
         self.slash_menu.base_url_buffer.clear();
+        self.slash_menu.close();
+    }
+
+    pub(crate) fn wizard_append_char(&mut self, ch: char) {
+        let Some(PanelKind::ProviderWizard {
+            step,
+            name,
+            base_url,
+            api_key,
+            ..
+        }) = &mut self.slash_menu.kind
+        else {
+            return;
+        };
+        match *step {
+            WizardStep::Name => name.push(ch),
+            WizardStep::BaseUrl => base_url.push(ch),
+            WizardStep::ApiKey => api_key.push(ch),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn wizard_backspace(&mut self) {
+        let Some(PanelKind::ProviderWizard {
+            step,
+            name,
+            base_url,
+            api_key,
+            ..
+        }) = &mut self.slash_menu.kind
+        else {
+            return;
+        };
+        match *step {
+            WizardStep::Name => name.pop(),
+            WizardStep::BaseUrl => base_url.pop(),
+            WizardStep::ApiKey => api_key.pop(),
+            _ => None,
+        };
+    }
+
+    pub(crate) fn wizard_cycle_protocol(&mut self) {
+        let Some(PanelKind::ProviderWizard { step, protocol, .. }) = &mut self.slash_menu.kind
+        else {
+            return;
+        };
+        if *step == WizardStep::Protocol {
+            *protocol = if protocol == "openai-chat" {
+                "anthropic-messages"
+            } else {
+                "openai-chat"
+            }
+            .to_string();
+        }
+    }
+
+    pub(crate) fn wizard_advance(&mut self) -> Option<PanelAction> {
+        let Some(PanelKind::ProviderWizard {
+            step,
+            name,
+            protocol,
+            base_url,
+            api_key,
+            ..
+        }) = &mut self.slash_menu.kind
+        else {
+            return None;
+        };
+        match *step {
+            WizardStep::Name => {
+                if name.trim().is_empty() {
+                    return None;
+                }
+                *step = WizardStep::Protocol;
+                if protocol.is_empty() {
+                    *protocol = "openai-chat".to_string();
+                }
+                None
+            }
+            WizardStep::Protocol => {
+                if protocol.is_empty() {
+                    *protocol = "openai-chat".to_string();
+                }
+                *step = WizardStep::BaseUrl;
+                None
+            }
+            WizardStep::BaseUrl => {
+                if base_url.trim().is_empty() {
+                    return None;
+                }
+                *step = WizardStep::ApiKey;
+                None
+            }
+            WizardStep::ApiKey => {
+                if api_key.trim().is_empty() {
+                    return None;
+                }
+                *step = WizardStep::Confirm;
+                None
+            }
+            WizardStep::Confirm => {
+                let action = PanelAction::RegisterCustomProvider {
+                    name: name.clone(),
+                    protocol: protocol.clone(),
+                    base_url: base_url.clone(),
+                    api_key: api_key.clone(),
+                };
+                self.slash_menu.close();
+                Some(action)
+            }
+        }
+    }
+
+    pub(crate) fn wizard_cancel(&mut self) {
         self.slash_menu.close();
     }
 
