@@ -4,6 +4,10 @@
 //! are sent to a provider. Reuses SEC-001/ADR-047 path authorization
 //! and enforces MIME/magic-byte, byte, pixel, and count limits per ADR-050.
 
+// This module is fully implemented and tested (18 tests) but not yet
+// wired into the TUI attachment UX (I152 scope). The public entry
+// point is `create_image_content_part` which will be called from the
+// TUI when the attachment flow is wired.
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
@@ -140,6 +144,27 @@ pub(crate) fn validate_image_path(
     }
 
     Ok((canonical, file_size, mime.to_string()))
+}
+
+/// Validates an image path and returns a `ContentPart::Image` ready for
+/// inclusion in a `Message::Multimodal` (ADR-050).
+///
+/// This is the public entry point for the TUI attachment flow (I152).
+/// It performs all validation checks (regular file, MIME/magic-byte,
+/// byte/aggregate/count limits, canonicalization) before returning
+/// the structured content part.
+pub fn create_image_content_part(
+    path: &Path,
+    current_count: usize,
+    current_total_bytes: u64,
+) -> Result<talos_core::message::ContentPart, ImageValidationError> {
+    let (canonical, byte_count, mime) =
+        validate_image_path(path, current_count, current_total_bytes)?;
+    Ok(talos_core::message::ContentPart::Image {
+        path: canonical,
+        mime,
+        byte_count,
+    })
 }
 
 fn read_file_header(path: &Path, len: usize) -> Result<Vec<u8>, ImageValidationError> {
@@ -337,5 +362,31 @@ mod tests {
         assert!(!is_supported_mime("image/bmp"));
         assert!(!is_supported_mime("image/tiff"));
         assert!(!is_supported_mime("application/pdf"));
+    }
+
+    #[test]
+    fn create_image_content_part_succeeds_for_valid_png() {
+        let (path, _dir) = write_temp_file(&make_png_header());
+        let result = create_image_content_part(&path, 0, 0);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            talos_core::message::ContentPart::Image {
+                path,
+                mime,
+                byte_count,
+            } => {
+                assert!(path.exists());
+                assert_eq!(mime, "image/png");
+                assert!(byte_count > 0);
+            }
+            _ => panic!("expected ContentPart::Image"),
+        }
+    }
+
+    #[test]
+    fn create_image_content_part_rejects_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = create_image_content_part(dir.path(), 0, 0);
+        assert!(result.is_err());
     }
 }
