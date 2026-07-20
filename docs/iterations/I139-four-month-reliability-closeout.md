@@ -87,6 +87,6 @@ The original closeout evidence was reopened and superseded. I135-I138 now close 
 failure injection, a real loaded-package product path, a byte-stable five-policy No-Go benchmark,
 and restoration of the production memory baseline with semver-compatible inert API retention.
 `cargo fmt`, locked check/Clippy/workspace tests, release preflight, governance validation, and
-`git diff --check` all pass on the corrected working tree. I139 remains Review until the correction
-is committed/pushed and replayed from clean `main`, as required by its published acceptance and the
-execution package final completion rule. REL-002 remains NO-GO; no release action is implied.
+`git diff --check` all passed on the corrected working tree. The correction was committed, pushed,
+replayed from clean `main`, and released in immutable `v0.3.8`; I139 is Complete. REL-002 remains
+NO-GO and the pre-1.0 release does not imply v1 readiness.

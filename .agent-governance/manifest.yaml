@@ -4,7 +4,7 @@ profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
 last_audited_at: "2026-07-20"
-status_note: "I141 is Complete and shipped in v0.3.9. I142/TUI-032 is Complete after automated validation and maintainer-guided rebuilt-binary acceptance on 2026-07-20; the implementation shipped in v0.4.0. REL-002 remains NO-GO."
+status_note: "I142/TUI-032 is Complete and shipped in v0.4.0. WEB-006/I143 is the next planned public-documentation candidate; ARCH-034/I144 is a deferred audit-only baseline behind I143. I018/I139 stale inventory is reconciled. REL-002 remains NO-GO."
 
 governance:
   skill_name: "agent-project-governance"

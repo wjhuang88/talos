@@ -3,11 +3,10 @@
 **User can**: Run Talos with bounded local log files and review built-in prompt behavior as
 standalone embedded assets.
 
-## Status: Planned
+## Status: Complete — fulfilled by I047 (reconciled 2026-07-20)
 
-I047 selects the same bounded log + embedded prompt asset acceptance as prerequisite closure for
-I019. Preserve this I018 baseline; if I047 completes the acceptance, record I018 as
-fulfilled/superseded by I047 during closeout rather than rewriting this plan.
+I047 delivered the same bounded log + embedded prompt asset acceptance as prerequisite closure for
+I019. This preserved baseline is fulfilled by I047; no separate I018 implementation remains.
 
 ## Scope
 
@@ -16,17 +15,17 @@ before memory and exploration make logs and prompts more important.
 
 ## Selected Stories
 
-- [ ] #ARCH-S8 R2: file logging with rotation and retention under ADR-014.
-- [ ] #I018-S1: extract built-in prompt text into compile-time embedded prompt assets under ADR-015.
+- [x] #ARCH-S8 R2: file logging with rotation and retention under ADR-014.
+- [x] #I018-S1: extract built-in prompt text into compile-time embedded prompt assets under ADR-015.
 
 ## Acceptance Criteria
 
-- [ ] TUI log output remains file-backed and cannot grow without configured bounds.
-- [ ] `[log.file]` supports enabled/path/max-size/max-files/rotation configuration.
-- [ ] Non-TUI modes still work with stderr-only logging by default.
-- [ ] Built-in prompt assets live in standalone files and are embedded at compile time.
-- [ ] Tests verify required prompt assets are present and non-empty.
-- [ ] `cargo test -p talos-config -p talos-cli -p talos-agent` passes.
+- [x] TUI log output remains file-backed and cannot grow without configured bounds.
+- [x] `[log.file]` supports enabled/path/max-size/max-files/rotation configuration.
+- [x] Non-TUI modes still work with stderr-only logging by default.
+- [x] Built-in prompt assets live in standalone files and are embedded at compile time.
+- [x] Tests verify required prompt assets are present and non-empty.
+- [x] I047 locked validation passed.
 
 ## Out of Scope
 

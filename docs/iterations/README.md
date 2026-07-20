@@ -173,11 +173,13 @@ docs/iterations/
 | I140 | SEC-001 External-Path Authorization | **Complete** (2026-07-17) | Exact tool/nature/path approval across Runtime/CLI/TUI accepted after Deny/headless/symlink fail-closed security review and full locked replay. See `I140-sec001-external-path-authorization.md`. |
 | I141 | MODEL-007 Variant Picker And TUI-031 Contextual Status Bar | **Complete** (2026-07-18) | Three-stage Provider → Model → Variant picker (ADR-048 amended) with conditional variant stage mirroring `/connect` UX, Recent group persisted at `~/.talos/recent_models.json`, and contextual status bar (`gix`-based branch/dirty, platform label, width-aware tiers). Full locked validation ladder, release preflight, and governance validation all green. See `I141-model-variant-picker-and-status-bar.md`. |
 | I142 | TUI-032 Composer Multiline Wrap | **Complete** (maintainer acceptance 2026-07-20) | Composer/history wrapping, CJK width, cursor/editing, height/scroll, Shift+Enter, Ctrl+J fallback, and bare-Enter submission passed the guided rebuilt-binary acceptance after automated regressions and the full locked validation ladder. Plan at `.sisyphus/plans/tui-032-composer-multiline-wrap.md`. See `I142-composer-multiline-wrap.md`. |
+| I143 | Public Documentation Hub And v0.4.0 Site Sync | **Planned** (2026-07-20) | WEB-006-A/B/C deliver bilingual docs hubs, current release truth, CTA accessibility repair and drift gates. Not activated. See `I143-public-documentation-hub.md`. |
+| I144 | Architecture Sustainability Audit | **Planned — deferred until I143 closes** (2026-07-20) | ARCH-034-A audit only: whole-workspace evidence, boundary/duplication/extension verdicts and remediation register; production refactoring is excluded. See `I144-architecture-sustainability-audit.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
 
-## Non-Terminal Inventory (2026-06-25 Refresh)
+## Non-Terminal Inventory (2026-07-20 Refresh)
 
 This inventory is the required disposition before selecting or activating more work. It does not
 rewrite published iteration baselines.
@@ -185,7 +187,7 @@ rewrite published iteration baselines.
 | Iteration | Current State | Disposition Before Next Activation |
 |---|---|---|
 | I011 | Complete (2026-06-30 closure) | S1 delivered; S2 (provider plugin arch) superseded by I015 (PROV-001 Complete). Removed from non-terminal inventory. |
-| I018 | Planned | Deferred; remains a valid future observability/prompt-assets baseline. |
+| I018 | Complete — fulfilled by I047 (reconciled 2026-07-20) | Removed from non-terminal inventory; I047 delivered bounded logs and embedded prompt assets under ADR-014/015. |
 | I019 | Complete (2026-06-29, via I050-I053) | Stale entry corrected 2026-07-15: I019 closed Complete; previously listed as Planned/blocked. |
 | I020 | Complete (2026-06-29, via I054-I055) | Stale entry corrected 2026-07-15: I020 closed Complete; previously listed as Planned/blocked. |
 | I028 | Superseded before implementation | Removed from activation inventory; I124-I127 own the changed Ask-gated acceptance target. |
@@ -204,7 +206,9 @@ rewrite published iteration baselines.
 | I055 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I055 doc). |
 | I056 | Complete (2026-06-29) | Removed from non-terminal inventory (Complete record in I056 doc). |
 | I135-I138, I140 | Complete (corrected 2026-07-17) | Removed after corrective evidence, security review, full locked workspace tests, release preflight, governance validation, and diff check passed. |
-| I139 | Review (corrected 2026-07-17) | Commit/push the accepted correction, then replay the close gate from clean `main`. |
+| I139 | Complete (inventory reconciled 2026-07-20) | Correction was committed/pushed, replayed from clean `main`, and released as v0.3.8. Removed from non-terminal inventory. |
+| I143 | Planned (2026-07-20) | Next candidate; activate only after explicit maintainer selection. |
+| I144 | Planned (2026-07-20) | Explicitly deferred until I143 closes; audit-only baseline, no remediation authorization. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |
