@@ -213,11 +213,13 @@ pub(crate) fn message_parts(message: &Message) -> (String, String) {
                         mime,
                         byte_count,
                     } => {
+                        let filename = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("(unknown)");
                         content.push_str(&format!(
                             " [Image: {} ({} bytes, {})]",
-                            path.display(),
-                            byte_count,
-                            mime
+                            filename, byte_count, mime
                         ));
                     }
                 }
