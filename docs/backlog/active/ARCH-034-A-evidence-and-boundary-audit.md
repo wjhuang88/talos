@@ -4,7 +4,7 @@
 |---|---|
 | Type | Architecture Spike |
 | Parent Epic | ARCH-034 |
-| Status | In Progress — I144 |
+| Status | Complete — I144 (2026-07-20) |
 | Priority | P1 |
 
 ## Deliverables

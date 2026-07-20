@@ -1,6 +1,6 @@
 # Iteration I144: Architecture Sustainability Audit
 
-> Document status: In Progress
+> Document status: Complete (2026-07-20)
 > Published plan date: 2026-07-20
 > Planned objective: execute ARCH-034-A and produce an evidence-backed whole-workspace
 > architecture verdict and remediation register.
@@ -32,3 +32,4 @@
 | 2026-07-20 | Planning | Baseline published behind I143. No audit verdict or remediation is claimed. |
 | 2026-07-20 | Availability | I143 completed; I144 is now eligible for explicit maintainer activation. No audit work has started. |
 | 2026-07-20 | Activation | Inventory: I143 is Complete; no other Active or Review iteration is recorded. I144 selects only ARCH-034-A; ARCH-034-B/C remain deferred in Refinement. |
+| 2026-07-20 | Execution and acceptance | Completed ARCH-034-A without production changes. The audit report and 20-item finding register now use an item-scoped `#[cfg(test)]` non-test LOC method (111,376 total / 70,869 non-test / 40,507 cfg-test lines), reconcile ARCH-011/022/023/030, classify 21 crates and seven extension scenarios, and retain every remediation as Proposed or Deferred. Independent reproduction of the embedded LOC procedure, `jq empty`, governance validation, and `git diff --check` passed. R03c remains an ADR-007 policy/security-review decision; no sandbox exception was claimed. |
