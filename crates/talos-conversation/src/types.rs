@@ -321,6 +321,12 @@ pub enum UiOutput {
     /// exhaustive `UiOutput` matches must add an arm or a wildcard fallback.
     /// The release containing this variant must be a minor bump, not a patch.
     SteeringQueueSnapshot(SteeringQueueSnapshot),
+    /// Request to validate and attach a local image (MODEL-009-D/I152).
+    /// The bridge calls `create_image_content_part` to validate the path
+    /// and returns a `ContentPart::Image` or an error message.
+    AttachImageRequest {
+        path: String,
+    },
     HydrateHistory(Vec<talos_core::message::Message>),
     Exit,
 }

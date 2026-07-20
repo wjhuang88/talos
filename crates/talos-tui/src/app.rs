@@ -769,6 +769,9 @@ impl Tui {
                 self.hydrate_history(&messages);
                 self.flush_pending_scrollback().ok();
             }
+            UiOutput::AttachImageRequest { .. } => {
+                // Handled by the bridge — should not reach the TUI directly.
+            }
         }
         false
     }

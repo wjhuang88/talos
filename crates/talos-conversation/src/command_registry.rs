@@ -295,6 +295,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
+        CommandDefinition {
+            name: "/attach",
+            aliases: &[],
+            usage: "/attach <path>",
+            description: "Attach a local image to the next message (vision models only)",
+            arg_hint: Some("<path>"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
     ])
 });
 

@@ -657,6 +657,17 @@ impl ConversationEngine {
             "/validate" => {
                 outputs.extend(self.handle_validate_command(arg));
             }
+            "/attach" => {
+                if arg.trim().is_empty() {
+                    let text =
+                        "[Error] /attach requires a file path. Usage: /attach <path>\n".to_string();
+                    outputs.push(content_block(MessageSource::Error, text));
+                } else {
+                    outputs.push(UiOutput::AttachImageRequest {
+                        path: arg.trim().to_string(),
+                    });
+                }
+            }
             _ => {
                 let text =
                     format!("[Error] Unknown command: {cmd}. Type /help for available commands.\n");

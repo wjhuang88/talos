@@ -177,6 +177,33 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                             runtime_skills.clone(),
                                         ).await;
                                     }
+                                    UiOutput::AttachImageRequest { path } => {
+                                        match crate::image_validation::create_image_content_part(
+                                            std::path::Path::new(&path),
+                                            0,
+                                            0,
+                                        ) {
+                                            Ok(content_part) => {
+                                                let summary = match &content_part {
+                                            talos_core::message::ContentPart::Image { path, mime, byte_count } =>
+                                                format!("{} ({} bytes, {})",
+                                                    path.file_name().unwrap_or_default().to_string_lossy(),
+                                                    byte_count, mime),
+                                            _ => String::new(),
+                                        };
+                                                let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                                                    source: MessageSource::System,
+                                                    text: format!("[System] Attached image: {summary}\n"),
+                                                }));
+                                            }
+                                            Err(e) => {
+                                                let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                                                    source: MessageSource::Error,
+                                                    text: format!("[Error] Image attachment failed: {e}\n"),
+                                                }));
+                                            }
+                                        }
+                                    }
                                     other => { let _ = ui_tx.send(other); }
                                 }
                             }
