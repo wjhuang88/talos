@@ -174,7 +174,7 @@ docs/iterations/
 | I141 | MODEL-007 Variant Picker And TUI-031 Contextual Status Bar | **Complete** (2026-07-18) | Three-stage Provider → Model → Variant picker (ADR-048 amended) with conditional variant stage mirroring `/connect` UX, Recent group persisted at `~/.talos/recent_models.json`, and contextual status bar (`gix`-based branch/dirty, platform label, width-aware tiers). Full locked validation ladder, release preflight, and governance validation all green. See `I141-model-variant-picker-and-status-bar.md`. |
 | I142 | TUI-032 Composer Multiline Wrap | **Complete** (maintainer acceptance 2026-07-20) | Composer/history wrapping, CJK width, cursor/editing, height/scroll, Shift+Enter, Ctrl+J fallback, and bare-Enter submission passed the guided rebuilt-binary acceptance after automated regressions and the full locked validation ladder. Plan at `.sisyphus/plans/tui-032-composer-multiline-wrap.md`. See `I142-composer-multiline-wrap.md`. |
 | I143 | Public Documentation Hub And v0.4.0 Site Sync | **Complete** (maintainer acceptance 2026-07-20) | WEB-006-A/B/C delivered bilingual docs hubs, current release truth, CTA accessibility repair and drift gates; static checks and manual browser QA passed. Pages deployment remains separately observable. See `I143-public-documentation-hub.md`. |
-| I144 | Architecture Sustainability Audit | **Planned — eligible next** (2026-07-20) | ARCH-034-A audit only: whole-workspace evidence, boundary/duplication/extension verdicts and remediation register; production refactoring is excluded. See `I144-architecture-sustainability-audit.md`. |
+| I144 | Architecture Sustainability Audit | **In Progress** (2026-07-20) | ARCH-034-A audit only: whole-workspace evidence, boundary/duplication/extension verdicts and remediation register; production refactoring is excluded. See `I144-architecture-sustainability-audit.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -208,7 +208,7 @@ rewrite published iteration baselines.
 | I135-I138, I140 | Complete (corrected 2026-07-17) | Removed after corrective evidence, security review, full locked workspace tests, release preflight, governance validation, and diff check passed. |
 | I139 | Complete (inventory reconciled 2026-07-20) | Correction was committed/pushed, replayed from clean `main`, and released as v0.3.8. Removed from non-terminal inventory. |
 | I143 | Complete (maintainer acceptance 2026-07-20) | WEB-006-A/B/C closed after static gates and manual browser QA; Pages deployment remains separately observable. |
-| I144 | Planned (2026-07-20) | Eligible after I143 completion; audit-only baseline, no remediation authorization. |
+| I144 | In Progress (2026-07-20) | ARCH-034-A audit only; no remediation authorization. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |

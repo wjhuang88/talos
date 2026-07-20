@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Type | Architecture Epic |
-| Status | Ready for audit; remediation gated |
+| Status | In Progress — I144 audit; remediation gated |
 | Priority | P1 |
-| Selected Iteration | I144 audit only (Planned after I143) |
+| Selected Iteration | I144 audit only (In Progress) |
 | Maintainer Value | Keep future delivery predictable as the workspace grows |
 
 ## Goal
