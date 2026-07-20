@@ -156,6 +156,24 @@ impl Tui {
                     .open_credential_input(&provider, None, false, None);
                 self.state.input_clear();
             }
+            PanelAction::SwitchModel {
+                provider,
+                model_id,
+                variant,
+            } => {
+                if let Some(ref tx) = self.user_input_tx {
+                    let _ = tx.send(UserInput::SwitchModel {
+                        provider,
+                        model_id,
+                        variant,
+                    });
+                }
+            }
+            PanelAction::ConnectSelect { provider } => {
+                if let Some(ref tx) = self.user_input_tx {
+                    let _ = tx.send(UserInput::ConnectSelect { provider });
+                }
+            }
             PanelAction::None => {}
         }
     }

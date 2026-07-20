@@ -1,7 +1,9 @@
 # Iteration I146: TUI-033 Parameterless Model And Provider Commands
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-07-20
+> Activated: 2026-07-20 (after P0 governance commit `6cd1c54` + checkpoint `abc89b4` pushed to origin/main)
+> Status changed to Review: 2026-07-20 (implementation + locked validation complete; real-terminal walkthrough pending maintainer acceptance)
 > Planned objective: make TUI `/model` and `/connect` strict no-argument menu commands so all
 > provider/model selection and search happens inside their existing panels, not through
 > parameterized command text.
@@ -145,3 +147,32 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-20 | Planning | Baseline published as part of the P0 governance commit. No implementation, release, tag, or production-code change has started. Activation requires the P0 governance commit to be pushed to `origin/main` first. |
+| 2026-07-20 | Activation | P0 governance commit `6cd1c54` + checkpoint `abc89b4` pushed to `origin/main`. I146 marked Active. |
+| 2026-07-20 | Implementation | 1. Command registry: `/model` and `/connect` `arg_hint` changed from `Some(...)` to `None` (DirectExecution); usage/description updated. 2. TUI bridge: intercepts non-empty `ModelSwitchRequest` and `ConnectProviderRequest` — emits a bounded correction `Content::Block` and forwards an empty-arg `ModelSwitchRequest`/`ConnectProviderRequest` to the lifecycle handler, which opens the picker. 3. Structured identity: `UserInput::SwitchModel { provider, model_id, variant }` and `UserInput::ConnectSelect { provider }` added to `talos-conversation::types`; `PanelItemAction::ConnectSelect` added to `talos-tui::panel_state`; `PanelAction::SwitchModel` and `PanelAction::ConnectSelect` added; `SwitchModel` panel selection no longer reserializes to `/model {value}` command text; connect picker no longer reserializes to `/connect {provider}` command text. 4. TUI bridge handles `UserInput::SwitchModel` and `UserInput::ConnectSelect` by forwarding structured data directly to `SessionLifecycleRequest::ModelSwitch` / `SessionLifecycleRequest::ConnectRequest`, bypassing the engine's command parser. 5. Tests: command registry DirectExecution assertions, slash-panel Enter/Tab completion for `/model` and `/connect`, model picker Level 2 `SwitchModel` structured action, connect picker `ConnectSelect` structured action, no-`Select`-with-`/connect` assertion, engine `/connect` dispatch tests (bare + with-arg), and command-registry `arg_hint: None` test. |
+| 2026-07-20 | Validation | All locked validation passes (see Actual Validation Results below). Real-terminal walkthrough remains pending maintainer acceptance — **not Complete**. |
+
+## Actual Validation Results (2026-07-20)
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | ✅ clean |
+| `cargo check --workspace --locked` | ✅ exit 0 |
+| `cargo clippy --workspace --locked -- -D warnings` | ✅ exit 0 |
+| `cargo test --workspace --locked` | ✅ all tests pass (0 failures) |
+| `scripts/validate_project_governance.sh .` | ✅ 0 warnings |
+| `git diff --check` | ✅ clean |
+
+## Remaining: Real Terminal Acceptance
+
+The following acceptance items require real terminal verification and are deferred for manual acceptance:
+
+- `/model` bare opens the model picker with empty search.
+- `/connect` bare opens the provider picker with empty search.
+- `/model gpt-4o` shows a correction and opens the model picker.
+- `/connect openai` shows a correction and opens the provider picker.
+- Slash-panel Enter on `/model` and `/connect` opens the picker directly (no trailing space).
+- Tab completion on `/model` and `/connect` inserts the bare command without trailing space.
+- Model picker selection switches the model through structured identity (not command text).
+- Connect picker selection enters credential flow through structured identity (not command text).
+- Escape cancels the picker at any level without side effects.
+- Model ID containing `/` or `@` is preserved exactly through structured identity.

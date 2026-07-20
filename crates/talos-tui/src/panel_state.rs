@@ -11,6 +11,14 @@ pub(crate) enum PanelAction {
     None,
     SendMessage(String),
     ProviderSetup(String),
+    SwitchModel {
+        provider: String,
+        model_id: String,
+        variant: Option<String>,
+    },
+    ConnectSelect {
+        provider: String,
+    },
 }
 
 /// What happens when a [`PanelItem`] is accepted.
@@ -42,6 +50,10 @@ pub(crate) enum PanelItemAction {
         model_id: String,
         variant: Option<String>,
     },
+    /// `/connect` picker selection — carries the provider name structurally
+    /// so the TUI can emit `UserInput::ConnectSelect` instead of reserializing
+    /// to `/connect name` command text (TUI-033).
+    ConnectSelect { provider: String },
     /// Non-navigable group header.
     Header,
 }
@@ -352,9 +364,8 @@ impl BottomPanelState {
                 PanelItem {
                     label: format!("{}   {}", p.name, p.provider),
                     description: desc,
-                    action: PanelItemAction::Select {
-                        command: "/connect".to_string(),
-                        value: p.provider.clone(),
+                    action: PanelItemAction::ConnectSelect {
+                        provider: p.provider.clone(),
                     },
                     is_current: false,
                 }
@@ -373,9 +384,8 @@ impl BottomPanelState {
                 PanelItem {
                     label: format!("{}   {}", p.name, p.provider),
                     description: format!("{} models   {}", p.model_count, url_label),
-                    action: PanelItemAction::Select {
-                        command: "/connect".to_string(),
-                        value: p.provider.clone(),
+                    action: PanelItemAction::ConnectSelect {
+                        provider: p.provider.clone(),
                     },
                     is_current: false,
                 }

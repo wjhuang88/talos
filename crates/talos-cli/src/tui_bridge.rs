@@ -134,10 +134,39 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         let _ = session_tx.send(SessionLifecycleRequest::Todo(req));
                                     }
                                     UiOutput::ModelSwitchRequest(req) => {
-                                        let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(req));
+                                        if req.model_id.trim().is_empty() {
+                                            let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(req));
+                                        } else {
+                                            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                                                source: MessageSource::System,
+                                                text: format!(
+                                                    "[System] /model no longer accepts arguments. Opening the model picker — use the panel search to find '{}'.\n",
+                                                    req.model_id.trim()
+                                                ),
+                                            }));
+                                            let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(
+                                                ModelSwitchRequest {
+                                                    model_id: String::new(),
+                                                    provider_needs_credential: false,
+                                                },
+                                            ));
+                                        }
                                     }
                                     UiOutput::ConnectProviderRequest { provider } => {
-                                        let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
+                                        if provider.trim().is_empty() {
+                                            let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
+                                        } else {
+                                            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                                                source: MessageSource::System,
+                                                text: format!(
+                                                    "[System] /connect no longer accepts arguments. Opening the provider picker — use the panel search to find '{}'.\n",
+                                                    provider.trim()
+                                                ),
+                                            }));
+                                            let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest {
+                                                provider: String::new(),
+                                            });
+                                        }
                                     }
                                     UiOutput::SkillCommand(req) => {
                                         handle_skill_command(
@@ -181,6 +210,21 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                     }
                     UserInput::ProviderSetup(provider) => {
                         let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider));
+                    }
+                    UserInput::SwitchModel { provider: _, model_id, variant } => {
+                        let value = match variant {
+                            Some(v) if !v.is_empty() => format!("{model_id}@{v}"),
+                            _ => model_id,
+                        };
+                        let _ = session_tx.send(SessionLifecycleRequest::ModelSwitch(
+                            ModelSwitchRequest {
+                                model_id: value,
+                                provider_needs_credential: false,
+                            },
+                        ));
+                    }
+                    UserInput::ConnectSelect { provider } => {
+                        let _ = session_tx.send(SessionLifecycleRequest::ConnectRequest { provider });
                     }
                     UserInput::Cancel => {
                         let sq_tx = sq_tx_watch.borrow().clone();

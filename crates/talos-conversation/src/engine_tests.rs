@@ -2011,6 +2011,49 @@ fn slash_model_with_id_emits_switch_request_with_model_id() {
     }
 }
 
+#[test]
+fn slash_connect_no_arg_emits_connect_request_with_empty_provider() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/connect");
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::ConnectProviderRequest { provider } => {
+            assert_eq!(provider, "");
+        }
+        _ => panic!("expected ConnectProviderRequest"),
+    }
+}
+
+#[test]
+fn slash_connect_with_arg_emits_connect_request_with_provider() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/connect openai");
+    assert_eq!(outputs.len(), 1);
+    match &outputs[0] {
+        UiOutput::ConnectProviderRequest { provider } => {
+            assert_eq!(provider, "openai");
+        }
+        _ => panic!("expected ConnectProviderRequest"),
+    }
+}
+
+#[test]
+fn model_and_connect_commands_have_no_arg_hint() {
+    let registry = crate::command_registry();
+    let model = registry.find("/model").expect("/model registered");
+    let connect = registry.find("/connect").expect("/connect registered");
+    assert!(
+        model.arg_hint.is_none(),
+        "/model must have no arg_hint (TUI-033 parameterless)"
+    );
+    assert!(
+        connect.arg_hint.is_none(),
+        "/connect must have no arg_hint (TUI-033 parameterless)"
+    );
+    assert!(!model.accepts_inline_arguments());
+    assert!(!connect.accepts_inline_arguments());
+}
+
 #[tokio::test]
 async fn slash_model_refuses_while_processing() {
     let mut engine = new_engine();

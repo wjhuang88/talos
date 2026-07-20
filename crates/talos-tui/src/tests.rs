@@ -713,9 +713,15 @@ mod tests {
             .collect();
         assert_eq!(visible.first(), Some(&"/model"));
 
+        // TUI-033: /model is now DirectExecution (no arg_hint) — Enter opens
+        // the picker directly by sending the bare command, not by filling the
+        // composer with "/model " (trailing parameter space).
         let action = state.accept_selected_panel_item();
-        assert_eq!(action, crate::state::PanelAction::None);
-        assert_eq!(state.input_buffer, "/model ");
+        assert_eq!(
+            action,
+            crate::state::PanelAction::SendMessage("/model".to_string())
+        );
+        assert!(state.input_buffer.is_empty());
         assert!(!state.slash_menu.is_open);
     }
 
@@ -734,9 +740,13 @@ mod tests {
             .collect();
         assert_eq!(visible.first(), Some(&"/model"));
 
+        // TUI-033: /model is DirectExecution — Enter sends bare "/model".
         let action = state.accept_selected_panel_item();
-        assert_eq!(action, crate::state::PanelAction::None);
-        assert_eq!(state.input_buffer, "/model ");
+        assert_eq!(
+            action,
+            crate::state::PanelAction::SendMessage("/model".to_string())
+        );
+        assert!(state.input_buffer.is_empty());
         assert!(!state.slash_menu.is_open);
     }
 
@@ -755,13 +765,36 @@ mod tests {
             .iter()
             .find(|item| item.label == "/export")
             .expect("/export item");
+        let model = menu
+            .items
+            .iter()
+            .find(|item| item.label == "/model")
+            .expect("/model item");
+        let connect = menu
+            .items
+            .iter()
+            .find(|item| item.label == "/connect")
+            .expect("/connect item");
 
-        match &help.action {
-            crate::state::PanelItemAction::SlashCommand { execution_mode, .. } => assert_eq!(
-                *execution_mode,
-                talos_conversation::CommandExecutionMode::DirectExecution
-            ),
-            other => panic!("expected SlashCommand action, got {other:?}"),
+        for (label, item) in [("/help", help), ("/model", model), ("/connect", connect)] {
+            match &item.action {
+                crate::state::PanelItemAction::SlashCommand {
+                    execution_mode,
+                    arg_hint,
+                    ..
+                } => {
+                    assert_eq!(
+                        *execution_mode,
+                        talos_conversation::CommandExecutionMode::DirectExecution,
+                        "{label} should be DirectExecution (TUI-033)"
+                    );
+                    assert!(
+                        arg_hint.is_none(),
+                        "{label} should have no arg_hint (TUI-033)"
+                    );
+                }
+                other => panic!("{label}: expected SlashCommand action, got {other:?}"),
+            }
         }
         match &export.action {
             crate::state::PanelItemAction::SlashCommand {
@@ -776,6 +809,208 @@ mod tests {
                 assert_eq!(arg_hint.as_deref(), Some("<path>"));
             }
             other => panic!("expected SlashCommand action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_slash_menu_enter_executes_connect_directly() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "connect".chars() {
+            state.append_slash_query_char(ch);
+        }
+
+        let action = state.accept_selected_panel_item();
+        assert_eq!(
+            action,
+            crate::state::PanelAction::SendMessage("/connect".to_string())
+        );
+        assert!(state.input_buffer.is_empty());
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_slash_menu_tab_completes_model_without_trailing_space() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "model".chars() {
+            state.append_slash_query_char(ch);
+        }
+
+        let action = state.complete_selected_panel_item();
+        assert_eq!(action, crate::state::PanelAction::None);
+        assert_eq!(state.input_buffer, "/model");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_slash_menu_tab_completes_connect_without_trailing_space() {
+        let registry = talos_conversation::command_registry();
+        let mut state = TuiState::new();
+        state.open_slash_menu(registry);
+        for ch in "connect".chars() {
+            state.append_slash_query_char(ch);
+        }
+
+        let action = state.complete_selected_panel_item();
+        assert_eq!(action, crate::state::PanelAction::None);
+        assert_eq!(state.input_buffer, "/connect");
+        assert!(!state.slash_menu.is_open);
+    }
+
+    #[test]
+    fn test_model_picker_switch_produces_structured_action() {
+        let data = talos_conversation::ModelPickerData {
+            recent: vec![],
+            ready_models: vec![talos_conversation::ModelPickerItem {
+                command: "/model".to_string(),
+                model_id: "gpt-4o".to_string(),
+                provider: "openai".to_string(),
+                label: "gpt-4o   OpenAI  128K".to_string(),
+                context_limit: Some(128_000),
+                pricing: None,
+                authenticated: true,
+                is_current: false,
+                variants: vec![],
+                variant: None,
+            }],
+            setup_providers: vec![],
+        };
+        // Level 2 (open_model_list) is where individual model rows live;
+        // variant-less models produce SwitchModel, variant-bearing ones
+        // produce OpenVariantPicker.
+        let panel = BottomPanelState::open_model_list("openai", &data);
+        let switch_item = panel
+            .items
+            .iter()
+            .find(|i| matches!(i.action, crate::state::PanelItemAction::SwitchModel { .. }))
+            .expect("Level 2 should have a SwitchModel item for a variant-less model");
+
+        match &switch_item.action {
+            crate::state::PanelItemAction::SwitchModel {
+                provider,
+                model_id,
+                variant,
+            } => {
+                assert_eq!(provider, "openai");
+                assert_eq!(model_id, "gpt-4o");
+                assert!(variant.is_none());
+            }
+            other => panic!("expected SwitchModel, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_model_picker_switch_with_variant_produces_structured_action() {
+        use talos_conversation::ModelPickerVariantItem;
+        let data = talos_conversation::ModelPickerData {
+            recent: vec![],
+            ready_models: vec![talos_conversation::ModelPickerItem {
+                command: "/model".to_string(),
+                model_id: "o3".to_string(),
+                provider: "openai".to_string(),
+                label: "o3   OpenAI  200K".to_string(),
+                context_limit: Some(200_000),
+                pricing: None,
+                authenticated: true,
+                is_current: false,
+                variants: vec![ModelPickerVariantItem {
+                    variant_id: "high-reasoning".to_string(),
+                    label: "High Reasoning".to_string(),
+                    provider: "openai".to_string(),
+                    model_id: "o3".to_string(),
+                }],
+                variant: None,
+            }],
+            setup_providers: vec![],
+        };
+        let panel = BottomPanelState::open_model_list("openai", &data);
+        let variant_item = panel
+            .items
+            .iter()
+            .find(|i| {
+                matches!(
+                    &i.action,
+                    crate::state::PanelItemAction::OpenVariantPicker { .. }
+                )
+            })
+            .expect("should have an OpenVariantPicker item");
+
+        match &variant_item.action {
+            crate::state::PanelItemAction::OpenVariantPicker {
+                provider,
+                model_id,
+                variants,
+            } => {
+                assert_eq!(provider, "openai");
+                assert_eq!(model_id, "o3");
+                assert_eq!(variants.len(), 1);
+                assert_eq!(variants[0].variant_id, "high-reasoning");
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_connect_picker_select_produces_structured_action() {
+        let data = talos_conversation::ConnectPickerData {
+            connected: vec![],
+            available: vec![talos_conversation::ConnectPickerItem {
+                provider: "openai".to_string(),
+                name: "OpenAI".to_string(),
+                model_count: 42,
+                api_base_url: Some("https://api.openai.com/v1".to_string()),
+                has_credential: false,
+                doc_url: None,
+            }],
+        };
+        let panel = BottomPanelState::open_connect_picker(&data);
+        let select_item = panel
+            .items
+            .iter()
+            .find(|i| {
+                matches!(
+                    &i.action,
+                    crate::state::PanelItemAction::ConnectSelect { .. }
+                )
+            })
+            .expect("should have a ConnectSelect item");
+
+        match &select_item.action {
+            crate::state::PanelItemAction::ConnectSelect { provider } => {
+                assert_eq!(provider, "openai");
+            }
+            other => panic!("expected ConnectSelect, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_connect_picker_does_not_produce_select_command_string() {
+        let data = talos_conversation::ConnectPickerData {
+            connected: vec![],
+            available: vec![talos_conversation::ConnectPickerItem {
+                provider: "anthropic".to_string(),
+                name: "Anthropic".to_string(),
+                model_count: 10,
+                api_base_url: None,
+                has_credential: false,
+                doc_url: None,
+            }],
+        };
+        let panel = BottomPanelState::open_connect_picker(&data);
+        for item in &panel.items {
+            if !matches!(item.action, crate::state::PanelItemAction::Header) {
+                assert!(
+                    !matches!(
+                        &item.action,
+                        crate::state::PanelItemAction::Select { command, .. }
+                        if command == "/connect"
+                    ),
+                    "connect picker must not use Select with /connect command (TUI-033 structured identity)"
+                );
+            }
         }
     }
 

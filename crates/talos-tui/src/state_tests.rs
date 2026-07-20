@@ -402,9 +402,14 @@ fn paste_still_updates_slash_query_and_composer() {
     state.input_paste("model");
 
     assert_eq!(state.input_buffer, "/model");
+    // TUI-033: /model is DirectExecution — Enter sends bare "/model" and
+    // clears the composer instead of filling it with "/model ".
     let action = state.accept_selected_panel_item();
-    assert_eq!(action, crate::state::PanelAction::None);
-    assert_eq!(state.input_buffer, "/model ");
+    assert_eq!(
+        action,
+        crate::state::PanelAction::SendMessage("/model".to_string())
+    );
+    assert!(state.input_buffer.is_empty());
 }
 
 #[test]

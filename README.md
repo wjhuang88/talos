@@ -437,9 +437,11 @@ at `~/.talos/recent_models.json`) and providers; selecting a provider enters Lev
 which lists that provider's models; selecting a model with declared invocation variants
 (for example `high-reasoning` or `low-reasoning` on reasoning-capable models) enters
 Level 3 to pick a variant, while selecting a variant-less model switches immediately.
-`Esc` closes the picker at any level. Use
-`/connect` to add or update provider credentials.
-`/connect` shows provider setup choices from the
+`Esc` closes the picker at any level. Both `/model` and `/connect` are **strict
+no-argument commands**: typing `/model gpt-4o` or `/connect openai` does not switch a
+model or start credential setup — it shows a brief correction and opens the relevant
+picker so you can search and select from the panel. Use `/connect` to add or update
+provider credentials. `/connect` shows provider setup choices from the
 packaged offline `models.toml`, asks for an API key, then offers an optional custom endpoint
 (`base_url`) for gateway-compatible providers. Standard providers whose catalog metadata supplies a
 default endpoint submit after the API key without prompting for a URL; custom providers (or any row
@@ -511,8 +513,8 @@ mode.
 | `/resume` | List resumable workspace sessions; `/resume <N>` selects by number |
 | `/fork` | Fork the active session (clones history into a child session) |
 | `/delete` | Open the session picker (excluding the active session); choose a row to remove it |
-| `/model` | Open the model picker — three-level navigation: Level 1 lists Recent (≤5 most-recently-used models, persisted) and providers; selecting a provider enters Level 2 (that provider's models); selecting a model with declared variants enters Level 3 (variant list), while variant-less models switch immediately; `Esc` closes the picker |
-| `/connect` | Open the provider picker to connect a new provider (credential and optional custom endpoint/`base_url`), or a specific `/connect <provider>` to connect it directly |
+| `/model` | Open the model picker — three-level navigation: Level 1 lists Recent (≤5 most-recently-used models, persisted) and providers; selecting a provider enters Level 2 (that provider's models); selecting a model with declared variants enters Level 3 (variant list), while variant-less models switch immediately; `Esc` closes the picker. No-argument only: `/model gpt-4o` shows a correction and opens the picker |
+| `/connect` | Open the provider picker to connect a new provider (credential and optional custom endpoint/`base_url`). No-argument only: `/connect openai` shows a correction and opens the picker |
 | `/todo`, `/todo list`, `/todo show <id>`, `/todo stats`, `/todo export [json|markdown]` | View or export active-session todos (read-only) |
 | `/todo delete <id> --confirm` | Delete a session todo item by short-ID or full UUID; requires `--confirm` |
 | `/hooks` | Show configured hook diagnostics (declared paths, presence, validation status) without executing hooks |

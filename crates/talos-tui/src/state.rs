@@ -379,6 +379,10 @@ impl TuiState {
                 self.slash_menu.close();
                 PanelAction::ProviderSetup(provider)
             }
+            PanelItemAction::ConnectSelect { provider } => {
+                self.slash_menu.close();
+                PanelAction::ConnectSelect { provider }
+            }
             PanelItemAction::OpenModelList { provider } => {
                 if let Some(data) = self.slash_menu.model_picker_data.clone() {
                     self.slash_menu =
@@ -398,17 +402,17 @@ impl TuiState {
                 PanelAction::None
             }
             PanelItemAction::SwitchModel {
-                model_id, variant, ..
+                provider,
+                model_id,
+                variant,
+                ..
             } => {
                 self.slash_menu.close();
-                // `model_id` is already provider-qualified when needed (see
-                // `build_model_picker_data` — qualifier is added when the same
-                // model id appears under multiple providers). Do NOT re-prefix.
-                let value = match variant {
-                    Some(v) => format!("{model_id}@{v}"),
-                    None => model_id,
-                };
-                PanelAction::SendMessage(format!("/model {value}"))
+                PanelAction::SwitchModel {
+                    provider,
+                    model_id,
+                    variant,
+                }
             }
         }
     }

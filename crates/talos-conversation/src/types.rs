@@ -548,6 +548,28 @@ pub enum UserInput {
     /// User selected a provider-level setup row. The bridge routes this to
     /// provider-level credential entry.
     ProviderSetup(String),
+    /// User selected a model from the `/model` picker. Carries structured
+    /// `(provider, model_id, variant)` identity so the bridge can forward it
+    /// directly to the lifecycle handler without reserializing into
+    /// `/model provider/model` or `/model model@variant` command text
+    /// (TUI-033).
+    SwitchModel {
+        /// Provider key (e.g. `anthropic`, `openai`, custom slug).
+        provider: String,
+        /// Opaque provider-specific model identifier. May contain `/` or `@`
+        /// without being parsed as command syntax.
+        model_id: String,
+        /// Optional variant identifier (ADR-048). `None` means no variant.
+        variant: Option<String>,
+    },
+    /// User selected a provider from the `/connect` picker. Carries the
+    /// provider name structurally so the bridge can forward it to the
+    /// credential/connect lifecycle handler without reserializing into
+    /// `/connect name` command text (TUI-033).
+    ConnectSelect {
+        /// Provider key to connect or re-connect.
+        provider: String,
+    },
     Cancel,
     Exit,
 }
