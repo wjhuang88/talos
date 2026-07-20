@@ -4,7 +4,7 @@
 |---|---|
 | Type | Technical documentation Story |
 | Parent Epic | WEB-006 |
-| Status | Refinement (depends on WEB-006-A/B) |
+| Status | Complete — I143 (maintainer acceptance 2026-07-20) |
 | Priority | P2 |
 
 ## Goal

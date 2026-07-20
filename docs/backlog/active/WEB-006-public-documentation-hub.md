@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Type | Product documentation Epic |
-| Status | In Progress — I143 |
+| Status | Complete — I143 (maintainer acceptance 2026-07-20) |
 | Priority | P1 |
 | Parent | None |
-| Selected Iteration | I143 (Planned) |
+| Selected Iteration | I143 (Complete) |
 | User | New and existing Talos operators |
 
 ## Goal And Value

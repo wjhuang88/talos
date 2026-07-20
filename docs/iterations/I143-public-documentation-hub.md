@@ -1,6 +1,6 @@
 # Iteration I143: Public Documentation Hub And v0.4.0 Site Sync
 
-> Document status: In Progress
+> Document status: Complete (maintainer acceptance 2026-07-20)
 > Published plan date: 2026-07-20
 > Planned objective: deliver WEB-006 as a release-grade bilingual documentation site.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -39,8 +39,9 @@
 | 2026-07-20 | Planning | Baseline published; not activated and no site implementation performed. |
 | 2026-07-20 | Activation | Maintainer selected I143 as the active iteration. WEB-006-A and WEB-006-B may proceed in parallel within the static-site boundary; WEB-006-C follows their completed content and CSS contracts. |
 | 2026-07-20 | Implementation | Frontline delivery added paired EN/zh-CN Documentation hubs, synchronized the 16 public pages to v0.4.0, repaired CTA cascade/focus styling, and added static drift checks. |
-| 2026-07-20 | Independent static review | `validate_public_site.sh`, installer validation, governance validation, and `git diff --check` passed. Browser automation could not start because the controlled environment omitted its required execution-policy metadata; browser QA remains outstanding, so this iteration stays In Progress. |
+| 2026-07-20 | Independent static review | `validate_public_site.sh`, installer validation, governance validation, and `git diff --check` passed. Browser automation in the controlled environment could not start because required execution-policy metadata was absent. |
 | 2026-07-20 | Release-gate follow-up | `release_preflight.sh` now derives the version from `Cargo.toml` and runs public-site plus installer validation before Rust checks. It requires the README pair and all release surfaces to name that version, rejects a retained immediate prior release after a bump, and was verified with `v0.4.0` plus a deliberately mismatched version argument. |
+| 2026-07-20 | Maintainer browser acceptance | Maintainer manually accepted the completed browser QA matrix (EN/zh-CN home and documentation pages, narrow viewport, light/dark themes, CTA readability, navigation/language links, anchors, and keyboard focus). This is local acceptance only; no Pages deployment was asserted. |
 
 ## Planning Verification
 

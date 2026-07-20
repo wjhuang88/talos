@@ -4,7 +4,7 @@
 |---|---|
 | Type | Product/UX Story |
 | Parent Epic | WEB-006 |
-| Status | In Progress — I143 |
+| Status | Complete — I143 (maintainer acceptance 2026-07-20) |
 | Priority | P1 |
 
 ## Problem And Root Cause

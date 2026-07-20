@@ -1,6 +1,6 @@
 # Iteration I144: Architecture Sustainability Audit
 
-> Document status: Planned — explicitly deferred until I143 closes
+> Document status: Planned — eligible after I143 completion
 > Published plan date: 2026-07-20
 > Planned objective: execute ARCH-034-A and produce an evidence-backed whole-workspace
 > architecture verdict and remediation register.
@@ -29,4 +29,5 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-07-20 | Planning | Baseline published; deferred behind I143. No audit verdict or remediation is claimed. |
+| 2026-07-20 | Planning | Baseline published behind I143. No audit verdict or remediation is claimed. |
+| 2026-07-20 | Availability | I143 completed; I144 is now eligible for explicit maintainer activation. No audit work has started. |
