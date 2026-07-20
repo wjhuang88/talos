@@ -335,6 +335,38 @@ On a hard stop:
   3. Confirm `docs/iterations/I147-custom-provider-wizard-atomic-config.md` is in Review state.
   4. Create `docs/iterations/I148-*.md` as a Planned baseline, then activate and begin implementation per MODEL-008-B acceptance criteria.
 
+### Checkpoint I148 (partial) — 2026-07-20
+
+- Completed task items: I148 model discovery core (protocol-specific HTTP requests, bounded response parsing, typed errors, 9 mock HTTP fixture tests).
+- Current commit: `8cef0a7` (origin/main).
+- Commands run and actual results:
+  - `cargo fmt --all -- --check` → clean.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0 (all tests pass, 0 failures).
+  - `scripts/validate_project_governance.sh .` → 0 warnings.
+  - `git diff --check` → clean.
+- Open risks or deviations:
+  - I148 is **not complete**. The TUI integration (discovered model picker, manual fallback entry, session rebuild on model selection) is not yet implemented. The discovery function (`discover_provider_models`) is implemented and tested with 9 mock HTTP fixtures but is not wired into the `handle_register_custom_provider` flow or the TUI.
+  - `reqwest` added as a new dependency to `talos-cli`. Cargo.lock updated.
+- Remaining for I148:
+  1. Wire `discover_provider_models` into `handle_register_custom_provider` (after config save, call discovery, emit results).
+  2. Create a model picker panel for discovered models (reuse `ModelPickerData` or create a new panel kind).
+  3. Manual model ID entry fallback (when discovery fails).
+  4. Session rebuild on model selection (reuse `rebuild_session_for_model`).
+  5. Config reference documentation.
+  6. Real-terminal walkthrough checklist.
+- Next task item: I149 — MODEL-009-A image input ADR and security spike (research/ADR only, no production image sending).
+- Recovery or resume instruction:
+  1. `git switch main && git pull --ff-only origin main`
+  2. Read this file's latest checkpoint (Checkpoint I148 partial).
+  3. Open `docs/iterations/I148-model-discovery-manual-fallback-activation.md` — the "Remaining" row lists unimplemented pieces.
+  4. Wire `discover_provider_models` into the provider registration flow in `session_handlers.rs`.
+  5. Create a model picker panel for discovered models.
+  6. Add manual fallback entry.
+  7. Wire session rebuild on model selection.
+  8. Write integration tests.
+  9. Run locked validation, commit, push, update checkpoint.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
