@@ -69,7 +69,23 @@ pub(crate) fn build_request_body(
                             json!({"type": "text", "text": text})
                         }
                         talos_core::message::ContentPart::Image { path, mime, .. } => {
-                            let bytes = std::fs::read(path).unwrap_or_default();
+                            let bytes = match std::panic::catch_unwind(|| std::fs::read(path)) {
+                                Ok(Ok(bytes)) => bytes,
+                                Ok(Err(e)) => {
+                                    tracing::warn!(
+                                        "Failed to read image at {}: {e}",
+                                        path.display()
+                                    );
+                                    Vec::new()
+                                }
+                                Err(_) => {
+                                    tracing::warn!(
+                                        "Panic while reading image at {}",
+                                        path.display()
+                                    );
+                                    Vec::new()
+                                }
+                            };
                             let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
                             json!({
                                 "type": "image",
@@ -609,5 +625,42 @@ mod tests {
             tool_block["is_error"], true,
             "orphan error result must preserve is_error flag"
         );
+    }
+
+    #[test]
+    fn multimodal_message_produces_image_content_block() {
+        use talos_core::message::ContentPart;
+
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&img_path, &png_header).unwrap();
+
+        let messages = vec![Message::Multimodal {
+            parts: vec![
+                ContentPart::Text {
+                    text: "Describe this".into(),
+                },
+                ContentPart::Image {
+                    path: img_path,
+                    mime: "image/png".into(),
+                    byte_count: 8,
+                },
+            ],
+        }];
+
+        let body = build_request_body("claude-sonnet-4-5-20250514", &messages, &[], None, None);
+        let msgs = body["messages"].as_array().unwrap();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["role"], "user");
+
+        let content = msgs[0]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 2);
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[0]["text"], "Describe this");
+        assert_eq!(content[1]["type"], "image");
+        assert_eq!(content[1]["source"]["type"], "base64");
+        assert_eq!(content[1]["source"]["media_type"], "image/png");
+        assert!(!content[1]["source"]["data"].as_str().unwrap().is_empty());
     }
 }

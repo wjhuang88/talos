@@ -99,7 +99,17 @@ pub(crate) fn build_request_body(
                             json!({"type": "text", "text": text})
                         }
                         talos_core::message::ContentPart::Image { path, mime, .. } => {
-                            let bytes = std::fs::read(path).unwrap_or_default();
+                            let bytes = match std::panic::catch_unwind(|| std::fs::read(path)) {
+                                Ok(Ok(bytes)) => bytes,
+                                Ok(Err(e)) => {
+                                    tracing::warn!("Failed to read image at {}: {e}", path.display());
+                                    Vec::new()
+                                }
+                                Err(_) => {
+                                    tracing::warn!("Panic while reading image at {}", path.display());
+                                    Vec::new()
+                                }
+                            };
                             let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
                             json!({"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{b64}")}})
                         }
@@ -283,5 +293,70 @@ fn non_empty_content(content: &str, fallback: &str) -> String {
         fallback.to_string()
     } else {
         content.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_core::message::ContentPart;
+
+    #[test]
+    fn multimodal_message_produces_array_content_with_image_url() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&img_path, &png_header).unwrap();
+
+        let messages = vec![Message::Multimodal {
+            parts: vec![
+                ContentPart::Text {
+                    text: "What is this?".into(),
+                },
+                ContentPart::Image {
+                    path: img_path,
+                    mime: "image/png".into(),
+                    byte_count: 8,
+                },
+            ],
+        }];
+
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+        let msgs = body["messages"].as_array().unwrap();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["role"], "user");
+
+        let content = msgs[0]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 2);
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[0]["text"], "What is this?");
+        assert_eq!(content[1]["type"], "image_url");
+        assert!(
+            content[1]["image_url"]["url"]
+                .as_str()
+                .unwrap()
+                .starts_with("data:image/png;base64,")
+        );
+    }
+
+    #[test]
+    fn text_only_multimodal_produces_array_with_text_parts() {
+        let messages = vec![Message::Multimodal {
+            parts: vec![
+                ContentPart::Text {
+                    text: "Hello".into(),
+                },
+                ContentPart::Text {
+                    text: "World".into(),
+                },
+            ],
+        }];
+
+        let body = build_request_body("gpt-4o", &messages, &[], None, None);
+        let msgs = body["messages"].as_array().unwrap();
+        let content = msgs[0]["content"].as_array().unwrap();
+        assert_eq!(content.len(), 2);
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[1]["type"], "text");
     }
 }

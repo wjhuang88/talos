@@ -5763,6 +5763,7 @@ dependencies = [
  "serde_json",
  "talos-config",
  "talos-core",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
