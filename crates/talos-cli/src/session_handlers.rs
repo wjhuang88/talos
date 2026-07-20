@@ -263,6 +263,9 @@ pub(crate) async fn handle_register_custom_provider(
         );
     }
 
+    let discovery_base_url = endpoint.base_url.clone();
+    let discovery_protocol = typed_protocol.clone();
+
     let mut new_config = config.clone();
     let provider_entry = new_config.providers.entry(name.to_string()).or_default();
     provider_entry.protocol = typed_protocol;
@@ -289,6 +292,46 @@ pub(crate) async fn handle_register_custom_provider(
             if is_update { "updated" } else { "registered" }
         ),
     );
+
+    match crate::provider_discovery::discover_provider_models(
+        &discovery_base_url,
+        api_key,
+        discovery_protocol,
+    )
+    .await
+    {
+        Ok(models) if !models.is_empty() => {
+            let display: Vec<String> = models.iter().take(20).map(|m| format!("  - {m}")).collect();
+            send_stream(
+                ui_tx,
+                MessageSource::System,
+                format!(
+                    "[System] Discovered {} model(s) from '{name}':\n{}\n[System] To activate a model, add it to ~/.talos/config.toml under [providers.{name}.models.<model_id>] then use /model.\n",
+                    models.len(),
+                    display.join("\n")
+                ),
+            );
+        }
+        Ok(_) => {
+            send_stream(
+                ui_tx,
+                MessageSource::System,
+                format!(
+                    "[System] Provider '{name}' returned an empty model list. You can manually add a model in ~/.talos/config.toml under [providers.{name}.models.<model_id>].\n"
+                ),
+            );
+        }
+        Err(e) => {
+            send_stream(
+                ui_tx,
+                MessageSource::System,
+                format!(
+                    "[System] Model discovery from '{name}' failed: {e}. You can manually add a model in ~/.talos/config.toml under [providers.{name}.models.<model_id>].\n"
+                ),
+            );
+        }
+    }
+
     Some(new_config)
 }
 

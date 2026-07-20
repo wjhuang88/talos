@@ -3,8 +3,6 @@
 //! Protocol-specific model discovery from OpenAI-compatible and
 //! Anthropic-compatible provider endpoints.
 
-#![allow(dead_code)]
-
 use std::time::Duration;
 
 use serde::Deserialize;
