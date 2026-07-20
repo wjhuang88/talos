@@ -423,27 +423,33 @@ On a hard stop:
   7. Write adversarial fixture tests.
   8. Run locked validation, commit, push, update checkpoint.
 
-### Post-Oracle Fixes + I148 Wiring + I151 — 2026-07-20
+### Post-Oracle Fixes + I148 Wiring + I151 + I152 — 2026-07-20
 
 - Oracle review identified: path leak in jsonl.rs (full local path exposed), I148 discovery not wired, I151 not started.
 - Fixes applied:
   1. `383f291` — Fixed path leak: jsonl.rs message_parts now uses `path.file_name()` instead of `path.display()`.
   2. `7da2141` — Wired `discover_provider_models` into `handle_register_custom_provider`: after atomic config save, calls discovery, emits discovered model IDs on success, manual fallback instructions on failure. Removed `#![allow(dead_code)]` from provider_discovery.rs.
   3. `8078827` — I151 image validation module: `image_validation.rs` with `validate_image_path` (regular file, directory/empty rejection, byte/aggregate/count limits, canonicalization, magic-byte MIME detection for PNG/JPEG/GIF/WebP). 16 adversarial fixture tests. Marked `#[allow(dead_code)]` pending I152 TUI wiring.
-- Current commit: `8078827` (origin/main).
+  4. `2599501` — I152 adapter wire mapping: OpenAI adapter emits `image_url` content parts with data URLs; Anthropic adapter emits `image` content blocks with base64 source. `OpenAIMessage.content` changed from `Option<String>` to `Option<Value>` for array content support. Added `base64` dependency to `talos-provider`.
+- Current commit: `2599501` (origin/main).
 - Validation: cargo fmt/clippy/test/governance/diff-check all pass.
-- Remaining for I152: OpenAI data URL wire mapping, Anthropic base64 wire mapping, TUI attachment UX, CLI parameter/rejection, safe history rendering.
 - Remaining for I153: end-to-end mock fixtures, native/panic boundary review, documentation sync (README/site/config reference/BOARD), release candidate checklist.
-- Next task item: I152 — provider adapter image wire mapping + TUI attachment UX.
+- Next task item: I153 — end-to-end hardening, documentation, release candidate.
 - Recovery or resume instruction:
   1. `git switch main && git pull --ff-only origin main`
   2. Read this file's latest checkpoint.
-  3. Modify `openai_request.rs` Multimodal arm to emit `image_url` content parts with data URLs.
-  4. Modify `anthropic_request.rs` Multimodal arm to emit `image` content blocks with base64 source.
-  5. Add `base64` crate dependency if not already available.
-  6. Wire `image_validation::validate_image_path` into the TUI attachment flow.
-  7. Implement TUI attachment UX (attach/list/remove/cancel/pre-send/capability-gating).
-  8. Run locked validation, commit, push, update checkpoint.
+  3. Run the final validation ladder:
+     ```
+     cargo fmt --all -- --check
+     cargo check --workspace --locked
+     cargo clippy --workspace --locked -- -D warnings
+     cargo test --workspace --locked
+     scripts/validate_project_governance.sh .
+     git diff --check
+     ```
+  4. Update README EN/zh-CN, site/, config reference, BOARD.md, iteration docs.
+  5. Generate release candidate checklist.
+  6. Commit, push, update checkpoint.
 
 ## Related Documents
 
