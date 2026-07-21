@@ -54,7 +54,10 @@ pub struct ModelCapabilities {
 /// metadata. `Unknown` applies to custom/discovered models with no
 /// confirmed capability. Both `Unknown` and `Unsupported` fail-closed
 /// for the attachment UI; the distinction is diagnostic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// The default is `Unknown` so that any code path that fails to resolve
+/// a model's metadata cannot accidentally enable image attachment.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ImageInputCapability {
     /// Catalog metadata confirms `image_input = true`.
@@ -62,6 +65,7 @@ pub enum ImageInputCapability {
     /// Catalog metadata confirms `image_input = false`.
     Unsupported,
     /// No confirmed capability (custom/discovered model).
+    #[default]
     Unknown,
 }
 

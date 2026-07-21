@@ -1797,4 +1797,273 @@ mod steering_snapshot_tests {
             other => panic!("expected Submit, got {:?}", other),
         }
     }
+
+    /// R3 regression: `/attach` must fail-closed when capability is `Unknown`.
+    ///
+    /// The bridge must reject the attach request before any filesystem
+    /// access. The error must reach the UI channel and no attachment must
+    /// be added to the engine state.
+    #[tokio::test]
+    async fn bridge_rejects_attach_when_capability_unknown() {
+        use crate::tui_bridge::{
+            ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop,
+        };
+        use talos_conversation::{
+            ContentOutput, ConversationEngine, MessageSource, ModelInfo, UiOutput, UserInput,
+        };
+        use talos_core::model::ImageInputCapability;
+
+        let mut engine =
+            ConversationEngine::new("unknown-model".to_string(), "test-provider".to_string());
+        engine.image_input_capability = ImageInputCapability::Unknown;
+        assert!(engine.pending_image_attachments.is_empty());
+
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "unknown-model".to_string(),
+            provider: "test-provider".to_string(),
+            image_input_capability: ImageInputCapability::Unknown,
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+            },
+        ));
+
+        // /attach with a path that WOULD exist — the rejection must happen
+        // before any filesystem probe, so we never create the file.
+        user_tx
+            .send(UserInput::Message(
+                "/attach /tmp/this-file-must-not-be-read.png".to_string(),
+            ))
+            .unwrap();
+
+        let received = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                match ui_rx.recv().await {
+                    Some(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text,
+                    })) => return Some(text),
+                    Some(_) => continue,
+                    None => return None,
+                }
+            }
+        })
+        .await;
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        let error_text = received
+            .expect("must receive an error block within timeout")
+            .expect("error channel must not close");
+        assert!(
+            error_text.contains("does not support image input"),
+            "error must mention capability rejection, got: {error_text}"
+        );
+        assert!(
+            error_text.contains("Unknown"),
+            "error must surface capability state for diagnostics, got: {error_text}"
+        );
+    }
+
+    /// R3 regression: `/attach` must fail-closed when capability is `Unsupported`.
+    #[tokio::test]
+    async fn bridge_rejects_attach_when_capability_unsupported() {
+        use crate::tui_bridge::{
+            ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop,
+        };
+        use talos_conversation::{
+            ContentOutput, ConversationEngine, MessageSource, ModelInfo, UiOutput, UserInput,
+        };
+        use talos_core::model::ImageInputCapability;
+
+        let mut engine =
+            ConversationEngine::new("text-only-model".to_string(), "test-provider".to_string());
+        engine.image_input_capability = ImageInputCapability::Unsupported;
+        assert!(engine.pending_image_attachments.is_empty());
+
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "text-only-model".to_string(),
+            provider: "test-provider".to_string(),
+            image_input_capability: ImageInputCapability::Unsupported,
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::Message(
+                "/attach /tmp/this-file-must-not-be-read.png".to_string(),
+            ))
+            .unwrap();
+
+        let received = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                match ui_rx.recv().await {
+                    Some(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text,
+                    })) => return Some(text),
+                    Some(_) => continue,
+                    None => return None,
+                }
+            }
+        })
+        .await;
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        let error_text = received
+            .expect("must receive an error block within timeout")
+            .expect("error channel must not close");
+        assert!(
+            error_text.contains("does not support image input"),
+            "error must mention capability rejection, got: {error_text}"
+        );
+        assert!(
+            error_text.contains("Unsupported"),
+            "error must surface capability state for diagnostics, got: {error_text}"
+        );
+    }
+
+    /// R3 positive: `/attach` proceeds when capability is `Supported` and the
+    /// path validates. The path here is a real PNG-encoded file inside a
+    /// tempdir so `create_image_content_part` succeeds end-to-end.
+    #[tokio::test]
+    async fn bridge_allows_attach_when_capability_supported() {
+        use crate::tui_bridge::{
+            ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop,
+        };
+        use talos_conversation::{
+            ContentOutput, ConversationEngine, MessageSource, ModelInfo, UiOutput, UserInput,
+        };
+        use talos_core::model::ImageInputCapability;
+
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("valid.png");
+        // A header-only stub fails R4's decoder; encode a real 8x8 PNG so
+        // `into_dimensions()` succeeds and `create_image_content_part`
+        // returns a valid ContentPart::Image.
+        let png = image::RgbaImage::new(8, 8);
+        png.save_with_format(&img_path, image::ImageFormat::Png).unwrap();
+
+        let mut engine =
+            ConversationEngine::new("vision-model".to_string(), "test-provider".to_string());
+        engine.image_input_capability = ImageInputCapability::Supported;
+        assert!(engine.pending_image_attachments.is_empty());
+
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, _sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "vision-model".to_string(),
+            provider: "test-provider".to_string(),
+            image_input_capability: ImageInputCapability::Supported,
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::Message(format!(
+                "/attach {}",
+                img_path.display()
+            )))
+            .unwrap();
+
+        let received = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                match ui_rx.recv().await {
+                    Some(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::System,
+                        text,
+                    })) if text.contains("Attached image") => return Some(text),
+                    Some(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text,
+                    })) => return Some(text),
+                    Some(_) => continue,
+                    None => return None,
+                }
+            }
+        })
+        .await;
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        let text = received
+            .expect("must receive a system or error block within timeout")
+            .expect("ui channel must not close");
+        assert!(
+            text.contains("Attached image"),
+            "supported capability must allow attachment, got: {text}"
+        );
+    }
 }

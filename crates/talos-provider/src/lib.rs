@@ -13,6 +13,7 @@
 //! concrete provider structs as pre-1.0 adapters and prefer the `talos-core` provider traits for
 //! long-lived integration code.
 
+mod image_io;
 pub mod mock;
 pub mod openai;
 mod openai_request;

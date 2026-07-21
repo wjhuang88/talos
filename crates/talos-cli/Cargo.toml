@@ -51,6 +51,7 @@ rmcp = "1.7.0"
 futures = "0.3"
 crossterm = "0.29"
 reqwest = { version = "0.13.4", features = ["json"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
 [lints]
 workspace = true

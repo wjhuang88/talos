@@ -178,6 +178,16 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         ).await;
                                     }
                                     UiOutput::AttachImageRequest { path } => {
+                                        if !engine.image_input_capability.allows_attachment() {
+                                            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                                                source: MessageSource::Error,
+                                                text: format!(
+                                                    "[Error] Active model does not support image input (capability: {:?}). /attach rejected before any file read. Use /model to switch to a vision-capable model.\n",
+                                                    engine.image_input_capability
+                                                ),
+                                            }));
+                                            continue;
+                                        }
                                         match crate::image_validation::create_image_content_part(
                                             std::path::Path::new(&path),
                                             engine.pending_image_attachments.len(),

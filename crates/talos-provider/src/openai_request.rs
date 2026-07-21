@@ -99,15 +99,15 @@ pub(crate) fn build_request_body(
                             json!({"type": "text", "text": text})
                         }
                         talos_core::message::ContentPart::Image { path, mime, .. } => {
-                            let bytes = match std::panic::catch_unwind(|| std::fs::read(path)) {
-                                Ok(Ok(bytes)) => bytes,
-                                Ok(Err(e)) => {
-                                    tracing::warn!("Failed to read image at {}: {e}", path.display());
-                                    Vec::new()
-                                }
-                                Err(_) => {
-                                    tracing::warn!("Panic while reading image at {}", path.display());
-                                    Vec::new()
+                            let bytes = match crate::image_io::read_image_with_toctou_guard(path)
+                                .into_bytes()
+                            {
+                                Some(b) => b,
+                                None => {
+                                    return json!({
+                                        "type": "text",
+                                        "text": "[image omitted: path validation failed]"
+                                    });
                                 }
                             };
                             let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
@@ -307,6 +307,10 @@ mod tests {
         let img_path = dir.path().join("test.png");
         let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
         std::fs::write(&img_path, &png_header).unwrap();
+        // ContentPart::Image.path contract: stored path MUST be the
+        // canonical path produced at grant time. The TOCTOU guard in
+        // image_io rejects any non-canonical stored path.
+        let canonical = img_path.canonicalize().unwrap();
 
         let messages = vec![Message::Multimodal {
             parts: vec![
@@ -314,7 +318,7 @@ mod tests {
                     text: "What is this?".into(),
                 },
                 ContentPart::Image {
-                    path: img_path,
+                    path: canonical,
                     mime: "image/png".into(),
                     byte_count: 8,
                 },

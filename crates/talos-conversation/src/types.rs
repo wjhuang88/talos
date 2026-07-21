@@ -2,6 +2,7 @@ use std::pin::Pin;
 use std::time::Instant;
 
 use talos_core::message::Usage;
+use talos_core::model::ImageInputCapability;
 use talos_core::tool::ToolProvenance;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -198,6 +199,9 @@ pub struct ModelInfo {
     pub output_price_per_million: Option<f64>,
     /// Selected variant ID (ADR-048).
     pub variant: Option<String>,
+    /// Resolved image-input capability (ADR-050). Controls whether `/attach`
+    /// is permitted for the active model. Defaults to `Unknown` (fail-closed).
+    pub image_input_capability: ImageInputCapability,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -161,9 +161,10 @@ fn send_stream(ui_tx: &mpsc::UnboundedSender<UiOutput>, source: MessageSource, t
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
-    let builtins = talos_config::model::builtin_models();
+    let all_models = config.all_models();
     let meta =
-        talos_config::model::find_model_by_provider(&builtins, &config.provider, &config.model);
+        talos_config::model::find_model_by_provider(&all_models, &config.provider, &config.model);
+    let image_input_capability = talos_core::model::ImageInputCapability::from_metadata(meta);
 
     let (context_limit, _) = config.resolve_model_limits();
 
@@ -178,6 +179,7 @@ pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
         input_price_per_million: input_price,
         output_price_per_million: output_price,
         variant: config.variant.clone(),
+        image_input_capability,
     }
 }
 

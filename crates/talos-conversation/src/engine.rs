@@ -180,6 +180,9 @@ pub struct ConversationEngine {
     pub(crate) input_price_per_million: Option<f64>,
     pub(crate) output_price_per_million: Option<f64>,
     pub(crate) workspace_root: Option<PathBuf>,
+    /// Resolved image-input capability for the active model (ADR-050).
+    /// `/attach` consults this to fail-closed before any file read.
+    pub image_input_capability: talos_core::model::ImageInputCapability,
     last_flushed_message: usize,
     content_open: bool,
     pub pending_image_attachments: Vec<talos_core::message::ContentPart>,
@@ -218,6 +221,7 @@ impl ConversationEngine {
             input_price_per_million: None,
             output_price_per_million: None,
             workspace_root: None,
+            image_input_capability: talos_core::model::ImageInputCapability::default(),
             last_flushed_message: 0,
             content_open: false,
             pending_image_attachments: Vec::new(),
@@ -284,6 +288,7 @@ impl ConversationEngine {
         self.input_price_per_million = info.input_price_per_million;
         self.output_price_per_million = info.output_price_per_million;
         self.variant = info.variant.clone();
+        self.image_input_capability = info.image_input_capability;
     }
 
     pub fn is_processing(&self) -> bool {
