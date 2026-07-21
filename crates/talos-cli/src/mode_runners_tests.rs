@@ -574,3 +574,111 @@ async fn handle_register_custom_provider_loopback_http_allowed() {
         Some("http://127.0.0.1:8080/v1")
     );
 }
+
+/// R9 regression: when discovery succeeds, the discovered model IDs
+/// MUST be persisted into the provider's `models` map atomically with
+/// the provider entry, so that the /model picker can surface them
+/// without a separate save round-trip. Verified end-to-end with a
+/// mock HTTP server that returns an OpenAI-shaped /models response.
+#[tokio::test]
+async fn r9_discovered_models_persisted_atomically_with_provider() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base_url = format!("http://{addr}/v1");
+
+    let body = r#"{"data":[{"id":"gw-1"},{"id":"gw-2"},{"id":"gw-3"}]}"#;
+    tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut req_buf = [0u8; 4096];
+        let _ = socket.read(&mut req_buf).await;
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        socket.write_all(response.as_bytes()).await.unwrap();
+        socket.flush().await.unwrap();
+    });
+
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let new_config = with_isolated_home(|| async {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        let result = handle_register_custom_provider(
+            &tx,
+            &config,
+            "r9-gw",
+            "openai-chat",
+            &base_url,
+            "r9-key",
+        )
+        .await;
+        drop(tx);
+        while rx.recv().await.is_some() {}
+        result
+    })
+    .await
+    .expect("R9 registration with mock discovery must succeed");
+
+    let provider = new_config
+        .providers
+        .get("r9-gw")
+        .expect("r9-gw provider entry must exist");
+
+    // R9 invariant: all three discovered models must be in the models map.
+    assert!(
+        provider.models.contains_key("gw-1"),
+        "gw-1 must be persisted, got: {:?}",
+        provider.models.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        provider.models.contains_key("gw-2"),
+        "gw-2 must be persisted, got: {:?}",
+        provider.models.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        provider.models.contains_key("gw-3"),
+        "gw-3 must be persisted, got: {:?}",
+        provider.models.keys().collect::<Vec<_>>()
+    );
+}
+
+/// R9 regression: discovery failure (e.g. network error) must NOT
+/// prevent the provider entry from being saved. The two concerns are
+/// decoupled — provider registration is authoritative, discovery is
+/// best-effort.
+#[tokio::test]
+async fn r9_provider_saved_when_discovery_fails() {
+    let _lock = HOME_ENV_MUTEX.lock().unwrap();
+    let new_config = with_isolated_home(|| async {
+        let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
+        let config = Config::default();
+        // Use a routable-but-closed port so discovery fails fast.
+        let result = handle_register_custom_provider(
+            &tx,
+            &config,
+            "r9-fail-gw",
+            "openai-chat",
+            "http://127.0.0.1:1/v1",
+            "r9-fail-key",
+        )
+        .await;
+        drop(tx);
+        while rx.recv().await.is_some() {}
+        result
+    })
+    .await
+    .expect("R9 registration must succeed even when discovery fails");
+
+    let provider = new_config
+        .providers
+        .get("r9-fail-gw")
+        .expect("provider entry must exist even if discovery failed");
+    assert_eq!(provider.api_key.as_deref(), Some("r9-fail-key"));
+    assert!(
+        provider.models.is_empty(),
+        "no models should be persisted when discovery failed"
+    );
+}

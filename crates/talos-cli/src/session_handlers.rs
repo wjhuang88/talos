@@ -2,6 +2,11 @@
 
 use super::*;
 
+/// Maximum discovered-model entries to persist into the provider's
+/// `models` map during a single registration. Caps config growth when
+/// a provider returns hundreds of model IDs.
+pub(crate) const MAX_DISCOVERED_MODELS_TO_PERSIST: usize = 32;
+
 /// Publish the UI boundary between two successfully committed sessions.
 ///
 /// The queue belongs to the retired conversation engine, so its preview must be
@@ -275,6 +280,29 @@ pub(crate) async fn handle_register_custom_provider(
         provider_entry.api_key_env = Some(format!("{}_API_KEY", name.to_uppercase()));
     }
 
+    // Run discovery BEFORE persisting so we can atomically write provider
+    // + discovered models in a single save. If discovery fails we still
+    // save the provider entry alone (R9: provider registration must not
+    // be coupled to discovery success, but discovery results must be
+    // persisted atomically with the provider when both succeed).
+    let discovery_outcome = crate::provider_discovery::discover_provider_models(
+        &discovery_base_url,
+        api_key,
+        discovery_protocol,
+    )
+    .await;
+
+    let mut discovered_count = 0usize;
+    match &discovery_outcome {
+        Ok(models) if !models.is_empty() => {
+            for model_id in models.iter().take(MAX_DISCOVERED_MODELS_TO_PERSIST) {
+                provider_entry.models.entry(model_id.clone()).or_default();
+            }
+            discovered_count = models.len();
+        }
+        _ => {}
+    }
+
     if let Err(e) = new_config.save() {
         send_stream(
             ui_tx,
@@ -288,27 +316,30 @@ pub(crate) async fn handle_register_custom_provider(
         ui_tx,
         MessageSource::System,
         format!(
-            "[System] Custom provider '{name}' {}. Use /model to browse its models.\n",
+            "[System] Custom provider '{name}' {}.\n",
             if is_update { "updated" } else { "registered" }
         ),
     );
 
-    match crate::provider_discovery::discover_provider_models(
-        &discovery_base_url,
-        api_key,
-        discovery_protocol,
-    )
-    .await
-    {
+    match discovery_outcome {
         Ok(models) if !models.is_empty() => {
-            let display: Vec<String> = models.iter().take(20).map(|m| format!("  - {m}")).collect();
+            let preview: Vec<String> = models
+                .iter()
+                .take(10)
+                .map(|m| format!("  - {name}/{m}"))
+                .collect();
+            let preview_text = preview.join("\n");
+            let extra = if models.len() > 10 {
+                format!("\n[System] ... and {} more.", models.len() - 10)
+            } else {
+                String::new()
+            };
+            let persisted = discovered_count.min(MAX_DISCOVERED_MODELS_TO_PERSIST);
             send_stream(
                 ui_tx,
                 MessageSource::System,
                 format!(
-                    "[System] Discovered {} model(s) from '{name}':\n{}\n[System] To activate a model, add it to ~/.talos/config.toml under [providers.{name}.models.<model_id>] then use /model.\n",
-                    models.len(),
-                    display.join("\n")
+                    "[System] Discovered {discovered_count} model(s) from '{name}'. The first {persisted} were saved to ~/.talos/config.toml so they appear in the /model picker.\n[System] Preview:\n{preview_text}{extra}\n[System] Run /model and select {name}/<model-id> to activate it. The provider+model are applied atomically when you pick.\n",
                 ),
             );
         }
