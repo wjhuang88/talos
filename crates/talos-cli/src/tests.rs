@@ -1663,4 +1663,138 @@ mod steering_snapshot_tests {
             "error must preserve queued message"
         );
     }
+    #[tokio::test]
+    async fn bridge_drains_attachments_and_sends_submit_multimodal() {
+        use crate::tui_bridge::{
+            ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop,
+        };
+        use talos_conversation::{ConversationEngine, ModelInfo, UserInput};
+        use talos_core::message::ContentPart;
+        let mut engine =
+            ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        engine.pending_image_attachments.push(ContentPart::Image {
+            path: std::path::PathBuf::from("/tmp/fake.png"),
+            mime: "image/png".to_string(),
+            byte_count: 100,
+        });
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::Message("describe this image".to_string()))
+            .unwrap();
+
+        let received_op =
+            tokio::time::timeout(std::time::Duration::from_secs(2), sq_rx.recv()).await;
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        assert!(
+            received_op.is_ok(),
+            "must receive a SessionOp within timeout"
+        );
+        match received_op.unwrap().unwrap() {
+            talos_core::session::SessionOp::SubmitMultimodal { text, attachments } => {
+                assert_eq!(text, "describe this image");
+                assert_eq!(attachments.len(), 1);
+                match &attachments[0] {
+                    ContentPart::Image { mime, .. } => {
+                        assert_eq!(mime, "image/png");
+                    }
+                    _ => panic!("expected ContentPart::Image"),
+                }
+            }
+            other => panic!(
+                "expected SubmitMultimodal, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn bridge_sends_plain_submit_when_no_attachments() {
+        use crate::tui_bridge::{
+            ConversationLoopIo, SessionLifecycleRequest, run_conversation_loop,
+        };
+        use talos_conversation::{ConversationEngine, ModelInfo, UserInput};
+        let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
+        let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (sq_tx, mut sq_rx) = tokio::sync::mpsc::channel(4);
+        let (_sq_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo {
+            model_name: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            ..Default::default()
+        });
+        let (session_tx, _session_rx) =
+            tokio::sync::mpsc::unbounded_channel::<SessionLifecycleRequest>();
+
+        let skills_dir = tempfile::tempdir().unwrap();
+        let runtime_skills = std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::skill_runtime::discover_runtime_skills(skills_dir.path(), false).unwrap(),
+        ));
+
+        let loop_handle = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx_watch,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills,
+            },
+        ));
+
+        user_tx
+            .send(UserInput::Message("plain text message".to_string()))
+            .unwrap();
+
+        let received_op =
+            tokio::time::timeout(std::time::Duration::from_secs(2), sq_rx.recv()).await;
+
+        drop(user_tx);
+        loop_handle.abort();
+
+        assert!(received_op.is_ok());
+        match received_op.unwrap().unwrap() {
+            talos_core::session::SessionOp::Submit { message } => {
+                assert_eq!(message, "plain text message");
+            }
+            other => panic!("expected Submit, got {:?}", other),
+        }
+    }
 }

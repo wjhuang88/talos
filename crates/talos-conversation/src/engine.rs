@@ -533,9 +533,8 @@ impl ConversationEngine {
         let msg_owned = msg.to_string();
 
         if !self.pending_image_attachments.is_empty() {
-            let attachments = std::mem::take(&mut self.pending_image_attachments);
             let mut display_parts = vec![msg_owned.clone()];
-            for part in &attachments {
+            for part in &self.pending_image_attachments {
                 if let talos_core::message::ContentPart::Image {
                     path,
                     mime,
