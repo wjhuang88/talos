@@ -304,6 +304,24 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             origin: CommandOrigin::Builtin,
             available: always_available,
         },
+        CommandDefinition {
+            name: "/attachments",
+            aliases: &["/imgs"],
+            usage: "/attachments",
+            description: "List pending image attachments",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
+            name: "/detach",
+            aliases: &[],
+            usage: "/detach <index|all>",
+            description: "Remove a pending image attachment",
+            arg_hint: Some("<index|all>"),
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
     ])
 });
 

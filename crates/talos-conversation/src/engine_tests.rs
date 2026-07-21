@@ -2762,3 +2762,154 @@ fn handle_turn_completed_success_emits_snapshot() {
         "handle_turn_completed(Success) must emit snapshot"
     );
 }
+
+fn push_test_attachment(engine: &mut ConversationEngine, name: &str, bytes: u64) {
+    engine
+        .pending_image_attachments
+        .push(talos_core::message::ContentPart::Image {
+            path: std::path::PathBuf::from(format!("/tmp/{name}")),
+            mime: "image/png".to_string(),
+            byte_count: bytes,
+        });
+}
+
+#[test]
+fn attachments_command_lists_pending_attachments() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/attachments");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("No pending image attachments"));
+
+    push_test_attachment(&mut engine, "a.png", 100);
+    push_test_attachment(&mut engine, "b.png", 200);
+    let outputs = engine.handle_slash_command("/attachments");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("Pending image attachments (2)"));
+    assert!(text.contains("a.png"));
+    assert!(text.contains("b.png"));
+    assert!(text.contains("[1]"));
+    assert!(text.contains("[2]"));
+    assert!(text.contains("/detach"));
+}
+
+#[test]
+fn detach_by_index_removes_attachment_and_emits_status() {
+    let mut engine = new_engine();
+    push_test_attachment(&mut engine, "a.png", 100);
+    push_test_attachment(&mut engine, "b.png", 200);
+
+    let outputs = engine.handle_slash_command("/detach 1");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("Removed attachment at index 1"));
+    assert_eq!(engine.pending_image_attachments.len(), 1);
+
+    // Status update must be emitted so the TUI status line reflects the
+    // new count immediately.
+    let has_status = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::Status(s) if s.attachment_count == 1));
+    assert!(has_status, "must emit Status with updated attachment_count");
+}
+
+#[test]
+fn detach_all_clears_pending_and_emits_status() {
+    let mut engine = new_engine();
+    push_test_attachment(&mut engine, "a.png", 100);
+    push_test_attachment(&mut engine, "b.png", 200);
+    push_test_attachment(&mut engine, "c.png", 300);
+
+    let outputs = engine.handle_slash_command("/detach all");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("Removed 3 pending attachment(s)"));
+    assert!(engine.pending_image_attachments.is_empty());
+
+    let has_status = outputs
+        .iter()
+        .any(|o| matches!(o, UiOutput::Status(s) if s.attachment_count == 0));
+    assert!(has_status, "must emit Status with attachment_count = 0");
+}
+
+#[test]
+fn detach_out_of_range_returns_error_without_mutating() {
+    let mut engine = new_engine();
+    push_test_attachment(&mut engine, "a.png", 100);
+
+    let outputs = engine.handle_slash_command("/detach 5");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("Index 5 out of range"));
+    assert_eq!(engine.pending_image_attachments.len(), 1, "must not mutate");
+}
+
+#[test]
+fn detach_invalid_arg_returns_error() {
+    let mut engine = new_engine();
+    push_test_attachment(&mut engine, "a.png", 100);
+
+    let outputs = engine.handle_slash_command("/detach notanumber");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("not a valid index"));
+    assert_eq!(engine.pending_image_attachments.len(), 1, "must not mutate");
+}
+
+#[test]
+fn detach_no_arg_prints_usage() {
+    let mut engine = new_engine();
+    let outputs = engine.handle_slash_command("/detach");
+    let text = outputs
+        .iter()
+        .find_map(|o| match o {
+            UiOutput::Content(ContentOutput::Block { text, .. }) => Some(text),
+            _ => None,
+        })
+        .expect("must produce a content block");
+    assert!(text.contains("Usage: /detach"));
+}
+
+#[test]
+fn status_snapshot_reflects_attachment_count() {
+    let mut engine = new_engine();
+    assert_eq!(engine.status_snapshot().attachment_count, 0);
+
+    push_test_attachment(&mut engine, "a.png", 100);
+    push_test_attachment(&mut engine, "b.png", 200);
+    assert_eq!(engine.status_snapshot().attachment_count, 2);
+
+    engine.pending_image_attachments.clear();
+    assert_eq!(engine.status_snapshot().attachment_count, 0);
+}

@@ -1974,6 +1974,7 @@ mod tests {
             input_price_per_million: Some(3.0),
             output_price_per_million: Some(15.0),
             variant: None,
+            attachment_count: 0,
         };
         let lines = build_exit_summary_lines(
             &status,
@@ -2020,6 +2021,7 @@ mod tests {
             input_price_per_million: None,
             output_price_per_million: None,
             variant: None,
+            attachment_count: 0,
         };
         let lines = build_exit_summary_lines(&status, Duration::from_secs(60), 5, None);
         let text: String = lines.iter().map(|l| l.text.as_str()).collect();

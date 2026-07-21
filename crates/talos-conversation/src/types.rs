@@ -187,6 +187,9 @@ pub struct StatusSnapshot {
     pub output_price_per_million: Option<f64>,
     /// Selected variant ID (ADR-048).
     pub variant: Option<String>,
+    /// Pending image attachments waiting for the next user submit.
+    /// Surfaced in the status line so the user sees what will be sent.
+    pub attachment_count: usize,
 }
 
 /// Model metadata passed from the CLI layer to the conversation engine.

@@ -523,7 +523,9 @@ mode.
 | `/todo delete <id> --confirm` | Delete a session todo item by short-ID or full UUID; requires `--confirm` |
 | `/hooks` | Show configured hook diagnostics (declared paths, presence, validation status) without executing hooks |
 | `/agile [status]` | Show read-only governance status: board disposition, open iterations, manifest, and Rust validation findings |
-| `/attach <path>` | Attach a local image (PNG/JPEG/GIF/WebP) to the next message. Validates file type, size, and MIME before attachment. Requires a vision-capable model |
+| `/attach <path>` | Attach a local image (PNG/JPEG/GIF/WebP) to the next message. Validates file type, size, MIME, and pixel dimensions before attachment. Requires a vision-capable model — `/attach` is rejected before any file read when the active model's `image_input` capability is `Unknown` or `Unsupported`. Use `/attachments` to list queued images and `/detach <index\|all>` to remove one |
+| `/attachments` (`/imgs`) | List pending image attachments with their index, byte size, and MIME type. Attachments are queued for the next user submit |
+| `/detach <index\|all>` | Remove a pending image attachment by 1-based index, or clear all pending attachments with `all`. The status line reflects the new count immediately |
 
 ## Skills
 

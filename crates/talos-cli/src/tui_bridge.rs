@@ -211,6 +211,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                                     source: MessageSource::System,
                                                     text: format!("[System] Attached image: {summary}\n"),
                                                 }));
+                                                let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
                                             }
                                             Err(e) => {
                                                 let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {

@@ -278,6 +278,7 @@ impl ConversationEngine {
             input_price_per_million: self.input_price_per_million,
             output_price_per_million: self.output_price_per_million,
             variant: self.variant.clone(),
+            attachment_count: self.pending_image_attachments.len(),
         }
     }
 
@@ -706,6 +707,87 @@ impl ConversationEngine {
                     outputs.push(UiOutput::AttachImageRequest {
                         path: arg.trim().to_string(),
                     });
+                }
+            }
+            "/attachments" | "/imgs" => {
+                if self.pending_image_attachments.is_empty() {
+                    let text =
+                        "[System] No pending image attachments. Use /attach <path> to add one.\n"
+                            .to_string();
+                    outputs.push(content_block(MessageSource::System, text));
+                } else {
+                    let mut text = format!(
+                        "[System] Pending image attachments ({}):\n",
+                        self.pending_image_attachments.len()
+                    );
+                    for (idx, part) in self.pending_image_attachments.iter().enumerate() {
+                        match part {
+                            talos_core::message::ContentPart::Image {
+                                path,
+                                mime,
+                                byte_count,
+                            } => {
+                                let filename = path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("(unknown)");
+                                text.push_str(&format!(
+                                    "[System]   [{}] {filename} ({byte_count} bytes, {mime})\n",
+                                    idx + 1
+                                ));
+                            }
+                            _ => {
+                                text.push_str(&format!(
+                                    "[System]   [{}] (non-image part)\n",
+                                    idx + 1
+                                ));
+                            }
+                        }
+                    }
+                    text.push_str(
+                        "[System] These will be sent with your next message. Use /detach <index|all> to remove.\n"
+                    );
+                    outputs.push(content_block(MessageSource::System, text));
+                }
+            }
+            "/detach" => {
+                let arg_trimmed = arg.trim();
+                if arg_trimmed.is_empty() {
+                    let hint = "[Error] Usage: /detach <index|all>\nExample: /detach 1\n          /detach all\n".to_string();
+                    outputs.push(content_block(MessageSource::Error, hint));
+                } else if arg_trimmed == "all" {
+                    let count = self.pending_image_attachments.len();
+                    if count == 0 {
+                        let text = "[System] No pending attachments to remove.\n".to_string();
+                        outputs.push(content_block(MessageSource::System, text));
+                    } else {
+                        self.pending_image_attachments.clear();
+                        let text = format!("[System] Removed {count} pending attachment(s).\n");
+                        outputs.push(content_block(MessageSource::System, text));
+                        outputs.push(UiOutput::Status(self.status_snapshot()));
+                    }
+                } else {
+                    match arg_trimmed.parse::<usize>() {
+                        Ok(n) if n >= 1 && n <= self.pending_image_attachments.len() => {
+                            self.pending_image_attachments.remove(n - 1);
+                            let text = format!("[System] Removed attachment at index {n}.\n");
+                            outputs.push(content_block(MessageSource::System, text));
+                            outputs.push(UiOutput::Status(self.status_snapshot()));
+                        }
+                        Ok(n) => {
+                            let text = format!(
+                                "[Error] Index {n} out of range. Run /attachments to see valid indices (1..={}).\n",
+                                self.pending_image_attachments.len()
+                            );
+                            outputs.push(content_block(MessageSource::Error, text));
+                        }
+                        Err(_) => {
+                            let text = format!(
+                                "[Error] '/detach {arg_trimmed}' is not a valid index. Use a positive number or 'all'.\n"
+                            );
+                            outputs.push(content_block(MessageSource::Error, text));
+                        }
+                    }
                 }
             }
             _ => {

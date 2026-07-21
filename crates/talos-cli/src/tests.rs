@@ -1991,7 +1991,8 @@ mod steering_snapshot_tests {
         // `into_dimensions()` succeeds and `create_image_content_part`
         // returns a valid ContentPart::Image.
         let png = image::RgbaImage::new(8, 8);
-        png.save_with_format(&img_path, image::ImageFormat::Png).unwrap();
+        png.save_with_format(&img_path, image::ImageFormat::Png)
+            .unwrap();
 
         let mut engine =
             ConversationEngine::new("vision-model".to_string(), "test-provider".to_string());
