@@ -1213,7 +1213,7 @@ pub(crate) fn render_history_messages(
                 if content.is_empty() {
                     continue;
                 }
-                lines.extend(render_history_message(stream_count, source, content));
+                lines.extend(render_history_message(stream_count, source, &content));
             }
         }
     }
@@ -1236,18 +1236,127 @@ pub(crate) fn render_history_message(
     lines
 }
 
-fn history_message_parts(message: &Message) -> Option<(MessageSource, &str)> {
+fn history_message_parts(message: &Message) -> Option<(MessageSource, String)> {
     match message {
-        Message::User { content } => Some((MessageSource::User, content.as_str())),
-        Message::Assistant { content, .. } => Some((MessageSource::Assistant, content.as_str())),
+        Message::User { content } => Some((MessageSource::User, content.clone())),
+        Message::Assistant { content, .. } => Some((MessageSource::Assistant, content.clone())),
         Message::Tool { result } => Some((
             MessageSource::Tool {
                 name: result.tool_use_id.clone(),
             },
-            result.content.as_str(),
+            result.content.clone(),
         )),
-        Message::System { content, .. } => Some((MessageSource::System, content.as_str())),
-        Message::Context { content } => Some((MessageSource::System, content.as_str())),
-        Message::Multimodal { .. } => None,
+        Message::System { content, .. } => Some((MessageSource::System, content.clone())),
+        Message::Context { content } => Some((MessageSource::System, content.clone())),
+        // R10: Multimodal messages must render a safe summary instead of
+        // being silently dropped on history hydration. We surface only
+        // the text content (if any) and a per-image marker containing
+        // basename + MIME + byte count. Full canonical paths and image
+        // bytes never enter the terminal scrollback.
+        Message::Multimodal { parts } => {
+            let mut summary = String::new();
+            for part in parts {
+                match part {
+                    talos_core::message::ContentPart::Text { text } => {
+                        if !summary.is_empty() {
+                            summary.push('\n');
+                        }
+                        summary.push_str(text);
+                    }
+                    talos_core::message::ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                    } => {
+                        if !summary.is_empty() {
+                            summary.push('\n');
+                        }
+                        let basename = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("(unknown)");
+                        summary
+                            .push_str(&format!("[Image: {basename} ({byte_count} bytes, {mime})]"));
+                    }
+                }
+            }
+            if summary.is_empty() {
+                None
+            } else {
+                Some((MessageSource::User, summary))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod r10_tests {
+    use super::*;
+    use talos_core::message::{ContentPart, Message};
+
+    fn image_part(name: &str, mime: &str, bytes: u64) -> ContentPart {
+        ContentPart::Image {
+            path: std::path::PathBuf::from(format!("/tmp/{name}")),
+            mime: mime.to_string(),
+            byte_count: bytes,
+        }
+    }
+
+    #[test]
+    fn plain_user_message_round_trips() {
+        let msg = Message::User {
+            content: "hello".to_string(),
+        };
+        let (source, content) = history_message_parts(&msg).expect("must return Some");
+        assert_eq!(source, MessageSource::User);
+        assert_eq!(content, "hello");
+    }
+
+    /// R10 regression: Multimodal messages must NOT be silently dropped
+    /// from history. The summary must include the text part and an
+    /// [Image: ...] marker per image. The full canonical path must NOT
+    /// appear — only the basename.
+    #[test]
+    fn multimodal_message_produces_safe_summary_instead_of_none() {
+        let msg = Message::Multimodal {
+            parts: vec![
+                ContentPart::Text {
+                    text: "describe these".to_string(),
+                },
+                image_part("a.png", "image/png", 100),
+                image_part("b.jpg", "image/jpeg", 200),
+            ],
+        };
+        let (source, content) =
+            history_message_parts(&msg).expect("R10: Multimodal must produce a summary, not None");
+        assert_eq!(source, MessageSource::User);
+        assert!(content.contains("describe these"));
+        assert!(content.contains("[Image: a.png (100 bytes, image/png)]"));
+        assert!(content.contains("[Image: b.jpg (200 bytes, image/jpeg)]"));
+        // Critical privacy invariant: full canonical path must not leak.
+        assert!(
+            !content.contains("/tmp/"),
+            "summary must not expose the full canonical path, got: {content}"
+        );
+    }
+
+    /// R10 privacy: image-only Multimodal messages (no text) still
+    /// render a safe per-image marker.
+    #[test]
+    fn image_only_multimodal_produces_summary() {
+        let msg = Message::Multimodal {
+            parts: vec![image_part("shot.png", "image/png", 4096)],
+        };
+        let (source, content) = history_message_parts(&msg).expect("must produce summary");
+        assert_eq!(source, MessageSource::User);
+        assert_eq!(content, "[Image: shot.png (4096 bytes, image/png)]");
+    }
+
+    /// R10 edge: empty Multimodal parts vector returns None (nothing
+    /// to render), preserving the existing skip-empty contract.
+    #[test]
+    fn empty_multimodal_returns_none() {
+        let msg = Message::Multimodal { parts: vec![] };
+        assert!(history_message_parts(&msg).is_none());
     }
 }
