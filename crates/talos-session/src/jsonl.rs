@@ -212,6 +212,7 @@ pub(crate) fn message_parts(message: &Message) -> (String, String) {
                         path,
                         mime,
                         byte_count,
+                        content_digest: _,
                     } => {
                         let filename = path
                             .file_name()

@@ -1,6 +1,6 @@
 # 050: Multimodal Image Input Architecture And Security Boundary
 
-> Status: Accepted
+> Status: Accepted (amended 2026-07-21 for P1-A/P1-B rework)
 > Date: 2026-07-20
 > Iteration: I149 (MODEL-009-A)
 > Gate: This ADR is the hard gate for I150-I152. If any decision point is unresolved, I150-I152 are Blocked.
@@ -85,10 +85,22 @@ wire format (data URL for OpenAI, base64 source for Anthropic).
 
 - Reuse SEC-001/ADR-047: the permission pipeline must approve the external path before any image
   byte is read. No bypass because the model is vision-capable.
+- **P1-A (2026-07-21 amendment)**: a shared `image_authorization` module in `talos-cli`
+  evaluates every `/attach` and `--attach` path against `PermissionEngine` with a synthetic
+  `attach_image` tool name and `ToolNature::Read`. Workspace-internal paths auto-allow; external
+  paths produce `Ask`, which the TUI resolves through `UiOutput::ToolApprovalRequest` and print
+  mode treats as fail-closed. User-approved external paths can be added as runtime allow rules
+  scoped to the exact path string.
 - **Canonicalization**: `std::fs::canonicalize` at attach time. The canonical path is stored.
 - **Regular file**: reject directories, FIFOs, character/block devices, sockets.
 - **Symlink**: canonicalize the symlink target. On execution (actual file read), re-canonicalize
   and compare — if the target changed between grant and read, reject (fail-closed).
+- **P1-B (2026-07-21 amendment)**: the TOCTOU path guard alone is insufficient against
+  same-path file replacement (atomic swap at the same canonical path). `ContentPart::Image`
+  now carries a `ContentDigest` (SHA-256, `[u8; 32]`) computed at grant time. The provider
+  adapter recomputes the digest at read time and omits the part on mismatch. The all-zero
+  `ContentDigest::default()` sentinel means "verification intentionally skipped" and is only
+  used by test fixtures.
 - **External path**: requires explicit interactive approval (same as SEC-001). Headless mode
   fails closed.
 

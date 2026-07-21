@@ -68,9 +68,17 @@ pub(crate) fn build_request_body(
                         talos_core::message::ContentPart::Text { text } => {
                             json!({"type": "text", "text": text})
                         }
-                        talos_core::message::ContentPart::Image { path, mime, .. } => {
-                            let bytes = match crate::image_io::read_image_with_toctou_guard(path)
-                                .into_bytes()
+                        talos_core::message::ContentPart::Image {
+                            path,
+                            mime,
+                            content_digest,
+                            ..
+                        } => {
+                            let bytes = match crate::image_io::read_image_with_toctou_guard(
+                                path,
+                                content_digest,
+                            )
+                            .into_bytes()
                             {
                                 Some(b) => b,
                                 None => {
@@ -623,7 +631,7 @@ mod tests {
 
     #[test]
     fn multimodal_message_produces_image_content_block() {
-        use talos_core::message::ContentPart;
+        use talos_core::message::{ContentDigest, ContentPart};
 
         let dir = tempfile::tempdir().unwrap();
         let img_path = dir.path().join("test.png");
@@ -643,6 +651,7 @@ mod tests {
                     path: canonical,
                     mime: "image/png".into(),
                     byte_count: 8,
+                    content_digest: ContentDigest::default(),
                 },
             ],
         }];

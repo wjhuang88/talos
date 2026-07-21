@@ -2770,6 +2770,7 @@ fn push_test_attachment(engine: &mut ConversationEngine, name: &str, bytes: u64)
             path: std::path::PathBuf::from(format!("/tmp/{name}")),
             mime: "image/png".to_string(),
             byte_count: bytes,
+            content_digest: talos_core::message::ContentDigest::default(),
         });
 }
 

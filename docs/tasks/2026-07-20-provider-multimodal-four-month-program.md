@@ -544,6 +544,34 @@ On a hard stop:
 - Next task item: re-run the full validation ladder, push, await Owner
   re-acceptance.
 
+### P1-A + P1-B — SEC-001 Permission Pipeline + Content Digest — 2026-07-21
+
+- Owner second NO-GO identified two P1 blockers:
+  1. External image path read bypasses SEC-001/ADR-047 permission pipeline
+  2. R5 TOCTOU guard doesn't defend same-path file replacement
+- P1-A: new `image_authorization` module in `talos-cli` evaluates every
+  `/attach` and `--attach` path against `PermissionEngine` with synthetic
+  `attach_image` tool name and `ToolNature::Read`. Workspace-internal → Allow.
+  External → Ask (TUI: interactive `UiOutput::ToolApprovalRequest`; print:
+  headless fail-closed). User-approved paths get runtime allow rules scoped
+  to the exact path string. `TuiApprovalHandler.engine` changed from
+  `Mutex<PermissionEngine>` to `Arc<Mutex<PermissionEngine>>` so the bridge
+  shares the same rule set. `ConversationLoopIo.permission_engine` added.
+- P1-B: `ContentPart::Image` extended with `content_digest: ContentDigest`
+  (SHA-256 `[u8; 32]`, hex-serialized in TLOG). `create_image_content_part`
+  now computes the digest at grant time. Provider adapter `image_io` recomputes
+  the digest at read time and omits the part on mismatch. The all-zero
+  `ContentDigest::default()` sentinel skips verification (test fixtures only).
+  `same_path_replacement_detected_via_digest_mismatch` test uses a real
+  canonical ContentPart path, writes file A, computes digest, replaces with
+  file B at the SAME canonical path, and verifies the guard omits.
+- ADR-050 amended: sections 1 and 4 updated to document the ContentDigest
+  field, P1-A permission gate, and P1-B digest verification.
+- I151/I152 status: Review → **Partial** (security rework is implemented
+  and tested, but not yet Owner-accepted as Review).
+- Validation: fmt + clippy -D warnings + test (0 failures) + governance +
+  diff-check all green.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.

@@ -78,11 +78,89 @@ pub struct AssistantReasoning {
     pub blocks: Vec<ReasoningBlock>,
 }
 
+/// Cryptographic digest of an image attachment's bytes at grant time.
+///
+/// Stored on `ContentPart::Image` so the provider adapter can detect
+/// same-path replacement attacks: when the adapter re-reads the file
+/// at request time, it recomputes the digest and compares. A mismatch
+/// means the file was replaced between grant and read, and the part
+/// MUST be omitted (Owner P1-B security rework, 2026-07-21).
+///
+/// Backed by SHA-256 (`[u8; 32]`). The hash itself is computed in
+/// `talos_cli::image_validation`; talos-core only carries the typed
+/// digest so it has no `sha2` dependency. Serde uses a lowercase hex
+/// string so TLOG dumps remain human-readable.
+///
+/// The default is the all-zero "unverified" sentinel: a freshly
+/// constructed ContentPart that has not yet been through
+/// `validate_image_path` carries this. Provider adapters treat the
+/// default as "verification intentionally skipped" — only test
+/// fixtures and unverified in-memory parts use this path.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ContentDigest([u8; 32]);
+
+impl ContentDigest {
+    /// Wrap an existing raw SHA-256 digest.
+    pub const fn from_raw(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns the raw 32-byte digest.
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Returns the digest formatted as a lowercase hex string.
+    pub fn to_hex(&self) -> String {
+        let mut out = String::with_capacity(64);
+        for byte in self.0 {
+            out.push_str(&format!("{byte:02x}"));
+        }
+        out
+    }
+
+    /// Parses a 64-char lowercase hex string into a digest.
+    pub fn from_hex(s: &str) -> Result<Self, String> {
+        if s.len() != 64 {
+            return Err(format!(
+                "content_digest must be 64 hex chars, got {}",
+                s.len()
+            ));
+        }
+        let mut bytes = [0u8; 32];
+        for (i, chunk) in s.as_bytes().chunks(2).enumerate() {
+            let hex = std::str::from_utf8(chunk).map_err(|e| e.to_string())?;
+            bytes[i] = u8::from_str_radix(hex, 16).map_err(|e| e.to_string())?;
+        }
+        Ok(Self(bytes))
+    }
+}
+
+impl std::fmt::Display for ContentDigest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_hex())
+    }
+}
+
+impl serde::Serialize for ContentDigest {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ContentDigest {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Self::from_hex(&s).map_err(serde::de::Error::custom)
+    }
+}
+
 /// One part of an ordered multimodal message content (ADR-050).
 ///
 /// Provider wire format (data URL, base64 source) is constructed inside
-/// `talos-provider` adapters at request time. The core type carries only
-/// the path, MIME type, and byte count — no image bytes.
+/// `talos-provider` adapters at request time. The core type carries the
+/// canonical path, MIME type, byte count, and a content digest — no
+/// image bytes.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentPart {
@@ -93,6 +171,12 @@ pub enum ContentPart {
         path: std::path::PathBuf,
         mime: String,
         byte_count: u64,
+        /// SHA-256 digest of the file bytes observed at grant time.
+        /// The provider adapter recomputes the digest at read time and
+        /// omits the part on mismatch. Defaults to all-zero for
+        /// newly-constructed parts that have not yet been validated.
+        #[serde(default)]
+        content_digest: ContentDigest,
     },
 }
 
@@ -380,6 +464,7 @@ Done."#;
             path: "/tmp/test.png".into(),
             mime: "image/png".into(),
             byte_count: 12345,
+            content_digest: ContentDigest::from_raw([7u8; 32]),
         };
         let json = serde_json::to_string(&part).unwrap();
         let decoded: ContentPart = serde_json::from_str(&json).unwrap();
@@ -397,6 +482,7 @@ Done."#;
                     path: "/tmp/screenshot.png".into(),
                     mime: "image/png".into(),
                     byte_count: 67890,
+                    content_digest: ContentDigest::from_raw([9u8; 32]),
                 },
             ],
         };

@@ -545,6 +545,7 @@ impl ConversationEngine {
                     path,
                     mime,
                     byte_count,
+                    content_digest: _,
                 } = part
                 {
                     let filename = path
@@ -726,6 +727,7 @@ impl ConversationEngine {
                                 path,
                                 mime,
                                 byte_count,
+                                content_digest: _,
                             } => {
                                 let filename = path
                                     .file_name()

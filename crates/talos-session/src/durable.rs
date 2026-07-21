@@ -511,10 +511,12 @@ fn filtered_message(message: &Message, policy: &PersistencePolicy) -> Message {
                         path,
                         mime,
                         byte_count,
+                        content_digest,
                     } => talos_core::message::ContentPart::Image {
                         path: path.clone(),
                         mime: mime.clone(),
                         byte_count: *byte_count,
+                        content_digest: content_digest.clone(),
                     },
                 })
                 .collect(),

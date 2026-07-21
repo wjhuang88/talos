@@ -1267,6 +1267,7 @@ fn history_message_parts(message: &Message) -> Option<(MessageSource, String)> {
                         path,
                         mime,
                         byte_count,
+                        content_digest: _,
                     } => {
                         if !summary.is_empty() {
                             summary.push('\n');

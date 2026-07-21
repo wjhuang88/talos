@@ -159,6 +159,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
             prompt,
             request_preview,
             &config.all_models(),
+            &workspace_root,
         )?)
         .await
         .context("failed to submit message to session")?;
@@ -212,6 +213,7 @@ fn build_print_submit_op(
     prompt: String,
     request_preview: Option<String>,
     all_models: &[talos_config::model::ModelMetadata],
+    workspace_root: &std::path::Path,
 ) -> Result<SessionOp> {
     if cli.attach.is_empty() {
         return Ok(match request_preview {
@@ -245,9 +247,33 @@ fn build_print_submit_op(
         );
     }
 
+    // P1-A: authorize each path against the SEC-001 permission pipeline
+    // before any file probe. Print mode is headless — unresolved Ask
+    // fails closed.
+    let auth_engine =
+        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf());
+
     let mut attachments = Vec::with_capacity(cli.attach.len());
     let mut total_bytes: u64 = 0;
     for path in &cli.attach {
+        match crate::image_authorization::ImageAuthorization::evaluate(path, &auth_engine) {
+            crate::image_authorization::ImageAuthorization::Allow => {}
+            crate::image_authorization::ImageAuthorization::Ask => {
+                bail!(
+                    "--attach {} is outside the workspace and there is no interactive approval \
+                     in print mode. Run in TUI mode to approve external paths, or add an explicit \
+                     permission rule for this path.",
+                    path.display()
+                );
+            }
+            crate::image_authorization::ImageAuthorization::Deny(reason) => {
+                bail!(
+                    "--attach {} denied by permission rule: {}",
+                    path.display(),
+                    reason
+                );
+            }
+        }
         let part = create_image_content_part(path, attachments.len(), total_bytes)
             .map_err(|e| anyhow!(attachment_error_message(&e, path)))?;
         if let talos_core::message::ContentPart::Image { byte_count, .. } = &part {
@@ -310,7 +336,15 @@ mod tests {
         let cli = cli_with_attach(vec![]);
         let config = config_with("anthropic", "claude-sonnet-4-5");
         let catalog = vec![metadata_for("anthropic", "claude-sonnet-4-5", true)];
-        let op = build_print_submit_op(&cli, &config, "hello".to_string(), None, &catalog).unwrap();
+        let op = build_print_submit_op(
+            &cli,
+            &config,
+            "hello".to_string(),
+            None,
+            &catalog,
+            std::path::Path::new("/tmp"),
+        )
+        .unwrap();
         match op {
             SessionOp::Submit { message } => assert_eq!(message, "hello"),
             other => panic!("expected Submit, got {other:?}"),
@@ -328,6 +362,7 @@ mod tests {
             "/mock-request hello".to_string(),
             Some("hello".to_string()),
             &catalog,
+            std::path::Path::new("/tmp"),
         )
         .unwrap();
         match op {
@@ -347,7 +382,14 @@ mod tests {
         )]);
         let config = config_with("anthropic", "claude-haiku-text-only");
         let catalog = vec![metadata_for("anthropic", "claude-haiku-text-only", false)];
-        let result = build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog);
+        let result = build_print_submit_op(
+            &cli,
+            &config,
+            "describe".to_string(),
+            None,
+            &catalog,
+            std::path::Path::new("/tmp"),
+        );
         let err = result.err().expect("Unsupported capability must bail");
         let msg = format!("{err}");
         assert!(
@@ -364,7 +406,14 @@ mod tests {
         )]);
         let config = config_with("custom", "discovered-model");
         let catalog: Vec<talos_config::model::ModelMetadata> = vec![];
-        let result = build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog);
+        let result = build_print_submit_op(
+            &cli,
+            &config,
+            "describe".to_string(),
+            None,
+            &catalog,
+            std::path::Path::new("/tmp"),
+        );
         let err = result.err().expect("Unknown capability must bail");
         let msg = format!("{err}");
         assert!(msg.contains("Unknown"));
@@ -378,7 +427,14 @@ mod tests {
         let cli = cli_with_attach(too_many);
         let config = config_with("openai", "gpt-4o");
         let catalog = vec![metadata_for("openai", "gpt-4o", true)];
-        let result = build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog);
+        let result = build_print_submit_op(
+            &cli,
+            &config,
+            "describe".to_string(),
+            None,
+            &catalog,
+            std::path::Path::new("/tmp"),
+        );
         let err = result.err().expect("too many attach paths must bail");
         let msg = format!("{err}");
         assert!(msg.contains("Too many --attach paths"));
@@ -398,8 +454,15 @@ mod tests {
         let cli = cli_with_attach(vec![img_path]);
         let config = config_with("openai", "gpt-4o");
         let catalog = vec![metadata_for("openai", "gpt-4o", true)];
-        let op =
-            build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog).unwrap();
+        let op = build_print_submit_op(
+            &cli,
+            &config,
+            "describe".to_string(),
+            None,
+            &catalog,
+            std::path::Path::new("/tmp"),
+        )
+        .unwrap();
         match op {
             SessionOp::SubmitMultimodal { text, attachments } => {
                 assert_eq!(text, "describe");

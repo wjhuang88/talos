@@ -196,7 +196,9 @@ fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
 /// It performs all validation checks (regular file, MIME/magic-byte,
 /// byte/aggregate/count limits, pixel-bomb defense, decoder panic
 /// containment, canonicalization) before returning the structured
-/// content part.
+/// content part. A SHA-256 digest of the file bytes is captured at
+/// grant time so the provider adapter can detect same-path replacement
+/// (Owner P1-B security rework).
 pub fn create_image_content_part(
     path: &Path,
     current_count: usize,
@@ -204,11 +206,25 @@ pub fn create_image_content_part(
 ) -> Result<talos_core::message::ContentPart, ImageValidationError> {
     let (canonical, byte_count, mime) =
         validate_image_path(path, current_count, current_total_bytes)?;
+    let bytes =
+        std::fs::read(&canonical).map_err(|e| ImageValidationError::IoError(e.to_string()))?;
+    let digest = compute_content_digest(&bytes);
     Ok(talos_core::message::ContentPart::Image {
         path: canonical,
         mime,
         byte_count,
+        content_digest: digest,
     })
+}
+
+/// Computes a SHA-256 digest over the provided bytes, returning the
+/// typed `ContentDigest` stored on `ContentPart::Image`.
+pub fn compute_content_digest(bytes: &[u8]) -> talos_core::message::ContentDigest {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let raw: [u8; 32] = hasher.finalize().into();
+    talos_core::message::ContentDigest::from_raw(raw)
 }
 
 fn read_file_header(path: &Path, len: usize) -> Result<Vec<u8>, ImageValidationError> {
@@ -444,6 +460,7 @@ mod tests {
                 path,
                 mime,
                 byte_count,
+                content_digest: _,
             } => {
                 assert!(path.exists());
                 assert_eq!(mime, "image/png");

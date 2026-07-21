@@ -282,9 +282,12 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
         mcp_runtime.tools(),
         approval_handler.clone(),
     );
-    let loaded_plugin_packages =
-        register_explicit_tui_plugins(&mut registry, &cli.plugin_packages, approval_handler)
-            .map_err(anyhow::Error::msg)?;
+    let loaded_plugin_packages = register_explicit_tui_plugins(
+        &mut registry,
+        &cli.plugin_packages,
+        approval_handler.clone(),
+    )
+    .map_err(anyhow::Error::msg)?;
 
     let mut agent = Agent::with_security_and_hooks(
         provider,
@@ -658,6 +661,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                 model_info_watch: model_info_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: Some(approval_handler.shared_engine()),
             },
         )
         .await;

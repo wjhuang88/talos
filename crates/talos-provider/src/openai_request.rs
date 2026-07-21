@@ -98,8 +98,11 @@ pub(crate) fn build_request_body(
                         talos_core::message::ContentPart::Text { text } => {
                             json!({"type": "text", "text": text})
                         }
-                        talos_core::message::ContentPart::Image { path, mime, .. } => {
-                            let bytes = match crate::image_io::read_image_with_toctou_guard(path)
+                        talos_core::message::ContentPart::Image { path, mime, content_digest, .. } => {
+                            let bytes = match crate::image_io::read_image_with_toctou_guard(
+                                path,
+                                content_digest,
+                            )
                                 .into_bytes()
                             {
                                 Some(b) => b,
@@ -299,7 +302,7 @@ fn non_empty_content(content: &str, fallback: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_core::message::ContentPart;
+    use talos_core::message::{ContentDigest, ContentPart};
 
     #[test]
     fn multimodal_message_produces_array_content_with_image_url() {
@@ -321,6 +324,7 @@ mod tests {
                     path: canonical,
                     mime: "image/png".into(),
                     byte_count: 8,
+                    content_digest: ContentDigest::default(),
                 },
             ],
         }];

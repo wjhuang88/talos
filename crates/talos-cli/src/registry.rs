@@ -45,7 +45,7 @@ use crate::colors;
 /// on stdin — the TUI renders an overlay and handles user interaction.
 pub(crate) struct TuiApprovalHandler {
     ui_output_tx: mpsc::UnboundedSender<UiOutput>,
-    engine: Mutex<PermissionEngine>,
+    engine: Arc<Mutex<PermissionEngine>>,
 }
 
 impl TuiApprovalHandler {
@@ -55,7 +55,9 @@ impl TuiApprovalHandler {
     ) -> Self {
         Self {
             ui_output_tx,
-            engine: Mutex::new(PermissionEngine::with_workspace_root(workspace_root)),
+            engine: Arc::new(Mutex::new(PermissionEngine::with_workspace_root(
+                workspace_root,
+            ))),
         }
     }
 
@@ -88,8 +90,15 @@ impl TuiApprovalHandler {
 
         Self {
             ui_output_tx,
-            engine: Mutex::new(engine),
+            engine: Arc::new(Mutex::new(engine)),
         }
+    }
+
+    /// Returns a shared handle to the permission engine so callers like
+    /// the TUI bridge can evaluate image-attachment paths against the
+    /// same SEC-001 rule set (P1-A).
+    pub(crate) fn shared_engine(&self) -> Arc<Mutex<PermissionEngine>> {
+        self.engine.clone()
     }
 
     async fn request_approval(

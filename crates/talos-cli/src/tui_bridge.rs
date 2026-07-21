@@ -27,6 +27,12 @@ pub(crate) struct ConversationLoopIo {
     pub model_info_watch: tokio::sync::watch::Receiver<ModelInfo>,
     pub session_tx: tokio::sync::mpsc::UnboundedSender<SessionLifecycleRequest>,
     pub runtime_skills: Arc<Mutex<RuntimeSkills>>,
+    /// Optional SEC-001/ADR-047 permission engine for image attachment
+    /// authorization (P1-A). When `Some`, the bridge evaluates every
+    /// `/attach` path against this engine and prompts the user for
+    /// external paths. When `None`, the bridge skips authorization
+    /// (test fixtures only).
+    pub permission_engine: Option<Arc<std::sync::Mutex<talos_permission::PermissionEngine>>>,
 }
 
 pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: ConversationLoopIo) {
@@ -38,6 +44,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
         mut model_info_watch,
         session_tx,
         runtime_skills,
+        permission_engine,
     } = io;
 
     loop {
@@ -188,6 +195,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                             }));
                                             continue;
                                         }
+                                        if !authorize_attach_image(&ui_tx, &permission_engine, &path).await {
+                                            continue;
+                                        }
                                         match crate::image_validation::create_image_content_part(
                                             std::path::Path::new(&path),
                                             engine.pending_image_attachments.len(),
@@ -200,7 +210,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                         ) {
                                             Ok(content_part) => {
                                                 let summary = match &content_part {
-                                                    talos_core::message::ContentPart::Image { path, mime, byte_count } =>
+                                                    talos_core::message::ContentPart::Image { path, mime, byte_count, .. } =>
                                                         format!("{} ({} bytes, {})",
                                                             path.file_name().unwrap_or_default().to_string_lossy(),
                                                             byte_count, mime),
@@ -313,6 +323,85 @@ async fn submit_session_message(
         None => talos_core::session::SessionOp::Submit { message },
     };
     sq_tx.send(op).await.map_err(|_| ())
+}
+
+/// P1-A: evaluates an image attachment path against the SEC-001
+/// permission pipeline before any filesystem probe. Returns true when
+/// the attachment may proceed (Allow or user-approved Ask) and false
+/// when it must be rejected (Deny, Ask with no engine, or denied
+/// approval).
+async fn authorize_attach_image(
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    permission_engine: &Option<Arc<std::sync::Mutex<talos_permission::PermissionEngine>>>,
+    path: &str,
+) -> bool {
+    use crate::image_authorization::{
+        ATTACH_IMAGE_TOOL_NAME, ImageAuthorization, add_attach_image_allow_rule,
+    };
+    use talos_core::ApprovalChoice;
+
+    let Some(engine_ref) = permission_engine else {
+        return true;
+    };
+
+    let path_buf = std::path::PathBuf::from(path);
+    let decision = {
+        let engine = engine_ref.lock().expect("permission engine lock poisoned");
+        ImageAuthorization::evaluate(&path_buf, &engine)
+    };
+
+    match decision {
+        ImageAuthorization::Allow => true,
+        ImageAuthorization::Deny(reason) => {
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text: format!(
+                    "[Error] /attach {path} denied by permission rule: {reason}. No file was read.\n"
+                ),
+            }));
+            false
+        }
+        ImageAuthorization::Ask => {
+            let (response_tx, response_rx) =
+                tokio::sync::oneshot::channel::<talos_core::ApprovalChoice>();
+            let summary_fields = vec!["path".to_string()];
+            if ui_tx
+                .send(UiOutput::ToolApprovalRequest {
+                    tool_name: ATTACH_IMAGE_TOOL_NAME.to_string(),
+                    arguments: serde_json::json!({ "path": path }),
+                    summary_fields,
+                    response: response_tx,
+                })
+                .is_err()
+            {
+                return false;
+            }
+            match response_rx.await {
+                Ok(ApprovalChoice::Deny) => {
+                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text: format!("[Error] /attach {path} denied by user. No file was read.\n"),
+                    }));
+                    false
+                }
+                Ok(ApprovalChoice::AlwaysApprove) => {
+                    let mut engine = engine_ref.lock().expect("permission engine lock poisoned");
+                    add_attach_image_allow_rule(&mut engine, path_buf.clone());
+                    true
+                }
+                Ok(_) => true,
+                Err(_) => {
+                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::Error,
+                        text: format!(
+                            "[Error] /attach {path} approval channel closed. No file was read.\n"
+                        ),
+                    }));
+                    false
+                }
+            }
+        }
+    }
 }
 
 async fn submit_session_message_multimodal(

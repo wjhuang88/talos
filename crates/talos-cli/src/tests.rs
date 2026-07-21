@@ -205,6 +205,7 @@ mod tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
             },
         ));
 
@@ -280,6 +281,7 @@ mod tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
             },
         ));
 
@@ -329,6 +331,7 @@ mod tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
             },
         ));
 
@@ -446,6 +449,7 @@ mod tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
             },
         ));
         (handle, TestTurnSender::new(agent_tx), ui_rx)
@@ -711,6 +715,7 @@ mod tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
             },
         ));
 
@@ -788,6 +793,7 @@ mod tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: None,
             },
         ));
 
@@ -1689,6 +1695,7 @@ mod steering_snapshot_tests {
             path: std::path::PathBuf::from("/tmp/fake.png"),
             mime: "image/png".to_string(),
             byte_count: 100,
+            content_digest: talos_core::message::ContentDigest::default(),
         });
 
         let skills_dir = tempfile::tempdir().unwrap();
@@ -1706,6 +1713,7 @@ mod steering_snapshot_tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: None,
             },
         ));
 
@@ -1776,6 +1784,7 @@ mod steering_snapshot_tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: None,
             },
         ));
 
@@ -1847,6 +1856,7 @@ mod steering_snapshot_tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: None,
             },
         ));
 
@@ -1933,6 +1943,7 @@ mod steering_snapshot_tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: None,
             },
         ));
 
@@ -2028,6 +2039,7 @@ mod steering_snapshot_tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
+                permission_engine: None,
             },
         ));
 
