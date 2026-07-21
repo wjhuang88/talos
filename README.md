@@ -256,6 +256,21 @@ Run a one-shot prompt in print mode:
 talos -p "summarize this repository"
 ```
 
+Attach one or more local images to a print-mode prompt (requires a vision-capable model):
+
+```bash
+talos -p "describe these screenshots" --attach shot-1.png --attach shot-2.png
+# shorthand: -a
+talos -p "describe this" -a diagram.png
+```
+
+`--attach` enforces the same fail-closed capability gate, MIME/byte/pixel
+limits, decoder panic containment, and TOCTOU guard as the TUI `/attach`
+flow. `--attach` is refused before any file read when the active model's
+catalog metadata does not confirm `image_input = true`. `--attach` is
+print-mode-only; TUI and inline modes reject it with a pointer to the
+`/attach` slash command.
+
 Choose a workspace explicitly:
 
 ```bash

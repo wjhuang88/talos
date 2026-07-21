@@ -185,6 +185,14 @@ pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
+    if !cli.attach.is_empty() {
+        bail!(
+            "--attach is not supported in TUI mode. Use the /attach slash command inside the TUI \
+             to attach images interactively. Print mode (-p) and inline mode (--inline) accept \
+             --attach from the command line."
+        );
+    }
+
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         eprintln!("\n\n--- TALOS PANIC ---");

@@ -6,12 +6,14 @@ use talos_agent::Agent;
 use talos_agent::session::AppServerSession;
 use talos_config::Config;
 use talos_core::message::AgentEvent;
+use talos_core::model::ImageInputCapability;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnEventPayload,
 };
 use talos_core::tool::ToolPresentationPolicy;
 
 use crate::approval::ApprovalPrompt;
+use crate::image_validation::{ImageValidationError, create_image_content_part, max_image_count};
 use crate::mcp_runtime::McpSessionRuntime;
 use crate::mode_runtime::{
     apply_mcp_fixture_config, context_files_for_agent, maybe_set_memory_provider,
@@ -48,7 +50,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let workspace_root = resolve_workspace_root(&cli)?;
     apply_mcp_fixture_config(&mut config, &cli);
-    let prompt = resolve_prompt(cli.prompt)?;
+    let prompt = resolve_prompt(cli.prompt.clone())?;
 
     let hooks = build_hook_registry(true);
     let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
@@ -59,6 +61,12 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     #[cfg(not(debug_assertions))]
     let fixture_mode = false;
     let request_preview = request_preview_payload(&prompt);
+    if request_preview.is_some() && !cli.attach.is_empty() {
+        bail!(
+            "--attach cannot be combined with the request-preview magic prefix. \
+               Drop the prefix or remove --attach."
+        );
+    }
 
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
@@ -145,10 +153,13 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     handle
         .sq_tx
-        .send(match request_preview {
-            Some(message) => SessionOp::PreviewRequest { message },
-            None => SessionOp::Submit { message: prompt },
-        })
+        .send(build_print_submit_op(
+            &cli,
+            &config,
+            prompt,
+            request_preview,
+            &config.all_models(),
+        )?)
         .await
         .context("failed to submit message to session")?;
 
@@ -189,4 +200,218 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Choose the SessionOp for print mode based on --attach and the preview
+/// magic prefix. `--attach` enforces the capability gate and path
+/// validation up front so that misconfiguration fails before any network
+/// call.
+fn build_print_submit_op(
+    cli: &Cli,
+    config: &Config,
+    prompt: String,
+    request_preview: Option<String>,
+    all_models: &[talos_config::model::ModelMetadata],
+) -> Result<SessionOp> {
+    if cli.attach.is_empty() {
+        return Ok(match request_preview {
+            Some(message) => SessionOp::PreviewRequest { message },
+            None => SessionOp::Submit { message: prompt },
+        });
+    }
+
+    // Capability gate (R3 equivalent for print mode): refuse before any
+    // file-system probe when the active model is not confirmed Supported.
+    let metadata =
+        talos_config::model::find_model_by_provider(all_models, &config.provider, &config.model);
+    let capability = ImageInputCapability::from_metadata(metadata);
+    if !capability.allows_attachment() {
+        bail!(
+            "Active model {}/{} does not support image input (capability: {:?}). \
+             --attach refused before any file read. \
+             Use --model to select a vision-capable model.",
+            config.provider,
+            config.model,
+            capability
+        );
+    }
+
+    if cli.attach.len() > max_image_count() {
+        bail!(
+            "Too many --attach paths: {} provided, limit is {}. \
+             Drop some attachments or run multiple prompts.",
+            cli.attach.len(),
+            max_image_count()
+        );
+    }
+
+    let mut attachments = Vec::with_capacity(cli.attach.len());
+    let mut total_bytes: u64 = 0;
+    for path in &cli.attach {
+        let part = create_image_content_part(path, attachments.len(), total_bytes)
+            .map_err(|e| anyhow!(attachment_error_message(&e, path)))?;
+        if let talos_core::message::ContentPart::Image { byte_count, .. } = &part {
+            total_bytes = total_bytes.saturating_add(*byte_count);
+        }
+        attachments.push(part);
+    }
+
+    Ok(SessionOp::SubmitMultimodal {
+        text: prompt,
+        attachments,
+    })
+}
+
+fn attachment_error_message(err: &ImageValidationError, path: &std::path::Path) -> String {
+    format!("--attach {} failed: {err}", path.display())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Cli;
+
+    fn metadata_for(
+        provider: &str,
+        model: &str,
+        image_input: bool,
+    ) -> talos_config::model::ModelMetadata {
+        talos_config::model::ModelMetadata {
+            id: model.to_string(),
+            provider: provider.to_string(),
+            context_limit: None,
+            output_limit: None,
+            pricing: None,
+            capabilities: talos_core::model::ModelCapabilities {
+                image_input,
+                ..Default::default()
+            },
+            release_date: None,
+            source: talos_core::model::ModelSource::Manual,
+            variants: vec![],
+        }
+    }
+
+    fn config_with(provider: &str, model: &str) -> Config {
+        let mut config = Config::default();
+        config.provider = provider.to_string();
+        config.model = model.to_string();
+        config
+    }
+
+    fn cli_with_attach(paths: Vec<std::path::PathBuf>) -> Cli {
+        let mut cli: Cli = clap::Parser::parse_from(["talos"]);
+        cli.attach = paths;
+        cli
+    }
+
+    #[test]
+    fn submit_op_plain_when_no_attach_and_no_preview() {
+        let cli = cli_with_attach(vec![]);
+        let config = config_with("anthropic", "claude-sonnet-4-5");
+        let catalog = vec![metadata_for("anthropic", "claude-sonnet-4-5", true)];
+        let op = build_print_submit_op(&cli, &config, "hello".to_string(), None, &catalog).unwrap();
+        match op {
+            SessionOp::Submit { message } => assert_eq!(message, "hello"),
+            other => panic!("expected Submit, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn submit_op_preview_when_magic_prefix_and_no_attach() {
+        let cli = cli_with_attach(vec![]);
+        let config = config_with("anthropic", "claude-sonnet-4-5");
+        let catalog = vec![metadata_for("anthropic", "claude-sonnet-4-5", true)];
+        let op = build_print_submit_op(
+            &cli,
+            &config,
+            "/mock-request hello".to_string(),
+            Some("hello".to_string()),
+            &catalog,
+        )
+        .unwrap();
+        match op {
+            SessionOp::PreviewRequest { message } => assert_eq!(message, "hello"),
+            other => panic!("expected PreviewRequest, got {other:?}"),
+        }
+    }
+
+    /// R8 regression: --attach on a model whose capability is
+    /// `Unsupported` must be refused before any file probe. We do not
+    /// even create the file — if validation reached the filesystem it
+    /// would return IoError instead of the capability bail.
+    #[test]
+    fn attach_refused_when_capability_unsupported() {
+        let cli = cli_with_attach(vec![std::path::PathBuf::from(
+            "/tmp/r8-must-not-be-read.png",
+        )]);
+        let config = config_with("anthropic", "claude-haiku-text-only");
+        let catalog = vec![metadata_for("anthropic", "claude-haiku-text-only", false)];
+        let result = build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog);
+        let err = result.err().expect("Unsupported capability must bail");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("does not support image input"),
+            "expected capability-refusal message, got: {msg}"
+        );
+        assert!(msg.contains("Unsupported"));
+    }
+
+    #[test]
+    fn attach_refused_when_capability_unknown_no_metadata() {
+        let cli = cli_with_attach(vec![std::path::PathBuf::from(
+            "/tmp/r8-must-not-be-read.png",
+        )]);
+        let config = config_with("custom", "discovered-model");
+        let catalog: Vec<talos_config::model::ModelMetadata> = vec![];
+        let result = build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog);
+        let err = result.err().expect("Unknown capability must bail");
+        let msg = format!("{err}");
+        assert!(msg.contains("Unknown"));
+    }
+
+    #[test]
+    fn attach_refused_when_too_many_paths() {
+        let too_many: Vec<_> = (0..(max_image_count() + 1))
+            .map(|i| std::path::PathBuf::from(format!("/tmp/r8-{i}.png")))
+            .collect();
+        let cli = cli_with_attach(too_many);
+        let config = config_with("openai", "gpt-4o");
+        let catalog = vec![metadata_for("openai", "gpt-4o", true)];
+        let result = build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog);
+        let err = result.err().expect("too many attach paths must bail");
+        let msg = format!("{err}");
+        assert!(msg.contains("Too many --attach paths"));
+    }
+
+    /// R8 positive: --attach on a Supported model with a real PNG flows
+    /// through SubmitMultimodal. Uses a real encoded image so R4's
+    /// decoder succeeds.
+    #[test]
+    fn attach_succeeds_for_supported_model_with_real_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("r8.png");
+        let img = image::RgbaImage::new(4, 4);
+        img.save_with_format(&img_path, image::ImageFormat::Png)
+            .unwrap();
+
+        let cli = cli_with_attach(vec![img_path]);
+        let config = config_with("openai", "gpt-4o");
+        let catalog = vec![metadata_for("openai", "gpt-4o", true)];
+        let op =
+            build_print_submit_op(&cli, &config, "describe".to_string(), None, &catalog).unwrap();
+        match op {
+            SessionOp::SubmitMultimodal { text, attachments } => {
+                assert_eq!(text, "describe");
+                assert_eq!(attachments.len(), 1);
+                match &attachments[0] {
+                    talos_core::message::ContentPart::Image { mime, .. } => {
+                        assert_eq!(mime, "image/png");
+                    }
+                    _ => panic!("expected ContentPart::Image"),
+                }
+            }
+            other => panic!("expected SubmitMultimodal, got {other:?}"),
+        }
+    }
 }

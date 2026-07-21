@@ -243,6 +243,17 @@ pub(crate) struct Cli {
     plugin_packages: Vec<PathBuf>,
 
     #[arg(
+        short = 'a',
+        long = "attach",
+        value_name = "PATH",
+        help = "Attach a local image (PNG/JPEG/GIF/WebP) to the prompt. \
+                Print/inline mode only; refused in TUI mode (use the /attach slash command). \
+                Requires an active model whose catalog metadata confirms image_input = true. \
+                May be repeated up to the attachment-count limit."
+    )]
+    attach: Vec<PathBuf>,
+
+    #[arg(
         long,
         help = "Use mock LLM provider for testing (no API key required)."
     )]

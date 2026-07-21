@@ -37,6 +37,13 @@ use crate::{Cli, build_hook_registry};
 pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
 
+    if !cli.attach.is_empty() {
+        bail!(
+            "--attach is not yet wired into inline mode. Use print mode (-p) for one-shot \
+             image prompts, or run the TUI and use /attach."
+        );
+    }
+
     if let Some(ref model) = cli.model {
         config.model = model.clone();
     }
