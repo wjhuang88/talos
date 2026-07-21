@@ -72,3 +72,6 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-07-20 | Planning | Baseline published. Activation follows I147 completion. |
+| 2026-07-20 | Implementation | Discovery core (`provider_discovery::discover_provider_models`) + 9 mock HTTP fixture tests + wired to `handle_register_custom_provider`. Manual fallback via printed config instructions. Marked Review. |
+| 2026-07-21 | Owner acceptance (NO-GO) | Owner feedback: discovery merely prints the list and tells the user to edit config + use `/model`. R9 rework required: discovery success should atomically persist discovered models and surface them through a picker. |
+| 2026-07-21 | R9 rework | `handle_register_custom_provider` now runs discovery BEFORE the atomic `Config::save()` and persists up to `MAX_DISCOVERED_MODELS_TO_PERSIST = 32` discovered model IDs into `providers.{name}.models`. The existing `/model` picker surfaces them; selecting one runs the existing atomic provider+model save + session rebuild. Registration is decoupled from discovery success. 2 new R9 tests cover atomic persistence (mock /models endpoint) and provider-saved-when-discovery-fails. Residual: a dedicated DiscoveredModels TUI panel that auto-opens on registration remains a separate future iteration. Status: **Partial** (core atomic flow delivered; dedicated picker UX is the documented gap). |

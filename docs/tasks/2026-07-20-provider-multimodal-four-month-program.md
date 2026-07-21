@@ -455,6 +455,95 @@ On a hard stop:
   5. Generate release candidate checklist.
   6. Commit, push, update checkpoint.
 
+### Owner Acceptance NO-GO + R1/R2 Hotfix — 2026-07-21
+
+- Owner returned NO-GO on the I153 release-candidate packet. Six blocker items identified:
+  R1 attachment ownership, R2 missing integration tests, R3 missing capability gate,
+  R4 missing real decode and pixel limit, R5 missing TOCTOU guard, R6 security review
+  overstated controls.
+- R1/R2 hotfix landed in `da94bb7`:
+  - `handle_user_message` no longer consumes `pending_image_attachments` for display;
+    it borrows them. The bridge remains the single consumer for `SubmitMultimodal`.
+  - Added `bridge_drains_attachments_and_sends_submit_multimodal` and
+    `bridge_sends_plain_submit_when_no_attachments` integration tests.
+- Status: R1/R2 closed. R3-R11 still pending.
+
+### R3-R6 — Capability Gate, Real Decode, TOCTOU, Security Doc Honesty — 2026-07-21
+
+- Commit: `52068ee` (origin/main).
+- R3 capability gate: `ImageInputCapability` plumbed through `ModelInfo` and
+  `ConversationEngine`. `/attach` consults it before any filesystem probe.
+  `Unknown`/`Unsupported` fail-closed. Default is `Unknown`. 3 new bridge tests.
+- R4 real decode: `image = "0.25"` (default-features = false, explicit
+  png/jpeg/gif/webp). `validate_image_path` now invokes
+  `image::ImageReader::into_dimensions()` inside `catch_unwind`. Pixel cap
+  enforced at 89 478 485. Header-only stubs now correctly fail as DecoderError.
+- R5 TOCTOU guard: new `talos-provider::image_io` module exposes
+  `read_image_with_toctou_guard`. Provider adapters re-canonicalize and
+  byte-compare against the stored canonical path; mismatches produce an
+  `[image omitted: ...]` text marker. Symlink-swap regression test added.
+- R6 security review honesty: `I149-MODEL-009-A-SECURITY-REVIEW-2026-07-20.md`
+  rewritten to match the implementation. SEC-001 reuse gap, scrollback gap,
+  and resume-revalidation gap are explicitly listed as residuals with
+  evidence cross-reference.
+- Validation: fmt + check + clippy -D warnings + test + governance + diff-check
+  all green.
+
+### R7 + MODEL-009-E/I154 Planning — 2026-07-21
+
+- Commits: `60a7064` (R7 implementation) + `2a9b1ac` (forward planning docs).
+- R7: `/attachments` (alias `/imgs`) and `/detach <index|all>` slash commands
+  added. `StatusSnapshot.attachment_count` field so the status line shows
+  pending attachment count. `/attach` handler now emits Status after a
+  successful push. 7 new engine tests.
+- Forward planning: MODEL-009-E / I154 added as Planned/Blocked. The future
+  iteration closes the SEC-001 reuse gap by routing model-initiated image
+  reads through the standard tool permission pipeline.
+
+### R8 — CLI --attach Flag For Print Mode — 2026-07-21
+
+- Commit: `09c5096` (origin/main).
+- R8: `--attach <path>` / `-a` clap arg added. `mode_print::build_print_submit_op`
+  chooses between Submit, PreviewRequest, and SubmitMultimodal. Capability
+  gate refuses before any file probe. `--attach` is refused in TUI mode
+  (use `/attach`) and in inline mode (use print mode). 6 new mode_print tests.
+- README updated with `--attach` examples and refusal notes.
+
+### R10 — Multimodal Safe Summary In Scrollback — 2026-07-21
+
+- Commit: `f025375` (origin/main).
+- R10: `history_message_parts` for `Message::Multimodal` returns a safe
+  summary (text content + per-image basename+MIME+byte count markers) instead
+  of `None`. Full canonical paths never enter scrollback. Caller signature
+  changed from `&str` to `String`. 4 new R10 tests cover plain/multimodal/
+  image-only/empty.
+- Resume path re-validation is closed by the R5 TOCTOU guard at provider
+  read time.
+
+### R9 — Atomic Discovery Persistence — 2026-07-21
+
+- Commit: `d5a28e1` (origin/main).
+- R9 (simplified): `handle_register_custom_provider` now runs discovery
+  BEFORE the atomic `Config::save()` and persists up to
+  `MAX_DISCOVERED_MODELS_TO_PERSIST = 32` discovered model IDs into
+  `providers.{name}.models`. The existing `/model` picker surfaces them
+  without a separate save round-trip. Registration is decoupled from
+  discovery success. 2 new R9 tests.
+- Residual: a dedicated `DiscoveredModels` TUI panel that auto-opens on
+  registration is documented as a future enhancement; the existing
+  `/model` picker covers the atomic-save + session-rebuild acceptance.
+
+### R11 — Iteration Status Sync — 2026-07-21
+
+- Iteration status updates:
+  - I148 → **Partial** (R9 atomic flow delivered; dedicated picker panel is residual).
+  - I151 → **Review** with R4 rework annotation (real decoder + pixel cap).
+  - I152 → **Review** with R3/R5/R7/R8/R10 rework annotation (capability gate,
+    TOCTOU, slash commands, CLI flag, scrollback summary).
+- This checkpoint records the R3-R11 sequence completion.
+- Next task item: re-run the full validation ladder, push, await Owner
+  re-acceptance.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
