@@ -195,11 +195,11 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                             }));
                                             continue;
                                         }
-                                        if !authorize_attach_image(&ui_tx, &permission_engine, &path).await {
+                                        let Some(authorized_canonical) = authorize_attach_image(&ui_tx, &permission_engine, &path).await else {
                                             continue;
-                                        }
+                                        };
                                         match crate::image_validation::create_image_content_part(
-                                            std::path::Path::new(&path),
+                                            &authorized_canonical,
                                             engine.pending_image_attachments.len(),
                                             engine.pending_image_attachments.iter().map(|p| {
                                                 match p {
@@ -326,15 +326,17 @@ async fn submit_session_message(
 }
 
 /// P1-A: evaluates an image attachment path against the SEC-001
-/// permission pipeline before any filesystem probe. Returns true when
-/// the attachment may proceed (Allow or user-approved Ask) and false
-/// when it must be rejected (Deny, no engine available, or denied
-/// approval).
+/// permission pipeline before any filesystem probe. Returns the
+/// authorized canonical PathBuf on success, or None when rejected
+/// (Deny, no engine available, or denied approval). The caller MUST
+/// pass the returned canonical path to create_image_content_part —
+/// NOT the original user-supplied path — so that symlink drift
+/// between authorization and ingestion is impossible.
 async fn authorize_attach_image(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     permission_engine: &Option<Arc<std::sync::Mutex<talos_permission::PermissionEngine>>>,
     path: &str,
-) -> bool {
+) -> Option<std::path::PathBuf> {
     use crate::image_authorization::{
         ATTACH_IMAGE_TOOL_NAME, ImageAuthorization, add_attach_image_allow_rule,
     };
@@ -347,14 +349,9 @@ async fn authorize_attach_image(
                 "[Error] /attach {path} refused: no permission engine available (fail-closed). No file was read.\n"
             ),
         }));
-        return false;
+        return None;
     };
 
-    // P1-A: canonicalize the path BEFORE authorization so that the
-    // approval display, the AlwaysApprove runtime rule, and the
-    // eventual attachment all use the same canonical resource
-    // identifier. This prevents path-alias/symlink drift between
-    // authorization and ingestion.
     let canonical = match std::path::Path::new(path).canonicalize() {
         Ok(c) => c,
         Err(e) => {
@@ -364,7 +361,7 @@ async fn authorize_attach_image(
                     "[Error] /attach {path} failed to canonicalize: {e}. No file was read.\n"
                 ),
             }));
-            return false;
+            return None;
         }
     };
     let canonical_str = canonical.display().to_string();
@@ -375,7 +372,7 @@ async fn authorize_attach_image(
     };
 
     match decision {
-        ImageAuthorization::Allow => true,
+        ImageAuthorization::Allow => Some(canonical),
         ImageAuthorization::Deny(reason) => {
             let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                 source: MessageSource::Error,
@@ -383,7 +380,7 @@ async fn authorize_attach_image(
                     "[Error] /attach {path} (canonical: {canonical_str}) denied by permission rule: {reason}. No file was read.\n"
                 ),
             }));
-            false
+            None
         }
         ImageAuthorization::Ask => {
             let (response_tx, response_rx) =
@@ -398,7 +395,7 @@ async fn authorize_attach_image(
                 })
                 .is_err()
             {
-                return false;
+                return None;
             }
             match response_rx.await {
                 Ok(ApprovalChoice::Deny) => {
@@ -408,14 +405,14 @@ async fn authorize_attach_image(
                             "[Error] /attach {path} (canonical: {canonical_str}) denied by user. No file was read.\n"
                         ),
                     }));
-                    false
+                    None
                 }
                 Ok(ApprovalChoice::AlwaysApprove) => {
                     let mut engine = engine_ref.lock().expect("permission engine lock poisoned");
                     add_attach_image_allow_rule(&mut engine, canonical.clone());
-                    true
+                    Some(canonical)
                 }
-                Ok(_) => true,
+                Ok(_) => Some(canonical),
                 Err(_) => {
                     let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                         source: MessageSource::Error,
@@ -423,7 +420,7 @@ async fn authorize_attach_image(
                             "[Error] /attach {path} approval channel closed. No file was read.\n"
                         ),
                     }));
-                    false
+                    None
                 }
             }
         }

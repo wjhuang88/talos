@@ -109,8 +109,26 @@ pub(crate) fn validate_image_path(
     if !metadata.is_file() {
         return Err(ImageValidationError::NotRegularFile);
     }
+    if metadata.len() == 0 {
+        return Err(ImageValidationError::EmptyFile);
+    }
 
-    let file_size = metadata.len();
+    let canonical = path.to_path_buf();
+
+    // P1-B: open the file and read at most MAX_SINGLE_IMAGE_BYTES + 1
+    // bytes. This bounded read replaces the pre-read metadata.len()
+    // size check: if the file grows between metadata() and read(), the
+    // bounded read caps the input and bytes.len() becomes the
+    // authoritative size for all subsequent checks.
+    use std::io::Read;
+    let file = std::fs::File::open(&canonical)
+        .map_err(|e| ImageValidationError::IoError(e.to_string()))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_SINGLE_IMAGE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| ImageValidationError::IoError(e.to_string()))?;
+
+    let file_size = bytes.len() as u64;
     if file_size == 0 {
         return Err(ImageValidationError::EmptyFile);
     }
@@ -128,17 +146,6 @@ pub(crate) fn validate_image_path(
             limit: MAX_TOTAL_IMAGE_BYTES,
         });
     }
-
-    let canonical = path
-        .canonicalize()
-        .map_err(|e| ImageValidationError::IoError(e.to_string()))?;
-
-    // P1-B: read the full byte snapshot ONCE and base all subsequent
-    // checks (MIME, pixel, digest) on this snapshot. This eliminates
-    // the validation-then-reread window where an attacker could replace
-    // the file between checks and the digest computation.
-    let bytes =
-        std::fs::read(&canonical).map_err(|e| ImageValidationError::IoError(e.to_string()))?;
 
     let header = &bytes[..bytes.len().min(16)];
     let mime =
