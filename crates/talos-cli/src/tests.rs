@@ -2039,7 +2039,11 @@ mod steering_snapshot_tests {
                 model_info_watch: model_rx,
                 session_tx,
                 runtime_skills,
-                permission_engine: None,
+                permission_engine: Some(std::sync::Arc::new(std::sync::Mutex::new(
+                    talos_permission::PermissionEngine::with_workspace_root(
+                        dir.path().to_path_buf(),
+                    ),
+                ))),
             },
         ));
 

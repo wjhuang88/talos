@@ -328,7 +328,7 @@ async fn submit_session_message(
 /// P1-A: evaluates an image attachment path against the SEC-001
 /// permission pipeline before any filesystem probe. Returns true when
 /// the attachment may proceed (Allow or user-approved Ask) and false
-/// when it must be rejected (Deny, Ask with no engine, or denied
+/// when it must be rejected (Deny, no engine available, or denied
 /// approval).
 async fn authorize_attach_image(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
@@ -341,13 +341,37 @@ async fn authorize_attach_image(
     use talos_core::ApprovalChoice;
 
     let Some(engine_ref) = permission_engine else {
-        return true;
+        let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::Error,
+            text: format!(
+                "[Error] /attach {path} refused: no permission engine available (fail-closed). No file was read.\n"
+            ),
+        }));
+        return false;
     };
 
-    let path_buf = std::path::PathBuf::from(path);
+    // P1-A: canonicalize the path BEFORE authorization so that the
+    // approval display, the AlwaysApprove runtime rule, and the
+    // eventual attachment all use the same canonical resource
+    // identifier. This prevents path-alias/symlink drift between
+    // authorization and ingestion.
+    let canonical = match std::path::Path::new(path).canonicalize() {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Error,
+                text: format!(
+                    "[Error] /attach {path} failed to canonicalize: {e}. No file was read.\n"
+                ),
+            }));
+            return false;
+        }
+    };
+    let canonical_str = canonical.display().to_string();
+
     let decision = {
         let engine = engine_ref.lock().expect("permission engine lock poisoned");
-        ImageAuthorization::evaluate(&path_buf, &engine)
+        ImageAuthorization::evaluate(&canonical, &engine)
     };
 
     match decision {
@@ -356,7 +380,7 @@ async fn authorize_attach_image(
             let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                 source: MessageSource::Error,
                 text: format!(
-                    "[Error] /attach {path} denied by permission rule: {reason}. No file was read.\n"
+                    "[Error] /attach {path} (canonical: {canonical_str}) denied by permission rule: {reason}. No file was read.\n"
                 ),
             }));
             false
@@ -368,7 +392,7 @@ async fn authorize_attach_image(
             if ui_tx
                 .send(UiOutput::ToolApprovalRequest {
                     tool_name: ATTACH_IMAGE_TOOL_NAME.to_string(),
-                    arguments: serde_json::json!({ "path": path }),
+                    arguments: serde_json::json!({ "path": canonical_str }),
                     summary_fields,
                     response: response_tx,
                 })
@@ -380,13 +404,15 @@ async fn authorize_attach_image(
                 Ok(ApprovalChoice::Deny) => {
                     let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                         source: MessageSource::Error,
-                        text: format!("[Error] /attach {path} denied by user. No file was read.\n"),
+                        text: format!(
+                            "[Error] /attach {path} (canonical: {canonical_str}) denied by user. No file was read.\n"
+                        ),
                     }));
                     false
                 }
                 Ok(ApprovalChoice::AlwaysApprove) => {
                     let mut engine = engine_ref.lock().expect("permission engine lock poisoned");
-                    add_attach_image_allow_rule(&mut engine, path_buf.clone());
+                    add_attach_image_allow_rule(&mut engine, canonical.clone());
                     true
                 }
                 Ok(_) => true,

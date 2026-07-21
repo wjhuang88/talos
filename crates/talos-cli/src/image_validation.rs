@@ -92,7 +92,7 @@ pub(crate) fn validate_image_path(
     path: &Path,
     current_count: usize,
     current_total_bytes: u64,
-) -> Result<(PathBuf, u64, String), ImageValidationError> {
+) -> Result<ValidatedImage, ImageValidationError> {
     if current_count >= MAX_IMAGE_COUNT {
         return Err(ImageValidationError::TooManyAttachments {
             count: current_count,
@@ -133,20 +133,22 @@ pub(crate) fn validate_image_path(
         .canonicalize()
         .map_err(|e| ImageValidationError::IoError(e.to_string()))?;
 
-    let header = read_file_header(&canonical, 16)?;
+    // P1-B: read the full byte snapshot ONCE and base all subsequent
+    // checks (MIME, pixel, digest) on this snapshot. This eliminates
+    // the validation-then-reread window where an attacker could replace
+    // the file between checks and the digest computation.
+    let bytes =
+        std::fs::read(&canonical).map_err(|e| ImageValidationError::IoError(e.to_string()))?;
+
+    let header = &bytes[..bytes.len().min(16)];
     let mime =
-        detect_mime_from_magic_bytes(&header).ok_or(ImageValidationError::UnsupportedFormat)?;
+        detect_mime_from_magic_bytes(header).ok_or(ImageValidationError::UnsupportedFormat)?;
 
     if !is_supported_mime(mime) {
         return Err(ImageValidationError::UnsupportedFormat);
     }
 
-    // Pixel-bomb defense (ADR-050): decode headers to read dimensions and
-    // reject when width*height exceeds the pixel cap. `into_dimensions()`
-    // reads only the format header for PNG/JPEG/GIF/WebP — no full decode.
-    // The call is wrapped in `catch_unwind` to satisfy Hard Constraint #9:
-    // a malformed file must never abort the process.
-    let (width, height) = decode_dimensions(&canonical)?;
+    let (width, height) = decode_dimensions_from_bytes(&bytes)?;
 
     let pixels = u64::from(width) * u64::from(height);
     if pixels > MAX_PIXELS {
@@ -156,16 +158,31 @@ pub(crate) fn validate_image_path(
         });
     }
 
-    Ok((canonical, file_size, mime.to_string()))
+    Ok(ValidatedImage {
+        canonical,
+        byte_count: file_size,
+        mime: mime.to_string(),
+        bytes,
+    })
 }
 
-fn decode_dimensions(path: &Path) -> Result<(u32, u32), ImageValidationError> {
+/// Result of validating an image path. Carries the full byte snapshot
+/// so the caller can compute a digest without re-reading from disk
+/// (P1-B: eliminate validation-then-reread window).
+#[derive(Debug)]
+pub(crate) struct ValidatedImage {
+    pub canonical: PathBuf,
+    pub byte_count: u64,
+    pub mime: String,
+    pub bytes: Vec<u8>,
+}
+
+fn decode_dimensions_from_bytes(bytes: &[u8]) -> Result<(u32, u32), ImageValidationError> {
+    use std::io::Cursor;
     let result = std::panic::catch_unwind(|| {
-        let reader = image::ImageReader::open(path)
-            .map_err(|e| ImageValidationError::IoError(e.to_string()))?;
-        let reader = reader
+        let reader = image::ImageReader::new(std::io::BufReader::new(Cursor::new(bytes)))
             .with_guessed_format()
-            .map_err(|e| ImageValidationError::IoError(e.to_string()))?;
+            .map_err(|e| ImageValidationError::DecoderError(e.to_string()))?;
         reader
             .into_dimensions()
             .map_err(|e| ImageValidationError::DecoderError(e.to_string()))
@@ -204,15 +221,12 @@ pub fn create_image_content_part(
     current_count: usize,
     current_total_bytes: u64,
 ) -> Result<talos_core::message::ContentPart, ImageValidationError> {
-    let (canonical, byte_count, mime) =
-        validate_image_path(path, current_count, current_total_bytes)?;
-    let bytes =
-        std::fs::read(&canonical).map_err(|e| ImageValidationError::IoError(e.to_string()))?;
-    let digest = compute_content_digest(&bytes);
+    let validated = validate_image_path(path, current_count, current_total_bytes)?;
+    let digest = compute_content_digest(&validated.bytes);
     Ok(talos_core::message::ContentPart::Image {
-        path: canonical,
-        mime,
-        byte_count,
+        path: validated.canonical,
+        mime: validated.mime,
+        byte_count: validated.byte_count,
         content_digest: digest,
     })
 }
@@ -345,10 +359,10 @@ mod tests {
         let (path, _dir) = write_real_png(8, 8);
         let result = validate_image_path(&path, 0, 0);
         assert!(result.is_ok(), "real PNG must validate: {:?}", result.err());
-        let (canonical, size, mime) = result.unwrap();
-        assert!(canonical.exists());
-        assert!(size > 0);
-        assert_eq!(mime, "image/png");
+        let validated = result.unwrap();
+        assert!(validated.canonical.exists());
+        assert!(validated.byte_count > 0);
+        assert_eq!(validated.mime, "image/png");
     }
 
     #[test]
@@ -366,7 +380,7 @@ mod tests {
             "real JPEG must validate: {:?}",
             result.err()
         );
-        assert_eq!(result.unwrap().2, "image/jpeg");
+        assert_eq!(result.unwrap().mime, "image/jpeg");
     }
 
     #[test]
@@ -508,7 +522,7 @@ mod tests {
         let _ = std::fs::remove_file(&truncated_path);
         match result {
             Err(ImageValidationError::DecoderError(_)) => {}
-            other => panic!("expected DecoderError for truncated PNG, got {:?}", other),
+            other => panic!("expected DecoderError for truncated PNG, got {other:?}"),
         }
     }
 

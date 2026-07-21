@@ -249,33 +249,40 @@ fn build_print_submit_op(
 
     // P1-A: authorize each path against the SEC-001 permission pipeline
     // before any file probe. Print mode is headless — unresolved Ask
-    // fails closed.
+    // fails closed. Canonicalize BEFORE authorization so the approval
+    // identity matches the attachment identity (P1-A: no path-alias drift).
     let auth_engine =
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf());
 
     let mut attachments = Vec::with_capacity(cli.attach.len());
     let mut total_bytes: u64 = 0;
     for path in &cli.attach {
-        match crate::image_authorization::ImageAuthorization::evaluate(path, &auth_engine) {
+        let canonical = path.canonicalize().context(format!(
+            "--attach {} failed to canonicalize: path may not exist",
+            path.display()
+        ))?;
+        match crate::image_authorization::ImageAuthorization::evaluate(&canonical, &auth_engine) {
             crate::image_authorization::ImageAuthorization::Allow => {}
             crate::image_authorization::ImageAuthorization::Ask => {
                 bail!(
-                    "--attach {} is outside the workspace and there is no interactive approval \
-                     in print mode. Run in TUI mode to approve external paths, or add an explicit \
-                     permission rule for this path.",
-                    path.display()
+                    "--attach {} (canonical: {}) is outside the workspace and there is no \
+                     interactive approval in print mode. Run in TUI mode to approve external \
+                     paths, or add an explicit permission rule for this path.",
+                    path.display(),
+                    canonical.display()
                 );
             }
             crate::image_authorization::ImageAuthorization::Deny(reason) => {
                 bail!(
-                    "--attach {} denied by permission rule: {}",
+                    "--attach {} (canonical: {}) denied by permission rule: {}",
                     path.display(),
+                    canonical.display(),
                     reason
                 );
             }
         }
-        let part = create_image_content_part(path, attachments.len(), total_bytes)
-            .map_err(|e| anyhow!(attachment_error_message(&e, path)))?;
+        let part = create_image_content_part(&canonical, attachments.len(), total_bytes)
+            .map_err(|e| anyhow!(attachment_error_message(&e, &canonical)))?;
         if let talos_core::message::ContentPart::Image { byte_count, .. } = &part {
             total_bytes = total_bytes.saturating_add(*byte_count);
         }
@@ -460,7 +467,7 @@ mod tests {
             "describe".to_string(),
             None,
             &catalog,
-            std::path::Path::new("/tmp"),
+            dir.path(),
         )
         .unwrap();
         match op {

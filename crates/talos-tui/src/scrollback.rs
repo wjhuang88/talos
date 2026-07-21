@@ -1300,6 +1300,7 @@ mod r10_tests {
             path: std::path::PathBuf::from(format!("/tmp/{name}")),
             mime: mime.to_string(),
             byte_count: bytes,
+            content_digest: talos_core::message::ContentDigest::default(),
         }
     }
 
