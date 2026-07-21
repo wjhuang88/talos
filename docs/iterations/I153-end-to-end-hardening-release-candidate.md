@@ -18,6 +18,7 @@
 | 2026-07-20 | Validation | Final validation ladder all green: cargo fmt, check, clippy -D warnings, test, governance, git diff --check. |
 | 2026-07-20 | Documentation | BOARD.md updated to Active status with I146-I152 progress. Iteration docs I146-I152 created. README EN/zh-CN updated for parameterless commands and wizard. |
 | 2026-07-20 | Safety review | catch_unwind at every file-read boundary in provider adapters. No new unsafe blocks. No new native/C dependencies beyond base64 (pure Rust). |
+| 2026-07-21 | Change control | Maintainer added agent-mediated image inspection. It is a new MODEL-009-E / I154 objective, not an I152 correction; I153's published release-candidate baseline is unchanged. |
 
 ## Validation Results (I153 Final Ladder)
 

@@ -8,7 +8,7 @@
 | Status | In Progress (P0 governance baseline) |
 | Branch | `main` (direct commits, no feature branches) |
 | SOP | `docs/sop/LONG-RUNNING-TASK.md` |
-| Confirmation | Single maintainer confirmation covers the full 8-iteration cycle + P0; no per-phase re-confirmation except at hard-stop conditions. |
+| Confirmation | Maintainer confirmation covers the original I146-I153 cycle and the accepted 2026-07-21 MODEL-009-E/I154 scope addition; no per-phase re-confirmation except at hard-stop conditions. |
 
 ## Outcome
 
@@ -18,7 +18,8 @@ Deliver, on `main`, a coherent four-month product slice that lets a user:
 2. Register an OpenAI-compatible or Anthropic-compatible custom provider interactively from `/connect`, without editing TOML, through a cancel-safe wizard with atomic config persistence (MODEL-008-A / I147).
 3. Discover models from the registered provider's protocol-defined models endpoint, with a safe manual fallback, and immediately activate the selected `(provider, model)` in the current session (MODEL-008-B / I148).
 4. Attach a local image to a message when, and only when, the selected model's confirmed capability is `image_input = Supported`; reject `Unknown` and `Unsupported` before reading any file bytes; emit protocol-native image content through the two existing adapters; and persist a safe, portable attachment record (MODEL-009-A/B/C/D / I149-I152).
-5. Ship a release-candidate evidence packet (no tag, no release) covering provider registration, model discovery, capability gating, image input, history resume, and text-only regression (I153).
+5. Let a Supported model explicitly invoke a separate `read_image` tool for an approved local path, without auto-reading paths embedded in normal user text (MODEL-009-E / I154).
+6. Ship a release-candidate evidence packet (no tag, no release) covering provider registration, model discovery, capability gating, image input, history resume, and text-only regression (I153, re-run after I154 if I154 is implemented).
 
 REL-002 remains NO-GO and is out of scope. No `v1.0.0` claim, tag, release, crates.io publish, GitHub Release, or Pages deployment is authorized by this task.
 
@@ -31,6 +32,7 @@ REL-002 remains NO-GO and is out of scope. No `v1.0.0` claim, tag, release, crat
 - MODEL-009-B: Talos-owned typed ordered content parts, capability semantics (`Supported` / `Unsupported` / `Unknown`), and safe persistence boundary (I150).
 - MODEL-009-C: safe local image ingestion — authorization, canonicalization, MIME/magic-byte validation, byte/pixel/count limits, decoder panic containment (I151).
 - MODEL-009-D: OpenAI-compatible and Anthropic-compatible image request adapters, TUI attachment UX, CLI equivalent or documented rejection, safe history/resume/export rendering (I152).
+- MODEL-009-E: agent-mediated `read_image` tool with exact-path authorization and a provider-neutral continuation artifact (I154; blocked until MODEL-009-C/D remediation is accepted).
 - I153: end-to-end mock hardening, native/panic boundary re-review, real-terminal TUI walkthrough checklist, full documentation sync, release-candidate checklist (no tag).
 - P0 governance baseline: this task record, child Stories, iteration drift repair, I146 Planned baseline.
 
@@ -61,10 +63,11 @@ REL-002 remains NO-GO and is out of scope. No `v1.0.0` claim, tag, release, crat
 | I151 | MODEL-009-C safe local image ingestion | Explicit local image path input (no auto-scan); reuse SEC-001/ADR-047 path authorization; canonicalization, regular-file validation, symlink policy, MIME + magic-byte validation, format limits, single-image byte limit, total byte limit, pixel limit, attachment count limit; all early-rejectable refusals before full file read; `catch_unwind` + size limit + error propagation at every native/panic boundary; on failure: composer usable, no partial session, no partial attachment, no path/binary leak | I150 | Adversarial fixtures: directory, FIFO/non-regular, corrupt image, fake MIME, oversize, pixel bomb, aggregate-limit breach, auth denial, external path, symlink, decoder panic/error; locked fmt/check/clippy/test; governance; `git diff --check` | If a decoder dependency cannot be made panic-safe: stop, record evidence, request maintainer decision before adding the dependency | Planned |
 | I152 | MODEL-009-D provider adapter and TUI/CLI interaction | OpenAI-compatible adapter emits protocol-native image request content; Anthropic-compatible adapter emits protocol-native image request content; fixtures prove multi-part text/image order and request shape; TUI: explicit path attach, attachment list/summary, remove, cancel, pre-send visibility, `Unsupported`/`Unknown` early rejection; CLI: equivalent explicit argument or documented safe rejection; `Unsupported`/`Unknown` rejected before any file bytes read; history/resume/copy/export render safe summary per ADR; no raw binary, no unconditional full path; text-only behavior + provider fixtures preserved | I151 | Two-protocol image fixture; text-only full regression; TUI state/app/Buffer render tests; CLI parameter or rejection-path tests; attach/remove/cancel/error recovery; history/resume/export/copy; locked fmt/check/clippy/test; governance; `git diff --check` | If TUI attachment UX cannot fit the existing viewport contract: stop, record evidence, request maintainer decision | Planned |
 | I153 | End-to-end hardening, documentation, release candidate | End-to-end mock coverage of provider registration + model discovery + capability Unknown + path authorization + image input + history resume + text regression; native/panic boundary re-review (no silent process exit); real-terminal TUI walkthrough checklist (`/model` + `/connect` no-arg + search, standard provider credential, custom provider success/fail/manual fallback, Supported/Unsupported/Unknown image attach, image attach/remove/cancel/send, multi-message steering queue FIFO + `+N more` + clear, narrow terminal + CJK + composer + menu layout); I145 real-terminal acceptance still required from maintainer; README EN/zh-CN + site + config reference + command reference + backlog + iteration + ADR + BOARD + release notes draft updated; version impact report + RC checklist; **no tag** | I152 | `cargo fmt --all -- --check`; `cargo check --workspace --locked`; `cargo clippy --workspace --locked -- -D warnings`; `cargo test --workspace --locked`; `scripts/validate_project_governance.sh .`; `git diff --check`; release-candidate checklist complete; no tag created | If full locked validation fails twice with root cause outside scope: stop, record evidence, request maintainer decision | Planned |
+| I154 | MODEL-009-E agent-mediated image read tool | Separate `read_image` tool for Supported models only; exact-path permission, reused safe-ingestion policy, provider-neutral artifact in the following provider request, safe provenance/history summary, unchanged text `read` behavior | Accepted MODEL-009-C/D remediation and I153 evidence refresh | Registry/presentation + permission + adversarial validation + agent/session continuation + two-protocol fixtures + text-only/history regressions; locked validation; governance; `git diff --check` | If two-protocol continuation cannot safely carry the artifact: do not expose the tool; amend ADR-050 and retain explicit attachment only | Planned / Blocked on I151-I152 |
 
 ## Dependencies And Prerequisites
 
-- P0 → I146 → I147 → I148 → I149 → I150 → I151 → I152 → I153 (strict sequential dependency chain).
+- P0 → I146 → I147 → I148 → I149 → I150 → I151 → I152 → I153 → I154 (strict sequential dependency chain; I154 was accepted by change control on 2026-07-21).
 - I149 is a hard gate: I150 may not start until I149 ADR is Accepted. If I149 is Blocked, I150-I153 are all Blocked.
 - I145 (Review) is independent of this program; I145 real-terminal acceptance remains a maintainer action and is referenced in I153's walkthrough checklist but is not a program dependency.
 - ADR-013 (provider config schema), ADR-023 (inline api_key boundary), ADR-048 (variant representation), ADR-049 (steering queue projection), and SEC-001/ADR-047 (external-path authorization) are governing decisions.
@@ -113,7 +116,7 @@ git diff --check
 - All work is on `main` directly. No feature branches, no worktrees.
 - Start of session: `git switch main && git pull --ff-only origin main && git status -sb`.
 - Forbidden: `git push --force`, `git reset --hard`, history rewriting, deleting `Cargo.lock` to bypass `--locked`.
-- One logical commit per iteration (P0 + I146 + I147 + I148 + I149 + I150 + I151 + I152 + I153 = 9 commits total). Multiple iterations must not be merged into one commit; no end-of-program batch push.
+- One logical commit per iteration (P0 + I146 + I147 + I148 + I149 + I150 + I151 + I152 + I153 + I154 = 10 commits total). Multiple iterations must not be merged into one commit; no end-of-program batch push.
 - Commit message format: `type(scope): description (#<story>) [model:gpt-5]` per AGENTS.md Git Rules. The `[model:gpt-5]` marker is required for agent-authored commits on this program.
 - Each commit is pushed immediately with `git push origin main` after the per-iteration validation ladder passes.
 - Checkpoint is appended to this task record after every iteration commit + push.
@@ -142,7 +145,7 @@ The following are **forbidden** unless explicitly authorized by a separate maint
 
 ## Time, Cost And Resource Limits
 
-- Wall-clock budget: 16 weeks (4 months) for I146-I153. P0 is the governance baseline and is expected to complete in one session.
+- Original wall-clock budget: 16 weeks (4 months) for I146-I153. The accepted I154 scope addition adds an estimated two weeks; the revised planning budget is 18 weeks. P0 is the governance baseline and is expected to complete in one session.
 - Compute budget: local macOS development machine. No paid cloud, no paid API keys.
 - Token/context budget: per-iteration owner doc + this task record + relevant ADRs/backlog stories. Each iteration should be self-contained enough that a fresh session can resume from the checkpoint.
 - No external service spend is authorized.
@@ -174,6 +177,7 @@ These defaults apply when a non-blocking ambiguity arises. They are recorded her
 11. **I151 image path authorization**: reuse SEC-001/ADR-047. No bypass because the model is vision-capable.
 12. **I152 CLI image input**: if a safe explicit argument is infeasible in scope, document a safe rejection with a pointer to the TUI path. Do not silently accept image input in CLI.
 13. **I153 release candidate**: prepare evidence only. No tag, no release, no publish.
+14. **I154 agent-mediated image read**: never auto-read a path from normal user text; expose a separate tool only after MODEL-009-C/D security remediation is accepted.
 14. **Per-iteration commit**: one logical commit per iteration. If an iteration's scope touches both code and docs, the code and docs go in the same commit (one logical change).
 
 ## Residual-Work Destination

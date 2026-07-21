@@ -184,6 +184,7 @@ docs/iterations/
 | I151 | MODEL-009-C Safe Local Image Ingestion | **Review** (2026-07-20) | Image validation module with MIME/magic-byte, byte/aggregate/count limits, canonicalization. 16 adversarial tests. `catch_unwind` at file read boundary. See `I151` checkpoint in task record. |
 | I152 | MODEL-009-D Provider Adapter And TUI/CLI | **Review** (2026-07-20) | OpenAI `image_url` data URL + Anthropic `image` base64 source wire mapping. `catch_unwind` at file reads. 3 fixture tests. TUI attachment UX pending. See `I152-provider-adapter-tui-cli.md`. |
 | I153 | End-to-End Hardening And Release Candidate | **Review** (2026-07-20) | Final validation ladder all green. Release candidate checklist documented. No tag authorized. See `I153-end-to-end-hardening-release-candidate.md`. |
+| I154 | Agent-Mediated Image Read Tool | **Planned / Blocked** (2026-07-21) | MODEL-009-E adds a separate `read_image` tool for Supported models only; it requires I151/I152 security remediation and must never auto-read paths embedded in normal user text. See `I154-agent-mediated-image-read-tool.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.

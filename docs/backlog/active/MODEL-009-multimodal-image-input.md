@@ -8,7 +8,7 @@
 | Status | Refinement — split into child Stories MODEL-009-A/B/C/D on 2026-07-20 |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | Catalog capability metadata; provider protocol boundary; session persistence boundary |
-| Blocks | — |
+| Blocks | MODEL-009-E agent-mediated image read tool |
 | Child Stories | [MODEL-009-A](MODEL-009-A-image-input-adr-and-security-spike.md) (I149 ADR + security spike) · [MODEL-009-B](MODEL-009-B-capability-content-types-persistence.md) (I150 capability + content + persistence) · [MODEL-009-C](MODEL-009-C-safe-local-image-ingestion.md) (I151 safe ingestion) · [MODEL-009-D](MODEL-009-D-provider-adapter-tui-cli.md) (I152 adapter + TUI/CLI) |
 
 ## Problem
@@ -57,6 +57,8 @@ portable record of what was sent.
   or treating a successful `/models` response as authoritative multimodal capability evidence.
 - Dynamic protocols, arbitrary request JSON, additional provider adapters, OAuth changes, or a
   provider credential-store redesign.
+- Agent-mediated image reading is a follow-on capability owned by MODEL-009-E. It must not be
+  implemented by making ordinary text paths auto-readable or by overloading the text `read` tool.
 - Automatic attachment of workspace files or images; every attachment is an explicit user action.
 
 ## Decision Links And Constraints
