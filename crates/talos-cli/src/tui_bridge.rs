@@ -180,17 +180,23 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     UiOutput::AttachImageRequest { path } => {
                                         match crate::image_validation::create_image_content_part(
                                             std::path::Path::new(&path),
-                                            0,
-                                            0,
+                                            engine.pending_image_attachments.len(),
+                                            engine.pending_image_attachments.iter().map(|p| {
+                                                match p {
+                                                    talos_core::message::ContentPart::Image { byte_count, .. } => *byte_count,
+                                                    _ => 0,
+                                                }
+                                            }).sum::<u64>(),
                                         ) {
                                             Ok(content_part) => {
                                                 let summary = match &content_part {
-                                            talos_core::message::ContentPart::Image { path, mime, byte_count } =>
-                                                format!("{} ({} bytes, {})",
-                                                    path.file_name().unwrap_or_default().to_string_lossy(),
-                                                    byte_count, mime),
-                                            _ => String::new(),
-                                        };
+                                                    talos_core::message::ContentPart::Image { path, mime, byte_count } =>
+                                                        format!("{} ({} bytes, {})",
+                                                            path.file_name().unwrap_or_default().to_string_lossy(),
+                                                            byte_count, mime),
+                                                    _ => String::new(),
+                                                };
+                                                engine.pending_image_attachments.push(content_part);
                                                 let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
                                                     source: MessageSource::System,
                                                     text: format!("[System] Attached image: {summary}\n"),

@@ -182,6 +182,7 @@ pub struct ConversationEngine {
     pub(crate) workspace_root: Option<PathBuf>,
     last_flushed_message: usize,
     content_open: bool,
+    pub pending_image_attachments: Vec<talos_core::message::ContentPart>,
 }
 
 impl ConversationEngine {
@@ -219,6 +220,7 @@ impl ConversationEngine {
             workspace_root: None,
             last_flushed_message: 0,
             content_open: false,
+            pending_image_attachments: Vec::new(),
         }
     }
 
@@ -529,19 +531,53 @@ impl ConversationEngine {
 
     pub fn handle_user_message(&mut self, msg: &str) -> Vec<UiOutput> {
         let msg_owned = msg.to_string();
-        self.messages.push(ChatMessage {
-            role: MessageRole::User,
-            status: MessageStatus::Completed,
-            content: format!("{msg_owned}\n"),
-            tool_call: None,
-            created_at: Instant::now(),
-        });
-        self.last_flushed_message = self.messages.len();
 
-        vec![UiOutput::Content(ContentOutput::Block {
-            source: MessageSource::User,
-            text: msg_owned,
-        })]
+        if !self.pending_image_attachments.is_empty() {
+            let attachments = std::mem::take(&mut self.pending_image_attachments);
+            let mut display_parts = vec![msg_owned.clone()];
+            for part in &attachments {
+                if let talos_core::message::ContentPart::Image {
+                    path,
+                    mime,
+                    byte_count,
+                } = part
+                {
+                    let filename = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("(unknown)");
+                    display_parts
+                        .push(format!(" [Image: {filename} ({byte_count} bytes, {mime})]"));
+                }
+            }
+            let combined = display_parts.join("\n");
+            self.messages.push(ChatMessage {
+                role: MessageRole::User,
+                status: MessageStatus::Completed,
+                content: format!("{combined}\n"),
+                tool_call: None,
+                created_at: Instant::now(),
+            });
+            self.last_flushed_message = self.messages.len();
+            vec![UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::User,
+                text: combined,
+            })]
+        } else {
+            self.messages.push(ChatMessage {
+                role: MessageRole::User,
+                status: MessageStatus::Completed,
+                content: format!("{msg_owned}\n"),
+                tool_call: None,
+                created_at: Instant::now(),
+            });
+            self.last_flushed_message = self.messages.len();
+
+            vec![UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::User,
+                text: msg_owned,
+            })]
+        }
     }
 
     pub fn handle_slash_command(&mut self, input: &str) -> Vec<UiOutput> {

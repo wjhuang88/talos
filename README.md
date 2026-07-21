@@ -523,6 +523,7 @@ mode.
 | `/todo delete <id> --confirm` | Delete a session todo item by short-ID or full UUID; requires `--confirm` |
 | `/hooks` | Show configured hook diagnostics (declared paths, presence, validation status) without executing hooks |
 | `/agile [status]` | Show read-only governance status: board disposition, open iterations, manifest, and Rust validation findings |
+| `/attach <path>` | Attach a local image (PNG/JPEG/GIF/WebP) to the next message. Validates file type, size, and MIME before attachment. Requires a vision-capable model |
 
 ## Skills
 
