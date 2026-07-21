@@ -223,7 +223,13 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 let _ = ui_tx.send(output);
                             }
                             let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                            if submit_session_message(&sq_tx_watch, msg).await.is_err() {
+                            let attachments = std::mem::take(&mut engine.pending_image_attachments);
+                            let submit_result = if attachments.is_empty() {
+                                submit_session_message(&sq_tx_watch, msg).await
+                            } else {
+                                submit_session_message_multimodal(&sq_tx_watch, msg, attachments).await
+                            };
+                            if submit_result.is_err() {
                                 for output in engine.handle_turn_completed(
                                     &talos_core::session::TurnCompletionStatus::Error {
                                         message: "session command channel closed".into(),
@@ -296,6 +302,23 @@ async fn submit_session_message(
         None => talos_core::session::SessionOp::Submit { message },
     };
     sq_tx.send(op).await.map_err(|_| ())
+}
+
+async fn submit_session_message_multimodal(
+    sq_tx_watch: &tokio::sync::watch::Receiver<
+        tokio::sync::mpsc::Sender<talos_core::session::SessionOp>,
+    >,
+    message: String,
+    attachments: Vec<talos_core::message::ContentPart>,
+) -> Result<(), ()> {
+    let sq_tx = sq_tx_watch.borrow().clone();
+    sq_tx
+        .send(talos_core::session::SessionOp::SubmitMultimodal {
+            text: message,
+            attachments,
+        })
+        .await
+        .map_err(|_| ())
 }
 
 async fn handle_skill_command(

@@ -204,7 +204,7 @@ impl Agent {
     /// [`AgentError::TurnBudgetExceeded`] if the tool call budget is exceeded,
     /// or [`AgentError::DoomLoopDetected`] if a doom loop is detected.
     pub async fn run(&self, user_message: String) -> AgentResult<String> {
-        let (result, _) = self.run_inner(user_message, vec![], None).await;
+        let (result, _) = self.run_inner(user_message, vec![], None, None).await;
         result
     }
 
@@ -230,7 +230,9 @@ impl Agent {
         history: Vec<Message>,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> AgentResult<(String, Vec<Message>)> {
-        let (result, messages) = self.run_inner(user_message, history, Some(event_tx)).await;
+        let (result, messages) = self
+            .run_inner(user_message, history, Some(event_tx), None)
+            .await;
         result.map(|text| (text, messages))
     }
 
@@ -249,7 +251,31 @@ impl Agent {
         history: Vec<Message>,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
     ) -> (AgentResult<String>, Vec<Message>) {
-        self.run_inner(user_message, history, Some(event_tx)).await
+        self.run_inner(user_message, history, Some(event_tx), None)
+            .await
+    }
+
+    /// Session turn with multimodal content (MODEL-009-D/I152).
+    /// Constructs `Message::Multimodal` instead of `Message::User`
+    /// when image attachments are present.
+    pub(crate) async fn run_for_session_turn_multimodal(
+        &self,
+        user_message: String,
+        attachments: Vec<talos_core::message::ContentPart>,
+        history: Vec<Message>,
+        event_tx: mpsc::UnboundedSender<AgentEvent>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        self.run_inner(
+            user_message,
+            history,
+            Some(event_tx),
+            if attachments.is_empty() {
+                None
+            } else {
+                Some(attachments)
+            },
+        )
+        .await
     }
 
     /// Builds a provider request preview without calling the provider.
@@ -353,6 +379,37 @@ impl Agent {
         Ok((messages, persist_start))
     }
 
+    /// Like `build_provider_messages` but pushes `Message::Multimodal`
+    /// instead of `Message::User` when attachments are present.
+    async fn build_provider_messages_with_attachments(
+        &self,
+        user_message: String,
+        history: Vec<Message>,
+        hook_ctx: &HookContext,
+        attachments: Vec<talos_core::message::ContentPart>,
+    ) -> AgentResult<(Vec<Message>, usize)> {
+        let (mut messages, persist_start) = self
+            .build_provider_messages(user_message, history, hook_ctx)
+            .await?;
+
+        if let Some(Message::User { content: _ }) = messages.last() {
+            let mut parts = Vec::new();
+            if let Some(Message::User { content }) = messages.last_mut()
+                && !content.is_empty()
+            {
+                parts.push(talos_core::message::ContentPart::Text {
+                    text: content.clone(),
+                });
+            }
+            parts.extend(attachments);
+            if let Some(last) = messages.last_mut() {
+                *last = Message::Multimodal { parts };
+            }
+        }
+
+        Ok((messages, persist_start))
+    }
+
     /// Internal implementation shared by [`run`] and [`run_streaming`].
     ///
     /// Executes the full turn loop: user message → provider → tool calls →
@@ -362,14 +419,18 @@ impl Agent {
         user_message: String,
         history: Vec<Message>,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        attachments: Option<Vec<talos_core::message::ContentPart>>,
     ) -> (AgentResult<String>, Vec<Message>) {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
-        let (mut messages, persist_start) = match self
-            .build_provider_messages(user_message, history, &hook_ctx)
-            .await
-        {
+        let (mut messages, persist_start) = match if let Some(atts) = attachments {
+            self.build_provider_messages_with_attachments(user_message, history, &hook_ctx, atts)
+                .await
+        } else {
+            self.build_provider_messages(user_message, history, &hook_ctx)
+                .await
+        } {
             Ok(messages) => messages,
             Err(error) => {
                 self.emit_turn_complete(&hook_ctx, TurnStatus::Denied).await;

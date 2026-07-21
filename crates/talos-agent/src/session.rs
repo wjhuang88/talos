@@ -199,6 +199,77 @@ impl AppServerSession {
                         let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                             agent,
                             message,
+                            attachments: None,
+                            history,
+                            event_tx,
+                            event_rx,
+                            eq_tx,
+                            cancel_token: token_clone,
+                            turn_id: turn_id_clone,
+                            session_id,
+                            sequence,
+                            persistence,
+                            durable_persistence,
+                            result_tx,
+                        }))
+                        .catch_unwind()
+                        .await;
+
+                        result_rx.await.ok()
+                    });
+
+                    current_turn = Some(handle);
+                }
+                SessionOp::SubmitMultimodal { text, attachments } => {
+                    if let Some(token) = cancel_token.take() {
+                        token.cancel();
+                    }
+                    if let Some(handle) = current_turn.take() {
+                        self.commit_finished_turn(handle).await;
+                    }
+
+                    turn_counter += 1;
+                    let turn_id = format!("{}_{}", self.turn_prefix, turn_counter);
+
+                    let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                        session_id: self.session_id.clone(),
+                        turn_id: turn_id.clone(),
+                        sequence: 0,
+                        payload: TurnEventPayload::Started,
+                    });
+                    let sequence = Arc::new(AtomicU64::new(1));
+
+                    let token = CancellationToken::new();
+                    cancel_token = Some(token.clone());
+
+                    if let Some(agent_mut) = Arc::get_mut(&mut self.agent) {
+                        agent_mut.set_append_prompt_opt(None);
+                    }
+
+                    if self.compactor.should_compact(&self.history) {
+                        let compacted = self.compactor.apply_budget(self.history.clone());
+                        let compacted = self.compactor.apply_trim(compacted);
+                        let compacted = self.compactor.apply_microcompact(compacted);
+                        self.history = compacted;
+                    }
+
+                    let agent = self.agent.clone();
+                    let eq_tx = self.eq_tx.clone();
+                    let turn_id_clone = turn_id.clone();
+                    let token_clone = token.clone();
+                    let history = self.history.clone();
+                    let persistence = self.persistence.clone();
+                    let durable_persistence = self.durable_persistence.clone();
+                    let session_id = self.session_id.clone();
+
+                    let handle = tokio::spawn(async move {
+                        let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
+                        let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
+
+                        let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
+                            agent,
+                            message: text,
+                            attachments: Some(attachments),
                             history,
                             event_tx,
                             event_rx,

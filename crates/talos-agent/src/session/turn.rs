@@ -31,6 +31,7 @@ pub(super) struct TurnRecord {
 pub(super) struct TurnForwarding {
     pub(super) agent: Arc<Agent>,
     pub(super) message: String,
+    pub(super) attachments: Option<Vec<talos_core::message::ContentPart>>,
     pub(super) history: Vec<Message>,
     pub(super) event_tx: mpsc::UnboundedSender<AgentEvent>,
     pub(super) event_rx: mpsc::UnboundedReceiver<AgentEvent>,
@@ -48,6 +49,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let TurnForwarding {
         agent,
         message,
+        attachments,
         history,
         event_tx,
         mut event_rx,
@@ -99,8 +101,15 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
     });
 
-    let mut agent_task =
-        tokio::spawn(async move { agent.run_for_session_turn(message, history, event_tx).await });
+    let mut agent_task = tokio::spawn(async move {
+        if let Some(atts) = attachments {
+            agent
+                .run_for_session_turn_multimodal(message, atts, history, event_tx)
+                .await
+        } else {
+            agent.run_for_session_turn(message, history, event_tx).await
+        }
+    });
 
     let agent_result = tokio::select! {
         result = &mut agent_task => result,

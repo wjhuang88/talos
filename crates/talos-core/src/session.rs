@@ -17,6 +17,12 @@ use crate::message::Message;
 pub enum SessionOp {
     /// Submit a user message for the agent to process.
     Submit { message: String },
+    /// Submit a user message with image attachments (MODEL-009-D/I152).
+    /// The session actor constructs `Message::Multimodal` from these parts.
+    SubmitMultimodal {
+        text: String,
+        attachments: Vec<crate::message::ContentPart>,
+    },
     /// Build a provider request preview for diagnostics without calling the provider.
     PreviewRequest { message: String },
     /// Replace the model-visible activated Skill context.
