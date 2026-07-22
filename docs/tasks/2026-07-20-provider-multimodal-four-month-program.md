@@ -242,6 +242,19 @@ On a hard stop:
 
 ## Checkpoints
 
+### Change Control — 2026-07-22: successor closeout and TUI-034
+
+- Change: the maintainer requested a long-running plan for the remaining provider/multimodal
+  closeout work and the independently acceptable TUI history-width outcome (TUI-034).
+- Classification: TUI-034 is a **scope addition**, not a correction to I153 or I154. It therefore
+  has a separate successor owner record rather than changing this published program baseline.
+- Decision: preserve this program's I146-I154 objectives and checkpoints. The successor task at
+  `docs/tasks/2026-07-22-product-closeout-and-history-visibility-long-task.md` owns I148 closeout,
+  I154 activation/implementation sequencing, TUI-034 refinement, a future I155 only after
+  refinement, and final evidence synchronization.
+- Effect: I145-I153 retain their documented Review/Partial states until their stated gates are met;
+  no release authorization is created.
+
 ### Checkpoint P0 — 2026-07-20
 
 - Completed task items: P0 (governance baseline).
