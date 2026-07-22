@@ -682,6 +682,7 @@ impl ConversationEngine {
                     outputs.push(UiOutput::ModelSwitchRequest(ModelSwitchRequest {
                         model_id: arg.to_string(),
                         provider_needs_credential: false,
+                        provider_hint: None,
                     }));
                 }
             }

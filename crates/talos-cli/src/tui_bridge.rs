@@ -155,6 +155,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                                 ModelSwitchRequest {
                                                     model_id: String::new(),
                                                     provider_needs_credential: false,
+                                                    provider_hint: None,
                                                 },
                                             ));
                                         }
@@ -271,7 +272,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                     UserInput::ProviderSetup(provider) => {
                         let _ = session_tx.send(SessionLifecycleRequest::ProviderSetup(provider));
                     }
-                    UserInput::SwitchModel { provider: _, model_id, variant } => {
+                    UserInput::SwitchModel { provider, model_id, variant } => {
                         let value = match variant {
                             Some(v) if !v.is_empty() => format!("{model_id}@{v}"),
                             _ => model_id,
@@ -280,6 +281,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             ModelSwitchRequest {
                                 model_id: value,
                                 provider_needs_credential: false,
+                                provider_hint: if provider.is_empty() { None } else { Some(provider) },
                             },
                         ));
                     }

@@ -1020,11 +1020,125 @@ async fn p1_selecting_discovered_model_sets_active_identity() {
     assert_eq!(found.provider, "select-gw");
     assert_eq!(found.id, "select-me");
 
-    // Simulate what the model lifecycle does: set the active model.
-    new_config.model = "select-me".to_string();
-    new_config.provider = "select-gw".to_string();
-
-    // Verify the active identity matches what was discovered.
+    // Verify that set_active_model with the provider-qualified form
+    // resolves correctly (this is what handle_session_model does when
+    // provider_hint is Some).
+    assert!(
+        new_config.set_active_model("select-gw/select-me").is_ok(),
+        "provider-qualified form must resolve the discovered model"
+    );
     assert_eq!(new_config.model, "select-me");
     assert_eq!(new_config.provider, "select-gw");
+}
+
+/// P1-fix: provider_hint disambiguates cross-provider duplicate model
+/// IDs. Two providers have a model named "shared-model". Without
+/// provider_hint, set_active_model errors. With provider_hint, it
+/// resolves to the correct provider.
+#[test]
+fn p1fix_provider_hint_disambiguates_cross_provider_duplicates() {
+    let mut config = Config::default();
+    config.providers.insert(
+        "provider-a".to_string(),
+        ProviderConfig {
+            api_key: Some("key-a".to_string()),
+            ..Default::default()
+        },
+    );
+    config
+        .providers
+        .get_mut("provider-a")
+        .unwrap()
+        .models
+        .insert("shared-model".to_string(), Default::default());
+
+    config.providers.insert(
+        "provider-b".to_string(),
+        ProviderConfig {
+            api_key: Some("key-b".to_string()),
+            ..Default::default()
+        },
+    );
+    config
+        .providers
+        .get_mut("provider-b")
+        .unwrap()
+        .models
+        .insert("shared-model".to_string(), Default::default());
+
+    // Without hint: ambiguity error
+    let result = config.set_active_model("shared-model");
+    assert!(result.is_err(), "bare model_id must fail on duplicates");
+
+    // With hint: resolves to the correct provider
+    let result = config.set_active_model("provider-b/shared-model");
+    assert!(result.is_ok(), "provider-qualified form must resolve");
+    assert_eq!(config.provider, "provider-b");
+    assert_eq!(config.model, "shared-model");
+}
+
+/// P1-fix: handle_session_model with provider_hint resolves the
+/// discovered model through the lifecycle path. This test verifies
+/// the data-level resolution: provider_hint causes
+/// Config::set_active_model to receive `provider/model_id` form.
+/// The actual session rebuild (spawned actor, channels) is tested in
+/// model_lifecycle.rs tests with MockProvider.
+#[test]
+fn p1fix_provider_hint_flows_to_set_active_model() {
+    let mut config = Config::default();
+    config.providers.insert(
+        "p1fix-gw".to_string(),
+        ProviderConfig {
+            api_key: Some("p1fix-key".to_string()),
+            ..Default::default()
+        },
+    );
+    config
+        .providers
+        .get_mut("p1fix-gw")
+        .unwrap()
+        .models
+        .insert("p1fix-model".to_string(), Default::default());
+
+    // Simulate what handle_session_model does with provider_hint:
+    let parsed_model_id = "p1fix-model";
+    let provider_hint = Some("p1fix-gw".to_string());
+    let resolve_id = match &provider_hint {
+        Some(p) if !p.is_empty() => format!("{p}/{parsed_model_id}"),
+        _ => parsed_model_id.to_string(),
+    };
+
+    assert!(config.set_active_model(&resolve_id).is_ok());
+    assert_eq!(config.provider, "p1fix-gw");
+    assert_eq!(config.model, "p1fix-model");
+}
+
+/// P1-fix: when handle_session_model receives an unknown model (with
+/// provider_hint), set_active_model errors, the function returns None,
+/// and the caller must not update config_for_handler. This test
+/// verifies the set_active_model failure path directly.
+#[test]
+fn p1fix_activation_failure_preserves_old_config() {
+    let mut config = Config::default();
+    config.model = "original-model".to_string();
+    config.provider = "original-provider".to_string();
+    config.providers.insert(
+        "original-provider".to_string(),
+        ProviderConfig {
+            api_key: Some("orig-key".to_string()),
+            ..Default::default()
+        },
+    );
+
+    let original_model = config.model.clone();
+    let original_provider = config.provider.clone();
+
+    // Simulate handle_session_model with a nonexistent model + hint:
+    let result = config.set_active_model("nonexistent-provider/nonexistent-model");
+    assert!(result.is_err(), "unknown model must fail");
+    assert_eq!(config.model, original_model, "old model must be unchanged");
+    assert_eq!(
+        config.provider, original_provider,
+        "old provider must be unchanged"
+    );
 }

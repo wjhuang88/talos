@@ -534,6 +534,12 @@ pub struct ModelSwitchRequest {
     pub model_id: String,
     /// Whether the provider needs credential setup before this model can be used.
     pub provider_needs_credential: bool,
+    /// Explicit provider to disambiguate when the same model_id exists
+    /// under multiple providers. When `Some`, `handle_session_model`
+    /// uses `provider/model_id` to avoid ambiguity. When `None`, the
+    /// model_id is resolved via `set_active_model` which errors on
+    /// duplicates.
+    pub provider_hint: Option<String>,
 }
 
 /// A candidate session displayed in the interactive session picker.

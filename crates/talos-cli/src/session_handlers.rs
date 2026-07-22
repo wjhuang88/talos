@@ -482,6 +482,7 @@ pub(crate) async fn handle_session_model(
     session_watch_rx: &watch::Receiver<talos_session::Session>,
     session_manager: &talos_session::SessionManager,
     model_id: String,
+    provider_hint: Option<String>,
     mock: bool,
 ) -> Option<Config> {
     if model_id.is_empty() {
@@ -499,10 +500,19 @@ pub(crate) async fn handle_session_model(
         (model_id.clone(), None)
     };
 
+    // P1-fix: when the caller supplies an explicit provider (e.g. from
+    // the /model picker's UserInput::SwitchModel), use the
+    // provider-qualified form so Config::set_active_model resolves
+    // unambiguously even when two providers share a model_id.
+    let resolve_id = match &provider_hint {
+        Some(p) if !p.is_empty() => format!("{p}/{parsed_model_id}"),
+        _ => parsed_model_id.clone(),
+    };
+
     let previous_model = config.model.clone();
     let previous_provider = config.provider.clone();
     let mut model_config = config.clone();
-    if let Err(e) = model_config.set_active_model(&parsed_model_id) {
+    if let Err(e) = model_config.set_active_model(&resolve_id) {
         let text = format!("[Error] Unknown model '{parsed_model_id}': {e}\n");
         send_stream(ui_tx, MessageSource::Error, text);
         return None;

@@ -483,6 +483,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
                         &session_watch_rx_for_handler,
                         &session_manager_for_handler,
                         req.model_id,
+                        req.provider_hint,
                         cli.mock,
                     )
                     .await
@@ -672,6 +673,7 @@ pub(crate) async fn run_tui_mode(cli: Cli) -> Result<()> {
             talos_conversation::ModelSwitchRequest {
                 model_id: String::new(),
                 provider_needs_credential: false,
+                provider_hint: None,
             },
         ));
         if needs_api_key {
