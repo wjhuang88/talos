@@ -1,10 +1,10 @@
 # Iteration I146: TUI-033 Parameterless Model And Provider Commands
 
-> Document status: Review (slash-prefix filtering repair awaiting maintainer retest)
+> Document status: Complete (maintainer slash-prefix retest 2026-07-22)
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20 (after P0 governance commit `6cd1c54` + checkpoint `abc89b4` pushed to origin/main)
 > Status changed to Review: 2026-07-20 (implementation + locked validation complete; real-terminal walkthrough pending maintainer acceptance)
-> Completion Commit: `0ef2f68` — parameterized-command correction and menu-routing repair used in the accepted terminal flow.
+> Completion Commit: `7f6972a` — slash-prefix filtering repair accepted in the maintainer terminal retest.
 > Planned objective: make TUI `/model` and `/connect` strict no-argument menu commands so all
 > provider/model selection and search happens inside their existing panels, not through
 > parameterized command text.
@@ -154,6 +154,7 @@
 | 2026-07-22 | Acceptance repair | Real-terminal feedback found that entering `/model <text>` or `/connect <text>` while the slash menu was open left the text in menu filtering, so it could become an unregistered message instead of reaching the bridge correction. The TUI now closes only that direct-command menu on its first argument separator while preserving the full composer text. Regressions cover typed `/model gpt-4o` and pasted `/connect openai`. |
 | 2026-07-22 | Change control and maintainer terminal acceptance | **In-scope correction:** the published phrase “slash-panel completion ... execute/open” was ambiguous about Tab. The maintainer confirmed the implemented, tested contract is preferable: **Tab completes `/model` or `/connect` into the composer without a trailing space and does not execute; Enter executes the direct command and opens the menu.** This changes no objective, API, crate boundary, or test target. The maintainer then passed all remaining real-terminal checks: bare and parameterized commands, side-effect-free correction, menu search/cancel, structured selection, and exact model IDs. I146 is Complete. |
 | 2026-07-22 | Terminal-found repair | Maintainer observed that `/mo` showed `/model` plus `/attach` and `/detach` because the slash filter appended prose-description matches after command-name prefix matches. The filter now gives command-name prefixes exclusive precedence, falling back to name/description search only when no prefix exists. Typed and pasted `/mo` regressions assert that only `/model` is visible. Status returns to **Review** until the maintainer retests this exact behavior. |
+| 2026-07-22 | Maintainer retest | Maintainer rebuilt and confirmed `/mo` shows only `/model`. The repair commit `7f6972a` is accepted; I146 returns to **Complete**. |
 
 ## Actual Validation Results (2026-07-20)
 

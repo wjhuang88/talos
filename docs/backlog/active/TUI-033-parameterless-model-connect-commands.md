@@ -5,13 +5,13 @@
 | Story ID | TUI-033 |
 | Type | Product / Interaction Story |
 | Priority | P2 |
-| Status | Review — slash-prefix filtering repair awaiting maintainer retest (2026-07-22) |
+| Status | Complete — I146 slash-prefix retest accepted (2026-07-22) |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | MODEL-007 picker; MODEL-008 custom-provider flow; TUI-010 slash panel |
 | Blocks | — |
 | Selected Into | [I146](../../iterations/I146-tui-parameterless-model-connect-commands.md) |
 
-> Completion Commit: `0ef2f68` — parameterized-command correction and menu-routing repair used in the accepted terminal flow.
+> Completion Commit: `7f6972a` — slash-prefix filtering repair accepted in the maintainer terminal retest.
 
 ## Problem
 
