@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-D |
 | Type | Product / API / UX Story |
 | Priority | P2 |
-| Status | Refinement — selected into I152 (2026-07-20) |
+| Status | Review — code-level Owner acceptance (2026-07-22); real-terminal evidence pending |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-009 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-C (I151) safe local image ingestion |
@@ -113,3 +113,13 @@ per the I149 ADR — all without breaking text-only behavior.
 - attach/remove/cancel/error-recovery integration tests.
 - history/resume/export/copy safe-summary rendering tests.
 - Locked fmt/check/clippy/test and `scripts/validate_project_governance.sh .`; `git diff --check`.
+
+## Execution Facts
+
+- 2026-07-22: code-level Owner acceptance recorded after P1-A/P1-B remediation.
+  TUI `/attach` and print `--attach` share the SEC-001 authorization boundary;
+  TUI ingestion receives the authorized canonical path rather than the raw
+  user-supplied symlink.
+- Commit `17e3fef` proves post-approval symlink redirection cannot redirect
+  the ingestion target. Real-terminal provider walkthrough evidence remains
+  the only gate to Complete.

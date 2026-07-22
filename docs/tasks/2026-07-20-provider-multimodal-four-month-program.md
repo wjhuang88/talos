@@ -5,7 +5,7 @@
 | Task ID | 2026-07-20-provider-multimodal-four-month-program |
 | Owner | Senior agent (single executor; no subagent delegation) |
 | Created | 2026-07-20 |
-| Status | In Progress (P0 governance baseline) |
+| Status | In Progress — I146/I147/I150-I153 Review; I148 Partial; I154 Blocked |
 | Branch | `main` (direct commits, no feature branches) |
 | SOP | `docs/sop/LONG-RUNNING-TASK.md` |
 | Confirmation | Maintainer confirmation covers the original I146-I153 cycle and the accepted 2026-07-21 MODEL-009-E/I154 scope addition; no per-phase re-confirmation except at hard-stop conditions. |
@@ -571,6 +571,22 @@ On a hard stop:
   and tested, but not yet Owner-accepted as Review).
 - Validation: fmt + clippy -D warnings + test (0 failures) + governance +
   diff-check all green.
+
+### Owner Re-Acceptance And Regression Coverage — 2026-07-22
+
+- Owner accepted the P1-A/P1-B code remediation after independent review.
+  `authorize_attach_image()` returns the authorized canonical path and the
+  TUI passes that exact path to ingestion; `validate_image_path()` uses a
+  bounded byte snapshot for the single-image limit, aggregate limit, decoder,
+  and digest.
+- Commit `17e3fef` adds regressions for post-approval symlink redirection and
+  actual-snapshot oversize rejection. Locked fmt/check/clippy/test,
+  governance, and diff-check pass.
+- I151 and I152 advance to **Review**. They remain in Review, not Complete,
+  until the maintainer records the I153 real-terminal walkthrough evidence.
+- GitHub issue mapping was checked for MODEL-008/MODEL-009 and I146-I154;
+  these maintainer-originated stories have no originating issue link, so no
+  issue comment or closure is applicable.
 
 ## Related Documents
 

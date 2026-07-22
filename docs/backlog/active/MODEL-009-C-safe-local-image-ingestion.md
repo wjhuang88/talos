@@ -5,7 +5,7 @@
 | Story ID | MODEL-009-C |
 | Type | Product / Security Story |
 | Priority | P2 |
-| Status | Refinement — selected into I151 (2026-07-20) |
+| Status | Review — code-level Owner acceptance (2026-07-22); real-terminal evidence pending |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-009 |
 | Parent Epic | MODEL-009 |
 | Depends on | MODEL-009-B (I150) typed content + capability semantics + persistence boundary |
@@ -116,3 +116,11 @@ session unchanged, leaves no partial attachment, and leaks no sensitive path or 
 - No-leak tests asserting no path or binary content appears in logs, Debug output, panel labels,
   or UI surfaces.
 - Locked fmt/check/clippy/test and `scripts/validate_project_governance.sh .`; `git diff --check`.
+
+## Execution Facts
+
+- 2026-07-22: code-level Owner acceptance recorded after P1-B remediation.
+  Ingestion uses one bounded byte snapshot for size, aggregate, MIME, pixel,
+  decode, and digest checks; provider reads re-verify the digest.
+- Commit `17e3fef` proves actual-snapshot oversize rejection. Real-terminal
+  attachment walkthrough evidence remains the only gate to Complete.

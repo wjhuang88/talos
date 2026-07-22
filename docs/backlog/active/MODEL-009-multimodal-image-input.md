@@ -5,7 +5,7 @@
 | Story ID | MODEL-009 |
 | Type | Product / API / State Story (Epic) |
 | Priority | P2 |
-| Status | Refinement — split into child Stories MODEL-009-A/B/C/D on 2026-07-20 |
+| Status | Active — MODEL-009-A Complete; B/C/D in Review; E remains blocked (2026-07-22) |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | Catalog capability metadata; provider protocol boundary; session persistence boundary |
 | Blocks | MODEL-009-E agent-mediated image read tool |
