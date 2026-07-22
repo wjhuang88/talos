@@ -71,7 +71,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 |---|---|---|---|---|---|---|
 | P0 | Establish this successor task and reconcile scope | This owner record, original-program change-control link, Board entry, and current-state evidence | None | Governance + diff checks; explicit inventory above remains true | If current owner docs conflict, stop and report file/line evidence | Complete on creation |
 | P1 | I148 discovery activation closeout | Mock-proven discover → select → `apply` model → rebuild current session → status/picker reflects the active identity; failure retains current session/config and exposes manual fallback | P0 | Two protocol fixtures; picker/bridge/session lifecycle tests; atomicity/redaction tests; full locked ladder | Keep discovery persistence and manual fallback; leave I148 Review with its terminal-only gate | Complete — evidence commits `23db287`, `187f13d`, `4d5f8d7`, `834400b`, `a01edc5` |
-| P2 | I153 prerequisite/evidence refresh and I154 activation decision | Append-only evidence update stating whether I154's code prerequisites are met; an I154 activation record only if they are | P1, I151/I152 accepted code state | Security-boundary inventory, I153 regression replay, no unresolved critical path; no false real-terminal Complete claim | Keep I154 Blocked and provide exact missing condition | Ready to checkpoint after the activation-evidence commit is pushed |
+| P2 | I153 prerequisite/evidence refresh and I154 activation decision | Append-only evidence update stating whether I154's code prerequisites are met; an I154 activation record only if they are | P1, I151/I152 accepted code state | Security-boundary inventory, I153 regression replay, no unresolved critical path; no false real-terminal Complete claim | Keep I154 Blocked and provide exact missing condition | Complete — Completion Commit: `ba90c02` |
 | P3 | I154 `read_image` tool | Supported-only registered tool; exact-path approval; shared image ingestion/digest revalidation; provider-neutral continuation artifact; two adapter fixtures; safe history/provenance; unchanged text `read` | P2 | Tool registry/presentation, permission Allow/Ask/Deny, symlink/replacement/decoder adversarial, agent-session continuation, OpenAI/Anthropic, text-only/history regression tests; security review; full locked ladder | Do not expose tool; amend ADR-050 with evidence and retain explicit `/attach` only | Planned |
 | P4 | TUI-034 rendering refinement | Fixed-cap inventory, active-vs-legacy `ToolCallBubble` reachability evidence, chosen continuation-row representation, width/height contract, and TUI-034 changed to Ready or explicitly left Refinement | P0; must not overlap an Active I154 | Actual `Buffer`/`InlineFrame` or active-renderer spike at 80/120/160 columns; CJK/emoji/newline observations; no terminal-autowrap assumption | Keep TUI-034 Refinement and record the smallest unresolved rendering boundary | Planned |
 | P5 | I155 adaptive history implementation | New append-only I155 baseline followed by viewport-width-aware tool history rendering; preserved TUI-015/TUI-025 behavior; updated user docs if behavior is described publicly | P4; P3 must be Complete or explicitly stopped so only one iteration is active | Active-renderer tests at 80/120/160; CJK/emoji/newline and former-120-boundary tests; TUI-015/TUI-025 regressions; two-terminal manual packet; full locked ladder | Revert only the uncommitted phase changes; leave TUI-034 Ready with refinement evidence | Planned |
@@ -219,6 +219,34 @@ not permission to change unrelated scopes.
   maintainer instruction.
 - Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the
   P2 task description in this file.
+
+### Checkpoint P2 — 2026-07-22
+
+- Completed task items: P2 — I153 code-prerequisite evidence refresh and the I154 activation
+  decision. Completion Commit: `ba90c02` (`docs(agent): ready I154 image-read implementation
+  (#I154) [model:gpt-5]`).
+- Commit pushed: `ba90c02` on `origin/main`.
+- Changed owner artifacts: ADR-051 and its index; I154 and MODEL-009-E implementation contract;
+  MODEL-009 parent/backlog/iteration index; derived Board; this long-task owner.
+- Commands and exit results:
+  - `git diff --check` → exit 0.
+  - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
+  - I153's full locked validation was already replayed by the v0.5.0 release preflight at
+    `3eec574`; P2 changes documentation only and did not alter Cargo/code.
+- Acceptance evidence / remaining human gate: code inventory confirmed the existing normal tool
+  authorization can bind the new `read_image` identity and exact canonical path; provider adapters
+  retain final digest revalidation. ADR-051 defines the missing one-shot continuation without
+  persistence or a side channel. I152/I153 remain Review solely for the unavailable
+  maintainer-owned live Anthropic-compatible provider check; fixture evidence is not misreported
+  as that check.
+- Open risks or deviations: P3 will make additive public API changes and must include the ADR-051
+  semver migration documentation. It must implement and fixture-test Anthropic tool-result/image
+  coalescing; no code has begun in P2.
+- Next task item: P3 — I154 `read_image` implementation. It is ready for a maintainer-dispatched
+  frontline developer; do not begin it automatically.
+- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint,
+  `docs/decisions/051-one-shot-multimodal-tool-continuation.md`, and
+  `docs/iterations/I154-agent-mediated-image-read-tool.md` before editing code.
 
 ## Hard Stops
 
