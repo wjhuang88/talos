@@ -4,11 +4,13 @@
 |-------|-------|
 | Story ID | TUI-026 |
 | Priority | P2 |
-| Status | Review (I145, 2026-07-20) |
+| Status | Complete — I145 maintainer terminal acceptance (2026-07-22) |
 | Source | Maintainer requirement refined 2026-07-20 |
 | Depends on | TUI-032 (composer 多行), TUI-004 (state model) |
 | Blocks | — |
 | Decision Gate | Cleared by ADR-049: bounded snapshots travel through the existing ordered `UiOutput` stream. |
+
+> Completion Commit: `1039430` — terminal-growth repaint and terminal-preview cleanup.
 
 ## 问题
 
