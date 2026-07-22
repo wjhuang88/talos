@@ -181,7 +181,7 @@ docs/iterations/
 | I149 | MODEL-009-A Image Input ADR And Security Spike | **Complete** (2026-07-20) | ADR-050 Accepted on all 10 safety-critical points. Security review complete. No production image sending. I150 may proceed. See `I149-image-input-adr-security-spike.md`. |
 | I152 | MODEL-009-D Provider Adapter And TUI/CLI | **Review** (code-level Owner acceptance 2026-07-22) | OpenAI `image_url` + Anthropic base64 wire mapping. R3: capability gate. R5/P1-B: TOCTOU + digest verification. R7: `/attachments` + `/detach` + status count. R8: `--attach` CLI flag. R10: scrollback safe summary. P1-A: shared `image_authorization` routes `/attach` and `--attach` through SEC-001 permission pipeline; canonical-path regression passes. TUI: interactive approval. Print: headless fail-closed. Real-terminal walkthrough remains pending. See `I152-provider-adapter-tui-cli.md`. |
 | I153 | End-to-End Hardening And Release Candidate | **Review** (locked evidence refreshed 2026-07-22 at `6ec5bbc`) | Full locked validation is green; release candidate checklist documented. The maintainer-owned live Anthropic-compatible Provider mapping check remains unavailable, so no tag is authorized. See `I153-end-to-end-hardening-release-candidate.md`. |
-| I154 | Agent-Mediated Image Read Tool | **Planned / Blocked** (2026-07-21) | MODEL-009-E adds a separate `read_image` tool for Supported models only; it requires I151/I152 security remediation and must never auto-read paths embedded in normal user text. See `I154-agent-mediated-image-read-tool.md`. |
+| I154 | Agent-Mediated Image Read Tool | **Ready** (P2 activation 2026-07-22) | MODEL-009-E adds a separate `read_image` tool for Supported models only. ADR-051 now fixes the one-shot provider-continuation contract; I152/I153 retain their separate live Anthropic review gate. I154 must never auto-read paths embedded in normal user text. See `I154-agent-mediated-image-read-tool.md`. |
 
 > Update this table whenever an iteration changes state. "Complete" requires runtime
 > evidence, not only passing unit tests — see `docs/sop/ITERATION-WORKFLOW.md`.
@@ -227,7 +227,7 @@ rewrite published iteration baselines.
 | I151 | Review (code-level Owner acceptance 2026-07-22) | Safe local image ingestion security remediation is accepted in code; real-terminal evidence remains pending. |
 | I152 | Review (code-level Owner acceptance 2026-07-22) | Provider/TUI/CLI image flow security remediation is accepted in code; real-terminal evidence remains pending. |
 | I153 | Review (2026-07-20) | Release-candidate evidence packet is implemented; it remains pending the human walkthrough evidence and has no release authorization. |
-| I154 | Planned / Blocked (2026-07-21) | Requires I153 evidence refresh and separate activation; normal text paths must never auto-read. |
+| I154 | Ready (2026-07-22) | P2 recorded the code-prerequisite inventory and ADR-051 implementation contract. Awaiting separately dispatched P3 implementation; normal text paths must never auto-read. |
 | I057 | Complete (2026-06-29) | Removed from non-terminal inventory. All 5 stories delivered; v0.2.0 tag pushed after user approval. |
 | I058 | Complete (2026-06-29) | Removed from non-terminal inventory. Implementation and validation recorded. |
 | I075 | Complete (2026-07-01) | Original self-bootstrap plan executed through Month 3; remaining Month 4 tasks are superseded into I076-I079. |

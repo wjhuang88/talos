@@ -5,10 +5,10 @@
 | Story ID | MODEL-009-E |
 | Type | Product / Tool / Security Story |
 | Priority | P2 |
-| Status | Planned — blocked by MODEL-009-C and MODEL-009-D acceptance remediation |
+| Status | Ready — I154 P2 activation accepted (2026-07-22); P3 implementation not started |
 | Source | Maintainer requirement, 2026-07-21 |
 | Parent Epic | MODEL-009 |
-| Depends on | MODEL-009-C safe image ingestion; MODEL-009-D attachment capability gate and provider pipeline; SEC-001; ADR-050 |
+| Depends on | MODEL-009-C safe image ingestion; MODEL-009-D attachment capability gate and provider pipeline; SEC-001; ADR-050; ADR-051 |
 | Blocks | — |
 
 ## Problem
@@ -24,9 +24,9 @@ Provide a separate, agent-invoked `read_image` tool. A model may request an expl
 - Add a distinct `read_image` tool. Preserve the text-only contract and behavior of `read`.
 - Expose the tool only when the active model has confirmed `ImageInputCapability::Supported`. `Unknown` and `Unsupported` models neither receive the tool schema nor read image bytes.
 - Tool input is one explicit local path; the normal permission pipeline grants or denies the exact canonical path.
-- Reuse MODEL-009-C validation: regular-file checks, canonicalization, SEC-001 authorization, symlink/TOCTOU revalidation at read, format/MIME/magic-byte limits, byte/pixel/count bounds, and panic-contained decoding.
+- Reuse MODEL-009-C validation from a shared `talos-tools` boundary: regular-file checks, canonicalization, SEC-001 authorization, symlink/TOCTOU revalidation at read, format/MIME/magic-byte limits, byte/pixel/count bounds, and panic-contained decoding.
 - Represent success as a Talos-owned internal image artifact/content part. Never put base64 or binary content in a text tool result, terminal transcript, export, or debug output.
-- After a successful tool read, the next provider request receives the image via existing OpenAI-compatible / Anthropic-compatible mappings, with a safe tool/result summary retained for history.
+- After a successful tool read, only the next provider request receives the image through ADR-051's non-persistent overlay and the existing OpenAI-compatible / Anthropic-compatible mappings; history retains only a safe tool/result summary.
 - TUI and CLI render only basename, media type, byte count, result status, and tool provenance.
 
 ## Explicit Exclusions
@@ -59,6 +59,7 @@ Provide a separate, agent-invoked `read_image` tool. A model may request an expl
 - `docs/backlog/active/SEC-001-external-path-authorization.md`
 - `docs/decisions/047-external-path-tool-authorization.md`
 - `docs/decisions/050-multimodal-image-input-architecture.md`
+- `docs/decisions/051-one-shot-multimodal-tool-continuation.md`
 - `docs/decisions/006-event-architecture-boundary.md`
 - `crates/talos-tools/src/`, `crates/talos-agent/src/`, and `crates/talos-provider/src/`
 
