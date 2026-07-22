@@ -5,11 +5,13 @@
 | Story ID | MODEL-008-A |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | Refinement — selected into I147 (2026-07-20) |
+| Status | Complete — I147 maintainer terminal acceptance (2026-07-22) |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-008 |
 | Parent Epic | MODEL-008 |
 | Depends on | MODEL-005 / MODEL-006 existing `/connect` flow; ADR-013 provider config schema; ADR-023 inline api_key boundary; TUI-033 parameterless commands (I146) |
 | Blocks | MODEL-008-B (I148) |
+
+> Completion Commit: `1c843b2` — provider-wizard rendering, cursor targeting, and visible protocol-choice acceptance repairs.
 
 ## Problem
 

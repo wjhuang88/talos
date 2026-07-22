@@ -34,7 +34,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 |---|---|---|
 | I145 / TUI-026 | Review | Do not change to Complete without maintainer terminal evidence. Include its walkthrough in the final packet only. |
 | I146 / TUI-033 | Review | Do not change to Complete without maintainer terminal evidence. No feature changes unless a regression is found while executing another phase. |
-| I147 / MODEL-008-A | Review | Do not change to Complete without maintainer terminal evidence. |
+| I147 / MODEL-008-A | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1c843b2`. Wizard rendering, cursor targeting, and visible protocol choices were retested and accepted. |
 | I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
 | I150 / MODEL-009-B | Review | Preserve status; run regressions when affected by I154. |
 | I151 / I152 | Review, code-level security acceptance | Preserve status pending real-terminal evidence; I154 must reuse their proven controls rather than recreate a parallel path. |
@@ -182,7 +182,7 @@ not permission to change unrelated scopes.
   - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
   - `git diff --check` → exit 0.
 - Acceptance evidence / remaining human gate: P1 is fully mock-testable and may be dispatched;
-  I145/I146/I147/I150-I153 still require the maintainer walkthrough listed below before any
+  I145/I146/I150-I153 still require the maintainer walkthrough listed below before any
   Complete status.
 - Open risks or deviations: no GitHub issue is mapped to TUI-034. I154 and I155 remain unstarted.
 - Next task item: P1 — I148 discovery → selection → immediate activation closeout.
@@ -279,8 +279,8 @@ The final report must ask the maintainer to execute and record:
 
 1. I145: enqueue several steering messages during a turn; verify FIFO preview, `+N more`, and
    disappearance after drain.
-2. I146/I147: bare and parameterized `/model`/`/connect`, search/cancel, custom-provider wizard,
-   update/cancel behavior, and no visible secret.
+2. I146: bare and parameterized `/model`/`/connect`, search/cancel, and structured-identity
+   behavior. I147 is Complete after maintainer acceptance (Completion Commit: `1c843b2`).
 3. I148: use a disposable/mock provider endpoint; discover, choose a model, verify immediate
    status/session transition, then verify a discovery failure retains the old session and offers
    manual entry.

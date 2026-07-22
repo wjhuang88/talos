@@ -601,6 +601,16 @@ On a hard stop:
   these maintainer-originated stories have no originating issue link, so no
   issue comment or closure is applicable.
 
+### I147 Maintainer Terminal Acceptance — 2026-07-22
+
+- I147 is Complete after the maintainer retested the repaired custom-provider wizard in a real
+  terminal: active-field cursor targeting and both visible protocol choices now behave correctly,
+  and the full guided walkthrough passed.
+- Completion Commit: `1c843b2` (origin/main). This completion evidence cites the existing repair
+  commit; the present documentation synchronization is not substituted for implementation evidence.
+- I146 remains Review: its remaining menu-specific acceptance cases are independent and have not
+  been promoted to Complete by the I147 result.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.

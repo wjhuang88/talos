@@ -1,9 +1,10 @@
 # Iteration I147: MODEL-008-A Custom Provider Wizard And Atomic Config
 
-> Document status: Review
+> Document status: Complete (maintainer terminal acceptance 2026-07-22)
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20 (after I146 completion)
 > Status changed to Review: 2026-07-20 (implementation + locked validation complete; real-terminal walkthrough pending)
+> Completion Commit: `1c843b2` — provider-wizard rendering, cursor targeting, and visible protocol-choice acceptance repairs.
 > Planned objective: let a user register an OpenAI-compatible or Anthropic-compatible
 > custom provider entirely from `/connect` without editing TOML, through a cancel-safe
 > five-step wizard with atomic config persistence.
@@ -139,6 +140,7 @@
 | 2026-07-20 | Validation | All locked validation passes (see below). Real-terminal walkthrough remains pending maintainer acceptance — **not Complete**. |
 | 2026-07-22 | Acceptance repair | Real-terminal feedback found that `ProviderWizard` had a state machine and keyboard handler but no `BottomPanelComponent` rendering branch, producing `No matches`. The panel now renders its five named steps, masked API-key entry, and confirmation summary. A Buffer/InlineFrame regression proves the wizard never falls through to the generic empty-picker rendering. |
 | 2026-07-22 | Acceptance repair 2 | The first renderer repair still left the terminal cursor in the composer and represented Protocol as one ambiguous value. The wizard now positions the cursor at its active entry field (or selected protocol row), and Protocol renders both `openai-chat` and `anthropic-messages` with a selection marker. Buffer and cursor-target regressions cover both protocol choices. |
+| 2026-07-22 | Maintainer terminal acceptance | Maintainer retested the repaired wizard in a real terminal and confirmed all guided checks pass: the active field owns the cursor, both protocol choices are visibly selectable, API-key entry remains masked, and the full wizard flow behaves as specified. I147 is therefore Complete. |
 
 ## Actual Validation Results (2026-07-20)
 
@@ -151,17 +153,7 @@
 | `scripts/validate_project_governance.sh .` | ✅ 0 warnings |
 | `git diff --check` | ✅ clean |
 
-## Remaining: Real Terminal Acceptance
+## Maintainer Terminal Acceptance (2026-07-22)
 
-The following acceptance items require real terminal verification and are deferred for manual acceptance:
-
-- `/connect` picker shows "Add custom provider" entry.
-- Selecting it opens the wizard at the Name step.
-- Typing a name and pressing Enter advances to Protocol.
-- Up/Down cycles between openai-chat and anthropic-messages.
-- Entering a base URL and pressing Enter advances to API Key.
-- Entering an API key (masked) and pressing Enter advances to Confirm.
-- Pressing Enter on Confirm saves the provider atomically and shows it in `/model`.
-- Esc at any step cancels without saving.
-- Entering an existing name shows the update confirmation.
-- Empty name/base_url/api_key does not advance.
+The maintainer completed the guided real-terminal walkthrough after the two acceptance repairs and
+reported all checks passing. This closes the previously deferred wizard interaction gate.
