@@ -36,7 +36,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | I146 / TUI-033 | Complete — maintainer slash-prefix retest (2026-07-22) | Completion Commit: `7f6972a`. Tab completes a bare command without execution; Enter opens its direct-command menu; `/mo` shows only `/model`. |
 | I147 / MODEL-008-A | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1c843b2`. Wizard rendering, cursor targeting, and visible protocol choices were retested and accepted. |
 | I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
-| I150 / MODEL-009-B | Review | Preserve status; run regressions when affected by I154. |
+| I150 / MODEL-009-B | Complete — maintainer combined terminal acceptance (2026-07-22) | Completion Commit: `b3cc943`. |
 | I151 / I152 | Review, code-level security acceptance | Preserve status pending real-terminal evidence; I154 must reuse their proven controls rather than recreate a parallel path. |
 | I153 | Review | Refresh automated evidence and checklist; it remains Review until maintainer walkthrough evidence exists. |
 | I154 / MODEL-009-E | Planned / Blocked | May activate only after Phase P2 records that its code-level prerequisites and evidence-refresh gate are satisfied. |

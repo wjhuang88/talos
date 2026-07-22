@@ -1,6 +1,6 @@
 # Iteration I150: MODEL-009-B Capability Model, Content Types, And Persistence Foundation
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20 (after I149 ADR-050 Accepted)
 > Prerequisite: I149 ADR Accepted ✅
@@ -28,7 +28,8 @@
 |---|---|---|
 | 2026-07-20 | Planning | Baseline published. ADR-050 Accepted, hard gate cleared. |
 | 2026-07-20 | Implementation | 1. `talos-core/src/message.rs`: `ContentPart` enum (Text + Image with path/mime/byte_count), `Message::Multimodal` variant. 2. `talos-core/src/model.rs`: `ImageInputCapability` enum (Supported/Unsupported/Unknown) with `from_metadata` and `allows_attachment`. 3. `talos-session/src/jsonl.rs`: `message_parts` handles Multimodal (text + image summary). 4. `talos-session/src/durable.rs`: `filtered_message` handles Multimodal (redact text, preserve image path ref). 5. `talos-provider/src/openai_request.rs`: Multimodal → extract text, ignore images. 6. `talos-provider/src/anthropic_request.rs`: Multimodal → extract text, ignore images. 7. `talos-agent/src/compaction/engine.rs`: Multimodal → extract text for compaction. 8. `talos-agent/src/token.rs`: Multimodal → token estimate for text + image metadata. 9. `talos-tui/src/scrollback.rs`: Multimodal → None (no rendering until I151). |
-| 2026-07-22 | Review evidence | Implementation landed in `b3cc943`. I151/I152 subsequently exercised the type through validated ingestion, session forwarding, provider mapping, safe scrollback summary, capability gating, authorization, and digest checks. I150 is Review, not Complete: its user-visible proof is part of the combined I151/I152 terminal walkthrough. |
+| 2026-07-22 | Review evidence | Implementation landed in `b3cc943`. I151/I152 subsequently exercised the type through validated ingestion, session forwarding, provider mapping, safe scrollback summary, capability gating, authorization, and digest checks. |
+| 2026-07-22 | Completion | Maintainer's combined terminal packet verified Supported/Unknown/Unsupported gating, a successful attachment, a safe history summary, and a text-only regression. Completion Commit: `b3cc943`. |
 
 ## Validation
 
@@ -43,7 +44,6 @@
 
 ## Remaining: Combined Terminal Acceptance
 
-I150 has no standalone interactive surface. Its `ContentPart` and capability semantics are
+I150 has no standalone interactive surface. Its `ContentPart` and capability semantics were
 verified through the I151/I152 combined terminal packet: Supported/Unknown/Unsupported gating,
-an accepted attachment, safe history summary, and unchanged text-only submission. Do not mark
-I150 Complete until that packet is recorded with its evidence commit.
+an accepted attachment, safe history summary, and unchanged text-only submission.
