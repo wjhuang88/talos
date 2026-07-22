@@ -30,6 +30,7 @@
 | 2026-07-22 | Terminal acceptance | Maintainer verified the Unsupported/Unknown image-capability gate rejects `/attach` before authorization, filesystem access, or pending-attachment mutation. This accepts the fail-closed gate portion of the terminal packet; I152 remains **Review** pending detach, text-only, and configured-provider checks. |
 | 2026-07-22 | Terminal acceptance | Maintainer verified `/detach 1` removes a pending attachment, `/attachments` then reports an empty list, and the status-bar attachment count clears. I152 remains **Review** pending text-only and configured-provider checks. |
 | 2026-07-22 | Terminal acceptance | Maintainer verified a text-only turn after attachment operations sends and renders normally, with no image summary and no attachment count left in the status bar. I152 remains **Review** pending the maintainer-owned live Anthropic-compatible provider check. |
+| 2026-07-22 | External acceptance gate | Maintainer has no usable Anthropic-compatible Provider or credential in the current environment. The live Anthropic image request is therefore not executed; deterministic Anthropic wire fixtures remain the available automated evidence. I152 remains **Review** until a maintainer can supply that environment. |
 
 ## Validation
 
