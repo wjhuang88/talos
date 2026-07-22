@@ -28,6 +28,7 @@
 | 2026-07-22 | Filename rendering repair | Real image submission succeeded, but the Markdown-rendered system attachment notice swallowed underscores in the basename. The safe history summary was already correct. At maintainer direction, the system-only basename display is wrapped in triple backticks, without escapes or zero-width characters; image path, digest, and provider payload behavior are unchanged. |
 | 2026-07-22 | Terminal acceptance | Maintainer rebuilt and verified that the fenced attachment filename renders as expected. Implementation and regression evidence: commit `65eb108`. I152 remains **Review** because this accepts only the filename-display repair, not the remaining terminal packet. |
 | 2026-07-22 | Terminal acceptance | Maintainer verified the Unsupported/Unknown image-capability gate rejects `/attach` before authorization, filesystem access, or pending-attachment mutation. This accepts the fail-closed gate portion of the terminal packet; I152 remains **Review** pending detach, text-only, and configured-provider checks. |
+| 2026-07-22 | Terminal acceptance | Maintainer verified `/detach 1` removes a pending attachment, `/attachments` then reports an empty list, and the status-bar attachment count clears. I152 remains **Review** pending text-only and configured-provider checks. |
 
 ## Validation
 
