@@ -50,7 +50,8 @@ pub(crate) enum PanelItemAction {
     },
     /// Direct switch (used by Recent items, variant-less models, and variant
     /// selections). `variant` carries the recorded/selected variant, if any.
-    /// `model_id` is already provider-qualified when needed — do not re-prefix.
+    /// `provider` and `model_id` are a structured identity; `model_id` remains
+    /// the opaque provider-side identifier.
     SwitchModel {
         provider: String,
         model_id: String,

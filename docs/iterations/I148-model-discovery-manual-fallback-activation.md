@@ -2,7 +2,7 @@
 
 > Document status: Review
 > Published plan date: 2026-07-20
-> Last updated: 2026-07-22 (P1-fix4)
+> Last updated: 2026-07-22 (duplicate model-ID picker repair)
 > Planned objective: let a custom provider call its protocol-specific models
 > endpoint to discover available model IDs, with a safe manual fallback, and
 > immediately activate the selected `(provider, model)` in the current session.
@@ -86,3 +86,4 @@
 | 2026-07-22 | P1-fix2 (NO-GO) | Owner returned NO-GO again: (1) still no real bridge→lifecycle integration test; (2) semver migration note missing for `ModelSwitchRequest.provider_hint`. Fixes: 2 bridge integration tests (`bridge_switch_model_forwards_provider_hint`, `bridge_switch_model_empty_provider_yields_none_hint`) proving `UserInput::SwitchModel → SessionLifecycleRequest::ModelSwitch` carries provider_hint. ADR-049 amended with migration note. Status remains **Partial** pending real-terminal walkthrough. |
 | 2026-07-22 | P1-fix3 (NO-GO) | Owner returned NO-GO: (1) tests still didn't go through `handle_session_model`; (2) semver note in wrong ADR. Fixes: 2 real handler integration tests (`p1fix3_handle_session_model_success_rebuilds_once`, `p1fix3_handle_session_model_failure_no_rebuild`) proving bridge_rx_update exactly once on success, zero on failure, old config/session unchanged. Semver note moved to ADR-048. Status remains **Partial**. |
 | 2026-07-22 | P1-fix4 (Review) | Owner returned GO for code, two doc/cleanup items: (1) 4 `unsafe { set_var }` blocks introduced by P1-fix3 tests — replaced with `with_isolated_home` helper (no new unsafe). (2) Document status header was still `Planned` — synced to **Review**. Status: **Partial → Review**. Remaining human gate: maintainer real-terminal walkthrough. |
+| 2026-07-22 | Terminal-found repair | Maintainer selected the catalogued duplicate `zai-coding-plan/glm-5v-turbo`; the picker had encoded its `model_id` as `zai-coding-plan/glm-5v-turbo` and the structured lifecycle then added `provider_hint` again, producing a double prefix and a false unknown-model error. Picker and Recent entries now retain the opaque provider-side model ID while carrying Provider only in the separate structured field. A regression selects an actual duplicate picker entry and resolves it through the same `provider/model_id` lifecycle representation. Status remains **Review**; this repair itself requires the maintainer to retest the reported selection. |

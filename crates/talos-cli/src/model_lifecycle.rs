@@ -25,20 +25,11 @@ use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 
 /// Constructs [`ModelPickerData`] from the given [`Config`].
 ///
-/// Iterates the model catalog, detects duplicate model IDs across providers,
-/// checks provider authentication, and formats display strings. Models from
+/// Iterates the model catalog, checks provider authentication, and formats display strings. Models from
 /// authenticated providers appear in `ready_models`; unauthenticated providers
 /// are intentionally omitted from `/model` and handled by `/connect`.
 pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
     let catalog = config.all_models();
-
-    // Detect model IDs that appear under multiple providers (e.g., glm-5.2
-    // under zhipu, zai, zai-coding-plan). These need provider-qualified values
-    // in the picker so the correct provider is selected.
-    let mut id_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-    for m in &catalog {
-        *id_counts.entry(m.id.as_str()).or_default() += 1;
-    }
 
     let mut ready_models: Vec<ModelPickerItem> = Vec::new();
     for m in &catalog {
@@ -57,17 +48,13 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
             .map(|c| format!("{}K", c / 1000))
             .unwrap_or_else(|| "?".to_string());
 
-        // Provider-qualify the model ID for the picker value when duplicates exist.
-        let picker_value = if id_counts.get(m.id.as_str()).copied().unwrap_or(0) > 1 {
-            format!("{}/{}", m.provider, m.id)
-        } else {
-            m.id.clone()
-        };
-
         if provider_authed {
             ready_models.push(ModelPickerItem {
                 command: "/model".to_string(),
-                model_id: picker_value,
+                // Provider identity travels in the separate `provider` field.
+                // Keeping this provider-side ID opaque avoids double-prefixing
+                // duplicate model IDs in the structured switch lifecycle.
+                model_id: m.id.clone(),
                 provider: m.provider.clone(),
                 label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
                 context_limit: m.context_limit,
@@ -122,15 +109,9 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                 .map(|c| format!("{}K", c / 1000))
                 .unwrap_or_else(|| "?".to_string());
 
-            let picker_value = if id_counts.get(m.id.as_str()).copied().unwrap_or(0) > 1 {
-                format!("{}/{}", m.provider, m.id)
-            } else {
-                m.id.clone()
-            };
-
             recent_items.push(ModelPickerItem {
                 command: "/model".to_string(),
-                model_id: picker_value,
+                model_id: m.id.clone(),
                 provider: m.provider.clone(),
                 label: format!("{}   {}   {}", m.id, m.provider, ctx_str),
                 context_limit: m.context_limit,
@@ -648,7 +629,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_model_ids_get_provider_qualified_values() {
+    fn duplicate_model_ids_keep_provider_side_ids_for_structured_switching() {
         let mut config = Config::default();
         config.model = "glm-5.2".to_string();
         config.provider = "zai".to_string();
@@ -675,15 +656,24 @@ mod tests {
             .filter(|m| m.model_id.contains("glm-5.2"))
             .collect();
 
-        if glm_entries.len() > 1 {
-            for entry in &glm_entries {
-                assert!(
-                    entry.model_id.contains('/'),
-                    "Duplicate model 'glm-5.2' should have provider-qualified value, got: {}",
-                    entry.model_id
-                );
-            }
-        }
+        assert!(
+            glm_entries.len() > 1,
+            "fixture must contain duplicate glm-5.2 IDs"
+        );
+        assert!(glm_entries.iter().all(|entry| entry.model_id == "glm-5.2"));
+        assert!(glm_entries.iter().any(|entry| entry.provider == "zai"));
+        assert!(glm_entries.iter().any(|entry| entry.provider == "zhipuai"));
+
+        let selected = glm_entries
+            .iter()
+            .find(|entry| entry.provider == "zai")
+            .expect("zai duplicate must be selectable");
+        let mut selected_config = config.clone();
+        selected_config
+            .set_active_model(&format!("{}/{}", selected.provider, selected.model_id))
+            .expect("structured provider + raw model ID must resolve a duplicate");
+        assert_eq!(selected_config.provider, "zai");
+        assert_eq!(selected_config.model, "glm-5.2");
     }
 
     #[test]
@@ -745,8 +735,8 @@ mod tests {
             current_models.len()
         );
         assert_eq!(
-            current_models[0].model_id, "anthropic/claude-sonnet-4-5",
-            "Current model should be provider-qualified because the ID is duplicated"
+            current_models[0].model_id, "claude-sonnet-4-5",
+            "Structured picker model IDs must remain provider-side IDs"
         );
         assert_eq!(
             current_models[0].provider, "anthropic",
@@ -754,7 +744,7 @@ mod tests {
         );
 
         for m in &data.ready_models {
-            if m.model_id != "anthropic/claude-sonnet-4-5" || m.provider != "anthropic" {
+            if m.model_id != "claude-sonnet-4-5" || m.provider != "anthropic" {
                 assert!(
                     !m.is_current,
                     "Model {} ({}) should not be current",
@@ -779,7 +769,7 @@ mod tests {
         let o3 = data
             .ready_models
             .iter()
-            .find(|model| model.provider == "openai" && model.model_id.ends_with("/o3"))
+            .find(|model| model.provider == "openai" && model.model_id == "o3")
             .expect("openai/o3 is in the picker");
         assert_eq!(o3.variants.len(), 2);
         assert_eq!(o3.variants[0].variant_id, "high-reasoning");
@@ -788,7 +778,7 @@ mod tests {
         let gpt_4o = data
             .ready_models
             .iter()
-            .find(|model| model.provider == "openai" && model.model_id.ends_with("/gpt-4o"))
+            .find(|model| model.provider == "openai" && model.model_id == "gpt-4o")
             .expect("openai/gpt-4o is in the picker");
         assert!(gpt_4o.variants.is_empty());
     }
