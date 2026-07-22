@@ -219,7 +219,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                                 let summary = match &content_part {
                                                     talos_core::message::ContentPart::Image { path, mime, byte_count, .. } =>
                                                         format!("{} ({} bytes, {})",
-                                                            path.file_name().unwrap_or_default().to_string_lossy(),
+                                                            escape_markdown_filename(&path.file_name().unwrap_or_default().to_string_lossy()),
                                                             byte_count, mime),
                                                     _ => String::new(),
                                                 };
@@ -331,6 +331,20 @@ async fn submit_session_message(
         None => talos_core::session::SessionOp::Submit { message },
     };
     sq_tx.send(op).await.map_err(|_| ())
+}
+
+/// Escapes a basename for display in a Markdown-rendered system message.
+///
+/// The filename remains only a UI summary, but it must not be interpreted as
+/// formatting (for example, underscores must remain visible).
+fn escape_markdown_filename(filename: &str) -> String {
+    filename
+        .replace('\\', "\\\\")
+        .replace('_', "\\_")
+        .replace('*', "\\*")
+        .replace('`', "\\`")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
 }
 
 /// P1-A: evaluates an image attachment path against the SEC-001
@@ -519,6 +533,14 @@ mod attachment_authorization_tests {
         image::RgbaImage::new(width, 1)
             .save_with_format(path, image::ImageFormat::Png)
             .unwrap();
+    }
+
+    #[test]
+    fn attachment_filename_escapes_markdown_without_changing_visible_text() {
+        assert_eq!(
+            escape_markdown_filename("ScreenShot_2026-07-22_140448_800.png"),
+            "ScreenShot\\_2026-07-22\\_140448\\_800.png"
+        );
     }
 
     /// P1-A regression: after approval resolves a symlink to its canonical
