@@ -5,11 +5,13 @@
 | Story ID | TUI-033 |
 | Type | Product / Interaction Story |
 | Priority | P2 |
-| Status | Ready — selected into I146 (2026-07-20) |
+| Status | Complete — I146 maintainer terminal acceptance (2026-07-22) |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | MODEL-007 picker; MODEL-008 custom-provider flow; TUI-010 slash panel |
 | Blocks | — |
 | Selected Into | [I146](../../iterations/I146-tui-parameterless-model-connect-commands.md) |
+
+> Completion Commit: `0ef2f68` — parameterized-command correction and menu-routing repair used in the accepted terminal flow.
 
 ## Problem
 
@@ -118,3 +120,10 @@ structured panel item rather than encoding identities in command text.
   and custom provider selection.
 - README EN/zh-CN and public-site documentation checks, then locked fmt/check/clippy/test and
   governance validation.
+
+## Change Control (2026-07-22)
+
+The original phrase “slash-panel completion ... execute/open” was clarified as an in-scope
+interaction correction. Tab completes the selected bare command without a trailing space and does
+not execute it; Enter executes the direct command and opens its menu. This preserves the stated
+no-argument, menu-first objective while retaining conventional completion semantics.

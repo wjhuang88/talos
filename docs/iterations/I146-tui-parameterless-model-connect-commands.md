@@ -1,9 +1,10 @@
 # Iteration I146: TUI-033 Parameterless Model And Provider Commands
 
-> Document status: Review
+> Document status: Complete (maintainer terminal acceptance 2026-07-22)
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20 (after P0 governance commit `6cd1c54` + checkpoint `abc89b4` pushed to origin/main)
 > Status changed to Review: 2026-07-20 (implementation + locked validation complete; real-terminal walkthrough pending maintainer acceptance)
+> Completion Commit: `0ef2f68` — parameterized-command correction and menu-routing repair used in the accepted terminal flow.
 > Planned objective: make TUI `/model` and `/connect` strict no-argument menu commands so all
 > provider/model selection and search happens inside their existing panels, not through
 > parameterized command text.
@@ -151,6 +152,7 @@
 | 2026-07-20 | Implementation | 1. Command registry: `/model` and `/connect` `arg_hint` changed from `Some(...)` to `None` (DirectExecution); usage/description updated. 2. TUI bridge: intercepts non-empty `ModelSwitchRequest` and `ConnectProviderRequest` — emits a bounded correction `Content::Block` and forwards an empty-arg `ModelSwitchRequest`/`ConnectProviderRequest` to the lifecycle handler, which opens the picker. 3. Structured identity: `UserInput::SwitchModel { provider, model_id, variant }` and `UserInput::ConnectSelect { provider }` added to `talos-conversation::types`; `PanelItemAction::ConnectSelect` added to `talos-tui::panel_state`; `PanelAction::SwitchModel` and `PanelAction::ConnectSelect` added; `SwitchModel` panel selection no longer reserializes to `/model {value}` command text; connect picker no longer reserializes to `/connect {provider}` command text. 4. TUI bridge handles `UserInput::SwitchModel` and `UserInput::ConnectSelect` by forwarding structured data directly to `SessionLifecycleRequest::ModelSwitch` / `SessionLifecycleRequest::ConnectRequest`, bypassing the engine's command parser. 5. Tests: command registry DirectExecution assertions, slash-panel Enter/Tab completion for `/model` and `/connect`, model picker Level 2 `SwitchModel` structured action, connect picker `ConnectSelect` structured action, no-`Select`-with-`/connect` assertion, engine `/connect` dispatch tests (bare + with-arg), and command-registry `arg_hint: None` test. |
 | 2026-07-20 | Validation | All locked validation passes (see Actual Validation Results below). Real-terminal walkthrough remains pending maintainer acceptance — **not Complete**. |
 | 2026-07-22 | Acceptance repair | Real-terminal feedback found that entering `/model <text>` or `/connect <text>` while the slash menu was open left the text in menu filtering, so it could become an unregistered message instead of reaching the bridge correction. The TUI now closes only that direct-command menu on its first argument separator while preserving the full composer text. Regressions cover typed `/model gpt-4o` and pasted `/connect openai`. |
+| 2026-07-22 | Change control and maintainer terminal acceptance | **In-scope correction:** the published phrase “slash-panel completion ... execute/open” was ambiguous about Tab. The maintainer confirmed the implemented, tested contract is preferable: **Tab completes `/model` or `/connect` into the composer without a trailing space and does not execute; Enter executes the direct command and opens the menu.** This changes no objective, API, crate boundary, or test target. The maintainer then passed all remaining real-terminal checks: bare and parameterized commands, side-effect-free correction, menu search/cancel, structured selection, and exact model IDs. I146 is Complete. |
 
 ## Actual Validation Results (2026-07-20)
 
@@ -163,17 +165,8 @@
 | `scripts/validate_project_governance.sh .` | ✅ 0 warnings |
 | `git diff --check` | ✅ clean |
 
-## Remaining: Real Terminal Acceptance
+## Maintainer Terminal Acceptance (2026-07-22)
 
-The following acceptance items require real terminal verification and are deferred for manual acceptance:
-
-- `/model` bare opens the model picker with empty search.
-- `/connect` bare opens the provider picker with empty search.
-- `/model gpt-4o` shows a correction and opens the model picker.
-- `/connect openai` shows a correction and opens the provider picker.
-- Slash-panel Enter on `/model` and `/connect` opens the picker directly (no trailing space).
-- Tab completion on `/model` and `/connect` inserts the bare command without trailing space.
-- Model picker selection switches the model through structured identity (not command text).
-- Connect picker selection enters credential flow through structured identity (not command text).
-- Escape cancels the picker at any level without side effects.
-- Model ID containing `/` or `@` is preserved exactly through structured identity.
+The maintainer completed the real-terminal walkthrough. Enter opens either direct-command menu;
+Tab only completes the bare command without adding a trailing space or executing it. All remaining
+menu, correction, cancellation, and structured-identity checks passed.

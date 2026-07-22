@@ -33,7 +33,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | Owner | Current state | Disposition in this task |
 |---|---|---|
 | I145 / TUI-026 | Review | Do not change to Complete without maintainer terminal evidence. Include its walkthrough in the final packet only. |
-| I146 / TUI-033 | Review | Do not change to Complete without maintainer terminal evidence. No feature changes unless a regression is found while executing another phase. |
+| I146 / TUI-033 | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `0ef2f68`. Tab completes a bare command without execution; Enter opens its direct-command menu. All other guided checks passed. |
 | I147 / MODEL-008-A | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1c843b2`. Wizard rendering, cursor targeting, and visible protocol choices were retested and accepted. |
 | I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
 | I150 / MODEL-009-B | Review | Preserve status; run regressions when affected by I154. |
@@ -182,7 +182,7 @@ not permission to change unrelated scopes.
   - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
   - `git diff --check` → exit 0.
 - Acceptance evidence / remaining human gate: P1 is fully mock-testable and may be dispatched;
-  I145/I146/I150-I153 still require the maintainer walkthrough listed below before any
+  I145/I150-I153 still require the maintainer walkthrough listed below before any
   Complete status.
 - Open risks or deviations: no GitHub issue is mapped to TUI-034. I154 and I155 remain unstarted.
 - Next task item: P1 — I148 discovery → selection → immediate activation closeout.
@@ -264,7 +264,7 @@ cite this packet only after an already-existing evidence or repair commit is nam
 | Case | Expected observable result | Owner(s) |
 |---|---|---|
 | Steering queue | During a tool-running turn, enqueue at least seven messages. FIFO preview appears, `+N more` is accurate, and it disappears after drain. | I145 |
-| Parameterless menus | Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab/Enter leave no trailing argument space; Escape cancels. | I146 |
+| Parameterless menus | **Complete.** Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab completes without execution or trailing space; Enter opens the menu; Escape cancels. Completion Commit: `0ef2f68`. | I146 |
 | Wizard | `/connect` → Add custom provider runs Name → Protocol → Base URL → API key → Confirm; key remains masked, Esc causes no save, and duplicate name shows the explicit update path. | I147 |
 | Discovery and activation | A mock/disposable provider discovers IDs. Select an ID containing `/` or `@`; the provider/model status changes and the current session rebuilds once. Discovery failure retains the old active session and permits manual configuration. | I148 |
 | Capability and attachment | Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/cancel work; history shows only a safe summary; a text-only turn still works. | I150, I151, I152 |
@@ -279,8 +279,9 @@ The final report must ask the maintainer to execute and record:
 
 1. I145: enqueue several steering messages during a turn; verify FIFO preview, `+N more`, and
    disappearance after drain.
-2. I146: bare and parameterized `/model`/`/connect`, search/cancel, and structured-identity
-   behavior. I147 is Complete after maintainer acceptance (Completion Commit: `1c843b2`).
+2. I146 is Complete after maintainer acceptance (Completion Commit: `0ef2f68`); Tab is
+   intentionally non-executing while Enter opens the menu. I147 is Complete after maintainer
+   acceptance (Completion Commit: `1c843b2`).
 3. I148: use a disposable/mock provider endpoint; discover, choose a model, verify immediate
    status/session transition, then verify a discovery failure retains the old session and offers
    manual entry.

@@ -611,6 +611,16 @@ On a hard stop:
 - I146 remains Review: its remaining menu-specific acceptance cases are independent and have not
   been promoted to Complete by the I147 result.
 
+### I146 Maintainer Terminal Acceptance And Interaction Clarification — 2026-07-22
+
+- I146 is Complete after maintainer terminal acceptance. The terminal walkthrough passed for the
+  bare and parameterized forms, correction behavior, cancellation, search, and structured identity.
+- Completion Commit: `0ef2f68` (origin/main). Tab's observed behavior is intentional and matches
+  its regression tests: it completes a bare command without executing it or adding a trailing
+  space; Enter executes the direct command and opens its menu.
+- This is an in-scope clarification of the published completion wording, not a feature or API
+  change; the I146 objective and implementation scope are unchanged.
+
 ## Related Documents
 
 - `docs/sop/LONG-RUNNING-TASK.md` — governing SOP.
