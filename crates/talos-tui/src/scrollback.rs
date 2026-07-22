@@ -35,6 +35,42 @@ pub(crate) use crate::scrollback_status::build_status_text;
 #[cfg(test)]
 pub(crate) use crate::scrollback_status::truncate_str;
 
+/// Returns the cursor row and column within a custom-provider wizard panel.
+///
+/// Entry steps place the cursor after the editable value; protocol places it
+/// on the selected option; confirmation has no editable field and anchors it
+/// at the panel header rather than leaving it in the composer.
+pub(crate) fn provider_wizard_cursor_position(
+    menu: &crate::state::BottomPanelState,
+) -> Option<(u16, u16)> {
+    let crate::state::PanelKind::ProviderWizard {
+        step,
+        name,
+        protocol,
+        base_url,
+        api_key,
+        ..
+    } = menu.kind.as_ref()?
+    else {
+        return None;
+    };
+
+    Some(match step {
+        crate::state::WizardStep::Name => (2, credential_cursor_col(name)),
+        crate::state::WizardStep::Protocol => {
+            let row = if protocol == "anthropic-messages" {
+                3
+            } else {
+                2
+            };
+            (row, 1)
+        }
+        crate::state::WizardStep::BaseUrl => (2, credential_cursor_col(base_url)),
+        crate::state::WizardStep::ApiKey => (2, credential_cursor_col(api_key)),
+        crate::state::WizardStep::Confirm => (0, 0),
+    })
+}
+
 pub(crate) struct PreviewComponent<'a> {
     pub(crate) padding: &'a str,
     pub(crate) text: &'a str,
@@ -547,7 +583,15 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                     ..
                 })
             );
-            return (if confirm { 6 } else { 3 }).min(self.max_height);
+            let natural_height = match self.menu.kind {
+                Some(crate::state::PanelKind::ProviderWizard {
+                    step: crate::state::WizardStep::Protocol,
+                    ..
+                }) => 4,
+                _ if confirm => 6,
+                _ => 3,
+            };
+            return natural_height.min(self.max_height);
         }
         let filtered = self.menu.filtered_items(self.query).len();
         let extra_header = if self.menu.is_variant_picker() || self.menu.is_model_list() {
@@ -710,7 +754,7 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                     2,
                     "Protocol",
                     " Up/Down selects a protocol; Enter continues.",
-                    protocol.clone(),
+                    String::new(),
                 ),
                 crate::state::WizardStep::BaseUrl => (
                     3,
@@ -747,6 +791,27 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                     Line::from(Span::styled(format!(" Base URL: {base_url}"), primary)),
                     Line::from(Span::styled(
                         format!(" API key: {}", credential_display_text(api_key)),
+                        primary,
+                    )),
+                ]);
+            } else if *step == crate::state::WizardStep::Protocol {
+                let openai_marker = if protocol == "openai-chat" {
+                    "▸"
+                } else {
+                    " "
+                };
+                let anthropic_marker = if protocol == "anthropic-messages" {
+                    "▸"
+                } else {
+                    " "
+                };
+                lines.extend([
+                    Line::from(Span::styled(
+                        format!(" {openai_marker} openai-chat"),
+                        primary,
+                    )),
+                    Line::from(Span::styled(
+                        format!(" {anthropic_marker} anthropic-messages"),
                         primary,
                     )),
                 ]);

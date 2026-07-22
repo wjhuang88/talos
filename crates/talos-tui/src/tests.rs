@@ -1124,6 +1124,44 @@ mod tests {
     }
 
     #[test]
+    fn provider_wizard_protocol_step_shows_both_choices_and_cursor_target() {
+        use ratatui::{buffer::Buffer, layout::Rect};
+
+        let mut state = TuiState::new();
+        state.slash_menu = BottomPanelState::open_provider_wizard();
+        state.wizard_append_char('g');
+        state.wizard_advance();
+        let component = BottomPanelComponent {
+            menu: &state.slash_menu,
+            query: "",
+            max_height: u16::MAX,
+        };
+        assert_eq!(component.height_hint(80), 4);
+        assert_eq!(
+            crate::scrollback::provider_wizard_cursor_position(&state.slash_menu),
+            Some((2, 1))
+        );
+
+        let area = Rect::new(0, 0, 80, 4);
+        let mut buffer = Buffer::empty(area);
+        let mut frame = InlineFrame::new(area, &mut buffer);
+        component.render(&mut frame, area);
+        let rendered: String = buffer
+            .content()
+            .iter()
+            .flat_map(|cell| cell.symbol().chars())
+            .collect();
+        assert!(rendered.contains("openai-chat"), "{rendered:?}");
+        assert!(rendered.contains("anthropic-messages"), "{rendered:?}");
+
+        state.wizard_cycle_protocol();
+        assert_eq!(
+            crate::scrollback::provider_wizard_cursor_position(&state.slash_menu),
+            Some((3, 1))
+        );
+    }
+
+    #[test]
     fn test_slash_menu_capped_rows_reserve_overflow_indicator() {
         assert_eq!(bottom_panel_rows(5, 3, 0), (1, true, true));
         assert_eq!(bottom_panel_rows(5, 6, 0), (5, true, false));

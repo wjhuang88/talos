@@ -990,6 +990,29 @@ impl Tui {
                 };
                 let cursor_col = crate::scrollback::credential_cursor_col(active_buffer);
                 self.terminal.set_cursor(cursor_col, input_row)?;
+            } else if self.state.slash_menu.is_provider_wizard() {
+                let panel_y_offset = match menu_placement {
+                    crate::scrollback::BottomPanelPlacement::AboveInput => {
+                        preview.height_hint(screen_w)
+                            + queue.height_hint(screen_w)
+                            + tips.height_hint(screen_w)
+                    }
+                    crate::scrollback::BottomPanelPlacement::BelowInput => {
+                        preview.height_hint(screen_w)
+                            + queue.height_hint(screen_w)
+                            + tips.height_hint(screen_w)
+                            + input_pad_top.height_hint(screen_w)
+                            + input.height_hint(screen_w)
+                    }
+                };
+                if let Some((row_offset, cursor_col)) =
+                    crate::scrollback::provider_wizard_cursor_position(&self.state.slash_menu)
+                {
+                    let cursor_row = stack_top
+                        .saturating_add(panel_y_offset)
+                        .saturating_add(row_offset);
+                    self.terminal.set_cursor(cursor_col, cursor_row)?;
+                }
             } else {
                 let mut input_y_offset: u16 = preview.height_hint(screen_w)
                     + queue.height_hint(screen_w)
