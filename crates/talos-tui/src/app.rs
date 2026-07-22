@@ -1293,13 +1293,16 @@ pub(crate) fn preview_text_for_state(
         return crate::scrollback::animated_hold_preview_text(status, processing_frame);
     }
 
-    if matches!(phase, Some(TurnPhase::TimedOut)) {
+    // Terminal phases remain visible in the status bar, but the preview is reserved for an active
+    // turn. Otherwise a cancelled/failed/timed-out label persists above the composer until the
+    // next turn replaces the engine phase.
+    if is_processing && matches!(phase, Some(TurnPhase::TimedOut)) {
         return "⏱ timed out".to_string();
     }
-    if matches!(phase, Some(TurnPhase::Failed)) {
+    if is_processing && matches!(phase, Some(TurnPhase::Failed)) {
         return "✗ failed".to_string();
     }
-    if matches!(phase, Some(TurnPhase::Cancelled)) {
+    if is_processing && matches!(phase, Some(TurnPhase::Cancelled)) {
         return "cancelled".to_string();
     }
     if let Some(TurnPhase::Retrying { attempt }) = phase {

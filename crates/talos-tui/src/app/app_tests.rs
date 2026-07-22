@@ -994,15 +994,15 @@ fn head_tail_truncation_does_not_affect_export_content() {
 #[test]
 fn preview_text_uses_phase_priority_states() {
     assert_eq!(
-        preview_text_for_state(None, Some(&TurnPhase::TimedOut), None, false, "stream", 0),
+        preview_text_for_state(None, Some(&TurnPhase::TimedOut), None, true, "stream", 0),
         "⏱ timed out"
     );
     assert_eq!(
-        preview_text_for_state(None, Some(&TurnPhase::Failed), None, false, "stream", 0),
+        preview_text_for_state(None, Some(&TurnPhase::Failed), None, true, "stream", 0),
         "✗ failed"
     );
     assert_eq!(
-        preview_text_for_state(None, Some(&TurnPhase::Cancelled), None, false, "stream", 0),
+        preview_text_for_state(None, Some(&TurnPhase::Cancelled), None, true, "stream", 0),
         "cancelled"
     );
     assert_eq!(
@@ -1033,6 +1033,16 @@ fn preview_text_uses_phase_priority_states() {
         ),
         "running tool: bash..."
     );
+}
+
+#[test]
+fn preview_text_clears_terminal_phase_after_turn_ends() {
+    for phase in [TurnPhase::TimedOut, TurnPhase::Failed, TurnPhase::Cancelled] {
+        assert!(
+            preview_text_for_state(None, Some(&phase), None, false, "", 0).is_empty(),
+            "terminal phase {phase:?} must not persist in the inactive preview"
+        );
+    }
 }
 
 #[test]

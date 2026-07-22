@@ -732,3 +732,16 @@ repeating known mistakes.
 - Fix: Two Oracle passes — first identified blockers, second verified fixes. Both passes were read-only and inexpensive relative to the cost of shipping the bugs.
 - Prevention: Budget an Oracle pass (or equivalent senior review) for any iteration that touches multiple crates, public APIs, persistence formats, or security boundaries. The first pass finds issues; the second verifies the fixes are complete and don't introduce regressions.
 - Promoted to rule/check: I141 closeout evidence now records Oracle first-pass findings + second-pass verification as part of the standard validation ladder for multi-crate iterations.
+
+## 2026-07-22 - Inline viewport growth must clear before buffer-diff repaint
+
+- Trigger: I145 real-terminal steering-queue acceptance in Alacritty.
+- Symptom: Queue count and FIFO logic were correct, but stale “Message queued…” Tip text remained
+  behind short queue entries when the preview grew from one row to six.
+- Root cause: Changing the inline viewport resets both backing buffers. The renderer forced a clear
+  only when the viewport shrank, so growth/reposition had no previous-buffer cells with which to
+  erase physical terminal text in newly claimed rows.
+- Fix: Any viewport-area change now requests a full clear before rendering the new buffer.
+- Prevention: Test both shrinking and growing transient viewport components; a buffer-only widget
+  test cannot prove terminal repaint correctness after a viewport-area change.
+- Promoted to rule/check: `inline_terminal::tests::viewport_growth_requires_full_clear_to_prevent_stale_rows`.

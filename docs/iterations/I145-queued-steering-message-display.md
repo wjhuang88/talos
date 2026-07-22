@@ -95,6 +95,7 @@
 | 2026-07-20 | Rework 2 | Session boundary cleanup: `/new`, `/resume`, `/fork` success paths emit empty `SteeringQueueSnapshot`. Truncation marker `⚠` width reserved in text budget. Buffer+InlineFrame render tests added (8-entry header/4-entry/+4 summary, truncated+narrow, CJK, multiline, empty, narrow-height compress). |
 | 2026-07-20 | Rework 3 | Added lifecycle and render coverage for queue projection, and updated README/README.zh-CN with user-facing queued-steering documentation. The initial layout coverage duplicated application arithmetic; Rework 4 replaced it with tests of the production allocator. Status changed to Review. |
 | 2026-07-20 | Rework 4 | Corrected narrow-height layout through the production `compress_layout()` helper: `draw_frame` first reserves fixed rows, then allocates the remaining budget in modal → composer (minimum one row when possible) → queue order. The bottom panel is counted once for placement. Composer text rendering and cursor scrolling use the same allocated height. `/new`, `/resume`, and `/fork` now share a tested ordered boundary helper that emits queue-clear before `SessionIdentity`. |
+| 2026-07-22 | Rework 5 — terminal-growth repaint and terminal-preview cleanup | Maintainer terminal acceptance proved queue ownership, count, and FIFO logic correct but exposed stale Tip text overlaid behind newly added queue rows. `InlineTerminal::draw` had cleared only shrinking viewports even though any viewport resize/reposition resets both diff buffers. It now forces a full clear for every viewport-area change before repainting. Separately, `TurnPhase::Cancelled` intentionally persists in the status snapshot, but the preview had rendered terminal phases even when inactive; it now clears after cancellation while the status bar retains the result. Growth and terminal-phase regressions protect both invariants. I145 remains Review pending a clean real-terminal rerun of the queue preview and drain. |
 
 ## Actual Validation Results (2026-07-20)
 
@@ -104,6 +105,16 @@
 | `cargo clippy --workspace --locked -- -D warnings` | ✅ clean |
 | `cargo test --workspace --locked` | ✅ workspace unit, integration, and doctests pass (including dashboard loopback tests) |
 | `scripts/validate_project_governance.sh .` | ✅ 0 warnings |
+| `git diff --check` | ✅ clean |
+
+### Rework 5 Validation (2026-07-22)
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | ✅ clean |
+| `cargo check --workspace --locked` | ✅ exit 0 |
+| `cargo clippy --workspace --locked -- -D warnings` | ✅ clean |
+| `cargo test -p talos-tui --locked` | ✅ 388 tests + 2 doctests pass |
 | `git diff --check` | ✅ clean |
 
 ## Remaining: Real Terminal Acceptance

@@ -54,6 +54,15 @@ pub trait ViewportComponent {
     fn render(&self, frame: &mut InlineFrame, area: Rect);
 }
 
+/// A resized or repositioned inline viewport must be cleared before diff rendering.
+///
+/// Changing the viewport resets both backing buffers to the new area. Without a full clear, the
+/// diff has no record of text that was physically present in newly claimed terminal rows, so stale
+/// content can remain behind a growing transient component (such as the steering queue preview).
+fn viewport_change_requires_clear(previous: Rect, next: Rect) -> bool {
+    previous != next
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct HistoryAttrs {
     pub(crate) bold: bool,
@@ -253,13 +262,10 @@ impl InlineTerminal {
             area.y = screen_size.height.saturating_sub(area.height);
         }
 
-        let area_changed = area != self.viewport_area;
-        let shrinking = area.height < self.viewport_area.height;
+        let area_changed = viewport_change_requires_clear(self.viewport_area, area);
         if area_changed {
             self.set_viewport_area(area);
-            if shrinking {
-                self.needs_clear = true;
-            }
+            self.needs_clear = true;
         }
 
         let force_clear = self.needs_clear;
@@ -532,5 +538,14 @@ mod tests {
         assert!(!keyboard_enhancement_supported(Err(io::Error::other(
             "probe failed"
         ))));
+    }
+
+    #[test]
+    fn viewport_growth_requires_full_clear_to_prevent_stale_rows() {
+        let previous = Rect::new(0, 18, 80, 6);
+        let expanded = Rect::new(0, 13, 80, 11);
+
+        assert!(viewport_change_requires_clear(previous, expanded));
+        assert!(!viewport_change_requires_clear(expanded, expanded));
     }
 }
