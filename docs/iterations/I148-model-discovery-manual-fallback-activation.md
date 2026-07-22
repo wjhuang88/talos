@@ -1,7 +1,8 @@
 # Iteration I148: MODEL-008-B Model Discovery, Manual Fallback, And Immediate Activation
 
-> Document status: Planned
+> Document status: Review
 > Published plan date: 2026-07-20
+> Last updated: 2026-07-22 (P1-fix4)
 > Planned objective: let a custom provider call its protocol-specific models
 > endpoint to discover available model IDs, with a safe manual fallback, and
 > immediately activate the selected `(provider, model)` in the current session.
@@ -9,6 +10,11 @@
 > MVP deliverable: after `/connect` wizard saves a custom provider, the user can
 > discover models from the provider's models endpoint or enter one manually, and
 > the selected model is immediately active in the current session.
+> Review evidence: commits 23db287 (P1 tests), 187f13d (P1-fix provider_hint),
+> 4d5f8d7 (P1-fix2 bridge integration), 834400b (P1-fix3 handler integration +
+> ADR-048 semver), and this fix (P1-fix4 unsafe removal + doc status sync).
+> Remaining human gate: maintainer real-terminal walkthrough of discovery →
+> selection → activation → status sync.
 
 ## Published Baseline
 
@@ -78,3 +84,5 @@
 | 2026-07-22 | P1 closeout | 7 new P1 tests prove the discovery → picker visibility → structured identity → activation closed loop. Tests cover: (1) OpenAI-compatible discovery models appear in `config.all_models()`; (2) Anthropic-compatible discovery same; (3) credential redaction — no API key in UI output; (4) structured identity — model IDs with `/` and `@` preserved exactly; (5) duplicate provider update preserves manually-added models; (6) manual fallback — after discovery failure, manually adding a model makes it visible; (7) selection → activation — setting active model to discovered ID produces correct identity. The code path was already implemented in the R9 rework; this commit adds test-only coverage. Status: **Partial → Review** (mock-proven closed loop; real-terminal walkthrough remains the human gate). |
 | 2026-07-22 | P1-fix (NO-GO) | Owner returned NO-GO: (1) bridge dropped provider identity from `UserInput::SwitchModel`; (2) tests called `set_active_model` directly instead of going through the real lifecycle; (3) discovery failure semantics contradictory. Fixes: `provider_hint: Option<String>` added to `ModelSwitchRequest`, bridge forwards provider, `handle_session_model` uses `provider/model_id` to disambiguate. 3 P1-fix tests added. I148 reverted to **Partial**. |
 | 2026-07-22 | P1-fix2 (NO-GO) | Owner returned NO-GO again: (1) still no real bridge→lifecycle integration test; (2) semver migration note missing for `ModelSwitchRequest.provider_hint`. Fixes: 2 bridge integration tests (`bridge_switch_model_forwards_provider_hint`, `bridge_switch_model_empty_provider_yields_none_hint`) proving `UserInput::SwitchModel → SessionLifecycleRequest::ModelSwitch` carries provider_hint. ADR-049 amended with migration note. Status remains **Partial** pending real-terminal walkthrough. |
+| 2026-07-22 | P1-fix3 (NO-GO) | Owner returned NO-GO: (1) tests still didn't go through `handle_session_model`; (2) semver note in wrong ADR. Fixes: 2 real handler integration tests (`p1fix3_handle_session_model_success_rebuilds_once`, `p1fix3_handle_session_model_failure_no_rebuild`) proving bridge_rx_update exactly once on success, zero on failure, old config/session unchanged. Semver note moved to ADR-048. Status remains **Partial**. |
+| 2026-07-22 | P1-fix4 (Review) | Owner returned GO for code, two doc/cleanup items: (1) 4 `unsafe { set_var }` blocks introduced by P1-fix3 tests — replaced with `with_isolated_home` helper (no new unsafe). (2) Document status header was still `Planned` — synced to **Review**. Status: **Partial → Review**. Remaining human gate: maintainer real-terminal walkthrough. |
