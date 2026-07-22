@@ -93,6 +93,9 @@ Git state/commit where applicable, and the exact next gate.
 A long-running task is complete only when:
 
 - every required item passed its completion gate;
+- every task item marked Complete names an already-existing implementation/evidence commit in its
+  owner record as `Completion Commit: <SHA>`; a checkpoint or documentation status commit cannot
+  cite itself as the evidence;
 - required tests and runtime evidence passed;
 - backlog, iteration, README, decisions, lessons, and Board owners are synchronized as applicable;
 - deviations and residuals have an explicit owner;

@@ -36,6 +36,12 @@ There is exactly one source of truth for each fact. All other mentions must agre
 - [ ] `README.md` and `README.zh-CN.md` say the same thing (bilingual parity).
 - [ ] Every iteration marked Complete has recorded **runtime** evidence, not only unit tests
       (see `ITERATION-WORKFLOW.md` §3a).
+- [ ] Every iteration, backlog Story, and long-task phase marked Complete records
+      `Completion Commit: <SHA>` in its owner document. The SHA identifies an already-existing
+      implementation/evidence commit, not the documentation-only status commit itself.
+- [ ] A missing, malformed, or unresolved completion SHA keeps the owner at Review, Partial, or
+      Blocked. `docs/BOARD.md` is derived and cannot provide completion evidence on an owner's
+      behalf.
 - [ ] `docs/iterations/README.md` "Current Iterations" table reflects every existing iteration.
 - [ ] Every Active, Review, Planned, and Blocked iteration has a current disposition before new
       backlog work is activated.
@@ -65,5 +71,5 @@ When profile, branch mode, worktree mode, or governance depth may have changed, 
 scripts/assess_project_scale.sh .
 ```
 
-A failing check, a stale status owner, or an unregistered residual gap means documentation is
-**not** in sync — fix before claiming completion.
+A failing check, a stale status owner, a missing completion commit, or an unregistered residual
+gap means documentation is **not** in sync — fix before claiming completion.

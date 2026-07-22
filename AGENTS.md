@@ -88,6 +88,11 @@ These are immutable facts that every change must respect:
   new iteration ID, even when it continues the same product area.
 - Every iteration must name a runnable, testable deliverable and affected user-facing
   documentation. Infrastructure-only exceptions must be explicit and cannot claim user behavior.
+- **Completion evidence is mandatory.** An iteration, backlog Story, or long-task phase may be
+  marked `Complete` only in its owner document and only with a `Completion Commit:` field naming
+  one or more already-existing implementation commit SHA(s). A commit that merely changes status
+  cannot serve as its own evidence. Without a verifiable SHA, use `Review`, `Partial`, or
+  `Blocked`; the Board must mirror, never substitute for, owner evidence.
 
 ### Dependency Discipline
 
@@ -169,7 +174,9 @@ All agents follow this sequence for compile, merge, and release work:
 
 Before ending a session, verify:
 
-1. **Status sync**: Update backlog story status, iteration progress in `docs/iterations/`.
+1. **Status sync**: Update backlog story status, iteration progress in `docs/iterations/`. Before
+   setting any owner to `Complete`, record `Completion Commit: <SHA>` for the already-pushed
+   implementation evidence; otherwise retain a non-complete status.
 2. **Verification evidence**: Did tests pass? Did you run `cargo check --workspace`?
 3. **Residual work**: Record incomplete items in the backlog or iteration notes.
 4. **Lessons / decisions**: For non-obvious problems, failed validation, or user correction, follow

@@ -56,6 +56,12 @@
 - {actual command}: {actual result}
 - Runtime evidence: {binary command/test and observed result}
 
+## Completion Evidence
+
+- Completion Commit: `{already-existing implementation SHA}`
+- Status-only documentation commits must not cite themselves. If implementation or maintainer
+  acceptance is still pending, retain `Review`, `Partial`, or `Blocked` instead of `Complete`.
+
 ## Variance And Residuals
 
 - {difference from baseline, deferred work, blocker, or none}

@@ -94,6 +94,41 @@ shows_evidence() {
   grep -Eiq '```|\b(test|tests|tested|testing|cargo|npm|pnpm|yarn|pytest|gradle|mvn|make|go test|passed|passing|verified|verify|evidence|exit[[:space:]]*0|coverage|benchmark|smoke)\b' "$1"
 }
 
+completion_status_added() {
+  base="$1"
+  file="$2"
+  relative="${file#"$root/"}"
+  {
+    if git -C "$root" ls-files --error-unmatch -- "$relative" >/dev/null 2>&1; then
+      git -C "$root" diff --unified=0 "$base" -- "$file" 2>/dev/null
+    else
+      git diff --no-index --unified=0 /dev/null "$file" 2>/dev/null || true
+    fi
+  } | grep -Eiq '^\+[[:space:]]*(>[[:space:]]*)?Document[[:space:]]+status:[[:space:]]*(Complete|Completed)|^\+[[:space:]]*\*\*Status\*\*:[[:space:]]*(Complete|Completed)|^\+.*\|[[:space:]]*(Complete|Completed)([^[:alnum:]]|$)'
+}
+
+check_completion_commit() {
+  file="$1"
+  relative="${file#"$root/"}"
+  evidence="$(grep -Ei 'Completion Commit(s)?:' "$file" 2>/dev/null || true)"
+  if [ -z "$evidence" ]; then
+    error "completion status change lacks owner completion evidence: $relative (add 'Completion Commit: <existing SHA>')"
+    return
+  fi
+
+  hashes="$(printf '%s\n' "$evidence" | grep -Eo '[0-9a-fA-F]{7,40}' || true)"
+  if [ -z "$hashes" ]; then
+    error "completion status change has no commit SHA in completion evidence: $relative"
+    return
+  fi
+
+  for sha in $hashes; do
+    if ! git -C "$root" rev-parse --verify -q "${sha}^{commit}" >/dev/null; then
+      error "completion evidence references an unknown commit '$sha': $relative"
+    fi
+  done
+}
+
 check_capability_file() {
   capability="$1"
   shift
@@ -185,6 +220,31 @@ if [ -n "$iteration_records" ]; then
     fi
   done <<EOF
 $iteration_records
+EOF
+fi
+
+# Completion must point to a concrete, pre-existing implementation commit. Check working-tree
+# changes during pre-commit validation and, on a clean checkout, the newest commit for CI/replay.
+# Historical records are grandfathered: this gate applies when a completion status is introduced.
+completion_base="HEAD"
+if git -C "$root" diff --quiet HEAD -- 2>/dev/null; then
+  completion_base="$(git -C "$root" rev-parse HEAD^ 2>/dev/null || printf '%s' HEAD)"
+fi
+completion_records=""
+for folder in "$root/docs/iterations" "$root/docs/tasks" "$root/docs/backlog/active"; do
+  if [ -d "$folder" ]; then
+    completion_records="${completion_records}$(find "$folder" -type f -name '*.md' -print)
+"
+  fi
+done
+if [ -n "$completion_records" ]; then
+  while IFS= read -r record; do
+    [ -n "$record" ] || continue
+    if completion_status_added "$completion_base" "$record"; then
+      check_completion_commit "$record"
+    fi
+  done <<EOF
+$completion_records
 EOF
 fi
 

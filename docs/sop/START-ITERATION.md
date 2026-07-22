@@ -73,6 +73,9 @@ Use `docs/iterations/TEMPLATE.md`; do not replace a committed plan with a newer 
 - One active iteration at a time unless explicitly approved.
 - Iteration scope changes require `CHANGE-CONTROL.md`.
 - Record results by appending to the iteration file, not overwriting the plan.
+- Before marking an iteration Complete, first commit and push the implementation/evidence, then
+  append `Completion Commit: <SHA>` to the iteration owner. A status-only commit cannot cite
+  itself. Missing SHA evidence means the iteration remains Review, Partial, or Blocked.
 - Select ready child Stories, not a multi-stage parent Epic with unresolved children.
 - The selected set must produce a runnable, testable deliverable. If it cannot, refine the slice
   or record an explicit infrastructure-only exception.
