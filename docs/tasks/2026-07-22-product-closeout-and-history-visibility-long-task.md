@@ -170,6 +170,25 @@ not permission to change unrelated scopes.
 - Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint and the next owner doc.
 ```
 
+## Checkpoints
+
+### Checkpoint P0 — 2026-07-22
+
+- Completed task items: P0 — successor scope, owner/doc disposition, and phase gates published.
+- Commit pushed: `e7754bc` on `origin/main`.
+- Changed owner artifacts: this task record; the 2026-07-20 program change-control entry; the
+  derived Board row.
+- Commands and exit results:
+  - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
+  - `git diff --check` → exit 0.
+- Acceptance evidence / remaining human gate: P1 is fully mock-testable and may be dispatched;
+  I145/I146/I147/I150-I153 still require the maintainer walkthrough listed below before any
+  Complete status.
+- Open risks or deviations: no GitHub issue is mapped to TUI-034. I154 and I155 remain unstarted.
+- Next task item: P1 — I148 discovery → selection → immediate activation closeout.
+- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then
+  `docs/iterations/I148-model-discovery-manual-fallback-activation.md` and its MODEL-008-B story.
+
 ## Hard Stops
 
 Stop, append the checkpoint, and request maintainer direction when any applies:
