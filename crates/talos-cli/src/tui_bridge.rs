@@ -502,6 +502,67 @@ fn send_bridge_stream(
     let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block { source, text }));
 }
 
+#[cfg(test)]
+mod attachment_authorization_tests {
+    use super::*;
+    use talos_core::ApprovalChoice;
+
+    fn write_png(path: &std::path::Path, width: u32) {
+        image::RgbaImage::new(width, 1)
+            .save_with_format(path, image::ImageFormat::Png)
+            .unwrap();
+    }
+
+    /// P1-A regression: after approval resolves a symlink to its canonical
+    /// target, later changing the user-supplied symlink cannot redirect the
+    /// image ingestion path. The bridge must use the returned canonical path.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn approved_symlink_drift_cannot_redirect_attachment_ingestion() {
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let approved = external.path().join("approved.png");
+        let replacement = external.path().join("replacement.png");
+        write_png(&approved, 2);
+        write_png(&replacement, 9);
+
+        let link = workspace.path().join("selected.png");
+        std::os::unix::fs::symlink(&approved, &link).unwrap();
+        let approved_canonical = approved.canonicalize().unwrap();
+
+        let permission_engine = Some(Arc::new(std::sync::Mutex::new(
+            talos_permission::PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+        )));
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut authorization = Box::pin(authorize_attach_image(
+            &ui_tx,
+            &permission_engine,
+            link.to_str().unwrap(),
+        ));
+
+        let approval = tokio::select! {
+            output = ui_rx.recv() => output.expect("authorization output"),
+            _ = &mut authorization => panic!("external attachment must request approval"),
+        };
+        let UiOutput::ToolApprovalRequest { response, .. } = approval else {
+            panic!("expected attachment approval request");
+        };
+        response.send(ApprovalChoice::ApproveOnce).unwrap();
+        let canonical = authorization.await.expect("approved canonical path");
+        assert_eq!(canonical, approved_canonical);
+
+        std::fs::remove_file(&link).unwrap();
+        std::os::unix::fs::symlink(&replacement, &link).unwrap();
+
+        let part = crate::image_validation::create_image_content_part(&canonical, 0, 0)
+            .expect("authorized canonical target remains readable");
+        let talos_core::message::ContentPart::Image { path, .. } = part else {
+            panic!("expected image content part");
+        };
+        assert_eq!(path, approved_canonical);
+    }
+}
+
 /// Session lifecycle request forwarded from the conversation loop to the mode runner.
 pub(crate) enum SessionLifecycleRequest {
     New(SessionNewRequest),

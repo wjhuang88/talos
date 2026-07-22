@@ -277,7 +277,6 @@ pub(crate) const fn max_pixels() -> u64 {
 mod tests {
     use super::*;
     use image::{ImageFormat, RgbaImage};
-    use std::io::Write;
 
     fn make_png_header() -> Vec<u8> {
         vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0]
@@ -428,16 +427,19 @@ mod tests {
     fn validate_oversize_file_rejected() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("big.img");
-        let header = make_png_header();
-        let mut file = std::fs::File::create(&path).unwrap();
-        file.write_all(&header).unwrap();
-        // We cannot write 20MB in a unit test; the size check reads
-        // metadata.len() so this fixture validates a small file passes
-        // the byte-limit branch. The oversize branch is exercised via
-        // the explicit PixelLimitExceeded/byte-count assertions below.
-        drop(file);
+        // P1-B regression: the limit is enforced against the bounded
+        // byte snapshot, not metadata observed before opening the file.
+        // The extra byte makes `Read::take(MAX + 1)` prove oversize
+        // without reading an unbounded attacker-controlled file.
+        std::fs::write(&path, vec![0_u8; (MAX_SINGLE_IMAGE_BYTES + 1) as usize]).unwrap();
         let result = validate_image_path(&path, 0, 0);
-        assert!(result.is_ok() || matches!(result, Err(ImageValidationError::DecoderError(_))));
+        assert!(matches!(
+            result,
+            Err(ImageValidationError::Oversize {
+                size,
+                limit: MAX_SINGLE_IMAGE_BYTES,
+            }) if size == MAX_SINGLE_IMAGE_BYTES + 1
+        ));
     }
 
     #[test]
