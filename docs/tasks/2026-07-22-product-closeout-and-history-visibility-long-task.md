@@ -35,7 +35,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | I145 / TUI-026 | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1039430`. FIFO preview, `+N more`, queue drain/clear, terminal-growth repaint, and Ctrl+C preview cleanup were retested and accepted. |
 | I146 / TUI-033 | Complete — maintainer slash-prefix retest (2026-07-22) | Completion Commit: `7f6972a`. Tab completes a bare command without execution; Enter opens its direct-command menu; `/mo` shows only `/model`. |
 | I147 / MODEL-008-A | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1c843b2`. Wizard rendering, cursor targeting, and visible protocol choices were retested and accepted. |
-| I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
+| I148 / MODEL-008-B | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `f89313c`. Discovery → selection → immediate activation and post-switch text submission passed. |
 | I150 / MODEL-009-B | Complete — maintainer combined terminal acceptance (2026-07-22) | Completion Commit: `b3cc943`. |
 | I151 / MODEL-009-C | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `17e3fef`. I154 must reuse its proven controls rather than recreate a parallel path. |
 | I152 / MODEL-009-D | Review, code-level security acceptance | The local terminal packet passed except for the maintainer-owned live Anthropic-compatible Provider check, which is unavailable in the current environment. |
@@ -267,7 +267,7 @@ cite this packet only after an already-existing evidence or repair commit is nam
 | Steering queue | **Complete.** During a tool-running turn, FIFO preview and `+N more` were accurate; the preview disappeared after drain and no stale text remained after viewport growth or Ctrl+C. Completion Commit: `1039430`. | I145 |
 | Parameterless menus | **Complete.** Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab completes without execution or trailing space; Enter opens the menu; Escape cancels. `/mo` shows only `/model`. Completion Commit: `7f6972a`. | I146 |
 | Wizard | `/connect` → Add custom provider runs Name → Protocol → Base URL → API key → Confirm; key remains masked, Esc causes no save, and duplicate name shows the explicit update path. | I147 |
-| Discovery and activation | A mock/disposable provider discovers IDs. Select an ID containing `/` or `@`; the provider/model status changes and the current session rebuilds once. Discovery failure retains the old active session and permits manual configuration. | I148 |
+| Discovery and activation | **Complete.** A custom-provider discovery → selection → immediate activation flow and post-switch text submission passed. Failure retains manual configuration fallback. Completion Commit: `f89313c`. | I148 |
 | Capability and attachment | **I150/I151 Complete.** Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/send work; history shows only a safe summary; a text-only turn still works. I152 remains Review only for its live Anthropic-compatible Provider check. | I150, I151, I152 |
 | Provider mapping | With a maintainer-owned disposable configured endpoint, one accepted image produces the expected compatible request or a safe, actionable provider failure; no path/data URL/API key appears in TUI history. | I152, I153 |
 
@@ -282,9 +282,7 @@ The final report must ask the maintainer to execute and record:
 2. I146 is Complete after the `/mo` slash-prefix retest (Completion Commit: `7f6972a`); Tab is
    intentionally non-executing while Enter opens the menu. I147 is Complete after maintainer
    acceptance (Completion Commit: `1c843b2`).
-3. I148: use a disposable/mock provider endpoint; discover, choose a model, verify immediate
-   status/session transition, then verify a discovery failure retains the old session and offers
-   manual entry.
+3. I148 is Complete after maintainer acceptance (Completion Commit: `f89313c`).
 4. I152: a maintainer-owned live Anthropic-compatible Provider check remains. I154 is still
    Planned/Blocked and must not be included in this terminal packet; normal pasted paths remain
    non-readable unless a future explicit tool is authorized.

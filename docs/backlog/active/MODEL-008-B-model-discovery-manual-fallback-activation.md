@@ -5,7 +5,7 @@
 | Story ID | MODEL-008-B |
 | Type | Product / Configuration Story |
 | Priority | P2 |
-| Status | Refinement — selected into I148 (2026-07-20) |
+| Status | Complete — I148 maintainer terminal acceptance (2026-07-22); Completion Commit: `f89313c` |
 | Source | Maintainer requirement recorded 2026-07-20; child of MODEL-008 |
 | Parent Epic | MODEL-008 |
 | Depends on | MODEL-008-A (I147) wizard + atomic config; ADR-013 provider config; ADR-023 credential boundary |

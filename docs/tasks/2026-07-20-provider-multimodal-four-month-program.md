@@ -5,7 +5,7 @@
 | Task ID | 2026-07-20-provider-multimodal-four-month-program |
 | Owner | Senior agent (single executor; no subagent delegation) |
 | Created | 2026-07-20 |
-| Status | In Progress — I146/I147/I150/I151 Complete; I148/I152/I153 Review; I154 Blocked |
+| Status | In Progress — I146/I147/I148/I150/I151 Complete; I152/I153 Review; I154 Blocked |
 | Branch | `main` (direct commits, no feature branches) |
 | SOP | `docs/sop/LONG-RUNNING-TASK.md` |
 | Confirmation | Maintainer confirmation covers the original I146-I153 cycle and the accepted 2026-07-21 MODEL-009-E/I154 scope addition; no per-phase re-confirmation except at hard-stop conditions. |
@@ -628,6 +628,14 @@ On a hard stop:
   capability gate, safe summary, and text-only regressions provide the combined packet context.
 - Completion Commit: `17e3fef` (origin/main). This is the final security-rework implementation
   evidence for canonical authorization, bounded byte snapshots, and digest verification.
+
+### I148 Maintainer Terminal Acceptance — 2026-07-22
+
+- I148 is Complete after the maintainer verified custom-provider discovery, model selection,
+  immediate active-identity/session transition, and a post-switch text submission. The documented
+  failure/manual fallback remains available.
+- Completion Commit: `f89313c` (origin/main), the duplicate provider/model-ID selection repair
+  retested in the real terminal.
 
 ## Related Documents
 

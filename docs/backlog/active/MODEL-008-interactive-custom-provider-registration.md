@@ -5,7 +5,7 @@
 | Story ID | MODEL-008 |
 | Type | Product / Configuration Story (Epic) |
 | Priority | P2 |
-| Status | Refinement — split into child Stories MODEL-008-A (I147) and MODEL-008-B (I148) on 2026-07-20 |
+| Status | Complete — child stories MODEL-008-A/I147 and MODEL-008-B/I148 accepted (2026-07-22); Completion Commit: `1c843b2` / `f89313c` |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | MODEL-005 / MODEL-006 existing `/connect` flow; configuration schema ADR-013; credential boundary ADR-023 |
 | Blocks | — |

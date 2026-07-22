@@ -1,6 +1,6 @@
 # Iteration I148: MODEL-008-B Model Discovery, Manual Fallback, And Immediate Activation
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-07-20
 > Last updated: 2026-07-22 (duplicate model-ID picker repair)
 > Planned objective: let a custom provider call its protocol-specific models
@@ -13,13 +13,12 @@
 > Review evidence: commits 23db287 (P1 tests), 187f13d (P1-fix provider_hint),
 > 4d5f8d7 (P1-fix2 bridge integration), 834400b (P1-fix3 handler integration +
 > ADR-048 semver), and this fix (P1-fix4 unsafe removal + doc status sync).
-> Remaining human gate: maintainer real-terminal walkthrough of discovery →
-> selection → activation → status sync.
+> Completion Commit: `f89313c` (real-terminal selection repair and retest).
 
 ## Published Baseline
 
 - Selected Ready story: MODEL-008-B, under ADR-013 (provider config) and ADR-023 (credential boundary).
-- Dependencies satisfied: MODEL-008-A (I147, Review — wizard + atomic config).
+- Dependencies satisfied: MODEL-008-A (I147, Complete — wizard + atomic config).
 - Protocol-specific discovery:
   - `openai-chat`: derive `GET /models` from the normalized gateway root using existing endpoint rules; use adapter-compatible `Authorization: Bearer <key>` header; do not generate duplicate `/chat/completions`.
   - `anthropic-messages`: use only the documented models-list endpoint and required headers; do not guess paths; do not cross-host fallback.
@@ -87,3 +86,4 @@
 | 2026-07-22 | P1-fix3 (NO-GO) | Owner returned NO-GO: (1) tests still didn't go through `handle_session_model`; (2) semver note in wrong ADR. Fixes: 2 real handler integration tests (`p1fix3_handle_session_model_success_rebuilds_once`, `p1fix3_handle_session_model_failure_no_rebuild`) proving bridge_rx_update exactly once on success, zero on failure, old config/session unchanged. Semver note moved to ADR-048. Status remains **Partial**. |
 | 2026-07-22 | P1-fix4 (Review) | Owner returned GO for code, two doc/cleanup items: (1) 4 `unsafe { set_var }` blocks introduced by P1-fix3 tests — replaced with `with_isolated_home` helper (no new unsafe). (2) Document status header was still `Planned` — synced to **Review**. Status: **Partial → Review**. Remaining human gate: maintainer real-terminal walkthrough. |
 | 2026-07-22 | Terminal-found repair | Maintainer selected the catalogued duplicate `zai-coding-plan/glm-5v-turbo`; the picker had encoded its `model_id` as `zai-coding-plan/glm-5v-turbo` and the structured lifecycle then added `provider_hint` again, producing a double prefix and a false unknown-model error. Picker and Recent entries now retain the opaque provider-side model ID while carrying Provider only in the separate structured field. A regression selects an actual duplicate picker entry and resolves it through the same `provider/model_id` lifecycle representation. Status remains **Review**; this repair itself requires the maintainer to retest the reported selection. |
+| 2026-07-22 | Terminal acceptance | Maintainer verified the custom-provider discovery → model selection → immediate activation flow, including normal text submission after activation. The failure/manual-fallback behavior was also confirmed available. I148 is **Complete**. Completion Commit: `f89313c`. |
