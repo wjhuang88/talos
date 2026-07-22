@@ -333,18 +333,13 @@ async fn submit_session_message(
     sq_tx.send(op).await.map_err(|_| ())
 }
 
-/// Escapes a basename for display in a Markdown-rendered system message.
+/// Preserves a basename in a Markdown-rendered system message.
 ///
 /// The filename remains only a UI summary, but it must not be interpreted as
-/// formatting (for example, underscores must remain visible).
+/// formatting (for example, underscores must remain visible). The zero-width
+/// separator is display-only and never reaches the path or provider payload.
 fn escape_markdown_filename(filename: &str) -> String {
-    filename
-        .replace('\\', "\\\\")
-        .replace('_', "\\_")
-        .replace('*', "\\*")
-        .replace('`', "\\`")
-        .replace('[', "\\[")
-        .replace(']', "\\]")
+    filename.replace('_', "_\u{200B}")
 }
 
 /// P1-A: evaluates an image attachment path against the SEC-001
@@ -539,7 +534,7 @@ mod attachment_authorization_tests {
     fn attachment_filename_escapes_markdown_without_changing_visible_text() {
         assert_eq!(
             escape_markdown_filename("ScreenShot_2026-07-22_140448_800.png"),
-            "ScreenShot\\_2026-07-22\\_140448\\_800.png"
+            "ScreenShot_\u{200B}2026-07-22_\u{200B}140448_\u{200B}800.png"
         );
     }
 
