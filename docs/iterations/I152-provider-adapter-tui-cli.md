@@ -29,6 +29,7 @@
 | 2026-07-22 | Terminal acceptance | Maintainer rebuilt and verified that the fenced attachment filename renders as expected. Implementation and regression evidence: commit `65eb108`. I152 remains **Review** because this accepts only the filename-display repair, not the remaining terminal packet. |
 | 2026-07-22 | Terminal acceptance | Maintainer verified the Unsupported/Unknown image-capability gate rejects `/attach` before authorization, filesystem access, or pending-attachment mutation. This accepts the fail-closed gate portion of the terminal packet; I152 remains **Review** pending detach, text-only, and configured-provider checks. |
 | 2026-07-22 | Terminal acceptance | Maintainer verified `/detach 1` removes a pending attachment, `/attachments` then reports an empty list, and the status-bar attachment count clears. I152 remains **Review** pending text-only and configured-provider checks. |
+| 2026-07-22 | Terminal acceptance | Maintainer verified a text-only turn after attachment operations sends and renders normally, with no image summary and no attachment count left in the status bar. I152 remains **Review** pending the maintainer-owned live Anthropic-compatible provider check. |
 
 ## Validation
 
