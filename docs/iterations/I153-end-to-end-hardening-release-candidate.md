@@ -20,6 +20,7 @@
 | 2026-07-20 | Safety review | catch_unwind at every file-read boundary in provider adapters. No new unsafe blocks. No new native/C dependencies beyond base64 (pure Rust). |
 | 2026-07-21 | Change control | Maintainer added agent-mediated image inspection. It is a new MODEL-009-E / I154 objective, not an I152 correction; I153's published release-candidate baseline is unchanged. |
 | 2026-07-22 | Post-baseline hardening | I151/I152 received capability fail-closed gating, SEC-001 exact-path authorization, decoder/pixel validation, canonical-path plus digest revalidation, attachment list/detach UX, print-mode `--attach`, and safe multimodal scrollback. Evidence commits: `52068ee`, `6b04c12`, `5edd8b9`, `17e3fef`. These repairs are included in the combined terminal packet; no release action is implied. |
+| 2026-07-22 | Evidence refresh | On `main` at `6ec5bbc`, reran the locked format, workspace check, Clippy `-D warnings`, workspace test, governance, and diff-cleanliness ladder successfully. I153 remains **Review**: the maintainer-owned live Anthropic-compatible Provider mapping check is unavailable in the current environment, and no release action is authorized. |
 
 ## Validation Results (I153 Final Ladder)
 
