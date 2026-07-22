@@ -642,8 +642,15 @@ impl BottomPanelState {
                     other_matches.push(i);
                 }
             }
-            prefix_matches.extend(other_matches);
-            return prefix_matches;
+            // Slash input is primarily command completion. Once the user has
+            // typed a command-name prefix, description matches must not crowd
+            // out that exact intent (for example `/mo` must not show commands
+            // whose prose happens to contain "model" or "remove").
+            return if prefix_matches.is_empty() {
+                other_matches
+            } else {
+                prefix_matches
+            };
         }
 
         let mut result = Vec::new();

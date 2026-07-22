@@ -1,6 +1,6 @@
 # Iteration I146: TUI-033 Parameterless Model And Provider Commands
 
-> Document status: Complete (maintainer terminal acceptance 2026-07-22)
+> Document status: Review (slash-prefix filtering repair awaiting maintainer retest)
 > Published plan date: 2026-07-20
 > Activated: 2026-07-20 (after P0 governance commit `6cd1c54` + checkpoint `abc89b4` pushed to origin/main)
 > Status changed to Review: 2026-07-20 (implementation + locked validation complete; real-terminal walkthrough pending maintainer acceptance)
@@ -153,6 +153,7 @@
 | 2026-07-20 | Validation | All locked validation passes (see Actual Validation Results below). Real-terminal walkthrough remains pending maintainer acceptance — **not Complete**. |
 | 2026-07-22 | Acceptance repair | Real-terminal feedback found that entering `/model <text>` or `/connect <text>` while the slash menu was open left the text in menu filtering, so it could become an unregistered message instead of reaching the bridge correction. The TUI now closes only that direct-command menu on its first argument separator while preserving the full composer text. Regressions cover typed `/model gpt-4o` and pasted `/connect openai`. |
 | 2026-07-22 | Change control and maintainer terminal acceptance | **In-scope correction:** the published phrase “slash-panel completion ... execute/open” was ambiguous about Tab. The maintainer confirmed the implemented, tested contract is preferable: **Tab completes `/model` or `/connect` into the composer without a trailing space and does not execute; Enter executes the direct command and opens the menu.** This changes no objective, API, crate boundary, or test target. The maintainer then passed all remaining real-terminal checks: bare and parameterized commands, side-effect-free correction, menu search/cancel, structured selection, and exact model IDs. I146 is Complete. |
+| 2026-07-22 | Terminal-found repair | Maintainer observed that `/mo` showed `/model` plus `/attach` and `/detach` because the slash filter appended prose-description matches after command-name prefix matches. The filter now gives command-name prefixes exclusive precedence, falling back to name/description search only when no prefix exists. Typed and pasted `/mo` regressions assert that only `/model` is visible. Status returns to **Review** until the maintainer retests this exact behavior. |
 
 ## Actual Validation Results (2026-07-20)
 

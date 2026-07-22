@@ -5,7 +5,7 @@
 | Story ID | TUI-033 |
 | Type | Product / Interaction Story |
 | Priority | P2 |
-| Status | Complete — I146 maintainer terminal acceptance (2026-07-22) |
+| Status | Review — slash-prefix filtering repair awaiting maintainer retest (2026-07-22) |
 | Source | Maintainer requirement recorded 2026-07-20 |
 | Depends on | MODEL-007 picker; MODEL-008 custom-provider flow; TUI-010 slash panel |
 | Blocks | — |

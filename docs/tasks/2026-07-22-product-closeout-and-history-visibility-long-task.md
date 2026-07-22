@@ -33,7 +33,7 @@ crates.io publish, Pages deployment, real provider credential, or paid API call 
 | Owner | Current state | Disposition in this task |
 |---|---|---|
 | I145 / TUI-026 | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1039430`. FIFO preview, `+N more`, queue drain/clear, terminal-growth repaint, and Ctrl+C preview cleanup were retested and accepted. |
-| I146 / TUI-033 | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `0ef2f68`. Tab completes a bare command without execution; Enter opens its direct-command menu. All other guided checks passed. |
+| I146 / TUI-033 | Review — slash-prefix filtering repair awaiting maintainer retest (2026-07-22) | Prior Completion Commit: `0ef2f68`. Tab completes a bare command without execution; Enter opens its direct-command menu. `/mo` must now show only `/model`; terminal retest is pending. |
 | I147 / MODEL-008-A | Complete — maintainer terminal acceptance (2026-07-22) | Completion Commit: `1c843b2`. Wizard rendering, cursor targeting, and visible protocol choices were retested and accepted. |
 | I148 / MODEL-008-B | Review | P1 code closure is complete; only the maintainer terminal walkthrough remains. |
 | I150 / MODEL-009-B | Review | Preserve status; run regressions when affected by I154. |
@@ -264,7 +264,7 @@ cite this packet only after an already-existing evidence or repair commit is nam
 | Case | Expected observable result | Owner(s) |
 |---|---|---|
 | Steering queue | **Complete.** During a tool-running turn, FIFO preview and `+N more` were accurate; the preview disappeared after drain and no stale text remained after viewport growth or Ctrl+C. Completion Commit: `1039430`. | I145 |
-| Parameterless menus | **Complete.** Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab completes without execution or trailing space; Enter opens the menu; Escape cancels. Completion Commit: `0ef2f68`. | I146 |
+| Parameterless menus | **Review.** Bare `/model` and `/connect` open their menus. Argument-bearing forms show a correction and do not mutate config/session. Tab completes without execution or trailing space; Enter opens the menu; Escape cancels. `/mo` must show only `/model`; this focused terminal retest remains pending. Prior Completion Commit: `0ef2f68`. | I146 |
 | Wizard | `/connect` → Add custom provider runs Name → Protocol → Base URL → API key → Confirm; key remains masked, Esc causes no save, and duplicate name shows the explicit update path. | I147 |
 | Discovery and activation | A mock/disposable provider discovers IDs. Select an ID containing `/` or `@`; the provider/model status changes and the current session rebuilds once. Discovery failure retains the old active session and permits manual configuration. | I148 |
 | Capability and attachment | Unsupported and Unknown models reject `/attach` before file access. A Supported model accepts a valid local PNG/JPEG/GIF/WebP; an invalid image is rejected. External path asks for exact-path approval; list/detach/cancel work; history shows only a safe summary; a text-only turn still works. | I150, I151, I152 |
@@ -278,8 +278,8 @@ iteration.
 The final report must ask the maintainer to execute and record:
 
 1. I145 is Complete after maintainer acceptance (Completion Commit: `1039430`).
-2. I146 is Complete after maintainer acceptance (Completion Commit: `0ef2f68`); Tab is
-   intentionally non-executing while Enter opens the menu. I147 is Complete after maintainer
+2. I146 is Review pending `/mo` slash-prefix retest; Tab is intentionally non-executing while
+   Enter opens the menu. I147 is Complete after maintainer
    acceptance (Completion Commit: `1c843b2`).
 3. I148: use a disposable/mock provider endpoint; discover, choose a model, verify immediate
    status/session transition, then verify a discovery failure retains the old session and offers

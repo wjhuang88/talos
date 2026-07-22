@@ -711,7 +711,7 @@ mod tests {
             .into_iter()
             .map(|item| item.label.as_str())
             .collect();
-        assert_eq!(visible.first(), Some(&"/model"));
+        assert_eq!(visible, vec!["/model"]);
 
         // TUI-033: /model is now DirectExecution (no arg_hint) — Enter opens
         // the picker directly by sending the bare command, not by filling the
@@ -738,7 +738,7 @@ mod tests {
             .into_iter()
             .map(|item| item.label.as_str())
             .collect();
-        assert_eq!(visible.first(), Some(&"/model"));
+        assert_eq!(visible, vec!["/model"]);
 
         // TUI-033: /model is DirectExecution — Enter sends bare "/model".
         let action = state.accept_selected_panel_item();
