@@ -14,6 +14,7 @@ pub mod file_tools;
 pub mod git;
 pub mod http_request;
 pub mod image_validation;
+pub mod read_image_tool;
 pub mod save_url;
 pub mod search_engine;
 pub mod search_tools;
