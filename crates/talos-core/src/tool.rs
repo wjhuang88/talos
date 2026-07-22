@@ -128,6 +128,54 @@ pub struct ToolResult {
     pub continuations: Vec<ToolContinuation>,
 }
 
+/// Output of an authorized tool execution that may carry a
+/// provider-neutral continuation artifact (ADR-051).
+///
+/// Most tools produce only the normal [`ToolResult`]. A tool like
+/// `read_image` additionally returns `next_provider_parts` — a
+/// `Vec<ContentPart>` that the agent delivers to the immediately
+/// following provider request exactly once and then discards.
+///
+/// The continuation artifact is **never** persisted in the session
+/// transcript, TLOG, UI, hooks, exports, or compaction. It exists
+/// solely for the next `stream_with_tools` call.
+#[derive(Debug, Clone)]
+pub struct ToolExecutionOutput {
+    /// The normal textual tool result (same as `ToolResult`).
+    pub result: ToolResult,
+    /// Provider-neutral content parts to carry to the next provider
+    /// request. Empty for all existing tools.
+    pub next_provider_parts: Vec<crate::message::ContentPart>,
+}
+
+impl ToolExecutionOutput {
+    /// Creates an output with a successful text result and no
+    /// continuation parts.
+    pub fn success(content: impl Into<String>) -> Self {
+        Self {
+            result: ToolResult::success(content),
+            next_provider_parts: Vec::new(),
+        }
+    }
+
+    /// Creates an output with an error text result and no continuation
+    /// parts.
+    pub fn error(content: impl Into<String>) -> Self {
+        Self {
+            result: ToolResult::error(content),
+            next_provider_parts: Vec::new(),
+        }
+    }
+
+    /// Wraps an existing [`ToolResult`] with no continuation parts.
+    pub fn from_result(result: ToolResult) -> Self {
+        Self {
+            result,
+            next_provider_parts: Vec::new(),
+        }
+    }
+}
+
 /// Model, display, and persistence views of one tool result.
 ///
 /// Most tools use the same content for all three views. Tools that return
@@ -671,6 +719,24 @@ pub trait AgentTool: Send + Sync {
         _authorizations: &[ToolExecutionAuthorization],
     ) -> ToolResult {
         self.execute(input).await
+    }
+
+    /// Executes with concrete authorizations and returns an output that
+    /// may carry a provider-neutral continuation artifact (ADR-051).
+    ///
+    /// The default implementation delegates to [`execute_authorized`]
+    /// and returns the result with no continuation parts. Tools that
+    /// produce one-shot provider artifacts (e.g. `read_image`) override
+    /// this method.
+    ///
+    /// Permission wrappers MUST forward this method after obtaining the
+    /// same authorizations they would use for [`execute_authorized`].
+    async fn execute_authorized_with_output(
+        &self,
+        input: Value,
+        authorizations: &[ToolExecutionAuthorization],
+    ) -> ToolExecutionOutput {
+        ToolExecutionOutput::from_result(self.execute_authorized(input, authorizations).await)
     }
 
     /// Returns the observer-safe form of a tool input.

@@ -277,7 +277,10 @@ impl AgentTool for TuiPermissionAwareTool {
                         ));
                     }
                 };
-                self.inner.execute_authorized(input, &authorizations).await
+                self.inner
+                    .execute_authorized_with_output(input, &authorizations)
+                    .await
+                    .result
             }
             ApprovalChoice::AlwaysApprove => {
                 self.approval
@@ -295,7 +298,10 @@ impl AgentTool for TuiPermissionAwareTool {
                         ));
                     }
                 };
-                self.inner.execute_authorized(input, &authorizations).await
+                self.inner
+                    .execute_authorized_with_output(input, &authorizations)
+                    .await
+                    .result
             }
             ApprovalChoice::Deny => ToolResult::error("Permission denied: User denied".to_string()),
         }
@@ -428,7 +434,10 @@ impl AgentTool for PermissionAwareTool {
                         }
                     }
                 };
-                self.inner.execute_authorized(input, &authorizations).await
+                self.inner
+                    .execute_authorized_with_output(input, &authorizations)
+                    .await
+                    .result
             }
             PermissionDecision::Deny(reason) => {
                 ToolResult::error(format!("Permission denied: {reason}"))
