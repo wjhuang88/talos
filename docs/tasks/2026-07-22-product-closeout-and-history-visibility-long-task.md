@@ -189,6 +189,32 @@ not permission to change unrelated scopes.
 - Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then
   `docs/iterations/I148-model-discovery-manual-fallback-activation.md` and its MODEL-008-B story.
 
+### Checkpoint P1 — 2026-07-22
+
+- Completed task items: P1 — I148 discovery → selection → immediate activation closeout.
+- Commit pushed: `23db287` on `origin/main` (code+tests); docs commit pending.
+- Changed owner artifacts: I148 iteration doc (execution record appended, status → Review);
+  iterations README (I148 row → Review); BOARD (program row updated).
+- Commands and exit results:
+  - `cargo fmt --all -- --check` → exit 0.
+  - `cargo check --workspace --locked` → exit 0.
+  - `cargo clippy --workspace --locked -- -D warnings` → exit 0.
+  - `cargo test --workspace --locked` → exit 0, 0 failures.
+  - `scripts/validate_project_governance.sh .` → exit 0, 0 warnings.
+  - `git diff --check` → exit 0.
+- Acceptance evidence / remaining human gate: 7 new P1 tests prove the closed loop at the data
+  level (discovery → all_models visibility → structured identity → activation). The code path
+  (handle_register_custom_provider → atomic Config::save → /model picker → UserInput::SwitchModel
+  → SessionLifecycleRequest::ModelSwitch → handle_session_model → session rebuild) was already
+  implemented in the R9 rework; these tests add missing coverage. Real-terminal walkthrough of
+  the discovery → selection → activation flow remains a human gate for I148 Review → Complete.
+- Open risks or deviations: no code changes were needed — the R9 rework already implemented the
+  closed loop. This commit is test-only. No GitHub issue is mapped to MODEL-008-B.
+- Next task item: P2 — I153 evidence refresh and I154 activation decision. Must not start without
+  maintainer instruction.
+- Resume: `git switch main && git pull --ff-only origin main`; read this checkpoint, then the
+  P2 task description in this file.
+
 ## Hard Stops
 
 Stop, append the checkpoint, and request maintainer direction when any applies:
