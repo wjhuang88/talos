@@ -23,6 +23,7 @@
 | 2026-07-20 | Tests | 3 wire mapping fixture tests: OpenAI image_url data URL shape, OpenAI text-only array, Anthropic image base64 source shape. |
 | 2026-07-21 | Security rework | Added capability fail-closed gating, SEC-001/ADR-047 attachment authorization, real decode and pixel limit, content-digest verification at provider read, `/attachments`/`/detach`, print-mode `--attach`, and safe multimodal scrollback summaries. |
 | 2026-07-22 | Owner acceptance | P1-A/P1-B code paths accepted after canonical-path authorization and bounded byte-snapshot remediation. Commit `17e3fef` adds regressions for approved-symlink drift and actual-snapshot oversize rejection. Real-terminal evidence remains required before Complete. |
+| 2026-07-22 | Terminal-found repair | Maintainer attached an authorized external PNG and verified `/attachments`, but the status bar omitted its pending attachment count. The engine already emitted `StatusSnapshot.attachment_count`; `build_status_text` had not rendered it. The status metrics now show `N image(s)` only for nonzero pending attachments, with wide and narrow rendering regressions. Status remains **Review** pending the rest of the real-terminal packet. |
 
 ## Validation
 

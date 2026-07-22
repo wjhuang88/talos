@@ -85,6 +85,16 @@ pub(crate) fn build_status_text(
     };
 
     let metrics_part = if narrow {
+        let attachments = if status.attachment_count > 0 {
+            let suffix = if status.attachment_count == 1 {
+                ""
+            } else {
+                "s"
+            };
+            format!(" · {} image{suffix}", status.attachment_count)
+        } else {
+            String::new()
+        };
         let q = if queue_total > 0 {
             format!(" · ⬡ {queue_total} queued")
         } else {
@@ -94,7 +104,7 @@ pub(crate) fn build_status_text(
             .as_deref()
             .map(|l| format!(" · {l}"))
             .unwrap_or_default();
-        format!("{output_usage_label}{q}{p}")
+        format!("{output_usage_label}{attachments}{q}{p}")
     } else {
         String::new()
     };

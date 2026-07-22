@@ -433,6 +433,28 @@ mod tests {
     }
 
     #[test]
+    fn test_status_bar_shows_pending_attachment_count_when_nonzero() {
+        let status = StatusSnapshot {
+            model_name: "test".to_string(),
+            provider: String::new(),
+            workspace_path: String::new(),
+            attachment_count: 2,
+            ..Default::default()
+        };
+
+        let wide = format!("{:?}", build_status_text(&status, 120));
+        let narrow = format!("{:?}", build_status_text(&status, 60));
+        assert!(wide.contains("2 images"));
+        assert!(narrow.contains("2 images"));
+
+        let empty = StatusSnapshot {
+            attachment_count: 0,
+            ..status
+        };
+        assert!(!format!("{:?}", build_status_text(&empty, 120)).contains("image"));
+    }
+
+    #[test]
     fn test_multiline_input_uses_prompt_only_on_first_line() {
         let mut state = TuiState::new();
         state.input_append_str("first\nsecond");
