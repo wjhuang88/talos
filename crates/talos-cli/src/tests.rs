@@ -2009,9 +2009,10 @@ mod steering_snapshot_tests {
         png.save_with_format(&img_path, image::ImageFormat::Png)
             .unwrap();
 
-        let mut engine =
+        // Deliberately leave the engine at its fail-closed default. The bridge
+        // must apply the initial watch value before processing `/attach`.
+        let engine =
             ConversationEngine::new("vision-model".to_string(), "test-provider".to_string());
-        engine.image_input_capability = ImageInputCapability::Supported;
         assert!(engine.pending_image_attachments.is_empty());
 
         let (_agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();

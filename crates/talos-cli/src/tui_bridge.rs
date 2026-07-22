@@ -47,6 +47,12 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
         permission_engine,
     } = io;
 
+    // A watch receiver exposes its initial value without emitting `changed()`.
+    // Apply it before entering the loop so a freshly started TUI has the same
+    // model capabilities as a model selected later during the session.
+    engine.set_model_info(&model_info_watch.borrow().clone());
+    let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+
     loop {
         tokio::select! {
             changed = model_info_watch.changed() => {
